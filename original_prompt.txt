@@ -1,0 +1,103 @@
+I want you to build three applications, a desktop app, an iOS app, and a watchOS application that should be Like Apple notes as much as practical.
+
+The things that follow are in no particular order, so you may regroup them in whatever way makes sense to you in working out the implementation plan.
+
+Support multiplayer mode primarily as a single real user, just across devices, so sync latency can be seconds and that’s fine. but there can be cases where multiple different humans could interact at the same time.
+
+For Syncing between applications instances only require a shared file area like Dropbox Google Drive iCloud or whatever shared file system folder you have. There can be multiple sync folders. For example, to share notes with others or to segregate notes between work and personal. Each sync point should have a name that shows in the app.
+
+Make it work offline and behave normally excepting the multiplayer functionality obviously won’t work while offline, but have it resume as soon as connectivity is restored.
+
+Inter note links via `>>note title` without the backticks and note title would be the title of the note to link to — which when >> is typed would pop up a simple search to select a note or offer to create a new one with that title.
+
+Add the ability to have Todo items in a note but the whole note doesn’t need to be a todo list.
+
+Provide for the ability to Organize notes by tags that look like #tagname that will appear in the note, but also provide for a folder structure for notes that the user cans set up how they like.
+
+Search notes by words, tags, etc. Also negative search able to be mixed with positive search.
+
+Users can search within a given note case insensitive, case sensitive, or Regex.
+
+Provide for the ability to Embed maps and images and maybe instagram or twitter unfurls - let me know if there are practical issues that might make me reconsider these or suggest other unfurls. For map unfurls, they can be static images for the map itself.
+
+For mobile app, be able to be shared to with unfurls
+
+Desktop is probably an electron app but native macOS would be fine also.
+
+Provide for the ability to pop open a note in a new window by double clicking on the note in the tree view or search results.
+
+Provide for the ability to attach arbitrary files to a note
+
+Provide the ability to Export to a tree of markdown documents and their attachments. Consider using this as your local storage native format, but you may suggest alternatives.
+
+Support tables and images in notes.
+
+Integrate with macOS shortcuts. For example, it create a new note, it could add a checklist item to a note and everything that shortcuts can do with the Apple notes app.
+
+Support a url notation so can link from calendar or other apps to a specific note, but just for myself not others. For them some kind of sharing function that would copy the note contents  
+
+Require no server out on the internet. The only communication between instances of the app are via the sync via remote filesystem.
+
+Would want either crdt or operational transform for multiplayer abilities. Loro could be a library for crdt. TipTap could be the base of the editor. But you may suggest alternatives.
+
+As a later addition, in the desktop app, provide a simple scripting and extension interface to be able to access the notes storage for query and update. Also some form of note DOM interface would be good here. For example a way to find notes with uncompleted checklist items and are tagged with a selection of tags.
+
+Checklist items should have three states, undone, done and nope (for didn’t do/won’t do. Other todo states could be added and available in the ui by right clicking on the checkbox. Make it possible to distinguish done versus nope in the state of the checkbox. Provide the ability to hide completed todos and a simple way to reorder them.
+
+Support note templates where it can put up an input form for fields in the note surrounded by {{ and }}. Handlebar templates is what I have in mind, but open to others.
+
+Links to local files should open the appropriate application to view them. For example, a pdf should open with the default pdf preview. Right clicking (or long pressing on a mobile device) on a link should pop up a menu that includes the usual sorts of things, but especially include “open with” that would give choices of apps that are known by os to be able to open such files.
+
+Ensure that no two not-deleted notes  have the same title. Notes in the trash can have non-unique names. If a duplicate is attempted, append a (<number>) where <number> is the lowest positive integer greater than zero which would make it unique. But don’t append this until after the focus has left where the title is edited. For example, if the title is the first text line in the editor, don’t append the parenthesis-number bit until the cursor has moved off the first line, or until they click the save icon.
+
+When notes are deleted, they go to the trash. Trashed notes still appear in search. Provide an ability to empty the trash as well as permanently delete individual notes in the trash.
+
+If a note title is changed, If there are links to that note from other notes, make sure those links are updated to point at its new location.
+
+For debugging, have a log of what the app is doing as far as note mutations are concerned.
+
+Please ask clarifying questions. I want you to produce an implementation plan which will then be used to generate code over some number of reasonably sized and organized git commits as I want you to grow it from mvp to fully featured, incrementally so we can make adjustments along the way or reorder feature additions. Commits should line up with feature additions. So when proceeding, stop between commits. I might not be right here with respect to commit strategy, so I’m open to suggestions.
+
+Don’t start generating code until I say so, so I can make sure the implementation plan is what I want, which includes what would be in which commits and the feature additions and sequence.
+
+Code should look as if a staff software engineer produced it. Ensure the app has in app help and online help via its website. The overall app and website should look professional.
+
+Don’t use regular expressions for things where there’s a library that deals with what you’re trying to do. For example use a url parsing library rather than implement it yourself. Or where you need to parse the native format of the notes, if there’s a library which can do that, don’t reimplement it. If for some reason you think you need to do regular expressions for that, please explain the situation and I’ll figure out what to do.
+
+Build a static website as part of the source tree that we can serve up via GitHub pages. It should include screenshots where appropriate. The main sections would include: installation and getting started, some ways to use the app, reference, and troubleshooting. As features are added, update the documentation.
+
+Produce a README in the repository covering how to build and test locally, as well as referring to the website you’ll make. 
+
+The website will be hosted at https://notecove.github.io, and the git repository will be hosted at https://github.com/drewcsillag/notecove.
+
+Create a few logo options that makes sense given the app name and use it consistently for the apps and website.
+
+I’m starting you in a totally empty directory, so you’ll need to initialize the git repository from scratch. Install the gh tool if it’s not already accessible, and use it for GitHub operation you may require.
+
+Build an iOS app built with the same feature set and incrementally. Features should arrive in the iOS and desktop versions at the same time as far as git commits are concerned. Have all versions of the app live in the same git repository as the desktop version. Likewise build a limited feature set version for watchOS that’s read only. You may know of or encounter other limitations for watchOS that you shall advise me of in the plan.
+
+Make sure to have adequate automated testing throughout, including unit tests and for “browser” testing, playwright tests if you go the electron route, as well as consider what other kinds of tests would be appropriate for e2e testing of the apps. We should have tests covering whatever functionality we have starting from the very beginning.
+
+License for the project will be the Apache v2 license.
+
+Create a feature to be able to show the changes between any two “versions” of the same note, where it would be broken down by time spans, where it might start with a day or an hour or whatever is appropriate and then be able to drill down. It should do it roughly like the way Google Docs doc history works.
+
+Todos can have a date attached which is a due date. Not sure,
+But suggest apple calendar integration options.
+
+How difficult would it be to have linked / entangled todos where editing one is synchronized to the other which would include the text from the checkbox to end of the line as well as checkbox state.
+
+Support printing notes. Configurable margins, page numbers, headers and footers.
+
+Font family for text in the editor should be AtlasGrotesk falling back to roboto then to sans-serif.
+
+Suggest to me ideas about notes being read only by default until an edit Button is clicked or some other form of intent to edit is expressed.
+
+Let me know how plausible it would be to have An advanced feature for sync between devices that are Bluetooth paired but not connected to the internet and so cannot sync the regular way. If we do Bluetooth, it would only be on apple devices (ios, Macos, big maybe on watchos).
+
+There’s a lot here, critique the plan and feature set in addition to everything else I asked.
+
+So to sum up:
+Provide me your understanding of the above, an implementation plan, and ask any questions you will need answers for to clarify what you need for your understanding and the plan. The plan should be written to a file named plan.txt and any updates on the plan should be written there. I may edit the plan myself, so when you’re going to do something with the plan, make sure to reread it from disk before proceeding.
+
+You may critique my requirements, and definitely critique your own plan. You may also offer suggestions as to other features or functionality you think it should include.

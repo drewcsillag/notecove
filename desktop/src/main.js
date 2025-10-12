@@ -206,6 +206,16 @@ class NoteCoveApp {
       }
     });
 
+    // Delete file
+    ipcMain.handle('fs:delete-file', async (event, filePath) => {
+      try {
+        await fs.unlink(filePath);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
     // Dialog operations
     ipcMain.handle('dialog:show-open', async (event, options) => {
       const result = await dialog.showOpenDialog(this.mainWindow, options);
@@ -214,6 +224,11 @@ class NoteCoveApp {
 
     ipcMain.handle('dialog:show-save', async (event, options) => {
       const result = await dialog.showSaveDialog(this.mainWindow, options);
+      return result;
+    });
+
+    ipcMain.handle('dialog:show-message-box', async (event, options) => {
+      const result = await dialog.showMessageBox(this.mainWindow, options);
       return result;
     });
   }

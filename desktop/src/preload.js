@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exists: (path) => ipcRenderer.invoke('fs:exists', path),
     readDir: (path) => ipcRenderer.invoke('fs:read-dir', path),
     mkdir: (path) => ipcRenderer.invoke('fs:mkdir', path),
+    deleteFile: (path) => ipcRenderer.invoke('fs:delete-file', path),
     watch: (path, callback) => {
       const id = Math.random().toString(36);
       ipcRenderer.on(`fs:watch:${id}`, callback);
@@ -34,7 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Dialog operations
   dialog: {
     showOpen: (options) => ipcRenderer.invoke('dialog:show-open', options),
-    showSave: (options) => ipcRenderer.invoke('dialog:show-save', options)
+    showSave: (options) => ipcRenderer.invoke('dialog:show-save', options),
+    showMessageBox: (options) => ipcRenderer.invoke('dialog:show-message-box', options)
   },
 
   // App info

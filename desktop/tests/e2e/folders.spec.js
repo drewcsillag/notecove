@@ -2,7 +2,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Folder Operations', () => {
   test.beforeEach(async ({ page }) => {
+    // Clear localStorage before each test to ensure clean state
     await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
   });
 
   test('should display folder section in sidebar', async ({ page }) => {

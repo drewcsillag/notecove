@@ -1,9 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('NoteCove Basic Functionality', () => {
-  test('should load the application', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    // Clear localStorage before each test to ensure clean state
     await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+  });
 
+  test('should load the application', async ({ page }) => {
     // Check that the app loads
     await expect(page.locator('#app')).toBeVisible();
 
@@ -12,8 +17,6 @@ test.describe('NoteCove Basic Functionality', () => {
   });
 
   test('should show welcome state when no notes exist', async ({ page }) => {
-    await page.goto('/');
-
     // Should show welcome state
     await expect(page.locator('#welcomeState')).toBeVisible();
     await expect(page.locator('.welcome-title')).toContainText('Welcome to NoteCove');
@@ -23,8 +26,6 @@ test.describe('NoteCove Basic Functionality', () => {
   });
 
   test('should create a new note', async ({ page }) => {
-    await page.goto('/');
-
     // Click create note button
     await page.locator('.new-note-btn').click();
 
@@ -37,8 +38,6 @@ test.describe('NoteCove Basic Functionality', () => {
   });
 
   test('should type in note and derive title from first line', async ({ page }) => {
-    await page.goto('/');
-
     // Create new note
     await page.locator('.new-note-btn').click();
 
@@ -54,8 +53,6 @@ test.describe('NoteCove Basic Functionality', () => {
   });
 
   test('should search notes', async ({ page }) => {
-    await page.goto('/');
-
     // Search input should be visible
     await expect(page.locator('.search-input')).toBeVisible();
 

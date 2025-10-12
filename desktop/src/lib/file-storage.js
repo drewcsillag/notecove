@@ -1,4 +1,4 @@
-import { validateNote, sanitizeFilename } from './utils.js';
+import { validateNote } from './utils.js';
 
 /**
  * File-based storage manager for NoteCove
@@ -79,8 +79,8 @@ export class FileStorage {
   getNoteFilePath(note) {
     if (!this.notesPath || !note.id) return null;
 
-    const filename = sanitizeFilename(note.title || 'Untitled') || 'Untitled';
-    return `${this.notesPath}/${note.id}-${filename}.json`;
+    // Use only note ID for filename to avoid creating multiple files when title changes
+    return `${this.notesPath}/${note.id}.json`;
   }
 
   /**
@@ -265,8 +265,7 @@ export class FileStorage {
         allNotes.filter(note => !note.deleted);
 
       for (const note of notesToExport) {
-        const filename = sanitizeFilename(note.title || 'Untitled') || 'Untitled';
-        const exportFilePath = `${exportPath}/${note.id}-${filename}.json`;
+        const exportFilePath = `${exportPath}/${note.id}.json`;
 
         const result = await window.electronAPI.fileSystem.writeFile(
           exportFilePath,

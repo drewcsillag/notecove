@@ -88,6 +88,12 @@ class NoteCoveApp {
       newFolderBtn.addEventListener('click', () => this.createNewFolder());
     }
 
+    // Reset store button
+    const resetStoreBtn = document.getElementById('resetStoreBtn');
+    if (resetStoreBtn) {
+      resetStoreBtn.addEventListener('click', () => this.resetNoteStore());
+    }
+
     // Editor events are handled via TipTap callbacks
 
     // Search
@@ -195,9 +201,10 @@ class NoteCoveApp {
   renderCurrentNote() {
     if (!this.currentNote) return;
 
-    // Only update editor content if it's not currently being edited
-    if (this.editor && !this.editor.isFocused()) {
+    // Always update editor content when switching notes
+    if (this.editor) {
       this.editor.setContent(this.currentNote.content || '');
+      this.editor.focus();
     }
   }
 
@@ -219,6 +226,54 @@ class NoteCoveApp {
     console.log('Create folder feature coming soon!');
     // TODO: Implement a proper modal dialog for folder creation
     this.updateStatus('Folder feature coming soon');
+  }
+
+  async resetNoteStore() {
+    // Create a simple confirmation using dialog API if available
+    if (window.electronAPI && window.electronAPI.dialog) {
+      const result = await window.electronAPI.dialog.showMessageBox({
+        type: 'warning',
+        buttons: ['Cancel', 'Reset'],
+        defaultId: 0,
+        title: 'Reset Note Store',
+        message: 'Are you sure you want to reset the note store?',
+        detail: 'This will delete all notes and reset to the initial state. This cannot be undone.'
+      });
+
+      if (result.response !== 1) {
+        return; // User cancelled
+      }
+    } else {
+      // Fallback for web mode
+      const confirmed = window.confirm('Are you sure you want to reset the note store? This will delete all notes and cannot be undone.');
+      if (!confirmed) return;
+    }
+
+    // Clear localStorage first
+    localStorage.clear();
+
+    // Delete all note files if in Electron
+    if (window.electronAPI && window.electronAPI.fileSystem) {
+      try {
+        const notesPath = await window.electronAPI.settings.get('notesPath');
+        const result = await window.electronAPI.fileSystem.readDir(notesPath);
+        if (result.success && result.files) {
+          // Delete each JSON file
+          for (const filename of result.files) {
+            if (filename.endsWith('.json')) {
+              const filePath = `${notesPath}/${filename}`;
+              await window.electronAPI.fileSystem.deleteFile(filePath);
+              console.log('Deleted:', filePath);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to clear note files:', error);
+      }
+    }
+
+    // Reload the page to get a fresh start
+    window.location.reload();
   }
 
   selectNote(noteId) {
