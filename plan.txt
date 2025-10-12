@@ -1,0 +1,335 @@
+# NoteCove Implementation Plan
+
+## Project Overview
+NoteCove is a cross-platform notes application (Desktop + iOS) designed to be like Apple Notes but with advanced organization and power-user features. The app works offline-first and syncs via shared file systems (Dropbox, Google Drive, iCloud) without requiring internet servers. Focuses on single-user multi-device experience with robust conflict-free synchronization.
+
+## Technical Architecture
+
+### Core Stack
+- **Desktop**: Electron app (cross-platform, easier to maintain than native)
+- **iOS**: Native Swift app with SwiftUI
+- **Editor**: TipTap for rich text editing in desktop
+- **Collaboration**: Yjs or Loro for CRDT (to be evaluated in Phase 1)
+- **Storage**: JSON files with embedded rich text document structure
+- **Testing**: Jest + Playwright for desktop, XCTest for iOS, extensive automated testing
+- **Website**: Static site with Vite/React for GitHub Pages
+
+### Key Libraries
+- **Desktop**: Electron, TipTap, Yjs/Loro, Electron Store
+- **iOS**: SwiftUI, Combine, FileManager, native CRDT integration
+- **Shared**: JSON schema for note format, sync protocol
+
+### CRDT Library Evaluation
+**Yjs Pros:**
+- Mature ecosystem, widely adopted
+- Excellent TipTap integration
+- Strong performance characteristics
+- Rich collaborative editing features
+- Good documentation and community
+
+**Loro Pros:**
+- Rust-based, potentially better performance
+- Designed for offline-first scenarios
+- More compact sync messages
+- Better conflict resolution for complex data structures
+
+**Decision:** Will evaluate both in Phase 1, likely favoring Yjs for TipTap integration unless Loro shows significant advantages.
+
+## Implementation Phases
+
+### Phase 1: Project Foundation (Commits 1-3)
+**Commit 1: Initial Project Setup**
+- Initialize git repository
+- Create monorepo structure (desktop/, ios/, website/, shared/)
+- Set up package.json and basic Electron app
+- Add Apache v2 license
+- Create basic README and logo options
+- Set up GitHub repository and Pages
+- Evaluate Yjs vs Loro for CRDT integration
+
+**Commit 2: Basic Desktop App Structure**
+- Electron main process setup
+- Basic window management
+- Menu bar and basic UI layout
+- Development build scripts
+- Basic testing setup (Jest + Playwright)
+
+**Commit 3: Simple Text Editor**
+- Basic TipTap editor integration
+- Create/edit/save single note
+- Simple note title editing
+- AtlasGrotesk font integration
+- Basic styling and layout
+
+### Phase 2: Core Note Management (Commits 4-7)
+**Commit 4: File-based Storage**
+- JSON file format with embedded document structure
+- Note CRUD operations
+- File system watching for changes
+- Basic error handling and validation
+
+**Commit 5: Note Organization**
+- Folder structure implementation
+- Note tree view in sidebar
+- Basic navigation between notes
+- Note deletion to trash
+
+**Commit 6: Tags and Basic Search**
+- #tag parsing and storage
+- Tag-based filtering
+- Basic text search across notes
+- Search UI component
+
+**Commit 7: Enhanced Editor Features**
+- Rich text formatting (bold, italic, headers)
+- Basic todo items (checkbox support)
+- Image paste/insert functionality
+- Table support
+
+### Phase 3: Sync and Collaboration (Commits 8-11)
+**Commit 8: Sync Infrastructure**
+- Sync folder configuration
+- File watching for external changes
+- Basic conflict detection
+- Sync status indicators
+
+**Commit 9: CRDT Integration**
+- Chosen CRDT library integration (Yjs or Loro)
+- Document synchronization
+- Conflict-free editing
+- Single-user multi-device sync focus
+
+**Commit 10: Offline Support**
+- Offline mode detection
+- Queue sync operations
+- Resume sync when online
+- Offline indicators
+
+**Commit 11: Multiple Sync Points**
+- Named sync folders (work/personal)
+- Sync point management UI
+- Per-folder note organization
+
+### Phase 5: Advanced Features (Commits 21-25)
+**Commit 21: Inter-note Links**
+- >>note title syntax parsing
+- Link autocomplete with search
+- Link resolution and navigation
+- Auto-create notes from links
+
+**Commit 22: Advanced Todos**
+- Multiple todo states (undone/done/nope)
+- Due dates for todos
+- Todo filtering and sorting
+- Right-click context menus
+
+**Commit 23: File Attachments**
+- Drag-and-drop file support
+- Attachment storage and management
+- File preview integration
+- "Open with" context menus
+
+**Commit 24: Advanced Search**
+- Negative search operators
+- Regex search support
+- Case-sensitive toggle
+- Search within specific notes
+
+**Commit 25: Export Functionality**
+- Export to markdown tree
+- Attachment handling in exports
+- Export configuration options
+
+### Phase 6: User Experience (Commits 26-29)
+**Commit 26: Version History**
+- Note change tracking
+- Time-based version browser
+- Diff visualization
+- Version restoration
+
+**Commit 27: Templates System**
+- Handlebars template support
+- Template input forms
+- Template management UI
+- Field interpolation
+
+**Commit 28: URL Scheme**
+- Custom protocol registration
+- Deep linking to specific notes
+- Share note contents
+- Integration testing
+
+**Commit 29: Enhanced UI/UX**
+- New window support (double-click)
+- Read-only mode by default
+- Edit intent detection
+- Unique title enforcement
+
+### Phase 4: iOS Development (Commits 17-20)
+**Commit 17: iOS App Foundation**
+- iOS project setup in repository
+- Basic SwiftUI note viewer
+- JSON file integration matching desktop
+- Basic navigation and note list
+
+**Commit 18: iOS Core Features**
+- Rich text editing with native iOS text view
+- Note organization (folders/tags)
+- Search functionality
+- CRDT integration for sync
+
+**Commit 19: iOS Sync Integration**
+- File system sync with desktop
+- Conflict-free editing between platforms
+- Offline support and queue management
+- Sync status indicators
+
+**Commit 20: iOS Mobile Features**
+- Share extension integration
+- Touch-optimized UI
+- Mobile-specific gestures
+- iOS-specific optimizations
+
+### Phase 7: Power User Features (Commits 30-34)
+**Commit 30: Scripting Interface**
+- JavaScript API for note access
+- Query and update capabilities
+- Extension system foundation
+- DOM-like note interface
+
+**Commit 31: Advanced Organization**
+- Linked/entangled todos
+- Calendar integration for due dates
+- Smart collections
+
+**Commit 32: Printing System**
+- Print preview
+- Configurable margins and headers
+- Page layout options
+
+**Commit 33: macOS Integration**
+- Shortcuts app integration
+- System services
+- Spotlight integration
+
+**Commit 34: Media Unfurls**
+- Instagram/Twitter embeds
+- Map integration (static images)
+- URL preview generation
+
+### Phase 8: Polish and Documentation (Commits 35-38)
+**Commit 35: Website Development**
+- Professional landing page
+- Feature documentation
+- Screenshots and demos
+
+**Commit 36: In-app Help**
+- Contextual help system
+- Onboarding flow
+- Feature discovery
+
+**Commit 37: Debug and Logging**
+- Mutation logging system
+- Debug console
+- Performance monitoring
+
+**Commit 38: Final Polish**
+- Performance optimizations
+- Bug fixes and edge cases
+- Release preparation
+
+### Phase 9: Advanced Features (Commits 39-42)
+**Commit 39: Bluetooth Sync**
+- Bluetooth sync for Apple devices (iOS/macOS)
+- Peer-to-peer discovery
+- Offline collaboration between paired devices
+
+**Commit 40: watchOS App**
+- Read-only note viewer
+- Basic navigation
+- Handoff integration with iOS
+- Limited note browsing
+
+**Commit 41: Advanced Power Features**
+- Linked/entangled todos (advanced implementation)
+- Complex scripting capabilities
+- Advanced automation hooks
+
+**Commit 42: Future Expansion**
+- Plugin architecture refinement
+- Advanced collaboration features
+- Platform-specific optimizations
+
+## Technical Considerations
+
+### Storage Format
+```json
+{
+  "id": "unique-uuid",
+  "title": "Note Title",
+  "created": "2024-01-01T00:00:00Z",
+  "modified": "2024-01-01T00:00:00Z",
+  "tags": ["tag1", "tag2"],
+  "syncPoints": ["work", "personal"],
+  "attachments": ["file1.pdf", "image.png"],
+  "document": {
+    // CRDT document structure (Yjs/Loro format)
+    // Contains rich text with todos, links, formatting
+  },
+  "version": 1,
+  "deleted": false
+}
+```
+
+**Rationale:** JSON format is easier to parse, validate, and work with across platforms. The CRDT document structure is embedded within the JSON for seamless sync.
+
+### Sync Protocol
+- JSON-based sync messages
+- Vector clocks for ordering
+- Content-addressable storage for attachments
+- Tombstone records for deletions
+
+### Testing Strategy
+- Unit tests for core logic (>80% coverage)
+- Integration tests for sync
+- E2E tests with Playwright
+- Mobile UI tests with XCTest
+
+## Risks and Mitigations
+
+1. **CRDT Complexity**: Start with simple text, expand gradually
+2. **File Sync Conflicts**: Robust conflict resolution UI
+3. **Cross-platform Consistency**: Shared design system
+4. **Performance with Large Notes**: Lazy loading and virtualization
+5. **Mobile Storage Limits**: Attachment size management
+
+## Success Metrics
+
+- Core editing works offline
+- Sync resolves conflicts correctly
+- Sub-second search across 1000+ notes
+- Mobile apps feel native
+- Extension API enables power users
+
+## Open Questions (To Be Addressed)
+
+1. **CRDT Library Choice:** Final decision between Yjs vs Loro based on TipTap integration and performance testing
+2. **Business Model:** Explore sustainable open-source business models (see section below)
+3. **Scripting API Depth:** How comprehensive should the JavaScript API be for power users?
+4. **Plugin Architecture:** Should we support external plugins beyond the scripting interface?
+5. **Calendar Integration:** Which calendar apps beyond Apple Calendar should we support?
+6. **Attachment Management:** Implement size limits and cleanup strategies for large files
+7. **Performance Limits:** Testing with very large note collections (10k+ notes)
+
+## Business Model Options
+
+While keeping the app fully open source, potential sustainable models:
+
+1. **Freemium Cloud Sync:** Free local/file sync, paid hosted sync service
+2. **Pro Features:** Advanced scripting, team collaboration features, premium templates
+3. **Support & Services:** Paid support, custom development, enterprise features
+4. **Marketplace:** Template marketplace, extension marketplace with revenue sharing
+5. **Sponsorship:** Corporate sponsorship for development, maintained by sponsors
+6. **Dual License:** Open source for personal use, commercial license for businesses
+
+**Recommendation:** Start fully open source, evaluate freemium cloud sync if user adoption is strong.

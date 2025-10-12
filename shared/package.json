@@ -1,0 +1,22 @@
+{
+  "name": "@notecove/shared",
+  "version": "0.1.0",
+  "description": "Shared utilities and schemas for NoteCove",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "zod": "^3.22.4",
+    "uuid": "^9.0.1",
+    "date-fns": "^2.30.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0",
+    "@types/uuid": "^9.0.7"
+  }
+}
