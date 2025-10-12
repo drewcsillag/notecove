@@ -295,6 +295,9 @@ export class NoteCoveEditor {
 
     if (actions[action]) {
       actions[action]();
+      // Update toolbar state immediately after action to ensure UI reflects changes
+      // This is needed because selectionUpdate event may not fire reliably for all actions
+      setTimeout(() => this.updateToolbarState(), 0);
     }
   }
 
