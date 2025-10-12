@@ -1,6 +1,6 @@
 # NoteCove
 
-![NoteCove Logo](docs/assets/logo-banner.png)
+![NoteCove Logo](docs/assets/logos/concept-2-main.svg)
 
 A cross-platform notes application designed to be like Apple Notes but with advanced organization, collaboration, and power-user features. NoteCove works offline-first and syncs via shared file systems without requiring internet servers.
 
@@ -86,34 +86,13 @@ npm run build:dist
 - **E2E Tests**: Playwright for desktop app testing
 - **iOS Tests**: XCTest for iOS-specific functionality
 
-## 📋 Logo Options
+## 🎨 Brand & Design
 
-### Concept 1: "Protected Harbor"
-- Stylized cove/bay silhouette with document icon inside
-- Colors: Deep blue (#1B365D) + warm gold (#F4A460)
-- Feel: Safe, professional, trustworthy
+**Main Logo**: "Digital Sanctuary" - N and C letterforms creating a protective enclosure
+**App Icon**: "Minimalist Mark" - Clean NC monogram
+**Colors**: Forest green (#2D5840) with charcoal accents (#374151)
 
-### Concept 2: "Digital Sanctuary"
-- Abstract "N" and "C" letterforms creating protective enclosure
-- Colors: Forest green (#2D5840) + light gray (#F8F9FA)
-- Feel: Natural, calm, organized
-
-### Concept 3: "Note Layers"
-- Stacked document icons with curved edge suggesting a cove
-- Colors: Gradient blue-to-teal (#3B82F6 to #06B6D4)
-- Feel: Dynamic, layered, structured
-
-### Concept 4: "Minimalist Mark"
-- Simple "NC" monogram in custom rounded typeface
-- Colors: Charcoal (#374151) with accent color options
-- Feel: Professional, timeless, software-focused
-
-### Concept 5: "Flowing Notes"
-- Abstract flowing lines forming both "cove" shape and text flow
-- Colors: Warm purple (#8B5CF6) + soft white (#FEFEFE)
-- Feel: Creative, fluid, thoughtful
-
-**Current Selection**: Concept 1 "Protected Harbor" for main logo, Concept 4 for app icons
+View all logo concepts and assets in [`docs/assets/logos/`](docs/assets/logos/)
 
 ## 🤝 Contributing
 

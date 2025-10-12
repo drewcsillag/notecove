@@ -1,0 +1,31 @@
+<!-- NoteCove Logo - Concept 4: "Minimalist Mark" - App Icon 256x256 -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="app-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#374151;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#4B5563;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1F2937;stop-opacity:1" />
+    </linearGradient>
+    <filter id="app-shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Background with subtle rounded square for modern app icon -->
+  <rect x="16" y="16" width="224" height="224" rx="48" ry="48"
+        fill="url(#app-gradient)" filter="url(#app-shadow)"/>
+
+  <!-- NC Monogram - Larger and more refined -->
+  <g transform="translate(128, 128)" text-anchor="middle">
+    <!-- N letterform with custom path for better control -->
+    <path d="M-32 -24 L-32 24 L-24 24 L-24 -4 L-8 20 L0 20 L0 -24 L-8 -24 L-8 4 L-24 -20 L-32 -20 Z"
+          fill="white"/>
+
+    <!-- C letterform with custom path -->
+    <path d="M8 -24 C24 -24 32 -16 32 0 C32 16 24 24 8 24 L6 24 C-10 24 -18 16 -18 0 C-18 -16 -10 -24 6 -24"
+          fill="none" stroke="white" stroke-width="8" stroke-linecap="round"/>
+
+    <!-- Refined connecting element -->
+    <circle cx="0" cy="0" r="2" fill="white" opacity="0.4"/>
+  </g>
+</svg>

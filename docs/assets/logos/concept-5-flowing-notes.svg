@@ -1,0 +1,33 @@
+<!-- NoteCove Logo - Concept 5: "Flowing Notes" -->
+<svg width="200" height="60" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="flow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#A855F7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C084FC;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Flowing lines forming cove shape and text flow -->
+  <g transform="translate(10, 15)">
+    <!-- Main flow creating protective cove -->
+    <path d="M0 20 Q15 5 30 15 Q35 18 40 15 Q50 10 55 25"
+          fill="none" stroke="url(#flow-gradient)" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Secondary flows suggesting text/content -->
+    <path d="M5 25 Q20 10 35 20 Q40 23 45 20"
+          fill="none" stroke="url(#flow-gradient)" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+
+    <path d="M10 30 Q25 15 40 25 Q45 28 50 25"
+          fill="none" stroke="url(#flow-gradient)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Flowing particles/dots -->
+    <circle cx="12" cy="18" r="1.5" fill="url(#flow-gradient)" opacity="0.8"/>
+    <circle cx="25" cy="12" r="1" fill="url(#flow-gradient)" opacity="0.6"/>
+    <circle cx="38" cy="22" r="1.2" fill="url(#flow-gradient)" opacity="0.7"/>
+  </g>
+
+  <!-- NoteCove text -->
+  <text x="75" y="25" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#7C3AED">NoteCove</text>
+  <text x="75" y="40" font-family="Inter, sans-serif" font-size="10" font-weight="400" fill="#6B7280">Where Ideas Flow Freely</text>
+</svg>

@@ -1,0 +1,29 @@
+<!-- NoteCove Logo - Concept 4: "Minimalist Mark" - App Icon -->
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="minimalist-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#374151;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1F2937;stop-opacity:1" />
+    </linearGradient>
+    <filter id="subtle-shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle for app icon -->
+  <circle cx="60" cy="60" r="54" fill="url(#minimalist-gradient)" filter="url(#subtle-shadow)"/>
+
+  <!-- NC Monogram -->
+  <g transform="translate(60, 60)" text-anchor="middle">
+    <!-- N letterform -->
+    <text x="-12" y="8" font-family="Inter, system-ui, sans-serif"
+          font-size="36" font-weight="700" fill="white" letter-spacing="-2px">N</text>
+
+    <!-- C letterform -->
+    <text x="12" y="8" font-family="Inter, system-ui, sans-serif"
+          font-size="36" font-weight="700" fill="white" letter-spacing="-2px">C</text>
+
+    <!-- Subtle connecting element -->
+    <line x1="-4" y1="0" x2="4" y2="0" stroke="white" stroke-width="2" opacity="0.3"/>
+  </g>
+</svg>
