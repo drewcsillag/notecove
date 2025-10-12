@@ -165,10 +165,9 @@ test.describe('Enhanced Editor Features', () => {
   });
 
   test.skip('should maintain toolbar button active states', async ({ page }) => {
-    // TODO: This test is disabled due to timing issues with toolbar state updates.
-    // The bold button activates correctly, but subsequent formatting buttons don't
-    // reliably update their state in the test environment. This works correctly in manual testing.
-    // This may indicate a real bug with selectionUpdate events not firing reliably.
+    // TODO: Confirmed real bug - toolbar state updates don't fire reliably.
+    // Bold button gets active class, but subsequent formatting buttons (italic) don't.
+    // This appears to be a selectionUpdate event issue in the editor
     const editor = page.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await page.waitForTimeout(500);

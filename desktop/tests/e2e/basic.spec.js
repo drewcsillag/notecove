@@ -41,11 +41,8 @@ test.describe('NoteCove Basic Functionality', () => {
     await expect(page.locator('#editor .ProseMirror')).toBeFocused();
   });
 
-  test.skip('should type in note and derive title from first line', async ({ page }) => {
-    // TODO: This test is disabled due to timing/update issues with title extraction
-    // The title derivation works correctly in manual testing, but in the test environment
-    // the title remains "Untitled" even after typing content and waiting for debounce.
-    // This may be related to how updates are batched/debounced in the test environment.
+  test('should type in note and derive title from first line', async ({ page }) => {
+    // Re-enabled after fixing handleEditorUpdate() to trigger sidebar re-render on title changes
     // Create new note
     await page.locator('.new-note-btn').click();
 
