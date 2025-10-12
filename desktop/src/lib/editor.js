@@ -92,6 +92,9 @@ export class NoteCoveEditor {
 
         // Initialize table column resizing
         this.cleanupTableResizing = initTableResizing(this.element);
+
+        // Setup paste image handling
+        this.setupPasteHandler();
       }
     });
 
@@ -280,6 +283,37 @@ export class NoteCoveEditor {
     if (actions[action]) {
       actions[action]();
     }
+  }
+
+  /**
+   * Setup paste event handler for images
+   */
+  setupPasteHandler() {
+    if (!this.element) return;
+
+    this.element.addEventListener('paste', async (event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      // Check if there's an image in the clipboard
+      for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+          event.preventDefault();
+
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          // Convert to base64
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = e.target.result;
+            this.editor.chain().focus().setImage({ src: base64 }).run();
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    });
   }
 
   /**

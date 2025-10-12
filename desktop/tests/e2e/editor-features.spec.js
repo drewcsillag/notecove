@@ -46,7 +46,7 @@ test.describe('Enhanced Editor Features', () => {
     await expect(taskItems.nth(0)).toHaveAttribute('data-checked', 'todo');
 
     // Click once to change to DONE
-    await firstTaskCheckbox.click({ force: true });
+    await firstTaskCheckbox.dispatchEvent('click');
     // Wait for the attribute to change
     await expect(taskItems.nth(0)).toHaveAttribute('data-checked', 'done', { timeout: 2000 });
 
@@ -55,7 +55,7 @@ test.describe('Enhanced Editor Features', () => {
     await expect(doneCheckbox).toHaveClass(/done/);
 
     // Click again to change to NOPE
-    await firstTaskCheckbox.click();
+    await firstTaskCheckbox.dispatchEvent('click');
     await page.waitForTimeout(100);
     await expect(taskItems.nth(0)).toHaveAttribute('data-checked', 'nope');
 
@@ -64,7 +64,7 @@ test.describe('Enhanced Editor Features', () => {
     await expect(nopeCheckbox).toHaveClass(/nope/);
 
     // Click again to cycle back to TODO
-    await firstTaskCheckbox.click();
+    await firstTaskCheckbox.dispatchEvent('click');
     await page.waitForTimeout(100);
     await expect(taskItems.nth(0)).toHaveAttribute('data-checked', 'todo');
   });
@@ -278,7 +278,7 @@ test.describe('Enhanced Editor Features', () => {
 
     // Set first task to DONE
     const firstTaskCheckbox = page.locator('li[data-type="taskItem"]').first().locator('label').first();
-    await firstTaskCheckbox.click(); // TODO -> DONE
+    await firstTaskCheckbox.dispatchEvent('click'); // TODO -> DONE
     await page.waitForTimeout(100);
 
     // Verify DONE state

@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
+import { wrappingInputRule } from '@tiptap/core';
 
 /**
  * Custom TaskItem extension with three states: TODO, DONE, NOPE
@@ -56,19 +57,9 @@ export const TaskItem = Node.create({
       'li',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         'data-type': this.name,
+        'data-checked': node.attrs.checked || 'todo',
       }),
-      [
-        'label',
-        [
-          'input',
-          {
-            type: 'checkbox',
-            checked: node.attrs.checked === 'done' ? true : null,
-            disabled: node.attrs.checked === 'nope' ? true : null,
-          },
-        ],
-        ['span', 0],
-      ],
+      0,
     ];
   },
 
@@ -98,7 +89,9 @@ export const TaskItem = Node.create({
       const content = document.createElement('div');
 
       checkboxWrapper.contentEditable = 'false';
+      checkboxWrapper.style.cursor = 'pointer';
       checkbox.type = 'checkbox';
+      checkbox.style.display = 'none'; // Hide the actual checkbox, show only our custom one
       checkbox.addEventListener('change', event => {
         // Prevent default to handle our custom tri-state logic
         event.preventDefault();
@@ -180,6 +173,8 @@ export const TaskItem = Node.create({
             return false;
           }
 
+          // Update the node reference for the updateCheckbox function
+          node = updatedNode;
           updateCheckbox();
           return true;
         },

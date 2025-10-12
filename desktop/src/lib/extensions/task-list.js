@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
+import { wrappingInputRule } from '@tiptap/core';
 
 /**
  * TaskList extension - container for TaskItems
@@ -50,5 +51,15 @@ export const TaskList = Node.create({
     return {
       'Mod-Shift-9': () => this.editor.commands.toggleTaskList(),
     };
+  },
+
+  addInputRules() {
+    return [
+      wrappingInputRule({
+        find: /^\s*\[\]\s$/,
+        type: this.type,
+        getAttributes: () => ({}),
+      }),
+    ];
   },
 });
