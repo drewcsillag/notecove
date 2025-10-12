@@ -64,11 +64,12 @@
       padding: 16px;
       border-bottom: 1px solid var(--border);
       background: var(--background);
+      -webkit-app-region: drag;
     }
 
-    /* When NOT maximized (normal windowed mode), add space for traffic lights */
-    body.maximized .sidebar-header {
-      padding: 48px 16px 16px 16px;
+    /* On macOS, when NOT maximized (normal windowed mode), add space for traffic lights */
+    body:not(.maximized) .sidebar-header {
+      padding-top: 48px;
     }
 
     .logo {
@@ -78,6 +79,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      -webkit-app-region: no-drag;
     }
 
     .logo-icon {
@@ -92,6 +94,7 @@
     .search-box {
       margin: 16px;
       position: relative;
+      -webkit-app-region: no-drag;
     }
 
     .search-input {
@@ -618,7 +621,7 @@
 
     .editor ul[data-type="taskList"] li {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       margin: 0.5rem 0;
     }
 
