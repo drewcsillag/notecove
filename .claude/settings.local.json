@@ -8,7 +8,12 @@
       "Bash(npm test:*)",
       "Bash(npx playwright test:*)",
       "Bash(npm run dev)",
-      "Read(//Users/drew/Documents/NoteCove/**)"
+      "Read(//Users/drew/Documents/NoteCove/**)",
+      "Bash(npx vitest run:*)",
+      "Bash(npm install:*)",
+      "Bash(npm audit)",
+      "Bash(npm audit fix:*)",
+      "Bash(npm list:*)"
     ],
     "deny": [],
     "ask": []

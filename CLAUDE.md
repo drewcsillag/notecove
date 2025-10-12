@@ -1,1 +1,2 @@
 - any time you fix something, add a test
+- when implementing new features, add tests

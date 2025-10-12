@@ -6,6 +6,7 @@ test.describe('NoteCove Basic Functionality', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.reload();
+    await page.waitForLoadState('networkidle');
   });
 
   test('should load the application', async ({ page }) => {
@@ -41,8 +42,15 @@ test.describe('NoteCove Basic Functionality', () => {
     // Create new note
     await page.locator('.new-note-btn').click();
 
+    // Wait for editor to be ready and focused
+    const editor = page.locator('#editor .ProseMirror');
+    await expect(editor).toBeFocused({ timeout: 5000 });
+    await page.waitForTimeout(500);
+
     // Type in editor - first line becomes the title
-    await page.locator('#editor .ProseMirror').fill('My Note Title\nThis is the note content');
+    await page.keyboard.type('My Note Title');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('This is the note content');
 
     // Wait for debounce
     await page.waitForTimeout(1500);
@@ -55,17 +63,29 @@ test.describe('NoteCove Basic Functionality', () => {
   test('should search notes and filter results', async ({ page }) => {
     // Create multiple notes
     await page.locator('.new-note-btn').click();
-    await page.locator('#editor .ProseMirror').fill('Apple Note\nThis is about apples');
+    const editor = page.locator('#editor .ProseMirror');
+    await expect(editor).toBeFocused({ timeout: 5000 });
+    await page.waitForTimeout(500);
+
+    await page.keyboard.type('Apple Note');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('This is about apples');
     await page.waitForTimeout(1500);
 
     await page.keyboard.press('Control+n');
+    await expect(editor).toBeFocused({ timeout: 5000 });
     await page.waitForTimeout(500);
-    await page.locator('#editor .ProseMirror').fill('Banana Note\nThis is about bananas');
+    await page.keyboard.type('Banana Note');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('This is about bananas');
     await page.waitForTimeout(1500);
 
     await page.keyboard.press('Control+n');
+    await expect(editor).toBeFocused({ timeout: 5000 });
     await page.waitForTimeout(500);
-    await page.locator('#editor .ProseMirror').fill('Cherry Note\nThis is about cherries');
+    await page.keyboard.type('Cherry Note');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('This is about cherries');
     await page.waitForTimeout(1500);
 
     // Verify all notes are visible

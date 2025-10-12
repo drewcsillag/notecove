@@ -166,7 +166,13 @@ test.describe('Drag and Drop', () => {
   test('should make notes draggable', async ({ page }) => {
     // Create a note
     await page.locator('.new-note-btn').click();
-    await page.locator('#editor .ProseMirror').fill('Draggable Note');
+
+    // Wait for editor to be ready and focused
+    const editor = page.locator('#editor .ProseMirror');
+    await expect(editor).toBeFocused({ timeout: 5000 });
+    await page.waitForTimeout(500);
+
+    await page.keyboard.type('Draggable Note');
     await page.waitForTimeout(1500);
 
     // Check if note item has draggable attribute
