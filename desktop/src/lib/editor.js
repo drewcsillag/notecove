@@ -197,6 +197,82 @@ export class NoteCoveEditor {
   }
 
   /**
+   * Setup toolbar with formatting buttons
+   */
+  setupToolbar() {
+    const toolbar = document.getElementById('editorToolbar');
+    if (!toolbar) return;
+
+    // Add click handlers to toolbar buttons
+    toolbar.addEventListener('click', (e) => {
+      const button = e.target.closest('.toolbar-btn');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      this.executeToolbarAction(action);
+    });
+
+    // Update toolbar button states on selection change
+    if (this.editor) {
+      this.editor.on('selectionUpdate', () => {
+        this.updateToolbarState();
+      });
+    }
+  }
+
+  /**
+   * Execute toolbar action
+   */
+  executeToolbarAction(action) {
+    if (!this.editor) return;
+
+    const actions = {
+      bold: () => this.editor.chain().focus().toggleBold().run(),
+      italic: () => this.editor.chain().focus().toggleItalic().run(),
+      strike: () => this.editor.chain().focus().toggleStrike().run(),
+      heading1: () => this.editor.chain().focus().toggleHeading({ level: 1 }).run(),
+      heading2: () => this.editor.chain().focus().toggleHeading({ level: 2 }).run(),
+      heading3: () => this.editor.chain().focus().toggleHeading({ level: 3 }).run(),
+      bulletList: () => this.editor.chain().focus().toggleBulletList().run(),
+      orderedList: () => this.editor.chain().focus().toggleOrderedList().run(),
+      undo: () => this.editor.chain().focus().undo().run(),
+      redo: () => this.editor.chain().focus().redo().run(),
+    };
+
+    if (actions[action]) {
+      actions[action]();
+    }
+  }
+
+  /**
+   * Update toolbar button active states
+   */
+  updateToolbarState() {
+    if (!this.editor) return;
+
+    const toolbar = document.getElementById('editorToolbar');
+    if (!toolbar) return;
+
+    const states = {
+      bold: this.editor.isActive('bold'),
+      italic: this.editor.isActive('italic'),
+      strike: this.editor.isActive('strike'),
+      heading1: this.editor.isActive('heading', { level: 1 }),
+      heading2: this.editor.isActive('heading', { level: 2 }),
+      heading3: this.editor.isActive('heading', { level: 3 }),
+      bulletList: this.editor.isActive('bulletList'),
+      orderedList: this.editor.isActive('orderedList'),
+    };
+
+    Object.keys(states).forEach(action => {
+      const button = toolbar.querySelector(`[data-action="${action}"]`);
+      if (button) {
+        button.classList.toggle('active', states[action]);
+      }
+    });
+  }
+
+  /**
    * Destroy the editor
    */
   destroy() {

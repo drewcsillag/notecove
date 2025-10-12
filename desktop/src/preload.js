@@ -5,8 +5,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   // Menu actions
   onMenuAction: (callback) => {
-    ipcRenderer.on('menu:new-note', callback);
-    ipcRenderer.on('menu:save', callback);
+    ipcRenderer.on('menu:new-note', () => callback('menu:new-note'));
+    ipcRenderer.on('menu:save', () => callback('menu:save'));
   },
 
   // File system operations

@@ -51,6 +51,9 @@ class NoteCoveApp {
       onFocus: () => this.handleEditorFocus(),
       onBlur: () => this.handleEditorBlur()
     });
+
+    // Setup the formatting toolbar
+    this.editor.setupToolbar();
   }
 
   handleNoteEvent(event, data) {
@@ -76,10 +79,16 @@ class NoteCoveApp {
   }
 
   setupEventListeners() {
-    // New note button
+    // New note button (welcome screen)
     const newNoteBtn = document.querySelector('.new-note-btn');
     if (newNoteBtn) {
       newNoteBtn.addEventListener('click', () => this.createNewNote());
+    }
+
+    // New note button (sidebar)
+    const newNoteBtnSidebar = document.getElementById('newNoteBtn');
+    if (newNoteBtnSidebar) {
+      newNoteBtnSidebar.addEventListener('click', () => this.createNewNote());
     }
 
     // New folder button
@@ -110,7 +119,7 @@ class NoteCoveApp {
     if (!window.electronAPI) return;
 
     // Menu actions
-    window.electronAPI.onMenuAction((event, action) => {
+    window.electronAPI.onMenuAction((action) => {
       switch (action) {
         case 'menu:new-note':
           this.createNewNote();
@@ -175,9 +184,15 @@ class NoteCoveApp {
 
   renderNotesList() {
     const notesList = document.getElementById('notesList');
+    const notesCount = document.getElementById('notesCount');
     const filteredNotes = this.searchQuery ?
       this.noteManager.searchNotes(this.searchQuery) :
       this.notes;
+
+    // Update notes count
+    if (notesCount) {
+      notesCount.textContent = this.notes.length;
+    }
 
     if (filteredNotes.length === 0) {
       notesList.innerHTML = `
@@ -192,7 +207,7 @@ class NoteCoveApp {
       <div class="note-item ${this.currentNote?.id === note.id ? 'active' : ''}"
            onclick="app.selectNote('${note.id}')">
         <div class="note-title">${escapeHtml(note.title || 'Untitled')}</div>
-        <div class="note-preview">${getPreview(this.editor ? this.editor.getText() : note.content, 60)}</div>
+        <div class="note-preview">${getPreview(note.content, 60)}</div>
         <div class="note-meta">${formatDate(note.modified)}</div>
       </div>
     `).join('');
@@ -204,7 +219,12 @@ class NoteCoveApp {
     // Always update editor content when switching notes
     if (this.editor) {
       this.editor.setContent(this.currentNote.content || '');
-      this.editor.focus();
+
+      // Only focus editor if search input doesn't have focus
+      const searchInput = document.querySelector('.search-input');
+      if (!searchInput || document.activeElement !== searchInput) {
+        this.editor.focus();
+      }
     }
   }
 

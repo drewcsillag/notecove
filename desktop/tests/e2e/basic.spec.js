@@ -52,11 +52,68 @@ test.describe('NoteCove Basic Functionality', () => {
     await expect(page.locator('.note-item .note-title').first()).toContainText('My Note Title');
   });
 
-  test('should search notes', async ({ page }) => {
-    // Search input should be visible
-    await expect(page.locator('.search-input')).toBeVisible();
+  test('should search notes and filter results', async ({ page }) => {
+    // Create multiple notes
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Apple Note\nThis is about apples');
+    await page.waitForTimeout(1500);
 
-    // Should be able to type in search
-    await page.locator('.search-input').fill('test');
+    await page.keyboard.press('Control+n');
+    await page.waitForTimeout(500);
+    await page.locator('#editor .ProseMirror').fill('Banana Note\nThis is about bananas');
+    await page.waitForTimeout(1500);
+
+    await page.keyboard.press('Control+n');
+    await page.waitForTimeout(500);
+    await page.locator('#editor .ProseMirror').fill('Cherry Note\nThis is about cherries');
+    await page.waitForTimeout(1500);
+
+    // Verify all notes are visible
+    const allNotes = await page.locator('.note-item').count();
+    expect(allNotes).toBe(3);
+
+    // Search for "banana"
+    const searchInput = page.locator('.search-input');
+    await searchInput.click();
+    await searchInput.fill('banana');
+
+    // Wait for filter to apply
+    await page.waitForTimeout(500);
+
+    // Should only show 1 note
+    const filteredNotes = await page.locator('.note-item').count();
+    expect(filteredNotes).toBe(1);
+
+    // Verify the correct note is shown
+    await expect(page.locator('.note-item .note-title').first()).toContainText('Banana Note');
+
+    // Clear search
+    await searchInput.clear();
+    await page.waitForTimeout(500);
+
+    // All notes should be visible again
+    const allNotesAgain = await page.locator('.note-item').count();
+    expect(allNotesAgain).toBe(3);
+  });
+
+  test('should maintain search input focus while typing', async ({ page }) => {
+    // Create a note first
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Test Note\nTest content');
+    await page.waitForTimeout(1500);
+
+    // Click in search box
+    const searchInput = page.locator('.search-input');
+    await searchInput.click();
+
+    // Type multiple characters
+    await page.keyboard.type('test');
+
+    // Verify search input still has focus
+    await expect(searchInput).toBeFocused();
+
+    // Verify the text was typed into search, not the editor
+    const searchValue = await searchInput.inputValue();
+    expect(searchValue).toBe('test');
   });
 });

@@ -15,14 +15,24 @@ export function escapeHtml(text) {
 
 /**
  * Generate a preview of note content
- * @param {string} content - Full note content
+ * @param {string} content - Full note content (HTML or plain text)
  * @param {number} maxLength - Maximum preview length
- * @returns {string} Preview text
+ * @returns {string} Preview text with all formatting stripped
  */
 export function getPreview(content, maxLength = 60) {
   if (!content) return '';
-  const preview = content.replace(/\n/g, ' ').substring(0, maxLength);
-  return preview.length < content.length ? preview + '...' : preview;
+
+  // Strip HTML tags to get plain text
+  const div = document.createElement('div');
+  div.innerHTML = content;
+  const plainText = div.textContent || div.innerText || '';
+
+  // Remove newlines and extra whitespace
+  const cleaned = plainText.replace(/\s+/g, ' ').trim();
+
+  // Truncate to max length
+  const preview = cleaned.substring(0, maxLength);
+  return preview.length < cleaned.length ? preview + '...' : preview;
 }
 
 /**

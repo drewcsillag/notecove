@@ -163,6 +163,8 @@ export class NoteManager {
 
     sampleNotes.forEach(note => {
       this.notes.set(note.id, note);
+      // Save sample notes to storage so they persist
+      this.saveNote(note);
     });
   }
 
