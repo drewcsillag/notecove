@@ -304,10 +304,22 @@ export class NoteManager {
    * @param {string} id - Note ID
    * @returns {boolean} Success
    */
-  permanentlyDeleteNote(id) {
+  async permanentlyDeleteNote(id) {
+    const note = this.notes.get(id);
+    if (!note) return false;
+
     const success = this.notes.delete(id);
     if (success) {
-      this.saveNotes();
+      // Delete the file in Electron mode
+      if (this.isElectron) {
+        try {
+          await this.fileStorage.deleteNote(note);
+        } catch (error) {
+          console.error('Failed to delete note file:', error);
+        }
+      } else {
+        await this.saveNotes();
+      }
       this.notify('note-permanently-deleted', { id });
     }
     return success;

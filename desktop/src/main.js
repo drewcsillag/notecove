@@ -81,9 +81,13 @@ class NoteCoveApp {
       this.mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 
-    // Show window when ready
+    // Show window when ready and send initial maximize state
     this.mainWindow.once('ready-to-show', () => {
       this.mainWindow.show();
+      // Send initial maximize state
+      const isMaximized = this.mainWindow.isMaximized();
+      console.log('Initial window maximized state:', isMaximized);
+      this.mainWindow.webContents.send('window:maximized', isMaximized);
     });
 
     // Handle window closed
@@ -94,6 +98,17 @@ class NoteCoveApp {
     // Save window geometry on resize and move
     this.mainWindow.on('resize', () => this.saveWindowGeometry());
     this.mainWindow.on('move', () => this.saveWindowGeometry());
+
+    // Track window maximize state changes
+    this.mainWindow.on('maximize', () => {
+      console.log('Window maximized');
+      this.mainWindow.webContents.send('window:maximized', true);
+    });
+
+    this.mainWindow.on('unmaximize', () => {
+      console.log('Window unmaximized');
+      this.mainWindow.webContents.send('window:maximized', false);
+    });
   }
 
   saveWindowGeometry() {

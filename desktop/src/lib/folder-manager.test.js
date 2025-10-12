@@ -257,15 +257,14 @@ describe('FolderManager', () => {
       const parent = await folderManager.createFolder('Parent', 'root');
       const child = await folderManager.createFolder('Child', parent.id);
 
-      await expect(
-        folderManager.moveFolder(parent.id, child.id)
-      ).rejects.toThrow('Cannot move folder into its own subtree');
+      const result = await folderManager.moveFolder(parent.id, child.id);
+      expect(result).toBeNull();
     });
 
     it('should not move special folders', async () => {
       const folder = await folderManager.createFolder('Test', 'root');
-      const success = await folderManager.moveFolder('all-notes', folder.id);
-      expect(success).toBe(false);
+      const result = await folderManager.moveFolder('all-notes', folder.id);
+      expect(result).toBeNull();
     });
 
     it('should update child paths when moved', async () => {
@@ -332,6 +331,89 @@ describe('FolderManager', () => {
       await expect(
         folderManager.createFolder('Test', 'root')
       ).resolves.toBeTruthy();
+    });
+  });
+
+  describe('folder moving', () => {
+    it('should move a folder to a new parent', async () => {
+      const folder1 = await folderManager.createFolder('Folder1', 'root');
+      const folder2 = await folderManager.createFolder('Folder2', 'root');
+
+      const moved = await folderManager.moveFolder(folder2.id, folder1.id);
+
+      expect(moved).toBeTruthy();
+      expect(moved.parentId).toBe(folder1.id);
+      expect(moved.path).toBe('Folder1/Folder2');
+    });
+
+    it('should update descendant paths when moving a folder', async () => {
+      const parent = await folderManager.createFolder('Parent', 'root');
+      const child = await folderManager.createFolder('Child', parent.id);
+      const grandchild = await folderManager.createFolder('Grandchild', child.id);
+
+      const newParent = await folderManager.createFolder('NewParent', 'root');
+      await folderManager.moveFolder(child.id, newParent.id);
+
+      const updatedChild = folderManager.getFolder(child.id);
+      const updatedGrandchild = folderManager.getFolder(grandchild.id);
+
+      expect(updatedChild.path).toBe('NewParent/Child');
+      expect(updatedGrandchild.path).toBe('NewParent/Child/Grandchild');
+    });
+
+    it('should not allow moving a folder into itself', async () => {
+      const folder = await folderManager.createFolder('Folder', 'root');
+
+      const result = await folderManager.moveFolder(folder.id, folder.id);
+
+      expect(result).toBeNull();
+    });
+
+    it('should not allow moving a folder into its own descendant', async () => {
+      const parent = await folderManager.createFolder('Parent', 'root');
+      const child = await folderManager.createFolder('Child', parent.id);
+      const grandchild = await folderManager.createFolder('Grandchild', child.id);
+
+      // Moving a parent into its own descendant should not be allowed
+      const result = await folderManager.moveFolder(parent.id, child.id);
+
+      expect(result).toBeNull();
+    });
+
+    it('should not allow moving special folders', async () => {
+      const folder = await folderManager.createFolder('Folder', 'root');
+
+      const result = await folderManager.moveFolder('all-notes', folder.id);
+
+      expect(result).toBeNull();
+    });
+
+    it('should not allow moving into trash or all-notes', async () => {
+      const folder = await folderManager.createFolder('Folder', 'root');
+
+      const result1 = await folderManager.moveFolder(folder.id, 'trash');
+      const result2 = await folderManager.moveFolder(folder.id, 'all-notes');
+
+      expect(result1).toBeNull();
+      expect(result2).toBeNull();
+    });
+
+    it('should emit folder-moved event when folder is moved', async () => {
+      const folder1 = await folderManager.createFolder('Folder1', 'root');
+      const folder2 = await folderManager.createFolder('Folder2', 'root');
+
+      let eventData = null;
+      folderManager.addListener((event, data) => {
+        if (event === 'folder-moved') {
+          eventData = data;
+        }
+      });
+
+      await folderManager.moveFolder(folder2.id, folder1.id);
+
+      expect(eventData).toBeTruthy();
+      expect(eventData.folder.id).toBe(folder2.id);
+      expect(eventData.newParentId).toBe(folder1.id);
     });
   });
 });

@@ -217,6 +217,7 @@ export class FolderManager {
     return true;
   }
 
+
   /**
    * Get folder by ID
    * @param {string} folderId - Folder ID
@@ -258,7 +259,10 @@ export class FolderManager {
       }));
     };
 
-    return buildTree('root');
+    // Get all root-level folders including special folders
+    const rootFolders = buildTree('root');
+
+    return rootFolders;
   }
 
   /**
@@ -284,19 +288,24 @@ export class FolderManager {
    * Move folder to a new parent
    * @param {string} folderId - Folder ID to move
    * @param {string} newParentId - New parent folder ID
-   * @returns {boolean} Success
+   * @returns {object|null} Updated folder or null
    */
   async moveFolder(folderId, newParentId) {
     const folder = this.folders.get(folderId);
     const newParent = this.folders.get(newParentId);
 
     if (!folder || !newParent || folder.isSpecial || folder.isRoot) {
-      return false;
+      return null;
     }
 
-    // Prevent moving folder into its own subtree
-    if (this.isDescendant(newParentId, folderId)) {
-      throw new Error('Cannot move folder into its own subtree');
+    // Prevent moving folder into itself or its own subtree
+    if (folderId === newParentId || this.isDescendant(newParentId, folderId)) {
+      return null;
+    }
+
+    // Cannot move into trash or all-notes
+    if (newParentId === 'trash' || newParentId === 'all-notes') {
+      return null;
     }
 
     const updatedFolder = {
@@ -309,9 +318,9 @@ export class FolderManager {
     this.updateChildPaths(folderId, updatedFolder.path);
 
     await this.saveFolders();
-    this.notify('folder-moved', { folder: updatedFolder, oldParentId: folder.parentId });
+    this.notify('folder-moved', { folder: updatedFolder, newParentId });
 
-    return true;
+    return updatedFolder;
   }
 
   /**

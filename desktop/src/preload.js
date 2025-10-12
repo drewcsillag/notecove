@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:save', () => callback('menu:save'));
   },
 
+  // Window state
+  onWindowMaximized: (callback) => {
+    ipcRenderer.on('window:maximized', (event, isMaximized) => callback(isMaximized));
+  },
+
   // File system operations
   fileSystem: {
     readFile: (path) => ipcRenderer.invoke('fs:read-file', path),

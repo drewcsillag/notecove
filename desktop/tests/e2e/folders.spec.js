@@ -1,138 +1,524 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Folder Operations', () => {
+test.describe('Folder Organization', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage before each test to ensure clean state
+    await page.goto('/');
+    // Clear localStorage to start fresh
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('should display default folders', async ({ page }) => {
+    // Wait for folder tree to be visible
+    const folderTree = page.locator('#folderTree');
+    await expect(folderTree).toBeVisible();
+
+    // Should have "All Notes" folder
+    const allNotesFolder = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await expect(allNotesFolder).toBeVisible();
+
+    // Should have "Recently Deleted" (trash) folder
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await expect(trashFolder).toBeVisible();
+  });
+
+  test('should create a new folder', async ({ page }) => {
+    // Click the new folder button
+    const newFolderBtn = page.locator('#newFolderBtn');
+    await newFolderBtn.click();
+
+    // Wait for custom dialog to appear
+    await page.waitForTimeout(200);
+
+    // Fill in the dialog input
+    const dialogInput = page.locator('#dialogInput');
+    await dialogInput.fill('My Test Folder');
+
+    // Click OK button
+    const okButton = page.locator('#dialogOk');
+    await okButton.click();
+
+    // Wait a bit for the folder to be created
+    await page.waitForTimeout(500);
+
+    // Check if the folder appears in the tree
+    const testFolder = page.locator('.folder-item').filter({ hasText: 'My Test Folder' });
+    await expect(testFolder).toBeVisible();
+  });
+
+  test('should select a folder and show it as active', async ({ page }) => {
+    // Create a test folder
+    await page.locator('#newFolderBtn').click();
+    await page.waitForTimeout(200);
+    await page.locator('#dialogInput').fill('Selected Folder');
+    await page.locator('#dialogOk').click();
+    await page.waitForTimeout(500);
+
+    // Click on the folder
+    const testFolder = page.locator('.folder-item').filter({ hasText: 'Selected Folder' });
+    await testFolder.click();
+
+    // Folder should have active class
+    await expect(testFolder).toHaveClass(/active/);
+  });
+
+  test('should filter notes by selected folder', async ({ page }) => {
+    // Create two folders
+    await page.locator('#newFolderBtn').click();
+    await page.waitForTimeout(200);
+    await page.locator('#dialogInput').fill('Folder A');
+    await page.locator('#dialogOk').click();
+    await page.waitForTimeout(300);
+
+    await page.locator('#newFolderBtn').click();
+    await page.waitForTimeout(200);
+    await page.locator('#dialogInput').fill('Folder B');
+    await page.locator('#dialogOk').click();
+    await page.waitForTimeout(300);
+
+    // Select Folder A
+    const folderA = page.locator('.folder-item').filter({ hasText: 'Folder A' });
+    await folderA.click();
+    await page.waitForTimeout(200);
+
+    // Create a note in Folder A
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Note in Folder A');
+    await page.waitForTimeout(1500); // Wait for debounce
+
+    // Click away to save
+    await page.locator('.sidebar').click();
+    await page.waitForTimeout(300);
+
+    // Select Folder B
+    const folderB = page.locator('.folder-item').filter({ hasText: 'Folder B' });
+    await folderB.click();
+    await page.waitForTimeout(200);
+
+    // Should show "No notes yet"
+    const emptyMessage = page.locator('.notes-list').getByText(/No notes yet/);
+    await expect(emptyMessage).toBeVisible();
+
+    // Go back to Folder A
+    await folderA.click();
+    await page.waitForTimeout(200);
+
+    // Should show the note
+    const note = page.locator('.note-item').filter({ hasText: 'Note in Folder A' });
+    await expect(note).toBeVisible();
+  });
+
+  test('should create new notes in the selected folder', async ({ page }) => {
+    // Create a folder
+    await page.locator('#newFolderBtn').click();
+    await page.waitForTimeout(200);
+    await page.locator('#dialogInput').fill('Project Notes');
+    await page.locator('#dialogOk').click();
+    await page.waitForTimeout(300);
+
+    // Select the folder
+    const projectFolder = page.locator('.folder-item').filter({ hasText: 'Project Notes' });
+    await projectFolder.click();
+    await page.waitForTimeout(200);
+
+    // Create a new note
+    await page.locator('#newNoteBtn').click();
+    await page.locator('#editor .ProseMirror').fill('Project note content');
+    await page.waitForTimeout(1500);
+
+    // Click away and go to All Notes
+    await page.locator('.sidebar').click();
+    await page.waitForTimeout(300);
+
+    const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await allNotes.click();
+    await page.waitForTimeout(200);
+
+    // Note should be visible in All Notes
+    const note = page.locator('.note-item').filter({ hasText: 'Project note content' });
+    await expect(note).toBeVisible();
+
+    // Go back to Project Notes folder - should still see it there
+    await projectFolder.click();
+    await page.waitForTimeout(200);
+    await expect(note).toBeVisible();
+  });
+
+  test('should show trash folder icon', async ({ page }) => {
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await expect(trashFolder).toBeVisible();
+
+    // Check for trash icon
+    const trashIcon = trashFolder.locator('.folder-icon');
+    await expect(trashIcon).toHaveText('🗑️');
+  });
+});
+
+test.describe('Drag and Drop', () => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.reload();
+    await page.waitForLoadState('networkidle');
   });
 
-  test('should display folder section in sidebar', async ({ page }) => {
-    // Check that folders section exists
-    await expect(page.locator('.folder-section')).toBeVisible();
-    await expect(page.locator('.folder-section .section-header')).toContainText('Folders');
-  });
-
-  test('should show new folder button', async ({ page }) => {
-    // Check that new folder button is visible
-    const newFolderBtn = page.locator('#newFolderBtn');
-    await expect(newFolderBtn).toBeVisible();
-    await expect(newFolderBtn).toHaveAttribute('title', 'New Folder');
-  });
-
-  test('should display notes section with count', async ({ page }) => {
-    // Check that notes section exists
-    await expect(page.locator('.notes-section')).toBeVisible();
-    await expect(page.locator('.notes-section .section-header')).toContainText('Notes');
-
-    // Check that notes count is displayed
-    const notesCount = page.locator('#notesCount');
-    await expect(notesCount).toBeVisible();
-  });
-
-  test('should create note and see it in notes list', async ({ page }) => {
-    // Create a new note
-    await page.locator('.new-note-btn').click();
-
-    // Type content
-    await page.locator('#editor .ProseMirror').fill('Test Folder Note\nThis is a test note');
-
-    // Wait for debounce
-    await page.waitForTimeout(1500);
-
-    // Check that note appears in sidebar
-    await expect(page.locator('.note-item .note-title').first()).toContainText('Test Folder Note');
-
-    // Check that notes count updated (should be more than default 2 sample notes)
-    const notesCount = await page.locator('#notesCount').textContent();
-    expect(parseInt(notesCount)).toBeGreaterThan(0);
-  });
-
-  test('should show folder tree placeholder', async ({ page }) => {
-    // Check that folder tree container exists
-    const folderTree = page.locator('#folderTree');
-    await expect(folderTree).toBeVisible();
-  });
-
-  test('should maintain folder structure when creating notes', async ({ page }) => {
-    // Create first note
-    await page.locator('.new-note-btn').click();
-    await page.locator('#editor .ProseMirror').fill('First Note\nContent');
-    await page.waitForTimeout(1500);
-
-    // Create second note - should be in same folder structure
-    const welcomeState = page.locator('#welcomeState');
-    const editorState = page.locator('#editorState');
-
-    // Verify we're in editor state
-    await expect(editorState).toBeVisible();
-    await expect(welcomeState).toBeHidden();
-
-    // Check that both sections (folders and notes) are still visible
-    await expect(page.locator('.folder-section')).toBeVisible();
-    await expect(page.locator('.notes-section')).toBeVisible();
-  });
-
-  test('should have search box in sidebar', async ({ page }) => {
-    const searchBox = page.locator('.search-box');
-    const searchInput = page.locator('.search-input');
-
-    await expect(searchBox).toBeVisible();
-    await expect(searchInput).toBeVisible();
-    await expect(searchInput).toHaveAttribute('placeholder', 'Search notes...');
-  });
-
-  test('should filter notes when searching', async ({ page }) => {
-    // Create a note to search for
-    await page.locator('.new-note-btn').click();
-    await page.locator('#editor .ProseMirror').fill('Unique Search Term\nTest content');
-    await page.waitForTimeout(1500);
-
-    // Type in search box
-    await page.locator('.search-input').fill('Unique Search Term');
-
-    // Wait a bit for search to process
-    await page.waitForTimeout(500);
-
-    // Should show the note with matching title
-    const notesList = page.locator('#notesList');
-    await expect(notesList).toBeVisible();
-  });
-
-  test('should show correct UI states', async ({ page }) => {
-    // Initially should show welcome state (or notes if sample notes exist)
-    const welcomeState = page.locator('#welcomeState');
-    const editorState = page.locator('#editorState');
-
-    // Check initial state
-    const welcomeVisible = await welcomeState.isVisible();
-    const editorVisible = await editorState.isVisible();
-
-    // One should be visible, one should be hidden
-    expect(welcomeVisible || editorVisible).toBe(true);
-    expect(welcomeVisible && editorVisible).toBe(false);
-  });
-
-  test('should maintain sidebar layout when creating notes', async ({ page }) => {
+  test('should make notes draggable', async ({ page }) => {
     // Create a note
     await page.locator('.new-note-btn').click();
-    await page.locator('#editor .ProseMirror').fill('Layout Test\nContent');
+    await page.locator('#editor .ProseMirror').fill('Draggable Note');
+    await page.waitForTimeout(1500);
 
-    // Check that sidebar is still visible and properly laid out
-    const sidebar = page.locator('.sidebar');
-    await expect(sidebar).toBeVisible();
-
-    // Check that all sidebar sections are present
-    await expect(page.locator('.sidebar-header')).toBeVisible();
-    await expect(page.locator('.search-box')).toBeVisible();
-    await expect(page.locator('.folder-section')).toBeVisible();
-    await expect(page.locator('.notes-section')).toBeVisible();
+    // Check if note item has draggable attribute
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Draggable Note' });
+    await expect(noteItem).toHaveAttribute('draggable', 'true');
   });
 
-  test('should show NoteCove branding in sidebar', async ({ page }) => {
-    const logo = page.locator('.logo');
-    await expect(logo).toBeVisible();
-    await expect(logo).toContainText('NoteCove');
+  test('should move note between folders via drag and drop', async ({ page }) => {
+    // Create a folder
+    await page.locator('#newFolderBtn').click();
+    await page.waitForTimeout(200);
+    await page.locator('#dialogInput').fill('Target Folder');
+    await page.locator('#dialogOk').click();
+    await page.waitForTimeout(300);
+
+    // Create a note in All Notes
+    const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await allNotes.click();
+    await page.waitForTimeout(200);
+
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Note to Move');
+    await page.waitForTimeout(1500);
+
+    // Click away to save
+    await page.locator('.sidebar').click();
+    await page.waitForTimeout(300);
+
+    // Drag the note to Target Folder
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Note to Move' });
+    const targetFolder = page.locator('.folder-item').filter({ hasText: 'Target Folder' });
+
+    await noteItem.dragTo(targetFolder);
+    await page.waitForTimeout(500);
+
+    // Select Target Folder
+    await targetFolder.click();
+    await page.waitForTimeout(200);
+
+    // Note should be visible in Target Folder
+    await expect(noteItem).toBeVisible();
+
+    // Go back to All Notes - note should still be in all notes view
+    await allNotes.click();
+    await page.waitForTimeout(200);
+    await expect(noteItem).toBeVisible();
+  });
+
+  test('should allow dragging notes from trash to folders for restore', async ({ page }) => {
+    // Create a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Note to Delete');
+    await page.waitForTimeout(1500);
+
+    // Delete the note using delete button
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => true;
+    });
+    const deleteBtn = page.locator('#deleteNoteBtn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    // Go to trash
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    // Note should be draggable for restore
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Note to Delete' });
+    await expect(noteItem).toHaveAttribute('draggable', 'true');
+  });
+});
+
+test.describe('Trash Functionality', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('should show restore and delete buttons in trash view', async ({ page }) => {
+    // Create and delete a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Deleted Note');
+    await page.waitForTimeout(1500);
+
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => true;
+    });
+
+    const deleteBtn = page.locator('#deleteNoteBtn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    // Go to trash
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    // Should see restore and delete buttons
+    const restoreBtn = page.locator('.restore-btn').first();
+    const permDeleteBtn = page.locator('.delete-btn').first();
+
+    await expect(restoreBtn).toBeVisible();
+    await expect(permDeleteBtn).toBeVisible();
+  });
+
+  test('should restore note from trash', async ({ page }) => {
+    // Create and delete a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Restore Me');
+    await page.waitForTimeout(1500);
+
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => true;
+    });
+
+    const deleteBtn = page.locator('#deleteNoteBtn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Restore Me' });
+
+    // Go to trash
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    // Click restore button
+    const restoreBtn = page.locator('.restore-btn').first();
+    await restoreBtn.click();
+    await page.waitForTimeout(500);
+
+    // Note should not be in trash anymore
+    await expect(noteItem).not.toBeVisible();
+
+    // Go to All Notes
+    const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await allNotes.click();
+    await page.waitForTimeout(200);
+
+    // Note should be restored
+    await expect(noteItem).toBeVisible();
+  });
+
+  test('should permanently delete note from trash', async ({ page }) => {
+    // Create and delete a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Delete Forever');
+    await page.waitForTimeout(1500);
+
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => true;
+    });
+
+    const deleteBtn = page.locator('#deleteNoteBtn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Delete Forever' });
+
+    // Go to trash
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    // Click permanent delete button
+    const permDeleteBtn = page.locator('.delete-btn').first();
+    await permDeleteBtn.click();
+    await page.waitForTimeout(500);
+
+    // Note should not be in trash
+    await expect(noteItem).not.toBeVisible();
+
+    // Go to All Notes - note should not be there either
+    const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await allNotes.click();
+    await page.waitForTimeout(200);
+
+    await expect(noteItem).not.toBeVisible();
+  });
+
+  test('should cancel delete when user declines confirmation', async ({ page }) => {
+    // Create a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Keep This Note');
+    await page.waitForTimeout(1500);
+
+    // Click the delete button
+    const deleteBtn = page.locator('#deleteNoteBtn');
+
+    // Mock the custom confirm dialog to click Cancel
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => false;
+    });
+
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    // Note should still be visible in notes list
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Keep This Note' });
+    await expect(noteItem).toBeVisible();
+
+    // Should not be in trash
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    await expect(noteItem).not.toBeVisible();
+  });
+
+  test('should not show deleted notes in All Notes view', async ({ page }) => {
+    // Create a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Note to Hide');
+    await page.waitForTimeout(1500);
+
+    // Delete the note
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => true;
+    });
+
+    const deleteBtn = page.locator('#deleteNoteBtn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    // Go to All Notes
+    const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await allNotes.click();
+    await page.waitForTimeout(200);
+
+    // Note should NOT be visible in All Notes
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Note to Hide' });
+    await expect(noteItem).not.toBeVisible();
+
+    // But should be visible in trash
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    await expect(noteItem).toBeVisible();
+  });
+
+  test('should not show permanently deleted notes anywhere', async ({ page }) => {
+    // Create and delete a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Gone Forever');
+    await page.waitForTimeout(1500);
+
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => true;
+    });
+
+    const deleteBtn = page.locator('#deleteNoteBtn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    // Go to trash and permanently delete
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    const permDeleteBtn = page.locator('.delete-btn').first();
+    await permDeleteBtn.click();
+    await page.waitForTimeout(500);
+
+    // Should not be in trash
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Gone Forever' });
+    await expect(noteItem).not.toBeVisible();
+
+    // Go to All Notes - should not be there either
+    const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await allNotes.click();
+    await page.waitForTimeout(200);
+
+    await expect(noteItem).not.toBeVisible();
+  });
+
+  test('should restore note from trash via drag-and-drop to folder', async ({ page }) => {
+    // Create a folder
+    await page.locator('#newFolderBtn').click();
+    await page.waitForTimeout(200);
+    await page.locator('#dialogInput').fill('Restore Folder');
+    await page.locator('#dialogOk').click();
+    await page.waitForTimeout(300);
+
+    // Create and delete a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Restore via Drag');
+    await page.waitForTimeout(1500);
+
+    await page.evaluate(() => {
+      window.app.showConfirmDialog = async () => true;
+    });
+
+    const deleteBtn = page.locator('#deleteNoteBtn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    // Go to trash
+    const trashFolder = page.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
+    await trashFolder.click();
+    await page.waitForTimeout(200);
+
+    // Drag note to the restore folder
+    const noteItem = page.locator('.note-item').filter({ hasText: 'Restore via Drag' });
+    const restoreFolder = page.locator('.folder-item').filter({ hasText: 'Restore Folder' });
+
+    await noteItem.dragTo(restoreFolder);
+    await page.waitForTimeout(500);
+
+    // Note should not be in trash anymore
+    await expect(noteItem).not.toBeVisible();
+
+    // Go to restore folder - note should be there
+    await restoreFolder.click();
+    await page.waitForTimeout(200);
+
+    await expect(noteItem).toBeVisible();
+
+    // Note should also appear in All Notes
+    const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
+    await allNotes.click();
+    await page.waitForTimeout(200);
+
+    await expect(noteItem).toBeVisible();
+  });
+
+  test('should not allow single-click to double-select notes', async ({ page }) => {
+    // Create two notes
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('First Note');
+    await page.waitForTimeout(1500);
+
+    await page.locator('.sidebar').click();
+    await page.waitForTimeout(200);
+
+    await page.locator('#newNoteBtn').click();
+    await page.locator('#editor .ProseMirror').fill('Second Note');
+    await page.waitForTimeout(1500);
+
+    // Click on first note once
+    const firstNote = page.locator('.note-item').filter({ hasText: 'First Note' });
+    await firstNote.click();
+    await page.waitForTimeout(200);
+
+    // Editor should show first note content
+    const editorText = await page.locator('#editor .ProseMirror').textContent();
+    expect(editorText).toContain('First Note');
+
+    // First note should be active
+    await expect(firstNote).toHaveClass(/active/);
   });
 });

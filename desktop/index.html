@@ -66,6 +66,11 @@
       background: var(--background);
     }
 
+    /* When NOT maximized (normal windowed mode), add space for traffic lights */
+    body.maximized .sidebar-header {
+      padding: 48px 16px 16px 16px;
+    }
+
     .logo {
       font-size: 20px;
       font-weight: 600;
@@ -272,10 +277,44 @@
       cursor: pointer;
       margin-bottom: 4px;
       transition: background-color 0.2s;
+      position: relative;
     }
 
     .note-item:hover {
       background: var(--background);
+    }
+
+    .note-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .note-action-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .note-action-btn:hover {
+      background: var(--background);
+      transform: scale(1.05);
+    }
+
+    .restore-btn:hover {
+      background: #4CAF50;
+      color: white;
+      border-color: #4CAF50;
+    }
+
+    .delete-btn:hover {
+      background: #f44336;
+      color: white;
+      border-color: #f44336;
     }
 
     .note-item.active {
@@ -351,6 +390,20 @@
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
+      justify-content: space-between;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
     .toolbar-btn {
@@ -376,11 +429,27 @@
       border-color: var(--primary);
     }
 
+    .toolbar-btn.delete-btn {
+      color: #ef4444;
+    }
+
+    .toolbar-btn.delete-btn:hover {
+      background: #fee;
+      border-color: #ef4444;
+    }
+
     .toolbar-separator {
       width: 1px;
       height: 20px;
       background: var(--border);
       margin: 0 4px;
+    }
+
+    .editor-state {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
     }
 
     .editor-container {
@@ -390,7 +459,6 @@
     }
 
     .editor {
-      min-height: 100%;
       font-size: 16px;
       line-height: 1.6;
       color: var(--text-primary);
@@ -527,6 +595,16 @@
       background: #153A6B;
     }
 
+    /* Drag and drop styles */
+    .note-item.dragging {
+      opacity: 0.5;
+    }
+
+    .folder-item.drag-over {
+      background: rgba(26, 115, 232, 0.1);
+      border-left: 3px solid var(--primary-color);
+    }
+
     /* Scrollbar styling */
     ::-webkit-scrollbar {
       width: 6px;
@@ -634,19 +712,24 @@
 
       <div id="editorState" class="editor-state" style="display: none; flex-direction: column; flex: 1;">
         <div class="editor-toolbar" id="editorToolbar">
-          <button class="toolbar-btn" data-action="bold" title="Bold (Cmd+B)"><strong>B</strong></button>
-          <button class="toolbar-btn" data-action="italic" title="Italic (Cmd+I)"><em>I</em></button>
-          <button class="toolbar-btn" data-action="strike" title="Strikethrough" style="text-decoration: line-through;">S</button>
-          <span class="toolbar-separator"></span>
-          <button class="toolbar-btn" data-action="heading1" title="Heading 1">H1</button>
-          <button class="toolbar-btn" data-action="heading2" title="Heading 2">H2</button>
-          <button class="toolbar-btn" data-action="heading3" title="Heading 3">H3</button>
-          <span class="toolbar-separator"></span>
-          <button class="toolbar-btn" data-action="bulletList" title="Bullet List">• List</button>
-          <button class="toolbar-btn" data-action="orderedList" title="Numbered List">1. List</button>
-          <span class="toolbar-separator"></span>
-          <button class="toolbar-btn" data-action="undo" title="Undo (Cmd+Z)">↶</button>
-          <button class="toolbar-btn" data-action="redo" title="Redo (Cmd+Shift+Z)">↷</button>
+          <div class="toolbar-left">
+            <button class="toolbar-btn" data-action="bold" title="Bold (Cmd+B)"><strong>B</strong></button>
+            <button class="toolbar-btn" data-action="italic" title="Italic (Cmd+I)"><em>I</em></button>
+            <button class="toolbar-btn" data-action="strike" title="Strikethrough" style="text-decoration: line-through;">S</button>
+            <span class="toolbar-separator"></span>
+            <button class="toolbar-btn" data-action="heading1" title="Heading 1">H1</button>
+            <button class="toolbar-btn" data-action="heading2" title="Heading 2">H2</button>
+            <button class="toolbar-btn" data-action="heading3" title="Heading 3">H3</button>
+            <span class="toolbar-separator"></span>
+            <button class="toolbar-btn" data-action="bulletList" title="Bullet List">• List</button>
+            <button class="toolbar-btn" data-action="orderedList" title="Numbered List">1. List</button>
+            <span class="toolbar-separator"></span>
+            <button class="toolbar-btn" data-action="undo" title="Undo (Cmd+Z)">↶</button>
+            <button class="toolbar-btn" data-action="redo" title="Redo (Cmd+Shift+Z)">↷</button>
+          </div>
+          <div class="toolbar-right">
+            <button class="toolbar-btn delete-btn" id="deleteNoteBtn" title="Move to Trash">🗑️ Delete</button>
+          </div>
         </div>
         <div class="editor-container">
           <div class="editor" id="editor" data-placeholder="Start writing..."></div>
