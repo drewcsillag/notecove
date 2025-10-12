@@ -1,6 +1,7 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { generateUUID, debounce } from './utils.js';
+import { Hashtag } from './extensions/hashtag.js';
 
 /**
  * NoteCove rich text editor wrapper around TipTap
@@ -39,7 +40,8 @@ export class NoteCoveEditor {
             keepMarks: true,
             keepAttributes: false
           }
-        })
+        }),
+        Hashtag
       ],
       content: '',
       autofocus: this.options.autofocus,

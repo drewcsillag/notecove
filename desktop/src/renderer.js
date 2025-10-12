@@ -13,6 +13,7 @@ class NoteCoveApp {
     this.searchQuery = '';
     this.currentFolderId = 'all-notes'; // Default to All Notes folder
     this.folderManager = null;
+    this.selectedTag = null; // Selected tag filter
 
     this.initializeApp();
     this.setupEventListeners();
@@ -43,6 +44,7 @@ class NoteCoveApp {
     // Update UI after notes are loaded
     this.updateUI();
     this.renderFolderTree();
+    this.renderTagsList();
   }
 
   initializeEditor() {
@@ -175,10 +177,35 @@ class NoteCoveApp {
       const firstLine = text.split('\n')[0].trim();
       const title = firstLine || 'Untitled';
 
+      // Extract tags from content
+      const tags = this.extractTags(text);
+
+      // Check if tags have changed
+      const tagsChanged = JSON.stringify(this.currentNote.tags || []) !== JSON.stringify(tags);
+
       this.currentNote.title = title;
       this.currentNote.content = content;
-      this.noteManager.updateNote(this.currentNote.id, { title, content });
+      this.currentNote.tags = tags;
+      this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+
+      // Only re-render tags list if tags actually changed
+      if (tagsChanged) {
+        this.renderTagsList();
+      }
     }
+  }
+
+  /**
+   * Extract hashtags from text
+   * @param {string} text - Text to extract tags from
+   * @returns {Array<string>} Array of unique tags (without # prefix)
+   */
+  extractTags(text) {
+    const tagRegex = /#[\w-]+/g;
+    const matches = text.match(tagRegex) || [];
+    // Remove # prefix and deduplicate
+    const tags = [...new Set(matches.map(tag => tag.substring(1)))];
+    return tags;
   }
 
   handleEditorFocus() {
@@ -205,11 +232,15 @@ class NoteCoveApp {
     } else {
       // Show notes list
       this.renderNotesList();
+      this.renderTagsList();
 
       if (this.currentNote) {
         welcomeState.style.display = 'none';
         editorState.style.display = 'flex';
-        this.renderCurrentNote();
+        // Only render current note if not actively editing (to avoid scroll issues)
+        if (!this.isEditing) {
+          this.renderCurrentNote();
+        }
       } else {
         welcomeState.style.display = 'flex';
         editorState.style.display = 'none';
@@ -241,6 +272,13 @@ class NoteCoveApp {
           );
         });
       }
+    }
+
+    // Filter by selected tag
+    if (this.selectedTag) {
+      filteredNotes = filteredNotes.filter(note =>
+        note.tags && note.tags.includes(this.selectedTag)
+      );
     }
 
     // Update notes count
@@ -290,7 +328,72 @@ class NoteCoveApp {
     });
   }
 
-  renderCurrentNote() {
+  /**
+   * Render tags list with counts
+   */
+  renderTagsList() {
+    const tagsList = document.getElementById('tagsList');
+    if (!tagsList) return;
+
+    // Collect all tags with counts
+    const tagCounts = new Map();
+    this.notes.forEach(note => {
+      if (note.tags && note.tags.length > 0) {
+        note.tags.forEach(tag => {
+          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        });
+      }
+    });
+
+    // Sort tags alphabetically
+    const sortedTags = Array.from(tagCounts.entries()).sort((a, b) =>
+      a[0].localeCompare(b[0])
+    );
+
+    if (sortedTags.length === 0) {
+      tagsList.innerHTML = `
+        <div style="padding: 8px; text-align: center; color: var(--text-secondary); font-size: 12px;">
+          No tags yet
+        </div>
+      `;
+      return;
+    }
+
+    tagsList.innerHTML = sortedTags.map(([tag, count]) => `
+      <div class="tag-item ${this.selectedTag === tag ? 'active' : ''}"
+           data-tag="${escapeHtml(tag)}">
+        <span class="tag-name">#${escapeHtml(tag)}</span>
+        <span class="tag-count">${count}</span>
+      </div>
+    `).join('');
+
+    // Add click event listeners
+    const tagItems = tagsList.querySelectorAll('.tag-item');
+    tagItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const tag = item.dataset.tag;
+        this.selectTag(tag);
+      });
+    });
+  }
+
+  /**
+   * Select a tag to filter notes
+   * @param {string} tag - Tag to filter by
+   */
+  selectTag(tag) {
+    // Toggle tag selection - clicking the same tag deselects it
+    if (this.selectedTag === tag) {
+      this.selectedTag = null;
+    } else {
+      this.selectedTag = tag;
+    }
+
+    this.renderTagsList();
+    this.renderNotesList();
+  }
+
+  renderCurrentNote(scrollToTop = true) {
     if (!this.currentNote) return;
 
     // Always update editor content when switching notes
@@ -303,14 +406,15 @@ class NoteCoveApp {
         this.editor.focus();
       }
 
-      // Scroll to top of editor container after a brief delay to ensure content is rendered
-      // and focus has been applied
-      setTimeout(() => {
-        const editorContainer = document.querySelector('.editor-container');
-        if (editorContainer) {
-          editorContainer.scrollTop = 0;
-        }
-      }, 0);
+      // Scroll to top of editor container only when switching notes
+      if (scrollToTop) {
+        setTimeout(() => {
+          const editorContainer = document.querySelector('.editor-container');
+          if (editorContainer) {
+            editorContainer.scrollTop = 0;
+          }
+        }, 0);
+      }
     }
   }
 

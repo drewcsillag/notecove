@@ -125,7 +125,7 @@
       overflow: hidden;
     }
 
-    .folder-section, .notes-section {
+    .folder-section, .tags-section, .notes-section {
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -133,7 +133,13 @@
 
     .folder-section {
       flex: 0 0 auto;
-      max-height: 40%;
+      max-height: 30%;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tags-section {
+      flex: 0 0 auto;
+      max-height: 20%;
       border-bottom: 1px solid var(--border);
     }
 
@@ -263,6 +269,49 @@
 
     .folder-children.collapsed {
       display: none;
+    }
+
+    .tags-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-content: flex-start;
+    }
+
+    .tag-item {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      background: var(--surface);
+      color: var(--primary-color);
+      border: 1px solid var(--primary-color);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tag-item:hover {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .tag-item.active {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .tag-name {
+      margin-right: 4px;
+    }
+
+    .tag-count {
+      font-size: 10px;
+      opacity: 0.7;
     }
 
     .notes-list {
@@ -550,6 +599,17 @@
       padding: 0;
     }
 
+    /* Hashtags */
+    .editor .hashtag {
+      color: var(--primary-color);
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .editor .hashtag:hover {
+      text-decoration: underline;
+    }
+
     /* Welcome state */
     .welcome-state {
       display: flex;
@@ -684,6 +744,15 @@
           </div>
           <div class="folder-tree" id="folderTree">
             <!-- Folder tree will be populated here -->
+          </div>
+        </div>
+
+        <div class="tags-section">
+          <div class="section-header">
+            <span class="section-title">Tags</span>
+          </div>
+          <div class="tags-list" id="tagsList">
+            <!-- Tags will be populated here -->
           </div>
         </div>
 
