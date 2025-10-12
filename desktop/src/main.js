@@ -1,11 +1,26 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const Store = require('electron-store');
 const path = require('path');
+const fs = require('fs').promises;
+const chokidar = require('chokidar');
+const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 
 class NoteCoveApp {
   constructor() {
     this.mainWindow = null;
+    this.watchers = new Map(); // File system watchers
+    this.store = new Store({
+      defaults: {
+        windowGeometry: { width: 1200, height: 800 },
+        theme: 'auto',
+        lastOpenNote: null,
+        notesPath: path.join(os.homedir(), 'Documents', 'NoteCove'),
+        documentsPath: path.join(os.homedir(), 'Documents')
+      }
+    });
     this.setupApp();
+    this.setupIPC();
   }
 
   setupApp() {
@@ -38,9 +53,13 @@ class NoteCoveApp {
   }
 
   createMainWindow() {
+    const geometry = this.store.get('windowGeometry');
+
     this.mainWindow = new BrowserWindow({
-      width: 1200,
-      height: 800,
+      width: geometry.width || 1200,
+      height: geometry.height || 800,
+      x: geometry.x,
+      y: geometry.y,
       minWidth: 800,
       minHeight: 600,
       webPreferences: {
@@ -50,7 +69,8 @@ class NoteCoveApp {
         preload: path.join(__dirname, 'preload.js')
       },
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-      show: false // Don't show until ready
+      show: false, // Don't show until ready
+      icon: path.join(__dirname, '../assets/icon.png') // Will add icon later
     });
 
     // Load the app
@@ -69,6 +89,132 @@ class NoteCoveApp {
     // Handle window closed
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
+    });
+
+    // Save window geometry on resize and move
+    this.mainWindow.on('resize', () => this.saveWindowGeometry());
+    this.mainWindow.on('move', () => this.saveWindowGeometry());
+  }
+
+  saveWindowGeometry() {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      const bounds = this.mainWindow.getBounds();
+      this.store.set('windowGeometry', bounds);
+    }
+  }
+
+  setupIPC() {
+    // File system operations (will be implemented in later commits)
+    ipcMain.handle('fs:read-file', async (event, filePath) => {
+      try {
+        const content = await fs.readFile(filePath, 'utf8');
+        return { success: true, content };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('fs:write-file', async (event, filePath, content) => {
+      try {
+        // Ensure directory exists
+        const dir = path.dirname(filePath);
+        await fs.mkdir(dir, { recursive: true });
+
+        await fs.writeFile(filePath, content, 'utf8');
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('fs:exists', async (event, filePath) => {
+      try {
+        await fs.access(filePath);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    ipcMain.handle('fs:read-dir', async (event, dirPath) => {
+      try {
+        const files = await fs.readdir(dirPath);
+        return { success: true, files };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Settings management
+    ipcMain.handle('settings:get', (event, key) => {
+      return this.store.get(key);
+    });
+
+    ipcMain.handle('settings:set', (event, key, value) => {
+      this.store.set(key, value);
+      return true;
+    });
+
+    // File watching
+    ipcMain.handle('fs:watch', async (event, watchPath, watchId) => {
+      try {
+        if (this.watchers.has(watchId)) {
+          await this.watchers.get(watchId).close();
+        }
+
+        const watcher = chokidar.watch(watchPath, {
+          ignored: /(^|[\/\\])\../, // ignore dotfiles
+          persistent: true,
+          ignoreInitial: true
+        });
+
+        watcher.on('all', (eventType, filePath) => {
+          if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+            this.mainWindow.webContents.send(`fs:watch:${watchId}`, {
+              event: eventType,
+              path: filePath
+            });
+          }
+        });
+
+        this.watchers.set(watchId, watcher);
+        return { success: true, watchId };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('fs:unwatch', async (event, watchId) => {
+      try {
+        if (this.watchers.has(watchId)) {
+          await this.watchers.get(watchId).close();
+          this.watchers.delete(watchId);
+        }
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Directory operations
+    ipcMain.handle('fs:mkdir', async (event, dirPath) => {
+      try {
+        await fs.mkdir(dirPath, { recursive: true });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Dialog operations
+    ipcMain.handle('dialog:show-open', async (event, options) => {
+      const result = await dialog.showOpenDialog(this.mainWindow, options);
+      return result;
+    });
+
+    ipcMain.handle('dialog:show-save', async (event, options) => {
+      const result = await dialog.showSaveDialog(this.mainWindow, options);
+      return result;
     });
   }
 

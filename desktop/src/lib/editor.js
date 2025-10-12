@@ -1,0 +1,207 @@
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import { generateUUID, debounce } from './utils.js';
+
+/**
+ * NoteCove rich text editor wrapper around TipTap
+ */
+export class NoteCoveEditor {
+  constructor(element, options = {}) {
+    this.element = element;
+    this.options = {
+      autofocus: true,
+      placeholder: 'Start writing...',
+      onUpdate: () => {},
+      onFocus: () => {},
+      onBlur: () => {},
+      ...options
+    };
+
+    this.currentNote = null;
+    this.isReady = false;
+
+    this.initializeEditor();
+  }
+
+  initializeEditor() {
+    this.editor = new Editor({
+      element: this.element,
+      extensions: [
+        StarterKit.configure({
+          heading: {
+            levels: [1, 2, 3]
+          },
+          bulletList: {
+            keepMarks: true,
+            keepAttributes: false
+          },
+          orderedList: {
+            keepMarks: true,
+            keepAttributes: false
+          }
+        })
+      ],
+      content: '',
+      autofocus: this.options.autofocus,
+      editable: true,
+      injectCSS: false,
+      onUpdate: ({ editor }) => {
+        this.handleUpdate(editor);
+      },
+      onFocus: ({ editor }) => {
+        this.options.onFocus(editor);
+      },
+      onBlur: ({ editor }) => {
+        this.options.onBlur(editor);
+      },
+      onCreate: () => {
+        this.isReady = true;
+        this.updatePlaceholder();
+      }
+    });
+
+    // Debounced update handler to avoid excessive saves
+    this.debouncedUpdate = debounce((editor) => {
+      this.options.onUpdate(editor);
+    }, 1000); // Increased debounce time to reduce flickering
+  }
+
+  handleUpdate(editor) {
+    this.updatePlaceholder();
+    this.debouncedUpdate(editor);
+  }
+
+  updatePlaceholder() {
+    const isEmpty = this.editor.isEmpty;
+    const element = this.editor.view.dom;
+
+    if (isEmpty && !element.classList.contains('is-empty')) {
+      element.classList.add('is-empty');
+      element.setAttribute('data-placeholder', this.options.placeholder);
+    } else if (!isEmpty && element.classList.contains('is-empty')) {
+      element.classList.remove('is-empty');
+      element.removeAttribute('data-placeholder');
+    }
+  }
+
+  /**
+   * Set the content of the editor
+   * @param {string} content - HTML content
+   */
+  setContent(content) {
+    if (this.isReady) {
+      this.editor.commands.setContent(content || '');
+      this.updatePlaceholder();
+    }
+  }
+
+  /**
+   * Get the current content as HTML
+   * @returns {string} HTML content
+   */
+  getContent() {
+    return this.isReady ? this.editor.getHTML() : '';
+  }
+
+  /**
+   * Get the current content as plain text
+   * @returns {string} Plain text content
+   */
+  getText() {
+    return this.isReady ? this.editor.getText() : '';
+  }
+
+  /**
+   * Focus the editor
+   */
+  focus() {
+    if (this.isReady) {
+      this.editor.commands.focus();
+    }
+  }
+
+  /**
+   * Check if the editor has focus
+   * @returns {boolean}
+   */
+  isFocused() {
+    return this.isReady ? this.editor.isFocused : false;
+  }
+
+  /**
+   * Check if editor is empty
+   * @returns {boolean}
+   */
+  isEmpty() {
+    return this.isReady ? this.editor.isEmpty : true;
+  }
+
+  /**
+   * Insert text at current position
+   * @param {string} text
+   */
+  insertText(text) {
+    if (this.isReady) {
+      this.editor.commands.insertContent(text);
+    }
+  }
+
+  /**
+   * Format text commands
+   */
+  bold() {
+    if (this.isReady) {
+      this.editor.chain().focus().toggleBold().run();
+    }
+  }
+
+  italic() {
+    if (this.isReady) {
+      this.editor.chain().focus().toggleItalic().run();
+    }
+  }
+
+  heading(level = 1) {
+    if (this.isReady) {
+      this.editor.chain().focus().toggleHeading({ level }).run();
+    }
+  }
+
+  bulletList() {
+    if (this.isReady) {
+      this.editor.chain().focus().toggleBulletList().run();
+    }
+  }
+
+  orderedList() {
+    if (this.isReady) {
+      this.editor.chain().focus().toggleOrderedList().run();
+    }
+  }
+
+  /**
+   * Get formatting state
+   */
+  getFormatState() {
+    if (!this.isReady) return {};
+
+    return {
+      isBold: this.editor.isActive('bold'),
+      isItalic: this.editor.isActive('italic'),
+      isHeading1: this.editor.isActive('heading', { level: 1 }),
+      isHeading2: this.editor.isActive('heading', { level: 2 }),
+      isHeading3: this.editor.isActive('heading', { level: 3 }),
+      isBulletList: this.editor.isActive('bulletList'),
+      isOrderedList: this.editor.isActive('orderedList')
+    };
+  }
+
+  /**
+   * Destroy the editor
+   */
+  destroy() {
+    if (this.editor) {
+      this.editor.destroy();
+    }
+  }
+}

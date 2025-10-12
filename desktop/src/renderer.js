@@ -1,15 +1,22 @@
+import { NoteCoveEditor } from './lib/editor.js';
+import { NoteManager } from './lib/note-manager.js';
+import { debounce, escapeHtml, getPreview, formatDate } from './lib/utils.js';
+
 // NoteCove Renderer Process
 class NoteCoveApp {
   constructor() {
     this.currentNote = null;
     this.notes = [];
     this.isEditing = false;
+    this.editor = null;
+    this.noteManager = null;
+    this.searchQuery = '';
 
     this.initializeApp();
     this.setupEventListeners();
   }
 
-  initializeApp() {
+  async initializeApp() {
     console.log('NoteCove Desktop v0.1.0 - Initializing...');
 
     // Check if we have electron API
@@ -20,9 +27,52 @@ class NoteCoveApp {
       console.log('Running in web mode');
     }
 
-    // Load existing notes (placeholder for now)
-    this.loadNotes();
+    // Initialize note manager
+    this.noteManager = new NoteManager();
+    this.noteManager.addListener((event, data) => this.handleNoteEvent(event, data));
+
+    // Initialize editor
+    this.initializeEditor();
+
+    // Update UI after notes are loaded
     this.updateUI();
+  }
+
+  initializeEditor() {
+    const editorElement = document.getElementById('editor');
+    if (!editorElement) {
+      console.error('Editor element not found');
+      return;
+    }
+
+    this.editor = new NoteCoveEditor(editorElement, {
+      placeholder: 'Start writing your note...',
+      onUpdate: () => this.handleEditorUpdate(),
+      onFocus: () => this.handleEditorFocus(),
+      onBlur: () => this.handleEditorBlur()
+    });
+  }
+
+  handleNoteEvent(event, data) {
+    switch (event) {
+      case 'notes-loaded':
+        this.notes = data.notes;
+        this.updateUI();
+        break;
+      case 'note-created':
+        this.notes = this.noteManager.getAllNotes();
+        this.updateUI();
+        break;
+      case 'note-updated':
+        // Only update the notes array in memory, don't re-render to avoid flickering
+        this.notes = this.noteManager.getAllNotes();
+        break;
+      case 'note-deleted':
+      case 'note-restored':
+        this.notes = this.noteManager.getAllNotes();
+        this.updateUI();
+        break;
+    }
   }
 
   setupEventListeners() {
@@ -32,20 +82,13 @@ class NoteCoveApp {
       newNoteBtn.addEventListener('click', () => this.createNewNote());
     }
 
-    // Note title input
-    const titleInput = document.getElementById('noteTitleInput');
-    if (titleInput) {
-      titleInput.addEventListener('input', (e) => this.onTitleChange(e.target.value));
-      titleInput.addEventListener('blur', () => this.saveCurrentNote());
+    // New folder button
+    const newFolderBtn = document.getElementById('newFolderBtn');
+    if (newFolderBtn) {
+      newFolderBtn.addEventListener('click', () => this.createNewFolder());
     }
 
-    // Editor
-    const editor = document.getElementById('editor');
-    if (editor) {
-      editor.addEventListener('input', () => this.onEditorChange());
-      editor.addEventListener('focus', () => this.onEditorFocus());
-      editor.addEventListener('blur', () => this.saveCurrentNote());
-    }
+    // Editor events are handled via TipTap callbacks
 
     // Search
     const searchInput = document.querySelector('.search-input');
@@ -73,19 +116,30 @@ class NoteCoveApp {
     });
   }
 
-  loadNotes() {
-    // Placeholder: Load notes from storage
-    // This will be implemented with actual file system in later commits
-    this.notes = [
-      {
-        id: '1',
-        title: 'Welcome to NoteCove',
-        content: 'This is your first note! Start typing to edit it.',
-        created: new Date().toISOString(),
-        modified: new Date().toISOString(),
-        tags: ['welcome']
-      }
-    ];
+  handleEditorUpdate() {
+    if (this.currentNote && this.editor) {
+      const content = this.editor.getContent();
+      const text = this.editor.getText();
+
+      // Extract title from first line
+      const firstLine = text.split('\n')[0].trim();
+      const title = firstLine || 'Untitled';
+
+      this.currentNote.title = title;
+      this.currentNote.content = content;
+      this.noteManager.updateNote(this.currentNote.id, { title, content });
+    }
+  }
+
+  handleEditorFocus() {
+    this.isEditing = true;
+  }
+
+  handleEditorBlur() {
+    this.isEditing = false;
+    this.saveCurrentNote();
+    // Update the notes list when done editing
+    this.renderNotesList();
   }
 
   updateUI() {
@@ -115,12 +169,25 @@ class NoteCoveApp {
 
   renderNotesList() {
     const notesList = document.getElementById('notesList');
+    const filteredNotes = this.searchQuery ?
+      this.noteManager.searchNotes(this.searchQuery) :
+      this.notes;
 
-    notesList.innerHTML = this.notes.map(note => `
+    if (filteredNotes.length === 0) {
+      notesList.innerHTML = `
+        <div style="padding: 16px; text-align: center; color: var(--text-secondary);">
+          ${this.searchQuery ? 'No notes found' : 'No notes yet'}
+        </div>
+      `;
+      return;
+    }
+
+    notesList.innerHTML = filteredNotes.map(note => `
       <div class="note-item ${this.currentNote?.id === note.id ? 'active' : ''}"
            onclick="app.selectNote('${note.id}')">
-        <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
-        <div class="note-preview">${this.getPreview(note.content)}</div>
+        <div class="note-title">${escapeHtml(note.title || 'Untitled')}</div>
+        <div class="note-preview">${getPreview(this.editor ? this.editor.getText() : note.content, 60)}</div>
+        <div class="note-meta">${formatDate(note.modified)}</div>
       </div>
     `).join('');
   }
@@ -128,70 +195,41 @@ class NoteCoveApp {
   renderCurrentNote() {
     if (!this.currentNote) return;
 
-    const titleInput = document.getElementById('noteTitleInput');
-    const editor = document.getElementById('editor');
-
-    if (titleInput) {
-      titleInput.value = this.currentNote.title || '';
-    }
-
-    if (editor) {
-      editor.innerHTML = this.formatContent(this.currentNote.content || '');
+    // Only update editor content if it's not currently being edited
+    if (this.editor && !this.editor.isFocused()) {
+      this.editor.setContent(this.currentNote.content || '');
     }
   }
 
   createNewNote() {
-    const newNote = {
-      id: Date.now().toString(),
-      title: '',
-      content: '',
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-      tags: []
-    };
-
-    this.notes.unshift(newNote);
+    const newNote = this.noteManager.createNote();
     this.currentNote = newNote;
     this.updateUI();
 
-    // Focus on title input
+    // Focus on editor
     setTimeout(() => {
-      const titleInput = document.getElementById('noteTitleInput');
-      if (titleInput) {
-        titleInput.focus();
+      if (this.editor) {
+        this.editor.focus();
       }
     }, 100);
   }
 
+  createNewFolder() {
+    // For now, just log a message. A proper modal dialog would be better.
+    console.log('Create folder feature coming soon!');
+    // TODO: Implement a proper modal dialog for folder creation
+    this.updateStatus('Folder feature coming soon');
+  }
+
   selectNote(noteId) {
-    const note = this.notes.find(n => n.id === noteId);
-    if (note) {
+    const note = this.noteManager.getNote(noteId);
+    if (note && !note.deleted) {
       this.saveCurrentNote(); // Save previous note
       this.currentNote = note;
       this.updateUI();
     }
   }
 
-  onTitleChange(title) {
-    if (this.currentNote) {
-      this.currentNote.title = title;
-      this.currentNote.modified = new Date().toISOString();
-      this.updateNoteInList();
-    }
-  }
-
-  onEditorChange() {
-    if (this.currentNote) {
-      const editor = document.getElementById('editor');
-      this.currentNote.content = editor.textContent || '';
-      this.currentNote.modified = new Date().toISOString();
-      this.updateNoteInList();
-    }
-  }
-
-  onEditorFocus() {
-    this.isEditing = true;
-  }
 
   updateNoteInList() {
     // Update the note item in the sidebar
@@ -200,15 +238,14 @@ class NoteCoveApp {
 
   saveCurrentNote() {
     if (this.currentNote) {
-      // Placeholder: Save to file system
-      console.log('Saving note:', this.currentNote.title);
+      // Note is automatically saved via noteManager updates
       this.updateStatus('Saved');
     }
   }
 
   onSearch(query) {
-    // Placeholder: Implement search
-    console.log('Searching for:', query);
+    this.searchQuery = query.trim();
+    this.updateUI();
   }
 
   handleKeyboard(e) {
@@ -227,21 +264,7 @@ class NoteCoveApp {
     }
   }
 
-  formatContent(content) {
-    // Basic HTML escaping and formatting
-    return this.escapeHtml(content).replace(/\n/g, '<br>');
-  }
-
-  getPreview(content) {
-    const preview = (content || '').replace(/\n/g, ' ').substring(0, 60);
-    return preview.length < content.length ? preview + '...' : preview;
-  }
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
+  // Removed - now using imported utility functions
 
   updateStatus(message) {
     const statusLeft = document.querySelector('.status-left');

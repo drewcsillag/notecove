@@ -9,12 +9,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:save', callback);
   },
 
-  // File system operations (to be implemented)
+  // File system operations
   fileSystem: {
     readFile: (path) => ipcRenderer.invoke('fs:read-file', path),
     writeFile: (path, content) => ipcRenderer.invoke('fs:write-file', path, content),
     exists: (path) => ipcRenderer.invoke('fs:exists', path),
     readDir: (path) => ipcRenderer.invoke('fs:read-dir', path),
+    mkdir: (path) => ipcRenderer.invoke('fs:mkdir', path),
     watch: (path, callback) => {
       const id = Math.random().toString(36);
       ipcRenderer.on(`fs:watch:${id}`, callback);
@@ -24,7 +25,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     unwatch: (id) => ipcRenderer.invoke('fs:unwatch', id)
   },
 
+  // Settings management
+  settings: {
+    get: (key) => ipcRenderer.invoke('settings:get', key),
+    set: (key, value) => ipcRenderer.invoke('settings:set', key, value)
+  },
+
+  // Dialog operations
+  dialog: {
+    showOpen: (options) => ipcRenderer.invoke('dialog:show-open', options),
+    showSave: (options) => ipcRenderer.invoke('dialog:show-save', options)
+  },
+
   // App info
   platform: process.platform,
-  version: process.versions.electron
+  version: process.versions.electron,
+  isElectron: true
 });

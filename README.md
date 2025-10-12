@@ -82,9 +82,42 @@ npm run build:dist
 
 ### Testing
 
-- **Unit Tests**: Jest/Vitest for core logic
-- **E2E Tests**: Playwright for desktop app testing
-- **iOS Tests**: XCTest for iOS-specific functionality
+NoteCove includes comprehensive test coverage:
+
+**Desktop App Tests:**
+```bash
+cd desktop
+
+# Run unit tests (Vitest)
+npm test                    # Watch mode
+npm test -- --run          # Run once
+
+# Run E2E tests (Playwright)
+npm run test:e2e
+
+# Run linting
+npm run lint
+npm run lint:fix           # Auto-fix issues
+```
+
+**Test Coverage:**
+- **Unit Tests** (Vitest with jsdom): 66 tests covering:
+  - Utilities (12 tests)
+  - Note Manager (17 tests)
+  - Folder Manager (33 tests)
+  - Renderer logic (4 tests)
+- **E2E Tests** (Playwright): 16 tests for:
+  - Basic workflows (5 tests)
+  - Folder operations (11 tests)
+- **iOS Tests**: XCTest for iOS-specific functionality (coming soon)
+
+**Test Data Isolation:**
+Tests use a separate `.test-data/` directory that is automatically cleaned between runs, enabling safe and repeatable testing without affecting your actual notes.
+
+**Note**: E2E tests require Playwright browsers. Install with:
+```bash
+npx playwright install
+```
 
 ## 🎨 Brand & Design
 
