@@ -14,7 +14,9 @@
       "Bash(npm audit)",
       "Bash(npm audit fix:*)",
       "Bash(npm list:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git diff:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manual Test - Note Switching</title>
+  <script>
+    window.addEventListener('load', async () => {
+      // Wait for app to initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      console.log('=== MANUAL TEST START ===');
+
+      // Get all notes
+      const noteItems = document.querySelectorAll('.note-item');
+      console.log('Found', noteItems.length, 'notes');
+
+      noteItems.forEach((item, index) => {
+        const title = item.querySelector('.note-title')?.textContent;
+        const id = item.dataset.noteId;
+        console.log(`Note ${index}: ${title} (${id})`);
+      });
+
+      // Click on the second note (index 1)
+      if (noteItems.length >= 2) {
+        console.log('\n=== Clicking second note ===');
+        noteItems[1].click();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check editor content
+        const editorContent = document.querySelector('#editor .ProseMirror')?.textContent;
+        console.log('Editor content after clicking second note:', editorContent?.substring(0, 100));
+
+        // Click on the first note (index 0)
+        console.log('\n=== Clicking first note ===');
+        noteItems[0].click();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check editor content again
+        const editorContent2 = document.querySelector('#editor .ProseMirror')?.textContent;
+        console.log('Editor content after clicking first note:', editorContent2?.substring(0, 100));
+      }
+
+      console.log('=== MANUAL TEST END ===');
+    });
+  </script>
+</head>
+<body>
+  <h1>Open DevTools Console to see test results</h1>
+  <p>This page will auto-run a test when the app loads.</p>
+</body>
+</html>

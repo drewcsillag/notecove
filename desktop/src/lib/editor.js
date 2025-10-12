@@ -27,6 +27,7 @@ export class NoteCoveEditor {
     };
 
     this.currentNote = null;
+    this.currentNoteId = null; // Track which note we're editing
     this.isReady = false;
     this.cleanupTableResizing = null;
 
@@ -99,14 +100,21 @@ export class NoteCoveEditor {
     });
 
     // Debounced update handler to avoid excessive saves
-    this.debouncedUpdate = debounce((editor) => {
-      this.options.onUpdate(editor);
+    // Note: We pass the noteId to verify we're still on the same note when the update fires
+    this.debouncedUpdate = debounce((editor, noteId) => {
+      // Only trigger update if we're still on the same note
+      if (noteId === this.currentNoteId) {
+        this.options.onUpdate(editor);
+      }
+      // Silently skip if note has changed
     }, 1000); // Increased debounce time to reduce flickering
   }
 
   handleUpdate(editor) {
     this.updatePlaceholder();
-    this.debouncedUpdate(editor);
+    // Pass the current note ID to the debounced update so it can verify
+    // the note hasn't changed before applying the update
+    this.debouncedUpdate(editor, this.currentNoteId);
   }
 
   updatePlaceholder() {
@@ -125,9 +133,14 @@ export class NoteCoveEditor {
   /**
    * Set the content of the editor
    * @param {string} content - HTML content
+   * @param {string} noteId - ID of the note being loaded (optional, for tracking)
    */
-  setContent(content) {
+  setContent(content, noteId = null) {
     if (this.isReady) {
+      // Update the current note ID so we can track if it changes before debounced updates fire
+      if (noteId) {
+        this.currentNoteId = noteId;
+      }
       this.editor.commands.setContent(content || '');
       this.updatePlaceholder();
     }

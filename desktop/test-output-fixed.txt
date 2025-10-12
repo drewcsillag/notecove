@@ -1,0 +1,359 @@
+
+> @notecove/desktop@0.1.0 test:e2e
+> playwright test
+
+[1A[2K[2m[WebServer] [22m
+[2m[WebServer] [22m  dist/main.js     819.4kb
+[2m[WebServer] [22m  dist/preload.js    1.7kb
+[2m[WebServer] [22m
+[2m[WebServer] [22m⚡ Done in 154ms
+
+
+Running 49 tests using 1 worker
+
+[1A[2K[1/49] [chromium] › tests/e2e/basic.spec.js:15:7 › NoteCove Basic Functionality › should load the application
+[1A[2K[2/49] [chromium] › tests/e2e/basic.spec.js:23:7 › NoteCove Basic Functionality › should show welcome state when no notes exist
+[1A[2K[3/49] [chromium] › tests/e2e/basic.spec.js:32:7 › NoteCove Basic Functionality › should create a new note
+[1A[2K[4/49] [chromium] › tests/e2e/basic.spec.js:44:8 › NoteCove Basic Functionality › should type in note and derive title from first line
+[1A[2K[5/49] [chromium] › tests/e2e/basic.spec.js:70:7 › NoteCove Basic Functionality › should search notes and filter results
+[1A[2K[6/49] [chromium] › tests/e2e/basic.spec.js:126:7 › NoteCove Basic Functionality › should maintain search input focus while typing
+[1A[2K[7/49] [chromium] › tests/e2e/editor-features.spec.js:18:7 › Enhanced Editor Features › should toggle task list with TODO/DONE/NOPE states
+[1A[2K[8/49] [chromium] › tests/e2e/editor-features.spec.js:75:7 › Enhanced Editor Features › should support image insertion via file picker
+[1A[2K[9/49] [chromium] › tests/e2e/editor-features.spec.js:96:7 › Enhanced Editor Features › should insert and edit tables
+[1A[2K[10/49] [chromium] › tests/e2e/editor-features.spec.js:140:7 › Enhanced Editor Features › should support column resizing in tables
+[1A[2K[11/49] [chromium] › tests/e2e/editor-features.spec.js:167:8 › Enhanced Editor Features › should maintain toolbar button active states
+[1A[2K[12/49] [chromium] › tests/e2e/editor-features.spec.js:223:7 › Enhanced Editor Features › should handle nested task lists
+[1A[2K[13/49] [chromium] › tests/e2e/editor-features.spec.js:247:7 › Enhanced Editor Features › should support keyboard shortcuts for task lists
+[1A[2K[14/49] [chromium] › tests/e2e/editor-features.spec.js:270:8 › Enhanced Editor Features › should persist task states after note switch
+[1A[2K[15/49] [chromium] › tests/e2e/editor-features.spec.js:326:7 › Enhanced Editor Features › should show resize handles when clicking on image
+[1A[2K[16/49] [chromium] › tests/e2e/folders.spec.js:15:7 › Folder Organization › should display default folders
+[1A[2K[17/49] [chromium] › tests/e2e/folders.spec.js:29:7 › Folder Organization › should create a new folder
+[1A[2K[18/49] [chromium] › tests/e2e/folders.spec.js:53:7 › Folder Organization › should select a folder and show it as active
+[1A[2K[19/49] [chromium] › tests/e2e/folders.spec.js:70:7 › Folder Organization › should filter notes by selected folder
+[1A[2K[20/49] [chromium] › tests/e2e/folders.spec.js:118:7 › Folder Organization › should create new notes in the selected folder
+[1A[2K[21/49] [chromium] › tests/e2e/folders.spec.js:155:7 › Folder Organization › should show trash folder icon
+[1A[2K[22/49] [chromium] › tests/e2e/folders.spec.js:177:7 › Drag and Drop › should make notes draggable
+[1A[2K[23/49] [chromium] › tests/e2e/folders.spec.js:194:7 › Drag and Drop › should move note between folders via drag and drop
+[1A[2K[24/49] [chromium] › tests/e2e/folders.spec.js:236:7 › Drag and Drop › should allow dragging notes from trash to folders for restore
+[1A[2K  1) [chromium] › tests/e2e/folders.spec.js:236:7 › Drag and Drop › should allow dragging notes from trash to folders for restore 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveAttribute[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('.note-item').filter({ hasText: 'Note to Delete' })
+    Expected: [32m"true"[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toHaveAttribute" with timeout 5000ms[22m
+    [2m  - waiting for locator('.note-item').filter({ hasText: 'Note to Delete' })[22m
+
+
+      255 |     // Note should be draggable for restore
+      256 |     const noteItem = page.locator('.note-item').filter({ hasText: 'Note to Delete' });
+    > 257 |     await expect(noteItem).toHaveAttribute('draggable', 'true');
+          |                            ^
+      258 |   });
+      259 | });
+      260 |
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:257:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Drag-and-Drop-shou-b3b6c-rash-to-folders-for-restore-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Drag-and-Drop-shou-b3b6c-rash-to-folders-for-restore-chromium/error-context.md
+
+
+[1A[2K[25/49] [chromium] › tests/e2e/folders.spec.js:273:7 › Trash Functionality › should show restore and delete buttons in trash view
+[1A[2K  2) [chromium] › tests/e2e/folders.spec.js:273:7 › Trash Functionality › should show restore and delete buttons in trash view 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('.restore-btn').first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('.restore-btn').first()[22m
+
+
+      294 |     const permDeleteBtn = page.locator('.delete-btn').first();
+      295 |
+    > 296 |     await expect(restoreBtn).toBeVisible();
+          |                              ^
+      297 |     await expect(permDeleteBtn).toBeVisible();
+      298 |   });
+      299 |
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:296:30
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Trash-Functionalit-27121-elete-buttons-in-trash-view-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Trash-Functionalit-27121-elete-buttons-in-trash-view-chromium/error-context.md
+
+
+[1A[2K[26/49] [chromium] › tests/e2e/folders.spec.js:300:7 › Trash Functionality › should restore note from trash
+[1A[2K  3) [chromium] › tests/e2e/folders.spec.js:300:7 › Trash Functionality › should restore note from trash 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.restore-btn').first()[22m
+
+
+      321 |     // Click restore button
+      322 |     const restoreBtn = page.locator('.restore-btn').first();
+    > 323 |     await restoreBtn.click();
+          |                      ^
+      324 |     await page.waitForTimeout(500);
+      325 |
+      326 |     // Note should not be in trash anymore
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:323:22
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Trash-Functionality-should-restore-note-from-trash-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Trash-Functionality-should-restore-note-from-trash-chromium/error-context.md
+
+
+[1A[2K[27/49] [chromium] › tests/e2e/folders.spec.js:338:7 › Trash Functionality › should permanently delete note from trash
+[1A[2K  4) [chromium] › tests/e2e/folders.spec.js:338:7 › Trash Functionality › should permanently delete note from trash 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.delete-btn').first()[22m
+    [2m    - locator resolved to <button id="deleteNoteBtn" title="Move to Trash" class="toolbar-btn delete-btn">🗑️ Delete</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    19 × waiting for element to be visible, enabled and stable[22m
+    [2m       - element is not visible[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+
+
+      359 |     // Click permanent delete button
+      360 |     const permDeleteBtn = page.locator('.delete-btn').first();
+    > 361 |     await permDeleteBtn.click();
+          |                         ^
+      362 |     await page.waitForTimeout(500);
+      363 |
+      364 |     // Note should not be in trash
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:361:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Trash-Functionalit-d6c8b-ntly-delete-note-from-trash-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Trash-Functionalit-d6c8b-ntly-delete-note-from-trash-chromium/error-context.md
+
+
+[1A[2K[28/49] [chromium] › tests/e2e/folders.spec.js:375:7 › Trash Functionality › should cancel delete when user declines confirmation
+[1A[2K[29/49] [chromium] › tests/e2e/folders.spec.js:404:7 › Trash Functionality › should not show deleted notes in All Notes view
+[1A[2K  5) [chromium] › tests/e2e/folders.spec.js:404:7 › Trash Functionality › should not show deleted notes in All Notes view 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('.note-item').filter({ hasText: 'Note to Hide' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('.note-item').filter({ hasText: 'Note to Hide' })[22m
+
+
+      431 |     await page.waitForTimeout(200);
+      432 |
+    > 433 |     await expect(noteItem).toBeVisible();
+          |                            ^
+      434 |   });
+      435 |
+      436 |   test('should not show permanently deleted notes anywhere', async ({ page }) => {
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:433:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Trash-Functionalit-74bc1-ted-notes-in-All-Notes-view-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Trash-Functionalit-74bc1-ted-notes-in-All-Notes-view-chromium/error-context.md
+
+
+[1A[2K[30/49] [chromium] › tests/e2e/folders.spec.js:436:7 › Trash Functionality › should not show permanently deleted notes anywhere
+[1A[2K  6) [chromium] › tests/e2e/folders.spec.js:436:7 › Trash Functionality › should not show permanently deleted notes anywhere 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.delete-btn').first()[22m
+    [2m    - locator resolved to <button id="deleteNoteBtn" title="Move to Trash" class="toolbar-btn delete-btn">🗑️ Delete</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    19 × waiting for element to be visible, enabled and stable[22m
+    [2m       - element is not visible[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+
+
+      454 |
+      455 |     const permDeleteBtn = page.locator('.delete-btn').first();
+    > 456 |     await permDeleteBtn.click();
+          |                         ^
+      457 |     await page.waitForTimeout(500);
+      458 |
+      459 |     // Should not be in trash
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:456:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Trash-Functionalit-e1bb7-ntly-deleted-notes-anywhere-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Trash-Functionalit-e1bb7-ntly-deleted-notes-anywhere-chromium/error-context.md
+
+
+[1A[2K[31/49] [chromium] › tests/e2e/folders.spec.js:471:7 › Trash Functionality › should restore note from trash via drag-and-drop to folder
+[1A[2K  7) [chromium] › tests/e2e/folders.spec.js:471:7 › Trash Functionality › should restore note from trash via drag-and-drop to folder 
+
+    TimeoutError: locator.dragTo: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.note-item').filter({ hasText: 'Restore via Drag' })[22m
+
+
+      500 |     const restoreFolder = page.locator('.folder-item').filter({ hasText: 'Restore Folder' });
+      501 |
+    > 502 |     await noteItem.dragTo(restoreFolder);
+          |                    ^
+      503 |     await page.waitForTimeout(500);
+      504 |
+      505 |     // Note should not be in trash anymore
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:502:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Trash-Functionalit-06bc4-via-drag-and-drop-to-folder-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Trash-Functionalit-06bc4-via-drag-and-drop-to-folder-chromium/error-context.md
+
+
+[1A[2K[32/49] [chromium] › tests/e2e/folders.spec.js:522:7 › Trash Functionality › should not allow single-click to double-select notes
+[1A[2K  8) [chromium] › tests/e2e/folders.spec.js:522:7 › Trash Functionality › should not allow single-click to double-select notes 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // indexOf[22m
+
+    Expected substring: [32m"First Note"[39m
+    Received string:    [31m"Second Note"[39m
+
+      540 |     // Editor should show first note content
+      541 |     const editorText = await page.locator('#editor .ProseMirror').textContent();
+    > 542 |     expect(editorText).toContain('First Note');
+          |                        ^
+      543 |
+      544 |     // First note should be active
+      545 |     await expect(firstNote).toHaveClass(/active/);
+        at /Users/drew/devel/nc/desktop/tests/e2e/folders.spec.js:542:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/folders-Trash-Functionalit-8ea58-lick-to-double-select-notes-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/folders-Trash-Functionalit-8ea58-lick-to-double-select-notes-chromium/error-context.md
+
+
+[1A[2K[33/49] [chromium] › tests/e2e/regression.spec.js:16:7 › Regression Tests › should not create duplicate notes when typing
+[1A[2K[chromium] › tests/e2e/regression.spec.js:16:7 › Regression Tests › should not create duplicate notes when typing
+Initial count: [33m0[39m
+
+[1A[2K[34/49] [chromium] › tests/e2e/regression.spec.js:42:7 › Regression Tests › should switch note content when clicking different notes
+[1A[2K  9) [chromium] › tests/e2e/regression.spec.js:42:7 › Regression Tests › should switch note content when clicking different notes 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // indexOf[22m
+
+    Expected substring: [32m"First Note Title"[39m
+    Received string:    [31m"Second Note TitleSecond note content"[39m
+
+      70 |     // Verify the editor shows the first note's content
+      71 |     const editorText = await page.locator('#editor .ProseMirror').textContent();
+    > 72 |     expect(editorText).toContain('First Note Title');
+         |                        ^
+      73 |     expect(editorText).toContain('First note content');
+      74 |
+      75 |     // Click on the second note
+        at /Users/drew/devel/nc/desktop/tests/e2e/regression.spec.js:72:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/regression-Regression-Test-36939-en-clicking-different-notes-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/regression-Regression-Test-36939-en-clicking-different-notes-chromium/error-context.md
+
+
+[1A[2K[35/49] [chromium] › tests/e2e/regression.spec.js:88:7 › Regression Tests › should maintain consistent note count after edits
+[1A[2K[36/49] [chromium] › tests/e2e/regression.spec.js:110:7 › Regression Tests › should show reset button in status bar
+[1A[2K[37/49] [chromium] › tests/e2e/regression.spec.js:116:7 › Regression Tests › reset button should have confirmation dialog
+[1A[2K[38/49] [chromium] › tests/e2e/regression.spec.js:131:7 › Regression Tests › reset button should clear all notes and reload page
+[1A[2K  10) [chromium] › tests/e2e/regression.spec.js:131:7 › Regression Tests › reset button should clear all notes and reload page 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m1[39m
+    Received: [31m3[39m
+
+      170 |
+      171 |     const notesAfterReset = await page.locator('.note-item').count();
+    > 172 |     expect(notesAfterReset).toBe(1);
+          |                             ^
+      173 |   });
+      174 |
+      175 |   test('should not create files with changing titles', async ({ page }) => {
+        at /Users/drew/devel/nc/desktop/tests/e2e/regression.spec.js:172:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/regression-Regression-Test-2bd6d-r-all-notes-and-reload-page-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/regression-Regression-Test-2bd6d-r-all-notes-and-reload-page-chromium/error-context.md
+
+
+[1A[2K[39/49] [chromium] › tests/e2e/regression.spec.js:175:7 › Regression Tests › should not create files with changing titles
+[1A[2K[40/49] [chromium] › tests/e2e/scrolling.spec.js:15:7 › Editor Scrolling › should scroll long notes properly
+[1A[2K[41/49] [chromium] › tests/e2e/scrolling.spec.js:87:7 › Editor Scrolling › should show scrollbar when content exceeds viewport
+[1A[2K[42/49] [chromium] › tests/e2e/scrolling.spec.js:123:7 › Editor Scrolling › should position cursor at top when opening long note
+[1A[2K[43/49] [chromium] › tests/e2e/tags.spec.js:15:7 › Tag Functionality › should detect and style hashtags in editor
+[1A[2K[44/49] [chromium] › tests/e2e/tags.spec.js:37:7 › Tag Functionality › should extract tags from note content
+[1A[2K[45/49] [chromium] › tests/e2e/tags.spec.js:61:7 › Tag Functionality › should show tag counts
+[1A[2K[46/49] [chromium] › tests/e2e/tags.spec.js:83:7 › Tag Functionality › should filter notes by tag when clicked
+[1A[2K[47/49] [chromium] › tests/e2e/tags.spec.js:127:7 › Tag Functionality › should deselect tag when clicked again
+[1A[2K[48/49] [chromium] › tests/e2e/tags.spec.js:153:7 › Tag Functionality › should support tags with hyphens
+[1A[2K[49/49] [chromium] › tests/e2e/tags.spec.js:169:7 › Tag Functionality › should not scroll to top while typing tags
+[1A[2K  10 failed
+    [chromium] › tests/e2e/folders.spec.js:236:7 › Drag and Drop › should allow dragging notes from trash to folders for restore 
+    [chromium] › tests/e2e/folders.spec.js:273:7 › Trash Functionality › should show restore and delete buttons in trash view 
+    [chromium] › tests/e2e/folders.spec.js:300:7 › Trash Functionality › should restore note from trash 
+    [chromium] › tests/e2e/folders.spec.js:338:7 › Trash Functionality › should permanently delete note from trash 
+    [chromium] › tests/e2e/folders.spec.js:404:7 › Trash Functionality › should not show deleted notes in All Notes view 
+    [chromium] › tests/e2e/folders.spec.js:436:7 › Trash Functionality › should not show permanently deleted notes anywhere 
+    [chromium] › tests/e2e/folders.spec.js:471:7 › Trash Functionality › should restore note from trash via drag-and-drop to folder 
+    [chromium] › tests/e2e/folders.spec.js:522:7 › Trash Functionality › should not allow single-click to double-select notes 
+    [chromium] › tests/e2e/regression.spec.js:42:7 › Regression Tests › should switch note content when clicking different notes 
+    [chromium] › tests/e2e/regression.spec.js:131:7 › Regression Tests › reset button should clear all notes and reload page 
+  3 skipped
+  36 passed (3.4m)
+
+[36m  Serving HTML report at http://localhost:9323. Press Ctrl+C to quit.[39m

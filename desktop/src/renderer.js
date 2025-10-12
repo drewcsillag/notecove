@@ -14,6 +14,7 @@ class NoteCoveApp {
     this.currentFolderId = 'all-notes'; // Default to All Notes folder
     this.folderManager = null;
     this.selectedTag = null; // Selected tag filter
+    this.isSettingContent = false; // Flag to prevent update handlers during programmatic content changes
 
     this.initializeApp();
     this.setupEventListeners();
@@ -169,6 +170,11 @@ class NoteCoveApp {
   }
 
   handleEditorUpdate() {
+    // Don't update note if we're programmatically setting content
+    if (this.isSettingContent) {
+      return;
+    }
+
     if (this.currentNote && this.editor) {
       const content = this.editor.getContent();
       const text = this.editor.getText();
@@ -404,7 +410,11 @@ class NoteCoveApp {
 
     // Always update editor content when switching notes
     if (this.editor) {
-      this.editor.setContent(this.currentNote.content || '');
+      // Set flag to prevent handleEditorUpdate from firing during programmatic content change
+      this.isSettingContent = true;
+      // Pass the note ID so the editor can track which note is currently loaded
+      this.editor.setContent(this.currentNote.content || '', this.currentNote.id);
+      this.isSettingContent = false;
 
       // Only focus editor if search input doesn't have focus
       const searchInput = document.querySelector('.search-input');
@@ -425,21 +435,11 @@ class NoteCoveApp {
   }
 
   createNewNote() {
-    // Save current note before switching (to preserve any edits)
-    if (this.currentNote) {
-      this.saveCurrentNote();
-    }
-
     // Create note in the currently selected folder
     const newNote = this.noteManager.createNote({
       folderId: this.currentFolderId || 'all-notes'
     });
     this.currentNote = newNote;
-
-    // Always render the new note's content (even if isEditing is true)
-    // This ensures the editor is cleared for the new note
-    this.renderCurrentNote();
-
     this.updateUI();
 
     // Focus on editor
@@ -662,6 +662,7 @@ class NoteCoveApp {
     if (note && !note.deleted) {
       this.saveCurrentNote(); // Save previous note
       this.currentNote = note;
+      this.isEditing = false; // Reset editing state when switching notes
       this.updateUI();
     }
   }
@@ -673,8 +674,19 @@ class NoteCoveApp {
   }
 
   saveCurrentNote() {
-    if (this.currentNote) {
-      // Note is automatically saved via noteManager updates
+    if (this.currentNote && this.editor) {
+      // Force immediate save of current content (don't wait for debounce)
+      const content = this.editor.getContent();
+      const text = this.editor.getText();
+      const firstLine = text.split('\n')[0].trim();
+      const title = firstLine || 'Untitled';
+      const tags = this.extractTags(text);
+
+      this.currentNote.title = title;
+      this.currentNote.content = content;
+      this.currentNote.tags = tags;
+      this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+
       this.updateStatus('Saved');
     }
   }
