@@ -610,6 +610,119 @@
       text-decoration: underline;
     }
 
+    /* Task Lists */
+    .editor ul[data-type="taskList"] {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .editor ul[data-type="taskList"] li {
+      display: flex;
+      align-items: flex-start;
+      margin: 0.5rem 0;
+    }
+
+    .editor ul[data-type="taskList"] li label {
+      display: flex;
+      align-items: center;
+      margin-right: 0.5rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .editor ul[data-type="taskList"] li .task-checkbox {
+      position: relative;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--text-secondary);
+      border-radius: 3px;
+      margin-right: 0.5rem;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .editor ul[data-type="taskList"] li[data-checked="done"] .task-checkbox {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+    }
+
+    .editor ul[data-type="taskList"] li[data-checked="done"] .task-checkbox::after {
+      content: '✓';
+      color: white;
+      position: absolute;
+      top: -2px;
+      left: 2px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .editor ul[data-type="taskList"] li[data-checked="done"] > div {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
+    .editor ul[data-type="taskList"] li[data-checked="nope"] .task-checkbox {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+
+    .editor ul[data-type="taskList"] li[data-checked="nope"] .task-checkbox::after {
+      content: '✕';
+      color: white;
+      position: absolute;
+      top: -3px;
+      left: 2px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .editor ul[data-type="taskList"] li[data-checked="nope"] > div {
+      opacity: 0.5;
+    }
+
+    /* Images */
+    .editor img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin: 0.5rem 0;
+    }
+
+    /* Tables */
+    .editor table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      table-layout: auto;
+      position: relative;
+    }
+
+    .editor table td,
+    .editor table th {
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+      vertical-align: top;
+      min-width: 100px;
+      position: relative;
+      user-select: text;
+    }
+
+    .editor table th {
+      background: var(--surface);
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .editor table .selectedCell {
+      background: rgba(26, 77, 143, 0.1);
+    }
+
+    .editor table td.resizing,
+    .editor table th.resizing {
+      background: rgba(26, 77, 143, 0.05);
+      user-select: none;
+    }
+
     /* Welcome state */
     .welcome-state {
       display: flex;
@@ -792,6 +905,10 @@
             <span class="toolbar-separator"></span>
             <button class="toolbar-btn" data-action="bulletList" title="Bullet List">• List</button>
             <button class="toolbar-btn" data-action="orderedList" title="Numbered List">1. List</button>
+            <button class="toolbar-btn" data-action="taskList" title="Task List (Cmd+Shift+9)">☐ Task</button>
+            <span class="toolbar-separator"></span>
+            <button class="toolbar-btn" data-action="insertImage" title="Insert Image">🖼️ Image</button>
+            <button class="toolbar-btn" data-action="insertTable" title="Insert Table">📊 Table</button>
             <span class="toolbar-separator"></span>
             <button class="toolbar-btn" data-action="undo" title="Undo (Cmd+Z)">↶</button>
             <button class="toolbar-btn" data-action="redo" title="Redo (Cmd+Shift+Z)">↷</button>

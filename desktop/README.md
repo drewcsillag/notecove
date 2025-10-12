@@ -5,6 +5,13 @@ Electron-based desktop application for NoteCove.
 ## Features
 
 - ✅ Rich text editing with TipTap
+  - Bold, italic, strikethrough formatting
+  - Headings (H1, H2, H3)
+  - Bullet and numbered lists
+  - **Task lists with TODO/DONE/NOPE states**
+  - **Image insertion and display**
+  - **Tables with resizable columns**
+  - Hashtag support with filtering
 - ✅ File-based note storage
 - ✅ Automatic title extraction from first line
 - ✅ Real-time note search
@@ -69,10 +76,11 @@ npm test -- --coverage
 **Test Files:**
 - `src/lib/utils.test.js` - Utility function tests (12 tests)
 - `src/lib/note-manager.test.js` - Note CRUD operations (17 tests)
-- `src/lib/folder-manager.test.js` - Folder management (33 tests)
+- `src/lib/folder-manager.test.js` - Folder management (40 tests)
+- `src/lib/file-storage.test.js` - File storage operations (7 tests)
 - `src/renderer.test.js` - Renderer logic tests (4 tests)
 
-**Total: 66 unit tests**
+**Total: 80 unit tests**
 
 ### E2E Tests (Playwright)
 
@@ -93,8 +101,12 @@ npx playwright show-report
 **Test Files:**
 - `tests/e2e/basic.spec.js` - Basic user workflows (5 tests)
 - `tests/e2e/folders.spec.js` - Folder UI and operations (11 tests)
+- `tests/e2e/tags.spec.js` - Hashtag functionality (7 tests)
+- `tests/e2e/scrolling.spec.js` - Scroll behavior (3 tests)
+- `tests/e2e/regression.spec.js` - Regression tests (5 tests)
+- `tests/e2e/editor-features.spec.js` - Enhanced editor features (7 tests)
 
-**Total: 16 E2E tests**
+**Total: 38 E2E tests**
 
 ### Linting
 
@@ -119,10 +131,19 @@ desktop/
 │       ├── note-manager.js  # Note CRUD operations
 │       ├── file-storage.js  # File system operations
 │       ├── folder-manager.js # Folder management
-│       └── utils.js         # Utility functions
+│       ├── utils.js         # Utility functions
+│       └── extensions/
+│           ├── hashtag.js   # Custom hashtag extension
+│           ├── task-list.js # Task list container
+│           └── task-item.js # Tri-state task items
 ├── tests/
 │   └── e2e/
-│       └── basic.spec.js    # End-to-end tests
+│       ├── basic.spec.js    # Basic functionality tests
+│       ├── folders.spec.js  # Folder tests
+│       ├── tags.spec.js     # Hashtag tests
+│       ├── scrolling.spec.js # Scroll behavior tests
+│       ├── regression.spec.js # Regression tests
+│       └── editor-features.spec.js # Editor features tests
 ├── dist/                    # Built files (gitignored)
 ├── index.html               # App HTML
 ├── package.json
@@ -150,6 +171,11 @@ desktop/
 2. **Debounced Updates**: Editor updates are debounced (1000ms) to reduce flickering in the notes list
 3. **File-based Storage**: Each note is stored as a JSON file for easy syncing via Dropbox/iCloud
 4. **CRDT-ready**: Structure supports future CRDT integration for conflict-free sync
+5. **Tri-state Task Items**: Custom implementation with three states:
+   - **TODO** (unchecked) - Initial state for new tasks
+   - **DONE** (blue checkmark) - Completed tasks with strikethrough text
+   - **NOPE** (red X) - Rejected/cancelled tasks with reduced opacity
+   - Click checkbox to cycle through states: TODO → DONE → NOPE → TODO
 
 ## Configuration
 

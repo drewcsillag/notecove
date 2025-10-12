@@ -1,7 +1,15 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
+import Table from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
 import { generateUUID, debounce } from './utils.js';
 import { Hashtag } from './extensions/hashtag.js';
+import { TaskList } from './extensions/task-list.js';
+import { TaskItem } from './extensions/task-item.js';
+import { initTableResizing } from './table-resize.js';
 
 /**
  * NoteCove rich text editor wrapper around TipTap
@@ -20,6 +28,7 @@ export class NoteCoveEditor {
 
     this.currentNote = null;
     this.isReady = false;
+    this.cleanupTableResizing = null;
 
     this.initializeEditor();
   }
@@ -41,7 +50,28 @@ export class NoteCoveEditor {
             keepAttributes: false
           }
         }),
-        Hashtag
+        Hashtag,
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+        }),
+        Image.configure({
+          inline: true,
+          allowBase64: true,
+        }),
+        Table.configure({
+          resizable: true,
+          HTMLAttributes: {
+            class: 'editor-table',
+          },
+        }),
+        TableRow,
+        TableHeader,
+        TableCell.configure({
+          HTMLAttributes: {
+            class: 'editor-table-cell',
+          },
+        }),
       ],
       content: '',
       autofocus: this.options.autofocus,
@@ -59,6 +89,9 @@ export class NoteCoveEditor {
       onCreate: () => {
         this.isReady = true;
         this.updatePlaceholder();
+
+        // Initialize table column resizing
+        this.cleanupTableResizing = initTableResizing(this.element);
       }
     });
 
@@ -237,6 +270,9 @@ export class NoteCoveEditor {
       heading3: () => this.editor.chain().focus().toggleHeading({ level: 3 }).run(),
       bulletList: () => this.editor.chain().focus().toggleBulletList().run(),
       orderedList: () => this.editor.chain().focus().toggleOrderedList().run(),
+      taskList: () => this.editor.chain().focus().toggleTaskList().run(),
+      insertImage: () => this.insertImage(),
+      insertTable: () => this.editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
       undo: () => this.editor.chain().focus().undo().run(),
       redo: () => this.editor.chain().focus().redo().run(),
     };
@@ -244,6 +280,31 @@ export class NoteCoveEditor {
     if (actions[action]) {
       actions[action]();
     }
+  }
+
+  /**
+   * Insert an image using file picker
+   */
+  async insertImage() {
+    // Create a hidden file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target.result;
+        this.editor.chain().focus().setImage({ src: base64 }).run();
+      };
+      reader.readAsDataURL(file);
+    };
+
+    input.click();
   }
 
   /**
@@ -264,6 +325,7 @@ export class NoteCoveEditor {
       heading3: this.editor.isActive('heading', { level: 3 }),
       bulletList: this.editor.isActive('bulletList'),
       orderedList: this.editor.isActive('orderedList'),
+      taskList: this.editor.isActive('taskList'),
     };
 
     Object.keys(states).forEach(action => {
@@ -278,6 +340,12 @@ export class NoteCoveEditor {
    * Destroy the editor
    */
   destroy() {
+    // Cleanup table resizing
+    if (this.cleanupTableResizing) {
+      this.cleanupTableResizing();
+      this.cleanupTableResizing = null;
+    }
+
     if (this.editor) {
       this.editor.destroy();
     }

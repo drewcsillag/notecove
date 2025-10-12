@@ -19,6 +19,11 @@
   },
   "dependencies": {
     "@tiptap/core": "^2.1.13",
+    "@tiptap/extension-image": "^2.26.3",
+    "@tiptap/extension-table": "^2.26.3",
+    "@tiptap/extension-table-cell": "^2.26.3",
+    "@tiptap/extension-table-header": "^2.26.3",
+    "@tiptap/extension-table-row": "^2.26.3",
     "@tiptap/extension-task-item": "^2.1.13",
     "@tiptap/extension-task-list": "^2.1.13",
     "@tiptap/pm": "^2.1.13",
