@@ -2,21 +2,14 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Editor Scrolling', () => {
   test.beforeEach(async ({ page }) => {
+    // Clear localStorage and set empty notes array to prevent sample notes from loading
     await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => {
+      localStorage.clear();
+      localStorage.setItem('notecove-notes', JSON.stringify([]));
+    });
     await page.reload();
     await page.waitForLoadState('networkidle');
-
-    // Delete all sample notes to start with truly empty state
-    await page.evaluate(() => {
-      if (window.app?.noteManager) {
-        const notes = window.app.noteManager.getAllNotes();
-        notes.forEach(note => {
-          window.app.noteManager.permanentlyDeleteNote(note.id);
-        });
-        localStorage.setItem('notecove-notes', JSON.stringify([]));
-      }
-    });
   });
 
   test('should scroll long notes properly', async ({ page }) => {
