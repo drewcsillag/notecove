@@ -691,6 +691,79 @@
       margin: 0.5rem 0;
     }
 
+    /* Images with resize handles */
+    .editor .image-container {
+      display: inline-block;
+      position: relative;
+      margin: 0.5rem 0;
+      max-width: 100%;
+    }
+
+    .editor .image-container img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    .editor .image-container .image-resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: var(--primary-color);
+      border: 2px solid white;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      z-index: 10;
+    }
+
+    /* Position each corner handle */
+    .editor .image-container .handle-nw {
+      top: -5px;
+      left: -5px;
+      cursor: nw-resize;
+    }
+
+    .editor .image-container .handle-ne {
+      top: -5px;
+      right: -5px;
+      cursor: ne-resize;
+    }
+
+    .editor .image-container .handle-sw {
+      bottom: -5px;
+      left: -5px;
+      cursor: sw-resize;
+    }
+
+    .editor .image-container .handle-se {
+      bottom: -5px;
+      right: -5px;
+      cursor: se-resize;
+    }
+
+    /* Show handles when image is selected */
+    .editor .image-container.selected .image-resize-handle {
+      opacity: 1;
+    }
+
+    .editor .image-container.selected {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    .editor .image-container.resizing {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+
+    .editor .image-container.resizing .image-resize-handle {
+      opacity: 1;
+    }
+
     /* Tables */
     .editor table {
       border-collapse: collapse;

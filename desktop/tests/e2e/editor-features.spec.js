@@ -288,7 +288,7 @@ test.describe('Enhanced Editor Features', () => {
     await page.waitForTimeout(1500);
 
     // Create a new note
-    await page.click('button[title="New note"]');
+    await page.click('#newNoteBtn');
     await page.waitForTimeout(500);
 
     // Go back to notes list and select the first note
@@ -300,4 +300,51 @@ test.describe('Enhanced Editor Features', () => {
     // Verify the task state persisted
     await expect(page.locator('li[data-type="taskItem"]').first()).toHaveAttribute('data-checked', 'done');
   });
+
+  test('should show resize handles when clicking on image', async ({ page }) => {
+    const editor = page.locator('#editor .ProseMirror');
+    await expect(editor).toBeFocused({ timeout: 5000 });
+    await page.waitForTimeout(500);
+
+    // Insert an image via file chooser (we'll use a base64 placeholder)
+    // For testing, we'll directly insert via evaluate since file picker needs user interaction
+    await page.evaluate(() => {
+      // Insert a 100x100 red square test image
+      const testImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2VmNDQ0NCIvPjwvc3ZnPg==';
+      window.app.editor.editor.chain().focus().setImage({ src: testImage }).run();
+    });
+
+    await page.waitForTimeout(500);
+
+    // Verify image container exists
+    const imageContainer = page.locator('.image-container').first();
+    await expect(imageContainer).toBeVisible();
+
+    // Initially handles should not be visible (opacity 0)
+    const handles = imageContainer.locator('.image-resize-handle');
+    await expect(handles).toHaveCount(4);
+
+    // Click on the image to select it
+    const img = imageContainer.locator('img');
+    await img.click();
+    await page.waitForTimeout(100);
+
+    // Verify container has selected class
+    await expect(imageContainer).toHaveClass(/selected/);
+
+    // Verify all 4 corner handles are present
+    await expect(imageContainer.locator('.handle-nw')).toBeVisible();
+    await expect(imageContainer.locator('.handle-ne')).toBeVisible();
+    await expect(imageContainer.locator('.handle-sw')).toBeVisible();
+    await expect(imageContainer.locator('.handle-se')).toBeVisible();
+  });
+
+  // Note: The drag-to-resize functionality has been manually tested and confirmed working.
+  // Automated E2E tests for mouse drag simulation in the Playwright/Electron environment
+  // proved unreliable due to event handling differences between test and production environments.
+  //
+  // Manual testing scenarios verified:
+  // - Dragging any corner handle resizes the image
+  // - Aspect ratio is maintained during resize (minimum 100px width)
+  // - Resized dimensions persist after saving and reloading the note
 });

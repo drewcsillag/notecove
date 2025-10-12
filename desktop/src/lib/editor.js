@@ -1,6 +1,5 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
@@ -9,6 +8,7 @@ import { generateUUID, debounce } from './utils.js';
 import { Hashtag } from './extensions/hashtag.js';
 import { TaskList } from './extensions/task-list.js';
 import { TaskItem } from './extensions/task-item.js';
+import { ResizableImage } from './extensions/resizable-image.js';
 import { initTableResizing } from './table-resize.js';
 
 /**
@@ -55,7 +55,7 @@ export class NoteCoveEditor {
         TaskItem.configure({
           nested: true,
         }),
-        Image.configure({
+        ResizableImage.configure({
           inline: true,
           allowBase64: true,
         }),
