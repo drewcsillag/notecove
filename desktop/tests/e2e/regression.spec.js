@@ -2,30 +2,21 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Regression Tests', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage before each test to ensure clean state
+    // Clear localStorage and set empty notes array to prevent sample notes from loading
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.clear();
+      localStorage.setItem('notecove-notes', JSON.stringify([]));
       console.log('localStorage cleared, items:', localStorage.length);
     });
     await page.reload();
     await page.waitForLoadState('networkidle');
-
-    // Delete all sample notes to start with truly empty state
-    await page.evaluate(() => {
-      if (window.app?.noteManager) {
-        const notes = window.app.noteManager.getAllNotes();
-        notes.forEach(note => {
-          window.app.noteManager.permanentlyDeleteNote(note.id);
-        });
-        localStorage.setItem('notecove-notes', JSON.stringify([]));
-      }
-    });
   });
 
   test('should not create duplicate notes when typing', async ({ page }) => {
-    // Get initial count (should be sample notes)
+    // Get initial count (should be 0 after deleting sample notes)
     const initialCount = await page.locator('.note-item').count();
+    console.log('Initial count:', initialCount);
 
     // Create a new note
     await page.locator('.new-note-btn').click();
