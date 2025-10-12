@@ -236,7 +236,10 @@ class NoteCoveApp {
     const welcomeState = document.getElementById('welcomeState');
     const editorState = document.getElementById('editorState');
 
-    if (this.notes.length === 0) {
+    // Always render notes list if viewing trash (even if all non-deleted notes are gone)
+    const shouldShowNotesList = this.notes.length > 0 || this.currentFolderId === 'trash';
+
+    if (!shouldShowNotesList) {
       // Show welcome state
       welcomeState.style.display = 'flex';
       editorState.style.display = 'none';
@@ -293,9 +296,13 @@ class NoteCoveApp {
       );
     }
 
-    // Update notes count
+    // Update notes count - show count in current folder view
     if (notesCount) {
-      notesCount.textContent = this.notes.length;
+      if (this.currentFolderId && this.currentFolderId !== 'all-notes') {
+        notesCount.textContent = this.noteManager.getNotesInFolder(this.currentFolderId).length;
+      } else {
+        notesCount.textContent = this.notes.length;
+      }
     }
 
     if (filteredNotes.length === 0) {
@@ -440,6 +447,7 @@ class NoteCoveApp {
       folderId: this.currentFolderId || 'all-notes'
     });
     this.currentNote = newNote;
+    this.isEditing = false; // Reset editing state to ensure editor gets cleared
     this.updateUI();
 
     // Focus on editor

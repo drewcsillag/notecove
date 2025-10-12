@@ -155,7 +155,14 @@ test.describe('Regression Tests', () => {
 
     // Wait for page reload
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+
+    // Prevent sample notes from loading after reset
+    await page.evaluate(() => {
+      localStorage.setItem('notecove-notes', JSON.stringify([]));
+    });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(500);
 
     // Verify welcome state is shown (no notes)
     await expect(page.locator('#welcomeState')).toBeVisible();
