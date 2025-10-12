@@ -180,15 +180,21 @@ class NoteCoveApp {
       // Extract tags from content
       const tags = this.extractTags(text);
 
-      // Check if tags have changed
+      // Check if tags or title have changed
       const tagsChanged = JSON.stringify(this.currentNote.tags || []) !== JSON.stringify(tags);
+      const titleChanged = this.currentNote.title !== title;
 
       this.currentNote.title = title;
       this.currentNote.content = content;
       this.currentNote.tags = tags;
       this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
 
-      // Only re-render tags list if tags actually changed
+      // Re-render notes list if title changed (to update sidebar)
+      if (titleChanged) {
+        this.renderNotesList();
+      }
+
+      // Re-render tags list if tags changed
       if (tagsChanged) {
         this.renderTagsList();
       }
@@ -419,11 +425,21 @@ class NoteCoveApp {
   }
 
   createNewNote() {
+    // Save current note before switching (to preserve any edits)
+    if (this.currentNote) {
+      this.saveCurrentNote();
+    }
+
     // Create note in the currently selected folder
     const newNote = this.noteManager.createNote({
       folderId: this.currentFolderId || 'all-notes'
     });
     this.currentNote = newNote;
+
+    // Always render the new note's content (even if isEditing is true)
+    // This ensures the editor is cleared for the new note
+    this.renderCurrentNote();
+
     this.updateUI();
 
     // Focus on editor
