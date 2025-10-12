@@ -7,6 +7,17 @@ test.describe('Folder Organization', () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.waitForLoadState('networkidle');
+
+    // Delete all sample notes to start with truly empty state
+    await page.evaluate(() => {
+      if (window.app?.noteManager) {
+        const notes = window.app.noteManager.getAllNotes();
+        notes.forEach(note => {
+          window.app.noteManager.permanentlyDeleteNote(note.id);
+        });
+        localStorage.setItem('notecove-notes', JSON.stringify([]));
+      }
+    });
   });
 
   test('should display default folders', async ({ page }) => {
@@ -165,6 +176,17 @@ test.describe('Drag and Drop', () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.waitForLoadState('networkidle');
+
+    // Delete all sample notes to start with truly empty state
+    await page.evaluate(() => {
+      if (window.app?.noteManager) {
+        const notes = window.app.noteManager.getAllNotes();
+        notes.forEach(note => {
+          window.app.noteManager.permanentlyDeleteNote(note.id);
+        });
+        localStorage.setItem('notecove-notes', JSON.stringify([]));
+      }
+    });
   });
 
   test('should make notes draggable', async ({ page }) => {
@@ -257,6 +279,17 @@ test.describe('Trash Functionality', () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.waitForLoadState('networkidle');
+
+    // Delete all sample notes to start with truly empty state
+    await page.evaluate(() => {
+      if (window.app?.noteManager) {
+        const notes = window.app.noteManager.getAllNotes();
+        notes.forEach(note => {
+          window.app.noteManager.permanentlyDeleteNote(note.id);
+        });
+        localStorage.setItem('notecove-notes', JSON.stringify([]));
+      }
+    });
   });
 
   test('should show restore and delete buttons in trash view', async ({ page }) => {
