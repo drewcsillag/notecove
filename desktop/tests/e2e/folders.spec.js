@@ -28,19 +28,19 @@ test.describe('Folder Organization', () => {
     const newFolderBtn = page.locator('#newFolderBtn');
     await newFolderBtn.click();
 
-    // Wait for custom dialog to appear
-    await page.waitForTimeout(200);
+    // Wait for dialog to appear
+    const dialogInput = page.locator('#dialogInput');
+    await expect(dialogInput).toBeVisible();
 
     // Fill in the dialog input
-    const dialogInput = page.locator('#dialogInput');
     await dialogInput.fill('My Test Folder');
 
     // Click OK button
     const okButton = page.locator('#dialogOk');
     await okButton.click();
 
-    // Wait a bit for the folder to be created
-    await page.waitForTimeout(500);
+    // Wait for dialog to disappear
+    await expect(dialogInput).toBeHidden();
 
     // Check if the folder appears in the tree
     const testFolder = page.locator('.folder-item').filter({ hasText: 'My Test Folder' });
@@ -50,10 +50,11 @@ test.describe('Folder Organization', () => {
   test('should select a folder and show it as active', async ({ page }) => {
     // Create a test folder
     await page.locator('#newFolderBtn').click();
-    await page.waitForTimeout(200);
-    await page.locator('#dialogInput').fill('Selected Folder');
+    const dialogInput = page.locator('#dialogInput');
+    await expect(dialogInput).toBeVisible();
+    await dialogInput.fill('Selected Folder');
     await page.locator('#dialogOk').click();
-    await page.waitForTimeout(500);
+    await expect(dialogInput).toBeHidden();
 
     // Click on the folder
     const testFolder = page.locator('.folder-item').filter({ hasText: 'Selected Folder' });
@@ -66,16 +67,18 @@ test.describe('Folder Organization', () => {
   test('should filter notes by selected folder', async ({ page }) => {
     // Create two folders
     await page.locator('#newFolderBtn').click();
-    await page.waitForTimeout(200);
-    await page.locator('#dialogInput').fill('Folder A');
+    let dialogInput = page.locator('#dialogInput');
+    await expect(dialogInput).toBeVisible();
+    await dialogInput.fill('Folder A');
     await page.locator('#dialogOk').click();
-    await page.waitForTimeout(300);
+    await expect(dialogInput).toBeHidden();
 
     await page.locator('#newFolderBtn').click();
-    await page.waitForTimeout(200);
-    await page.locator('#dialogInput').fill('Folder B');
+    dialogInput = page.locator('#dialogInput');
+    await expect(dialogInput).toBeVisible();
+    await dialogInput.fill('Folder B');
     await page.locator('#dialogOk').click();
-    await page.waitForTimeout(300);
+    await expect(dialogInput).toBeHidden();
 
     // Select Folder A
     const folderA = page.locator('.folder-item').filter({ hasText: 'Folder A' });
@@ -112,10 +115,11 @@ test.describe('Folder Organization', () => {
   test('should create new notes in the selected folder', async ({ page }) => {
     // Create a folder
     await page.locator('#newFolderBtn').click();
-    await page.waitForTimeout(200);
-    await page.locator('#dialogInput').fill('Project Notes');
+    const dialogInput = page.locator('#dialogInput');
+    await expect(dialogInput).toBeVisible();
+    await dialogInput.fill('Project Notes');
     await page.locator('#dialogOk').click();
-    await page.waitForTimeout(300);
+    await expect(dialogInput).toBeHidden();
 
     // Select the folder
     const projectFolder = page.locator('.folder-item').filter({ hasText: 'Project Notes' });
@@ -183,10 +187,11 @@ test.describe('Drag and Drop', () => {
   test('should move note between folders via drag and drop', async ({ page }) => {
     // Create a folder
     await page.locator('#newFolderBtn').click();
-    await page.waitForTimeout(200);
-    await page.locator('#dialogInput').fill('Target Folder');
+    const dialogInput = page.locator('#dialogInput');
+    await expect(dialogInput).toBeVisible();
+    await dialogInput.fill('Target Folder');
     await page.locator('#dialogOk').click();
-    await page.waitForTimeout(300);
+    await expect(dialogInput).toBeHidden();
 
     // Create a note in All Notes
     const allNotes = page.locator('.folder-item').filter({ hasText: 'All Notes' });
@@ -455,10 +460,11 @@ test.describe('Trash Functionality', () => {
   test('should restore note from trash via drag-and-drop to folder', async ({ page }) => {
     // Create a folder
     await page.locator('#newFolderBtn').click();
-    await page.waitForTimeout(200);
-    await page.locator('#dialogInput').fill('Restore Folder');
+    const dialogInput = page.locator('#dialogInput');
+    await expect(dialogInput).toBeVisible();
+    await dialogInput.fill('Restore Folder');
     await page.locator('#dialogOk').click();
-    await page.waitForTimeout(300);
+    await expect(dialogInput).toBeHidden();
 
     // Create and delete a note
     await page.locator('.new-note-btn').click();
