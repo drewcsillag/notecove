@@ -23,9 +23,15 @@ export function getPreview(content, maxLength = 60) {
   if (!content) return '';
 
   // Strip HTML tags to get plain text
-  const div = document.createElement('div');
-  div.innerHTML = content;
-  const plainText = div.textContent || div.innerText || '';
+  let plainText = '';
+  if (typeof document !== 'undefined') {
+    const div = document.createElement('div');
+    div.innerHTML = content;
+    plainText = div.textContent || div.innerText || '';
+  } else {
+    // Fallback for environments without DOM (e.g., tests)
+    plainText = content.replace(/<[^>]*>/g, '');
+  }
 
   // Remove newlines and extra whitespace
   const cleaned = plainText.replace(/\s+/g, ' ').trim();

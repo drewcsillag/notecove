@@ -120,10 +120,10 @@ describe('NoteManager', () => {
       expect(deletedNote.deleted).toBe(true);
     });
 
-    it('should permanently delete a note', () => {
+    it('should permanently delete a note', async () => {
       const note = noteManager.createNote({ title: 'Test' });
 
-      const success = noteManager.permanentlyDeleteNote(note.id);
+      const success = await noteManager.permanentlyDeleteNote(note.id);
 
       expect(success).toBe(true);
       const deletedNote = noteManager.getNote(note.id);

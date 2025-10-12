@@ -9,13 +9,30 @@ import {
   sanitizeFilename
 } from './utils.js';
 
-// Mock DOM for escapeHtml test
+// Mock DOM for escapeHtml and getPreview tests
 beforeEach(() => {
   global.document = {
-    createElement: vi.fn(() => ({
-      textContent: '',
-      innerHTML: ''
-    }))
+    createElement: vi.fn(() => {
+      const element = {
+        _innerHTML: '',
+        _textContent: '',
+        get innerHTML() {
+          return this._innerHTML;
+        },
+        set innerHTML(value) {
+          this._innerHTML = value;
+          // Strip HTML tags for textContent
+          this._textContent = value.replace(/<[^>]*>/g, '');
+        },
+        get textContent() {
+          return this._textContent;
+        },
+        set textContent(value) {
+          this._textContent = value;
+        }
+      };
+      return element;
+    })
   };
 });
 
@@ -28,18 +45,18 @@ describe('Utils', () => {
     });
 
     it('should return full content if shorter than max length', () => {
-      const content = 'Short content';
-      expect(getPreview(content)).toBe(content);
+      const content = '<p>Short content</p>';
+      expect(getPreview(content)).toBe('Short content');
     });
 
     it('should truncate long content with ellipsis', () => {
-      const content = 'This is a very long piece of content that should be truncated';
+      const content = '<p>This is a very long piece of content that should be truncated</p>';
       const preview = getPreview(content, 20);
       expect(preview).toBe('This is a very long ...');
     });
 
     it('should replace newlines with spaces', () => {
-      const content = 'Line 1\nLine 2\nLine 3';
+      const content = '<p>Line 1</p> <p>Line 2</p> <p>Line 3</p>';
       const preview = getPreview(content);
       expect(preview).toBe('Line 1 Line 2 Line 3');
     });
