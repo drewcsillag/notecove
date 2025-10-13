@@ -51,9 +51,6 @@ class NoteCoveApp {
     this.updateUI();
     this.renderFolderTree();
     this.renderTagsList();
-
-    // Restore last opened note
-    this.restoreLastOpenedNote();
   }
 
   initializeEditor() {
@@ -154,6 +151,8 @@ class NoteCoveApp {
       case 'notes-loaded':
         this.notes = data.notes;
         this.updateUI();
+        // Restore last opened note after notes are loaded
+        this.restoreLastOpenedNote();
         break;
       case 'note-created':
         this.notes = this.noteManager.getAllNotes();
@@ -1164,6 +1163,7 @@ class NoteCoveApp {
             this.noteManager.deleteNote(noteId);
             this.updateStatus(`Moved "${note.title || 'Untitled'}" to trash`);
             this.updateUI();
+            this.renderFolderTree(); // Update folder counts
             // Clear editor if the deleted note was selected
             if (this.currentNoteId === noteId) {
               this.currentNoteId = null;
@@ -1190,12 +1190,14 @@ class NoteCoveApp {
             this.updateStatus(`Restored "${note.title || 'Untitled'}"`);
           }
           this.updateUI();
+          this.renderFolderTree(); // Update folder counts
         }
         // Otherwise, just move the note
         else if (!note.deleted && note.folderId !== folderId && folderId !== 'all-notes') {
           await this.noteManager.moveNoteToFolder(noteId, folderId);
           this.updateStatus(`Moved "${note.title || 'Untitled'}" to folder`);
           this.updateUI();
+          this.renderFolderTree(); // Update folder counts
         }
       }
     }
