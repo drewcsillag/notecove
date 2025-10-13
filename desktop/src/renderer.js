@@ -717,6 +717,9 @@ class NoteCoveApp {
         ? `<span class="folder-collapse-arrow" onclick="event.stopPropagation(); app.toggleFolderCollapse('${folder.id}')">${isExpanded ? '▼' : '▶'}</span>`
         : '<span class="folder-collapse-arrow" style="visibility: hidden;">▼</span>';
 
+      // Get note count for this folder (direct children only)
+      const noteCount = this.noteManager.getNotesInFolder(folder.id).length;
+
       return `
         <div class="folder-item ${isActive ? 'active' : ''}"
              style="padding-left: ${indent + 8}px"
@@ -731,6 +734,7 @@ class NoteCoveApp {
           ${collapseArrow}
           <span class="folder-icon">${icon}</span>
           <span class="folder-name">${escapeHtml(folder.name)}</span>
+          <span class="folder-count">${noteCount}</span>
         </div>
         ${hasChildren && isExpanded ? this.renderFolderItems(folder.children, level + 1) : ''}
       `;
