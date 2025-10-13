@@ -22,13 +22,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readDir: (path) => ipcRenderer.invoke('fs:read-dir', path),
     mkdir: (path) => ipcRenderer.invoke('fs:mkdir', path),
     deleteFile: (path) => ipcRenderer.invoke('fs:delete-file', path),
-    watch: (path, callback) => {
-      const id = Math.random().toString(36);
-      ipcRenderer.on(`fs:watch:${id}`, callback);
-      ipcRenderer.invoke('fs:watch', path, id);
-      return id;
+    watch: async (path, watchId) => {
+      // Set up listener for this watch ID
+      return await ipcRenderer.invoke('fs:watch', path, watchId);
     },
-    unwatch: (id) => ipcRenderer.invoke('fs:unwatch', id)
+    unwatch: (watchId) => ipcRenderer.invoke('fs:unwatch', watchId)
+  },
+
+  // File change events
+  onFileChange: (watchId, callback) => {
+    ipcRenderer.on(`fs:watch:${watchId}`, (event, data) => {
+      callback(event, data);
+    });
   },
 
   // Settings management

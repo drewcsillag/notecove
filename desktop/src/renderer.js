@@ -1,5 +1,6 @@
 import { NoteCoveEditor } from './lib/editor.js';
 import { NoteManager } from './lib/note-manager.js';
+import { SyncManager } from './lib/sync-manager.js';
 import { debounce, escapeHtml, getPreview, formatDate } from './lib/utils.js';
 
 // NoteCove Renderer Process
@@ -10,6 +11,7 @@ class NoteCoveApp {
     this.isEditing = false;
     this.editor = null;
     this.noteManager = null;
+    this.syncManager = null;
     this.searchQuery = '';
     this.currentFolderId = 'all-notes'; // Default to All Notes folder
     this.folderManager = null;
@@ -42,6 +44,9 @@ class NoteCoveApp {
     // Initialize editor
     this.initializeEditor();
 
+    // Initialize sync manager
+    this.initializeSyncManager();
+
     // Update UI after notes are loaded
     this.updateUI();
     this.renderFolderTree();
@@ -64,6 +69,81 @@ class NoteCoveApp {
 
     // Setup the formatting toolbar
     this.editor.setupToolbar();
+  }
+
+  initializeSyncManager() {
+    if (!this.noteManager || !this.noteManager.fileStorage) {
+      console.log('Sync manager not initialized: file storage not available');
+      return;
+    }
+
+    // Create sync manager
+    this.syncManager = new SyncManager(this.noteManager, this.noteManager.fileStorage);
+
+    // Add sync event listeners
+    this.syncManager.addListener((event, data) => this.handleSyncEvent(event, data));
+
+    // Start watching for file changes
+    this.syncManager.startWatching();
+  }
+
+  handleSyncEvent(event, data) {
+    switch (event) {
+      case 'status-changed':
+        console.log('Sync status changed:', data.status);
+        this.updateSyncStatus(data.status);
+        break;
+      case 'note-synced':
+        console.log('Note synced:', data.noteId, data.action);
+        this.updateStatus(`Synced: ${data.action}`);
+        // Refresh the notes list if a note was added or updated externally
+        if (data.action === 'added' || data.action === 'deleted') {
+          this.notes = this.noteManager.getAllNotes();
+          this.updateUI();
+        } else if (data.action === 'updated') {
+          // Only update the notes array, don't re-render to avoid flickering
+          this.notes = this.noteManager.getAllNotes();
+          this.renderNotesList();
+        }
+        break;
+      case 'conflict-detected':
+        console.warn('Sync conflict detected:', data.noteId);
+        this.updateStatus(`Conflict resolved: ${data.resolution} version kept`);
+        break;
+      case 'force-sync-complete':
+        console.log('Force sync completed:', data.noteCount, 'notes');
+        this.updateStatus('Sync complete');
+        break;
+    }
+  }
+
+  updateSyncStatus(status) {
+    // Update sync status in UI
+    const syncStatus = document.getElementById('syncStatus');
+    if (syncStatus) {
+      let statusText = '';
+      let statusIcon = '';
+      switch (status) {
+        case 'watching':
+          statusIcon = '👁️';
+          statusText = 'Watching';
+          break;
+        case 'syncing':
+          statusIcon = '🔄';
+          statusText = 'Syncing...';
+          break;
+        case 'error':
+          statusIcon = '⚠️';
+          statusText = 'Sync Error';
+          break;
+        case 'idle':
+        default:
+          statusIcon = '✓';
+          statusText = 'Sync Ready';
+          break;
+      }
+      syncStatus.textContent = `${statusIcon} ${statusText}`;
+    }
   }
 
   handleNoteEvent(event, data) {
