@@ -13,9 +13,19 @@ export class NoteManager {
     this.fileStorage = new FileStorage();
     this.folderManager = new FolderManager();
     this.watchId = null;
+    this.syncManager = null; // Will be set after SyncManager is initialized
 
     this.initializeStorage();
     this.setupFolderListener();
+  }
+
+  /**
+   * Set the sync manager to use for CRDT-based sync
+   * @param {SyncManager} syncManager - Sync manager instance
+   */
+  setSyncManager(syncManager) {
+    this.syncManager = syncManager;
+    console.log('NoteManager: SyncManager integration enabled');
   }
 
   /**
@@ -198,7 +208,14 @@ export class NoteManager {
   async saveNote(note) {
     try {
       if (this.isElectron) {
-        await this.fileStorage.saveNote(note);
+        // Use SyncManager for CRDT-based sync if available
+        if (this.syncManager) {
+          console.log('Saving note with CRDT sync:', note.id);
+          await this.syncManager.saveNoteWithCRDT(note);
+        } else {
+          console.log('Saving note without sync:', note.id);
+          await this.fileStorage.saveNote(note);
+        }
       } else {
         await this.saveNotes(); // Save all notes in web mode
       }

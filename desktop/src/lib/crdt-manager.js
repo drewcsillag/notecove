@@ -1,6 +1,7 @@
 /**
  * CRDT Manager - Handles conflict-free replication using Yjs
- * Provides CRDT-based document synchronization for multi-device editing
+ * Integrates with TipTap's Collaboration extension for real-time editing
+ * Uses append-only update files for robust multi-instance sync
  */
 import * as Y from 'yjs';
 
@@ -14,6 +15,10 @@ export class CRDTManager {
 
     // Listeners for CRDT events
     this.listeners = new Set();
+
+    // Track pending updates that need to be written
+    // Map of noteId -> Array of updates
+    this.pendingUpdates = new Map();
   }
 
   /**
@@ -59,7 +64,14 @@ export class CRDTManager {
 
       // Set up update handler to track changes
       const updateHandler = (update, origin) => {
-        if (origin !== 'silent') {
+        // Only track local changes (not 'remote' or 'silent')
+        if (origin !== 'remote' && origin !== 'silent') {
+          // Store the update to be written as an append-only file
+          if (!this.pendingUpdates.has(noteId)) {
+            this.pendingUpdates.set(noteId, []);
+          }
+          this.pendingUpdates.get(noteId).push(Array.from(update));
+
           this.notify('doc-updated', {
             noteId,
             update: Array.from(update),
@@ -79,40 +91,45 @@ export class CRDTManager {
 
   /**
    * Initialize a note's CRDT document with content
+   * This is used for TipTap integration
    * @param {string} noteId - Note ID
    * @param {object} note - Note object with content
    */
   initializeNote(noteId, note) {
     const doc = this.getDoc(noteId);
 
-    // Get the shared types
-    const yTitle = doc.getText('title');
-    const yContent = doc.getText('content');
-    const yMetadata = doc.getMap('metadata');
-
-    // Initialize with note data (transact to batch updates)
+    // Use transact with 'silent' to avoid triggering update events
     doc.transact(() => {
+      // Store metadata in a Y.Map
+      const yMetadata = doc.getMap('metadata');
+
       // Only initialize if empty
-      if (yTitle.length === 0 && note.title) {
-        yTitle.insert(0, note.title);
+      if (yMetadata.size === 0) {
+        yMetadata.set('title', note.title || 'Untitled');
+        yMetadata.set('created', note.created || new Date().toISOString());
+        yMetadata.set('modified', note.modified || new Date().toISOString());
+        yMetadata.set('tags', note.tags || []);
+        yMetadata.set('folder', note.folder || null);
       }
 
-      if (yContent.length === 0 && note.content) {
-        // For TipTap content, we store the JSON string
-        const contentStr = typeof note.content === 'string'
-          ? note.content
-          : JSON.stringify(note.content);
-        yContent.insert(0, contentStr);
-      }
+      // For TipTap Collaboration: the content is stored in a Y.XmlFragment
+      // named 'prosemirror' (this is what TipTap's Collaboration extension uses)
+      // We don't manually initialize it here - TipTap will do it when the editor connects
 
-      // Store metadata
-      yMetadata.set('created', note.created || new Date().toISOString());
-      yMetadata.set('modified', note.modified || new Date().toISOString());
-      if (note.tags) yMetadata.set('tags', note.tags);
-      if (note.folder) yMetadata.set('folder', note.folder);
-    }, 'silent'); // Use 'silent' to avoid triggering update events during initialization
+    }, 'silent');
 
     console.log('Initialized CRDT document for note:', noteId);
+  }
+
+  /**
+   * Get the Y.XmlFragment that TipTap uses for content
+   * @param {string} noteId - Note ID
+   * @returns {Y.XmlFragment} The fragment TipTap will use
+   */
+  getContentFragment(noteId) {
+    const doc = this.getDoc(noteId);
+    // TipTap's Collaboration extension uses a fragment named 'default'
+    return doc.getXmlFragment('default');
   }
 
   /**
@@ -123,25 +140,24 @@ export class CRDTManager {
   getNoteFromDoc(noteId) {
     const doc = this.getDoc(noteId);
 
-    const yTitle = doc.getText('title');
-    const yContent = doc.getText('content');
     const yMetadata = doc.getMap('metadata');
 
-    // Extract content and parse if it's JSON
-    let content = yContent.toString();
-    try {
-      // Try to parse as JSON for TipTap format
-      const parsed = JSON.parse(content);
-      if (parsed && typeof parsed === 'object') {
-        content = parsed;
-      }
-    } catch (e) {
-      // If not JSON, keep as string
+    // For content, we need to convert the Y.XmlFragment to TipTap JSON
+    // This is used when loading notes
+    const fragment = doc.getXmlFragment('default');
+
+    // Convert Y.XmlFragment to plain object for storage
+    // TipTap will handle the reverse when loading
+    let content = { type: 'doc', content: [] };
+    if (fragment.length > 0) {
+      // The fragment contains the ProseMirror document structure
+      // We'll let TipTap handle the serialization through its own methods
+      content = null; // Will be handled by TipTap's getJSON()
     }
 
     return {
       id: noteId,
-      title: yTitle.toString() || 'Untitled',
+      title: yMetadata.get('title') || 'Untitled',
       content: content,
       created: yMetadata.get('created'),
       modified: yMetadata.get('modified'),
@@ -151,31 +167,21 @@ export class CRDTManager {
   }
 
   /**
-   * Update note content in CRDT
+   * Update note metadata (not content - content is handled by TipTap)
    * @param {string} noteId - Note ID
    * @param {object} updates - Updates to apply
    */
-  updateNote(noteId, updates) {
+  updateMetadata(noteId, updates) {
     const doc = this.getDoc(noteId);
 
     doc.transact(() => {
-      if (updates.title !== undefined) {
-        const yTitle = doc.getText('title');
-        yTitle.delete(0, yTitle.length);
-        yTitle.insert(0, updates.title);
-      }
-
-      if (updates.content !== undefined) {
-        const yContent = doc.getText('content');
-        const contentStr = typeof updates.content === 'string'
-          ? updates.content
-          : JSON.stringify(updates.content);
-        yContent.delete(0, yContent.length);
-        yContent.insert(0, contentStr);
-      }
-
-      // Update metadata
       const yMetadata = doc.getMap('metadata');
+
+      if (updates.title !== undefined) {
+        yMetadata.set('title', updates.title);
+      }
+
+      // Update timestamp
       yMetadata.set('modified', new Date().toISOString());
 
       if (updates.tags !== undefined) {
@@ -186,99 +192,7 @@ export class CRDTManager {
       }
     });
 
-    console.log('Updated CRDT document for note:', noteId);
-  }
-
-  /**
-   * Merge external note data using CRDT
-   * @param {string} noteId - Note ID
-   * @param {object} externalNote - External note data
-   * @returns {object} Merged note
-   */
-  mergeExternalNote(noteId, externalNote) {
-    // Get or create the doc
-    const doc = this.getDoc(noteId);
-
-    // If the doc is empty, initialize it with external note
-    if (this.isDocEmpty(noteId)) {
-      this.initializeNote(noteId, externalNote);
-      return this.getNoteFromDoc(noteId);
-    }
-
-    // If doc has content, we need to merge
-    // Check if external note has CRDT state
-    if (externalNote.crdtState) {
-      // Apply the CRDT state update
-      try {
-        const update = new Uint8Array(externalNote.crdtState);
-        Y.applyUpdate(doc, update, 'remote');
-        console.log('Applied CRDT update from external source for note:', noteId);
-      } catch (error) {
-        console.error('Error applying CRDT update:', error);
-        // Fall back to manual merge
-        this.manualMerge(noteId, externalNote);
-      }
-    } else {
-      // No CRDT state - do a manual merge
-      this.manualMerge(noteId, externalNote);
-    }
-
-    return this.getNoteFromDoc(noteId);
-  }
-
-  /**
-   * Manual merge when CRDT state is not available
-   * @param {string} noteId - Note ID
-   * @param {object} externalNote - External note
-   */
-  manualMerge(noteId, externalNote) {
-    const doc = this.getDoc(noteId);
-    const currentNote = this.getNoteFromDoc(noteId);
-
-    doc.transact(() => {
-      const yMetadata = doc.getMap('metadata');
-
-      // Use timestamps to decide what to keep
-      const currentModified = new Date(currentNote.modified || 0).getTime();
-      const externalModified = new Date(externalNote.modified || 0).getTime();
-
-      // If external is newer, update content
-      if (externalModified > currentModified) {
-        if (externalNote.title !== undefined) {
-          const yTitle = doc.getText('title');
-          yTitle.delete(0, yTitle.length);
-          yTitle.insert(0, externalNote.title);
-        }
-
-        if (externalNote.content !== undefined) {
-          const yContent = doc.getText('content');
-          const contentStr = typeof externalNote.content === 'string'
-            ? externalNote.content
-            : JSON.stringify(externalNote.content);
-          yContent.delete(0, yContent.length);
-          yContent.insert(0, contentStr);
-        }
-
-        yMetadata.set('modified', externalNote.modified);
-      }
-
-      // Merge tags (union of both sets)
-      if (externalNote.tags) {
-        const currentTags = new Set(currentNote.tags || []);
-        const externalTags = new Set(externalNote.tags || []);
-        const mergedTags = [...new Set([...currentTags, ...externalTags])];
-        yMetadata.set('tags', mergedTags);
-      }
-
-      // Keep the earlier created timestamp
-      const currentCreated = new Date(currentNote.created || Date.now()).getTime();
-      const externalCreated = new Date(externalNote.created || Date.now()).getTime();
-      if (externalCreated < currentCreated) {
-        yMetadata.set('created', externalNote.created);
-      }
-    }, 'remote');
-
-    console.log('Manual merge completed for note:', noteId);
+    console.log('Updated metadata for note:', noteId);
   }
 
   /**
@@ -287,49 +201,53 @@ export class CRDTManager {
    * @returns {boolean} True if doc is empty
    */
   isDocEmpty(noteId) {
+    if (!this.docs.has(noteId)) {
+      return true;
+    }
     const doc = this.getDoc(noteId);
-    const yTitle = doc.getText('title');
-    const yContent = doc.getText('content');
-    return yTitle.length === 0 && yContent.length === 0;
+    const yMetadata = doc.getMap('metadata');
+    return yMetadata.size === 0;
   }
 
   /**
-   * Get CRDT state for serialization
+   * Get CRDT state for serialization (full state)
    * @param {string} noteId - Note ID
-   * @returns {Array} State vector as array
+   * @returns {Uint8Array} State vector as Uint8Array
    */
   getState(noteId) {
     const doc = this.getDoc(noteId);
-    const state = Y.encodeStateAsUpdate(doc);
-    return Array.from(state);
+    return Y.encodeStateAsUpdate(doc);
   }
 
   /**
-   * Apply CRDT state update
+   * Apply CRDT state update from external source
    * @param {string} noteId - Note ID
    * @param {Array|Uint8Array} state - State update
+   * @param {string} origin - Origin marker (default: 'remote')
    */
-  applyState(noteId, state) {
+  applyUpdate(noteId, state, origin = 'remote') {
     const doc = this.getDoc(noteId);
     const update = state instanceof Uint8Array ? state : new Uint8Array(state);
-    Y.applyUpdate(doc, update, 'remote');
-    console.log('Applied state update for note:', noteId);
+    Y.applyUpdate(doc, update, origin);
+    console.log('Applied update for note:', noteId);
   }
 
   /**
-   * Create a snapshot of current state
+   * Get pending updates for a note (to be written to files)
    * @param {string} noteId - Note ID
-   * @returns {object} Snapshot with note data and CRDT state
+   * @returns {Array} Array of updates
    */
-  createSnapshot(noteId) {
-    const note = this.getNoteFromDoc(noteId);
-    const crdtState = this.getState(noteId);
+  getPendingUpdates(noteId) {
+    const updates = this.pendingUpdates.get(noteId) || [];
+    return updates;
+  }
 
-    return {
-      ...note,
-      crdtState,
-      snapshotAt: new Date().toISOString()
-    };
+  /**
+   * Clear pending updates after they've been written
+   * @param {string} noteId - Note ID
+   */
+  clearPendingUpdates(noteId) {
+    this.pendingUpdates.delete(noteId);
   }
 
   /**
@@ -349,6 +267,7 @@ export class CRDTManager {
       // Destroy doc
       doc.destroy();
       this.docs.delete(noteId);
+      this.pendingUpdates.delete(noteId);
 
       console.log('Removed CRDT document for note:', noteId);
     }
@@ -361,7 +280,11 @@ export class CRDTManager {
   getStats() {
     return {
       documentCount: this.docs.size,
-      documents: Array.from(this.docs.keys())
+      documents: Array.from(this.docs.keys()),
+      pendingUpdates: Array.from(this.pendingUpdates.entries()).map(([noteId, updates]) => ({
+        noteId,
+        updateCount: updates.length
+      }))
     };
   }
 
@@ -381,6 +304,7 @@ export class CRDTManager {
     this.docs.clear();
     this.updateHandlers.clear();
     this.listeners.clear();
+    this.pendingUpdates.clear();
 
     console.log('CRDT Manager destroyed');
   }

@@ -57,7 +57,8 @@ export class SyncManager {
   }
 
   /**
-   * Start watching for file changes
+   * Start watching for CRDT file changes (.yjs files only)
+   * This watches the source of truth, not the materialized JSON cache
    */
   async startWatching() {
     if (!this.isElectron || this.watchId) {
@@ -74,29 +75,21 @@ export class SyncManager {
       // Set up listener for note manager events to auto-save with CRDT
       this.setupNoteManagerListener();
 
-      // Generate unique watch ID
-      this.watchId = `notes-${Date.now()}`;
+      // Watch the CRDT directory (source of truth for sync)
+      this.watchId = await this.fileStorage.watchCRDT((data) => {
+        this.handleFileChange(data);
+      });
 
-      // Set up event listener for file changes
-      if (window.electronAPI && window.electronAPI.onFileChange) {
-        window.electronAPI.onFileChange(this.watchId, (event, data) => {
-          this.handleFileChange(data);
-        });
-      }
-
-      // Start watching
-      const result = await window.electronAPI.fileSystem.watch(notesPath, this.watchId);
-
-      if (result.success) {
+      if (this.watchId) {
         this.updateStatus('watching');
         this.lastSyncTime = new Date();
-        console.log('Started watching notes directory:', notesPath);
+        console.log('Started watching CRDT directory');
       } else {
-        console.error('Failed to start watching:', result.error);
+        console.error('Failed to start CRDT watching');
         this.updateStatus('error');
       }
     } catch (error) {
-      console.error('Error starting file watch:', error);
+      console.error('Error starting CRDT watch:', error);
       this.updateStatus('error');
     }
   }
@@ -140,29 +133,29 @@ export class SyncManager {
   }
 
   /**
-   * Handle file system changes
+   * Handle CRDT file system changes (.yjs files only)
    * @param {object} data - Change data from chokidar
    */
   async handleFileChange(data) {
     const { event: eventType, path: filePath } = data;
 
-    // Only process .json files (notes)
-    if (!filePath.endsWith('.json')) {
+    // Only process .yjs files (CRDT source of truth)
+    if (!filePath.endsWith('.yjs')) {
       return;
     }
 
-    console.log('File change detected:', eventType, filePath);
+    console.log('CRDT file change detected:', eventType, filePath);
     this.updateStatus('syncing');
 
     try {
       // Extract note ID from filename
       const filename = filePath.split('/').pop();
-      const noteId = filename.replace('.json', '');
+      const noteId = filename.replace('.yjs', '');
 
       switch (eventType) {
         case 'add':
         case 'change':
-          await this.handleNoteChanged(noteId, filePath);
+          await this.handleCRDTChanged(noteId, filePath);
           break;
 
         case 'unlink':
@@ -173,59 +166,64 @@ export class SyncManager {
       this.lastSyncTime = new Date();
       this.updateStatus('watching');
     } catch (error) {
-      console.error('Error handling file change:', error);
+      console.error('Error handling CRDT change:', error);
       this.updateStatus('error');
     }
   }
 
   /**
-   * Handle note added or changed externally
+   * Handle CRDT file added or changed externally
    * @param {string} noteId - Note ID
    * @param {string} filePath - File path
    */
-  async handleNoteChanged(noteId, filePath) {
+  async handleCRDTChanged(noteId, filePath) {
     try {
-      // Read the file
-      const result = await window.electronAPI.fileSystem.readFile(filePath);
-      if (!result.success) {
-        console.error('Failed to read changed file:', result.error);
+      // Load the CRDT data
+      const crdtData = await this.fileStorage.loadCRDT(noteId);
+      if (!crdtData) {
+        console.error('Failed to load CRDT for note:', noteId);
         return;
       }
 
-      const externalNote = JSON.parse(result.content);
       const localNote = this.noteManager.getNote(noteId);
 
-      // Use CRDT merging for conflict-free synchronization
       if (localNote) {
+        // Existing note - merge CRDT updates
         // Initialize CRDT if not already done
         if (this.crdtManager.isDocEmpty(noteId)) {
           this.crdtManager.initializeNote(noteId, localNote);
         }
 
-        // Merge external note using CRDT
-        const mergedNote = this.crdtManager.mergeExternalNote(noteId, externalNote);
+        // Apply the external CRDT updates
+        this.crdtManager.applyState(noteId, crdtData);
+
+        // Extract the merged note from CRDT
+        const mergedNote = this.crdtManager.getNoteFromDoc(noteId);
+        mergedNote.id = noteId; // Ensure ID is preserved
 
         // Update the note in memory WITHOUT saving to disk (to prevent infinite loop)
         this.noteManager.notes.set(noteId, mergedNote);
-        this.noteManager.notify('note-updated', { note: mergedNote, updates: mergedNote });
+        this.noteManager.notify('note-updated', { note: mergedNote, source: 'sync' });
 
-        console.log('Note synced with CRDT merge:', noteId);
+        console.log('Note synced from CRDT:', noteId);
         this.notify('note-synced', {
           noteId,
-          action: 'merged',
-          hasCrdtState: !!externalNote.crdtState
+          action: 'merged'
         });
       } else {
-        // New note - initialize CRDT and add to note manager
-        this.crdtManager.initializeNote(noteId, externalNote);
-        this.noteManager.notes.set(noteId, externalNote);
-        this.noteManager.notify('note-created', { note: externalNote });
+        // New note - load CRDT and create note
+        this.crdtManager.applyState(noteId, crdtData);
+        const newNote = this.crdtManager.getNoteFromDoc(noteId);
+        newNote.id = noteId;
 
-        console.log('New note synced from external change:', noteId);
+        this.noteManager.notes.set(noteId, newNote);
+        this.noteManager.notify('note-created', { note: newNote, source: 'sync' });
+
+        console.log('New note synced from CRDT:', noteId);
         this.notify('note-synced', { noteId, action: 'added' });
       }
     } catch (error) {
-      console.error('Error handling note change:', error);
+      console.error('Error handling CRDT change:', error);
     }
   }
 
@@ -317,35 +315,56 @@ export class SyncManager {
 
   /**
    * Save a note with CRDT state
+   * Saves both the CRDT file (.yjs) and the materialized JSON cache
    * @param {object} note - Note to save
    * @returns {boolean} Success
    */
   async saveNoteWithCRDT(note) {
+    console.log('=== saveNoteWithCRDT called ===');
+    console.log('  Note ID:', note.id);
+    console.log('  Note title:', note.title);
+    console.log('  isElectron:', this.isElectron);
+
     if (!this.isElectron) {
       // In web mode, just save normally
+      console.log('  Using web mode save');
       return await this.fileStorage.saveNote(note);
     }
 
     try {
       // Initialize or update CRDT document
-      if (this.crdtManager.isDocEmpty(note.id)) {
+      const isEmpty = this.crdtManager.isDocEmpty(note.id);
+      console.log('  CRDT doc empty:', isEmpty);
+
+      if (isEmpty) {
+        console.log('  Initializing new CRDT document');
         this.crdtManager.initializeNote(note.id, note);
       } else {
+        console.log('  Updating existing CRDT document');
         this.crdtManager.updateNote(note.id, note);
       }
 
-      // Get CRDT state
+      // Get CRDT state (binary)
       const crdtState = this.crdtManager.getState(note.id);
+      const crdtData = new Uint8Array(crdtState);
+      console.log('  CRDT state size:', crdtData.length, 'bytes');
 
-      // Save note with CRDT state
-      const noteWithCRDT = {
-        ...note,
-        crdtState
-      };
+      // Save CRDT file (source of truth, watched for sync)
+      console.log('  Saving CRDT file...');
+      const crdtSaved = await this.fileStorage.saveCRDT(note.id, crdtData);
+      console.log('  CRDT saved:', crdtSaved);
 
-      return await this.fileStorage.saveNote(noteWithCRDT);
+      // Save materialized JSON (cache for fast loading, NOT watched)
+      console.log('  Saving JSON cache...');
+      const noteSaved = await this.fileStorage.saveNote(note);
+      console.log('  JSON saved:', noteSaved);
+
+      const success = crdtSaved && noteSaved;
+      console.log('=== saveNoteWithCRDT result:', success, '===');
+      return success;
     } catch (error) {
       console.error('Error saving note with CRDT:', error);
+      console.error('Stack trace:', error.stack);
       return false;
     }
   }

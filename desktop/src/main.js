@@ -6,19 +6,70 @@ const chokidar = require('chokidar');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 
+// Parse command-line arguments for multi-instance support
+function parseArgs() {
+  const args = process.argv.slice(isDev ? 2 : 1);
+  const parsed = {
+    userDataDir: null,
+    notesPath: null,
+    instance: null
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--user-data-dir' && args[i + 1]) {
+      parsed.userDataDir = args[i + 1];
+      i++;
+    } else if (args[i] === '--notes-path' && args[i + 1]) {
+      parsed.notesPath = args[i + 1];
+      i++;
+    } else if (args[i] === '--instance' && args[i + 1]) {
+      parsed.instance = args[i + 1];
+      i++;
+    }
+  }
+
+  return parsed;
+}
+
+const cmdArgs = parseArgs();
+
+// Set custom user data directory if provided (for multiple instances)
+if (cmdArgs.userDataDir) {
+  app.setPath('userData', cmdArgs.userDataDir);
+  console.log('Using custom user data directory:', cmdArgs.userDataDir);
+}
+
+// Set custom notes path for this instance
+const customNotesPath = cmdArgs.notesPath ||
+  (cmdArgs.instance ? path.join(os.homedir(), 'Documents', `NoteCove-${cmdArgs.instance}`) : null);
+
 class NoteCoveApp {
   constructor() {
     this.mainWindow = null;
     this.watchers = new Map(); // File system watchers
+    this.instanceName = cmdArgs.instance || 'default';
+
+    // Default notes path considers instance name
+    const defaultNotesPath = customNotesPath || path.join(os.homedir(), 'Documents', 'NoteCove');
+
     this.store = new Store({
       defaults: {
         windowGeometry: { width: 1200, height: 800 },
         theme: 'auto',
         lastOpenNote: null,
-        notesPath: path.join(os.homedir(), 'Documents', 'NoteCove'),
+        notesPath: defaultNotesPath,
         documentsPath: path.join(os.homedir(), 'Documents')
       }
     });
+
+    // Override notesPath if custom path provided
+    if (customNotesPath) {
+      this.store.set('notesPath', customNotesPath);
+    }
+
+    console.log('Instance:', this.instanceName);
+    console.log('Notes path:', this.store.get('notesPath'));
+
     this.setupApp();
     this.setupIPC();
   }

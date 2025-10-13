@@ -90,10 +90,12 @@ class NoteCoveApp {
     // Add sync event listeners
     this.syncManager.addListener((event, data) => this.handleSyncEvent(event, data));
 
-    // File watching is disabled by default to prevent file system loops
-    // It can be enabled when multi-device sync or external editor support is needed
-    // this.syncManager.startWatching();
-    console.log('Sync manager initialized (file watching disabled)');
+    // Connect NoteManager to SyncManager for CRDT-based saves
+    this.noteManager.setSyncManager(this.syncManager);
+
+    // Start watching CRDT files for sync (now safe - only watches .yjs files)
+    this.syncManager.startWatching();
+    console.log('Sync manager initialized and watching CRDT files');
   }
 
   handleSyncEvent(event, data) {
@@ -168,6 +170,8 @@ class NoteCoveApp {
       case 'note-created':
         this.notes = this.noteManager.getAllNotes();
         this.updateUI();
+        // Update folder counts when a note is created
+        this.renderFolderTree();
         break;
       case 'note-updated':
         // Only update the notes array in memory, don't re-render to avoid flickering
@@ -177,6 +181,8 @@ class NoteCoveApp {
       case 'note-restored':
         this.notes = this.noteManager.getAllNotes();
         this.updateUI();
+        // Update folder counts when notes are deleted/restored
+        this.renderFolderTree();
         break;
     }
   }

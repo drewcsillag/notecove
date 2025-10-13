@@ -66,21 +66,50 @@ export class FileStorage {
         // Directory creation will be handled by the main process
         console.log('Notes directory will be created at:', this.notesPath);
       }
+
+      // Ensure subdirectories exist for CRDT-based sync
+      const crdtDir = `${this.notesPath}/crdt`;
+      const notesDir = `${this.notesPath}/notes`;
+
+      const crdtExists = await window.electronAPI.fileSystem.exists(crdtDir);
+      if (!crdtExists) {
+        console.log('Creating CRDT directory:', crdtDir);
+        await window.electronAPI.fileSystem.mkdir(crdtDir);
+      }
+
+      const notesExists = await window.electronAPI.fileSystem.exists(notesDir);
+      if (!notesExists) {
+        console.log('Creating notes directory:', notesDir);
+        await window.electronAPI.fileSystem.mkdir(notesDir);
+      }
+
+      console.log('Storage structure ready:', { crdtDir, notesDir });
     } catch (error) {
       console.error('Failed to ensure notes directory:', error);
     }
   }
 
   /**
-   * Get file path for a note
-   * @param {object} note - Note object
+   * Get file path for a note's JSON cache
+   * @param {object|string} noteOrId - Note object or note ID
    * @returns {string} File path
    */
-  getNoteFilePath(note) {
-    if (!this.notesPath || !note.id) return null;
+  getNoteFilePath(noteOrId) {
+    const noteId = typeof noteOrId === 'string' ? noteOrId : noteOrId?.id;
+    if (!this.notesPath || !noteId) return null;
 
     // Use only note ID for filename to avoid creating multiple files when title changes
-    return `${this.notesPath}/${note.id}.json`;
+    return `${this.notesPath}/notes/${noteId}.json`;
+  }
+
+  /**
+   * Get file path for a note's CRDT data (source of truth)
+   * @param {string} noteId - Note ID
+   * @returns {string} File path to .yjs file
+   */
+  getCRDTFilePath(noteId) {
+    if (!this.notesPath || !noteId) return null;
+    return `${this.notesPath}/crdt/${noteId}.yjs`;
   }
 
   /**
@@ -325,6 +354,115 @@ export class FileStorage {
       console.log('Stopped watching notes directory');
     } catch (error) {
       console.error('Error stopping file watch:', error);
+    }
+  }
+
+  /**
+   * Save CRDT data for a note (binary Yjs updates)
+   * This is the source of truth for syncing
+   * @param {string} noteId - Note ID
+   * @param {Uint8Array} crdtData - Binary CRDT data
+   * @returns {boolean} Success
+   */
+  async saveCRDT(noteId, crdtData) {
+    if (!this.initialized || !this.isElectron) return false;
+
+    try {
+      const filePath = this.getCRDTFilePath(noteId);
+
+      // Convert Uint8Array to base64 for storage
+      const base64Data = btoa(String.fromCharCode(...crdtData));
+
+      const result = await window.electronAPI.fileSystem.writeFile(
+        filePath,
+        base64Data
+      );
+
+      if (result.success) {
+        console.log('CRDT saved:', filePath);
+        return true;
+      } else {
+        console.error('Failed to save CRDT:', result.error);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saving CRDT:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Load CRDT data for a note
+   * @param {string} noteId - Note ID
+   * @returns {Uint8Array|null} CRDT data or null
+   */
+  async loadCRDT(noteId) {
+    if (!this.initialized || !this.isElectron) return null;
+
+    try {
+      const filePath = this.getCRDTFilePath(noteId);
+      const result = await window.electronAPI.fileSystem.readFile(filePath);
+
+      if (result.success) {
+        // Convert base64 back to Uint8Array
+        const binaryString = atob(result.content);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        console.log('CRDT loaded:', filePath);
+        return bytes;
+      } else {
+        console.log('No CRDT file found for note:', noteId);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error loading CRDT:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if CRDT file exists for a note
+   * @param {string} noteId - Note ID
+   * @returns {boolean} True if CRDT file exists
+   */
+  async hasCRDT(noteId) {
+    if (!this.initialized || !this.isElectron) return false;
+
+    try {
+      const filePath = this.getCRDTFilePath(noteId);
+      return await window.electronAPI.fileSystem.exists(filePath);
+    } catch (error) {
+      console.error('Error checking CRDT existence:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Watch CRDT directory for changes (source of truth for sync)
+   * @param {Function} callback - Callback for changes
+   * @returns {string} Watch ID
+   */
+  async watchCRDT(callback) {
+    if (!this.initialized || !this.isElectron || !this.notesPath) return null;
+
+    try {
+      const crdtPath = `${this.notesPath}/crdt`;
+      const watchId = `crdt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Set up the listener for file change events
+      window.electronAPI.onFileChange(watchId, (event, data) => {
+        callback(data);
+      });
+
+      // Start watching the CRDT directory
+      await window.electronAPI.fileSystem.watch(crdtPath, watchId);
+      console.log('Watching CRDT directory:', crdtPath, 'with ID:', watchId);
+      return watchId;
+    } catch (error) {
+      console.error('Error setting up CRDT watch:', error);
+      return null;
     }
   }
 }
