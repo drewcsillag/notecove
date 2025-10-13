@@ -1,5 +1,14 @@
 # CRDT-Based Sync Testing Guide
 
+## Status Update (Latest)
+
+✅ **CLI Argument Parsing** - Fixed to handle both `--key=value` and `--key value` formats
+✅ **Custom Notes Path** - Fixed `getDefaultNotesPath()` to read `notesPath` setting correctly
+✅ **Per-Note Directory Structure** - Implemented `note-123/cache.json` with `updates/` and `meta/` subdirectories
+⏳ **Ready for Multi-Instance Testing**
+
+See [TESTING_INSTRUCTIONS.md](./TESTING_INSTRUCTIONS.md) for detailed step-by-step testing guide.
+
 ## Overview
 
 NoteCove now implements CRDT (Conflict-free Replicated Data Type) based synchronization using Yjs. This allows multiple instances to edit the same notes simultaneously without conflicts.
