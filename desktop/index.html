@@ -46,18 +46,55 @@
       flex: 1;
       width: 100vw;
       overflow: hidden;
+      position: relative;
     }
 
-    /* Sidebar */
+    /* Sidebar - Left Column */
     .sidebar {
-      width: 280px;
+      flex: 0 0 25%;
+      min-width: 200px;
+      max-width: 50%;
       background: var(--surface);
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      min-width: 200px;
-      resize: horizontal;
       overflow: hidden;
+    }
+
+    /* Notes Panel - Middle Column */
+    .notes-panel {
+      flex: 0 0 25%;
+      min-width: 200px;
+      max-width: 50%;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Resize Handles */
+    .resize-handle {
+      flex: 0 0 4px;
+      background: var(--border);
+      cursor: col-resize;
+      position: relative;
+      z-index: 10;
+      transition: background 0.2s;
+    }
+
+    .resize-handle:hover,
+    .resize-handle.resizing {
+      background: var(--primary-color);
+    }
+
+    .resize-handle::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -2px;
+      right: -2px;
     }
 
     .sidebar-header {
@@ -929,6 +966,7 @@
 </head>
 <body>
   <div id="app">
+    <!-- Left Column: Sidebar (Folders & Tags) -->
     <div class="sidebar">
       <div class="sidebar-header">
         <div class="logo">
@@ -943,11 +981,6 @@
           </div>
           NoteCove
         </div>
-      </div>
-
-      <div class="search-box">
-        <div class="search-icon">🔍</div>
-        <input type="text" class="search-input" placeholder="Search notes...">
       </div>
 
       <div class="sidebar-content">
@@ -969,22 +1002,37 @@
             <!-- Tags will be populated here -->
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="notes-section">
-          <div class="section-header">
-            <span class="section-title">Notes</span>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="notes-count" id="notesCount">0</span>
-              <button class="section-action" id="newNoteBtn" title="New Note">➕</button>
-            </div>
+    <!-- Resize Handle 1 -->
+    <div class="resize-handle" data-resize="sidebar"></div>
+
+    <!-- Middle Column: Notes Panel -->
+    <div class="notes-panel">
+      <div class="search-box">
+        <div class="search-icon">🔍</div>
+        <input type="text" class="search-input" placeholder="Search notes...">
+      </div>
+
+      <div class="notes-section">
+        <div class="section-header">
+          <span class="section-title">Notes</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="notes-count" id="notesCount">0</span>
+            <button class="section-action" id="newNoteBtn" title="New Note">➕</button>
           </div>
-          <div class="notes-list" id="notesList">
-            <!-- Notes will be populated here -->
-          </div>
+        </div>
+        <div class="notes-list" id="notesList">
+          <!-- Notes will be populated here -->
         </div>
       </div>
     </div>
 
+    <!-- Resize Handle 2 -->
+    <div class="resize-handle" data-resize="notes-panel"></div>
+
+    <!-- Right Column: Editor -->
     <div class="main-content">
       <div id="welcomeState" class="welcome-state">
         <div class="welcome-icon">📝</div>

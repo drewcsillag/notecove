@@ -18,8 +18,15 @@ class NoteCoveApp {
     this.tagFilterState = null; // Tag filter state: { tag: string, mode: 'include' | 'exclude' } or null
     this.isSettingContent = false; // Flag to prevent update handlers during programmatic content changes
 
+    // Panel resize state
+    this.isResizing = false;
+    this.resizingPanel = null;
+    this.startX = 0;
+    this.startWidth = 0;
+
     this.initializeApp();
     this.setupEventListeners();
+    this.initializePanelSizes();
   }
 
   async initializeApp() {
@@ -244,6 +251,116 @@ class NoteCoveApp {
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+
+    // Setup panel resize handlers
+    this.setupPanelResize();
+  }
+
+  initializePanelSizes() {
+    // Load saved panel sizes from localStorage or use defaults
+    try {
+      const saved = localStorage.getItem('notecove-panel-sizes');
+      if (saved) {
+        const sizes = JSON.parse(saved);
+        const sidebar = document.querySelector('.sidebar');
+        const notesPanel = document.querySelector('.notes-panel');
+
+        if (sidebar && sizes.sidebar) {
+          sidebar.style.flex = `0 0 ${sizes.sidebar}%`;
+        }
+        if (notesPanel && sizes.notesPanel) {
+          notesPanel.style.flex = `0 0 ${sizes.notesPanel}%`;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load panel sizes:', error);
+    }
+  }
+
+  setupPanelResize() {
+    const resizeHandles = document.querySelectorAll('.resize-handle');
+
+    resizeHandles.forEach(handle => {
+      handle.addEventListener('mousedown', (e) => this.startResize(e));
+    });
+
+    document.addEventListener('mousemove', (e) => this.doResize(e));
+    document.addEventListener('mouseup', () => this.stopResize());
+  }
+
+  startResize(e) {
+    this.isResizing = true;
+    this.startX = e.clientX;
+
+    const handle = e.target.closest('.resize-handle');
+    this.resizingPanel = handle.dataset.resize;
+
+    const panel = document.querySelector(`.${this.resizingPanel}`);
+    if (panel) {
+      this.startWidth = panel.offsetWidth;
+    }
+
+    handle.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    e.preventDefault();
+  }
+
+  doResize(e) {
+    if (!this.isResizing || !this.resizingPanel) return;
+
+    const deltaX = e.clientX - this.startX;
+    const panel = document.querySelector(`.${this.resizingPanel}`);
+
+    if (!panel) return;
+
+    const container = document.getElementById('app');
+    const containerWidth = container.offsetWidth;
+
+    // Calculate new width as percentage
+    const newWidth = this.startWidth + deltaX;
+    const newPercentage = (newWidth / containerWidth) * 100;
+
+    // Enforce min/max constraints (10% - 50%)
+    const clampedPercentage = Math.max(10, Math.min(50, newPercentage));
+
+    panel.style.flex = `0 0 ${clampedPercentage}%`;
+  }
+
+  stopResize() {
+    if (!this.isResizing) return;
+
+    this.isResizing = false;
+
+    const handle = document.querySelector('.resize-handle.resizing');
+    if (handle) {
+      handle.classList.remove('resizing');
+    }
+
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+
+    // Save panel sizes
+    this.savePanelSizes();
+
+    this.resizingPanel = null;
+  }
+
+  savePanelSizes() {
+    try {
+      const sidebar = document.querySelector('.sidebar');
+      const notesPanel = document.querySelector('.notes-panel');
+
+      const sizes = {
+        sidebar: parseFloat(sidebar.style.flex.match(/[\d.]+/)?.[0] || '25'),
+        notesPanel: parseFloat(notesPanel.style.flex.match(/[\d.]+/)?.[0] || '25')
+      };
+
+      localStorage.setItem('notecove-panel-sizes', JSON.stringify(sizes));
+    } catch (error) {
+      console.error('Failed to save panel sizes:', error);
+    }
   }
 
   setupElectronListeners() {
