@@ -66,24 +66,7 @@ export class FileStorage {
         // Directory creation will be handled by the main process
         console.log('Notes directory will be created at:', this.notesPath);
       }
-
-      // Ensure subdirectories exist for CRDT-based sync
-      const crdtDir = `${this.notesPath}/crdt`;
-      const notesDir = `${this.notesPath}/notes`;
-
-      const crdtExists = await window.electronAPI.fileSystem.exists(crdtDir);
-      if (!crdtExists) {
-        console.log('Creating CRDT directory:', crdtDir);
-        await window.electronAPI.fileSystem.mkdir(crdtDir);
-      }
-
-      const notesExists = await window.electronAPI.fileSystem.exists(notesDir);
-      if (!notesExists) {
-        console.log('Creating notes directory:', notesDir);
-        await window.electronAPI.fileSystem.mkdir(notesDir);
-      }
-
-      console.log('Storage structure ready:', { crdtDir, notesDir });
+      // Note: Per-note subdirectories are created by UpdateStore as needed
     } catch (error) {
       console.error('Failed to ensure notes directory:', error);
     }
@@ -98,8 +81,8 @@ export class FileStorage {
     const noteId = typeof noteOrId === 'string' ? noteOrId : noteOrId?.id;
     if (!this.notesPath || !noteId) return null;
 
-    // Use only note ID for filename to avoid creating multiple files when title changes
-    return `${this.notesPath}/notes/${noteId}.json`;
+    // Store JSON cache in note's directory alongside updates/meta
+    return `${this.notesPath}/${noteId}/cache.json`;
   }
 
   /**
