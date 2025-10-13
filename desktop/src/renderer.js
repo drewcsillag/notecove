@@ -138,6 +138,25 @@ class NoteCoveApp {
       searchInput.addEventListener('input', (e) => this.onSearch(e.target.value));
     }
 
+    // Use event delegation for note item clicks to avoid race conditions
+    // when DOM is recreated by renderNotesList()
+    const notesList = document.getElementById('notesList');
+    if (notesList) {
+      notesList.addEventListener('click', (e) => {
+        // Find the closest .note-item element
+        const noteItem = e.target.closest('.note-item');
+        if (!noteItem) return;
+
+        // Don't select if clicking on action buttons
+        if (e.target.closest('.note-actions')) return;
+
+        const noteId = noteItem.dataset.noteId;
+        if (noteId) {
+          this.selectNote(noteId);
+        }
+      });
+    }
+
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => this.handleKeyboard(e));
   }
@@ -333,17 +352,8 @@ class NoteCoveApp {
       </div>
     `).join('');
 
-    // Add click event listeners to note items
-    const noteItems = notesList.querySelectorAll('.note-item');
-    noteItems.forEach(item => {
-      item.addEventListener('click', (e) => {
-        // Don't select if clicking on action buttons
-        if (e.target.closest('.note-actions')) return;
-
-        const noteId = item.dataset.noteId;
-        this.selectNote(noteId);
-      });
-    });
+    // Note: Click event listeners are set up once using event delegation in initializeEventListeners()
+    // No need to add individual listeners here, which prevents race conditions when DOM is recreated
   }
 
   /**
@@ -447,9 +457,26 @@ class NoteCoveApp {
     });
     this.currentNote = newNote;
     this.isEditing = false; // Reset editing state to ensure editor gets cleared
-    this.updateUI();
 
-    // Focus on editor
+    // Don't call updateUI() here as it recreates the DOM and can interfere with click events
+    // Instead, just update what's needed:
+
+    // 1. Add the new note to the notes list (uses event delegation for clicks)
+    this.renderNotesList();
+    this.renderTagsList();
+
+    // 2. Update editor content
+    this.renderCurrentNote();
+
+    // 3. Show editor state if it's hidden
+    const welcomeState = document.getElementById('welcomeState');
+    const editorState = document.getElementById('editorState');
+    if (this.currentNote) {
+      welcomeState.style.display = 'none';
+      editorState.style.display = 'flex';
+    }
+
+    // Focus on editor after DOM updates complete
     setTimeout(() => {
       if (this.editor) {
         this.editor.focus();
