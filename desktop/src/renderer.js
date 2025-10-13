@@ -51,8 +51,8 @@ class NoteCoveApp {
     // Initialize editor
     this.initializeEditor();
 
-    // Initialize sync manager
-    this.initializeSyncManager();
+    // Initialize sync manager (will reload notes from CRDT)
+    await this.initializeSyncManager();
 
     // Update UI after notes are loaded
     this.updateUI();
@@ -78,7 +78,7 @@ class NoteCoveApp {
     this.editor.setupToolbar();
   }
 
-  initializeSyncManager() {
+  async initializeSyncManager() {
     if (!this.noteManager || !this.noteManager.fileStorage) {
       console.log('Sync manager not initialized: file storage not available');
       return;
@@ -91,9 +91,10 @@ class NoteCoveApp {
     this.syncManager.addListener((event, data) => this.handleSyncEvent(event, data));
 
     // Connect NoteManager to SyncManager for CRDT-based saves
-    this.noteManager.setSyncManager(this.syncManager);
+    // This will reload notes from CRDT
+    await this.noteManager.setSyncManager(this.syncManager);
 
-    // Start watching CRDT files for sync (now safe - only watches .yjs files)
+    // Start watching CRDT files for sync
     this.syncManager.startWatching();
     console.log('Sync manager initialized and watching CRDT files');
   }

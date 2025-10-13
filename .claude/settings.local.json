@@ -17,7 +17,8 @@
       "WebSearch",
       "Bash(git diff:*)",
       "Bash(git add:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

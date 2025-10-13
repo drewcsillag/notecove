@@ -23,9 +23,14 @@ export class NoteManager {
    * Set the sync manager to use for CRDT-based sync
    * @param {SyncManager} syncManager - Sync manager instance
    */
-  setSyncManager(syncManager) {
+  async setSyncManager(syncManager) {
     this.syncManager = syncManager;
     console.log('NoteManager: SyncManager integration enabled');
+
+    // Reload notes from CRDT now that SyncManager is available
+    console.log('NoteManager: Reloading notes from CRDT');
+    await this.loadNotes();
+    this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
   }
 
   /**
@@ -97,7 +102,11 @@ export class NoteManager {
   async loadNotes() {
     try {
       if (this.isElectron) {
-        const notes = await this.fileStorage.loadAllNotes();
+        // Load from CRDT if syncManager is available, otherwise use old file storage
+        const notes = this.syncManager ?
+          await this.syncManager.loadAllNotes() :
+          await this.fileStorage.loadAllNotes();
+
         if (notes.length === 0) {
           this.loadSampleNotes();
         } else {

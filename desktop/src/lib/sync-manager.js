@@ -262,13 +262,8 @@ export class SyncManager {
       // Clear pending updates from CRDT manager (they're now in UpdateStore)
       this.crdtManager.clearPendingUpdates(note.id);
 
-      // Also save a JSON cache for fast loading
-      console.log('  Saving JSON cache...');
-      const noteSaved = await this.fileStorage.saveNote(note);
-      console.log('  JSON saved:', noteSaved);
-
       console.log('=== saveNoteWithCRDT complete ===');
-      return noteSaved;
+      return true;
     } catch (error) {
       console.error('Error saving note with CRDT:', error);
       console.error('Stack trace:', error.stack);
@@ -277,7 +272,72 @@ export class SyncManager {
   }
 
   /**
-   * Load a note and initialize CRDT
+   * Load all notes from CRDT update files
+   * @returns {Array} Array of notes
+   */
+  async loadAllNotes() {
+    if (!this.isElectron) return [];
+
+    try {
+      const notesPath = this.fileStorage.notesPath;
+      if (!notesPath || notesPath === 'localStorage') {
+        return [];
+      }
+
+      // Check if notes directory exists
+      const exists = await window.electronAPI.fileSystem.exists(notesPath);
+      if (!exists) {
+        return [];
+      }
+
+      // Read all subdirectories (each is a note)
+      const result = await window.electronAPI.fileSystem.readDir(notesPath);
+      if (!result.success) {
+        console.error('Failed to read notes directory:', result.error);
+        return [];
+      }
+
+      const notes = [];
+
+      for (const item of result.files) {
+        // Skip hidden files and non-directories
+        if (item.startsWith('.')) continue;
+
+        // Each directory is a note ID
+        const noteId = item;
+        const noteDir = `${notesPath}/${noteId}`;
+
+        // Check if updates directory exists (indicates this is a real note)
+        const updatesDir = `${noteDir}/updates`;
+        const updatesExist = await window.electronAPI.fileSystem.exists(updatesDir);
+
+        if (!updatesExist) {
+          continue; // Not a note directory
+        }
+
+        try {
+          // Load the note from CRDT updates
+          const note = await this.loadNote(noteId);
+          if (note) {
+            notes.push(note);
+          }
+        } catch (error) {
+          console.error(`Error loading note ${noteId}:`, error);
+        }
+      }
+
+      console.log(`Loaded ${notes.length} notes from CRDT updates`);
+
+      // Sort by modification date
+      return notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+    } catch (error) {
+      console.error('Error loading all notes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Load a note and initialize CRDT from update files
    * @param {string} noteId - Note ID
    * @returns {object} Note or null
    */
@@ -289,23 +349,26 @@ export class SyncManager {
         this.initializedNotes.add(noteId);
       }
 
-      // Load from JSON cache first (fast)
-      const cachedNote = await this.fileStorage.loadNote(noteId);
+      // Load all updates from all instances and build CRDT state
+      const allUpdates = await this.updateStore.readNewUpdates(noteId);
 
-      if (cachedNote) {
-        // Initialize CRDT with cached note
-        if (this.crdtManager.isDocEmpty(noteId)) {
-          this.crdtManager.initializeNote(noteId, cachedNote);
-        }
-
-        // Sync any new updates
-        await this.syncNote(noteId);
-
-        // Return the potentially updated note
-        return this.crdtManager.getNoteFromDoc(noteId);
+      if (allUpdates.length === 0) {
+        // No updates = note doesn't exist
+        return null;
       }
 
-      return null;
+      console.log(`Loading note ${noteId} from ${allUpdates.length} CRDT updates`);
+
+      // Apply all updates to build the current state
+      for (const { instanceId, sequence, update } of allUpdates) {
+        this.crdtManager.applyUpdate(noteId, update, 'load');
+      }
+
+      // Extract the merged note from CRDT
+      const note = this.crdtManager.getNoteFromDoc(noteId);
+      note.id = noteId;
+
+      return note;
     } catch (error) {
       console.error('Error loading note:', error);
       return null;
