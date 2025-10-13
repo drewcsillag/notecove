@@ -74,25 +74,18 @@ export class NoteManager {
   }
 
   /**
-   * Initialize storage and load notes
+   * Initialize storage (but don't load notes yet - wait for SyncManager)
    */
   async initializeStorage() {
     try {
       const initialized = await this.fileStorage.initialize();
-      if (initialized) {
-        await this.loadNotes();
-        // File watching disabled to prevent infinite sync loop
-        // CRDT-based sync should sync operations directly, not watch materialized state
-        // await this.setupFileWatching();
-      } else {
-        console.warn('Storage initialization failed, using sample notes');
-        this.loadSampleNotes();
-        this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
+      if (!initialized) {
+        console.warn('Storage initialization failed');
       }
+      // Note: We don't load notes here anymore.
+      // Notes are loaded in setSyncManager() after CRDT sync is ready.
     } catch (error) {
       console.error('Failed to initialize storage:', error);
-      this.loadSampleNotes();
-      this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
     }
   }
 
