@@ -9,6 +9,7 @@ const isDev = process.env.NODE_ENV === 'development';
 // Parse command-line arguments for multi-instance support
 function parseArgs() {
   const args = process.argv.slice(isDev ? 2 : 1);
+
   const parsed = {
     userDataDir: null,
     notesPath: null,
@@ -16,13 +17,24 @@ function parseArgs() {
   };
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--user-data-dir' && args[i + 1]) {
+    const arg = args[i];
+
+    // Handle --key=value format (used by npx/npm exec)
+    if (arg.startsWith('--user-data-dir=')) {
+      parsed.userDataDir = arg.substring('--user-data-dir='.length);
+    } else if (arg.startsWith('--notes-path=')) {
+      parsed.notesPath = arg.substring('--notes-path='.length);
+    } else if (arg.startsWith('--instance=')) {
+      parsed.instance = arg.substring('--instance='.length);
+    }
+    // Handle --key value format (two separate args)
+    else if (arg === '--user-data-dir' && args[i + 1]) {
       parsed.userDataDir = args[i + 1];
       i++;
-    } else if (args[i] === '--notes-path' && args[i + 1]) {
+    } else if (arg === '--notes-path' && args[i + 1]) {
       parsed.notesPath = args[i + 1];
       i++;
-    } else if (args[i] === '--instance' && args[i + 1]) {
+    } else if (arg === '--instance' && args[i + 1]) {
       parsed.instance = args[i + 1];
       i++;
     }
