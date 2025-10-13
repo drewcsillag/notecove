@@ -747,26 +747,29 @@ class NoteCoveApp {
     // Clear all localStorage data including folders and notes
     localStorage.clear();
 
-    // Reset folders to default structure
-    localStorage.removeItem('notecove-folders');
-
-    // Delete all note files if in Electron
-    if (window.electronAPI && window.electronAPI.fileSystem) {
+    // Clear folders and notes from Electron settings (if in Electron mode)
+    if (window.electronAPI && window.electronAPI.settings) {
       try {
-        const notesPath = await window.electronAPI.settings.get('notesPath');
-        const result = await window.electronAPI.fileSystem.readDir(notesPath);
-        if (result.success && result.files) {
-          // Delete each JSON file
-          for (const filename of result.files) {
-            if (filename.endsWith('.json')) {
-              const filePath = `${notesPath}/${filename}`;
-              await window.electronAPI.fileSystem.deleteFile(filePath);
-              console.log('Deleted:', filePath);
+        // Reset folders to empty array so they reinitialize to defaults
+        await window.electronAPI.settings.set('folders', []);
+
+        // Delete all note files
+        if (window.electronAPI.fileSystem) {
+          const notesPath = await window.electronAPI.settings.get('notesPath');
+          const result = await window.electronAPI.fileSystem.readDir(notesPath);
+          if (result.success && result.files) {
+            // Delete each JSON file
+            for (const filename of result.files) {
+              if (filename.endsWith('.json')) {
+                const filePath = `${notesPath}/${filename}`;
+                await window.electronAPI.fileSystem.deleteFile(filePath);
+                console.log('Deleted:', filePath);
+              }
             }
           }
         }
       } catch (error) {
-        console.error('Failed to clear note files:', error);
+        console.error('Failed to clear Electron data:', error);
       }
     }
 

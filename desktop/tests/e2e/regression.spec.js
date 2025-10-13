@@ -263,21 +263,21 @@ test.describe('Regression Tests', () => {
     const resetBtn = page.locator('#resetStoreBtn');
     page.once('dialog', dialog => dialog.accept());
     await resetBtn.click();
-    await page.waitForLoadState('networkidle');
 
-    // Prevent sample notes from loading
-    await page.evaluate(() => {
-      localStorage.setItem('notecove-notes', JSON.stringify([]));
-    });
-    await page.reload();
+    // Wait for page to reload after reset
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000); // Give time for folders to initialize
 
     // Verify custom folder is gone
     const customFolderAfter = page.locator('.folder-item .folder-name').filter({ hasText: 'Custom Folder' });
     await expect(customFolderAfter).toHaveCount(0);
 
-    // Verify default folders are back
+    // Verify only default folders remain (should be exactly 2: All Notes and Recently Deleted)
+    const allFolderNames = page.locator('.folder-item .folder-name');
+    const folderCount = await allFolderNames.count();
+    expect(folderCount).toBe(2);
+
+    // Verify default folders are present
     const allNotesFolder = page.locator('.folder-item .folder-name').filter({ hasText: 'All Notes' });
     await expect(allNotesFolder).toBeVisible();
 
