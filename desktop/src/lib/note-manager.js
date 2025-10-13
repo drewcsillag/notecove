@@ -66,7 +66,9 @@ export class NoteManager {
       const initialized = await this.fileStorage.initialize();
       if (initialized) {
         await this.loadNotes();
-        await this.setupFileWatching();
+        // File watching disabled to prevent infinite sync loop
+        // CRDT-based sync should sync operations directly, not watch materialized state
+        // await this.setupFileWatching();
       } else {
         console.warn('Storage initialization failed, using sample notes');
         this.loadSampleNotes();
