@@ -107,17 +107,31 @@ test.describe('New Features', () => {
     test('should show collapse arrows for folders with children', async ({ page }) => {
       // Create a parent folder
       await page.locator('#newFolderBtn').click();
-      const dialogInput = page.locator('#dialogInput');
+      let dialogInput = page.locator('#dialogInput');
       await expect(dialogInput).toBeVisible();
       await dialogInput.fill('Parent Folder');
       await page.locator('#dialogOk').click();
       await expect(dialogInput).toBeHidden();
 
-      // Initially no arrow should be visible (no children yet)
+      // Initially arrow should be hidden (no children yet)
       const parentFolder = page.locator('.folder-item').filter({ hasText: 'Parent Folder' });
       const arrow = parentFolder.locator('.folder-collapse-arrow');
+      await expect(arrow).toBeHidden();
 
-      // Arrow should exist but might be hidden or showing default state
+      // Select the parent folder
+      await parentFolder.click();
+      await page.waitForTimeout(200);
+
+      // Create a child folder
+      await page.locator('#newFolderBtn').click();
+      dialogInput = page.locator('#dialogInput');
+      await expect(dialogInput).toBeVisible();
+      await dialogInput.fill('Child Folder');
+      await page.locator('#dialogOk').click();
+      await expect(dialogInput).toBeHidden();
+      await page.waitForTimeout(300);
+
+      // Now arrow should be visible (has children)
       await expect(arrow).toBeVisible();
     });
 
