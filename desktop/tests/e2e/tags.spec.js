@@ -124,8 +124,8 @@ test.describe('Tag Functionality', () => {
     await expect(page.locator('.tag-item.active').filter({ hasText: '#react' })).toBeVisible();
   });
 
-  test('should deselect tag when clicked again', async ({ page }) => {
-    // Create note with tag
+  test('should cycle through filter states when clicked multiple times', async ({ page }) => {
+    // Create notes with and without tag
     await page.locator('.new-note-btn').click();
     const editor = page.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
@@ -134,20 +134,43 @@ test.describe('Tag Functionality', () => {
     await page.keyboard.type('Test Note with #testing');
     await page.waitForTimeout(1500);
 
-    // Click tag to filter
+    await page.keyboard.press('Control+n');
+    await expect(editor).toBeFocused({ timeout: 5000 });
+    await page.waitForTimeout(500);
+    await page.keyboard.type('Note without tag');
+    await page.waitForTimeout(1500);
+
+    // Both notes visible initially
+    let noteCount = await page.locator('.note-item').count();
+    expect(noteCount).toBe(2);
+
+    // First click: Include mode (show only notes WITH tag)
     const testingTag = page.locator('.tag-item').filter({ hasText: '#testing' });
     await testingTag.click();
     await page.waitForTimeout(500);
 
-    // Tag should be active
+    // Tag should be active, only 1 note visible
     await expect(page.locator('.tag-item.active')).toBeVisible();
+    noteCount = await page.locator('.note-item').count();
+    expect(noteCount).toBe(1);
 
-    // Click again to deselect
+    // Second click: Exclude mode (show only notes WITHOUT tag)
     await testingTag.click();
     await page.waitForTimeout(500);
 
-    // Tag should not be active anymore
+    // Tag should have exclude styling, only 1 note visible (different one)
+    await expect(testingTag).toHaveClass(/tag-exclude/);
+    noteCount = await page.locator('.note-item').count();
+    expect(noteCount).toBe(1);
+
+    // Third click: No filter (show all notes)
+    await testingTag.click();
+    await page.waitForTimeout(500);
+
+    // Tag should not be active anymore, both notes visible
     await expect(page.locator('.tag-item.active')).not.toBeVisible();
+    noteCount = await page.locator('.note-item').count();
+    expect(noteCount).toBe(2);
   });
 
   test('should support tags with hyphens', async ({ page }) => {
