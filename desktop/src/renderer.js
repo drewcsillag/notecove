@@ -153,6 +153,8 @@ class NoteCoveApp {
         this.updateUI();
         // Restore last opened note after notes are loaded
         this.restoreLastOpenedNote();
+        // Update folder counts now that notes are loaded
+        this.renderFolderTree();
         break;
       case 'note-created':
         this.notes = this.noteManager.getAllNotes();
