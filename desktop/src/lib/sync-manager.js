@@ -1,6 +1,8 @@
 /**
  * Sync Manager - Handles file synchronization and conflict detection
  */
+import { CRDTManager } from './crdt-manager.js';
+
 export class SyncManager {
   constructor(noteManager, fileStorage) {
     this.noteManager = noteManager;
@@ -11,6 +13,7 @@ export class SyncManager {
     this.listeners = new Set();
     this.lastSyncTime = null;
     this.conflictedNotes = new Map(); // noteId -> conflict info
+    this.crdtManager = new CRDTManager();
   }
 
   /**
@@ -68,6 +71,9 @@ export class SyncManager {
         return;
       }
 
+      // Set up listener for note manager events to auto-save with CRDT
+      this.setupNoteManagerListener();
+
       // Generate unique watch ID
       this.watchId = `notes-${Date.now()}`;
 
@@ -93,6 +99,26 @@ export class SyncManager {
       console.error('Error starting file watch:', error);
       this.updateStatus('error');
     }
+  }
+
+  /**
+   * Set up listener for note manager events
+   */
+  setupNoteManagerListener() {
+    if (!this.noteManager) return;
+
+    // Listen for note updates and save with CRDT state
+    this.noteManager.addListener((event, data) => {
+      if (event === 'note-saved' && data.note) {
+        // Update CRDT when note is saved
+        const note = data.note;
+        if (this.crdtManager.isDocEmpty(note.id)) {
+          this.crdtManager.initializeNote(note.id, note);
+        } else {
+          this.crdtManager.updateNote(note.id, note);
+        }
+      }
+    });
   }
 
   /**
@@ -169,22 +195,33 @@ export class SyncManager {
       const externalNote = JSON.parse(result.content);
       const localNote = this.noteManager.getNote(noteId);
 
-      // Check for conflicts
-      if (localNote && this.hasConflict(localNote, externalNote)) {
-        this.handleConflict(noteId, localNote, externalNote);
-      } else {
-        // No conflict - update the note
-        if (localNote) {
-          // Update existing note
-          this.noteManager.updateNote(noteId, externalNote);
-        } else {
-          // Add new note
-          this.noteManager.notes.set(noteId, externalNote);
-          this.noteManager.notify('note-created', { note: externalNote });
+      // Use CRDT merging for conflict-free synchronization
+      if (localNote) {
+        // Initialize CRDT if not already done
+        if (this.crdtManager.isDocEmpty(noteId)) {
+          this.crdtManager.initializeNote(noteId, localNote);
         }
 
-        console.log('Note synced from external change:', noteId);
-        this.notify('note-synced', { noteId, action: localNote ? 'updated' : 'added' });
+        // Merge external note using CRDT
+        const mergedNote = this.crdtManager.mergeExternalNote(noteId, externalNote);
+
+        // Update the note manager with merged result
+        this.noteManager.updateNote(noteId, mergedNote);
+
+        console.log('Note synced with CRDT merge:', noteId);
+        this.notify('note-synced', {
+          noteId,
+          action: 'merged',
+          hasCrdtState: !!externalNote.crdtState
+        });
+      } else {
+        // New note - initialize CRDT and add to note manager
+        this.crdtManager.initializeNote(noteId, externalNote);
+        this.noteManager.notes.set(noteId, externalNote);
+        this.noteManager.notify('note-created', { note: externalNote });
+
+        console.log('New note synced from external change:', noteId);
+        this.notify('note-synced', { noteId, action: 'added' });
       }
     } catch (error) {
       console.error('Error handling note change:', error);
@@ -201,6 +238,10 @@ export class SyncManager {
     if (localNote) {
       // Mark as deleted
       this.noteManager.deleteNote(noteId);
+
+      // Clean up CRDT document
+      this.crdtManager.removeDoc(noteId);
+
       console.log('Note synced deletion from external change:', noteId);
       this.notify('note-synced', { noteId, action: 'deleted' });
     }
@@ -274,6 +315,66 @@ export class SyncManager {
   }
 
   /**
+   * Save a note with CRDT state
+   * @param {object} note - Note to save
+   * @returns {boolean} Success
+   */
+  async saveNoteWithCRDT(note) {
+    if (!this.isElectron) {
+      // In web mode, just save normally
+      return await this.fileStorage.saveNote(note);
+    }
+
+    try {
+      // Initialize or update CRDT document
+      if (this.crdtManager.isDocEmpty(note.id)) {
+        this.crdtManager.initializeNote(note.id, note);
+      } else {
+        this.crdtManager.updateNote(note.id, note);
+      }
+
+      // Get CRDT state
+      const crdtState = this.crdtManager.getState(note.id);
+
+      // Save note with CRDT state
+      const noteWithCRDT = {
+        ...note,
+        crdtState
+      };
+
+      return await this.fileStorage.saveNote(noteWithCRDT);
+    } catch (error) {
+      console.error('Error saving note with CRDT:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Load a note and initialize CRDT
+   * @param {string} noteId - Note ID
+   * @returns {object|null} Note data
+   */
+  async loadNoteWithCRDT(noteId) {
+    try {
+      const note = await this.fileStorage.loadNote(noteId);
+      if (!note) return null;
+
+      // If note has CRDT state, apply it
+      if (note.crdtState) {
+        this.crdtManager.applyState(noteId, note.crdtState);
+      } else {
+        // Initialize CRDT with note content
+        this.crdtManager.initializeNote(noteId, note);
+      }
+
+      return note;
+    } catch (error) {
+      console.error('Error loading note with CRDT:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get sync status
    * @returns {object} Sync status information
    */
@@ -282,7 +383,8 @@ export class SyncManager {
       status: this.syncStatus,
       watching: !!this.watchId,
       lastSyncTime: this.lastSyncTime,
-      conflictCount: this.conflictedNotes.size
+      conflictCount: this.conflictedNotes.size,
+      crdtDocCount: this.crdtManager.getStats().documentCount
     };
   }
 
@@ -321,13 +423,22 @@ export class SyncManager {
 
       console.log(`Force sync: ${diskNotes.length} notes on disk, ${localNotes.length} local notes`);
 
-      // Update local notes with disk versions
+      // Update local notes with disk versions using CRDT merge
       for (const diskNote of diskNotes) {
         const localNote = this.noteManager.getNote(diskNote.id);
 
-        if (localNote && this.hasConflict(localNote, diskNote)) {
-          this.handleConflict(diskNote.id, localNote, diskNote);
+        if (localNote) {
+          // Initialize CRDT if needed
+          if (this.crdtManager.isDocEmpty(diskNote.id)) {
+            this.crdtManager.initializeNote(diskNote.id, localNote);
+          }
+
+          // Merge using CRDT
+          const mergedNote = this.crdtManager.mergeExternalNote(diskNote.id, diskNote);
+          this.noteManager.updateNote(diskNote.id, mergedNote);
         } else {
+          // New note from disk
+          this.crdtManager.initializeNote(diskNote.id, diskNote);
           this.noteManager.updateNote(diskNote.id, diskNote);
         }
       }
@@ -336,7 +447,7 @@ export class SyncManager {
       this.updateStatus('watching');
       this.notify('force-sync-complete', { noteCount: diskNotes.length });
 
-      console.log('Force sync completed');
+      console.log('Force sync completed with CRDT merging');
     } catch (error) {
       console.error('Error during force sync:', error);
       this.updateStatus('error');
@@ -350,5 +461,6 @@ export class SyncManager {
     await this.stopWatching();
     this.listeners.clear();
     this.conflictedNotes.clear();
+    this.crdtManager.destroy();
   }
 }
