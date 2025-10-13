@@ -295,8 +295,17 @@ export class FileStorage {
     if (!this.initialized || !this.isElectron || !this.notesPath) return null;
 
     try {
-      const watchId = await window.electronAPI.fileSystem.watch(this.notesPath, callback);
-      console.log('Watching notes directory:', this.notesPath);
+      // Generate a unique watch ID
+      const watchId = `watch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Set up the listener for file change events
+      window.electronAPI.onFileChange(watchId, (event, data) => {
+        callback(data);
+      });
+
+      // Start watching the directory
+      await window.electronAPI.fileSystem.watch(this.notesPath, watchId);
+      console.log('Watching notes directory:', this.notesPath, 'with ID:', watchId);
       return watchId;
     } catch (error) {
       console.error('Error setting up file watch:', error);
