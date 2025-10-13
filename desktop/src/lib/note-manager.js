@@ -225,6 +225,17 @@ export class NoteManager {
   }
 
   /**
+   * Get the most recently modified note
+   * @returns {object|null} Most recent note or null if no notes exist
+   */
+  getMostRecentNote() {
+    const notes = Array.from(this.notes.values())
+      .filter(note => !note.deleted)
+      .sort((a, b) => new Date(b.modified) - new Date(a.modified));
+    return notes[0] || null;
+  }
+
+  /**
    * Create a new note
    * @param {object} noteData - Initial note data
    * @returns {object} Created note

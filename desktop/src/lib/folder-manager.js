@@ -8,8 +8,10 @@ export class FolderManager {
     this.folders = new Map();
     this.listeners = new Set();
     this.isElectron = window.electronAPI?.isElectron || false;
+    this.folderState = new Map(); // folderId -> isExpanded (boolean)
 
     this.initializeFolders();
+    this.loadFolderState();
   }
 
   /**
@@ -355,5 +357,68 @@ export class FolderManager {
     }
 
     return breadcrumb;
+  }
+
+  /**
+   * Load folder collapse/expand state from storage
+   */
+  loadFolderState() {
+    try {
+      const stored = localStorage.getItem('notecove-folder-state');
+      if (stored) {
+        const state = JSON.parse(stored);
+        Object.entries(state).forEach(([id, expanded]) => {
+          this.folderState.set(id, expanded);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load folder state:', error);
+    }
+  }
+
+  /**
+   * Save folder collapse/expand state to storage
+   */
+  saveFolderState() {
+    try {
+      const state = {};
+      this.folderState.forEach((expanded, id) => {
+        state[id] = expanded;
+      });
+      localStorage.setItem('notecove-folder-state', JSON.stringify(state));
+    } catch (error) {
+      console.error('Failed to save folder state:', error);
+    }
+  }
+
+  /**
+   * Toggle folder expanded/collapsed state
+   * @param {string} folderId - Folder ID to toggle
+   */
+  toggleFolderExpanded(folderId) {
+    const currentState = this.folderState.get(folderId) ?? true; // default expanded
+    this.folderState.set(folderId, !currentState);
+    this.saveFolderState();
+    this.notify('folder-state-changed', { folderId, expanded: !currentState });
+  }
+
+  /**
+   * Check if a folder is expanded
+   * @param {string} folderId - Folder ID to check
+   * @returns {boolean} True if expanded (default), false if collapsed
+   */
+  isFolderExpanded(folderId) {
+    return this.folderState.get(folderId) ?? true; // default expanded
+  }
+
+  /**
+   * Check if a folder has child folders
+   * @param {string} folderId - Folder ID to check
+   * @returns {boolean} True if folder has children
+   */
+  hasChildFolders(folderId) {
+    return Array.from(this.folders.values()).some(
+      folder => folder.parentId === folderId && folder.id !== 'root'
+    );
   }
 }

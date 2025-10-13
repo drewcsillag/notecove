@@ -51,6 +51,9 @@ class NoteCoveApp {
     this.updateUI();
     this.renderFolderTree();
     this.renderTagsList();
+
+    // Restore last opened note
+    this.restoreLastOpenedNote();
   }
 
   initializeEditor() {
@@ -174,6 +177,7 @@ class NoteCoveApp {
       case 'folder-created':
       case 'folder-updated':
       case 'folder-deleted':
+      case 'folder-state-changed':
         this.renderFolderTree();
         break;
     }
@@ -704,8 +708,14 @@ class NoteCoveApp {
       const indent = level * 16;
       const icon = folder.icon || '📁';
       const hasChildren = folder.children && folder.children.length > 0;
+      const isExpanded = this.folderManager.isFolderExpanded(folder.id);
       const isActive = this.currentFolderId === folder.id;
       const isDraggable = !folder.isSpecial && !folder.isRoot;
+
+      // Show collapse arrow only if folder has children
+      const collapseArrow = hasChildren
+        ? `<span class="folder-collapse-arrow" onclick="event.stopPropagation(); app.toggleFolderCollapse('${folder.id}')">${isExpanded ? '▼' : '▶'}</span>`
+        : '<span class="folder-collapse-arrow" style="visibility: hidden;">▼</span>';
 
       return `
         <div class="folder-item ${isActive ? 'active' : ''}"
@@ -718,10 +728,11 @@ class NoteCoveApp {
              ondragover="app.handleFolderDragOver(event)"
              ondragleave="app.handleFolderDragLeave(event)"
              ondrop="app.handleFolderDrop(event)">
+          ${collapseArrow}
           <span class="folder-icon">${icon}</span>
           <span class="folder-name">${escapeHtml(folder.name)}</span>
         </div>
-        ${hasChildren ? this.renderFolderItems(folder.children, level + 1) : ''}
+        ${hasChildren && isExpanded ? this.renderFolderItems(folder.children, level + 1) : ''}
       `;
     }).join('');
   }
@@ -730,6 +741,14 @@ class NoteCoveApp {
     this.currentFolderId = folderId;
     this.renderFolderTree();
     this.updateUI();
+  }
+
+  /**
+   * Toggle folder collapse/expand state
+   * @param {string} folderId - Folder ID to toggle
+   */
+  toggleFolderCollapse(folderId) {
+    this.folderManager.toggleFolderExpanded(folderId);
   }
 
   async resetNoteStore() {
@@ -817,6 +836,38 @@ class NoteCoveApp {
 
       // 4. Update tags list
       this.renderTagsList();
+
+      // 5. Save as last opened note
+      localStorage.setItem('notecove-last-opened-note', JSON.stringify({
+        noteId: this.currentNote.id,
+        timestamp: Date.now()
+      }));
+    }
+  }
+
+  /**
+   * Restore the last opened note on startup
+   * If the last note was deleted, open the most recent note
+   */
+  restoreLastOpenedNote() {
+    try {
+      const stored = localStorage.getItem('notecove-last-opened-note');
+      if (!stored) return;
+
+      const { noteId } = JSON.parse(stored);
+      const note = this.noteManager.getNote(noteId);
+
+      if (note && !note.deleted) {
+        this.selectNote(noteId);
+      } else {
+        // Note was deleted, find most recent note
+        const recentNote = this.noteManager.getMostRecentNote();
+        if (recentNote) {
+          this.selectNote(recentNote.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to restore last opened note:', error);
     }
   }
 
