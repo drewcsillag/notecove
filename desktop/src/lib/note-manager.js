@@ -210,16 +210,18 @@ export class NoteManager {
   async saveNote(note) {
     try {
       if (this.isElectron) {
-        // Use SyncManager for CRDT-based sync if available
-        if (this.syncManager) {
-          console.log('Saving note with CRDT sync:', note.id);
-          await this.syncManager.saveNoteWithCRDT(note);
-        } else {
-          console.log('Saving note without sync:', note.id);
-          await this.fileStorage.saveNote(note);
+        // MUST use SyncManager for CRDT-based sync
+        if (!this.syncManager) {
+          console.error('ERROR: Trying to save note before SyncManager is ready!');
+          console.error('Note:', note.id, note.title);
+          console.trace('saveNote called from:');
+          return;
         }
+        console.log('Saving note with CRDT sync:', note.id);
+        await this.syncManager.saveNoteWithCRDT(note);
       } else {
-        await this.saveNotes(); // Save all notes in web mode
+        // Web mode - use localStorage
+        await this.saveNotes();
       }
     } catch (error) {
       console.error('Failed to save note:', error);
