@@ -7,9 +7,9 @@ import { UpdateStore } from './update-store.js';
 import { generateUUID } from './utils.js';
 
 export class SyncManager {
-  constructor(noteManager, fileStorage, instanceId = null) {
+  constructor(noteManager, notesPath, instanceId = null) {
     this.noteManager = noteManager;
-    this.fileStorage = fileStorage;
+    this.notesPath = notesPath;
     this.isElectron = window.electronAPI?.isElectron || false;
     this.watchId = null;
     this.syncStatus = 'idle'; // idle, watching, syncing, error
@@ -20,8 +20,12 @@ export class SyncManager {
     // Generate or use provided instance ID
     this.instanceId = instanceId || `instance-${generateUUID().substring(0, 8)}`;
 
-    // Create UpdateStore for this instance
-    this.updateStore = new UpdateStore(fileStorage, this.instanceId);
+    // Create UpdateStore for this instance (pass minimal storage interface)
+    const storageInterface = {
+      isElectron: this.isElectron,
+      notesPath: this.notesPath
+    };
+    this.updateStore = new UpdateStore(storageInterface, this.instanceId);
 
     // Track which notes are initialized with UpdateStore
     this.initializedNotes = new Set();
@@ -101,8 +105,7 @@ export class SyncManager {
     }
 
     try {
-      const notesPath = this.fileStorage.notesPath;
-      if (!notesPath || notesPath === 'localStorage') {
+      if (!this.notesPath || this.notesPath === 'localStorage') {
         console.log('Invalid notes path');
         return;
       }
@@ -279,19 +282,18 @@ export class SyncManager {
     if (!this.isElectron) return [];
 
     try {
-      const notesPath = this.fileStorage.notesPath;
-      if (!notesPath || notesPath === 'localStorage') {
+      if (!this.notesPath || this.notesPath === 'localStorage') {
         return [];
       }
 
       // Check if notes directory exists
-      const exists = await window.electronAPI.fileSystem.exists(notesPath);
+      const exists = await window.electronAPI.fileSystem.exists(this.notesPath);
       if (!exists) {
         return [];
       }
 
       // Read all subdirectories (each is a note)
-      const result = await window.electronAPI.fileSystem.readDir(notesPath);
+      const result = await window.electronAPI.fileSystem.readDir(this.notesPath);
       if (!result.success) {
         console.error('Failed to read notes directory:', result.error);
         return [];
@@ -305,7 +307,7 @@ export class SyncManager {
 
         // Each directory is a note ID
         const noteId = item;
-        const noteDir = `${notesPath}/${noteId}`;
+        const noteDir = `${this.notesPath}/${noteId}`;
 
         // Check if updates directory exists (indicates this is a real note)
         const updatesDir = `${noteDir}/updates`;

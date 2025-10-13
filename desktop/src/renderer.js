@@ -79,13 +79,20 @@ class NoteCoveApp {
   }
 
   async initializeSyncManager() {
-    if (!this.noteManager || !this.noteManager.fileStorage) {
-      console.log('Sync manager not initialized: file storage not available');
+    if (!this.noteManager) {
+      console.log('Sync manager not initialized: note manager not available');
+      return;
+    }
+
+    // Get notes path from settings
+    const notesPath = await window.electronAPI.settings.get('notesPath');
+    if (!notesPath) {
+      console.error('No notes path configured!');
       return;
     }
 
     // Create sync manager
-    this.syncManager = new SyncManager(this.noteManager, this.noteManager.fileStorage);
+    this.syncManager = new SyncManager(this.noteManager, notesPath);
 
     // Add sync event listeners
     this.syncManager.addListener((event, data) => this.handleSyncEvent(event, data));

@@ -1,21 +1,19 @@
 import { generateUUID, validateNote } from './utils.js';
-import { FileStorage } from './file-storage.js';
 import { FolderManager } from './folder-manager.js';
 
 /**
  * Note Manager - handles CRUD operations for notes
+ * Storage is handled entirely by SyncManager (CRDT-based)
  */
 export class NoteManager {
   constructor() {
     this.notes = new Map();
     this.listeners = new Set();
     this.isElectron = window.electronAPI?.isElectron || false;
-    this.fileStorage = new FileStorage();
     this.folderManager = new FolderManager();
     this.watchId = null;
     this.syncManager = null; // Will be set after SyncManager is initialized
 
-    this.initializeStorage();
     this.setupFolderListener();
   }
 
@@ -73,32 +71,20 @@ export class NoteManager {
     });
   }
 
-  /**
-   * Initialize storage (but don't load notes yet - wait for SyncManager)
-   */
-  async initializeStorage() {
-    try {
-      const initialized = await this.fileStorage.initialize();
-      if (!initialized) {
-        console.warn('Storage initialization failed');
-      }
-      // Note: We don't load notes here anymore.
-      // Notes are loaded in setSyncManager() after CRDT sync is ready.
-    } catch (error) {
-      console.error('Failed to initialize storage:', error);
-    }
-  }
 
   /**
-   * Load notes from storage
+   * Load notes from storage (CRDT-based in Electron, localStorage in web)
    */
   async loadNotes() {
     try {
       if (this.isElectron) {
-        // Load from CRDT if syncManager is available, otherwise use old file storage
-        const notes = this.syncManager ?
-          await this.syncManager.loadAllNotes() :
-          await this.fileStorage.loadAllNotes();
+        if (!this.syncManager) {
+          console.error('ERROR: loadNotes called before SyncManager is ready!');
+          return;
+        }
+
+        // Load from CRDT via SyncManager
+        const notes = await this.syncManager.loadAllNotes();
 
         if (notes.length === 0) {
           this.loadSampleNotes();
