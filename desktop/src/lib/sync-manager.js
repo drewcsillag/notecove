@@ -221,9 +221,9 @@ export class SyncManager {
     console.log('  Note title:', note.title);
 
     if (!this.isElectron) {
-      // Web mode - just save normally
-      console.log('  Using web mode save');
-      return await this.fileStorage.saveNote(note);
+      // Web mode - this shouldn't be called (NoteManager handles web storage)
+      console.error('ERROR: saveNoteWithCRDT called in web mode! This should not happen.');
+      return false;
     }
 
     try {

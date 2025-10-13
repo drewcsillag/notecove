@@ -183,21 +183,20 @@ export class NoteManager {
   }
 
   /**
-   * Save notes to storage
+   * Save notes to storage (web mode only - Electron uses CRDT auto-save)
    */
   async saveNotes() {
     try {
-      const notesArray = Array.from(this.notes.values());
-
       if (this.isElectron) {
-        // Save individual note files
-        for (const note of notesArray) {
-          await this.fileStorage.saveNote(note);
-        }
-      } else {
-        // Web mode - use localStorage
-        localStorage.setItem('notecove-notes', JSON.stringify(notesArray));
+        // Electron mode: Notes are auto-saved via CRDT on every edit
+        // No need to batch save - each note saves individually via SyncManager
+        console.log('saveNotes() called in Electron mode - ignoring (CRDT auto-saves)');
+        return;
       }
+
+      // Web mode - save to localStorage
+      const notesArray = Array.from(this.notes.values());
+      localStorage.setItem('notecove-notes', JSON.stringify(notesArray));
     } catch (error) {
       console.error('Failed to save notes:', error);
     }
