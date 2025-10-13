@@ -39,15 +39,16 @@ export class FileStorage {
     if (!this.isElectron) return null;
 
     try {
-      // Get user's documents directory from settings
-      let documentsPath = await window.electronAPI.settings.get('documentsPath');
+      // Get notes path from settings (set by main process with --notes-path arg)
+      let notesPath = await window.electronAPI.settings.get('notesPath');
 
-      // If not in settings, this will be set by the main process
-      if (!documentsPath) {
-        documentsPath = await window.electronAPI.settings.get('documentsPath');
+      if (!notesPath) {
+        // Fallback to default location
+        const documentsPath = await window.electronAPI.settings.get('documentsPath');
+        notesPath = `${documentsPath}/NoteCove`;
       }
 
-      return `${documentsPath}/NoteCove`;
+      return notesPath;
     } catch (error) {
       console.error('Failed to get default notes path:', error);
       return './notes'; // Fallback to relative path
@@ -172,23 +173,46 @@ export class FileStorage {
       }
 
       const notes = [];
-      const jsonFiles = result.files.filter(file => file.endsWith('.json'));
 
-      for (const filename of jsonFiles) {
+      // New structure: each note has its own directory (note-123/, note-456/, etc.)
+      // Each directory contains cache.json, updates/, and meta/
+      for (const item of result.files) {
         try {
-          const filePath = `${this.notesPath}/${filename}`;
-          const fileResult = await window.electronAPI.fileSystem.readFile(filePath);
+          // Skip hidden files and non-directories
+          if (item.startsWith('.')) continue;
 
+          const noteDir = `${this.notesPath}/${item}`;
+          const cachePath = `${noteDir}/cache.json`;
+
+          // Check if cache.json exists
+          const cacheExists = await window.electronAPI.fileSystem.exists(cachePath);
+          if (!cacheExists) {
+            // Also check for old flat JSON format (migration compatibility)
+            if (item.endsWith('.json')) {
+              const filePath = `${this.notesPath}/${item}`;
+              const fileResult = await window.electronAPI.fileSystem.readFile(filePath);
+              if (fileResult.success) {
+                const noteData = JSON.parse(fileResult.content);
+                if (validateNote(noteData)) {
+                  notes.push(noteData);
+                }
+              }
+            }
+            continue;
+          }
+
+          // Read cache.json from note directory
+          const fileResult = await window.electronAPI.fileSystem.readFile(cachePath);
           if (fileResult.success) {
             const noteData = JSON.parse(fileResult.content);
             if (validateNote(noteData)) {
               notes.push(noteData);
             } else {
-              console.warn('Invalid note data in file:', filename);
+              console.warn('Invalid note data in directory:', item);
             }
           }
         } catch (error) {
-          console.error('Error parsing note file:', filename, error);
+          console.error('Error loading note from directory:', item, error);
         }
       }
 

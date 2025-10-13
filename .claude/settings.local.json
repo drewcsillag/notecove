@@ -16,7 +16,8 @@
       "Bash(npm list:*)",
       "WebSearch",
       "Bash(git diff:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(tee:*)"
     ],
     "deny": [],
     "ask": []

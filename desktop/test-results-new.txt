@@ -1,0 +1,58 @@
+
+> @notecove/desktop@0.1.0 test:e2e
+> playwright test
+
+[1A[2K[2m[WebServer] [22m
+[2m[WebServer] [22m  dist/main.js     819.4kb
+[2m[WebServer] [22m  dist/preload.js    1.8kb
+[2m[WebServer] [22m
+[2m[WebServer] [22m⚡ Done in 145ms
+
+
+Running 82 tests using 1 worker
+
+[1A[2K[1/82] [chromium] › tests/e2e/basic.spec.js:15:7 › NoteCove Basic Functionality › should load the application
+[1A[2K[2/82] [chromium] › tests/e2e/basic.spec.js:23:7 › NoteCove Basic Functionality › should show welcome state when no notes exist
+[1A[2K[3/82] [chromium] › tests/e2e/basic.spec.js:32:7 › NoteCove Basic Functionality › should create a new note
+[1A[2K[4/82] [chromium] › tests/e2e/basic.spec.js:44:7 › NoteCove Basic Functionality › should type in note and derive title from first line
+[1A[2K[5/82] [chromium] › tests/e2e/basic.spec.js:67:7 › NoteCove Basic Functionality › should search notes and filter results
+[1A[2K[6/82] [chromium] › tests/e2e/basic.spec.js:123:7 › NoteCove Basic Functionality › should maintain search input focus while typing
+[1A[2K[7/82] [chromium] › tests/e2e/crdt.spec.js:16:7 › CRDT Integration › should initialize CRDT manager
+[1A[2K[8/82] [chromium] › tests/e2e/crdt.spec.js:26:7 › CRDT Integration › should have CRDT manager methods available
+[1A[2K[9/82] [chromium] › tests/e2e/crdt.spec.js:49:7 › CRDT Integration › should create CRDT document when note is created
+[1A[2K[10/82] [chromium] › tests/e2e/crdt.spec.js:75:7 › CRDT Integration › should track CRDT document count in sync status
+[1A[2K[11/82] [chromium] › tests/e2e/crdt.spec.js:85:7 › CRDT Integration › should include CRDT state when saving notes
+[1A[2K[12/82] [chromium] › tests/e2e/crdt.spec.js:97:7 › CRDT Integration › should have merge capabilities for external notes
+[1A[2K[13/82] [chromium] › tests/e2e/crdt.spec.js:118:7 › CRDT Integration › should initialize CRDT for existing notes
+[1A[2K[14/82] [chromium] › tests/e2e/crdt.spec.js:153:7 › CRDT Integration › should get CRDT state from document
+[1A[2K[15/82] [chromium] › tests/e2e/crdt.spec.js:182:7 › CRDT Integration › should extract note data from CRDT document
+[1A[2K[16/82] [chromium] › tests/e2e/crdt.spec.js:211:7 › CRDT Integration › should cleanup CRDT documents on destroy
+[1A[2K[17/82] [chromium] › tests/e2e/editor-features.spec.js:18:7 › Enhanced Editor Features › should toggle task list with TODO/DONE/NOPE states
+[1A[2K[18/82] [chromium] › tests/e2e/editor-features.spec.js:75:7 › Enhanced Editor Features › should support image insertion via file picker
+[1A[2K[19/82] [chromium] › tests/e2e/editor-features.spec.js:96:7 › Enhanced Editor Features › should insert and edit tables
+[1A[2K[20/82] [chromium] › tests/e2e/editor-features.spec.js:140:7 › Enhanced Editor Features › should support column resizing in tables
+[1A[2K[21/82] [chromium] › tests/e2e/editor-features.spec.js:167:8 › Enhanced Editor Features › should maintain toolbar button active states
+[1A[2K[22/82] [chromium] › tests/e2e/editor-features.spec.js:223:7 › Enhanced Editor Features › should handle nested task lists
+[1A[2K[23/82] [chromium] › tests/e2e/editor-features.spec.js:247:7 › Enhanced Editor Features › should support keyboard shortcuts for task lists
+[1A[2K[24/82] [chromium] › tests/e2e/editor-features.spec.js:270:8 › Enhanced Editor Features › should persist task states after note switch
+[1A[2K[25/82] [chromium] › tests/e2e/editor-features.spec.js:325:7 › Enhanced Editor Features › should show resize handles when clicking on image
+[1A[2K[26/82] [chromium] › tests/e2e/folders.spec.js:15:7 › Folder Organization › should display default folders
+[1A[2K[27/82] [chromium] › tests/e2e/folders.spec.js:29:7 › Folder Organization › should create a new folder
+[1A[2K[28/82] [chromium] › tests/e2e/folders.spec.js:53:7 › Folder Organization › should select a folder and show it as active
+[1A[2K[29/82] [chromium] › tests/e2e/folders.spec.js:70:7 › Folder Organization › should filter notes by selected folder
+[1A[2K[30/82] [chromium] › tests/e2e/folders.spec.js:118:7 › Folder Organization › should create new notes in the selected folder
+[1A[2K[31/82] [chromium] › tests/e2e/folders.spec.js:155:7 › Folder Organization › should show trash folder icon
+[1A[2K[32/82] [chromium] › tests/e2e/folders.spec.js:177:7 › Drag and Drop › should make notes draggable
+[1A[2K[33/82] [chromium] › tests/e2e/folders.spec.js:194:7 › Drag and Drop › should move note between folders via drag and drop
+[1A[2K[34/82] [chromium] › tests/e2e/folders.spec.js:236:7 › Drag and Drop › should allow dragging notes from trash to folders for restore
+[1A[2K[35/82] [chromium] › tests/e2e/folders.spec.js:273:7 › Trash Functionality › should show restore and delete buttons in trash view
+[1A[2K[36/82] [chromium] › tests/e2e/folders.spec.js:300:7 › Trash Functionality › should restore note from trash
+[1A[2K[37/82] [chromium] › tests/e2e/folders.spec.js:338:7 › Trash Functionality › should permanently delete note from trash
+[1A[2K[38/82] [chromium] › tests/e2e/folders.spec.js:375:7 › Trash Functionality › should cancel delete when user declines confirmation
+[1A[2K[39/82] [chromium] › tests/e2e/folders.spec.js:404:7 › Trash Functionality › should not show deleted notes in All Notes view
+[1A[2K[40/82] [chromium] › tests/e2e/folders.spec.js:436:7 › Trash Functionality › should not show permanently deleted notes anywhere
+[1A[2K[41/82] [chromium] › tests/e2e/folders.spec.js:471:7 › Trash Functionality › should restore note from trash via drag-and-drop to folder
+[1A[2K[42/82] [chromium] › tests/e2e/folders.spec.js:522:7 › Trash Functionality › should not allow single-click to double-select notes
+[1A[2K[43/82] [chromium] › tests/e2e/new-features.spec.js:16:9 › New Features › Three-State Tag Filtering › should cycle through include, exclude, and no filter states
+[1A[2K[44/82] [chromium] › tests/e2e/new-features.spec.js:75:9 › New Features › Three-State Tag Filtering › should show visual indicators for exclude mode
+[1A[2K[45/82] [chromium] › tests/e2e/new-features.spec.js:107:9 › New Features › Folder Collapse/Expand › should show collapse arrows for folders with children

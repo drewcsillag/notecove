@@ -1,0 +1,301 @@
+
+> @notecove/desktop@0.1.0 test:e2e
+> playwright test
+
+
+Running 82 tests using 1 worker
+
+[1A[2K[1/82] [chromium] › tests/e2e/basic.spec.js:15:7 › NoteCove Basic Functionality › should load the application
+[1A[2K[2/82] [chromium] › tests/e2e/basic.spec.js:23:7 › NoteCove Basic Functionality › should show welcome state when no notes exist
+[1A[2K[3/82] [chromium] › tests/e2e/basic.spec.js:32:7 › NoteCove Basic Functionality › should create a new note
+[1A[2K[4/82] [chromium] › tests/e2e/basic.spec.js:44:7 › NoteCove Basic Functionality › should type in note and derive title from first line
+[1A[2K[5/82] [chromium] › tests/e2e/basic.spec.js:67:7 › NoteCove Basic Functionality › should search notes and filter results
+[1A[2K[6/82] [chromium] › tests/e2e/basic.spec.js:123:7 › NoteCove Basic Functionality › should maintain search input focus while typing
+[1A[2K[7/82] [chromium] › tests/e2e/crdt.spec.js:16:7 › CRDT Integration › should initialize CRDT manager
+[1A[2K[8/82] [chromium] › tests/e2e/crdt.spec.js:26:7 › CRDT Integration › should have CRDT manager methods available
+[1A[2K[9/82] [chromium] › tests/e2e/crdt.spec.js:49:7 › CRDT Integration › should create CRDT document when note is created
+[1A[2K[10/82] [chromium] › tests/e2e/crdt.spec.js:75:7 › CRDT Integration › should track CRDT document count in sync status
+[1A[2K[11/82] [chromium] › tests/e2e/crdt.spec.js:85:7 › CRDT Integration › should include CRDT state when saving notes
+[1A[2K[12/82] [chromium] › tests/e2e/crdt.spec.js:97:7 › CRDT Integration › should have merge capabilities for external notes
+[1A[2K[13/82] [chromium] › tests/e2e/crdt.spec.js:118:7 › CRDT Integration › should initialize CRDT for existing notes
+[1A[2K[14/82] [chromium] › tests/e2e/crdt.spec.js:153:7 › CRDT Integration › should get CRDT state from document
+[1A[2K[15/82] [chromium] › tests/e2e/crdt.spec.js:182:7 › CRDT Integration › should extract note data from CRDT document
+[1A[2K[16/82] [chromium] › tests/e2e/crdt.spec.js:211:7 › CRDT Integration › should cleanup CRDT documents on destroy
+[1A[2K[17/82] [chromium] › tests/e2e/editor-features.spec.js:18:7 › Enhanced Editor Features › should toggle task list with TODO/DONE/NOPE states
+[1A[2K[18/82] [chromium] › tests/e2e/editor-features.spec.js:75:7 › Enhanced Editor Features › should support image insertion via file picker
+[1A[2K[19/82] [chromium] › tests/e2e/editor-features.spec.js:96:7 › Enhanced Editor Features › should insert and edit tables
+[1A[2K[20/82] [chromium] › tests/e2e/editor-features.spec.js:140:7 › Enhanced Editor Features › should support column resizing in tables
+[1A[2K[21/82] [chromium] › tests/e2e/editor-features.spec.js:167:8 › Enhanced Editor Features › should maintain toolbar button active states
+[1A[2K[22/82] [chromium] › tests/e2e/editor-features.spec.js:223:7 › Enhanced Editor Features › should handle nested task lists
+[1A[2K[23/82] [chromium] › tests/e2e/editor-features.spec.js:247:7 › Enhanced Editor Features › should support keyboard shortcuts for task lists
+[1A[2K[24/82] [chromium] › tests/e2e/editor-features.spec.js:270:8 › Enhanced Editor Features › should persist task states after note switch
+[1A[2K[25/82] [chromium] › tests/e2e/editor-features.spec.js:325:7 › Enhanced Editor Features › should show resize handles when clicking on image
+[1A[2K[26/82] [chromium] › tests/e2e/folders.spec.js:15:7 › Folder Organization › should display default folders
+[1A[2K[27/82] [chromium] › tests/e2e/folders.spec.js:29:7 › Folder Organization › should create a new folder
+[1A[2K[28/82] [chromium] › tests/e2e/folders.spec.js:53:7 › Folder Organization › should select a folder and show it as active
+[1A[2K[29/82] [chromium] › tests/e2e/folders.spec.js:70:7 › Folder Organization › should filter notes by selected folder
+[1A[2K[30/82] [chromium] › tests/e2e/folders.spec.js:118:7 › Folder Organization › should create new notes in the selected folder
+[1A[2K[31/82] [chromium] › tests/e2e/folders.spec.js:155:7 › Folder Organization › should show trash folder icon
+[1A[2K[32/82] [chromium] › tests/e2e/folders.spec.js:177:7 › Drag and Drop › should make notes draggable
+[1A[2K[33/82] [chromium] › tests/e2e/folders.spec.js:194:7 › Drag and Drop › should move note between folders via drag and drop
+[1A[2K[34/82] [chromium] › tests/e2e/folders.spec.js:236:7 › Drag and Drop › should allow dragging notes from trash to folders for restore
+[1A[2K[35/82] [chromium] › tests/e2e/folders.spec.js:273:7 › Trash Functionality › should show restore and delete buttons in trash view
+[1A[2K[36/82] [chromium] › tests/e2e/folders.spec.js:300:7 › Trash Functionality › should restore note from trash
+[1A[2K[37/82] [chromium] › tests/e2e/folders.spec.js:338:7 › Trash Functionality › should permanently delete note from trash
+[1A[2K[38/82] [chromium] › tests/e2e/folders.spec.js:375:7 › Trash Functionality › should cancel delete when user declines confirmation
+[1A[2K[39/82] [chromium] › tests/e2e/folders.spec.js:404:7 › Trash Functionality › should not show deleted notes in All Notes view
+[1A[2K[40/82] [chromium] › tests/e2e/folders.spec.js:436:7 › Trash Functionality › should not show permanently deleted notes anywhere
+[1A[2K[41/82] [chromium] › tests/e2e/folders.spec.js:471:7 › Trash Functionality › should restore note from trash via drag-and-drop to folder
+[1A[2K[42/82] [chromium] › tests/e2e/folders.spec.js:522:7 › Trash Functionality › should not allow single-click to double-select notes
+[1A[2K[43/82] [chromium] › tests/e2e/new-features.spec.js:16:9 › New Features › Three-State Tag Filtering › should cycle through include, exclude, and no filter states
+[1A[2K[44/82] [chromium] › tests/e2e/new-features.spec.js:75:9 › New Features › Three-State Tag Filtering › should show visual indicators for exclude mode
+[1A[2K[45/82] [chromium] › tests/e2e/new-features.spec.js:107:9 › New Features › Folder Collapse/Expand › should show collapse arrows for folders with children
+[1A[2K  1) [chromium] › tests/e2e/new-features.spec.js:107:9 › New Features › Folder Collapse/Expand › should show collapse arrows for folders with children 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('.folder-item').filter({ hasText: 'Parent Folder' }).locator('.folder-collapse-arrow')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('.folder-item').filter({ hasText: 'Parent Folder' }).locator('.folder-collapse-arrow')[22m
+    [2m    9 × locator resolved to <span class="folder-collapse-arrow">▼</span>[22m
+    [2m      - unexpected value "hidden"[22m
+
+
+      119 |
+      120 |       // Arrow should exist but might be hidden or showing default state
+    > 121 |       await expect(arrow).toBeVisible();
+          |                           ^
+      122 |     });
+      123 |
+      124 |     test('should collapse and expand folders', async ({ page }) => {
+        at /Users/drew/devel/nc/desktop/tests/e2e/new-features.spec.js:121:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/new-features-New-Features--99e75-s-for-folders-with-children-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/new-features-New-Features--99e75-s-for-folders-with-children-chromium/error-context.md
+
+
+[1A[2K[46/82] [chromium] › tests/e2e/new-features.spec.js:124:9 › New Features › Folder Collapse/Expand › should collapse and expand folders
+[1A[2K  2) [chromium] › tests/e2e/new-features.spec.js:124:9 › New Features › Folder Collapse/Expand › should collapse and expand folders 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.folder-item').filter({ hasText: /^Parent$/ })[22m
+
+
+      133 |       // Select parent folder
+      134 |       const parentFolder = page.locator('.folder-item').filter({ hasText: /^Parent$/ });
+    > 135 |       await parentFolder.click();
+          |                          ^
+      136 |       await page.waitForTimeout(200);
+      137 |
+      138 |       // Create child folder
+        at /Users/drew/devel/nc/desktop/tests/e2e/new-features.spec.js:135:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/new-features-New-Features--0fd0b-collapse-and-expand-folders-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/new-features-New-Features--0fd0b-collapse-and-expand-folders-chromium/error-context.md
+
+
+[1A[2K[47/82] [chromium] › tests/e2e/new-features.spec.js:174:9 › New Features › Folder Collapse/Expand › should persist folder collapse state across page reloads
+[1A[2K  3) [chromium] › tests/e2e/new-features.spec.js:174:9 › New Features › Folder Collapse/Expand › should persist folder collapse state across page reloads 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.folder-item').filter({ hasText: /^Parent$/ })[22m
+
+
+      182 |
+      183 |       const parentFolder = page.locator('.folder-item').filter({ hasText: /^Parent$/ });
+    > 184 |       await parentFolder.click();
+          |                          ^
+      185 |       await page.waitForTimeout(200);
+      186 |
+      187 |       await page.locator('#newFolderBtn').click();
+        at /Users/drew/devel/nc/desktop/tests/e2e/new-features.spec.js:184:26
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/new-features-New-Features--412d1-e-state-across-page-reloads-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/new-features-New-Features--412d1-e-state-across-page-reloads-chromium/error-context.md
+
+
+[1A[2K[48/82] [chromium] › tests/e2e/new-features.spec.js:212:9 › New Features › Last Opened Note Restoration › should restore last opened note on startup
+[1A[2K  4) [chromium] › tests/e2e/new-features.spec.js:212:9 › New Features › Last Opened Note Restoration › should restore last opened note on startup 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#editor .ProseMirror')
+    Expected substring: [32m"Second Note"[39m
+    Received string:    [31m""[39m
+    Timeout: 5000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('#editor .ProseMirror')[22m
+    [2m    9 × locator resolved to <div tabindex="0" role="textbox" translate="no" contenteditable="true" class="tiptap ProseMirror is-empty" data-placeholder="Start writing your note...">…</div>[22m
+    [2m      - unexpected value ""[22m
+
+
+      235 |       // Second note should still be open
+      236 |       const editorAfterReload = page.locator('#editor .ProseMirror');
+    > 237 |       await expect(editorAfterReload).toContainText('Second Note');
+          |                                       ^
+      238 |     });
+      239 |
+      240 |     test('should open most recent note if last opened was deleted', async ({ page }) => {
+        at /Users/drew/devel/nc/desktop/tests/e2e/new-features.spec.js:237:39
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/new-features-New-Features--5b0b3-last-opened-note-on-startup-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/new-features-New-Features--5b0b3-last-opened-note-on-startup-chromium/error-context.md
+
+
+[1A[2K[49/82] [chromium] › tests/e2e/new-features.spec.js:240:9 › New Features › Last Opened Note Restoration › should open most recent note if last opened was deleted
+[1A[2K  5) [chromium] › tests/e2e/new-features.spec.js:240:9 › New Features › Last Opened Note Restoration › should open most recent note if last opened was deleted 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#deleteBtn')[22m
+
+
+      254 |
+      255 |       // Delete the second note (currently open)
+    > 256 |       await page.locator('#deleteBtn').click();
+          |                                        ^
+      257 |       await page.waitForTimeout(300);
+      258 |
+      259 |       // Reload the page
+        at /Users/drew/devel/nc/desktop/tests/e2e/new-features.spec.js:256:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/new-features-New-Features--cd60c--if-last-opened-was-deleted-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/new-features-New-Features--cd60c--if-last-opened-was-deleted-chromium/error-context.md
+
+
+[1A[2K[50/82] [chromium] › tests/e2e/new-features.spec.js:271:9 › New Features › Folder Note Counts › should display note count for folders
+[1A[2K  6) [chromium] › tests/e2e/new-features.spec.js:271:9 › New Features › Folder Note Counts › should display note count for folders 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  locator('.folder-item').filter({ hasText: 'Test Folder' }).locator('.folder-count')
+    Expected: [32m"1"[39m
+    Received: [31m"0"[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveText" with timeout 5000ms[22m
+    [2m  - waiting for locator('.folder-item').filter({ hasText: 'Test Folder' }).locator('.folder-count')[22m
+    [2m    9 × locator resolved to <span class="folder-count">0</span>[22m
+    [2m      - unexpected value "0"[22m
+
+
+      293 |       // Folder should show count of 1
+      294 |       const folderCount = testFolder.locator('.folder-count');
+    > 295 |       await expect(folderCount).toHaveText('1');
+          |                                 ^
+      296 |
+      297 |       // Create another note
+      298 |       await page.keyboard.press('Control+n');
+        at /Users/drew/devel/nc/desktop/tests/e2e/new-features.spec.js:295:33
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/new-features-New-Features--98721-play-note-count-for-folders-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/new-features-New-Features--98721-play-note-count-for-folders-chromium/error-context.md
+
+
+[1A[2K[51/82] [chromium] › tests/e2e/new-features.spec.js:308:9 › New Features › Folder Note Counts › should show correct counts on app startup
+[1A[2K[52/82] [chromium] › tests/e2e/new-features.spec.js:338:9 › New Features › Folder Note Counts › should update counts when notes are moved between folders
+[1A[2K  7) [chromium] › tests/e2e/new-features.spec.js:338:9 › New Features › Folder Note Counts › should update counts when notes are moved between folders 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  locator('.folder-item').filter({ hasText: 'Folder A' }).locator('.folder-count')
+    Expected: [32m"1"[39m
+    Received: [31m"0"[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveText" with timeout 5000ms[22m
+    [2m  - waiting for locator('.folder-item').filter({ hasText: 'Folder A' }).locator('.folder-count')[22m
+    [2m    9 × locator resolved to <span class="folder-count">0</span>[22m
+    [2m      - unexpected value "0"[22m
+
+
+      366 |       // Folder A should have count of 1
+      367 |       const folderACount = folderA.locator('.folder-count');
+    > 368 |       await expect(folderACount).toHaveText('1');
+          |                                  ^
+      369 |
+      370 |       // Folder B should have count of 0
+      371 |       const folderB = page.locator('.folder-item').filter({ hasText: 'Folder B' });
+        at /Users/drew/devel/nc/desktop/tests/e2e/new-features.spec.js:368:34
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/new-features-New-Features--bfaba-s-are-moved-between-folders-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/new-features-New-Features--bfaba-s-are-moved-between-folders-chromium/error-context.md
+
+
+[1A[2K[53/82] [chromium] › tests/e2e/new-features.spec.js:389:9 › New Features › Tag Recognition with Whitespace › should only recognize tags with whitespace before #
+[1A[2K[54/82] [chromium] › tests/e2e/new-features.spec.js:416:9 › New Features › Tag Recognition with Whitespace › should recognize tags at the start of a line
+[1A[2K[55/82] [chromium] › tests/e2e/new-features.spec.js:432:9 › New Features › Tag Recognition with Whitespace › should recognize tags after newlines
+[1A[2K[56/82] [chromium] › tests/e2e/regression.spec.js:16:7 › Regression Tests › should not create duplicate notes when typing
+[1A[2K[chromium] › tests/e2e/regression.spec.js:16:7 › Regression Tests › should not create duplicate notes when typing
+Initial count: [33m0[39m
+
+[1A[2K[57/82] [chromium] › tests/e2e/regression.spec.js:42:7 › Regression Tests › should switch note content when clicking different notes
+[1A[2K[58/82] [chromium] › tests/e2e/regression.spec.js:88:7 › Regression Tests › should maintain consistent note count after edits
+[1A[2K[59/82] [chromium] › tests/e2e/regression.spec.js:110:7 › Regression Tests › should show reset button in status bar
+[1A[2K[60/82] [chromium] › tests/e2e/regression.spec.js:116:7 › Regression Tests › reset button should have confirmation dialog
+[1A[2K[61/82] [chromium] › tests/e2e/regression.spec.js:131:7 › Regression Tests › reset button should clear all notes and reload page
+[1A[2K[62/82] [chromium] › tests/e2e/regression.spec.js:182:7 › Regression Tests › should not create files with changing titles
+[1A[2K[63/82] [chromium] › tests/e2e/regression.spec.js:209:7 › Regression Tests › should show editor (not welcome screen) when clicking on a note
+[1A[2K[64/82] [chromium] › tests/e2e/regression.spec.js:243:7 › Regression Tests › should reset folder structure when resetting storage
+[1A[2K[65/82] [chromium] › tests/e2e/scrolling.spec.js:15:7 › Editor Scrolling › should scroll long notes properly
+[1A[2K[66/82] [chromium] › tests/e2e/scrolling.spec.js:87:7 › Editor Scrolling › should show scrollbar when content exceeds viewport
+[1A[2K[67/82] [chromium] › tests/e2e/scrolling.spec.js:123:7 › Editor Scrolling › should position cursor at top when opening long note
+[1A[2K[68/82] [chromium] › tests/e2e/sync.spec.js:16:7 › Sync Infrastructure › should initialize sync manager and show status indicator
+[1A[2K[69/82] [chromium] › tests/e2e/sync.spec.js:26:7 › Sync Infrastructure › should verify SyncManager is initialized in Electron mode
+[1A[2K[70/82] [chromium] › tests/e2e/sync.spec.js:41:7 › Sync Infrastructure › should maintain sync status through normal operations
+[1A[2K[71/82] [chromium] › tests/e2e/sync.spec.js:68:7 › Sync Infrastructure › should have sync manager methods available
+[1A[2K[72/82] [chromium] › tests/e2e/sync.spec.js:90:7 › Sync Infrastructure › should show sync status in status bar
+[1A[2K[73/82] [chromium] › tests/e2e/sync.spec.js:111:7 › Sync Infrastructure › should update sync status text correctly
+[1A[2K[74/82] [chromium] › tests/e2e/sync.spec.js:124:7 › Sync Infrastructure › should have sync event handlers in place
+[1A[2K[75/82] [chromium] › tests/e2e/sync.spec.js:137:7 › Sync Infrastructure › should integrate with note manager
+[1A[2K[76/82] [chromium] › tests/e2e/tags.spec.js:15:7 › Tag Functionality › should detect and style hashtags in editor
+[1A[2K[77/82] [chromium] › tests/e2e/tags.spec.js:37:7 › Tag Functionality › should extract tags from note content
+[1A[2K[78/82] [chromium] › tests/e2e/tags.spec.js:61:7 › Tag Functionality › should show tag counts
+[1A[2K[79/82] [chromium] › tests/e2e/tags.spec.js:83:7 › Tag Functionality › should filter notes by tag when clicked
+[1A[2K[80/82] [chromium] › tests/e2e/tags.spec.js:127:7 › Tag Functionality › should cycle through filter states when clicked multiple times
+[1A[2K[81/82] [chromium] › tests/e2e/tags.spec.js:176:7 › Tag Functionality › should support tags with hyphens
+[1A[2K[82/82] [chromium] › tests/e2e/tags.spec.js:192:7 › Tag Functionality › should not scroll to top while typing tags
+[1A[2K  7 failed
+    [chromium] › tests/e2e/new-features.spec.js:107:9 › New Features › Folder Collapse/Expand › should show collapse arrows for folders with children 
+    [chromium] › tests/e2e/new-features.spec.js:124:9 › New Features › Folder Collapse/Expand › should collapse and expand folders 
+    [chromium] › tests/e2e/new-features.spec.js:174:9 › New Features › Folder Collapse/Expand › should persist folder collapse state across page reloads 
+    [chromium] › tests/e2e/new-features.spec.js:212:9 › New Features › Last Opened Note Restoration › should restore last opened note on startup 
+    [chromium] › tests/e2e/new-features.spec.js:240:9 › New Features › Last Opened Note Restoration › should open most recent note if last opened was deleted 
+    [chromium] › tests/e2e/new-features.spec.js:271:9 › New Features › Folder Note Counts › should display note count for folders 
+    [chromium] › tests/e2e/new-features.spec.js:338:9 › New Features › Folder Note Counts › should update counts when notes are moved between folders 
+  2 skipped
+  73 passed (4.9m)
+
+[36m  Serving HTML report at http://localhost:9323. Press Ctrl+C to quit.[39m

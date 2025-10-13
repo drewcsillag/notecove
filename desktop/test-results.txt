@@ -1,0 +1,86 @@
+
+> @notecove/desktop@0.1.0 test:e2e
+> playwright test
+
+
+Running 69 tests using 1 worker
+
+[1A[2K[1/69] [chromium] › tests/e2e/basic.spec.js:15:7 › NoteCove Basic Functionality › should load the application
+[1A[2K[2/69] [chromium] › tests/e2e/basic.spec.js:23:7 › NoteCove Basic Functionality › should show welcome state when no notes exist
+[1A[2K[3/69] [chromium] › tests/e2e/basic.spec.js:32:7 › NoteCove Basic Functionality › should create a new note
+[1A[2K[4/69] [chromium] › tests/e2e/basic.spec.js:44:7 › NoteCove Basic Functionality › should type in note and derive title from first line
+[1A[2K[5/69] [chromium] › tests/e2e/basic.spec.js:67:7 › NoteCove Basic Functionality › should search notes and filter results
+[1A[2K[6/69] [chromium] › tests/e2e/basic.spec.js:123:7 › NoteCove Basic Functionality › should maintain search input focus while typing
+[1A[2K[7/69] [chromium] › tests/e2e/crdt.spec.js:16:7 › CRDT Integration › should initialize CRDT manager
+[1A[2K[8/69] [chromium] › tests/e2e/crdt.spec.js:26:7 › CRDT Integration › should have CRDT manager methods available
+[1A[2K[9/69] [chromium] › tests/e2e/crdt.spec.js:49:7 › CRDT Integration › should create CRDT document when note is created
+[1A[2K[10/69] [chromium] › tests/e2e/crdt.spec.js:75:7 › CRDT Integration › should track CRDT document count in sync status
+[1A[2K[11/69] [chromium] › tests/e2e/crdt.spec.js:85:7 › CRDT Integration › should include CRDT state when saving notes
+[1A[2K[12/69] [chromium] › tests/e2e/crdt.spec.js:97:7 › CRDT Integration › should have merge capabilities for external notes
+[1A[2K[13/69] [chromium] › tests/e2e/crdt.spec.js:118:7 › CRDT Integration › should initialize CRDT for existing notes
+[1A[2K[14/69] [chromium] › tests/e2e/crdt.spec.js:153:7 › CRDT Integration › should get CRDT state from document
+[1A[2K[15/69] [chromium] › tests/e2e/crdt.spec.js:182:7 › CRDT Integration › should extract note data from CRDT document
+[1A[2K[16/69] [chromium] › tests/e2e/crdt.spec.js:211:7 › CRDT Integration › should cleanup CRDT documents on destroy
+[1A[2K[17/69] [chromium] › tests/e2e/editor-features.spec.js:18:7 › Enhanced Editor Features › should toggle task list with TODO/DONE/NOPE states
+[1A[2K[18/69] [chromium] › tests/e2e/editor-features.spec.js:75:7 › Enhanced Editor Features › should support image insertion via file picker
+[1A[2K[19/69] [chromium] › tests/e2e/editor-features.spec.js:96:7 › Enhanced Editor Features › should insert and edit tables
+[1A[2K[20/69] [chromium] › tests/e2e/editor-features.spec.js:140:7 › Enhanced Editor Features › should support column resizing in tables
+[1A[2K[21/69] [chromium] › tests/e2e/editor-features.spec.js:167:8 › Enhanced Editor Features › should maintain toolbar button active states
+[1A[2K[22/69] [chromium] › tests/e2e/editor-features.spec.js:223:7 › Enhanced Editor Features › should handle nested task lists
+[1A[2K[23/69] [chromium] › tests/e2e/editor-features.spec.js:247:7 › Enhanced Editor Features › should support keyboard shortcuts for task lists
+[1A[2K[24/69] [chromium] › tests/e2e/editor-features.spec.js:270:8 › Enhanced Editor Features › should persist task states after note switch
+[1A[2K[25/69] [chromium] › tests/e2e/editor-features.spec.js:325:7 › Enhanced Editor Features › should show resize handles when clicking on image
+[1A[2K[26/69] [chromium] › tests/e2e/folders.spec.js:15:7 › Folder Organization › should display default folders
+[1A[2K[27/69] [chromium] › tests/e2e/folders.spec.js:29:7 › Folder Organization › should create a new folder
+[1A[2K[28/69] [chromium] › tests/e2e/folders.spec.js:53:7 › Folder Organization › should select a folder and show it as active
+[1A[2K[29/69] [chromium] › tests/e2e/folders.spec.js:70:7 › Folder Organization › should filter notes by selected folder
+[1A[2K[30/69] [chromium] › tests/e2e/folders.spec.js:118:7 › Folder Organization › should create new notes in the selected folder
+[1A[2K[31/69] [chromium] › tests/e2e/folders.spec.js:155:7 › Folder Organization › should show trash folder icon
+[1A[2K[32/69] [chromium] › tests/e2e/folders.spec.js:177:7 › Drag and Drop › should make notes draggable
+[1A[2K[33/69] [chromium] › tests/e2e/folders.spec.js:194:7 › Drag and Drop › should move note between folders via drag and drop
+[1A[2K[34/69] [chromium] › tests/e2e/folders.spec.js:236:7 › Drag and Drop › should allow dragging notes from trash to folders for restore
+[1A[2K[35/69] [chromium] › tests/e2e/folders.spec.js:273:7 › Trash Functionality › should show restore and delete buttons in trash view
+[1A[2K[36/69] [chromium] › tests/e2e/folders.spec.js:300:7 › Trash Functionality › should restore note from trash
+[1A[2K[37/69] [chromium] › tests/e2e/folders.spec.js:338:7 › Trash Functionality › should permanently delete note from trash
+[1A[2K[38/69] [chromium] › tests/e2e/folders.spec.js:375:7 › Trash Functionality › should cancel delete when user declines confirmation
+[1A[2K[39/69] [chromium] › tests/e2e/folders.spec.js:404:7 › Trash Functionality › should not show deleted notes in All Notes view
+[1A[2K[40/69] [chromium] › tests/e2e/folders.spec.js:436:7 › Trash Functionality › should not show permanently deleted notes anywhere
+[1A[2K[41/69] [chromium] › tests/e2e/folders.spec.js:471:7 › Trash Functionality › should restore note from trash via drag-and-drop to folder
+[1A[2K[42/69] [chromium] › tests/e2e/folders.spec.js:522:7 › Trash Functionality › should not allow single-click to double-select notes
+[1A[2K[43/69] [chromium] › tests/e2e/regression.spec.js:16:7 › Regression Tests › should not create duplicate notes when typing
+[1A[2K[chromium] › tests/e2e/regression.spec.js:16:7 › Regression Tests › should not create duplicate notes when typing
+Initial count: [33m0[39m
+
+[1A[2K[44/69] [chromium] › tests/e2e/regression.spec.js:42:7 › Regression Tests › should switch note content when clicking different notes
+[1A[2K[45/69] [chromium] › tests/e2e/regression.spec.js:88:7 › Regression Tests › should maintain consistent note count after edits
+[1A[2K[46/69] [chromium] › tests/e2e/regression.spec.js:110:7 › Regression Tests › should show reset button in status bar
+[1A[2K[47/69] [chromium] › tests/e2e/regression.spec.js:116:7 › Regression Tests › reset button should have confirmation dialog
+[1A[2K[48/69] [chromium] › tests/e2e/regression.spec.js:131:7 › Regression Tests › reset button should clear all notes and reload page
+[1A[2K[49/69] [chromium] › tests/e2e/regression.spec.js:182:7 › Regression Tests › should not create files with changing titles
+[1A[2K[50/69] [chromium] › tests/e2e/regression.spec.js:209:7 › Regression Tests › should show editor (not welcome screen) when clicking on a note
+[1A[2K[51/69] [chromium] › tests/e2e/regression.spec.js:243:7 › Regression Tests › should reset folder structure when resetting storage
+[1A[2K[52/69] [chromium] › tests/e2e/scrolling.spec.js:15:7 › Editor Scrolling › should scroll long notes properly
+[1A[2K[53/69] [chromium] › tests/e2e/scrolling.spec.js:87:7 › Editor Scrolling › should show scrollbar when content exceeds viewport
+[1A[2K[54/69] [chromium] › tests/e2e/scrolling.spec.js:123:7 › Editor Scrolling › should position cursor at top when opening long note
+[1A[2K[55/69] [chromium] › tests/e2e/sync.spec.js:16:7 › Sync Infrastructure › should initialize sync manager and show status indicator
+[1A[2K[56/69] [chromium] › tests/e2e/sync.spec.js:26:7 › Sync Infrastructure › should verify SyncManager is initialized in Electron mode
+[1A[2K[57/69] [chromium] › tests/e2e/sync.spec.js:41:7 › Sync Infrastructure › should maintain sync status through normal operations
+[1A[2K[58/69] [chromium] › tests/e2e/sync.spec.js:68:7 › Sync Infrastructure › should have sync manager methods available
+[1A[2K[59/69] [chromium] › tests/e2e/sync.spec.js:90:7 › Sync Infrastructure › should show sync status in status bar
+[1A[2K[60/69] [chromium] › tests/e2e/sync.spec.js:111:7 › Sync Infrastructure › should update sync status text correctly
+[1A[2K[61/69] [chromium] › tests/e2e/sync.spec.js:124:7 › Sync Infrastructure › should have sync event handlers in place
+[1A[2K[62/69] [chromium] › tests/e2e/sync.spec.js:137:7 › Sync Infrastructure › should integrate with note manager
+[1A[2K[63/69] [chromium] › tests/e2e/tags.spec.js:15:7 › Tag Functionality › should detect and style hashtags in editor
+[1A[2K[64/69] [chromium] › tests/e2e/tags.spec.js:37:7 › Tag Functionality › should extract tags from note content
+[1A[2K[65/69] [chromium] › tests/e2e/tags.spec.js:61:7 › Tag Functionality › should show tag counts
+[1A[2K[66/69] [chromium] › tests/e2e/tags.spec.js:83:7 › Tag Functionality › should filter notes by tag when clicked
+[1A[2K[67/69] [chromium] › tests/e2e/tags.spec.js:127:7 › Tag Functionality › should deselect tag when clicked again
+[1A[2K[68/69] [chromium] › tests/e2e/tags.spec.js:153:7 › Tag Functionality › should support tags with hyphens
+[1A[2K[69/69] [chromium] › tests/e2e/tags.spec.js:169:7 › Tag Functionality › should not scroll to top while typing tags
+[1A[2K  2 skipped
+  67 passed (3.1m)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
