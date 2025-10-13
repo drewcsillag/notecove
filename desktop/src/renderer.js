@@ -15,7 +15,7 @@ class NoteCoveApp {
     this.searchQuery = '';
     this.currentFolderId = 'all-notes'; // Default to All Notes folder
     this.folderManager = null;
-    this.selectedTag = null; // Selected tag filter
+    this.tagFilterState = null; // Tag filter state: { tag: string, mode: 'include' | 'exclude' } or null
     this.isSettingContent = false; // Flag to prevent update handlers during programmatic content changes
 
     this.initializeApp();
@@ -400,11 +400,20 @@ class NoteCoveApp {
       }
     }
 
-    // Filter by selected tag
-    if (this.selectedTag) {
-      filteredNotes = filteredNotes.filter(note =>
-        note.tags && note.tags.includes(this.selectedTag)
-      );
+    // Filter by tag (include or exclude mode)
+    if (this.tagFilterState) {
+      const { tag, mode } = this.tagFilterState;
+      if (mode === 'include') {
+        // Include mode: show only notes WITH the tag
+        filteredNotes = filteredNotes.filter(note =>
+          note.tags && note.tags.includes(tag)
+        );
+      } else if (mode === 'exclude') {
+        // Exclude mode: show only notes WITHOUT the tag
+        filteredNotes = filteredNotes.filter(note =>
+          !note.tags || !note.tags.includes(tag)
+        );
+      }
     }
 
     // Update notes count - show count in current folder view
@@ -480,13 +489,20 @@ class NoteCoveApp {
       return;
     }
 
-    tagsList.innerHTML = sortedTags.map(([tag, count]) => `
-      <div class="tag-item ${this.selectedTag === tag ? 'active' : ''}"
-           data-tag="${escapeHtml(tag)}">
-        <span class="tag-name">#${escapeHtml(tag)}</span>
-        <span class="tag-count">${count}</span>
-      </div>
-    `).join('');
+    tagsList.innerHTML = sortedTags.map(([tag, count]) => {
+      // Determine if this tag is active and what mode
+      const isActive = this.tagFilterState && this.tagFilterState.tag === tag;
+      const isExclude = isActive && this.tagFilterState.mode === 'exclude';
+      const isInclude = isActive && this.tagFilterState.mode === 'include';
+
+      return `
+        <div class="tag-item ${isInclude ? 'active' : ''} ${isExclude ? 'tag-exclude' : ''}"
+             data-tag="${escapeHtml(tag)}">
+          <span class="tag-name" style="${isExclude ? 'text-decoration: line-through;' : ''}">#${escapeHtml(tag)}</span>
+          <span class="tag-count">${count}</span>
+        </div>
+      `;
+    }).join('');
 
     // Add click event listeners
     const tagItems = tagsList.querySelectorAll('.tag-item');
@@ -500,14 +516,24 @@ class NoteCoveApp {
 
   /**
    * Select a tag to filter notes
+   * Three-state cycling: null → include → exclude → null
    * @param {string} tag - Tag to filter by
    */
   selectTag(tag) {
-    // Toggle tag selection - clicking the same tag deselects it
-    if (this.selectedTag === tag) {
-      this.selectedTag = null;
+    // Cycle through three states:
+    // 1. null (no filter) → include (show only notes WITH tag)
+    // 2. include → exclude (show only notes WITHOUT tag)
+    // 3. exclude → null (clear filter)
+
+    if (!this.tagFilterState || this.tagFilterState.tag !== tag) {
+      // State 1: null → include
+      this.tagFilterState = { tag, mode: 'include' };
+    } else if (this.tagFilterState.mode === 'include') {
+      // State 2: include → exclude
+      this.tagFilterState = { tag, mode: 'exclude' };
     } else {
-      this.selectedTag = tag;
+      // State 3: exclude → null
+      this.tagFilterState = null;
     }
 
     this.renderTagsList();
