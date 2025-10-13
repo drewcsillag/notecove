@@ -268,9 +268,8 @@ test.describe('Enhanced Editor Features', () => {
   });
 
   test.skip('should persist task states after note switch', async ({ page }) => {
-    // TODO: This test is disabled due to unreliable note switching and content loading.
-    // The task item is not consistently found after switching back to the original note.
-    // This requires manual verification that task states persist correctly across note switches.
+    // TODO: Still having issues with note content not loading after switch.
+    // Note switching works in other tests, but this specific scenario needs investigation.
     const editor = page.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await page.waitForTimeout(500);
