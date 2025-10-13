@@ -227,8 +227,8 @@ class NoteCoveApp {
   handleEditorBlur() {
     this.isEditing = false;
     this.saveCurrentNote();
-    // Update the notes list when done editing
-    this.renderNotesList();
+    // Don't call renderNotesList() here as it recreates the DOM and can interfere with click events
+    // The notes list will be updated by handleEditorUpdate() when the title changes
   }
 
   updateUI() {
@@ -252,10 +252,9 @@ class NoteCoveApp {
       if (this.currentNote) {
         welcomeState.style.display = 'none';
         editorState.style.display = 'flex';
-        // Only render current note if not actively editing (to avoid scroll issues)
-        if (!this.isEditing) {
-          this.renderCurrentNote();
-        }
+        // Always render current note when updateUI is called
+        // The isSettingContent flag in renderCurrentNote prevents infinite loops
+        this.renderCurrentNote();
       } else {
         welcomeState.style.display = 'flex';
         editorState.style.display = 'none';
@@ -671,7 +670,23 @@ class NoteCoveApp {
       this.saveCurrentNote(); // Save previous note
       this.currentNote = note;
       this.isEditing = false; // Reset editing state when switching notes
-      this.updateUI();
+
+      // Don't call updateUI() here as it recreates the DOM and breaks event handling
+      // Instead, just update what's needed:
+
+      // 1. Update editor content
+      this.renderCurrentNote();
+
+      // 2. Update active state in sidebar (without recreating HTML)
+      const notesList = document.getElementById('notesList');
+      if (notesList) {
+        notesList.querySelectorAll('.note-item').forEach(item => {
+          item.classList.toggle('active', item.dataset.noteId === noteId);
+        });
+      }
+
+      // 3. Update tags list
+      this.renderTagsList();
     }
   }
 
