@@ -1,5 +1,11 @@
 # Multi-Instance Sync Testing
 
+## Status Update
+
+✅ **CLI Argument Parsing Fixed** - Custom `--notes-path` and `--instance` arguments now work correctly
+✅ **Per-Note Directory Structure Implemented** - Notes saved as `note-123/cache.json` with `updates/` and `meta/` subdirectories
+✅ **File Storage Integration Complete** - Reads from both new and old formats for migration compatibility
+
 ## Quick Test
 
 The new CRDT-based sync architecture is now integrated! Here's how to test it:
@@ -7,7 +13,7 @@ The new CRDT-based sync architecture is now integrated! Here's how to test it:
 ### Prerequisites
 ```bash
 cd /Users/drew/devel/nc/desktop
-npm run build:main  # Already done
+npm run build:main  # Rebuild if you made changes
 ```
 
 ### Manual Testing (Recommended)
@@ -30,40 +36,58 @@ npx electron . \
 
 ### What to Test
 
-1. **Create a note in Instance 1**
-   - Open Instance 1
-   - Create a new note with some content
+1. **Verify Instance 1 Startup**
+   - Check console logs show:
+     ```
+     Instance: test1
+     Notes path: /Users/drew/Documents/NoteCove-SyncTest
+     ```
+   - If you see "Instance: default" or wrong path, argument parsing failed
+
+2. **Create a note in Instance 1**
+   - Click "New Note" button
+   - Type some content (e.g., "# Test Note from Instance 1")
    - Wait 3 seconds (for auto-flush)
+   - Check console for: "Saving note with CRDT sync: note-..."
 
-2. **Check Instance 2**
-   - Within ~2 seconds (sync poll interval), the note should appear
-   - Check console for: "Syncing N updates for note..."
+3. **Verify File Structure**
+   ```bash
+   # Should see the note directory
+   ls -la ~/Documents/NoteCove-SyncTest/
 
-3. **Edit in Instance 2**
-   - Make changes to the note
-   - Wait 3 seconds
+   # Should see cache.json and subdirectories
+   ls -la ~/Documents/NoteCove-SyncTest/note-*/
 
-4. **Check Instance 1**
-   - Changes should sync back
+   # Expected structure:
+   # note-abc123/
+   #   cache.json         ← JSON snapshot of note
+   #   updates/           ← CRDT update files
+   #     test1.000001.yjson or test1.000001-000005.yjson
+   #   meta/              ← Per-instance tracking
+   #     test1.json
+   ```
+
+4. **Start Instance 2**
+   - Open second terminal and run Instance 2 command
+   - Check console logs show correct instance name and path
+   - Note created in Instance 1 should appear within ~2 seconds
+
+5. **Edit in Instance 2**
+   - Make changes to the note (e.g., add "# Edit from Instance 2")
+   - Wait 3 seconds for flush
+   - Check console for: "UpdateStore: Flushed N updates..."
+
+6. **Check Instance 1**
+   - Changes should sync back within ~2 seconds
+   - Console should show: "Syncing N updates for note..."
    - Both instances should show the same content
 
-5. **Check File Structure**
-   ```bash
-   # Should see packed update files
-   ls -la ~/Documents/NoteCove-SyncTest/*/updates/
-
-   # Should see meta tracking files
-   ls -la ~/Documents/NoteCove-SyncTest/*/meta/
-
-   # Example:
-   # note-123/
-   #   updates/
-   #     test1.000001-000005.yjson
-   #     test2.000001-000003.yjson
-   #   meta/
-   #     test1.json
-   #     test2.json
-   ```
+7. **Verify Bidirectional Sync**
+   - Edit in Instance 1 again
+   - Should sync to Instance 2
+   - Edit in Instance 2
+   - Should sync to Instance 1
+   - No data loss, no conflicts
 
 ### What to Look For in Console
 
@@ -87,21 +111,41 @@ Applied update 1 from test1 to note note-123
 
 ### Troubleshooting
 
-**Notes not syncing?**
+**Wrong instance name or notes path in console?**
+- **Symptom**: Console shows "Instance: default" instead of "test1"
+- **Cause**: CLI arguments not being parsed correctly
+- **Fix**: Rebuild with `npm run build:main` (argument parsing was fixed)
+- **Verify**: Check process args with `ps aux | grep electron`
+
+**Notes saving to old location (~/ Documents/NoteCove)?**
+- **Symptom**: Files appear in default location instead of NoteCove-SyncTest
+- **Cause**: FileStorage not reading `notesPath` setting correctly
+- **Fix**: Rebuild with `npm run build:main` (getDefaultNotesPath() was fixed)
+- **Verify**: Check console for "Notes path:" on startup
+
+**Notes not syncing between instances?**
 - Check console for errors
 - Verify both instances are using same `--notes-path`
 - Look for "SyncManager created for instance" message
 - Check sync status: Should show "watching" or "syncing"
+- Make sure you waited 3 seconds after editing (idle flush timeout)
 
 **Files not created?**
 - Check: `~/Documents/NoteCove-SyncTest/`
 - Wait 3 seconds after editing (idle flush timeout)
 - Check console for "UpdateStore: Flushed" messages
+- Check console for "Saving note with CRDT sync:" message
+
+**Can't find note files?**
+- **Old format**: `~/Documents/NoteCove/note-123.json` (flat file)
+- **New format**: `~/Documents/NoteCove/note-123/cache.json` (directory)
+- The code supports reading both formats for migration
 
 **Instances not starting?**
-- Make sure different `--user-data-dir` for each
+- Make sure different `--user-data-dir` for each instance
 - Check for errors in console
 - Try `npm run dev` first to verify app works
+- Kill any running instances: `pkill -f "electron.*NoteCove"`
 
 ## Expected Behavior
 
