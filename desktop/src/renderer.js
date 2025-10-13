@@ -90,8 +90,10 @@ class NoteCoveApp {
     // Add sync event listeners
     this.syncManager.addListener((event, data) => this.handleSyncEvent(event, data));
 
-    // Start watching for file changes
-    this.syncManager.startWatching();
+    // File watching is disabled by default to prevent file system loops
+    // It can be enabled when multi-device sync or external editor support is needed
+    // this.syncManager.startWatching();
+    console.log('Sync manager initialized (file watching disabled)');
   }
 
   handleSyncEvent(event, data) {

@@ -205,8 +205,9 @@ export class SyncManager {
         // Merge external note using CRDT
         const mergedNote = this.crdtManager.mergeExternalNote(noteId, externalNote);
 
-        // Update the note manager with merged result
-        this.noteManager.updateNote(noteId, mergedNote);
+        // Update the note in memory WITHOUT saving to disk (to prevent infinite loop)
+        this.noteManager.notes.set(noteId, mergedNote);
+        this.noteManager.notify('note-updated', { note: mergedNote, updates: mergedNote });
 
         console.log('Note synced with CRDT merge:', noteId);
         this.notify('note-synced', {
