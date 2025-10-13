@@ -80,6 +80,28 @@ npm run test:e2e
 npm run build:dist
 ```
 
+### Website & Documentation
+
+The website and documentation are built with Vite and React:
+
+```bash
+cd website
+
+# Install dependencies
+npm install
+
+# Start development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build locally
+npm run preview
+```
+
+The development server runs on `http://localhost:5173` by default. The production build outputs to `website/dist/` and can be deployed to any static hosting service.
+
 ### Testing
 
 NoteCove includes comprehensive test coverage:

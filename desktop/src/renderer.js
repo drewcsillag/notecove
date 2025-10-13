@@ -308,14 +308,23 @@ class NoteCoveApp {
 
   /**
    * Extract hashtags from text
+   * Only matches # when preceded by whitespace, newline, or at start of text
    * @param {string} text - Text to extract tags from
    * @returns {Array<string>} Array of unique tags (without # prefix)
    */
   extractTags(text) {
-    const tagRegex = /#[\w-]+/g;
-    const matches = text.match(tagRegex) || [];
-    // Remove # prefix and deduplicate
-    const tags = [...new Set(matches.map(tag => tag.substring(1)))];
+    // Match # only when preceded by whitespace, newline, or at start
+    const tagRegex = /(^|\s)(#[\w-]+)/g;
+    const matches = [];
+    let match;
+
+    while ((match = tagRegex.exec(text)) !== null) {
+      // match[2] is the hashtag (including #)
+      matches.push(match[2].substring(1)); // Remove # prefix
+    }
+
+    // Deduplicate
+    const tags = [...new Set(matches)];
     return tags;
   }
 

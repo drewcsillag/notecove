@@ -33,7 +33,8 @@ export const Hashtag = Extension.create({
 
 function findHashtags(doc) {
   const decorations = [];
-  const hashtagRegex = /#[\w-]+/g;
+  // Match # only when preceded by whitespace, newline, or at start of text
+  const hashtagRegex = /(^|\s)(#[\w-]+)/g;
 
   doc.descendants((node, pos) => {
     if (!node.isText) {
@@ -44,13 +45,15 @@ function findHashtags(doc) {
     let match;
 
     while ((match = hashtagRegex.exec(text)) !== null) {
-      const from = pos + match.index;
-      const to = from + match[0].length;
+      // match[1] is the whitespace/start, match[2] is the actual hashtag
+      const hashtagStart = match.index + match[1].length;
+      const from = pos + hashtagStart;
+      const to = from + match[2].length;
 
       decorations.push(
         Decoration.inline(from, to, {
           class: 'hashtag',
-          'data-tag': match[0].substring(1)
+          'data-tag': match[2].substring(1) // Remove # prefix
         })
       );
     }
