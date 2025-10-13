@@ -205,4 +205,83 @@ test.describe('Regression Tests', () => {
     const count = await notesWithTest.count();
     expect(count).toBeLessThanOrEqual(1); // Should be exactly 1, but at most 1
   });
+
+  test('should show editor (not welcome screen) when clicking on a note', async ({ page }) => {
+    // Create a note
+    await page.locator('.new-note-btn').click();
+    await page.locator('#editor .ProseMirror').fill('Test Note for Selection\nThis is the content');
+    await page.waitForTimeout(1500);
+
+    // Get the note ID and title before creating second note
+    const firstNoteTitle = 'Test Note for Selection';
+
+    // Create second note
+    await page.keyboard.press('Control+n');
+    await page.waitForTimeout(500);
+    await page.locator('#editor .ProseMirror').fill('Second Note\nSecond content');
+    await page.waitForTimeout(1500);
+
+    // Verify we have 2 notes
+    const noteCount = await page.locator('.note-item').count();
+    expect(noteCount).toBe(2);
+
+    // Click on the first note in the list
+    const firstNote = page.locator('.note-item').filter({ hasText: firstNoteTitle });
+    await firstNote.click();
+    await page.waitForTimeout(300);
+
+    // Verify editor is shown (not welcome screen)
+    await expect(page.locator('#welcomeState')).toBeHidden();
+    await expect(page.locator('#editorState')).toBeVisible();
+
+    // Verify the correct content is loaded
+    const editorText = await page.locator('#editor .ProseMirror').textContent();
+    expect(editorText).toContain(firstNoteTitle);
+    expect(editorText).toContain('This is the content');
+  });
+
+  test('should reset folder structure when resetting storage', async ({ page }) => {
+    // Create a custom folder
+    await page.locator('#newFolderBtn').click();
+    await page.waitForTimeout(300);
+
+    // Type folder name in the dialog input
+    const folderNameInput = page.locator('#dialogInput');
+    await folderNameInput.fill('Custom Folder');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+
+    // Verify custom folder exists
+    const customFolder = page.locator('.folder-item').filter({ hasText: 'Custom Folder' });
+    await expect(customFolder).toBeVisible();
+
+    // Get folder count before reset
+    const foldersBeforeReset = await page.locator('.folder-item').count();
+    expect(foldersBeforeReset).toBeGreaterThan(2); // Should have default folders + custom
+
+    // Reset storage
+    const resetBtn = page.locator('#resetStoreBtn');
+    page.once('dialog', dialog => dialog.accept());
+    await resetBtn.click();
+    await page.waitForLoadState('networkidle');
+
+    // Prevent sample notes from loading
+    await page.evaluate(() => {
+      localStorage.setItem('notecove-notes', JSON.stringify([]));
+    });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(500);
+
+    // Verify custom folder is gone
+    const customFolderAfter = page.locator('.folder-item .folder-name').filter({ hasText: 'Custom Folder' });
+    await expect(customFolderAfter).toHaveCount(0);
+
+    // Verify default folders are back
+    const allNotesFolder = page.locator('.folder-item .folder-name').filter({ hasText: 'All Notes' });
+    await expect(allNotesFolder).toBeVisible();
+
+    const trashFolder = page.locator('.folder-item .folder-name').filter({ hasText: 'Recently Deleted' });
+    await expect(trashFolder).toBeVisible();
+  });
 });

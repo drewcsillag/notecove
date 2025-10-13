@@ -744,8 +744,11 @@ class NoteCoveApp {
       if (!confirmed) return;
     }
 
-    // Clear localStorage first
+    // Clear all localStorage data including folders and notes
     localStorage.clear();
+
+    // Reset folders to default structure
+    localStorage.removeItem('notecove-folders');
 
     // Delete all note files if in Electron
     if (window.electronAPI && window.electronAPI.fileSystem) {
@@ -767,7 +770,7 @@ class NoteCoveApp {
       }
     }
 
-    // Reload the page to get a fresh start
+    // Reload the page to get a fresh start with default folders
     window.location.reload();
   }
 
@@ -781,10 +784,18 @@ class NoteCoveApp {
       // Don't call updateUI() here as it recreates the DOM and breaks event handling
       // Instead, just update what's needed:
 
-      // 1. Update editor content
+      // 1. Show editor state and hide welcome state
+      const welcomeState = document.getElementById('welcomeState');
+      const editorState = document.getElementById('editorState');
+      if (welcomeState && editorState) {
+        welcomeState.style.display = 'none';
+        editorState.style.display = 'flex';
+      }
+
+      // 2. Update editor content
       this.renderCurrentNote();
 
-      // 2. Update active state in sidebar (without recreating HTML)
+      // 3. Update active state in sidebar (without recreating HTML)
       const notesList = document.getElementById('notesList');
       if (notesList) {
         notesList.querySelectorAll('.note-item').forEach(item => {
@@ -792,7 +803,7 @@ class NoteCoveApp {
         });
       }
 
-      // 3. Update tags list
+      // 4. Update tags list
       this.renderTagsList();
     }
   }
