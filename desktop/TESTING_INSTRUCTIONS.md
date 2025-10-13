@@ -21,18 +21,20 @@ npm run build:main  # Rebuild if you made changes
 **Terminal 1 - Instance 1:**
 ```bash
 npx electron . \
-  --user-data-dir="$HOME/.notecove-test1" \
-  --notes-path="$HOME/Documents/NoteCove-SyncTest" \
-  --instance="test1"
+  --user-data-dir=/Users/drew/.notecove-test1 \
+  --notes-path=/Users/drew/Documents/NoteCove-SyncTest \
+  --instance=test1
 ```
 
 **Terminal 2 - Instance 2:**
 ```bash
 npx electron . \
-  --user-data-dir="$HOME/.notecove-test2" \
-  --notes-path="$HOME/Documents/NoteCove-SyncTest" \
-  --instance="test2"
+  --user-data-dir=/Users/drew/.notecove-test2 \
+  --notes-path=/Users/drew/Documents/NoteCove-SyncTest \
+  --instance=test2
 ```
+
+**Note**: Use full paths (not `$HOME`) to avoid path expansion issues.
 
 ### What to Test
 
