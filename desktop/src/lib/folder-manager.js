@@ -4,12 +4,13 @@ import { generateUUID } from './utils.js';
  * Folder Manager - handles folder organization for notes
  */
 export class FolderManager {
-  constructor(notesPath = null) {
+  constructor(notesPath = null, crdtManager = null) {
     this.folders = new Map();
     this.listeners = new Set();
     this.isElectron = window.electronAPI?.isElectron || false;
     this.folderState = new Map(); // folderId -> isExpanded (boolean)
-    this.notesPath = notesPath; // Path to notes directory for file-based folder sync
+    this.notesPath = notesPath; // Path to notes directory
+    this.crdtManager = crdtManager; // CRDT manager for folder sync
 
     this.initializeFolders();
     this.loadFolderState();
@@ -96,22 +97,23 @@ export class FolderManager {
     try {
       let storedFolders = null;
 
-      // Try file-based storage first (for multi-instance sync)
-      if (this.isElectron && this.notesPath && this.notesPath !== 'localStorage') {
-        const foldersFile = `${this.notesPath}/.folders.json`;
-        const exists = await window.electronAPI.fileSystem.exists(foldersFile);
+      // Try CRDT-based storage first (for multi-instance sync)
+      if (this.isElectron && this.crdtManager) {
+        const foldersDoc = this.crdtManager.getDoc('.folders');
+        if (!this.crdtManager.isDocEmpty('.folders')) {
+          const yMap = foldersDoc.getMap('folders');
+          storedFolders = [];
 
-        if (exists) {
-          const result = await window.electronAPI.fileSystem.readFile(foldersFile);
-          if (result.success) {
-            storedFolders = JSON.parse(result.content);
-            console.log('[FolderManager] Loaded folders from file:', storedFolders.length);
-          }
+          yMap.forEach((folderData, folderId) => {
+            storedFolders.push({ id: folderId, ...folderData });
+          });
+
+          console.log('[FolderManager] Loaded folders from CRDT:', storedFolders.length);
         }
       }
 
-      // Fall back to settings/localStorage if no file-based storage
-      if (!storedFolders) {
+      // Fall back to settings/localStorage if no CRDT storage
+      if (!storedFolders || storedFolders.length === 0) {
         if (this.isElectron) {
           storedFolders = await window.electronAPI.settings.get('folders');
         } else {
@@ -143,17 +145,24 @@ export class FolderManager {
       const customFolders = Array.from(this.folders.values())
         .filter(folder => !folder.isSpecial && !folder.isRoot);
 
-      // Save to file-based storage for multi-instance sync
-      if (this.isElectron && this.notesPath && this.notesPath !== 'localStorage') {
-        const foldersFile = `${this.notesPath}/.folders.json`;
-        const content = JSON.stringify(customFolders, null, 2);
-        const result = await window.electronAPI.fileSystem.writeFile(foldersFile, content);
+      // Save to CRDT for multi-instance sync
+      if (this.isElectron && this.crdtManager) {
+        const foldersDoc = this.crdtManager.getDoc('.folders');
 
-        if (!result.success) {
-          console.error('[FolderManager] Failed to save folders file:', result.error);
-        } else {
-          console.log('[FolderManager] Saved folders to file:', customFolders.length);
-        }
+        foldersDoc.transact(() => {
+          const yMap = foldersDoc.getMap('folders');
+
+          // Clear existing folders
+          yMap.clear();
+
+          // Add all custom folders
+          customFolders.forEach(folder => {
+            const { id, ...folderData } = folder;
+            yMap.set(id, folderData);
+          });
+        });
+
+        console.log('[FolderManager] Saved folders to CRDT:', customFolders.length);
 
         // Also save to settings as backup
         await window.electronAPI.settings.set('folders', customFolders);

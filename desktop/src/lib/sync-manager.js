@@ -174,54 +174,46 @@ export class SyncManager {
 
   /**
    * Check for folder structure changes from other instances
+   * Uses CRDT-based sync just like notes
    */
   async syncFolders() {
     if (!this.isElectron) return;
-    if (!this.notesPath || this.notesPath === 'localStorage') return;
 
     try {
-      const foldersFile = `${this.notesPath}/.folders.json`;
-      const exists = await window.electronAPI.fileSystem.exists(foldersFile);
+      // Sync the .folders CRDT document just like any other note
+      const folderId = '.folders';
 
-      if (exists) {
-        const result = await window.electronAPI.fileSystem.readFile(foldersFile);
-
-        if (result.success) {
-          const remoteFolders = JSON.parse(result.content);
-          const folderManager = this.noteManager.getFolderManager();
-          const localFolders = Array.from(folderManager.folders.values())
-            .filter(f => !f.isSpecial && !f.isRoot);
-
-          // Check if folders have changed
-          const remoteIds = new Set(remoteFolders.map(f => f.id));
-          const localIds = new Set(localFolders.map(f => f.id));
-
-          let changed = remoteFolders.length !== localFolders.length;
-
-          // Check for new or modified folders
-          if (!changed) {
-            for (const remoteFolder of remoteFolders) {
-              const localFolder = folderManager.folders.get(remoteFolder.id);
-              if (!localFolder || JSON.stringify(localFolder) !== JSON.stringify({
-                ...remoteFolder,
-                // Exclude fields that might differ
-              })) {
-                changed = true;
-                break;
-              }
-            }
-          }
-
-          if (changed) {
-            console.log('[SyncManager] Folder structure changed, reloading...');
-            await folderManager.loadCustomFolders();
-            // Notify renderer to update folder tree
-            this.noteManager.notify('folders-synced', {
-              folders: folderManager.getFolderTree()
-            });
-          }
-        }
+      // Initialize UpdateStore for folders if not done yet
+      if (!this.initializedNotes.has(folderId)) {
+        await this.updateStore.initialize(folderId);
+        this.initializedNotes.add(folderId);
       }
+
+      // Read new updates from other instances
+      const newUpdates = await this.updateStore.readNewUpdates(folderId);
+
+      if (newUpdates.length === 0) {
+        return; // No folder changes
+      }
+
+      console.log(`[SyncManager] Syncing ${newUpdates.length} folder updates`);
+
+      // Apply each update to the CRDT
+      for (const { instanceId, sequence, update } of newUpdates) {
+        this.crdtManager.applyUpdate(folderId, update, 'remote');
+        console.log(`Applied folder update ${sequence} from ${instanceId}`);
+      }
+
+      // Reload folders from CRDT
+      const folderManager = this.noteManager.getFolderManager();
+      await folderManager.loadCustomFolders();
+
+      // Notify renderer to update folder tree
+      this.noteManager.notify('folders-synced', {
+        folders: folderManager.getFolderTree()
+      });
+
+      console.log('[SyncManager] Folder structure synced');
     } catch (error) {
       console.error('Error syncing folders:', error);
     }
