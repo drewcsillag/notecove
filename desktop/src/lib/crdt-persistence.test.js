@@ -159,16 +159,13 @@ describe('CRDT Persistence Integration', () => {
     const loaded1 = await syncManager2.loadNote(noteId);
     expect(loaded1.title).toBe('Version 1');
 
-    // === Update and Save ===
-    await syncManager2.saveNoteWithCRDT({
-      id: noteId,
+    // === Update Metadata via CRDT Manager (this is how metadata should be updated) ===
+    syncManager2.crdtManager.updateMetadata(noteId, {
       title: 'Version 2',
-      created: '2025-10-13T20:00:00.000Z',
-      modified: '2025-10-13T20:01:00.000Z',
-      tags: ['updated'],
-      folder: 'all-notes',
-      deleted: false
+      tags: ['updated']
     });
+
+    // Get pending updates and flush them
     await syncManager2.updateStore.flush(noteId);
     await syncManager2.destroy();
 

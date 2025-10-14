@@ -203,7 +203,11 @@ export class CRDTManager {
 
     if (needsExtraction && content && content.length > 0) {
       // Extract title from content (first line of text)
-      const textContent = content.replace(/<[^>]*>/g, ''); // Strip HTML tags
+      // Replace block-level HTML elements with newlines to preserve structure
+      const textWithNewlines = content
+        .replace(/<\/(p|div|h[1-6]|li|br)>/gi, '\n')  // Add newline after closing block tags
+        .replace(/<br\s*\/?>/gi, '\n');                 // Convert <br> to newline
+      const textContent = textWithNewlines.replace(/<[^>]*>/g, ''); // Strip remaining HTML tags
       const firstLine = textContent.split('\n')[0].trim();
       const extractedTitle = firstLine || 'Untitled';
       console.log(`[CRDTManager] Extracted title from content: "${extractedTitle}"`);

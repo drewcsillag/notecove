@@ -56,7 +56,8 @@ describe('NoteManager', () => {
 
       const allNotes = noteManager.getAllNotes();
 
-      expect(allNotes).toHaveLength(3); // 2 sample notes + 1 new note (note2 is deleted)
+      // Only note1 should be returned (note2 is deleted, sample notes not loaded in tests)
+      expect(allNotes).toHaveLength(1);
       expect(allNotes.find(n => n.id === note1.id)).toBeTruthy();
       expect(allNotes.find(n => n.id === note2.id)).toBeFalsy();
     });

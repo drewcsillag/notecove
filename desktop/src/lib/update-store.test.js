@@ -75,8 +75,8 @@ describe('UpdateStore', () => {
   describe('Initialization', () => {
     it('should initialize with empty state for new note', async () => {
       await store.initialize(noteId);
-      expect(store.writeCounter).toBe(0);
-      expect(store.seen.size).toBe(0);
+      expect(store.getNoteState(noteId).writeCounter).toBe(0);
+      expect(store.getNoteState(noteId).seen.size).toBe(0);
     });
 
     it('should load existing state from meta file', async () => {
@@ -93,9 +93,9 @@ describe('UpdateStore', () => {
       );
 
       await store.initialize(noteId);
-      expect(store.writeCounter).toBe(5);
-      expect(store.seen.get('instance-A')).toBe(5);
-      expect(store.seen.get('instance-B')).toBe(3);
+      expect(store.getNoteState(noteId).writeCounter).toBe(5);
+      expect(store.getNoteState(noteId).seen.get('instance-A')).toBe(5);
+      expect(store.getNoteState(noteId).seen.get('instance-B')).toBe(3);
     });
   });
 
@@ -112,7 +112,7 @@ describe('UpdateStore', () => {
       await store.addUpdate(noteId, update2);
 
       // Should be buffered, not flushed yet
-      expect(store.pendingUpdates.length).toBe(2);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(2);
 
       // Force flush
       await store.flush(noteId);
@@ -156,12 +156,12 @@ describe('UpdateStore', () => {
 
       await store.addUpdate(noteId, new Uint8Array([1]));
       await store.addUpdate(noteId, new Uint8Array([2]));
-      expect(store.pendingUpdates.length).toBe(2);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(2);
 
       await store.addUpdate(noteId, new Uint8Array([3]));
 
       // Should auto-flush after 3 updates
-      expect(store.pendingUpdates.length).toBe(0);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(0);
       const updatePath = '/test/notes/test-note-123/updates/instance-A.000001-000003.yjson';
       expect(fileStorage.files.has(updatePath)).toBe(true);
     });
@@ -230,7 +230,7 @@ describe('UpdateStore', () => {
       expect(newUpdates[1].sequence).toBe(2);
 
       // Verify we marked them as seen
-      expect(store.seen.get('instance-B')).toBe(2);
+      expect(store.getNoteState(noteId).seen.get('instance-B')).toBe(2);
     });
 
     it('should only read updates we haven\'t seen', async () => {
@@ -249,7 +249,7 @@ describe('UpdateStore', () => {
       // Read first batch
       let newUpdates = await store.readNewUpdates(noteId);
       expect(newUpdates.length).toBe(4);
-      expect(store.seen.get('instance-B')).toBe(4);
+      expect(store.getNoteState(noteId).seen.get('instance-B')).toBe(4);
 
       // Write more updates
       await instanceBStore.addUpdate(noteId, new Uint8Array([5]));
@@ -259,7 +259,7 @@ describe('UpdateStore', () => {
       newUpdates = await store.readNewUpdates(noteId);
       expect(newUpdates.length).toBe(1);
       expect(newUpdates[0].sequence).toBe(5);
-      expect(store.seen.get('instance-B')).toBe(5);
+      expect(store.getNoteState(noteId).seen.get('instance-B')).toBe(5);
     });
 
     it('should handle partial reads from packed files', async () => {
@@ -273,7 +273,7 @@ describe('UpdateStore', () => {
       await instanceBStore.flush(noteId);
 
       // Manually mark that we've seen updates 1-3
-      store.seen.set('instance-B', 3);
+      store.getNoteState(noteId).seen.set('instance-B', 3);
 
       // Read - should only get 4 and 5
       const newUpdates = await store.readNewUpdates(noteId);
@@ -342,7 +342,7 @@ describe('UpdateStore', () => {
       const instanceA2 = new UpdateStore(fileStorage, 'instance-A');
       await instanceA2.initialize(noteId);
 
-      expect(instanceA2.writeCounter).toBe(2);
+      expect(instanceA2.getNoteState(noteId).writeCounter).toBe(2);
 
       await instanceA2.addUpdate(noteId, new Uint8Array([3]));
       await instanceA2.flush(noteId);
@@ -472,7 +472,7 @@ describe('UpdateStore', () => {
 
       // Add updates
       await store.addUpdate(noteId, new Uint8Array([1, 2, 3]));
-      expect(store.pendingUpdates.length).toBe(1);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(1);
 
       // Mock a write failure
       const originalWriteFile = fileStorage.writeFile;
@@ -482,13 +482,13 @@ describe('UpdateStore', () => {
       expect(result).toBe(false);
 
       // Updates should still be in buffer
-      expect(store.pendingUpdates.length).toBe(1);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(1);
 
       // Restore and retry
       fileStorage.writeFile = originalWriteFile;
       const retryResult = await store.flush(noteId);
       expect(retryResult).toBe(true);
-      expect(store.pendingUpdates.length).toBe(0);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(0);
     });
 
     it('should handle corrupted meta file gracefully', async () => {
@@ -500,8 +500,8 @@ describe('UpdateStore', () => {
 
       // Should not throw, should initialize with defaults
       await expect(store.initialize(noteId)).resolves.not.toThrow();
-      expect(store.writeCounter).toBe(0);
-      expect(store.seen.size).toBe(0);
+      expect(store.getNoteState(noteId).writeCounter).toBe(0);
+      expect(store.getNoteState(noteId).seen.size).toBe(0);
     });
 
     it('should handle corrupted update file gracefully', async () => {
@@ -524,11 +524,11 @@ describe('UpdateStore', () => {
       await store.initialize(noteId);
 
       await store.addUpdate(noteId, new Uint8Array([1, 2, 3]));
-      expect(store.pendingUpdates.length).toBe(1);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(1);
 
       await store.cleanup(noteId);
 
-      expect(store.pendingUpdates.length).toBe(0);
+      expect(store.getNoteState(noteId).pendingUpdates.length).toBe(0);
       const updatePath = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
       expect(fileStorage.files.has(updatePath)).toBe(true);
     });

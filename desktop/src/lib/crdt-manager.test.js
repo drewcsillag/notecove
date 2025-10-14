@@ -232,12 +232,13 @@ describe('CRDTManager', () => {
       expect(metadata.get('folder')).toBe('projects');
     });
 
-    it('should update modified timestamp', () => {
+    it('should update modified timestamp', async () => {
       const doc = manager.getDoc(noteId);
       const metadata = doc.getMap('metadata');
       const originalModified = metadata.get('modified');
 
       // Wait a bit to ensure timestamp changes
+      await new Promise(resolve => setTimeout(resolve, 10));
       manager.updateMetadata(noteId, { title: 'Updated' });
 
       const newModified = metadata.get('modified');
@@ -278,7 +279,8 @@ describe('CRDTManager', () => {
       expect(note.created).toBe('2025-01-01T00:00:00Z');
       expect(note.modified).toBe('2025-01-01T00:00:00Z');
       expect(note.tags).toEqual(['test']);
-      expect(note.folder).toBe('work');
+      expect(note.folderId).toBe('work'); // Changed from note.folder to note.folderId
+      expect(note.content).toBeDefined(); // Verify content is present
     });
 
     it('should provide default title for empty note', () => {
@@ -293,7 +295,9 @@ describe('CRDTManager', () => {
 
       const note = manager.getNoteFromDoc(noteId);
       expect(note.tags).toEqual([]);
-      expect(note.folder).toBe(null);
+      expect(note.folderId).toBe('all-notes'); // Changed from note.folder to note.folderId with default value
+      expect(note.title).toBe('Untitled'); // Verify title extraction works
+      expect(note.content).toBeDefined(); // Verify content is present
     });
   });
 

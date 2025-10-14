@@ -382,6 +382,18 @@ export class SyncManager {
       const note = this.crdtManager.getNoteFromDoc(noteId);
       note.id = noteId;
 
+      // If we extracted a title from content (because metadata title was empty/Untitled),
+      // update the metadata to persist it for next load
+      const doc = this.crdtManager.getDoc(noteId);
+      const yMetadata = doc.getMap('metadata');
+      const metadataTitle = yMetadata.get('title');
+      if ((!metadataTitle || metadataTitle === 'Untitled') && note.title && note.title !== 'Untitled') {
+        console.log(`[SyncManager] Persisting extracted title to metadata: "${note.title}"`);
+        this.crdtManager.updateMetadata(noteId, { title: note.title });
+        // Flush the metadata update immediately
+        await this.updateStore.flush(noteId);
+      }
+
       return note;
     } catch (error) {
       console.error('Error loading note:', error);
