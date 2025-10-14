@@ -442,6 +442,15 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sync-status-icon {
+      font-size: 12px;
+      opacity: 0.8;
+      flex-shrink: 0;
     }
 
     .note-preview {
@@ -961,6 +970,33 @@
     .reset-btn:hover {
       background: var(--border);
       color: var(--text-primary);
+    }
+
+    /* Gap Indicators */
+    .editor-status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: var(--surface);
+    }
+
+    .gap-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #f59e0b; /* amber-500 */
+    }
+
+    .gap-indicator .status-icon {
+      font-size: 14px;
+    }
+
+    .gap-indicator .status-text {
+      font-size: 11px;
     }
   </style>
 </head>

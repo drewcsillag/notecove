@@ -17,6 +17,7 @@ class NoteCoveApp {
     this.folderManager = null;
     this.tagFilterState = null; // Tag filter state: { tag: string, mode: 'include' | 'exclude' } or null
     this.isSettingContent = false; // Flag to prevent update handlers during programmatic content changes
+    this.noteGaps = new Map(); // Track gaps per note: noteId -> gap summary
 
     // Panel resize state
     this.isResizing = false;
@@ -216,6 +217,13 @@ class NoteCoveApp {
         }
         break;
       case 'note-deleted':
+        console.log('[renderer] Note deleted event received:', data.note?.id, data.note?.title);
+        this.notes = this.noteManager.getAllNotes();
+        console.log('[renderer] After getAllNotes(), notes count:', this.notes.length);
+        this.updateUI();
+        // Update folder counts when notes are deleted/restored
+        this.renderFolderTree();
+        break;
       case 'note-restored':
         this.notes = this.noteManager.getAllNotes();
         this.updateUI();
@@ -226,6 +234,18 @@ class NoteCoveApp {
         // Folder structure was synced from another instance
         console.log('[renderer] Folders synced from another instance');
         this.renderFolderTree();
+        break;
+      case 'note-gaps-detected':
+        // Gaps were detected for this note
+        console.log('[renderer] Gaps detected for note:', data.noteId, data.summary);
+        this.noteGaps.set(data.noteId, data.summary);
+        this.updateGapIndicators(data.noteId);
+        break;
+      case 'note-gaps-resolved':
+        // Gaps were resolved for this note
+        console.log('[renderer] Gaps resolved for note:', data.noteId);
+        this.noteGaps.delete(data.noteId);
+        this.updateGapIndicators(data.noteId);
         break;
     }
   }
@@ -663,7 +683,10 @@ class NoteCoveApp {
            ${!isTrashView ? 'draggable="true"' : 'draggable="true"'}
            data-note-id="${note.id}"
            ${!isTrashView ? 'ondragstart="app.handleNoteDragStart(event)" ondragend="app.handleNoteDragEnd(event)"' : 'ondragstart="app.handleTrashNoteDragStart(event)" ondragend="app.handleNoteDragEnd(event)"'}>
-        <div class="note-title">${escapeHtml(note.title || 'Untitled')}</div>
+        <div class="note-title">
+          ${escapeHtml(note.title || 'Untitled')}
+          ${this.noteGaps.has(note.id) ? '<span class="sync-status-icon" title="Syncing...">⚠️</span>' : ''}
+        </div>
         <div class="note-preview">${getPreview(note.content, 60)}</div>
         <div class="note-meta">${formatDate(note.modified)}</div>
         ${isTrashView ? `
@@ -677,6 +700,68 @@ class NoteCoveApp {
 
     // Note: Click event listeners are set up once using event delegation in initializeEventListeners()
     // No need to add individual listeners here, which prevents race conditions when DOM is recreated
+  }
+
+  /**
+   * Update gap indicators for a note
+   * @param {string} noteId - Note ID
+   */
+  updateGapIndicators(noteId) {
+    // Update note list (will show/hide gap icon)
+    this.renderNotesList();
+
+    // Update editor status bar if this note is currently open
+    if (this.currentNote && this.currentNote.id === noteId) {
+      this.updateEditorStatusBar();
+    }
+  }
+
+  /**
+   * Update the editor status bar with gap information
+   */
+  updateEditorStatusBar() {
+    // Find or create editor status bar
+    const editorSection = document.querySelector('.editor-section');
+    if (!editorSection) return;
+
+    let statusBar = editorSection.querySelector('.editor-status-bar');
+    if (!statusBar) {
+      // Create status bar if it doesn't exist
+      statusBar = document.createElement('div');
+      statusBar.className = 'editor-status-bar';
+      editorSection.appendChild(statusBar);
+    }
+
+    // Clear existing content
+    statusBar.innerHTML = '';
+
+    // Add gap indicator if current note has gaps
+    if (this.currentNote && this.noteGaps.has(this.currentNote.id)) {
+      const summary = this.noteGaps.get(this.currentNote.id);
+      const gapIndicator = document.createElement('div');
+      gapIndicator.className = 'gap-indicator';
+      gapIndicator.innerHTML = `
+        <span class="status-icon warning">⚠️</span>
+        <span class="status-text">Syncing... (waiting for updates)</span>
+      `;
+      gapIndicator.title = this.buildGapTooltip(summary);
+      statusBar.appendChild(gapIndicator);
+    }
+  }
+
+  /**
+   * Build tooltip text for gap indicator
+   * @param {object} summary - Gap summary
+   * @returns {string} Tooltip text
+   */
+  buildGapTooltip(summary) {
+    const lines = ['Waiting for updates:'];
+    summary.instances.forEach(inst => {
+      const deviceName = inst.instanceId.substring(9, 17); // Show 8 chars
+      lines.push(`• Device ${deviceName}: ${inst.missing} updates missing`);
+    });
+    lines.push(`\nLast checked: ${new Date(summary.lastChecked).toLocaleTimeString()}`);
+    return lines.join('\n');
   }
 
   /**
@@ -1210,7 +1295,10 @@ class NoteCoveApp {
       // 4. Update tags list
       this.renderTagsList();
 
-      // 5. Save as last opened note
+      // 5. Update editor status bar (gap indicators)
+      this.updateEditorStatusBar();
+
+      // 6. Save as last opened note
       localStorage.setItem('notecove-last-opened-note', JSON.stringify({
         noteId: this.currentNote.id,
         timestamp: Date.now()
@@ -1321,7 +1409,7 @@ class NoteCoveApp {
     if (!confirmed) return;
 
     const noteId = this.currentNote.id;
-    this.noteManager.deleteNote(noteId);
+    await this.noteManager.deleteNote(noteId);
     this.currentNote = null;
     this.updateStatus('Moved to trash');
     this.updateUI();
@@ -1525,7 +1613,7 @@ class NoteCoveApp {
             `Are you sure you want to move "${note.title || 'Untitled'}" to trash?`
           );
           if (confirmed) {
-            this.noteManager.deleteNote(noteId);
+            await this.noteManager.deleteNote(noteId);
             this.updateStatus(`Moved "${note.title || 'Untitled'}" to trash`);
             this.updateUI();
             this.renderFolderTree(); // Update folder counts

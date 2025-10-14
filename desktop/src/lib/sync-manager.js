@@ -171,12 +171,50 @@ export class SyncManager {
         await this.syncNote(note.id);
       }
 
+      // Check for gaps after syncing all notes
+      await this.checkForGaps();
+
       this.lastSyncTime = new Date();
       this.updateStatus('watching');
       console.log('[performSync] Sync cycle complete');
     } catch (error) {
       console.error('Error performing sync:', error);
       this.updateStatus('error');
+    }
+  }
+
+  /**
+   * Check for gaps in all notes and emit events
+   */
+  async checkForGaps() {
+    if (!this.isElectron) return;
+
+    try {
+      // Get all notes with gaps
+      const notesWithGaps = this.updateStore.getNotesWithGaps();
+
+      // Check each note and emit appropriate events
+      for (const noteId of notesWithGaps) {
+        const summary = this.updateStore.getGapSummary(noteId);
+        if (summary) {
+          // Emit gap detected event (NoteManager will forward to renderer)
+          this.noteManager.notify('note-gaps-detected', {
+            noteId,
+            summary
+          });
+        }
+      }
+
+      // Check for notes that previously had gaps but now don't
+      const allNotes = Array.from(this.noteManager.notes.values());
+      for (const note of allNotes) {
+        if (!this.updateStore.hasGaps(note.id)) {
+          // This note has no gaps - emit resolved event
+          this.noteManager.notify('note-gaps-resolved', { noteId: note.id });
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for gaps:', error);
     }
   }
 

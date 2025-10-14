@@ -32,6 +32,83 @@ export class UpdateStore {
   }
 
   /**
+   * Add a range to an instance's seen ranges, merging adjacent/overlapping ranges
+   * @param {Array<[number, number]>} ranges - Sorted array of [start, end] ranges
+   * @param {number} start - Start sequence
+   * @param {number} end - End sequence
+   * @returns {Array<[number, number]>} Updated ranges
+   */
+  addToRanges(ranges, start, end) {
+    if (ranges.length === 0) {
+      return [[start, end]];
+    }
+
+    const newRanges = [];
+    let merged = false;
+    let newStart = start;
+    let newEnd = end;
+
+    for (const [rangeStart, rangeEnd] of ranges) {
+      if (merged) {
+        // Already merged, just copy remaining ranges
+        newRanges.push([rangeStart, rangeEnd]);
+      } else if (newEnd < rangeStart - 1) {
+        // New range comes before this range, no overlap
+        newRanges.push([newStart, newEnd]);
+        newRanges.push([rangeStart, rangeEnd]);
+        merged = true;
+      } else if (newStart > rangeEnd + 1) {
+        // New range comes after this range, no overlap
+        newRanges.push([rangeStart, rangeEnd]);
+      } else {
+        // Ranges overlap or are adjacent, merge them
+        newStart = Math.min(newStart, rangeStart);
+        newEnd = Math.max(newEnd, rangeEnd);
+      }
+    }
+
+    if (!merged) {
+      // New range extends or comes after all existing ranges
+      newRanges.push([newStart, newEnd]);
+    }
+
+    return newRanges;
+  }
+
+  /**
+   * Find gaps in a set of ranges
+   * @param {Array<[number, number]>} ranges - Sorted array of [start, end] ranges
+   * @returns {Array<[number, number]>} Array of gap ranges
+   */
+  findGaps(ranges) {
+    if (ranges.length === 0) return [];
+
+    const gaps = [];
+    for (let i = 0; i < ranges.length - 1; i++) {
+      const [, currentEnd] = ranges[i];
+      const [nextStart] = ranges[i + 1];
+      if (nextStart > currentEnd + 1) {
+        gaps.push([currentEnd + 1, nextStart - 1]);
+      }
+    }
+    return gaps;
+  }
+
+  /**
+   * Check if a sequence is in any of the ranges
+   * @param {Array<[number, number]>} ranges - Sorted array of [start, end] ranges
+   * @param {number} seq - Sequence number to check
+   * @returns {boolean} True if sequence is in ranges
+   */
+  isInRanges(ranges, seq) {
+    for (const [start, end] of ranges) {
+      if (seq >= start && seq <= end) return true;
+      if (seq < start) return false; // Ranges are sorted
+    }
+    return false;
+  }
+
+  /**
    * Get or create state for a note
    * @param {string} noteId - Note ID
    * @returns {object} Note state
@@ -39,7 +116,8 @@ export class UpdateStore {
   getNoteState(noteId) {
     if (!this.noteState.has(noteId)) {
       this.noteState.set(noteId, {
-        seen: new Map(),
+        seen: new Map(),              // DEPRECATED: for backwards compatibility
+        seenRanges: new Map(),        // NEW: instanceId -> [[start, end], ...]
         writeCounter: 0,
         pendingUpdates: [],
         pendingStartSeq: null
@@ -315,11 +393,25 @@ export class UpdateStore {
         const startSeq = parseInt(startStr, 10);
         const endSeq = endStr ? parseInt(endStr, 10) : startSeq;
 
-        // Have we seen all updates in this file?
-        const lastSeen = state.seen.get(instanceId) || 0;
-        if (endSeq <= lastSeen) {
-          continue; // Already seen all updates in this file
+        // Get the ranges we've seen from this instance
+        const ranges = state.seenRanges.get(instanceId) || [];
+
+        // Check if we need to read this file at all
+        // We need it if ANY sequence in the file is not in our ranges
+        let needFile = false;
+        for (let seq = startSeq; seq <= endSeq; seq++) {
+          if (!this.isInRanges(ranges, seq)) {
+            needFile = true;
+            break;
+          }
         }
+
+        if (!needFile) {
+          console.log(`[readNewUpdates] ${noteId}: Skipping ${filename} - all sequences in ranges`);
+          continue;
+        }
+
+        console.log(`[readNewUpdates] ${noteId}: Reading ${filename} (may have new sequences)`);
 
         // Read the packed file
         const updatePath = `${updatesDir}/${filename}`;
@@ -332,20 +424,27 @@ export class UpdateStore {
         const packedFile = JSON.parse(readResult.content);
 
         // Extract updates we haven't seen
-        const [fileStartSeq, fileEndSeq] = packedFile.sequence;
+        const [fileStartSeq] = packedFile.sequence;
+        let hasNewUpdates = false;
 
         for (let i = 0; i < packedFile.updates.length; i++) {
           const seq = fileStartSeq + i;
 
-          if (seq <= lastSeen) {
-            continue; // Already seen
+          // Skip if we already have this sequence
+          if (this.isInRanges(ranges, seq)) {
+            continue;
           }
 
           const update = this.decodeUpdate(packedFile.updates[i]);
           newUpdates.push({ instanceId, sequence: seq, update });
+          hasNewUpdates = true;
+        }
 
-          // Mark as seen
-          state.seen.set(instanceId, Math.max(lastSeen, seq));
+        // Update ranges for this instance with the entire file range
+        // (even if we skipped some sequences, they're now "available")
+        if (hasNewUpdates) {
+          const updatedRanges = this.addToRanges(ranges, startSeq, endSeq);
+          state.seenRanges.set(instanceId, updatedRanges);
         }
       }
 
@@ -521,6 +620,105 @@ export class UpdateStore {
     if (state.pendingUpdates.length > 0) {
       await this.flush(noteId);
     }
+  }
+
+  /**
+   * Get gaps for a specific note from a specific instance
+   * @param {string} noteId - Note ID
+   * @param {string} instanceId - Instance ID
+   * @returns {Array<[number, number]>} Array of gap ranges
+   */
+  getGapsForInstance(noteId, instanceId) {
+    const state = this.getNoteState(noteId);
+    const ranges = state.seenRanges.get(instanceId) || [];
+    return this.findGaps(ranges);
+  }
+
+  /**
+   * Get all gaps for a note from all instances
+   * @param {string} noteId - Note ID
+   * @returns {Map<string, Array<[number, number]>>} instanceId -> gap ranges
+   */
+  getGaps(noteId) {
+    const state = this.getNoteState(noteId);
+    const gaps = new Map();
+
+    state.seenRanges.forEach((ranges, instanceId) => {
+      const gapRanges = this.findGaps(ranges);
+      if (gapRanges.length > 0) {
+        gaps.set(instanceId, gapRanges);
+      }
+    });
+
+    return gaps;
+  }
+
+  /**
+   * Check if a note has any gaps
+   * @param {string} noteId - Note ID
+   * @returns {boolean} True if note has gaps
+   */
+  hasGaps(noteId) {
+    const gaps = this.getGaps(noteId);
+    return gaps.size > 0;
+  }
+
+  /**
+   * Check if any tracked notes have gaps
+   * @returns {boolean} True if any note has gaps
+   */
+  hasAnyGaps() {
+    for (const [noteId] of this.noteState) {
+      if (this.hasGaps(noteId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get a summary of gap state for UI display
+   * @param {string} noteId - Note ID
+   * @returns {object|null} Gap summary or null if no gaps
+   */
+  getGapSummary(noteId) {
+    const gaps = this.getGaps(noteId);
+    if (gaps.size === 0) return null;
+
+    let totalMissing = 0;
+    const instances = [];
+
+    gaps.forEach((ranges, instanceId) => {
+      const missing = ranges.reduce((sum, [start, end]) =>
+        sum + (end - start + 1), 0);
+      totalMissing += missing;
+      instances.push({
+        instanceId,
+        ranges,
+        missing
+      });
+    });
+
+    return {
+      totalMissing,
+      instanceCount: instances.length,
+      instances,
+      lastChecked: Date.now()
+    };
+  }
+
+  /**
+   * Get all notes that currently have gaps
+   * @returns {Array<string>} Array of note IDs with gaps
+   */
+  getNotesWithGaps() {
+    const notesWithGaps = [];
+    for (const [noteId] of this.noteState) {
+      if (this.hasGaps(noteId)) {
+        notesWithGaps.push(noteId);
+      }
+    }
+    return notesWithGaps;
   }
 }
 
