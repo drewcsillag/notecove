@@ -154,6 +154,9 @@ export class SyncManager {
       // First, scan for new notes created by other instances
       await this.scanForNewNotes();
 
+      // Check for folder changes
+      await this.syncFolders();
+
       // Get all notes that have been loaded (includes newly discovered notes)
       const notes = this.noteManager.getAllNotes();
 
@@ -166,6 +169,61 @@ export class SyncManager {
     } catch (error) {
       console.error('Error performing sync:', error);
       this.updateStatus('error');
+    }
+  }
+
+  /**
+   * Check for folder structure changes from other instances
+   */
+  async syncFolders() {
+    if (!this.isElectron) return;
+    if (!this.notesPath || this.notesPath === 'localStorage') return;
+
+    try {
+      const foldersFile = `${this.notesPath}/.folders.json`;
+      const exists = await window.electronAPI.fileSystem.exists(foldersFile);
+
+      if (exists) {
+        const result = await window.electronAPI.fileSystem.readFile(foldersFile);
+
+        if (result.success) {
+          const remoteFolders = JSON.parse(result.content);
+          const folderManager = this.noteManager.getFolderManager();
+          const localFolders = Array.from(folderManager.folders.values())
+            .filter(f => !f.isSpecial && !f.isRoot);
+
+          // Check if folders have changed
+          const remoteIds = new Set(remoteFolders.map(f => f.id));
+          const localIds = new Set(localFolders.map(f => f.id));
+
+          let changed = remoteFolders.length !== localFolders.length;
+
+          // Check for new or modified folders
+          if (!changed) {
+            for (const remoteFolder of remoteFolders) {
+              const localFolder = folderManager.folders.get(remoteFolder.id);
+              if (!localFolder || JSON.stringify(localFolder) !== JSON.stringify({
+                ...remoteFolder,
+                // Exclude fields that might differ
+              })) {
+                changed = true;
+                break;
+              }
+            }
+          }
+
+          if (changed) {
+            console.log('[SyncManager] Folder structure changed, reloading...');
+            await folderManager.loadCustomFolders();
+            // Notify renderer to update folder tree
+            this.noteManager.notify('folders-synced', {
+              folders: folderManager.getFolderTree()
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing folders:', error);
     }
   }
 
@@ -263,11 +321,20 @@ export class SyncManager {
       // Update in NoteManager (this will NOT trigger a save because we're not calling saveNote)
       this.noteManager.notes.set(noteId, mergedNote);
 
-      // Notify UI to update
-      this.noteManager.notify('note-updated', {
-        note: mergedNote,
-        source: 'sync'
-      });
+      // Notify UI to update based on what changed
+      if (mergedNote.deleted) {
+        // If note was deleted, notify as deletion
+        this.noteManager.notify('note-deleted', {
+          note: mergedNote,
+          source: 'sync'
+        });
+      } else {
+        // Normal update
+        this.noteManager.notify('note-updated', {
+          note: mergedNote,
+          source: 'sync'
+        });
+      }
 
       this.notify('note-synced', { noteId, updateCount: newUpdates.length });
     } catch (error) {
@@ -307,10 +374,22 @@ export class SyncManager {
         console.log('  Initializing new CRDT document');
         this.crdtManager.initializeNote(note.id, note);
       } else {
-        console.log('  CRDT document already exists - skipping metadata update');
-        console.log('  (Metadata is managed by renderer via editor updates)');
-        // Don't update metadata here - it's managed by the renderer via editor updates
-        // The CRDT is the source of truth, not the note object
+        // Always update critical metadata that changes outside the editor
+        // (deleted flag, folder assignments) even if the CRDT already exists
+        const criticalMetadata = {};
+        if (note.deleted !== undefined) {
+          criticalMetadata.deleted = note.deleted;
+        }
+        if (note.folderId !== undefined) {
+          criticalMetadata.folder = note.folderId; // Note: CRDT uses 'folder', not 'folderId'
+        }
+
+        if (Object.keys(criticalMetadata).length > 0) {
+          console.log('  Updating critical metadata:', criticalMetadata);
+          this.crdtManager.updateMetadata(note.id, criticalMetadata);
+        } else {
+          console.log('  CRDT document already exists - no critical metadata updates');
+        }
       }
 
       // Get pending updates from CRDT manager

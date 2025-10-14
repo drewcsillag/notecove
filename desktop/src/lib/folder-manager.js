@@ -4,11 +4,12 @@ import { generateUUID } from './utils.js';
  * Folder Manager - handles folder organization for notes
  */
 export class FolderManager {
-  constructor() {
+  constructor(notesPath = null) {
     this.folders = new Map();
     this.listeners = new Set();
     this.isElectron = window.electronAPI?.isElectron || false;
     this.folderState = new Map(); // folderId -> isExpanded (boolean)
+    this.notesPath = notesPath; // Path to notes directory for file-based folder sync
 
     this.initializeFolders();
     this.loadFolderState();
@@ -93,23 +94,41 @@ export class FolderManager {
    */
   async loadCustomFolders() {
     try {
-      if (this.isElectron) {
-        const storedFolders = await window.electronAPI.settings.get('folders');
-        if (storedFolders && Array.isArray(storedFolders)) {
-          storedFolders.forEach(folder => {
-            this.folders.set(folder.id, folder);
-          });
-        }
-      } else {
-        // Web mode - use localStorage
-        const stored = localStorage.getItem('notecove-folders');
-        if (stored) {
-          const folders = JSON.parse(stored);
-          folders.forEach(folder => {
-            this.folders.set(folder.id, folder);
-          });
+      let storedFolders = null;
+
+      // Try file-based storage first (for multi-instance sync)
+      if (this.isElectron && this.notesPath && this.notesPath !== 'localStorage') {
+        const foldersFile = `${this.notesPath}/.folders.json`;
+        const exists = await window.electronAPI.fileSystem.exists(foldersFile);
+
+        if (exists) {
+          const result = await window.electronAPI.fileSystem.readFile(foldersFile);
+          if (result.success) {
+            storedFolders = JSON.parse(result.content);
+            console.log('[FolderManager] Loaded folders from file:', storedFolders.length);
+          }
         }
       }
+
+      // Fall back to settings/localStorage if no file-based storage
+      if (!storedFolders) {
+        if (this.isElectron) {
+          storedFolders = await window.electronAPI.settings.get('folders');
+        } else {
+          // Web mode - use localStorage
+          const stored = localStorage.getItem('notecove-folders');
+          if (stored) {
+            storedFolders = JSON.parse(stored);
+          }
+        }
+      }
+
+      if (storedFolders && Array.isArray(storedFolders)) {
+        storedFolders.forEach(folder => {
+          this.folders.set(folder.id, folder);
+        });
+      }
+
       this.notify('folders-loaded', { folders: this.getFolderTree() });
     } catch (error) {
       console.error('Failed to load custom folders:', error);
@@ -124,7 +143,21 @@ export class FolderManager {
       const customFolders = Array.from(this.folders.values())
         .filter(folder => !folder.isSpecial && !folder.isRoot);
 
-      if (this.isElectron) {
+      // Save to file-based storage for multi-instance sync
+      if (this.isElectron && this.notesPath && this.notesPath !== 'localStorage') {
+        const foldersFile = `${this.notesPath}/.folders.json`;
+        const content = JSON.stringify(customFolders, null, 2);
+        const result = await window.electronAPI.fileSystem.writeFile(foldersFile, content);
+
+        if (!result.success) {
+          console.error('[FolderManager] Failed to save folders file:', result.error);
+        } else {
+          console.log('[FolderManager] Saved folders to file:', customFolders.length);
+        }
+
+        // Also save to settings as backup
+        await window.electronAPI.settings.set('folders', customFolders);
+      } else if (this.isElectron) {
         await window.electronAPI.settings.set('folders', customFolders);
       } else {
         localStorage.setItem('notecove-folders', JSON.stringify(customFolders));

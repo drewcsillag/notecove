@@ -222,6 +222,11 @@ class NoteCoveApp {
         // Update folder counts when notes are deleted/restored
         this.renderFolderTree();
         break;
+      case 'folders-synced':
+        // Folder structure was synced from another instance
+        console.log('[renderer] Folders synced from another instance');
+        this.renderFolderTree();
+        break;
     }
   }
 

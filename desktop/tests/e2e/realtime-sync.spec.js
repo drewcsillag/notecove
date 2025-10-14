@@ -208,4 +208,228 @@ test.describe('Real-time Sync E2E', () => {
 
     console.log('=== TEST COMPLETE ===');
   });
+
+  test('should sync note deletion between instances', async () => {
+    console.log('=== TEST: Note deletion sync ===');
+
+    // Launch first instance
+    const electronApp1 = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'instance1'),
+        '--notes-path=' + testDir
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test'
+      }
+    });
+
+    const window1 = await electronApp1.firstWindow();
+    await window1.waitForTimeout(1000);
+
+    // Create a note in instance 1
+    await window1.click('#newNoteBtn');
+    await window1.waitForTimeout(500);
+
+    await window1.locator('.editor').click();
+    await window1.keyboard.type('Note to be deleted');
+    await window1.keyboard.press('Enter');
+    await window1.keyboard.type('This note will be deleted in instance 1');
+    await window1.waitForTimeout(1000);
+
+    console.log('Created note in instance 1');
+
+    // Launch second instance
+    const electronApp2 = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'instance2'),
+        '--notes-path=' + testDir
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test'
+      }
+    });
+
+    const window2 = await electronApp2.firstWindow();
+    await window2.waitForTimeout(3000); // Wait for sync
+
+    // Verify note exists in instance 2
+    const notes2Before = await window2.locator('#notesList .note-item .note-title').allInnerTexts();
+    console.log('Notes in instance 2 before delete:', notes2Before);
+    expect(notes2Before.some(title => title.includes('Note to be deleted'))).toBeTruthy();
+
+    // Delete the note in instance 1
+    await window1.click('#deleteNoteBtn');
+    await window1.waitForTimeout(1000);
+
+    console.log('Deleted note in instance 1');
+
+    // Wait for sync to propagate
+    await window2.waitForTimeout(5000);
+
+    // Verify note is deleted in instance 2
+    const notes2After = await window2.locator('#notesList .note-item .note-title').allInnerTexts();
+    console.log('Notes in instance 2 after delete:', notes2After);
+    expect(notes2After.some(title => title.includes('Note to be deleted'))).toBeFalsy();
+    console.log('✓ Note deletion synced to instance 2');
+
+    // Cleanup
+    await electronApp1.close();
+    await electronApp2.close();
+
+    console.log('=== TEST COMPLETE ===');
+  });
+
+  test('should sync folder creation between instances', async () => {
+    console.log('=== TEST: Folder creation sync ===');
+
+    // Launch first instance
+    const electronApp1 = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'instance1'),
+        '--notes-path=' + testDir
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test'
+      }
+    });
+
+    const window1 = await electronApp1.firstWindow();
+    await window1.waitForTimeout(1000);
+
+    // Launch second instance
+    const electronApp2 = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'instance2'),
+        '--notes-path=' + testDir
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test'
+      }
+    });
+
+    const window2 = await electronApp2.firstWindow();
+    await window2.waitForTimeout(2000);
+
+    // Get initial folders in instance 2
+    const folders2Before = await window2.locator('#folderTree .folder-item .folder-name').allInnerTexts();
+    console.log('Folders in instance 2 before:', folders2Before);
+
+    // Create a new folder in instance 1
+    await window1.click('#newFolderBtn');
+    await window1.waitForTimeout(500);
+
+    // Type folder name (assuming a prompt or input appears)
+    await window1.keyboard.type('Synced Project');
+    await window1.keyboard.press('Enter');
+    await window1.waitForTimeout(1000);
+
+    console.log('Created folder in instance 1');
+
+    // Wait for sync
+    await window2.waitForTimeout(5000);
+
+    // Check if folder appears in instance 2
+    const folders2After = await window2.locator('#folderTree .folder-item .folder-name').allInnerTexts();
+    console.log('Folders in instance 2 after:', folders2After);
+    expect(folders2After).toContain('Synced Project');
+    console.log('✓ Folder creation synced to instance 2');
+
+    // Cleanup
+    await electronApp1.close();
+    await electronApp2.close();
+
+    console.log('=== TEST COMPLETE ===');
+  });
+
+  test('should sync note move between folders', async () => {
+    console.log('=== TEST: Note move between folders sync ===');
+
+    // Launch first instance
+    const electronApp1 = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'instance1'),
+        '--notes-path=' + testDir
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test'
+      }
+    });
+
+    const window1 = await electronApp1.firstWindow();
+    await window1.waitForTimeout(1000);
+
+    // Create a folder first
+    await window1.click('#newFolderBtn');
+    await window1.waitForTimeout(500);
+    await window1.keyboard.type('Target Folder');
+    await window1.keyboard.press('Enter');
+    await window1.waitForTimeout(500);
+
+    // Create a note
+    await window1.click('#newNoteBtn');
+    await window1.waitForTimeout(500);
+    await window1.locator('.editor').click();
+    await window1.keyboard.type('Movable Note');
+    await window1.keyboard.press('Enter');
+    await window1.keyboard.type('This note will be moved to another folder');
+    await window1.waitForTimeout(1000);
+
+    console.log('Created folder and note in instance 1');
+
+    // Launch second instance
+    const electronApp2 = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'instance2'),
+        '--notes-path=' + testDir
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test'
+      }
+    });
+
+    const window2 = await electronApp2.firstWindow();
+    await window2.waitForTimeout(3000); // Wait for sync
+
+    console.log('Instance 2 started and synced');
+
+    // Move the note to the folder in instance 1 via drag-and-drop
+    const noteItem = window1.locator('#notesList .note-item').first();
+    const targetFolder = window1.locator('#folderTree .folder-item').filter({ hasText: 'Target Folder' });
+
+    await noteItem.dragTo(targetFolder);
+    await window1.waitForTimeout(1000);
+
+    console.log('Moved note to folder in instance 1');
+
+    // Wait for sync
+    await window2.waitForTimeout(5000);
+
+    // In instance 2, select the target folder
+    await window2.locator('#folderTree .folder-item').filter({ hasText: 'Target Folder' }).click();
+    await window2.waitForTimeout(500);
+
+    // Check if the note appears in the target folder in instance 2
+    const notesInFolder2 = await window2.locator('#notesList .note-item .note-title').allInnerTexts();
+    console.log('Notes in Target Folder in instance 2:', notesInFolder2);
+    expect(notesInFolder2.some(title => title.includes('Movable Note'))).toBeTruthy();
+    console.log('✓ Note move synced to instance 2');
+
+    // Cleanup
+    await electronApp1.close();
+    await electronApp2.close();
+
+    console.log('=== TEST COMPLETE ===');
+  });
 });

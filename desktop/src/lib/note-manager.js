@@ -25,6 +25,13 @@ export class NoteManager {
     this.syncManager = syncManager;
     console.log('NoteManager: SyncManager integration enabled');
 
+    // Update FolderManager with notesPath for file-based sync
+    if (syncManager.notesPath) {
+      this.folderManager.notesPath = syncManager.notesPath;
+      // Reload folders with new path
+      await this.folderManager.loadCustomFolders();
+    }
+
     // Reload notes from CRDT now that SyncManager is available
     console.log('NoteManager: Reloading notes from CRDT');
     await this.loadNotes();
