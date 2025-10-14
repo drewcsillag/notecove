@@ -371,27 +371,35 @@ export class SyncManager {
         return null;
       }
 
-      console.log(`Loading note ${noteId} from ${allUpdates.length} CRDT updates`);
+      console.log(`[SyncManager] Loading note ${noteId} from ${allUpdates.length} CRDT updates`);
 
       // Apply all updates to build the current state
       for (const { instanceId, sequence, update } of allUpdates) {
         this.crdtManager.applyUpdate(noteId, update, 'load');
       }
 
-      // Extract the merged note from CRDT
-      const note = this.crdtManager.getNoteFromDoc(noteId);
-      note.id = noteId;
-
-      // If we extracted a title from content (because metadata title was empty/Untitled),
-      // update the metadata to persist it for next load
+      // Check metadata AFTER applying all updates
       const doc = this.crdtManager.getDoc(noteId);
       const yMetadata = doc.getMap('metadata');
       const metadataTitle = yMetadata.get('title');
+      console.log(`[SyncManager] After applying updates, metadata title: "${metadataTitle}"`);
+
+      // Extract the merged note from CRDT
+      const note = this.crdtManager.getNoteFromDoc(noteId);
+      note.id = noteId;
+      console.log(`[SyncManager] Extracted note title from getNoteFromDoc: "${note.title}"`);
+
+      // If we extracted a title from content (because metadata title was empty/Untitled),
+      // update the metadata to persist it for next load
       if ((!metadataTitle || metadataTitle === 'Untitled') && note.title && note.title !== 'Untitled') {
         console.log(`[SyncManager] Persisting extracted title to metadata: "${note.title}"`);
         this.crdtManager.updateMetadata(noteId, { title: note.title });
         // Flush the metadata update immediately
-        await this.updateStore.flush(noteId);
+        const flushResult = await this.updateStore.flush(noteId);
+        console.log(`[SyncManager] Flush result:`, flushResult);
+        // Verify the title is now in metadata
+        const newMetadataTitle = yMetadata.get('title');
+        console.log(`[SyncManager] After flush, metadata title: "${newMetadataTitle}"`);
       }
 
       return note;
