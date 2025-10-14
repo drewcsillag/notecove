@@ -47,28 +47,7 @@ test.describe('Real-time Sync E2E', () => {
 
     console.log('Instance 1 started');
 
-    // Create a note in instance 1
-    await window1.click('#newNoteBtn');
-    await window1.waitForTimeout(500);
-
-    // Type content
-    await window1.locator('.editor').click();
-    await window1.keyboard.type('Sync Test Note Title');
-    await window1.keyboard.press('Enter');
-    await window1.keyboard.type('This note should appear in instance 2');
-    await window1.waitForTimeout(1000); // Wait for debounce
-
-    console.log('Created note in instance 1');
-
-    // Get the note ID from the notes list
-    const notesList1 = await window1.locator('#notesList .note-item');
-    const noteCount1 = await notesList1.count();
-    expect(noteCount1).toBeGreaterThan(0);
-
-    const firstNote1 = await window1.locator('#notesList .note-item').first().innerText();
-    console.log('Note in instance 1:', firstNote1);
-
-    // Launch second instance
+    // Launch second instance BEFORE creating the note
     const electronApp2 = await electron.launch({
       args: [
         path.join(process.cwd(), 'dist/main.js'),
@@ -86,10 +65,31 @@ test.describe('Real-time Sync E2E', () => {
 
     console.log('Instance 2 started');
 
-    // Check that instance 2 has the sample notes
+    // Check initial note count in instance 2
     const notesList2Initial = await window2.locator('#notesList .note-item');
     const noteCount2Initial = await notesList2Initial.count();
     console.log('Initial notes in instance 2:', noteCount2Initial);
+
+    // NOW create a note in instance 1 (while instance 2 is running)
+    await window1.click('#newNoteBtn');
+    await window1.waitForTimeout(500);
+
+    // Type content
+    await window1.locator('.editor').click();
+    await window1.keyboard.type('Sync Test Note Title');
+    await window1.keyboard.press('Enter');
+    await window1.keyboard.type('This note should appear in instance 2');
+    await window1.waitForTimeout(2000); // Wait for save
+
+    console.log('Created note in instance 1');
+
+    // Get the note ID from the notes list
+    const notesList1 = await window1.locator('#notesList .note-item');
+    const noteCount1 = await notesList1.count();
+    expect(noteCount1).toBeGreaterThan(0);
+
+    const firstNote1 = await window1.locator('#notesList .note-item').first().innerText();
+    console.log('Note in instance 1:', firstNote1);
 
     // Wait for sync to discover the new note (sync runs every 2 seconds)
     await window2.waitForTimeout(5000);
@@ -226,6 +226,15 @@ test.describe('Real-time Sync E2E', () => {
     });
 
     const window1 = await electronApp1.firstWindow();
+
+    // Capture console logs from instance 1 too
+    window1.on('console', msg => {
+      const text = msg.text();
+      if (text.includes('SyncManager') || text.includes('instanceId')) {
+        console.log(`[Instance 1] ${text}`);
+      }
+    });
+
     await window1.waitForTimeout(1000);
 
     // Create a note in instance 1
@@ -254,6 +263,17 @@ test.describe('Real-time Sync E2E', () => {
     });
 
     const window2 = await electronApp2.firstWindow();
+
+    // Capture console logs from instance 2
+    window2.on('console', msg => {
+      const text = msg.text();
+      if (text.includes('[syncNote]') || text.includes('[renderer]') ||
+          text.includes('[performSync]') || text.includes('[readNewUpdates]') ||
+          text.includes('SyncManager') || text.includes('instanceId')) {
+        console.log(`[Instance 2] ${text}`);
+      }
+    });
+
     await window2.waitForTimeout(3000); // Wait for sync
 
     // Verify note exists in instance 2
@@ -263,12 +283,15 @@ test.describe('Real-time Sync E2E', () => {
 
     // Delete the note in instance 1
     await window1.click('#deleteNoteBtn');
+    // Wait for confirmation dialog and confirm
+    await window1.waitForSelector('#dialogConfirm', { timeout: 2000 });
+    await window1.click('#dialogConfirm');
     await window1.waitForTimeout(1000);
 
     console.log('Deleted note in instance 1');
 
-    // Wait for sync to propagate
-    await window2.waitForTimeout(5000);
+    // Wait for sync to propagate (increased to 10s to rule out timing issues)
+    await window2.waitForTimeout(10000);
 
     // Verify note is deleted in instance 2
     const notes2After = await window2.locator('#notesList .note-item .note-title').allInnerTexts();
@@ -300,6 +323,16 @@ test.describe('Real-time Sync E2E', () => {
     });
 
     const window1 = await electronApp1.firstWindow();
+
+    // Capture console logs from instance 1
+    window1.on('console', msg => {
+      const text = msg.text();
+      if (text.includes('[FolderManager]') || text.includes('[syncFolders]') ||
+          text.includes('[SyncManager]') || text.includes('[UpdateStore]')) {
+        console.log(`[Instance 1] ${text}`);
+      }
+    });
+
     await window1.waitForTimeout(1000);
 
     // Launch second instance
@@ -316,6 +349,17 @@ test.describe('Real-time Sync E2E', () => {
     });
 
     const window2 = await electronApp2.firstWindow();
+
+    // Capture console logs from instance 2
+    window2.on('console', msg => {
+      const text = msg.text();
+      if (text.includes('[FolderManager]') || text.includes('[syncFolders]') ||
+          text.includes('[SyncManager]') || text.includes('[UpdateStore]') ||
+          text.includes('[renderer]')) {
+        console.log(`[Instance 2] ${text}`);
+      }
+    });
+
     await window2.waitForTimeout(2000);
 
     // Get initial folders in instance 2
@@ -326,12 +370,17 @@ test.describe('Real-time Sync E2E', () => {
     await window1.click('#newFolderBtn');
     await window1.waitForTimeout(500);
 
-    // Type folder name (assuming a prompt or input appears)
-    await window1.keyboard.type('Synced Project');
-    await window1.keyboard.press('Enter');
+    // Wait for input dialog and type folder name
+    await window1.waitForSelector('#dialogInput', { timeout: 2000 });
+    await window1.locator('#dialogInput').fill('Synced Project');
+    await window1.click('#dialogOk');
     await window1.waitForTimeout(1000);
 
     console.log('Created folder in instance 1');
+
+    // Verify folder was created in instance 1
+    const folders1After = await window1.locator('#folderTree .folder-item .folder-name').allInnerTexts();
+    console.log('Folders in instance 1 after creation:', folders1After);
 
     // Wait for sync
     await window2.waitForTimeout(5000);

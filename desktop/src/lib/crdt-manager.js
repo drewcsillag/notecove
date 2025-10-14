@@ -134,6 +134,7 @@ export class CRDTManager {
         yMetadata.set('modified', note.modified || new Date().toISOString());
         yMetadata.set('tags', note.tags || []);
         yMetadata.set('folder', note.folder || null);
+        yMetadata.set('deleted', note.deleted || false);
 
         // Verify what was actually set
         console.log(`  - Verified title in Y.Map:`, yMetadata.get('title'));
@@ -257,6 +258,9 @@ export class CRDTManager {
       if (updates.folder !== undefined) {
         yMetadata.set('folder', updates.folder);
       }
+      if (updates.deleted !== undefined) {
+        yMetadata.set('deleted', updates.deleted);
+      }
 
       console.log(`  - Title after update:`, yMetadata.get('title'));
     });
@@ -274,6 +278,14 @@ export class CRDTManager {
       return true;
     }
     const doc = this.getDoc(noteId);
+
+    // For folder documents, check the 'folders' map
+    if (noteId === '.folders') {
+      const yFolders = doc.getMap('folders');
+      return yFolders.size === 0;
+    }
+
+    // For note documents, check the 'metadata' map
     const yMetadata = doc.getMap('metadata');
     return yMetadata.size === 0;
   }

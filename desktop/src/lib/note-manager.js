@@ -28,6 +28,7 @@ export class NoteManager {
     // Update FolderManager with CRDT manager for conflict-free sync
     if (syncManager.crdtManager) {
       this.folderManager.crdtManager = syncManager.crdtManager;
+      this.folderManager.updateStore = syncManager.updateStore;
       this.folderManager.notesPath = syncManager.notesPath;
       // Initialize folder CRDT document
       await syncManager.updateStore.initialize('.folders');

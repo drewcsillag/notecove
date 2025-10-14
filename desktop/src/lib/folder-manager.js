@@ -4,13 +4,14 @@ import { generateUUID } from './utils.js';
  * Folder Manager - handles folder organization for notes
  */
 export class FolderManager {
-  constructor(notesPath = null, crdtManager = null) {
+  constructor(notesPath = null, crdtManager = null, updateStore = null) {
     this.folders = new Map();
     this.listeners = new Set();
     this.isElectron = window.electronAPI?.isElectron || false;
     this.folderState = new Map(); // folderId -> isExpanded (boolean)
     this.notesPath = notesPath; // Path to notes directory
     this.crdtManager = crdtManager; // CRDT manager for folder sync
+    this.updateStore = updateStore; // Update store for flushing
 
     this.initializeFolders();
     this.loadFolderState();
@@ -147,6 +148,7 @@ export class FolderManager {
 
       // Save to CRDT for multi-instance sync
       if (this.isElectron && this.crdtManager) {
+        console.log('[FolderManager] Saving folders to CRDT...');
         const foldersDoc = this.crdtManager.getDoc('.folders');
 
         foldersDoc.transact(() => {
@@ -158,11 +160,22 @@ export class FolderManager {
           // Add all custom folders
           customFolders.forEach(folder => {
             const { id, ...folderData } = folder;
+            console.log(`[FolderManager]   Adding folder: ${folder.name} (${id})`);
             yMap.set(id, folderData);
           });
         });
 
         console.log('[FolderManager] Saved folders to CRDT:', customFolders.length);
+
+        // Flush immediately so other instances see the changes
+        // (Updates are automatically added to buffer by CRDT listener)
+        if (this.updateStore) {
+          console.log('[FolderManager] Flushing folder updates...');
+          await this.updateStore.flush('.folders');
+          console.log('[FolderManager] Flushed folder updates immediately');
+        } else {
+          console.log('[FolderManager] WARNING: No updateStore available for flush!');
+        }
 
         // Also save to settings as backup
         await window.electronAPI.settings.set('folders', customFolders);

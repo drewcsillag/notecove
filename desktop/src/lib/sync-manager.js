@@ -18,7 +18,9 @@ export class SyncManager {
     this.crdtManager = new CRDTManager();
 
     // Generate or use provided instance ID
+    console.log(`[SyncManager] constructor: instanceId param = ${instanceId}`);
     this.instanceId = instanceId || `instance-${generateUUID().substring(0, 8)}`;
+    console.log(`[SyncManager] constructor: using instanceId = ${this.instanceId}`);
 
     // Create UpdateStore for this instance (pass minimal storage interface)
     const storageInterface = {
@@ -151,21 +153,27 @@ export class SyncManager {
     this.updateStatus('syncing');
 
     try {
+      console.log('[performSync] Starting sync cycle...');
+
       // First, scan for new notes created by other instances
       await this.scanForNewNotes();
 
       // Check for folder changes
       await this.syncFolders();
 
-      // Get all notes that have been loaded (includes newly discovered notes)
-      const notes = this.noteManager.getAllNotes();
+      // Get ALL notes (including deleted ones) to sync their state
+      // We need to sync deleted notes too, otherwise other instances won't see deletions
+      const allNotes = Array.from(this.noteManager.notes.values());
+      console.log(`[performSync] Syncing ${allNotes.length} notes`);
 
-      for (const note of notes) {
+      for (const note of allNotes) {
+        console.log(`[performSync] Syncing note ${note.id} (deleted: ${note.deleted})`);
         await this.syncNote(note.id);
       }
 
       this.lastSyncTime = new Date();
       this.updateStatus('watching');
+      console.log('[performSync] Sync cycle complete');
     } catch (error) {
       console.error('Error performing sync:', error);
       this.updateStatus('error');
@@ -183,14 +191,18 @@ export class SyncManager {
       // Sync the .folders CRDT document just like any other note
       const folderId = '.folders';
 
+      console.log('[syncFolders] Checking for folder changes...');
+
       // Initialize UpdateStore for folders if not done yet
       if (!this.initializedNotes.has(folderId)) {
+        console.log('[syncFolders] Initializing UpdateStore for .folders');
         await this.updateStore.initialize(folderId);
         this.initializedNotes.add(folderId);
       }
 
       // Read new updates from other instances
       const newUpdates = await this.updateStore.readNewUpdates(folderId);
+      console.log(`[syncFolders] Found ${newUpdates.length} new folder updates`);
 
       if (newUpdates.length === 0) {
         return; // No folder changes
@@ -294,6 +306,8 @@ export class SyncManager {
       // Read new updates from other instances
       const newUpdates = await this.updateStore.readNewUpdates(noteId);
 
+      console.log(`[syncNote] Found ${newUpdates.length} new updates for note ${noteId}`);
+
       if (newUpdates.length === 0) {
         return; // No new updates
       }
@@ -310,12 +324,20 @@ export class SyncManager {
       const mergedNote = this.crdtManager.getNoteFromDoc(noteId);
       mergedNote.id = noteId;
 
+      console.log(`[syncNote] Merged note ${noteId}:`, {
+        id: mergedNote.id,
+        title: mergedNote.title,
+        deleted: mergedNote.deleted,
+        folderId: mergedNote.folderId
+      });
+
       // Update in NoteManager (this will NOT trigger a save because we're not calling saveNote)
       this.noteManager.notes.set(noteId, mergedNote);
 
       // Notify UI to update based on what changed
       if (mergedNote.deleted) {
         // If note was deleted, notify as deletion
+        console.log(`[syncNote] Notifying note-deleted for ${noteId}`);
         this.noteManager.notify('note-deleted', {
           note: mergedNote,
           source: 'sync'
@@ -384,17 +406,16 @@ export class SyncManager {
         }
       }
 
-      // Get pending updates from CRDT manager
-      const pendingUpdates = this.crdtManager.getPendingUpdates(note.id);
-      console.log('  Pending CRDT updates:', pendingUpdates.length);
-
-      // Add all pending updates to UpdateStore
-      for (const update of pendingUpdates) {
-        await this.updateStore.addUpdate(note.id, new Uint8Array(update));
+      // If we updated critical metadata (deletion, folder moves), flush immediately
+      // so other instances can see the changes right away
+      // (Updates are automatically added to UpdateStore by CRDT listener)
+      console.log('  Checking flush: deleted=' + note.deleted + ', folderId=' + note.folderId);
+      const hasCriticalMetadata = note.deleted !== undefined || note.folderId !== undefined;
+      console.log('  hasCriticalMetadata:', hasCriticalMetadata);
+      if (hasCriticalMetadata) {
+        console.log('  Flushing critical metadata immediately');
+        await this.updateStore.flush(note.id);
       }
-
-      // Clear pending updates from CRDT manager (they're now in UpdateStore)
-      this.crdtManager.clearPendingUpdates(note.id);
 
       console.log('=== saveNoteWithCRDT complete ===');
       return true;
