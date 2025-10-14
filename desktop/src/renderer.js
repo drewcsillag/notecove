@@ -471,10 +471,19 @@ class NoteCoveApp {
       // In Electron/CRDT mode, content is automatically saved by Collaboration extension
       // We only need to update metadata (title, tags)
       if (this.isElectron && this.syncManager) {
-        // Content is in Y.Doc - don't pass it to updateNote
-        this.noteManager.updateNote(this.currentNote.id, { title, tags });
-        // Flush immediately to ensure metadata is saved
-        this.syncManager.updateStore.flush(this.currentNote.id);
+        // Only update metadata if something actually changed
+        // Also, don't overwrite a real title with "Untitled" (which could happen if editor is empty/not fully loaded)
+        const shouldUpdate = (titleChanged || tagsChanged) &&
+                            !(title === 'Untitled' && this.currentNote.title && this.currentNote.title !== 'Untitled');
+
+        if (shouldUpdate) {
+          // Update metadata in CRDT (this is the source of truth)
+          this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
+          // Also update the in-memory note object
+          this.noteManager.updateNote(this.currentNote.id, { title, tags });
+          // Flush immediately to ensure metadata is saved
+          this.syncManager.updateStore.flush(this.currentNote.id);
+        }
       } else {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
@@ -1230,9 +1239,17 @@ class NoteCoveApp {
 
       // In Electron/CRDT mode, content is in Y.Doc
       if (this.isElectron && this.syncManager) {
-        this.noteManager.updateNote(this.currentNote.id, { title, tags });
-        // Flush immediately to ensure metadata is saved
-        this.syncManager.updateStore.flush(this.currentNote.id);
+        // Don't overwrite a real title with "Untitled" (which could happen if editor is empty/not fully loaded)
+        const shouldUpdate = !(title === 'Untitled' && this.currentNote.title && this.currentNote.title !== 'Untitled');
+
+        if (shouldUpdate) {
+          // Update metadata in CRDT (this is the source of truth)
+          this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
+          // Also update the in-memory note object
+          this.noteManager.updateNote(this.currentNote.id, { title, tags });
+          // Flush immediately to ensure metadata is saved
+          this.syncManager.updateStore.flush(this.currentNote.id);
+        }
       } else {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
