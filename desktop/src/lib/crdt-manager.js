@@ -286,9 +286,13 @@ export class CRDTManager {
       return yFolders.size === 0;
     }
 
-    // For note documents, check the 'metadata' map
+    // For note documents, check BOTH metadata AND content
+    // Content might sync before metadata is initialized
     const yMetadata = doc.getMap('metadata');
-    return yMetadata.size === 0;
+    const yContent = doc.getXmlFragment('default');
+
+    // Doc is only empty if BOTH metadata and content are empty
+    return yMetadata.size === 0 && yContent.length === 0;
   }
 
   /**

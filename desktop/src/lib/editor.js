@@ -402,7 +402,15 @@ export class NoteCoveEditor {
           const reader = new FileReader();
           reader.onload = (e) => {
             const base64 = e.target.result;
-            this.editor.chain().focus().setImage({ src: base64 }).run();
+
+            // Insert using transaction to ensure Y.Doc update
+            const { state, view } = this.editor;
+            const { tr } = state;
+            const imageNode = state.schema.nodes.image.create({
+              src: base64
+            });
+            tr.replaceSelectionWith(imageNode);
+            view.dispatch(tr);
           };
           reader.readAsDataURL(file);
           break;
@@ -428,7 +436,19 @@ export class NoteCoveEditor {
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target.result;
-        this.editor.chain().focus().setImage({ src: base64 }).run();
+
+        // Insert the image
+        const { state, view } = this.editor;
+        const { tr } = state;
+
+        // Get image node type
+        const imageNode = state.schema.nodes.image.create({
+          src: base64
+        });
+
+        // Insert at current position
+        tr.replaceSelectionWith(imageNode);
+        view.dispatch(tr);
       };
       reader.readAsDataURL(file);
     };
