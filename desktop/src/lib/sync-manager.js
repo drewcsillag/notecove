@@ -151,7 +151,10 @@ export class SyncManager {
     this.updateStatus('syncing');
 
     try {
-      // Get all notes that have been loaded
+      // First, scan for new notes created by other instances
+      await this.scanForNewNotes();
+
+      // Get all notes that have been loaded (includes newly discovered notes)
       const notes = this.noteManager.getAllNotes();
 
       for (const note of notes) {
@@ -163,6 +166,66 @@ export class SyncManager {
     } catch (error) {
       console.error('Error performing sync:', error);
       this.updateStatus('error');
+    }
+  }
+
+  /**
+   * Scan filesystem for new notes created by other instances
+   */
+  async scanForNewNotes() {
+    if (!this.isElectron) return;
+
+    try {
+      if (!this.notesPath || this.notesPath === 'localStorage') {
+        return;
+      }
+
+      // Check if notes directory exists
+      const exists = await window.electronAPI.fileSystem.exists(this.notesPath);
+      if (!exists) {
+        return;
+      }
+
+      // Read all subdirectories (each is a note)
+      const result = await window.electronAPI.fileSystem.readDir(this.notesPath);
+      if (!result.success) {
+        return;
+      }
+
+      // Get currently known note IDs
+      const knownNoteIds = new Set(this.noteManager.getAllNotes().map(n => n.id));
+
+      // Check each directory
+      for (const item of result.files) {
+        // Skip hidden files and already-known notes
+        if (item.startsWith('.') || knownNoteIds.has(item)) continue;
+
+        const noteId = item;
+        const noteDir = `${this.notesPath}/${noteId}`;
+
+        // Check if updates directory exists (indicates this is a real note)
+        const updatesDir = `${noteDir}/updates`;
+        const updatesExist = await window.electronAPI.fileSystem.exists(updatesDir);
+
+        if (!updatesExist) {
+          continue; // Not a note directory
+        }
+
+        // New note discovered! Load it
+        console.log(`[SyncManager] Discovered new note from other instance: ${noteId}`);
+        const note = await this.loadNote(noteId);
+
+        if (note) {
+          // Add to NoteManager
+          this.noteManager.notes.set(noteId, note);
+
+          // Notify UI about new note
+          this.noteManager.notify('note-created', { note, source: 'sync' });
+          console.log(`[SyncManager] Added new note to manager: ${note.title || noteId}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error scanning for new notes:', error);
     }
   }
 

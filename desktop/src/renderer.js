@@ -181,16 +181,39 @@ class NoteCoveApp {
         this.renderFolderTree();
         break;
       case 'note-created':
-        // Don't call updateUI() here - let createNewNote() handle UI updates
-        // This prevents a race condition where updateUI() renders the OLD currentNote
-        // before createNewNote() can set this.currentNote to the new note
+        // Update the notes array
         this.notes = this.noteManager.getAllNotes();
-        // Update folder counts when a note is created
+
+        // If this came from sync (not from local createNewNote), update the UI
+        if (data.source === 'sync') {
+          console.log('[renderer] New note discovered from sync:', data.note?.title);
+          this.renderNotesList();
+          this.renderTagsList();
+        }
+
+        // Always update folder counts
         this.renderFolderTree();
         break;
       case 'note-updated':
-        // Only update the notes array in memory, don't re-render to avoid flickering
+        // Update the notes array in memory
         this.notes = this.noteManager.getAllNotes();
+
+        // If this came from sync, update the UI to show changes
+        if (data.source === 'sync') {
+          console.log('[renderer] Note updated from sync:', data.note?.id, data.note?.title);
+          // Re-render notes list (to show title changes)
+          this.renderNotesList();
+          // Re-render tags list (to show tag changes)
+          this.renderTagsList();
+          // Update folder tree (in case folder changed)
+          this.renderFolderTree();
+
+          // If this is the currently open note, update the editor metadata
+          if (this.currentNote && this.currentNote.id === data.note?.id) {
+            // Update current note reference with synced data
+            this.currentNote = data.note;
+          }
+        }
         break;
       case 'note-deleted':
       case 'note-restored':
