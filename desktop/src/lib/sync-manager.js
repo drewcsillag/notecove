@@ -244,13 +244,10 @@ export class SyncManager {
         console.log('  Initializing new CRDT document');
         this.crdtManager.initializeNote(note.id, note);
       } else {
-        console.log('  Updating existing CRDT metadata');
-        // Only update metadata - content is handled by TipTap directly
-        this.crdtManager.updateMetadata(note.id, {
-          title: note.title,
-          tags: note.tags,
-          folder: note.folder
-        });
+        console.log('  CRDT document already exists - skipping metadata update');
+        console.log('  (Metadata is managed by renderer via editor updates)');
+        // Don't update metadata here - it's managed by the renderer via editor updates
+        // The CRDT is the source of truth, not the note object
       }
 
       // Get pending updates from CRDT manager
@@ -282,12 +279,17 @@ export class SyncManager {
     if (!this.isElectron) return [];
 
     try {
+      console.log('=== loadAllNotes called ===');
+      console.log('Notes path:', this.notesPath);
+
       if (!this.notesPath || this.notesPath === 'localStorage') {
+        console.log('Invalid notes path');
         return [];
       }
 
       // Check if notes directory exists
       const exists = await window.electronAPI.fileSystem.exists(this.notesPath);
+      console.log('Notes directory exists:', exists);
       if (!exists) {
         return [];
       }
@@ -299,6 +301,8 @@ export class SyncManager {
         return [];
       }
 
+      console.log('Found items in notes directory:', result.files.length);
+
       const notes = [];
 
       for (const item of result.files) {
@@ -307,11 +311,14 @@ export class SyncManager {
 
         // Each directory is a note ID
         const noteId = item;
+        console.log(`Checking note directory: ${noteId}`);
+
         const noteDir = `${this.notesPath}/${noteId}`;
 
         // Check if updates directory exists (indicates this is a real note)
         const updatesDir = `${noteDir}/updates`;
         const updatesExist = await window.electronAPI.fileSystem.exists(updatesDir);
+        console.log(`  updates/ exists: ${updatesExist}`);
 
         if (!updatesExist) {
           continue; // Not a note directory
@@ -319,16 +326,20 @@ export class SyncManager {
 
         try {
           // Load the note from CRDT updates
+          console.log(`  Loading note ${noteId}...`);
           const note = await this.loadNote(noteId);
           if (note) {
+            console.log(`  ✓ Loaded: ${note.title}`);
             notes.push(note);
+          } else {
+            console.log(`  ✗ loadNote returned null`);
           }
         } catch (error) {
           console.error(`Error loading note ${noteId}:`, error);
         }
       }
 
-      console.log(`Loaded ${notes.length} notes from CRDT updates`);
+      console.log(`=== Loaded ${notes.length} notes total ===`);
 
       // Sort by modification date
       return notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
@@ -351,8 +362,9 @@ export class SyncManager {
         this.initializedNotes.add(noteId);
       }
 
-      // Load all updates from all instances and build CRDT state
-      const allUpdates = await this.updateStore.readNewUpdates(noteId);
+      // Load ALL updates from all instances (not just "new" ones)
+      // This is needed on startup to reconstruct the full note state
+      const allUpdates = await this.updateStore.readAllUpdates(noteId);
 
       if (allUpdates.length === 0) {
         // No updates = note doesn't exist

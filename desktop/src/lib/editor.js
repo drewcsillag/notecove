@@ -1,5 +1,6 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import Collaboration from '@tiptap/extension-collaboration';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
@@ -23,6 +24,7 @@ export class NoteCoveEditor {
       onUpdate: () => {},
       onFocus: () => {},
       onBlur: () => {},
+      onReady: () => {}, // Called when editor is fully initialized
       ...options
     };
 
@@ -31,49 +33,65 @@ export class NoteCoveEditor {
     this.isReady = false;
     this.cleanupTableResizing = null;
 
+    // Y.Doc for CRDT-based collaboration (Electron mode)
+    this.yDoc = options.yDoc || null;
+
     this.initializeEditor();
   }
 
   initializeEditor() {
+    // Build extensions array
+    const extensions = [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3]
+        },
+        bulletList: {
+          keepMarks: true,
+          keepAttributes: false
+        },
+        orderedList: {
+          keepMarks: true,
+          keepAttributes: false
+        }
+      }),
+      Hashtag,
+      TaskList,
+      TaskItem.configure({
+        nested: true,
+      }),
+      ResizableImage.configure({
+        inline: true,
+        allowBase64: true,
+      }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'editor-table',
+        },
+      }),
+      TableRow,
+      TableHeader,
+      TableCell.configure({
+        HTMLAttributes: {
+          class: 'editor-table-cell',
+        },
+      }),
+    ];
+
+    // Add Collaboration extension if we have a Y.Doc (Electron mode)
+    if (this.yDoc) {
+      extensions.push(
+        Collaboration.configure({
+          document: this.yDoc,
+          field: 'default' // Use 'default' fragment name to match CRDTManager
+        })
+      );
+    }
+
     this.editor = new Editor({
       element: this.element,
-      extensions: [
-        StarterKit.configure({
-          heading: {
-            levels: [1, 2, 3]
-          },
-          bulletList: {
-            keepMarks: true,
-            keepAttributes: false
-          },
-          orderedList: {
-            keepMarks: true,
-            keepAttributes: false
-          }
-        }),
-        Hashtag,
-        TaskList,
-        TaskItem.configure({
-          nested: true,
-        }),
-        ResizableImage.configure({
-          inline: true,
-          allowBase64: true,
-        }),
-        Table.configure({
-          resizable: true,
-          HTMLAttributes: {
-            class: 'editor-table',
-          },
-        }),
-        TableRow,
-        TableHeader,
-        TableCell.configure({
-          HTMLAttributes: {
-            class: 'editor-table-cell',
-          },
-        }),
-      ],
+      extensions,
       content: '',
       autofocus: this.options.autofocus,
       editable: true,
@@ -96,6 +114,18 @@ export class NoteCoveEditor {
 
         // Setup paste image handling
         this.setupPasteHandler();
+
+        // Clear binding flag after debounce period to allow initial sync
+        if (this._isBindingDocument) {
+          setTimeout(() => {
+            this._isBindingDocument = false;
+            // Notify that editor is fully ready
+            this.options.onReady();
+          }, 300); // Longer than debounce (250ms)
+        } else {
+          // If not binding, call onReady immediately
+          this.options.onReady();
+        }
       }
     });
 
@@ -107,11 +137,28 @@ export class NoteCoveEditor {
         this.options.onUpdate(editor);
       }
       // Silently skip if note has changed
-    }, 1000); // Increased debounce time to reduce flickering
+    }, 250); // Reduced to 250ms for faster saves
   }
 
   handleUpdate(editor) {
     this.updatePlaceholder();
+
+    console.log(`[Editor] handleUpdate() called, _isBindingDocument=${this._isBindingDocument}, isReady=${this.isReady}`);
+
+    // Don't queue updates if we're binding a new document
+    if (this._isBindingDocument) {
+      console.log('[Editor] Skipping update - binding new document');
+      return;
+    }
+
+    // Don't queue updates if we're programmatically setting content
+    // This prevents debounced updates from firing after isSettingContent becomes false
+    if (this.options.isSettingContent && this.options.isSettingContent()) {
+      console.log('[Editor] Skipping update - content is being set programmatically');
+      return;
+    }
+
+    console.log('[Editor] Queueing debounced update');
     // Pass the current note ID to the debounced update so it can verify
     // the note hasn't changed before applying the update
     this.debouncedUpdate(editor, this.currentNoteId);
@@ -131,7 +178,39 @@ export class NoteCoveEditor {
   }
 
   /**
-   * Set the content of the editor
+   * Switch to a new Y.Doc (for CRDT mode when changing notes)
+   * @param {Y.Doc} yDoc - New Y.Doc to bind to
+   * @param {string} noteId - ID of the note being loaded
+   */
+  setDocument(yDoc, noteId) {
+    if (!yDoc) {
+      console.error('setDocument called with null yDoc');
+      return;
+    }
+
+    this.yDoc = yDoc;
+    this.currentNoteId = noteId;
+
+    // Set flag to prevent updates during editor recreation
+    this._isBindingDocument = true;
+
+    // Need to destroy and recreate editor with new Y.Doc
+    // TipTap Collaboration extension doesn't support changing documents dynamically
+    if (this.editor) {
+      this.editor.destroy();
+    }
+
+    if (this.cleanupTableResizing) {
+      this.cleanupTableResizing();
+      this.cleanupTableResizing = null;
+    }
+
+    this.isReady = false;
+    this.initializeEditor();
+  }
+
+  /**
+   * Set the content of the editor (for non-CRDT mode)
    * @param {string} content - HTML content
    * @param {string} noteId - ID of the note being loaded (optional, for tracking)
    */

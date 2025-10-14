@@ -33,7 +33,8 @@ class NoteCoveApp {
     console.log('NoteCove Desktop v0.1.0 - Initializing...');
 
     // Check if we have electron API
-    if (window.electronAPI) {
+    this.isElectron = window.electronAPI?.isElectron || false;
+    if (this.isElectron) {
       console.log('Electron API available');
       this.setupElectronListeners();
     } else {
@@ -71,7 +72,9 @@ class NoteCoveApp {
       placeholder: 'Start writing your note...',
       onUpdate: () => this.handleEditorUpdate(),
       onFocus: () => this.handleEditorFocus(),
-      onBlur: () => this.handleEditorBlur()
+      onBlur: () => this.handleEditorBlur(),
+      onReady: () => this.handleEditorReady(),
+      isSettingContent: () => this.isSettingContent
     });
 
     // Setup the formatting toolbar
@@ -84,15 +87,17 @@ class NoteCoveApp {
       return;
     }
 
-    // Get notes path from settings
+    // Get notes path and instance ID from settings
     const notesPath = await window.electronAPI.settings.get('notesPath');
     if (!notesPath) {
       console.error('No notes path configured!');
       return;
     }
 
-    // Create sync manager
-    this.syncManager = new SyncManager(this.noteManager, notesPath);
+    const instanceId = await window.electronAPI.settings.get('instance');
+
+    // Create sync manager with instance ID (if provided)
+    this.syncManager = new SyncManager(this.noteManager, notesPath, instanceId);
 
     // Add sync event listeners
     this.syncManager.addListener((event, data) => this.handleSyncEvent(event, data));
@@ -176,8 +181,10 @@ class NoteCoveApp {
         this.renderFolderTree();
         break;
       case 'note-created':
+        // Don't call updateUI() here - let createNewNote() handle UI updates
+        // This prevents a race condition where updateUI() renders the OLD currentNote
+        // before createNewNote() can set this.currentNote to the new note
         this.notes = this.noteManager.getAllNotes();
-        this.updateUI();
         // Update folder counts when a note is created
         this.renderFolderTree();
         break;
@@ -208,6 +215,16 @@ class NoteCoveApp {
   }
 
   setupEventListeners() {
+    // Save current note before window closes
+    window.addEventListener('beforeunload', () => {
+      console.log('Window closing - saving current note');
+      this.saveCurrentNote();
+      // Also flush any pending CRDT updates
+      if (this.syncManager && this.currentNote) {
+        this.syncManager.updateStore.flush(this.currentNote.id);
+      }
+    });
+
     // New note button (welcome screen)
     const newNoteBtn = document.querySelector('.new-note-btn');
     if (newNoteBtn) {
@@ -394,6 +411,15 @@ class NoteCoveApp {
       }
     });
 
+    // Handle save before quit
+    window.electronAPI.onSaveBeforeQuit(() => {
+      console.log('Save before quit triggered');
+      this.saveCurrentNote();
+      if (this.syncManager && this.currentNote) {
+        this.syncManager.updateStore.flush(this.currentNote.id);
+      }
+    });
+
     // Window maximize state
     window.electronAPI.onWindowMaximized((isMaximized) => {
       console.log('Window maximized state changed:', isMaximized);
@@ -406,14 +432,22 @@ class NoteCoveApp {
     });
   }
 
+  handleEditorReady() {
+    console.log('[renderer] handleEditorReady() - editor is fully initialized');
+    // Clear the isSettingContent flag now that editor is ready
+    this.isSettingContent = false;
+    // Also clear the rendering flag
+    this._isRendering = false;
+  }
+
   handleEditorUpdate() {
     // Don't update note if we're programmatically setting content
     if (this.isSettingContent) {
+      console.log('[renderer] handleEditorUpdate() skipped - isSettingContent=true');
       return;
     }
 
     if (this.currentNote && this.editor) {
-      const content = this.editor.getContent();
       const text = this.editor.getText();
 
       // Extract title from first line
@@ -427,10 +461,26 @@ class NoteCoveApp {
       const tagsChanged = JSON.stringify(this.currentNote.tags || []) !== JSON.stringify(tags);
       const titleChanged = this.currentNote.title !== title;
 
-      this.currentNote.title = title;
-      this.currentNote.content = content;
-      this.currentNote.tags = tags;
-      this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+      // Update local copy for UI (but don't modify the Map object directly)
+      // In Electron mode, the source of truth is the CRDT, not the in-memory object
+      if (!this.isElectron) {
+        this.currentNote.title = title;
+        this.currentNote.tags = tags;
+      }
+
+      // In Electron/CRDT mode, content is automatically saved by Collaboration extension
+      // We only need to update metadata (title, tags)
+      if (this.isElectron && this.syncManager) {
+        // Content is in Y.Doc - don't pass it to updateNote
+        this.noteManager.updateNote(this.currentNote.id, { title, tags });
+        // Flush immediately to ensure metadata is saved
+        this.syncManager.updateStore.flush(this.currentNote.id);
+      } else {
+        // Web mode: save content as HTML
+        const content = this.editor.getContent();
+        this.currentNote.content = content;
+        this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+      }
 
       // Re-render notes list if title changed (to update sidebar)
       if (titleChanged) {
@@ -674,16 +724,111 @@ class NoteCoveApp {
     this.renderNotesList();
   }
 
-  renderCurrentNote(scrollToTop = true) {
+  async renderCurrentNote(scrollToTop = true) {
     if (!this.currentNote) return;
+
+    // Prevent concurrent calls - wait for previous render to complete
+    if (this._isRendering) {
+      console.log('[renderer] renderCurrentNote() already in progress, skipping duplicate call');
+      return;
+    }
+    this._isRendering = true;
+
+    console.log(`[renderer] renderCurrentNote() called for note:`, {
+      id: this.currentNote.id,
+      title: this.currentNote.title,
+      hasContent: !!this.currentNote.content,
+      contentLength: this.currentNote.content?.length
+    });
 
     // Always update editor content when switching notes
     if (this.editor) {
       // Set flag to prevent handleEditorUpdate from firing during programmatic content change
       this.isSettingContent = true;
-      // Pass the note ID so the editor can track which note is currently loaded
-      this.editor.setContent(this.currentNote.content || '', this.currentNote.id);
-      this.isSettingContent = false;
+
+      // In Electron mode with CRDT, bind editor to Y.Doc
+      if (this.isElectron && this.syncManager) {
+        const yDoc = this.syncManager.getDoc(this.currentNote.id);
+
+        // Initialize the Y.Doc with metadata if it's empty
+        // This ensures sample notes and new notes have proper metadata
+        const isEmpty = this.syncManager.crdtManager.isDocEmpty(this.currentNote.id);
+        console.log(`[renderer] Y.Doc isEmpty: ${isEmpty}`);
+        if (isEmpty) {
+          // Extract title from HTML content if available (for sample notes)
+          // This ensures we use the original title from the HTML, not a potentially modified one
+          let noteToInitialize = { ...this.currentNote };
+
+          // DEBUG: Log before extraction
+          const debugInfo = {
+            noteId: this.currentNote.id,
+            originalTitle: this.currentNote.title,
+            hasContent: !!this.currentNote.content,
+            contentLength: this.currentNote.content?.length,
+            hasH1: this.currentNote.content?.includes('<h1>'),
+            contentPreview: this.currentNote.content?.substring(0, 100)
+          };
+          console.log('[renderer] DEBUG before title extraction:', JSON.stringify(debugInfo));
+
+          if (noteToInitialize.content && noteToInitialize.content.includes('<h1>')) {
+            const h1Match = noteToInitialize.content.match(/<h1[^>]*>(.*?)<\/h1>/);
+            if (h1Match) {
+              noteToInitialize.title = h1Match[1];
+              console.log('[renderer] Extracted title from HTML:', noteToInitialize.title);
+            }
+          }
+
+          console.log('[renderer] Initializing Y.Doc with note:', {
+            id: noteToInitialize.id,
+            title: noteToInitialize.title
+          });
+          this.syncManager.crdtManager.initializeNote(this.currentNote.id, noteToInitialize);
+          // Wait a moment for the async update listener to process
+          await new Promise(resolve => setTimeout(resolve, 10));
+          // Flush metadata FIRST before binding editor
+          console.log('[renderer] Flushing metadata before binding editor');
+          await this.syncManager.updateStore.flush(this.currentNote.id);
+
+          // Update the note object in noteManager Map with the CRDT title
+          // This ensures the notes list shows the correct title
+          const crdtTitle = this.syncManager.crdtManager.getDoc(this.currentNote.id).getMap('metadata').get('title');
+          console.log('[renderer] Checking if note title needs sync - CRDT:', crdtTitle, 'Note:', this.currentNote.title);
+          if (crdtTitle) {
+            console.log('[renderer] Syncing note object title from CRDT:', crdtTitle);
+            this.currentNote.title = crdtTitle;
+            // IMPORTANT: Update the actual note object in the Map, not just currentNote reference
+            const noteInMap = this.noteManager.notes.get(this.currentNote.id);
+            if (noteInMap) {
+              noteInMap.title = crdtTitle;
+            }
+            // Update the notes list to show correct title
+            this.renderNotesList();
+          }
+
+          // Now bind editor
+          console.log('[renderer] Binding editor to Y.Doc');
+          this.editor.setDocument(yDoc, this.currentNote.id);
+
+          // If the note has HTML content (e.g., sample notes), set it after binding
+          if (this.currentNote.content && this.currentNote.content !== '<p></p>') {
+            console.log('[renderer] Setting HTML content to editor, length:', this.currentNote.content.length);
+            // Set the HTML content - TipTap will convert it to Y.XmlFragment
+            this.editor.editor.commands.setContent(this.currentNote.content);
+            // Flush content updates
+            console.log('[renderer] Flushing content updates');
+            await this.syncManager.updateStore.flush(this.currentNote.id);
+          }
+        } else {
+          console.log('[renderer] Y.Doc not empty, just binding editor');
+          this.editor.setDocument(yDoc, this.currentNote.id);
+        }
+      } else {
+        // Web mode: use HTML content
+        this.editor.setContent(this.currentNote.content || '', this.currentNote.id);
+      }
+
+      // Don't clear isSettingContent here - wait for editor's onReady callback
+      // this.isSettingContent = false;
 
       // Only focus editor if search input doesn't have focus
       const searchInput = document.querySelector('.search-input');
@@ -703,23 +848,44 @@ class NoteCoveApp {
     }
   }
 
-  createNewNote() {
+  async createNewNote() {
+    console.log('[createNewNote] Starting...');
+    const previousNote = this.currentNote;
+    console.log('[createNewNote] Previous note was:', previousNote?.id, previousNote?.title);
+
     // Create note in the currently selected folder
     const newNote = this.noteManager.createNote({
       folderId: this.currentFolderId || 'all-notes'
     });
+    console.log('[createNewNote] Created new note:', newNote.id, newNote.title);
+
     this.currentNote = newNote;
+    console.log('[createNewNote] Set this.currentNote to:', this.currentNote.id);
     this.isEditing = false; // Reset editing state to ensure editor gets cleared
+
+    // In Electron mode, flush the new note immediately to ensure it's persisted
+    // This is important because the note initialization generates CRDT updates
+    // that need to be written to disk
+    if (this.isElectron && this.syncManager) {
+      // Wait a moment for async initialization to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+      console.log('[createNewNote] About to flush, this.currentNote is:', this.currentNote.id);
+      await this.syncManager.updateStore.flush(newNote.id);
+      console.log('[createNewNote] After flush, this.currentNote is:', this.currentNote.id);
+    }
 
     // Don't call updateUI() here as it recreates the DOM and can interfere with click events
     // Instead, just update what's needed:
 
     // 1. Add the new note to the notes list (uses event delegation for clicks)
+    console.log('[createNewNote] Before renderNotesList, this.currentNote is:', this.currentNote.id);
     this.renderNotesList();
+    console.log('[createNewNote] After renderNotesList, this.currentNote is:', this.currentNote.id);
     this.renderTagsList();
 
     // 2. Update editor content
-    this.renderCurrentNote();
+    console.log('[createNewNote] Before renderCurrentNote, this.currentNote is:', this.currentNote.id);
+    await this.renderCurrentNote();
 
     // 3. Show editor state if it's hidden
     const welcomeState = document.getElementById('welcomeState');
@@ -971,8 +1137,14 @@ class NoteCoveApp {
 
   selectNote(noteId) {
     const note = this.noteManager.getNote(noteId);
+    console.log(`[renderer] selectNote(${noteId}):`, {
+      found: !!note,
+      title: note?.title,
+      deleted: note?.deleted
+    });
     if (note && !note.deleted) {
       this.saveCurrentNote(); // Save previous note
+      console.log(`[renderer] Setting currentNote to:`, { id: note.id, title: note.title });
       this.currentNote = note;
       this.isEditing = false; // Reset editing state when switching notes
 
@@ -1044,16 +1216,29 @@ class NoteCoveApp {
   saveCurrentNote() {
     if (this.currentNote && this.editor) {
       // Force immediate save of current content (don't wait for debounce)
-      const content = this.editor.getContent();
       const text = this.editor.getText();
       const firstLine = text.split('\n')[0].trim();
       const title = firstLine || 'Untitled';
       const tags = this.extractTags(text);
 
-      this.currentNote.title = title;
-      this.currentNote.content = content;
-      this.currentNote.tags = tags;
-      this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+      // Don't modify the note object directly in Electron mode
+      // The CRDT is the source of truth
+      if (!this.isElectron) {
+        this.currentNote.title = title;
+        this.currentNote.tags = tags;
+      }
+
+      // In Electron/CRDT mode, content is in Y.Doc
+      if (this.isElectron && this.syncManager) {
+        this.noteManager.updateNote(this.currentNote.id, { title, tags });
+        // Flush immediately to ensure metadata is saved
+        this.syncManager.updateStore.flush(this.currentNote.id);
+      } else {
+        // Web mode: save content as HTML
+        const content = this.editor.getContent();
+        this.currentNote.content = content;
+        this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+      }
 
       this.updateStatus('Saved');
     }

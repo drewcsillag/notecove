@@ -18,7 +18,17 @@
       "Bash(git diff:*)",
       "Bash(git add:*)",
       "Bash(tee:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(ls:*)",
+      "Read(//Users/drew/Documents/**)",
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "Bash(killall:*)",
+      "Bash(npx electron:*)",
+      "Bash(timeout 60 npx playwright test:*)",
+      "Bash(timeout 90 npx playwright test tests/e2e/content-persistence.spec.js --reporter=line)",
+      "Bash(timeout 90 npx playwright test desktop/tests/e2e/content-persistence.spec.js --reporter=line)",
+      "Bash(timeout 90 npx playwright test desktop/tests/e2e/content-persistence.spec.js:28 --reporter=line)"
     ],
     "deny": [],
     "ask": []

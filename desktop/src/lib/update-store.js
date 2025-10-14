@@ -12,13 +12,12 @@ export class UpdateStore {
     this.instanceId = instanceId;
     this.isElectron = fileStorage.isElectron;
 
-    // Track what we've seen: { instance-A: 5, instance-B: 3 }
+    // Per-note tracking: Map<noteId, { seen, writeCounter, pendingUpdates, pendingStartSeq }>
+    this.noteState = new Map();
+
+    // DEPRECATED - keeping for backwards compatibility but not using
     this.seen = new Map();
-
-    // Our current write counter
     this.writeCounter = 0;
-
-    // Buffer for pending updates
     this.pendingUpdates = [];
     this.pendingStartSeq = null;
 
@@ -33,6 +32,23 @@ export class UpdateStore {
   }
 
   /**
+   * Get or create state for a note
+   * @param {string} noteId - Note ID
+   * @returns {object} Note state
+   */
+  getNoteState(noteId) {
+    if (!this.noteState.has(noteId)) {
+      this.noteState.set(noteId, {
+        seen: new Map(),
+        writeCounter: 0,
+        pendingUpdates: [],
+        pendingStartSeq: null
+      });
+    }
+    return this.noteState.get(noteId);
+  }
+
+  /**
    * Initialize the update store for a note
    * Loads our meta file and sets up tracking
    * @param {string} noteId - Note ID
@@ -40,29 +56,31 @@ export class UpdateStore {
   async initialize(noteId) {
     if (!this.isElectron) return;
 
+    const state = this.getNoteState(noteId);
+
     try {
       const metaPath = this.getMetaPath(noteId);
       const result = await window.electronAPI.fileSystem.readFile(metaPath);
 
       if (result.success) {
         const meta = JSON.parse(result.content);
-        this.writeCounter = meta.lastWrite || 0;
-        this.seen = new Map(Object.entries(meta.seen || {}));
+        state.writeCounter = meta.lastWrite || 0;
+        state.seen = new Map(Object.entries(meta.seen || {}));
         console.log(`UpdateStore initialized for ${noteId}:`, {
           instanceId: this.instanceId,
-          writeCounter: this.writeCounter,
-          seen: Object.fromEntries(this.seen)
+          writeCounter: state.writeCounter,
+          seen: Object.fromEntries(state.seen)
         });
       } else {
         // First time - initialize empty
-        this.writeCounter = 0;
-        this.seen = new Map();
+        state.writeCounter = 0;
+        state.seen = new Map();
         console.log(`UpdateStore: New note ${noteId}, starting fresh`);
       }
     } catch (error) {
       console.error('Error initializing UpdateStore:', error);
-      this.writeCounter = 0;
-      this.seen = new Map();
+      state.writeCounter = 0;
+      state.seen = new Map();
     }
   }
 
@@ -75,17 +93,19 @@ export class UpdateStore {
   async addUpdate(noteId, update) {
     if (!this.isElectron) return;
 
+    const state = this.getNoteState(noteId);
+
     // Track the sequence number for this update
-    if (this.pendingStartSeq === null) {
-      this.pendingStartSeq = this.writeCounter + 1;
+    if (state.pendingStartSeq === null) {
+      state.pendingStartSeq = state.writeCounter + 1;
     }
 
-    this.pendingUpdates.push(update);
+    state.pendingUpdates.push(update);
 
     // Check if we should flush based on strategy
     const shouldFlush = this.flushStrategy.shouldFlush({
-      updateCount: this.pendingUpdates.length,
-      totalBytes: this.getTotalBytes(),
+      updateCount: state.pendingUpdates.length,
+      totalBytes: this.getTotalBytes(noteId),
       firstUpdateTime: this.flushStrategy.firstUpdateTime
     });
 
@@ -117,10 +137,12 @@ export class UpdateStore {
 
   /**
    * Get total bytes of pending updates
+   * @param {string} noteId - Note ID
    * @returns {number} Total bytes
    */
-  getTotalBytes() {
-    return this.pendingUpdates.reduce((sum, update) => sum + update.length, 0);
+  getTotalBytes(noteId) {
+    const state = this.getNoteState(noteId);
+    return state.pendingUpdates.reduce((sum, update) => sum + update.length, 0);
   }
 
   /**
@@ -129,7 +151,17 @@ export class UpdateStore {
    * @returns {boolean} Success
    */
   async flush(noteId) {
-    if (!this.isElectron || this.pendingUpdates.length === 0) {
+    const state = this.getNoteState(noteId);
+
+    console.log(`[UpdateStore] flush() called for ${noteId}, buffer has ${state.pendingUpdates.length} updates`);
+
+    if (!this.isElectron) {
+      console.log('[UpdateStore] Not in Electron mode, skipping flush');
+      return false;
+    }
+
+    if (state.pendingUpdates.length === 0) {
+      console.log('[UpdateStore] No pending updates to flush');
       return false;
     }
 
@@ -139,18 +171,20 @@ export class UpdateStore {
         this.flushTimer = null;
       }
 
-      const startSeq = this.pendingStartSeq;
-      const endSeq = startSeq + this.pendingUpdates.length - 1;
+      const startSeq = state.pendingStartSeq;
+      const endSeq = startSeq + state.pendingUpdates.length - 1;
+
+      console.log(`[UpdateStore] Flushing ${state.pendingUpdates.length} updates (seq ${startSeq}-${endSeq})`);
 
       // Update our write counter
-      this.writeCounter = endSeq;
+      state.writeCounter = endSeq;
 
       // Create packed file
       const packedFile = {
         instance: this.instanceId,
         sequence: [startSeq, endSeq],  // Range [start, end] inclusive
         timestamp: new Date().toISOString(),
-        updates: this.pendingUpdates.map(u => this.encodeUpdate(u))
+        updates: state.pendingUpdates.map(u => this.encodeUpdate(u))
       };
 
       // Write packed file
@@ -168,16 +202,16 @@ export class UpdateStore {
       }
 
       // Update our seen map
-      this.seen.set(this.instanceId, this.writeCounter);
+      state.seen.set(this.instanceId, state.writeCounter);
 
       // Write our meta file
       await this.writeMeta(noteId);
 
-      console.log(`UpdateStore: Flushed ${this.pendingUpdates.length} updates as ${this.instanceId}.${startSeq}-${endSeq} for note ${noteId}`);
+      console.log(`UpdateStore: Flushed ${state.pendingUpdates.length} updates as ${this.instanceId}.${startSeq}-${endSeq} for note ${noteId}`);
 
       // Clear buffer
-      this.pendingUpdates = [];
-      this.pendingStartSeq = null;
+      state.pendingUpdates = [];
+      state.pendingStartSeq = null;
       this.flushStrategy.reset();
 
       return true;
@@ -188,12 +222,75 @@ export class UpdateStore {
   }
 
   /**
+   * Read ALL updates from all instances (ignoring seen state)
+   * Used when loading a note from scratch
+   * @param {string} noteId - Note ID
+   * @returns {Array} Array of {instanceId, sequence, update} objects
+   */
+  async readAllUpdates(noteId) {
+    if (!this.isElectron) return [];
+
+    try {
+      const updatesDir = this.getUpdatesDir(noteId);
+
+      // List all update files
+      const listResult = await window.electronAPI.fileSystem.readDir(updatesDir);
+      if (!listResult.success) {
+        // Directory doesn't exist yet
+        return [];
+      }
+
+      const allUpdates = [];
+
+      for (const filename of listResult.files) {
+        if (!filename.endsWith('.yjson')) continue;
+
+        // Parse filename: instance-A.000001-000050.yjson or instance-A.000001.yjson
+        const match = filename.match(/^(.+)\.(\d+)(?:-(\d+))?\.yjson$/);
+        if (!match) continue;
+
+        const [, instanceId] = match;
+
+        // Read the packed file
+        const updatePath = `${updatesDir}/${filename}`;
+        const readResult = await window.electronAPI.fileSystem.readFile(updatePath);
+        if (!readResult.success) {
+          console.error('Failed to read packed update file:', updatePath);
+          continue;
+        }
+
+        const packedFile = JSON.parse(readResult.content);
+        const [fileStartSeq] = packedFile.sequence;
+
+        // Read ALL updates from this file
+        for (let i = 0; i < packedFile.updates.length; i++) {
+          const seq = fileStartSeq + i;
+          const update = this.decodeUpdate(packedFile.updates[i]);
+          allUpdates.push({ instanceId, sequence: seq, update });
+        }
+      }
+
+      // Sort by sequence to apply in order
+      allUpdates.sort((a, b) => a.sequence - b.sequence);
+
+      console.log(`UpdateStore: Read ${allUpdates.length} total updates for note ${noteId}`);
+      return allUpdates;
+    } catch (error) {
+      console.error('Error reading all updates:', error);
+      return [];
+    }
+  }
+
+  /**
    * Read all updates we haven't seen yet from all instances
+   * Used for incremental sync
    * @param {string} noteId - Note ID
    * @returns {Array} Array of {instanceId, sequence, update} objects
    */
   async readNewUpdates(noteId) {
     if (!this.isElectron) return [];
+
+    const state = this.getNoteState(noteId);
 
     try {
       const updatesDir = this.getUpdatesDir(noteId);
@@ -219,7 +316,7 @@ export class UpdateStore {
         const endSeq = endStr ? parseInt(endStr, 10) : startSeq;
 
         // Have we seen all updates in this file?
-        const lastSeen = this.seen.get(instanceId) || 0;
+        const lastSeen = state.seen.get(instanceId) || 0;
         if (endSeq <= lastSeen) {
           continue; // Already seen all updates in this file
         }
@@ -248,7 +345,7 @@ export class UpdateStore {
           newUpdates.push({ instanceId, sequence: seq, update });
 
           // Mark as seen
-          this.seen.set(instanceId, Math.max(lastSeen, seq));
+          state.seen.set(instanceId, Math.max(lastSeen, seq));
         }
       }
 
@@ -275,13 +372,15 @@ export class UpdateStore {
   async writeMeta(noteId) {
     if (!this.isElectron) return;
 
+    const state = this.getNoteState(noteId);
+
     try {
       const metaPath = this.getMetaPath(noteId);
 
       const meta = {
         instanceId: this.instanceId,
-        lastWrite: this.writeCounter,
-        seen: Object.fromEntries(this.seen),
+        lastWrite: state.writeCounter,
+        seen: Object.fromEntries(state.seen),
         lastUpdated: new Date().toISOString()
       };
 
@@ -412,12 +511,14 @@ export class UpdateStore {
    * @param {string} noteId - Note ID
    */
   async cleanup(noteId) {
+    const state = this.getNoteState(noteId);
+
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
 
-    if (this.pendingUpdates.length > 0) {
+    if (state.pendingUpdates.length > 0) {
       await this.flush(noteId);
     }
   }

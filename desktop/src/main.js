@@ -79,6 +79,9 @@ class NoteCoveApp {
       this.store.set('notesPath', customNotesPath);
     }
 
+    // Store instance name in settings so renderer can use it
+    this.store.set('instance', this.instanceName);
+
     console.log('Instance:', this.instanceName);
     console.log('Notes path:', this.store.get('notesPath'));
 
@@ -91,6 +94,25 @@ class NoteCoveApp {
     app.whenReady().then(() => {
       this.createMainWindow();
       this.setupMenu();
+
+      // Handle before-quit to ensure data is saved
+      let quitting = false;
+      app.on('before-quit', async (event) => {
+        if (quitting) return; // Already handled
+
+        event.preventDefault(); // Prevent quit until we're done
+        console.log('App quitting - ensuring data is saved');
+
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          // Send message to renderer to save current note
+          this.mainWindow.webContents.send('save-before-quit');
+          // Wait for debounce (250ms) + save time (250ms) = 500ms
+          await new Promise(resolve => setTimeout(resolve, 600));
+        }
+
+        quitting = true;
+        app.quit(); // Now actually quit
+      });
 
       // Handle window-all-closed (except on macOS)
       app.on('window-all-closed', () => {

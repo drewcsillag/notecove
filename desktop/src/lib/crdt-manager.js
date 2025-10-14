@@ -4,6 +4,17 @@
  * Uses append-only update files for robust multi-instance sync
  */
 import * as Y from 'yjs';
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import Collaboration from '@tiptap/extension-collaboration';
+import Table from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
+import { Hashtag } from './extensions/hashtag.js';
+import { TaskList } from './extensions/task-list.js';
+import { TaskItem } from './extensions/task-item.js';
+import { ResizableImage } from './extensions/resizable-image.js';
 
 export class CRDTManager {
   constructor() {
@@ -98,25 +109,44 @@ export class CRDTManager {
   initializeNote(noteId, note) {
     const doc = this.getDoc(noteId);
 
-    // Use transact with 'silent' to avoid triggering update events
+    console.log(`[CRDTManager] initializeNote called:`, {
+      noteId,
+      title: note.title,
+      titleType: typeof note.title,
+      created: note.created,
+      isEmpty: doc.getMap('metadata').size === 0,
+      fullNote: JSON.stringify(note)
+    });
+
+    // Transact WITHOUT 'silent' so update events are triggered
+    // This ensures the metadata is saved to update files
     doc.transact(() => {
       // Store metadata in a Y.Map
       const yMetadata = doc.getMap('metadata');
 
       // Only initialize if empty
       if (yMetadata.size === 0) {
-        yMetadata.set('title', note.title || 'Untitled');
+        const titleToSet = note.title || 'Untitled';
+        console.log(`[CRDTManager] Initializing metadata for ${noteId}`);
+        console.log(`  - Setting title to:`, titleToSet, `(type: ${typeof titleToSet})`);
+        yMetadata.set('title', titleToSet);
         yMetadata.set('created', note.created || new Date().toISOString());
         yMetadata.set('modified', note.modified || new Date().toISOString());
         yMetadata.set('tags', note.tags || []);
         yMetadata.set('folder', note.folder || null);
+
+        // Verify what was actually set
+        console.log(`  - Verified title in Y.Map:`, yMetadata.get('title'));
+      } else {
+        console.log(`[CRDTManager] Metadata already exists for ${noteId}, skipping init`);
+        console.log(`  - Current title:`, yMetadata.get('title'));
       }
 
       // For TipTap Collaboration: the content is stored in a Y.XmlFragment
       // named 'prosemirror' (this is what TipTap's Collaboration extension uses)
       // We don't manually initialize it here - TipTap will do it when the editor connects
 
-    }, 'silent');
+    });
 
     console.log('Initialized CRDT document for note:', noteId);
   }
@@ -142,27 +172,55 @@ export class CRDTManager {
 
     const yMetadata = doc.getMap('metadata');
 
-    // For content, we need to convert the Y.XmlFragment to TipTap JSON
+    // Debug: log what's in metadata
+    console.log(`[CRDTManager] getNoteFromDoc(${noteId}):`, {
+      metadataSize: yMetadata.size,
+      title: yMetadata.get('title'),
+      created: yMetadata.get('created'),
+      modified: yMetadata.get('modified'),
+      tags: yMetadata.get('tags'),
+      folder: yMetadata.get('folder')
+    });
+
+    // For content, we need to convert the Y.XmlFragment to HTML string
     // This is used when loading notes
     const fragment = doc.getXmlFragment('default');
 
-    // Convert Y.XmlFragment to plain object for storage
-    // TipTap will handle the reverse when loading
-    let content = { type: 'doc', content: [] };
+    // Convert Y.XmlFragment to HTML string
+    let content = '<p></p>'; // Empty content by default
     if (fragment.length > 0) {
-      // The fragment contains the ProseMirror document structure
-      // We'll let TipTap handle the serialization through its own methods
-      content = null; // Will be handled by TipTap's getJSON()
+      // Extract actual HTML content from Y.Doc
+      content = this.getHTMLFromDoc(doc);
+    }
+
+    // Get title from metadata, or extract from content if empty/untitled
+    let title = yMetadata.get('title');
+    console.log(`[CRDTManager] getNoteFromDoc - title from metadata: "${title}", typeof: ${typeof title}, content length: ${content.length}`);
+
+    // Always extract title from content if metadata title is missing or generic
+    const needsExtraction = !title ||
+                           (typeof title === 'string' && (title.trim() === '' || title.trim().toLowerCase() === 'untitled'));
+
+    if (needsExtraction && content && content.length > 0) {
+      // Extract title from content (first line of text)
+      const textContent = content.replace(/<[^>]*>/g, ''); // Strip HTML tags
+      const firstLine = textContent.split('\n')[0].trim();
+      const extractedTitle = firstLine || 'Untitled';
+      console.log(`[CRDTManager] Extracted title from content: "${extractedTitle}"`);
+      title = extractedTitle;
+    } else if (!title) {
+      title = 'Untitled';
     }
 
     return {
       id: noteId,
-      title: yMetadata.get('title') || 'Untitled',
+      title: title,
       content: content,
-      created: yMetadata.get('created'),
-      modified: yMetadata.get('modified'),
+      created: yMetadata.get('created') || new Date().toISOString(),
+      modified: yMetadata.get('modified') || new Date().toISOString(),
       tags: yMetadata.get('tags') || [],
-      folder: yMetadata.get('folder') || null
+      deleted: yMetadata.get('deleted') || false,
+      folderId: yMetadata.get('folder') || 'all-notes'
     };
   }
 
@@ -174,10 +232,15 @@ export class CRDTManager {
   updateMetadata(noteId, updates) {
     const doc = this.getDoc(noteId);
 
+    console.log(`[CRDTManager] updateMetadata(${noteId}):`, updates);
+
     doc.transact(() => {
       const yMetadata = doc.getMap('metadata');
 
+      console.log(`  - Current title before update:`, yMetadata.get('title'));
+
       if (updates.title !== undefined) {
+        console.log(`  - Setting title to:`, updates.title);
         yMetadata.set('title', updates.title);
       }
 
@@ -190,6 +253,8 @@ export class CRDTManager {
       if (updates.folder !== undefined) {
         yMetadata.set('folder', updates.folder);
       }
+
+      console.log(`  - Title after update:`, yMetadata.get('title'));
     });
 
     console.log('Updated metadata for note:', noteId);
@@ -286,6 +351,50 @@ export class CRDTManager {
         updateCount: updates.length
       }))
     };
+  }
+
+  /**
+   * Convert Y.Doc to HTML using a temporary TipTap editor
+   * This is used for generating note previews
+   * @param {Y.Doc} doc - Y.Doc to convert
+   * @returns {string} HTML content
+   */
+  getHTMLFromDoc(doc) {
+    try {
+      // Create a temporary headless editor
+      const tempEditor = new Editor({
+        extensions: [
+          StarterKit.configure({
+            heading: { levels: [1, 2, 3] },
+            bulletList: { keepMarks: true },
+            orderedList: { keepMarks: true }
+          }),
+          Table.configure({ resizable: false }),
+          TableRow,
+          TableHeader,
+          TableCell,
+          Hashtag,
+          TaskList,
+          TaskItem,
+          ResizableImage,
+          Collaboration.configure({
+            document: doc,
+            field: 'default'
+          })
+        ]
+      });
+
+      // Get HTML from the editor
+      const html = tempEditor.getHTML();
+
+      // Clean up
+      tempEditor.destroy();
+
+      return html || '<p></p>';
+    } catch (error) {
+      console.error('[CRDTManager] Error converting Y.Doc to HTML:', error);
+      return '<p></p>';
+    }
   }
 
   /**

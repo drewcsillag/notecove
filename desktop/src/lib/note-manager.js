@@ -87,13 +87,26 @@ export class NoteManager {
         const notes = await this.syncManager.loadAllNotes();
 
         if (notes.length === 0) {
+          console.log('No notes found, loading sample notes');
           this.loadSampleNotes();
         } else {
+          console.log(`Adding ${notes.length} notes to NoteManager`);
           notes.forEach(note => {
+            console.log(`  Validating note ${note.id}:`, {
+              title: note.title,
+              hasId: !!note.id,
+              hasCreated: !!note.created,
+              hasModified: !!note.modified,
+              deleted: note.deleted
+            });
             if (validateNote(note)) {
               this.notes.set(note.id, note);
+              console.log(`    ✓ Added to map`);
+            } else {
+              console.log(`    ✗ Failed validation`);
             }
           });
+          console.log(`NoteManager now has ${this.notes.size} notes`);
         }
       } else {
         // Web mode - use localStorage
@@ -138,11 +151,13 @@ export class NoteManager {
    * Load sample notes for demo
    */
   loadSampleNotes() {
+    console.log('[NoteManager] loadSampleNotes() called');
+    // Use stable IDs for sample notes so they persist across restarts
     const sampleNotes = [
       {
-        id: generateUUID(),
+        id: 'sample-welcome-note',
         title: 'Welcome to NoteCove',
-        content: '<h1>Welcome to NoteCove</h1><p>This is your first note! NoteCove is designed to be your digital sanctuary for ideas and thoughts.</p><p><strong>Features:</strong></p><ul><li>Rich text editing</li><li>File-based sync</li><li>Offline-first design</li><li>Advanced organization</li></ul><p>Start by editing this note or create a new one. Everything you write is automatically saved.</p>',
+        content: '<h1>Welcome to NoteCove</h1><p>This is your first note! NoteCove is designed to be your digital sanctuary for ideas and thoughts.</p><p><strong>Features:</strong></p><ul><li>Rich text editing</li><li>File-based sync</li><li>Offline-first design</li><li>Advanced organization</li></ul><p>Start by editing this note or create a new note. Everything you write is automatically saved.</p>',
         created: new Date().toISOString(),
         modified: new Date().toISOString(),
         tags: ['welcome', 'getting-started'],
@@ -150,7 +165,7 @@ export class NoteManager {
         folderId: 'all-notes'
       },
       {
-        id: generateUUID(),
+        id: 'sample-getting-started',
         title: 'Getting Started Guide',
         content: '<h2>Quick Start</h2><p>Here are some tips to get you started with NoteCove:</p><ol><li><strong>Creating Notes:</strong> Use Cmd+N (Mac) or Ctrl+N (Windows/Linux) to create a new note</li><li><strong>Organization:</strong> Use #tags in your notes for easy categorization</li><li><strong>Search:</strong> Use the search box to find notes quickly</li><li><strong>Formatting:</strong> Use the toolbar or keyboard shortcuts for formatting</li></ol><p>Enjoy your note-taking journey! 📝</p>',
         created: new Date(Date.now() - 86400000).toISOString(),
@@ -162,10 +177,11 @@ export class NoteManager {
     ];
 
     sampleNotes.forEach(note => {
+      console.log(`[NoteManager] Adding sample note to map:`, { id: note.id, title: note.title });
       this.notes.set(note.id, note);
-      // Save sample notes to storage so they persist
-      this.saveNote(note);
+      // Don't save here - will be saved in setSyncManager() after SyncManager is ready
     });
+    console.log('[NoteManager] Sample notes loaded, map size:', this.notes.size);
   }
 
   /**

@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:save', () => callback('menu:save'));
   },
 
+  // App lifecycle
+  onSaveBeforeQuit: (callback) => {
+    ipcRenderer.on('save-before-quit', () => callback());
+  },
+
   // Window state
   onWindowMaximized: (callback) => {
     ipcRenderer.on('window:maximized', (event, isMaximized) => callback(isMaximized));
