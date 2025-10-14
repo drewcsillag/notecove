@@ -738,13 +738,15 @@ class NoteCoveApp {
     // Add gap indicator if current note has gaps
     if (this.currentNote && this.noteGaps.has(this.currentNote.id)) {
       const summary = this.noteGaps.get(this.currentNote.id);
+      const tooltipText = this.buildGapTooltip(summary);
+
       const gapIndicator = document.createElement('div');
       gapIndicator.className = 'gap-indicator';
+      gapIndicator.title = tooltipText;
       gapIndicator.innerHTML = `
-        <span class="status-icon warning">⚠️</span>
-        <span class="status-text">Syncing... (waiting for updates)</span>
+        <span class="status-icon warning" title="${tooltipText}">⚠️</span>
+        <span class="status-text" title="${tooltipText}">Syncing... (waiting for updates)</span>
       `;
-      gapIndicator.title = this.buildGapTooltip(summary);
       statusBar.appendChild(gapIndicator);
     }
   }
