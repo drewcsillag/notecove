@@ -153,7 +153,7 @@ describe('Bug Reproduction Test', () => {
 
     // Create a new note
     console.log('\nCreating new note...');
-    const newNote = noteManager1.createNote({ folderId: 'all-notes' });
+    const newNote = await noteManager1.createNote({ folderId: 'all-notes' });
     console.log('Created note:', newNote.id);
 
     // Check if existing notes still have their titles
@@ -182,7 +182,7 @@ describe('Bug Reproduction Test', () => {
       const syncManager = new SyncManager(noteManager, testDir, 'test1');
       await noteManager.setSyncManager(syncManager);
 
-      const newNote = noteManager.createNote({ folderId: 'all-notes' });
+      const newNote = await noteManager.createNote({ folderId: 'all-notes' });
       userNoteId = newNote.id;
 
       // Bind to editor and type content
@@ -274,7 +274,7 @@ describe('Bug Reproduction Test', () => {
     const syncManager = new SyncManager(noteManager, testDir, 'test1');
     await noteManager.setSyncManager(syncManager);
 
-    const note = noteManager.createNote({ folderId: 'all-notes' });
+    const note = await noteManager.createNote({ folderId: 'all-notes' });
     const yDoc = syncManager.getDoc(note.id);
 
     const editor = new Editor({

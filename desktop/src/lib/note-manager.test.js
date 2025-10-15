@@ -19,8 +19,8 @@ describe('NoteManager', () => {
   });
 
   describe('note creation', () => {
-    it('should create a new note with default values', () => {
-      const note = noteManager.createNote();
+    it('should create a new note with default values', async () => {
+      const note = await noteManager.createNote();
 
       expect(note).toMatchObject({
         id: expect.any(String),
@@ -33,14 +33,14 @@ describe('NoteManager', () => {
       });
     });
 
-    it('should create a note with custom data', () => {
+    it('should create a note with custom data', async () => {
       const customData = {
         title: 'Test Note',
         content: 'Test content',
         tags: ['test']
       };
 
-      const note = noteManager.createNote(customData);
+      const note = await noteManager.createNote(customData);
 
       expect(note.title).toBe('Test Note');
       expect(note.content).toBe('Test content');
@@ -49,9 +49,9 @@ describe('NoteManager', () => {
   });
 
   describe('note retrieval', () => {
-    it('should get all notes excluding deleted ones', () => {
-      const note1 = noteManager.createNote({ title: 'Note 1' });
-      const note2 = noteManager.createNote({ title: 'Note 2' });
+    it('should get all notes excluding deleted ones', async () => {
+      const note1 = await noteManager.createNote({ title: 'Note 1' });
+      const note2 = await noteManager.createNote({ title: 'Note 2' });
       noteManager.deleteNote(note2.id);
 
       const allNotes = noteManager.getAllNotes();
@@ -62,8 +62,8 @@ describe('NoteManager', () => {
       expect(allNotes.find(n => n.id === note2.id)).toBeFalsy();
     });
 
-    it('should get note by ID', () => {
-      const note = noteManager.createNote({ title: 'Test Note' });
+    it('should get note by ID', async () => {
+      const note = await noteManager.createNote({ title: 'Test Note' });
 
       const retrieved = noteManager.getNote(note.id);
 
@@ -79,7 +79,7 @@ describe('NoteManager', () => {
 
   describe('note updates', () => {
     it('should update note properties', async () => {
-      const note = noteManager.createNote({ title: 'Original' });
+      const note = await noteManager.createNote({ title: 'Original' });
 
       // Small delay to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -100,8 +100,8 @@ describe('NoteManager', () => {
       expect(result).toBeNull();
     });
 
-    it('should not update deleted note', () => {
-      const note = noteManager.createNote({ title: 'Test' });
+    it('should not update deleted note', async () => {
+      const note = await noteManager.createNote({ title: 'Test' });
       noteManager.deleteNote(note.id);
 
       const result = noteManager.updateNote(note.id, { title: 'Updated' });
@@ -111,8 +111,8 @@ describe('NoteManager', () => {
   });
 
   describe('note deletion', () => {
-    it('should soft delete a note', () => {
-      const note = noteManager.createNote({ title: 'Test' });
+    it('should soft delete a note', async () => {
+      const note = await noteManager.createNote({ title: 'Test' });
 
       const success = noteManager.deleteNote(note.id);
 
@@ -122,7 +122,7 @@ describe('NoteManager', () => {
     });
 
     it('should permanently delete a note', async () => {
-      const note = noteManager.createNote({ title: 'Test' });
+      const note = await noteManager.createNote({ title: 'Test' });
 
       const success = await noteManager.permanentlyDeleteNote(note.id);
 
@@ -131,8 +131,8 @@ describe('NoteManager', () => {
       expect(deletedNote).toBeNull();
     });
 
-    it('should restore a deleted note', () => {
-      const note = noteManager.createNote({ title: 'Test' });
+    it('should restore a deleted note', async () => {
+      const note = await noteManager.createNote({ title: 'Test' });
       noteManager.deleteNote(note.id);
 
       const restored = noteManager.restoreNote(note.id);
@@ -143,13 +143,13 @@ describe('NoteManager', () => {
   });
 
   describe('search functionality', () => {
-    beforeEach(() => {
-      noteManager.createNote({
+    beforeEach(async () => {
+      await noteManager.createNote({
         title: 'JavaScript Tutorial',
         content: 'Learn about functions and variables',
         tags: ['programming', 'js']
       });
-      noteManager.createNote({
+      await noteManager.createNote({
         title: 'Python Guide',
         content: 'Python is a great language for beginners',
         tags: ['programming', 'python']
@@ -184,10 +184,10 @@ describe('NoteManager', () => {
   });
 
   describe('tag management', () => {
-    beforeEach(() => {
-      noteManager.createNote({ title: 'Note 1', tags: ['tag1', 'common'] });
-      noteManager.createNote({ title: 'Note 2', tags: ['tag2', 'common'] });
-      noteManager.createNote({ title: 'Note 3', tags: ['tag1'] });
+    beforeEach(async () => {
+      await noteManager.createNote({ title: 'Note 1', tags: ['tag1', 'common'] });
+      await noteManager.createNote({ title: 'Note 2', tags: ['tag2', 'common'] });
+      await noteManager.createNote({ title: 'Note 3', tags: ['tag1'] });
     });
 
     it('should get all unique tags with counts', () => {

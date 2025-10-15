@@ -502,12 +502,16 @@ class NoteCoveApp {
       const firstLine = text.split('\n')[0].trim();
       const title = firstLine || 'Untitled';
 
+      console.log('[DEBUG] handleEditorUpdate - firstLine:', firstLine, 'title:', title, 'currentNote.title:', this.currentNote.title);
+
       // Extract tags from content
       const tags = this.extractTags(text);
 
       // Check if tags or title have changed
       const tagsChanged = JSON.stringify(this.currentNote.tags || []) !== JSON.stringify(tags);
       const titleChanged = this.currentNote.title !== title;
+
+      console.log('[DEBUG] titleChanged:', titleChanged, 'tagsChanged:', tagsChanged);
 
       // Update local copy for UI (but don't modify the Map object directly)
       // In Electron mode, the source of truth is the CRDT, not the in-memory object
@@ -528,7 +532,11 @@ class NoteCoveApp {
           // Update metadata in CRDT (this is the source of truth)
           this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
           // Also update the in-memory note object
-          this.noteManager.updateNote(this.currentNote.id, { title, tags });
+          const updatedNote = this.noteManager.updateNote(this.currentNote.id, { title, tags });
+          // Update our local reference to keep it in sync
+          if (updatedNote) {
+            this.currentNote = updatedNote;
+          }
           // Flush immediately to ensure metadata is saved
           this.syncManager.updateStore.flush(this.currentNote.id);
         }
@@ -536,7 +544,11 @@ class NoteCoveApp {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
         this.currentNote.content = content;
-        this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+        const updatedNote = this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+        // Update our local reference to keep it in sync
+        if (updatedNote) {
+          this.currentNote = updatedNote;
+        }
       }
 
       // Re-render notes list if title changed (to update sidebar)

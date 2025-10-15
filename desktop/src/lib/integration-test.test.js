@@ -123,7 +123,7 @@ describe('Full App Integration Test', () => {
     console.log('NoteManager has', noteManager1.notes.size, 'notes');
 
     // Step 3: Create a new note (as user would do)
-    const newNote = noteManager1.createNote({ folderId: 'all-notes' });
+    const newNote = await noteManager1.createNote({ folderId: 'all-notes' });
     console.log('Created note:', newNote.id);
     expect(newNote).toBeDefined();
     expect(newNote.id).toBeDefined();
@@ -264,7 +264,7 @@ describe('Full App Integration Test', () => {
     await noteManager.setSyncManager(syncManager);
 
     // Create a note
-    const note = noteManager.createNote({ folderId: 'all-notes' });
+    const note = await noteManager.createNote({ folderId: 'all-notes' });
 
     // Get Y.Doc
     const yDoc = syncManager.getDoc(note.id);
@@ -282,7 +282,7 @@ describe('Full App Integration Test', () => {
     const syncManager1 = new SyncManager(noteManager1, testDir, instanceId);
     await noteManager1.setSyncManager(syncManager1);
 
-    const note = noteManager1.createNote({ folderId: 'all-notes' });
+    const note = await noteManager1.createNote({ folderId: 'all-notes' });
     const yDoc1 = syncManager1.getDoc(note.id);
 
     const editor1 = new Editor({
