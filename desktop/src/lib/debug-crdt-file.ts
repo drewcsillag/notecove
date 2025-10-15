@@ -4,10 +4,22 @@
 import * as Y from 'yjs';
 import * as fs from 'fs';
 
-export function inspectCRDTFile(filePath) {
+interface PackedFile {
+  instance: string;
+  sequence: string;
+  timestamp: string;
+  updates: string[];
+}
+
+interface InspectionResult {
+  metadata: Record<string, any>;
+  fragmentLength: number;
+}
+
+export function inspectCRDTFile(filePath: string): InspectionResult | null {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    const packedFile = JSON.parse(content);
+    const packedFile: PackedFile = JSON.parse(content);
 
     console.log('CRDT File:', filePath);
     console.log('  Instance:', packedFile.instance);
@@ -20,7 +32,7 @@ export function inspectCRDTFile(filePath) {
 
     for (const updateStr of packedFile.updates) {
       const updateBytes = Buffer.from(updateStr, 'base64');
-      Y.applyUpdate(doc, updateBytes, 'silent');
+      Y.applyUpdate(doc, updateBytes, 'silent' as any);
     }
 
     // Extract metadata
@@ -39,7 +51,7 @@ export function inspectCRDTFile(filePath) {
     if (fragment.length > 0) {
       // Try to get text representation
       let textContent = '';
-      fragment.forEach(item => {
+      fragment.forEach((item: any) => {
         if (item.toString) {
           textContent += item.toString();
         }
