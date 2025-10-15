@@ -108,7 +108,10 @@ export const TaskItem = Node.create<TaskItemOptions>({
       checkboxWrapper.addEventListener('click', (event: Event) => {
         event.preventDefault();
         if (typeof getPos === 'function') {
-          const currentState = node.attrs.checked as CheckedState;
+          // Get the current node from the editor's state, not the closure variable
+          const pos = getPos();
+          const currentNode = editor.state.doc.nodeAt(pos);
+          const currentState = currentNode?.attrs.checked as CheckedState;
           let newState: CheckedState;
 
           if (currentState === null) {
@@ -120,9 +123,8 @@ export const TaskItem = Node.create<TaskItemOptions>({
           }
 
           editor.commands.command(({ tr }) => {
-            const pos = getPos();
             tr.setNodeMarkup(pos, undefined, {
-              ...node.attrs,
+              ...currentNode?.attrs,
               checked: newState,
             });
             return true;
