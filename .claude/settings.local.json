@@ -57,7 +57,8 @@
       "Bash(timeout 120 npx playwright test desktop/tests/e2e/image-sync-simple.spec.js desktop/tests/e2e/image-sync-ui.spec.js desktop/tests/e2e/image-resize-sync.spec.js --reporter=line --workers=1)",
       "Bash(timeout 180 npx playwright test desktop/tests/e2e/new-note-image-resize.spec.js desktop/tests/e2e/image-resize-sync.spec.js desktop/tests/e2e/image-sync-simple.spec.js desktop/tests/e2e/image-sync-ui.spec.js --reporter=line --workers=1)",
       "Bash(timeout 300 npm run test:e2e)",
-      "Bash(timeout 300 npm run test:e2e -- --workers=4)"
+      "Bash(timeout 300 npm run test:e2e -- --workers=4)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

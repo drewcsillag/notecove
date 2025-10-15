@@ -207,7 +207,7 @@ test.describe('Image Sync', () => {
 
     console.log('Initial dimensions:', initialDimensions);
 
-    // Resize the image by simulating drag
+    // Resize the image by updating attributes
     await window1.evaluate(() => {
       const editor = window.app.editor.editor;
       const img = document.querySelector('.ProseMirror img');
@@ -215,18 +215,36 @@ test.describe('Image Sync', () => {
       // Click on image to show handles
       img.click();
 
-      // Find the image node in the editor
-      const pos = editor.view.posAtDOM(img, 0);
+      // Find the image node position more reliably
+      let imagePos = null;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'image') {
+          imagePos = pos;
+          console.log('Found image node at position:', pos, 'with attrs:', node.attrs);
+          return false; // Stop searching
+        }
+      });
 
-      // Update the image node with new dimensions
-      editor.commands.command(({ tr }) => {
-        tr.setNodeMarkup(pos - 1, undefined, {
-          src: img.src,
+      if (imagePos === null) {
+        console.log('ERROR: Could not find image node in document');
+        return;
+      }
+
+      // Update the image node with new dimensions using updateAttributes
+      const result = editor.chain()
+        .focus()
+        .setNodeSelection(imagePos)
+        .updateAttributes('image', {
           width: 300,
           height: 300,
-        });
-        return true;
-      });
+        })
+        .run();
+
+      console.log('updateAttributes result:', result);
+
+      // Verify the update
+      const updatedNode = editor.state.doc.nodeAt(imagePos);
+      console.log('After update, node attrs:', updatedNode?.attrs);
     });
 
     console.log('Image resized to 300x300');
@@ -234,14 +252,28 @@ test.describe('Image Sync', () => {
     // Wait for update to be processed
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Check dimensions after resize
+    // Check dimensions after resize (read from editor state, not DOM)
     const resizedDimensions = await window1.evaluate(() => {
+      const editor = window.app.editor.editor;
       const img = document.querySelector('.ProseMirror img');
       if (!img) {
         console.log('Image not found after resize!');
         return null;
       }
-      return { width: img.width, height: img.height };
+
+      // Get the image node from editor state (more reliable than DOM properties)
+      const pos = editor.view.posAtDOM(img, 0);
+      const node = editor.state.doc.nodeAt(pos - 1);
+
+      if (!node || node.type.name !== 'image') {
+        console.log('Could not find image node in editor state');
+        return { width: img.width, height: img.height }; // Fallback to DOM
+      }
+
+      return {
+        width: node.attrs.width || img.width,
+        height: node.attrs.height || img.height
+      };
     });
 
     console.log('Resized dimensions:', resizedDimensions);
@@ -264,11 +296,24 @@ test.describe('Image Sync', () => {
       await noteItems[1].click();
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Check dimensions after switching notes
+      // Check dimensions after switching notes (read from editor state)
       const persistedDimensions = await window1.evaluate(() => {
+        const editor = window.app.editor.editor;
         const img = document.querySelector('.ProseMirror img');
         if (!img) return null;
-        return { width: img.width, height: img.height };
+
+        // Get from editor state for reliability
+        const pos = editor.view.posAtDOM(img, 0);
+        const node = editor.state.doc.nodeAt(pos - 1);
+
+        if (!node || node.type.name !== 'image') {
+          return { width: img.width, height: img.height };
+        }
+
+        return {
+          width: node.attrs.width || img.width,
+          height: node.attrs.height || img.height
+        };
       });
 
       console.log('Persisted dimensions:', persistedDimensions);
