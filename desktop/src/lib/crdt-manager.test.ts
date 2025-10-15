@@ -102,7 +102,7 @@ describe('CRDTManager', () => {
         created: '2025-01-01T00:00:00Z',
         modified: '2025-01-01T00:00:00Z',
         tags: ['test', 'demo'],
-        folder: 'work'
+        folderId: 'work'
       };
 
       manager.initializeNote(noteId, note);
@@ -225,7 +225,7 @@ describe('CRDTManager', () => {
     });
 
     it('should update folder', () => {
-      manager.updateMetadata(noteId, { folder: 'projects' });
+      manager.updateMetadata(noteId, { folderId: 'projects' });
 
       const doc = manager.getDoc(noteId);
       const metadata = doc.getMap('metadata');
@@ -249,7 +249,7 @@ describe('CRDTManager', () => {
       manager.updateMetadata(noteId, {
         title: 'Updated Title',
         tags: ['new', 'tags'],
-        folder: 'archive'
+        folderId: 'archive'
       });
 
       const doc = manager.getDoc(noteId);
@@ -455,7 +455,7 @@ describe('CRDTManager', () => {
       // Manager 1 makes multiple edits
       manager1.updateMetadata(noteId, { title: 'Edit 1' });
       manager1.updateMetadata(noteId, { tags: ['tag1'] });
-      manager1.updateMetadata(noteId, { folder: 'work' });
+      manager1.updateMetadata(noteId, { folderId: 'work' });
 
       // Get incremental updates
       const pendingUpdates = manager1.getPendingUpdates(noteId);
