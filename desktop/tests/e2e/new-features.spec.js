@@ -7,6 +7,7 @@ test.describe('New Features', () => {
     await page.evaluate(() => {
       localStorage.clear();
       localStorage.setItem('notecove-notes', JSON.stringify([]));
+      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
     });
     await page.reload();
     await page.waitForLoadState('networkidle');

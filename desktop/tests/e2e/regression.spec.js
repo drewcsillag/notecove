@@ -7,6 +7,7 @@ test.describe('Regression Tests', () => {
     await page.evaluate(() => {
       localStorage.clear();
       localStorage.setItem('notecove-notes', JSON.stringify([]));
+      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
       console.log('localStorage cleared, items:', localStorage.length);
     });
     await page.reload();
@@ -159,6 +160,7 @@ test.describe('Regression Tests', () => {
     // Prevent sample notes from loading after reset
     await page.evaluate(() => {
       localStorage.setItem('notecove-notes', JSON.stringify([]));
+      localStorage.setItem('notecove-test-mode', 'true'); // Re-enable test mode after reset
     });
     await page.reload();
     await page.waitForLoadState('networkidle');

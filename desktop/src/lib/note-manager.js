@@ -159,9 +159,28 @@ export class NoteManager {
   }
 
   /**
+   * Check if we're in test mode (should skip sample notes)
+   * @returns {boolean} True if in test mode
+   */
+  isTestMode() {
+    // Check localStorage for test mode flag
+    try {
+      return localStorage.getItem('notecove-test-mode') === 'true';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Load sample notes for demo
    */
   loadSampleNotes() {
+    // Skip sample notes in test mode
+    if (this.isTestMode()) {
+      console.log('[NoteManager] Skipping sample notes (test mode)');
+      return;
+    }
+
     console.log('[NoteManager] loadSampleNotes() called');
     // Use stable IDs for sample notes so they persist across restarts
     const sampleNotes = [

@@ -6,6 +6,7 @@ test.describe('Editor Scrolling', () => {
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.clear();
+      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
       localStorage.setItem('notecove-notes', JSON.stringify([]));
     });
     await page.reload();

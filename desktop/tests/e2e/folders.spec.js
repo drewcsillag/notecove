@@ -6,6 +6,7 @@ test.describe('Folder Organization', () => {
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.clear();
+      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
       localStorage.setItem('notecove-notes', JSON.stringify([]));
     });
     await page.reload();
@@ -168,6 +169,7 @@ test.describe('Drag and Drop', () => {
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.clear();
+      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
       localStorage.setItem('notecove-notes', JSON.stringify([]));
     });
     await page.reload();
@@ -264,6 +266,7 @@ test.describe('Trash Functionality', () => {
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.clear();
+      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
       localStorage.setItem('notecove-notes', JSON.stringify([]));
     });
     await page.reload();
