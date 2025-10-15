@@ -147,8 +147,8 @@ describe('Full App Integration Test', () => {
     });
     console.log('Created editor bound to Y.Doc');
 
-    // Step 6: User types content
-    const testContent = '<h1>My Test Note</h1><p>This is content that should persist.</p><p>Even after restart!</p>';
+    // Step 6: User types content (use paragraphs to ensure newline separation)
+    const testContent = '<p>My Test Note</p><p>This is content that should persist.</p><p>Even after restart!</p>';
     editor1.commands.setContent(testContent);
     await new Promise(resolve => setTimeout(resolve, 10));
     console.log('Set content in editor');

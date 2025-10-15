@@ -192,7 +192,8 @@ describe('Bug Reproduction Test', () => {
         extensions: [StarterKit, Collaboration.configure({ document: yDoc, field: 'default' })]
       });
 
-      editor.commands.setContent('<h1>My Note Title</h1><p>This is the body content.</p>');
+      // Use paragraphs to ensure newline separation
+      editor.commands.setContent('<p>My Note Title</p><p>This is the body content.</p>');
       await new Promise(resolve => setTimeout(resolve, 10));
 
       // Extract title and update metadata

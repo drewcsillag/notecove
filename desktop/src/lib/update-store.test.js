@@ -229,8 +229,10 @@ describe('UpdateStore', () => {
       expect(newUpdates[0].sequence).toBe(1);
       expect(newUpdates[1].sequence).toBe(2);
 
-      // Verify we marked them as seen
-      expect(store.getNoteState(noteId).seen.get('instance-B')).toBe(2);
+      // Verify we marked them as seen in ranges
+      const ranges = store.getNoteState(noteId).seenRanges.get('instance-B');
+      expect(ranges).toBeDefined();
+      expect(ranges).toEqual([[1, 2]]);
     });
 
     it('should only read updates we haven\'t seen', async () => {
@@ -249,7 +251,8 @@ describe('UpdateStore', () => {
       // Read first batch
       let newUpdates = await store.readNewUpdates(noteId);
       expect(newUpdates.length).toBe(4);
-      expect(store.getNoteState(noteId).seen.get('instance-B')).toBe(4);
+      let ranges = store.getNoteState(noteId).seenRanges.get('instance-B');
+      expect(ranges).toEqual([[1, 4]]);
 
       // Write more updates
       await instanceBStore.addUpdate(noteId, new Uint8Array([5]));
@@ -259,7 +262,8 @@ describe('UpdateStore', () => {
       newUpdates = await store.readNewUpdates(noteId);
       expect(newUpdates.length).toBe(1);
       expect(newUpdates[0].sequence).toBe(5);
-      expect(store.getNoteState(noteId).seen.get('instance-B')).toBe(5);
+      ranges = store.getNoteState(noteId).seenRanges.get('instance-B');
+      expect(ranges).toEqual([[1, 5]]);
     });
 
     it('should handle partial reads from packed files', async () => {
@@ -273,7 +277,7 @@ describe('UpdateStore', () => {
       await instanceBStore.flush(noteId);
 
       // Manually mark that we've seen updates 1-3
-      store.getNoteState(noteId).seen.set('instance-B', 3);
+      store.getNoteState(noteId).seenRanges.set('instance-B', [[1, 3]]);
 
       // Read - should only get 4 and 5
       const newUpdates = await store.readNewUpdates(noteId);

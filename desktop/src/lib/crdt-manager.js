@@ -76,8 +76,9 @@ export class CRDTManager {
       // Set up update handler to track changes
       const updateHandler = (update, origin) => {
         // Skip updates from remote instances AND from loading (don't re-store loaded updates)
+        // Also skip 'silent' origin updates (used for internal operations that shouldn't trigger saves)
         // We want to save all local changes (including those from editor, programmatic updates, etc.)
-        if (origin !== 'remote' && origin !== 'load') {
+        if (origin !== 'remote' && origin !== 'load' && origin !== 'silent') {
           // Store the update to be written as an append-only file
           if (!this.pendingUpdates.has(noteId)) {
             this.pendingUpdates.set(noteId, []);

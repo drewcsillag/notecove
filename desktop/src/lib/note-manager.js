@@ -328,6 +328,21 @@ export class NoteManager {
     };
 
     this.notes.set(id, updatedNote);
+
+    // In Electron mode with CRDT, update metadata directly
+    // This ensures title/tags/folder changes are reflected in CRDT
+    if (this.isElectron && this.syncManager) {
+      const metadataUpdates = {};
+      if (updates.title !== undefined) metadataUpdates.title = updates.title;
+      if (updates.tags !== undefined) metadataUpdates.tags = updates.tags;
+      if (updates.folder !== undefined) metadataUpdates.folder = updates.folder;
+      if (updates.deleted !== undefined) metadataUpdates.deleted = updates.deleted;
+
+      if (Object.keys(metadataUpdates).length > 0) {
+        this.syncManager.crdtManager.updateMetadata(id, metadataUpdates);
+      }
+    }
+
     this.saveNote(updatedNote); // Save asynchronously without blocking
     this.notify('note-updated', { note: updatedNote, updates });
 

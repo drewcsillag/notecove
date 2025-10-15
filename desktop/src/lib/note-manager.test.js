@@ -114,7 +114,7 @@ describe('NoteManager', () => {
     it('should soft delete a note', async () => {
       const note = await noteManager.createNote({ title: 'Test' });
 
-      const success = noteManager.deleteNote(note.id);
+      const success = await noteManager.deleteNote(note.id);
 
       expect(success).toBe(true);
       const deletedNote = noteManager.getNote(note.id);
