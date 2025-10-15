@@ -56,6 +56,11 @@ class NoteCoveApp {
     // Initialize sync manager (will reload notes from CRDT)
     await this.initializeSyncManager();
 
+    // In web mode, load notes now that everything is initialized
+    if (!this.isElectron) {
+      await this.noteManager.loadNotes();
+    }
+
     // Update UI after notes are loaded
     this.updateUI();
     this.renderFolderTree();
@@ -186,8 +191,8 @@ class NoteCoveApp {
       case 'notes-loaded':
         this.notes = data.notes;
         this.updateUI();
-        // Restore last opened note after notes are loaded
-        this.restoreLastOpenedNote();
+        // Restore last opened note after notes are loaded and editor is ready
+        this.restoreLastOpenedNoteWhenReady();
         // Update folder counts now that notes are loaded
         this.renderFolderTree();
         break;
@@ -1332,25 +1337,47 @@ class NoteCoveApp {
   }
 
   /**
+   * Restore the last opened note when editor is ready
+   * Waits for editor initialization to complete before restoring
+   */
+  async restoreLastOpenedNoteWhenReady() {
+    // Wait for editor to be ready
+    const maxWait = 5000; // 5 seconds max
+    const startTime = Date.now();
+    while (!this.editor?.isReady && (Date.now() - startTime) < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
+    if (!this.editor?.isReady) {
+      console.warn('Editor not ready after timeout, skipping note restoration');
+      return;
+    }
+
+    this.restoreLastOpenedNote();
+  }
+
+  /**
    * Restore the last opened note on startup
-   * If the last note was deleted, open the most recent note
+   * If the last note was deleted or doesn't exist, open the most recent note
    */
   restoreLastOpenedNote() {
     try {
       const stored = localStorage.getItem('notecove-last-opened-note');
-      if (!stored) return;
 
-      const { noteId } = JSON.parse(stored);
-      const note = this.noteManager.getNote(noteId);
+      if (stored) {
+        const { noteId } = JSON.parse(stored);
+        const note = this.noteManager.getNote(noteId);
 
-      if (note && !note.deleted) {
-        this.selectNote(noteId);
-      } else {
-        // Note was deleted, find most recent note
-        const recentNote = this.noteManager.getMostRecentNote();
-        if (recentNote) {
-          this.selectNote(recentNote.id);
+        if (note && !note.deleted) {
+          this.selectNote(noteId);
+          return;
         }
+      }
+
+      // No last opened note or note was deleted - open most recent note
+      const recentNote = this.noteManager.getMostRecentNote();
+      if (recentNote) {
+        this.selectNote(recentNote.id);
       }
     } catch (error) {
       console.error('Failed to restore last opened note:', error);

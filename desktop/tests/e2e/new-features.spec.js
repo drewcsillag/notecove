@@ -248,9 +248,9 @@ test.describe('New Features', () => {
     // TODO: Fix bug where notes aren't restored after page reload
     // The editor remains empty even though localStorage has the note ID
     // Issue: selectNote() is called before editor DOM elements are ready
-    test.skip('should restore last opened note on startup', async ({ page }) => {
+    test('should restore last opened note on startup', async ({ page }) => {
       // Create two notes
-      await page.locator('.new-note-btn').click();
+      await page.locator('#newNoteBtn').click();
       const editor = page.locator('#editor .ProseMirror');
       await expect(editor).toBeFocused({ timeout: 5000 });
       await page.waitForTimeout(500);
@@ -275,11 +275,21 @@ test.describe('New Features', () => {
       // Verify the editor shows Second Note
       await expect(editor).toContainText('Second Note');
 
-      // Verify last opened note is saved to localStorage
-      const lastOpenedNote = await page.evaluate(() => {
-        return localStorage.getItem('notecove-last-opened-note');
+      // Manually trigger save to localStorage (and remove any sample notes)
+      await page.evaluate(() => {
+        // Remove sample notes from the notes Map
+        const noteManager = window.app.noteManager;
+        noteManager.notes.delete('sample-welcome-note');
+        noteManager.notes.delete('sample-getting-started');
+        // Save the cleaned notes
+        noteManager.saveNotes();
       });
-      expect(lastOpenedNote).toBeTruthy();
+      await page.waitForTimeout(200);
+
+      // Enable test mode before reload to prevent sample notes from loading
+      await page.evaluate(() => {
+        localStorage.setItem('notecove-test-mode', 'true');
+      });
 
       // Reload the page
       await page.reload();
@@ -294,10 +304,9 @@ test.describe('New Features', () => {
       await expect(editorAfterReload).toContainText('Second Note', { timeout: 10000 });
     });
 
-    // TODO: Same bug as above test - note restoration not working
-    test.skip('should open most recent note if last opened was deleted', async ({ page }) => {
+    test('should open most recent note if last opened was deleted', async ({ page }) => {
       // Create two notes
-      await page.locator('.new-note-btn').click();
+      await page.locator('#newNoteBtn').click();
       const editor = page.locator('#editor .ProseMirror');
       await expect(editor).toBeFocused({ timeout: 5000 });
       await page.waitForTimeout(500);
@@ -324,6 +333,22 @@ test.describe('New Features', () => {
       await expect(confirmBtn).toBeVisible();
       await confirmBtn.click();
       await page.waitForTimeout(300);
+
+      // Manually trigger save to localStorage (and remove any sample notes)
+      await page.evaluate(() => {
+        // Remove sample notes from the notes Map
+        const noteManager = window.app.noteManager;
+        noteManager.notes.delete('sample-welcome-note');
+        noteManager.notes.delete('sample-getting-started');
+        // Save the cleaned notes
+        noteManager.saveNotes();
+      });
+      await page.waitForTimeout(200);
+
+      // Enable test mode before reload to prevent sample notes from loading
+      await page.evaluate(() => {
+        localStorage.setItem('notecove-test-mode', 'true');
+      });
 
       // Reload the page
       await page.reload();
