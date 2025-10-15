@@ -273,9 +273,9 @@ export class NoteManager {
   /**
    * Create a new note
    * @param {object} noteData - Initial note data
-   * @returns {object} Created note
+   * @returns {Promise<object>} Created note
    */
-  createNote(noteData = {}) {
+  async createNote(noteData = {}) {
     const now = new Date().toISOString();
     const note = {
       id: generateUUID(),
@@ -290,7 +290,9 @@ export class NoteManager {
     };
 
     this.notes.set(note.id, note);
-    this.saveNote(note); // Save asynchronously without blocking
+    // IMPORTANT: Await saveNote() to ensure CRDT is fully initialized before continuing
+    // This prevents race conditions where the editor binds to a partially-initialized Y.Doc
+    await this.saveNote(note);
     this.notify('note-created', { note });
 
     return note;

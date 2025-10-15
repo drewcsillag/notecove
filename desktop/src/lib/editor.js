@@ -143,22 +143,17 @@ export class NoteCoveEditor {
   handleUpdate(editor) {
     this.updatePlaceholder();
 
-    console.log(`[Editor] handleUpdate() called, _isBindingDocument=${this._isBindingDocument}, isReady=${this.isReady}`);
-
     // Don't queue updates if we're binding a new document
     if (this._isBindingDocument) {
-      console.log('[Editor] Skipping update - binding new document');
       return;
     }
 
     // Don't queue updates if we're programmatically setting content
     // This prevents debounced updates from firing after isSettingContent becomes false
     if (this.options.isSettingContent && this.options.isSettingContent()) {
-      console.log('[Editor] Skipping update - content is being set programmatically');
       return;
     }
 
-    console.log('[Editor] Queueing debounced update');
     // Pass the current note ID to the debounced update so it can verify
     // the note hasn't changed before applying the update
     this.debouncedUpdate(editor, this.currentNoteId);
@@ -188,9 +183,6 @@ export class NoteCoveEditor {
       return;
     }
 
-    console.log(`[Editor] setDocument() called for note ${noteId}`);
-    console.trace('[Editor] setDocument() stack trace');
-
     this.yDoc = yDoc;
     this.currentNoteId = noteId;
 
@@ -200,7 +192,6 @@ export class NoteCoveEditor {
     // Need to destroy and recreate editor with new Y.Doc
     // TipTap Collaboration extension doesn't support changing documents dynamically
     if (this.editor) {
-      console.log('[Editor] Destroying existing editor');
       this.editor.destroy();
     }
 
@@ -402,8 +393,6 @@ export class NoteCoveEditor {
           const file = item.getAsFile();
           if (!file) continue;
 
-          console.log('[Editor] Pasting image from clipboard');
-
           // Convert to base64
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -416,8 +405,6 @@ export class NoteCoveEditor {
                 src: base64
               }
             });
-
-            console.log('[Editor] Pasted image inserted');
           };
           reader.readAsDataURL(file);
           break;
@@ -439,36 +426,18 @@ export class NoteCoveEditor {
       const file = e.target.files[0];
       if (!file) return;
 
-      console.log('[Editor] Image file selected:', file.name, 'size:', file.size);
-
       // Convert to base64
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target.result;
-        console.log('[Editor] Image converted to base64, length:', base64.length);
-
-        // Check Y.Doc before insertion
-        if (this.yDoc) {
-          const yContent = this.yDoc.getXmlFragment('default');
-          console.log('[Editor] Y.Doc before image insert, length:', yContent.length);
-        }
 
         // Insert using structured content (not HTML string) to ensure proper Y.Doc sync
-        const inserted = this.editor.commands.insertContent({
+        this.editor.commands.insertContent({
           type: 'image',
           attrs: {
             src: base64
           }
         });
-
-        console.log('[Editor] Image inserted, success:', inserted);
-
-        // Check Y.Doc after insertion
-        if (this.yDoc) {
-          const yContent = this.yDoc.getXmlFragment('default');
-          console.log('[Editor] Y.Doc after image insert, length:', yContent.length);
-          console.log('[Editor] Y.Doc content:', yContent.toString().substring(0, 200));
-        }
       };
       reader.readAsDataURL(file);
     };

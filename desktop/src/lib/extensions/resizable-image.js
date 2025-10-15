@@ -76,7 +76,17 @@ export const ResizableImage = Image.extend({
       img.onload = () => {
         aspectRatio = img.naturalWidth / img.naturalHeight;
 
-        if (!node.attrs.width && !node.attrs.height) {
+        // IMPORTANT: Check CURRENT node attributes each time onload fires
+        // Not the captured value from when NodeView was created!
+        // This prevents auto-sizing from overwriting user resizes when NodeView recreates
+        if (typeof getPos !== 'function') return;
+
+        const pos = getPos();
+        const currentNode = editor.state.doc.nodeAt(pos);
+        const hasExistingDimensions = currentNode?.attrs?.width || currentNode?.attrs?.height;
+
+        // Only auto-size if this is a brand new image without dimensions
+        if (!hasExistingDimensions) {
           // Set initial size to natural size or max 600px width
           const maxWidth = 600;
           if (img.naturalWidth > maxWidth) {
@@ -86,17 +96,14 @@ export const ResizableImage = Image.extend({
             img.height = newHeight;
 
             // Immediately save the dimensions
-            if (typeof getPos === 'function') {
-              editor.commands.command(({ tr }) => {
-                const pos = getPos();
-                tr.setNodeMarkup(pos, undefined, {
-                  ...node.attrs,
-                  width: newWidth,
-                  height: newHeight,
-                });
-                return true;
+            editor.commands.command(({ tr }) => {
+              tr.setNodeMarkup(pos, undefined, {
+                ...currentNode.attrs,
+                width: newWidth,
+                height: newHeight,
               });
-            }
+              return true;
+            });
           } else {
             img.width = img.naturalWidth;
             img.height = img.naturalHeight;
@@ -182,15 +189,16 @@ export const ResizableImage = Image.extend({
         const newHeight = img.height;
 
         if (typeof getPos === 'function') {
-          editor.commands.command(({ tr }) => {
-            const pos = getPos();
-            tr.setNodeMarkup(pos, undefined, {
-              ...node.attrs,
+          const pos = getPos();
+
+          // First select the node, then update its attributes
+          editor.chain()
+            .setNodeSelection(pos)
+            .updateAttributes('image', {
               width: newWidth,
               height: newHeight,
-            });
-            return true;
-          });
+            })
+            .run();
         }
       };
 

@@ -978,7 +978,8 @@ class NoteCoveApp {
     console.log('[createNewNote] Previous note was:', previousNote?.id, previousNote?.title);
 
     // Create note in the currently selected folder
-    const newNote = this.noteManager.createNote({
+    // IMPORTANT: Await to ensure CRDT initialization completes before rendering
+    const newNote = await this.noteManager.createNote({
       folderId: this.currentFolderId || 'all-notes'
     });
     console.log('[createNewNote] Created new note:', newNote.id, newNote.title);
@@ -988,14 +989,10 @@ class NoteCoveApp {
     this.isEditing = false; // Reset editing state to ensure editor gets cleared
 
     // In Electron mode, flush the new note immediately to ensure it's persisted
-    // This is important because the note initialization generates CRDT updates
-    // that need to be written to disk
+    // The Y.Doc is now fully initialized, so all subsequent updates will be captured
     if (this.isElectron && this.syncManager) {
-      // Wait a moment for async initialization to complete
-      await new Promise(resolve => setTimeout(resolve, 50));
-      console.log('[createNewNote] About to flush, this.currentNote is:', this.currentNote.id);
+      console.log('[createNewNote] Flushing note to disk:', this.currentNote.id);
       await this.syncManager.updateStore.flush(newNote.id);
-      console.log('[createNewNote] After flush, this.currentNote is:', this.currentNote.id);
     }
 
     // Don't call updateUI() here as it recreates the DOM and can interfere with click events
