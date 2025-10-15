@@ -7,7 +7,7 @@ import {
   formatDate,
   validateNote,
   sanitizeFilename
-} from './utils.js';
+} from './utils';
 
 // Mock DOM for escapeHtml and getPreview tests
 beforeEach(() => {

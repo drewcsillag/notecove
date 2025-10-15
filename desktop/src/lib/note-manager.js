@@ -1,4 +1,4 @@
-import { generateUUID, validateNote } from './utils.js';
+import { generateUUID, validateNote } from './utils';
 import { FolderManager } from './folder-manager.js';
 
 /**

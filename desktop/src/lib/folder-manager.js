@@ -1,4 +1,4 @@
-import { generateUUID } from './utils.js';
+import { generateUUID } from './utils';
 
 /**
  * Folder Manager - handles folder organization for notes

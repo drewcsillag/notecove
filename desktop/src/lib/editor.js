@@ -5,7 +5,7 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
-import { generateUUID, debounce } from './utils.js';
+import { generateUUID, debounce } from './utils';
 import { Hashtag } from './extensions/hashtag.js';
 import { TaskList } from './extensions/task-list.js';
 import { TaskItem } from './extensions/task-item.js';

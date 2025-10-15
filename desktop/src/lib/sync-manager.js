@@ -4,7 +4,7 @@
  */
 import { CRDTManager } from './crdt-manager.js';
 import { UpdateStore } from './update-store.js';
-import { generateUUID } from './utils.js';
+import { generateUUID } from './utils';
 
 export class SyncManager {
   constructor(noteManager, notesPath, instanceId = null) {

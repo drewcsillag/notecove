@@ -1,7 +1,7 @@
 import { NoteCoveEditor } from './lib/editor.js';
 import { NoteManager } from './lib/note-manager.js';
 import { SyncManager } from './lib/sync-manager.js';
-import { debounce, escapeHtml, getPreview, formatDate } from './lib/utils.js';
+import { debounce, escapeHtml, getPreview, formatDate } from './lib/utils';
 
 // NoteCove Renderer Process
 class NoteCoveApp {
