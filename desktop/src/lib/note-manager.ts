@@ -109,7 +109,7 @@ export class NoteManager {
 
         if (notes.length === 0) {
           console.log('No notes found, loading sample notes');
-          this.loadSampleNotes();
+          await this.loadSampleNotes();
         } else {
           console.log(`Adding ${notes.length} notes to NoteManager`);
           notes.forEach(note => {
@@ -140,13 +140,13 @@ export class NoteManager {
             }
           });
         } else {
-          this.loadSampleNotes();
+          await this.loadSampleNotes();
         }
       }
       this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
     } catch (error) {
       console.error('Failed to load notes:', error);
-      this.loadSampleNotes();
+      await this.loadSampleNotes();
       this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
     }
   }
@@ -182,7 +182,7 @@ export class NoteManager {
   /**
    * Load sample notes for demo
    */
-  loadSampleNotes(): void {
+  async loadSampleNotes(): Promise<void> {
     // Skip sample notes in test mode
     if (this.isTestMode()) {
       console.log('[NoteManager] Skipping sample notes (test mode)');
@@ -214,12 +214,14 @@ export class NoteManager {
       }
     ];
 
-    sampleNotes.forEach(note => {
-      console.log(`[NoteManager] Adding sample note to map:`, { id: note.id, title: note.title });
+    // Add sample notes to the map and persist them to disk
+    for (const note of sampleNotes) {
+      console.log(`[NoteManager] Adding and persisting sample note:`, { id: note.id, title: note.title });
       this.notes.set(note.id, note);
-      // Don't save here - will be saved in setSyncManager() after SyncManager is ready
-    });
-    console.log('[NoteManager] Sample notes loaded, map size:', this.notes.size);
+      // Save to disk so they persist as real notes
+      await this.saveNote(note);
+    }
+    console.log('[NoteManager] Sample notes loaded and persisted, map size:', this.notes.size);
   }
 
   /**
