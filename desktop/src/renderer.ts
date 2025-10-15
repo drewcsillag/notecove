@@ -1335,6 +1335,13 @@ class NoteCoveApp {
   async selectNote(noteId: string): Promise<void> {
     if (!this.noteManager) return;
 
+    // If this is already the current note, don't reload it
+    // This prevents losing unsaved title/tag updates during debounce
+    if (this.currentNote && this.currentNote.id === noteId) {
+      console.log(`[renderer] selectNote: Note ${noteId} is already selected, skipping`);
+      return;
+    }
+
     const note = this.noteManager.getNote(noteId);
     console.log(`[renderer] selectNote(${noteId}):`, {
       found: !!note,

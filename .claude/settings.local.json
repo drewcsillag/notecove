@@ -80,7 +80,8 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:main:*)",
       "Bash(npm run build:renderer:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(timeout 120 npx playwright test tests/e2e/basic.spec.js tests/e2e/editor-features.spec.js --reporter=line --workers=1)"
     ],
     "deny": [],
     "ask": []
