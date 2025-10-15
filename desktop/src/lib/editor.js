@@ -217,6 +217,10 @@ export class NoteCoveEditor {
       }
       this.editor.commands.setContent(content || '');
       this.updatePlaceholder();
+
+      // Notify that editor is ready (in case renderer is waiting with isSettingContent flag)
+      // This matches the behavior of setDocument() which calls onReady after binding
+      this.options.onReady();
     }
   }
 
