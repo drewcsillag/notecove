@@ -14,17 +14,7 @@ import { Hashtag } from './extensions/hashtag';
 import { TaskList } from './extensions/task-list';
 import { TaskItem } from './extensions/task-item';
 import { ResizableImage } from './extensions/resizable-image';
-
-interface Note {
-  id: string;
-  title: string;
-  content: string;
-  created: string;
-  modified: string;
-  tags: string[];
-  deleted: boolean;
-  folderId: string;
-}
+import type { Note } from './utils';
 
 type UpdateHandler = (update: Uint8Array, origin: any) => void;
 type CRDTListener = (event: string, data: any) => void;

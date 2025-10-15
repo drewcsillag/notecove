@@ -12,7 +12,7 @@ export interface Note {
   created: string;
   modified: string;
   tags: string[];
-  folder?: string;
+  folderId?: string;
   deleted?: boolean;
 }
 

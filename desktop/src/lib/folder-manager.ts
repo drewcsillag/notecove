@@ -144,7 +144,7 @@ export class FolderManager {
       // Fall back to settings/localStorage if no CRDT storage
       if (!storedFolders || storedFolders.length === 0) {
         if (this.isElectron) {
-          storedFolders = await window.electronAPI.settings.get('folders');
+          storedFolders = (await window.electronAPI?.settings.get('folders')) || null;
         } else {
           // Web mode - use localStorage
           const stored = localStorage.getItem('notecove-folders');
@@ -206,9 +206,9 @@ export class FolderManager {
         }
 
         // Also save to settings as backup
-        await window.electronAPI.settings.set('folders', customFolders);
+        await window.electronAPI?.settings.set('folders', customFolders);
       } else if (this.isElectron) {
-        await window.electronAPI.settings.set('folders', customFolders);
+        await window.electronAPI?.settings.set('folders', customFolders);
       } else {
         localStorage.setItem('notecove-folders', JSON.stringify(customFolders));
       }

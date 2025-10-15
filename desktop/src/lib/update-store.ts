@@ -206,9 +206,9 @@ export class UpdateStore {
 
     try {
       const metaPath = this.getMetaPath(noteId);
-      const result = await window.electronAPI.fileSystem.readFile(metaPath);
+      const result = await window.electronAPI?.fileSystem.readFile(metaPath);
 
-      if (result.success) {
+      if (result?.success && result.content) {
         const meta: MetaFile = JSON.parse(result.content);
         state.writeCounter = meta.lastWrite || 0;
         state.seen = new Map(Object.entries(meta.seen || {}));
@@ -337,13 +337,13 @@ export class UpdateStore {
       const updatePath = this.getUpdatePath(noteId, this.instanceId, startSeq, endSeq);
       await this.ensureDirectories(noteId);
 
-      const writeResult = await window.electronAPI.fileSystem.writeFile(
+      const writeResult = await window.electronAPI?.fileSystem.writeFile(
         updatePath,
         JSON.stringify(packedFile)
       );
 
-      if (!writeResult.success) {
-        console.error('Failed to write packed update file:', writeResult.error);
+      if (!writeResult?.success) {
+        console.error('Failed to write packed update file:', writeResult?.error || 'Unknown error');
         return false;
       }
 
@@ -380,15 +380,16 @@ export class UpdateStore {
       const updatesDir = this.getUpdatesDir(noteId);
 
       // List all update files
-      const listResult = await window.electronAPI.fileSystem.readDir(updatesDir);
-      if (!listResult.success) {
+      const listResult = await window.electronAPI?.fileSystem.readDir(updatesDir);
+      if (!listResult || !listResult.success) {
         // Directory doesn't exist yet
         return [];
       }
 
       const allUpdates: UpdateWithMetadata[] = [];
 
-      for (const filename of listResult.files) {
+      if (!listResult) return [];
+      for (const filename of listResult.files || []) {
         if (!filename.endsWith('.yjson')) continue;
 
         // Parse filename: instance-A.000001-000050.yjson or instance-A.000001.yjson
@@ -399,8 +400,8 @@ export class UpdateStore {
 
         // Read the packed file
         const updatePath = `${updatesDir}/${filename}`;
-        const readResult = await window.electronAPI.fileSystem.readFile(updatePath);
-        if (!readResult.success) {
+        const readResult = await window.electronAPI?.fileSystem.readFile(updatePath);
+        if (!readResult?.success || !readResult.content) {
           console.error('Failed to read packed update file:', updatePath);
           continue;
         }
@@ -442,15 +443,16 @@ export class UpdateStore {
       const updatesDir = this.getUpdatesDir(noteId);
 
       // List all update files
-      const listResult = await window.electronAPI.fileSystem.readDir(updatesDir);
-      if (!listResult.success) {
+      const listResult = await window.electronAPI?.fileSystem.readDir(updatesDir);
+      if (!listResult || !listResult.success) {
         // Directory doesn't exist yet
         return [];
       }
 
       const newUpdates: UpdateWithMetadata[] = [];
 
-      for (const filename of listResult.files) {
+      if (!listResult) return [];
+      for (const filename of listResult.files || []) {
         if (!filename.endsWith('.yjson')) continue;
 
         // Parse filename: instance-A.000001-000050.yjson or instance-A.000001.yjson
@@ -483,8 +485,8 @@ export class UpdateStore {
 
         // Read the packed file
         const updatePath = `${updatesDir}/${filename}`;
-        const readResult = await window.electronAPI.fileSystem.readFile(updatePath);
-        if (!readResult.success) {
+        const readResult = await window.electronAPI?.fileSystem.readFile(updatePath);
+        if (!readResult?.success || !readResult.content) {
           console.error('Failed to read packed update file:', updatePath);
           continue;
         }
@@ -553,13 +555,13 @@ export class UpdateStore {
 
       await this.ensureDirectories(noteId);
 
-      const result = await window.electronAPI.fileSystem.writeFile(
+      const result = await window.electronAPI?.fileSystem.writeFile(
         metaPath,
         JSON.stringify(meta, null, 2)
       );
 
-      if (!result.success) {
-        console.error('Failed to write meta file:', result.error);
+      if (!result?.success) {
+        console.error('Failed to write meta file:', result?.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error writing meta file:', error);
@@ -579,9 +581,9 @@ export class UpdateStore {
     const metaDir = `${noteDir}/meta`;
 
     for (const dir of [noteDir, updatesDir, metaDir]) {
-      const exists = await window.electronAPI.fileSystem.exists(dir);
+      const exists = await window.electronAPI?.fileSystem.exists(dir);
       if (!exists) {
-        await window.electronAPI.fileSystem.mkdir(dir);
+        await window.electronAPI?.fileSystem.mkdir(dir);
       }
     }
   }
@@ -669,13 +671,13 @@ export class UpdateStore {
 
     try {
       const metaDir = `${this.fileStorage.notesPath}/${noteId}/meta`;
-      const result = await window.electronAPI.fileSystem.readDir(metaDir);
+      const result = await window.electronAPI?.fileSystem.readDir(metaDir);
 
-      if (!result.success) {
+      if (!result?.success) {
         return [];
       }
 
-      return result.files
+      return (result.files || [])
         .filter((f: string) => f.endsWith('.json'))
         .map((f: string) => f.replace('.json', ''));
     } catch (error) {

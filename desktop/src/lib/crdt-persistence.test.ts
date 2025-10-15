@@ -95,7 +95,7 @@ describe('CRDT Persistence Integration', () => {
       created: '2025-10-13T20:00:00.000Z',
       modified: '2025-10-13T20:00:00.000Z',
       tags: ['test', 'important'],
-      folder: 'work',
+      folderId: 'work',
       deleted: false
     };
 
@@ -148,7 +148,7 @@ describe('CRDT Persistence Integration', () => {
       created: '2025-10-13T20:00:00.000Z',
       modified: '2025-10-13T20:00:00.000Z',
       tags: [],
-      folder: 'all-notes',
+      folderId: 'all-notes',
       deleted: false
     });
     await syncManager1.updateStore.flush(noteId);

@@ -28,7 +28,7 @@ interface DialogAPI {
   showMessageBox: (options: Electron.MessageBoxOptions) => Promise<Electron.MessageBoxReturnValue>;
 }
 
-interface ElectronAPI {
+export interface ElectronAPI {
   // Menu actions
   onMenuAction: (callback: (action: string) => void) => void;
 
@@ -115,13 +115,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   version: process.versions.electron,
   isElectron: true
 } as ElectronAPI);
-
-// Augment the global Window interface to include our electronAPI
-declare global {
-  interface Window {
-    electronAPI?: ElectronAPI;
-  }
-}
-
-// Export the ElectronAPI type for use in other modules
-export type { ElectronAPI };

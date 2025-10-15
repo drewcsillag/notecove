@@ -269,7 +269,7 @@ describe('CRDTManager', () => {
         created: '2025-01-01T00:00:00Z',
         modified: '2025-01-01T00:00:00Z',
         tags: ['test'],
-        folder: 'work'
+        folderId: 'work'
       });
 
       const note = manager.getNoteFromDoc(noteId);

@@ -324,7 +324,7 @@ class NoteCoveApp {
     }
   }
 
-  handleFolderEvent(event: string, data: any): void {
+  handleFolderEvent(event: string, _data: any): void {
     switch (event) {
       case 'folders-loaded':
       case 'folder-created':
@@ -888,8 +888,8 @@ class NoteCoveApp {
     tagsList.innerHTML = sortedTags.map(([tag, count]) => {
       // Determine if this tag is active and what mode
       const isActive = this.tagFilterState && this.tagFilterState.tag === tag;
-      const isExclude = isActive && this.tagFilterState.mode === 'exclude';
-      const isInclude = isActive && this.tagFilterState.mode === 'include';
+      const isExclude = isActive && this.tagFilterState && this.tagFilterState.mode === 'exclude';
+      const isInclude = isActive && this.tagFilterState && this.tagFilterState.mode === 'include';
 
       return `
         <div class="tag-item ${isInclude ? 'active' : ''} ${isExclude ? 'tag-exclude' : ''}"

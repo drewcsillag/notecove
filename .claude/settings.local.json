@@ -79,7 +79,8 @@
       "Bash(timeout 120 npx playwright test tests/e2e/editor-features.spec.js --grep \"should persist task states after note switch|should maintain toolbar button active states\" --reporter=line --workers=1)",
       "Bash(npx tsc:*)",
       "Bash(npm run build:main:*)",
-      "Bash(npm run build:renderer:*)"
+      "Bash(npm run build:renderer:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,17 +1,6 @@
-import { generateUUID, validateNote } from './utils';
+import { generateUUID, validateNote, type Note } from './utils';
 import { FolderManager } from './folder-manager';
 import { SyncManager } from './sync-manager';
-
-interface Note {
-  id: string;
-  title: string;
-  content: string;
-  created: string;
-  modified: string;
-  tags: string[];
-  deleted: boolean;
-  folderId: string;
-}
 
 type NoteListener = (event: string, data: any) => void;
 
