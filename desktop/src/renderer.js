@@ -502,16 +502,12 @@ class NoteCoveApp {
       const firstLine = text.split('\n')[0].trim();
       const title = firstLine || 'Untitled';
 
-      console.log('[DEBUG] handleEditorUpdate - firstLine:', firstLine, 'title:', title, 'currentNote.title:', this.currentNote.title);
-
       // Extract tags from content
       const tags = this.extractTags(text);
 
       // Check if tags or title have changed
       const tagsChanged = JSON.stringify(this.currentNote.tags || []) !== JSON.stringify(tags);
       const titleChanged = this.currentNote.title !== title;
-
-      console.log('[DEBUG] titleChanged:', titleChanged, 'tagsChanged:', tagsChanged);
 
       // Update local copy for UI (but don't modify the Map object directly)
       // In Electron mode, the source of truth is the CRDT, not the in-memory object
@@ -553,6 +549,8 @@ class NoteCoveApp {
 
       // Re-render notes list if title changed (to update sidebar)
       if (titleChanged) {
+        // Update the cached notes array so renderNotesList() sees the new title
+        this.notes = this.noteManager.getAllNotes();
         this.renderNotesList();
       }
 

@@ -43,8 +43,8 @@ test.describe('NoteCove Basic Functionality', () => {
 
   test('should type in note and derive title from first line', async ({ page }) => {
     // Re-enabled after fixing handleEditorUpdate() to trigger sidebar re-render on title changes
-    // Create new note
-    await page.locator('.new-note-btn').click();
+    // Create new note using sidebar button (sample notes are loaded, so welcome button isn't visible)
+    await page.locator('#newNoteBtn').click();
 
     // Wait for editor to be ready and focused
     const editor = page.locator('#editor .ProseMirror');
@@ -65,8 +65,8 @@ test.describe('NoteCove Basic Functionality', () => {
   });
 
   test('should search notes and filter results', async ({ page }) => {
-    // Create multiple notes
-    await page.locator('.new-note-btn').click();
+    // Create multiple notes using sidebar button
+    await page.locator('#newNoteBtn').click();
     const editor = page.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await page.waitForTimeout(500);
@@ -121,8 +121,8 @@ test.describe('NoteCove Basic Functionality', () => {
   });
 
   test('should maintain search input focus while typing', async ({ page }) => {
-    // Create a note first
-    await page.locator('.new-note-btn').click();
+    // Create a note first using sidebar button
+    await page.locator('#newNoteBtn').click();
     await page.locator('#editor .ProseMirror').fill('Test Note\nTest content');
     await page.waitForTimeout(1500);
 

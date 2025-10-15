@@ -293,6 +293,17 @@ export class NoteManager {
     // IMPORTANT: Await saveNote() to ensure CRDT is fully initialized before continuing
     // This prevents race conditions where the editor binds to a partially-initialized Y.Doc
     await this.saveNote(note);
+
+    // After CRDT initialization, sync the note object with CRDT metadata
+    // (e.g., empty title becomes "Untitled" in CRDT)
+    if (this.isElectron && this.syncManager) {
+      const crdtTitle = this.syncManager.crdtManager.getDoc(note.id).getMap('metadata').get('title');
+      if (crdtTitle && crdtTitle !== note.title) {
+        note.title = crdtTitle;
+        this.notes.set(note.id, note);
+      }
+    }
+
     this.notify('note-created', { note });
 
     return note;
