@@ -1,10 +1,15 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { wrappingInputRule } from '@tiptap/core';
 
+export interface TaskListOptions {
+  itemTypeName: string;
+  HTMLAttributes: Record<string, any>;
+}
+
 /**
  * TaskList extension - container for TaskItems
  */
-export const TaskList = Node.create({
+export const TaskList = Node.create<TaskListOptions>({
   name: 'taskList',
 
   addOptions() {

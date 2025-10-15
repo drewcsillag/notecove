@@ -3,20 +3,15 @@
  * Adds drag handles to table columns for manual resizing
  */
 
-export function initTableResizing(editorElement) {
+export function initTableResizing(editorElement: HTMLElement): () => void {
   let isResizing = false;
-  let currentCell = null;
+  let currentCell: HTMLTableCellElement | null = null;
   let startX = 0;
   let startWidth = 0;
 
-  // Add event listeners to editor
-  editorElement.addEventListener('mousedown', handleMouseDown);
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
-
-  function handleMouseDown(e) {
+  function handleMouseDown(e: MouseEvent): void {
     // Check if click is on the resize handle (right edge of cell)
-    const cell = e.target.closest('th, td');
+    const cell = (e.target as HTMLElement).closest('th, td') as HTMLTableCellElement | null;
     if (!cell) return;
 
     const rect = cell.getBoundingClientRect();
@@ -34,7 +29,7 @@ export function initTableResizing(editorElement) {
     }
   }
 
-  function handleMouseMove(e) {
+  function handleMouseMove(e: MouseEvent): void {
     if (!isResizing || !currentCell) return;
 
     const diff = e.clientX - startX;
@@ -46,7 +41,7 @@ export function initTableResizing(editorElement) {
     currentCell.style.maxWidth = `${newWidth}px`;
   }
 
-  function handleMouseUp() {
+  function handleMouseUp(): void {
     if (isResizing && currentCell) {
       currentCell.classList.remove('resizing');
       isResizing = false;
@@ -54,11 +49,10 @@ export function initTableResizing(editorElement) {
     }
   }
 
-  // Update cursor on hover
-  editorElement.addEventListener('mousemove', (e) => {
+  function handleEditorMouseMove(e: MouseEvent): void {
     if (isResizing) return;
 
-    const cell = e.target.closest('th, td');
+    const cell = (e.target as HTMLElement).closest('th, td') as HTMLTableCellElement | null;
     if (!cell) {
       editorElement.style.cursor = '';
       return;
@@ -72,12 +66,21 @@ export function initTableResizing(editorElement) {
     } else {
       editorElement.style.cursor = '';
     }
-  });
+  }
+
+  // Add event listeners to editor
+  editorElement.addEventListener('mousedown', handleMouseDown);
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+
+  // Update cursor on hover
+  editorElement.addEventListener('mousemove', handleEditorMouseMove);
 
   // Cleanup function
   return () => {
     editorElement.removeEventListener('mousedown', handleMouseDown);
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
+    editorElement.removeEventListener('mousemove', handleEditorMouseMove);
   };
 }

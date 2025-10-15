@@ -2,17 +2,54 @@
  * Sync Manager - Coordinates CRDT-based multi-instance sync
  * Uses UpdateStore for append-only file operations
  */
-import { CRDTManager } from './crdt-manager.js';
-import { UpdateStore } from './update-store.js';
+import { CRDTManager } from './crdt-manager';
+import { UpdateStore } from './update-store';
 import { generateUUID } from './utils';
+import type { NoteManager } from './note-manager';
+import * as Y from 'yjs';
+
+interface Note {
+  id: string;
+  title: string;
+  content: string;
+  created: string;
+  modified: string;
+  tags: string[];
+  deleted: boolean;
+  folderId: string;
+}
+
+type SyncListener = (event: string, data: any) => void;
+type SyncStatus = 'idle' | 'watching' | 'syncing' | 'error';
+
+interface SyncStats {
+  instanceId: string;
+  status: SyncStatus;
+  lastSyncTime: Date | null;
+  initializedNotes: string[];
+  crdtStats: any;
+}
 
 export class SyncManager {
-  constructor(noteManager, notesPath, instanceId = null) {
+  noteManager: NoteManager;
+  notesPath: string;
+  isElectron: boolean;
+  watchId: string | null;
+  syncStatus: SyncStatus;
+  listeners: Set<SyncListener>;
+  lastSyncTime: Date | null;
+  crdtManager: CRDTManager;
+  instanceId: string;
+  updateStore: UpdateStore;
+  initializedNotes: Set<string>;
+  syncInterval: NodeJS.Timeout | null;
+
+  constructor(noteManager: NoteManager, notesPath: string, instanceId: string | null = null) {
     this.noteManager = noteManager;
     this.notesPath = notesPath;
     this.isElectron = window.electronAPI?.isElectron || false;
     this.watchId = null;
-    this.syncStatus = 'idle'; // idle, watching, syncing, error
+    this.syncStatus = 'idle';
     this.listeners = new Set();
     this.lastSyncTime = null;
     this.crdtManager = new CRDTManager();
@@ -32,6 +69,9 @@ export class SyncManager {
     // Track which notes are initialized with UpdateStore
     this.initializedNotes = new Set();
 
+    // Sync interval timer
+    this.syncInterval = null;
+
     // Listen to CRDT updates
     this.setupCRDTListener();
 
@@ -40,26 +80,26 @@ export class SyncManager {
 
   /**
    * Add a listener for sync events
-   * @param {Function} listener - Callback for sync events
+   * @param listener - Callback for sync events
    */
-  addListener(listener) {
+  addListener(listener: SyncListener): void {
     this.listeners.add(listener);
   }
 
   /**
    * Remove a listener
-   * @param {Function} listener - Listener to remove
+   * @param listener - Listener to remove
    */
-  removeListener(listener) {
+  removeListener(listener: SyncListener): void {
     this.listeners.delete(listener);
   }
 
   /**
    * Notify all listeners of sync events
-   * @param {string} event - Event type
-   * @param {object} data - Event data
+   * @param event - Event type
+   * @param data - Event data
    */
-  notify(event, data) {
+  notify(event: string, data: any): void {
     this.listeners.forEach(listener => {
       try {
         listener(event, data);
@@ -71,9 +111,9 @@ export class SyncManager {
 
   /**
    * Update sync status
-   * @param {string} status - New status
+   * @param status - New status
    */
-  updateStatus(status) {
+  updateStatus(status: SyncStatus): void {
     this.syncStatus = status;
     this.notify('status-changed', { status, time: new Date() });
   }
@@ -81,7 +121,7 @@ export class SyncManager {
   /**
    * Set up listener for CRDT update events
    */
-  setupCRDTListener() {
+  setupCRDTListener(): void {
     this.crdtManager.addListener(async (event, data) => {
       if (event === 'doc-updated') {
         // CRDT document was updated locally
@@ -95,7 +135,7 @@ export class SyncManager {
   /**
    * Start watching for file changes and syncing
    */
-  async startWatching() {
+  async startWatching(): Promise<void> {
     if (!this.isElectron) {
       console.log('Not in Electron mode, skipping file watch');
       return;
@@ -129,7 +169,7 @@ export class SyncManager {
   /**
    * Stop watching for changes
    */
-  async stopWatching() {
+  async stopWatching(): Promise<void> {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
@@ -147,7 +187,7 @@ export class SyncManager {
   /**
    * Perform sync: read new updates and apply them
    */
-  async performSync() {
+  async performSync(): Promise<void> {
     if (!this.isElectron) return;
 
     this.updateStatus('syncing');
@@ -186,7 +226,7 @@ export class SyncManager {
   /**
    * Check for gaps in all notes and emit events
    */
-  async checkForGaps() {
+  async checkForGaps(): Promise<void> {
     if (!this.isElectron) return;
 
     try {
@@ -222,7 +262,7 @@ export class SyncManager {
    * Check for folder structure changes from other instances
    * Uses CRDT-based sync just like notes
    */
-  async syncFolders() {
+  async syncFolders(): Promise<void> {
     if (!this.isElectron) return;
 
     try {
@@ -272,7 +312,7 @@ export class SyncManager {
   /**
    * Scan filesystem for new notes created by other instances
    */
-  async scanForNewNotes() {
+  async scanForNewNotes(): Promise<void> {
     if (!this.isElectron) return;
 
     try {
@@ -331,9 +371,9 @@ export class SyncManager {
 
   /**
    * Sync a specific note
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  async syncNote(noteId) {
+  async syncNote(noteId: string): Promise<void> {
     try {
       // Initialize UpdateStore for this note if not done yet
       if (!this.initializedNotes.has(noteId)) {
@@ -397,10 +437,10 @@ export class SyncManager {
   /**
    * Save a note with CRDT
    * Called by NoteManager when a note is saved locally
-   * @param {object} note - Note to save
-   * @returns {boolean} Success
+   * @param note - Note to save
+   * @returns Success
    */
-  async saveNoteWithCRDT(note) {
+  async saveNoteWithCRDT(note: Note): Promise<boolean> {
     console.log('=== saveNoteWithCRDT called ===');
     console.log('  Note ID:', note.id);
     console.log('  Note title:', note.title);
@@ -428,7 +468,7 @@ export class SyncManager {
       } else {
         // Always update critical metadata that changes outside the editor
         // (deleted flag, folder assignments) even if the CRDT already exists
-        const criticalMetadata = {};
+        const criticalMetadata: Record<string, any> = {};
         if (note.deleted !== undefined) {
           criticalMetadata.deleted = note.deleted;
         }
@@ -459,16 +499,16 @@ export class SyncManager {
       return true;
     } catch (error) {
       console.error('Error saving note with CRDT:', error);
-      console.error('Stack trace:', error.stack);
+      console.error('Stack trace:', (error as Error).stack);
       return false;
     }
   }
 
   /**
    * Load all notes from CRDT update files
-   * @returns {Array} Array of notes
+   * @returns Array of notes
    */
-  async loadAllNotes() {
+  async loadAllNotes(): Promise<Note[]> {
     if (!this.isElectron) return [];
 
     try {
@@ -496,7 +536,7 @@ export class SyncManager {
 
       console.log('Found items in notes directory:', result.files.length);
 
-      const notes = [];
+      const notes: Note[] = [];
 
       for (const item of result.files) {
         // Skip hidden files and non-directories
@@ -535,7 +575,7 @@ export class SyncManager {
       console.log(`=== Loaded ${notes.length} notes total ===`);
 
       // Sort by modification date
-      return notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+      return notes.sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
     } catch (error) {
       console.error('Error loading all notes:', error);
       return [];
@@ -544,10 +584,10 @@ export class SyncManager {
 
   /**
    * Load a note and initialize CRDT from update files
-   * @param {string} noteId - Note ID
-   * @returns {object} Note or null
+   * @param noteId - Note ID
+   * @returns Note or null
    */
-  async loadNote(noteId) {
+  async loadNote(noteId: string): Promise<Note | null> {
     try {
       // Initialize UpdateStore for this note
       if (!this.initializedNotes.has(noteId)) {
@@ -571,7 +611,7 @@ export class SyncManager {
       this.crdtManager.clearDoc(noteId);
 
       // Apply all updates to build the current state
-      for (const { instanceId, sequence, update } of allUpdates) {
+      for (const { update } of allUpdates) {
         this.crdtManager.applyUpdate(noteId, update, 'load');
       }
 
@@ -608,27 +648,27 @@ export class SyncManager {
 
   /**
    * Get the CRDT document for a note (for TipTap integration)
-   * @param {string} noteId - Note ID
-   * @returns {Y.Doc} Yjs document
+   * @param noteId - Note ID
+   * @returns Yjs document
    */
-  getDoc(noteId) {
+  getDoc(noteId: string): Y.Doc {
     return this.crdtManager.getDoc(noteId);
   }
 
   /**
    * Get the content fragment for TipTap
-   * @param {string} noteId - Note ID
-   * @returns {Y.XmlFragment} Fragment for TipTap
+   * @param noteId - Note ID
+   * @returns Fragment for TipTap
    */
-  getContentFragment(noteId) {
+  getContentFragment(noteId: string): Y.XmlFragment {
     return this.crdtManager.getContentFragment(noteId);
   }
 
   /**
    * Get sync statistics
-   * @returns {object} Stats
+   * @returns Stats
    */
-  getStats() {
+  getStats(): SyncStats {
     return {
       instanceId: this.instanceId,
       status: this.syncStatus,
@@ -641,7 +681,7 @@ export class SyncManager {
   /**
    * Clean up resources
    */
-  async destroy() {
+  async destroy(): Promise<void> {
     await this.stopWatching();
     this.crdtManager.destroy();
     this.listeners.clear();

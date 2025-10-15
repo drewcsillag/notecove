@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { UpdateStore, ImmediateFlushStrategy, CountFlushStrategy } from '../../src/lib/update-store.js';
+import { UpdateStore, ImmediateFlushStrategy, CountFlushStrategy } from '../../src/lib/update-store';
 import * as Y from 'yjs';
 
 // Mock file storage

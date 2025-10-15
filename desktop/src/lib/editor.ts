@@ -5,18 +5,77 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
-import { generateUUID, debounce } from './utils';
-import { Hashtag } from './extensions/hashtag.js';
-import { TaskList } from './extensions/task-list.js';
-import { TaskItem } from './extensions/task-item.js';
-import { ResizableImage } from './extensions/resizable-image.js';
-import { initTableResizing } from './table-resize.js';
+import * as Y from 'yjs';
+import { debounce } from './utils';
+import { Hashtag } from './extensions/hashtag';
+import { TaskList } from './extensions/task-list';
+import { TaskItem } from './extensions/task-item';
+import { ResizableImage } from './extensions/resizable-image';
+import { initTableResizing } from './table-resize';
+
+export interface NoteCoveEditorOptions {
+  autofocus?: boolean;
+  placeholder?: string;
+  onUpdate?: (editor: Editor) => void;
+  onFocus?: (editor: Editor) => void;
+  onBlur?: (editor: Editor) => void;
+  onReady?: () => void;
+  isSettingContent?: () => boolean;
+  yDoc?: Y.Doc | null;
+}
+
+interface FormatState {
+  isBold: boolean;
+  isItalic: boolean;
+  isHeading1: boolean;
+  isHeading2: boolean;
+  isHeading3: boolean;
+  isBulletList: boolean;
+  isOrderedList: boolean;
+}
+
+interface ToolbarStates {
+  bold: boolean;
+  italic: boolean;
+  strike: boolean;
+  heading1: boolean;
+  heading2: boolean;
+  heading3: boolean;
+  bulletList: boolean;
+  orderedList: boolean;
+  taskList: boolean;
+}
+
+type ToolbarAction =
+  | 'bold'
+  | 'italic'
+  | 'strike'
+  | 'heading1'
+  | 'heading2'
+  | 'heading3'
+  | 'bulletList'
+  | 'orderedList'
+  | 'taskList'
+  | 'insertImage'
+  | 'insertTable'
+  | 'undo'
+  | 'redo';
 
 /**
  * NoteCove rich text editor wrapper around TipTap
  */
 export class NoteCoveEditor {
-  constructor(element, options = {}) {
+  private element: HTMLElement;
+  private options: Required<NoteCoveEditorOptions>;
+  private currentNoteId: string | null;
+  private isReady: boolean;
+  private cleanupTableResizing: (() => void) | null;
+  private yDoc: Y.Doc | null;
+  private editor!: Editor;
+  private debouncedUpdate!: (editor: Editor, noteId: string | null) => void;
+  private _isBindingDocument: boolean;
+
+  constructor(element: HTMLElement, options: NoteCoveEditorOptions = {}) {
     this.element = element;
     this.options = {
       autofocus: true,
@@ -25,13 +84,15 @@ export class NoteCoveEditor {
       onFocus: () => {},
       onBlur: () => {},
       onReady: () => {}, // Called when editor is fully initialized
+      isSettingContent: () => false,
+      yDoc: null,
       ...options
     };
 
-    this.currentNote = null;
     this.currentNoteId = null; // Track which note we're editing
     this.isReady = false;
     this.cleanupTableResizing = null;
+    this._isBindingDocument = false;
 
     // Y.Doc for CRDT-based collaboration (Electron mode)
     this.yDoc = options.yDoc || null;
@@ -39,7 +100,7 @@ export class NoteCoveEditor {
     this.initializeEditor();
   }
 
-  initializeEditor() {
+  private initializeEditor(): void {
     // Build extensions array
     const extensions = [
       StarterKit.configure({
@@ -131,7 +192,7 @@ export class NoteCoveEditor {
 
     // Debounced update handler to avoid excessive saves
     // Note: We pass the noteId to verify we're still on the same note when the update fires
-    this.debouncedUpdate = debounce((editor, noteId) => {
+    this.debouncedUpdate = debounce((editor: Editor, noteId: string | null) => {
       // Only trigger update if we're still on the same note
       if (noteId === this.currentNoteId) {
         this.options.onUpdate(editor);
@@ -140,7 +201,7 @@ export class NoteCoveEditor {
     }, 250); // Reduced to 250ms for faster saves
   }
 
-  handleUpdate(editor) {
+  private handleUpdate(editor: Editor): void {
     this.updatePlaceholder();
 
     // Don't queue updates if we're binding a new document
@@ -159,9 +220,9 @@ export class NoteCoveEditor {
     this.debouncedUpdate(editor, this.currentNoteId);
   }
 
-  updatePlaceholder() {
+  private updatePlaceholder(): void {
     const isEmpty = this.editor.isEmpty;
-    const element = this.editor.view.dom;
+    const element = this.editor.view.dom as HTMLElement;
 
     if (isEmpty && !element.classList.contains('is-empty')) {
       element.classList.add('is-empty');
@@ -174,10 +235,10 @@ export class NoteCoveEditor {
 
   /**
    * Switch to a new Y.Doc (for CRDT mode when changing notes)
-   * @param {Y.Doc} yDoc - New Y.Doc to bind to
-   * @param {string} noteId - ID of the note being loaded
+   * @param yDoc - New Y.Doc to bind to
+   * @param noteId - ID of the note being loaded
    */
-  setDocument(yDoc, noteId) {
+  setDocument(yDoc: Y.Doc, noteId: string): void {
     if (!yDoc) {
       console.error('setDocument called with null yDoc');
       return;
@@ -206,10 +267,10 @@ export class NoteCoveEditor {
 
   /**
    * Set the content of the editor (for non-CRDT mode)
-   * @param {string} content - HTML content
-   * @param {string} noteId - ID of the note being loaded (optional, for tracking)
+   * @param content - HTML content
+   * @param noteId - ID of the note being loaded (optional, for tracking)
    */
-  setContent(content, noteId = null) {
+  setContent(content: string, noteId: string | null = null): void {
     if (this.isReady) {
       // Update the current note ID so we can track if it changes before debounced updates fire
       if (noteId) {
@@ -226,24 +287,24 @@ export class NoteCoveEditor {
 
   /**
    * Get the current content as HTML
-   * @returns {string} HTML content
+   * @returns HTML content
    */
-  getContent() {
+  getContent(): string {
     return this.isReady ? this.editor.getHTML() : '';
   }
 
   /**
    * Get the current content as plain text
-   * @returns {string} Plain text content
+   * @returns Plain text content
    */
-  getText() {
+  getText(): string {
     return this.isReady ? this.editor.getText() : '';
   }
 
   /**
    * Focus the editor
    */
-  focus() {
+  focus(): void {
     if (this.isReady) {
       this.editor.commands.focus();
     }
@@ -251,25 +312,25 @@ export class NoteCoveEditor {
 
   /**
    * Check if the editor has focus
-   * @returns {boolean}
+   * @returns boolean
    */
-  isFocused() {
+  isFocused(): boolean {
     return this.isReady ? this.editor.isFocused : false;
   }
 
   /**
    * Check if editor is empty
-   * @returns {boolean}
+   * @returns boolean
    */
-  isEmpty() {
+  isEmpty(): boolean {
     return this.isReady ? this.editor.isEmpty : true;
   }
 
   /**
    * Insert text at current position
-   * @param {string} text
+   * @param text - Text to insert
    */
-  insertText(text) {
+  insertText(text: string): void {
     if (this.isReady) {
       this.editor.commands.insertContent(text);
     }
@@ -278,31 +339,31 @@ export class NoteCoveEditor {
   /**
    * Format text commands
    */
-  bold() {
+  bold(): void {
     if (this.isReady) {
       this.editor.chain().focus().toggleBold().run();
     }
   }
 
-  italic() {
+  italic(): void {
     if (this.isReady) {
       this.editor.chain().focus().toggleItalic().run();
     }
   }
 
-  heading(level = 1) {
+  heading(level: 1 | 2 | 3 = 1): void {
     if (this.isReady) {
       this.editor.chain().focus().toggleHeading({ level }).run();
     }
   }
 
-  bulletList() {
+  bulletList(): void {
     if (this.isReady) {
       this.editor.chain().focus().toggleBulletList().run();
     }
   }
 
-  orderedList() {
+  orderedList(): void {
     if (this.isReady) {
       this.editor.chain().focus().toggleOrderedList().run();
     }
@@ -311,8 +372,18 @@ export class NoteCoveEditor {
   /**
    * Get formatting state
    */
-  getFormatState() {
-    if (!this.isReady) return {};
+  getFormatState(): FormatState {
+    if (!this.isReady) {
+      return {
+        isBold: false,
+        isItalic: false,
+        isHeading1: false,
+        isHeading2: false,
+        isHeading3: false,
+        isBulletList: false,
+        isOrderedList: false
+      };
+    }
 
     return {
       isBold: this.editor.isActive('bold'),
@@ -328,21 +399,21 @@ export class NoteCoveEditor {
   /**
    * Setup toolbar with formatting buttons
    */
-  setupToolbar() {
+  setupToolbar(): void {
     const toolbar = document.getElementById('editorToolbar');
     if (!toolbar) return;
 
     // Add click handlers to toolbar buttons
-    toolbar.addEventListener('click', (e) => {
-      const button = e.target.closest('.toolbar-btn');
+    toolbar.addEventListener('click', (e: MouseEvent) => {
+      const button = (e.target as HTMLElement).closest('.toolbar-btn') as HTMLElement;
       if (!button) return;
 
-      const action = button.dataset.action;
+      const action = button.dataset.action as ToolbarAction;
       this.executeToolbarAction(action);
     });
 
     // Create throttled version of updateToolbarState to avoid excessive calls
-    let toolbarUpdateTimeout = null;
+    let toolbarUpdateTimeout: NodeJS.Timeout | null = null;
     const throttledUpdateToolbar = () => {
       if (toolbarUpdateTimeout) return; // Skip if already scheduled
       toolbarUpdateTimeout = setTimeout(() => {
@@ -365,10 +436,10 @@ export class NoteCoveEditor {
   /**
    * Execute toolbar action
    */
-  executeToolbarAction(action) {
+  private executeToolbarAction(action: ToolbarAction): void {
     if (!this.editor) return;
 
-    const actions = {
+    const actions: Record<ToolbarAction, () => void> = {
       bold: () => this.editor.chain().focus().toggleBold().run(),
       italic: () => this.editor.chain().focus().toggleItalic().run(),
       strike: () => this.editor.chain().focus().toggleStrike().run(),
@@ -377,7 +448,7 @@ export class NoteCoveEditor {
       heading3: () => this.editor.chain().focus().toggleHeading({ level: 3 }).run(),
       bulletList: () => this.editor.chain().focus().toggleBulletList().run(),
       orderedList: () => this.editor.chain().focus().toggleOrderedList().run(),
-      taskList: () => this.editor.chain().focus().toggleTaskList().run(),
+      taskList: () => (this.editor.chain().focus() as any).toggleTaskList().run(),
       insertImage: () => this.insertImage(),
       insertTable: () => this.editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
       undo: () => this.editor.chain().focus().undo().run(),
@@ -395,15 +466,17 @@ export class NoteCoveEditor {
   /**
    * Setup paste event handler for images
    */
-  setupPasteHandler() {
+  private setupPasteHandler(): void {
     if (!this.element) return;
 
-    this.element.addEventListener('paste', async (event) => {
+    this.element.addEventListener('paste', async (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
       if (!items) return;
 
       // Check if there's an image in the clipboard
-      for (const item of items) {
+      // Convert DataTransferItemList to array for iteration
+      const itemsArray = Array.from(items);
+      for (const item of itemsArray) {
         if (item.type.indexOf('image') !== -1) {
           event.preventDefault();
 
@@ -412,8 +485,8 @@ export class NoteCoveEditor {
 
           // Convert to base64
           const reader = new FileReader();
-          reader.onload = (e) => {
-            const base64 = e.target.result;
+          reader.onload = (e: ProgressEvent<FileReader>) => {
+            const base64 = e.target?.result as string;
 
             // Insert using structured content (not HTML string) to ensure Y.Doc sync
             this.editor.commands.insertContent({
@@ -433,20 +506,21 @@ export class NoteCoveEditor {
   /**
    * Insert an image using file picker
    */
-  async insertImage() {
+  private async insertImage(): Promise<void> {
     // Create a hidden file input
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
 
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
+    input.onchange = async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
       if (!file) return;
 
       // Convert to base64
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target.result;
+      reader.onload = (event: ProgressEvent<FileReader>) => {
+        const base64 = event.target?.result as string;
 
         // Insert using structured content (not HTML string) to ensure proper Y.Doc sync
         this.editor.commands.insertContent({
@@ -465,13 +539,13 @@ export class NoteCoveEditor {
   /**
    * Update toolbar button active states
    */
-  updateToolbarState() {
+  private updateToolbarState(): void {
     if (!this.editor) return;
 
     const toolbar = document.getElementById('editorToolbar');
     if (!toolbar) return;
 
-    const states = {
+    const states: ToolbarStates = {
       bold: this.editor.isActive('bold'),
       italic: this.editor.isActive('italic'),
       strike: this.editor.isActive('strike'),
@@ -486,7 +560,7 @@ export class NoteCoveEditor {
     Object.keys(states).forEach(action => {
       const button = toolbar.querySelector(`[data-action="${action}"]`);
       if (button) {
-        button.classList.toggle('active', states[action]);
+        button.classList.toggle('active', states[action as keyof ToolbarStates]);
       }
     });
   }
@@ -494,7 +568,7 @@ export class NoteCoveEditor {
   /**
    * Destroy the editor
    */
-  destroy() {
+  destroy(): void {
     // Cleanup table resizing
     if (this.cleanupTableResizing) {
       this.cleanupTableResizing();

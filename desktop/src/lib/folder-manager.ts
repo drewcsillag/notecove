@@ -1,10 +1,38 @@
 import { generateUUID } from './utils';
+import { CRDTManager } from './crdt-manager';
+import { UpdateStore } from './update-store';
+
+interface Folder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  path: string;
+  created: string;
+  isRoot?: boolean;
+  isSpecial?: boolean;
+  icon?: string;
+}
+
+interface FolderWithChildren extends Folder {
+  children: FolderWithChildren[];
+  noteCount?: number;
+}
+
+type FolderListener = (event: string, data: any) => void;
 
 /**
  * Folder Manager - handles folder organization for notes
  */
 export class FolderManager {
-  constructor(notesPath = null, crdtManager = null, updateStore = null) {
+  folders: Map<string, Folder>;
+  listeners: Set<FolderListener>;
+  isElectron: boolean;
+  folderState: Map<string, boolean>;
+  notesPath: string | null;
+  crdtManager: CRDTManager | null;
+  updateStore: UpdateStore | null;
+
+  constructor(notesPath: string | null = null, crdtManager: CRDTManager | null = null, updateStore: UpdateStore | null = null) {
     this.folders = new Map();
     this.listeners = new Set();
     this.isElectron = window.electronAPI?.isElectron || false;
@@ -19,26 +47,26 @@ export class FolderManager {
 
   /**
    * Add a listener for folder changes
-   * @param {Function} listener - Function to call on changes
+   * @param listener - Function to call on changes
    */
-  addListener(listener) {
+  addListener(listener: FolderListener): void {
     this.listeners.add(listener);
   }
 
   /**
    * Remove a listener
-   * @param {Function} listener - Listener to remove
+   * @param listener - Listener to remove
    */
-  removeListener(listener) {
+  removeListener(listener: FolderListener): void {
     this.listeners.delete(listener);
   }
 
   /**
    * Notify all listeners of changes
-   * @param {string} event - Event type
-   * @param {object} data - Event data
+   * @param event - Event type
+   * @param data - Event data
    */
-  notify(event, data) {
+  notify(event: string, data: any): void {
     this.listeners.forEach(listener => {
       try {
         listener(event, data);
@@ -51,9 +79,9 @@ export class FolderManager {
   /**
    * Initialize default folders
    */
-  initializeFolders() {
+  initializeFolders(): void {
     // Root folder (invisible)
-    const rootFolder = {
+    const rootFolder: Folder = {
       id: 'root',
       name: 'Root',
       parentId: null,
@@ -63,7 +91,7 @@ export class FolderManager {
     };
 
     // All Notes folder
-    const allNotesFolder = {
+    const allNotesFolder: Folder = {
       id: 'all-notes',
       name: 'All Notes',
       parentId: 'root',
@@ -74,7 +102,7 @@ export class FolderManager {
     };
 
     // Recently Deleted folder
-    const trashFolder = {
+    const trashFolder: Folder = {
       id: 'trash',
       name: 'Recently Deleted',
       parentId: 'root',
@@ -94,9 +122,9 @@ export class FolderManager {
   /**
    * Load custom folders from storage
    */
-  async loadCustomFolders() {
+  async loadCustomFolders(): Promise<void> {
     try {
-      let storedFolders = null;
+      let storedFolders: Folder[] | null = null;
 
       // Try CRDT-based storage first (for multi-instance sync)
       if (this.isElectron && this.crdtManager) {
@@ -105,8 +133,8 @@ export class FolderManager {
           const yMap = foldersDoc.getMap('folders');
           storedFolders = [];
 
-          yMap.forEach((folderData, folderId) => {
-            storedFolders.push({ id: folderId, ...folderData });
+          yMap.forEach((folderData: any, folderId: string) => {
+            storedFolders!.push({ id: folderId, ...folderData });
           });
 
           console.log('[FolderManager] Loaded folders from CRDT:', storedFolders.length);
@@ -141,7 +169,7 @@ export class FolderManager {
   /**
    * Save folders to storage
    */
-  async saveFolders() {
+  async saveFolders(): Promise<void> {
     try {
       const customFolders = Array.from(this.folders.values())
         .filter(folder => !folder.isSpecial && !folder.isRoot);
@@ -191,17 +219,17 @@ export class FolderManager {
 
   /**
    * Create a new folder
-   * @param {string} name - Folder name
-   * @param {string} parentId - Parent folder ID
-   * @returns {object} Created folder
+   * @param name - Folder name
+   * @param parentId - Parent folder ID
+   * @returns Created folder
    */
-  async createFolder(name, parentId = 'root') {
+  async createFolder(name: string, parentId = 'root'): Promise<Folder> {
     const parent = this.folders.get(parentId);
     if (!parent) {
       throw new Error('Parent folder not found');
     }
 
-    const folder = {
+    const folder: Folder = {
       id: generateUUID(),
       name: name.trim(),
       parentId,
@@ -220,27 +248,29 @@ export class FolderManager {
 
   /**
    * Update a folder
-   * @param {string} folderId - Folder ID
-   * @param {object} updates - Updates to apply
-   * @returns {object|null} Updated folder or null
+   * @param folderId - Folder ID
+   * @param updates - Updates to apply
+   * @returns Updated folder or null
    */
-  async updateFolder(folderId, updates) {
+  async updateFolder(folderId: string, updates: Partial<Folder>): Promise<Folder | null> {
     const folder = this.folders.get(folderId);
     if (!folder || folder.isSpecial || folder.isRoot) {
       return null;
     }
 
-    const updatedFolder = { ...folder, ...updates };
+    const updatedFolder: Folder = { ...folder, ...updates };
 
     // Update path if name changed
     if (updates.name) {
-      const parent = this.folders.get(folder.parentId);
-      updatedFolder.path = parent.path ?
-        `${parent.path}/${updates.name}` :
-        updates.name;
+      const parent = this.folders.get(folder.parentId!);
+      if (parent) {
+        updatedFolder.path = parent.path ?
+          `${parent.path}/${updates.name}` :
+          updates.name;
 
-      // Update paths of all child folders
-      this.updateChildPaths(folderId, updatedFolder.path);
+        // Update paths of all child folders
+        this.updateChildPaths(folderId, updatedFolder.path);
+      }
     }
 
     this.folders.set(folderId, updatedFolder);
@@ -252,10 +282,10 @@ export class FolderManager {
 
   /**
    * Delete a folder
-   * @param {string} folderId - Folder ID
-   * @returns {boolean} Success
+   * @param folderId - Folder ID
+   * @returns Success
    */
-  async deleteFolder(folderId) {
+  async deleteFolder(folderId: string): Promise<boolean> {
     const folder = this.folders.get(folderId);
     if (!folder || folder.isSpecial || folder.isRoot) {
       return false;
@@ -277,27 +307,27 @@ export class FolderManager {
 
   /**
    * Get folder by ID
-   * @param {string} folderId - Folder ID
-   * @returns {object|null} Folder or null
+   * @param folderId - Folder ID
+   * @returns Folder or null
    */
-  getFolder(folderId) {
+  getFolder(folderId: string): Folder | null {
     return this.folders.get(folderId) || null;
   }
 
   /**
    * Get all folders as a flat array
-   * @returns {Array} Array of folders
+   * @returns Array of folders
    */
-  getAllFolders() {
+  getAllFolders(): Folder[] {
     return Array.from(this.folders.values());
   }
 
   /**
    * Get child folders of a parent
-   * @param {string} parentId - Parent folder ID
-   * @returns {Array} Child folders
+   * @param parentId - Parent folder ID
+   * @returns Child folders
    */
-  getChildFolders(parentId) {
+  getChildFolders(parentId: string): Folder[] {
     return Array.from(this.folders.values())
       .filter(folder => folder.parentId === parentId)
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -305,10 +335,10 @@ export class FolderManager {
 
   /**
    * Get folder tree structure
-   * @returns {Array} Tree structure
+   * @returns Tree structure
    */
-  getFolderTree() {
-    const buildTree = (parentId) => {
+  getFolderTree(): FolderWithChildren[] {
+    const buildTree = (parentId: string): FolderWithChildren[] => {
       const children = this.getChildFolders(parentId);
       return children.map(folder => ({
         ...folder,
@@ -324,13 +354,13 @@ export class FolderManager {
 
   /**
    * Update paths of child folders when parent path changes
-   * @param {string} parentId - Parent folder ID
-   * @param {string} newParentPath - New parent path
+   * @param parentId - Parent folder ID
+   * @param newParentPath - New parent path
    */
-  updateChildPaths(parentId, newParentPath) {
+  updateChildPaths(parentId: string, newParentPath: string): void {
     const children = this.getChildFolders(parentId);
     children.forEach(child => {
-      const updatedChild = {
+      const updatedChild: Folder = {
         ...child,
         path: `${newParentPath}/${child.name}`
       };
@@ -343,11 +373,11 @@ export class FolderManager {
 
   /**
    * Move folder to a new parent
-   * @param {string} folderId - Folder ID to move
-   * @param {string} newParentId - New parent folder ID
-   * @returns {object|null} Updated folder or null
+   * @param folderId - Folder ID to move
+   * @param newParentId - New parent folder ID
+   * @returns Updated folder or null
    */
-  async moveFolder(folderId, newParentId) {
+  async moveFolder(folderId: string, newParentId: string): Promise<Folder | null> {
     const folder = this.folders.get(folderId);
     const newParent = this.folders.get(newParentId);
 
@@ -365,7 +395,7 @@ export class FolderManager {
       return null;
     }
 
-    const updatedFolder = {
+    const updatedFolder: Folder = {
       ...folder,
       parentId: newParentId,
       path: newParent.path ? `${newParent.path}/${folder.name}` : folder.name
@@ -382,11 +412,11 @@ export class FolderManager {
 
   /**
    * Check if one folder is a descendant of another
-   * @param {string} descendantId - Potential descendant ID
-   * @param {string} ancestorId - Potential ancestor ID
-   * @returns {boolean} True if descendant
+   * @param descendantId - Potential descendant ID
+   * @param ancestorId - Potential ancestor ID
+   * @returns True if descendant
    */
-  isDescendant(descendantId, ancestorId) {
+  isDescendant(descendantId: string, ancestorId: string): boolean {
     let current = this.folders.get(descendantId);
     while (current && current.parentId) {
       if (current.parentId === ancestorId) {
@@ -399,11 +429,11 @@ export class FolderManager {
 
   /**
    * Get folder breadcrumb path
-   * @param {string} folderId - Folder ID
-   * @returns {Array} Breadcrumb array
+   * @param folderId - Folder ID
+   * @returns Breadcrumb array
    */
-  getBreadcrumb(folderId) {
-    const breadcrumb = [];
+  getBreadcrumb(folderId: string): Folder[] {
+    const breadcrumb: Folder[] = [];
     let current = this.folders.get(folderId);
 
     while (current && current.parentId) {
@@ -417,11 +447,11 @@ export class FolderManager {
   /**
    * Load folder collapse/expand state from storage
    */
-  loadFolderState() {
+  loadFolderState(): void {
     try {
       const stored = localStorage.getItem('notecove-folder-state');
       if (stored) {
-        const state = JSON.parse(stored);
+        const state: Record<string, boolean> = JSON.parse(stored);
         Object.entries(state).forEach(([id, expanded]) => {
           this.folderState.set(id, expanded);
         });
@@ -434,9 +464,9 @@ export class FolderManager {
   /**
    * Save folder collapse/expand state to storage
    */
-  saveFolderState() {
+  saveFolderState(): void {
     try {
-      const state = {};
+      const state: Record<string, boolean> = {};
       this.folderState.forEach((expanded, id) => {
         state[id] = expanded;
       });
@@ -448,9 +478,9 @@ export class FolderManager {
 
   /**
    * Toggle folder expanded/collapsed state
-   * @param {string} folderId - Folder ID to toggle
+   * @param folderId - Folder ID to toggle
    */
-  toggleFolderExpanded(folderId) {
+  toggleFolderExpanded(folderId: string): void {
     const currentState = this.folderState.get(folderId) ?? true; // default expanded
     this.folderState.set(folderId, !currentState);
     this.saveFolderState();
@@ -459,19 +489,19 @@ export class FolderManager {
 
   /**
    * Check if a folder is expanded
-   * @param {string} folderId - Folder ID to check
-   * @returns {boolean} True if expanded (default), false if collapsed
+   * @param folderId - Folder ID to check
+   * @returns True if expanded (default), false if collapsed
    */
-  isFolderExpanded(folderId) {
+  isFolderExpanded(folderId: string): boolean {
     return this.folderState.get(folderId) ?? true; // default expanded
   }
 
   /**
    * Check if a folder has child folders
-   * @param {string} folderId - Folder ID to check
-   * @returns {boolean} True if folder has children
+   * @param folderId - Folder ID to check
+   * @returns True if folder has children
    */
-  hasChildFolders(folderId) {
+  hasChildFolders(folderId: string): boolean {
     return Array.from(this.folders.values()).some(
       folder => folder.parentId === folderId && folder.id !== 'root'
     );

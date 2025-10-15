@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CRDTManager } from './crdt-manager.js';
+import { CRDTManager } from './crdt-manager';
 import * as Y from 'yjs';
 
 describe('CRDTManager', () => {

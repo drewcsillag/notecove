@@ -2,7 +2,7 @@
  * Simple test to debug CRDT save/load issue
  * Run with: node --loader ./node_modules/vitest/dist/node-loader.mjs src/lib/crdt-simple-test.js
  */
-import { CRDTManager } from './crdt-manager.js';
+import { CRDTManager } from './crdt-manager';
 import * as Y from 'yjs';
 
 console.log('=== Test 1: Create a note and check if updates are generated ===');

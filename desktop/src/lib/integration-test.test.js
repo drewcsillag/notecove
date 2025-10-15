@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { NoteManager } from './note-manager.js';
-import { SyncManager } from './sync-manager.js';
-import { NoteCoveEditor } from './editor.js';
+import { NoteManager } from './note-manager';
+import { SyncManager } from './sync-manager';
+import { NoteCoveEditor } from './editor';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';

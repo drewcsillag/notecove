@@ -6,8 +6,76 @@
  * Updates are batched into files based on configurable flush strategy
  */
 
+interface FileStorage {
+  isElectron: boolean;
+  notesPath: string;
+}
+
+interface NoteState {
+  seen: Map<string, number>;
+  seenRanges: Map<string, Array<[number, number]>>;
+  writeCounter: number;
+  pendingUpdates: Uint8Array[];
+  pendingStartSeq: number | null;
+}
+
+interface MetaFile {
+  instanceId: string;
+  lastWrite: number;
+  seen: Record<string, number>;
+  lastUpdated: string;
+}
+
+interface PackedFile {
+  instance: string;
+  sequence: [number, number];
+  timestamp: string;
+  updates: string[];
+}
+
+interface FlushOptions {
+  updateCount: number;
+  totalBytes: number;
+  firstUpdateTime: number | null;
+}
+
+interface FlushStrategyOptions {
+  idleMs?: number;
+  maxUpdates?: number;
+  maxBytes?: number;
+  flushStrategy?: FlushStrategy;
+}
+
+interface UpdateWithMetadata {
+  instanceId: string;
+  sequence: number;
+  update: Uint8Array;
+}
+
+interface GapSummary {
+  totalMissing: number;
+  instanceCount: number;
+  instances: Array<{
+    instanceId: string;
+    ranges: Array<[number, number]>;
+    missing: number;
+  }>;
+  lastChecked: number;
+}
+
 export class UpdateStore {
-  constructor(fileStorage, instanceId, options = {}) {
+  fileStorage: FileStorage;
+  instanceId: string;
+  isElectron: boolean;
+  noteState: Map<string, NoteState>;
+  seen: Map<string, number>;
+  writeCounter: number;
+  pendingUpdates: Uint8Array[];
+  pendingStartSeq: number | null;
+  flushStrategy: FlushStrategy;
+  flushTimer: NodeJS.Timeout | null;
+
+  constructor(fileStorage: FileStorage, instanceId: string, options: FlushStrategyOptions = {}) {
     this.fileStorage = fileStorage;
     this.instanceId = instanceId;
     this.isElectron = fileStorage.isElectron;
@@ -33,17 +101,17 @@ export class UpdateStore {
 
   /**
    * Add a range to an instance's seen ranges, merging adjacent/overlapping ranges
-   * @param {Array<[number, number]>} ranges - Sorted array of [start, end] ranges
-   * @param {number} start - Start sequence
-   * @param {number} end - End sequence
-   * @returns {Array<[number, number]>} Updated ranges
+   * @param ranges - Sorted array of [start, end] ranges
+   * @param start - Start sequence
+   * @param end - End sequence
+   * @returns Updated ranges
    */
-  addToRanges(ranges, start, end) {
+  addToRanges(ranges: Array<[number, number]>, start: number, end: number): Array<[number, number]> {
     if (ranges.length === 0) {
       return [[start, end]];
     }
 
-    const newRanges = [];
+    const newRanges: Array<[number, number]> = [];
     let merged = false;
     let newStart = start;
     let newEnd = end;
@@ -77,13 +145,13 @@ export class UpdateStore {
 
   /**
    * Find gaps in a set of ranges
-   * @param {Array<[number, number]>} ranges - Sorted array of [start, end] ranges
-   * @returns {Array<[number, number]>} Array of gap ranges
+   * @param ranges - Sorted array of [start, end] ranges
+   * @returns Array of gap ranges
    */
-  findGaps(ranges) {
+  findGaps(ranges: Array<[number, number]>): Array<[number, number]> {
     if (ranges.length === 0) return [];
 
-    const gaps = [];
+    const gaps: Array<[number, number]> = [];
     for (let i = 0; i < ranges.length - 1; i++) {
       const [, currentEnd] = ranges[i];
       const [nextStart] = ranges[i + 1];
@@ -96,11 +164,11 @@ export class UpdateStore {
 
   /**
    * Check if a sequence is in any of the ranges
-   * @param {Array<[number, number]>} ranges - Sorted array of [start, end] ranges
-   * @param {number} seq - Sequence number to check
-   * @returns {boolean} True if sequence is in ranges
+   * @param ranges - Sorted array of [start, end] ranges
+   * @param seq - Sequence number to check
+   * @returns True if sequence is in ranges
    */
-  isInRanges(ranges, seq) {
+  isInRanges(ranges: Array<[number, number]>, seq: number): boolean {
     for (const [start, end] of ranges) {
       if (seq >= start && seq <= end) return true;
       if (seq < start) return false; // Ranges are sorted
@@ -110,10 +178,10 @@ export class UpdateStore {
 
   /**
    * Get or create state for a note
-   * @param {string} noteId - Note ID
-   * @returns {object} Note state
+   * @param noteId - Note ID
+   * @returns Note state
    */
-  getNoteState(noteId) {
+  getNoteState(noteId: string): NoteState {
     if (!this.noteState.has(noteId)) {
       this.noteState.set(noteId, {
         seen: new Map(),              // DEPRECATED: for backwards compatibility
@@ -123,15 +191,15 @@ export class UpdateStore {
         pendingStartSeq: null
       });
     }
-    return this.noteState.get(noteId);
+    return this.noteState.get(noteId)!;
   }
 
   /**
    * Initialize the update store for a note
    * Loads our meta file and sets up tracking
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  async initialize(noteId) {
+  async initialize(noteId: string): Promise<void> {
     if (!this.isElectron) return;
 
     const state = this.getNoteState(noteId);
@@ -141,7 +209,7 @@ export class UpdateStore {
       const result = await window.electronAPI.fileSystem.readFile(metaPath);
 
       if (result.success) {
-        const meta = JSON.parse(result.content);
+        const meta: MetaFile = JSON.parse(result.content);
         state.writeCounter = meta.lastWrite || 0;
         state.seen = new Map(Object.entries(meta.seen || {}));
         console.log(`UpdateStore initialized for ${noteId}:`, {
@@ -165,10 +233,10 @@ export class UpdateStore {
   /**
    * Add a CRDT update to the buffer
    * Will be flushed according to flush strategy
-   * @param {string} noteId - Note ID
-   * @param {Uint8Array} update - CRDT update data
+   * @param noteId - Note ID
+   * @param update - CRDT update data
    */
-  async addUpdate(noteId, update) {
+  async addUpdate(noteId: string, update: Uint8Array): Promise<void> {
     if (!this.isElectron) return;
 
     const state = this.getNoteState(noteId);
@@ -197,15 +265,15 @@ export class UpdateStore {
 
   /**
    * Reset the idle flush timer
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  resetFlushTimer(noteId) {
+  resetFlushTimer(noteId: string): void {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
     }
 
     // Only set timer if strategy has idle timeout
-    const idleMs = this.flushStrategy.options?.idleMs;
+    const idleMs = (this.flushStrategy as IdleFlushStrategy).options?.idleMs;
     if (idleMs) {
       this.flushTimer = setTimeout(() => {
         this.flush(noteId);
@@ -215,20 +283,20 @@ export class UpdateStore {
 
   /**
    * Get total bytes of pending updates
-   * @param {string} noteId - Note ID
-   * @returns {number} Total bytes
+   * @param noteId - Note ID
+   * @returns Total bytes
    */
-  getTotalBytes(noteId) {
+  getTotalBytes(noteId: string): number {
     const state = this.getNoteState(noteId);
     return state.pendingUpdates.reduce((sum, update) => sum + update.length, 0);
   }
 
   /**
    * Flush pending updates to a packed file
-   * @param {string} noteId - Note ID
-   * @returns {boolean} Success
+   * @param noteId - Note ID
+   * @returns Success
    */
-  async flush(noteId) {
+  async flush(noteId: string): Promise<boolean> {
     const state = this.getNoteState(noteId);
 
     console.log(`[UpdateStore] flush() called for ${noteId}, buffer has ${state.pendingUpdates.length} updates`);
@@ -249,7 +317,7 @@ export class UpdateStore {
         this.flushTimer = null;
       }
 
-      const startSeq = state.pendingStartSeq;
+      const startSeq = state.pendingStartSeq!;
       const endSeq = startSeq + state.pendingUpdates.length - 1;
 
       console.log(`[UpdateStore] Flushing ${state.pendingUpdates.length} updates (seq ${startSeq}-${endSeq})`);
@@ -258,7 +326,7 @@ export class UpdateStore {
       state.writeCounter = endSeq;
 
       // Create packed file
-      const packedFile = {
+      const packedFile: PackedFile = {
         instance: this.instanceId,
         sequence: [startSeq, endSeq],  // Range [start, end] inclusive
         timestamp: new Date().toISOString(),
@@ -302,10 +370,10 @@ export class UpdateStore {
   /**
    * Read ALL updates from all instances (ignoring seen state)
    * Used when loading a note from scratch
-   * @param {string} noteId - Note ID
-   * @returns {Array} Array of {instanceId, sequence, update} objects
+   * @param noteId - Note ID
+   * @returns Array of {instanceId, sequence, update} objects
    */
-  async readAllUpdates(noteId) {
+  async readAllUpdates(noteId: string): Promise<UpdateWithMetadata[]> {
     if (!this.isElectron) return [];
 
     try {
@@ -318,7 +386,7 @@ export class UpdateStore {
         return [];
       }
 
-      const allUpdates = [];
+      const allUpdates: UpdateWithMetadata[] = [];
 
       for (const filename of listResult.files) {
         if (!filename.endsWith('.yjson')) continue;
@@ -337,7 +405,7 @@ export class UpdateStore {
           continue;
         }
 
-        const packedFile = JSON.parse(readResult.content);
+        const packedFile: PackedFile = JSON.parse(readResult.content);
         const [fileStartSeq] = packedFile.sequence;
 
         // Read ALL updates from this file
@@ -362,10 +430,10 @@ export class UpdateStore {
   /**
    * Read all updates we haven't seen yet from all instances
    * Used for incremental sync
-   * @param {string} noteId - Note ID
-   * @returns {Array} Array of {instanceId, sequence, update} objects
+   * @param noteId - Note ID
+   * @returns Array of {instanceId, sequence, update} objects
    */
-  async readNewUpdates(noteId) {
+  async readNewUpdates(noteId: string): Promise<UpdateWithMetadata[]> {
     if (!this.isElectron) return [];
 
     const state = this.getNoteState(noteId);
@@ -380,7 +448,7 @@ export class UpdateStore {
         return [];
       }
 
-      const newUpdates = [];
+      const newUpdates: UpdateWithMetadata[] = [];
 
       for (const filename of listResult.files) {
         if (!filename.endsWith('.yjson')) continue;
@@ -421,7 +489,7 @@ export class UpdateStore {
           continue;
         }
 
-        const packedFile = JSON.parse(readResult.content);
+        const packedFile: PackedFile = JSON.parse(readResult.content);
 
         // Extract updates we haven't seen
         const [fileStartSeq] = packedFile.sequence;
@@ -466,9 +534,9 @@ export class UpdateStore {
 
   /**
    * Write our meta file tracking what we've seen
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  async writeMeta(noteId) {
+  async writeMeta(noteId: string): Promise<void> {
     if (!this.isElectron) return;
 
     const state = this.getNoteState(noteId);
@@ -476,7 +544,7 @@ export class UpdateStore {
     try {
       const metaPath = this.getMetaPath(noteId);
 
-      const meta = {
+      const meta: MetaFile = {
         instanceId: this.instanceId,
         lastWrite: state.writeCounter,
         seen: Object.fromEntries(state.seen),
@@ -500,9 +568,9 @@ export class UpdateStore {
 
   /**
    * Ensure directories exist for a note
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  async ensureDirectories(noteId) {
+  async ensureDirectories(noteId: string): Promise<void> {
     if (!this.isElectron) return;
 
     const notesPath = this.fileStorage.notesPath;
@@ -520,33 +588,33 @@ export class UpdateStore {
 
   /**
    * Get path to our meta file
-   * @param {string} noteId - Note ID
-   * @returns {string} Path
+   * @param noteId - Note ID
+   * @returns Path
    */
-  getMetaPath(noteId) {
+  getMetaPath(noteId: string): string {
     const notesPath = this.fileStorage.notesPath;
     return `${notesPath}/${noteId}/meta/${this.instanceId}.json`;
   }
 
   /**
    * Get path to updates directory
-   * @param {string} noteId - Note ID
-   * @returns {string} Path
+   * @param noteId - Note ID
+   * @returns Path
    */
-  getUpdatesDir(noteId) {
+  getUpdatesDir(noteId: string): string {
     const notesPath = this.fileStorage.notesPath;
     return `${notesPath}/${noteId}/updates`;
   }
 
   /**
    * Get path to a packed update file
-   * @param {string} noteId - Note ID
-   * @param {string} instanceId - Instance ID
-   * @param {number} startSeq - Start sequence number
-   * @param {number} endSeq - End sequence number (optional, same as start for single update)
-   * @returns {string} Path
+   * @param noteId - Note ID
+   * @param instanceId - Instance ID
+   * @param startSeq - Start sequence number
+   * @param endSeq - End sequence number (optional, same as start for single update)
+   * @returns Path
    */
-  getUpdatePath(noteId, instanceId, startSeq, endSeq = null) {
+  getUpdatePath(noteId: string, instanceId: string, startSeq: number, endSeq: number | null = null): string {
     const updatesDir = this.getUpdatesDir(noteId);
     const paddedStart = startSeq.toString().padStart(6, '0');
 
@@ -560,10 +628,10 @@ export class UpdateStore {
 
   /**
    * Encode update as base64 for storage
-   * @param {Uint8Array} update - Update data
-   * @returns {string} Base64 string
+   * @param update - Update data
+   * @returns Base64 string
    */
-  encodeUpdate(update) {
+  encodeUpdate(update: Uint8Array): string {
     // For large updates (images), we can't use spread operator as it causes stack overflow
     // Process in chunks instead
     const chunkSize = 8192; // 8KB chunks
@@ -579,10 +647,10 @@ export class UpdateStore {
 
   /**
    * Decode update from base64
-   * @param {string} base64 - Base64 string
-   * @returns {Uint8Array} Update data
+   * @param base64 - Base64 string
+   * @returns Update data
    */
-  decodeUpdate(base64) {
+  decodeUpdate(base64: string): Uint8Array {
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -593,10 +661,10 @@ export class UpdateStore {
 
   /**
    * Get all instance IDs that have written updates for a note
-   * @param {string} noteId - Note ID
-   * @returns {Array<string>} Instance IDs
+   * @param noteId - Note ID
+   * @returns Instance IDs
    */
-  async getInstances(noteId) {
+  async getInstances(noteId: string): Promise<string[]> {
     if (!this.isElectron) return [];
 
     try {
@@ -608,8 +676,8 @@ export class UpdateStore {
       }
 
       return result.files
-        .filter(f => f.endsWith('.json'))
-        .map(f => f.replace('.json', ''));
+        .filter((f: string) => f.endsWith('.json'))
+        .map((f: string) => f.replace('.json', ''));
     } catch (error) {
       return [];
     }
@@ -617,9 +685,9 @@ export class UpdateStore {
 
   /**
    * Cleanup - flush any pending updates
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  async cleanup(noteId) {
+  async cleanup(noteId: string): Promise<void> {
     const state = this.getNoteState(noteId);
 
     if (this.flushTimer) {
@@ -634,11 +702,11 @@ export class UpdateStore {
 
   /**
    * Get gaps for a specific note from a specific instance
-   * @param {string} noteId - Note ID
-   * @param {string} instanceId - Instance ID
-   * @returns {Array<[number, number]>} Array of gap ranges
+   * @param noteId - Note ID
+   * @param instanceId - Instance ID
+   * @returns Array of gap ranges
    */
-  getGapsForInstance(noteId, instanceId) {
+  getGapsForInstance(noteId: string, instanceId: string): Array<[number, number]> {
     const state = this.getNoteState(noteId);
     const ranges = state.seenRanges.get(instanceId) || [];
     return this.findGaps(ranges);
@@ -646,12 +714,12 @@ export class UpdateStore {
 
   /**
    * Get all gaps for a note from all instances
-   * @param {string} noteId - Note ID
-   * @returns {Map<string, Array<[number, number]>>} instanceId -> gap ranges
+   * @param noteId - Note ID
+   * @returns instanceId -> gap ranges
    */
-  getGaps(noteId) {
+  getGaps(noteId: string): Map<string, Array<[number, number]>> {
     const state = this.getNoteState(noteId);
-    const gaps = new Map();
+    const gaps = new Map<string, Array<[number, number]>>();
 
     state.seenRanges.forEach((ranges, instanceId) => {
       const gapRanges = this.findGaps(ranges);
@@ -665,19 +733,19 @@ export class UpdateStore {
 
   /**
    * Check if a note has any gaps
-   * @param {string} noteId - Note ID
-   * @returns {boolean} True if note has gaps
+   * @param noteId - Note ID
+   * @returns True if note has gaps
    */
-  hasGaps(noteId) {
+  hasGaps(noteId: string): boolean {
     const gaps = this.getGaps(noteId);
     return gaps.size > 0;
   }
 
   /**
    * Check if any tracked notes have gaps
-   * @returns {boolean} True if any note has gaps
+   * @returns True if any note has gaps
    */
-  hasAnyGaps() {
+  hasAnyGaps(): boolean {
     for (const [noteId] of this.noteState) {
       if (this.hasGaps(noteId)) {
         return true;
@@ -688,15 +756,19 @@ export class UpdateStore {
 
   /**
    * Get a summary of gap state for UI display
-   * @param {string} noteId - Note ID
-   * @returns {object|null} Gap summary or null if no gaps
+   * @param noteId - Note ID
+   * @returns Gap summary or null if no gaps
    */
-  getGapSummary(noteId) {
+  getGapSummary(noteId: string): GapSummary | null {
     const gaps = this.getGaps(noteId);
     if (gaps.size === 0) return null;
 
     let totalMissing = 0;
-    const instances = [];
+    const instances: Array<{
+      instanceId: string;
+      ranges: Array<[number, number]>;
+      missing: number;
+    }> = [];
 
     gaps.forEach((ranges, instanceId) => {
       const missing = ranges.reduce((sum, [start, end]) =>
@@ -719,10 +791,10 @@ export class UpdateStore {
 
   /**
    * Get all notes that currently have gaps
-   * @returns {Array<string>} Array of note IDs with gaps
+   * @returns Array of note IDs with gaps
    */
-  getNotesWithGaps() {
-    const notesWithGaps = [];
+  getNotesWithGaps(): string[] {
+    const notesWithGaps: string[] = [];
     for (const [noteId] of this.noteState) {
       if (this.hasGaps(noteId)) {
         notesWithGaps.push(noteId);
@@ -733,11 +805,23 @@ export class UpdateStore {
 }
 
 /**
+ * Base flush strategy interface
+ */
+interface FlushStrategy {
+  firstUpdateTime: number | null;
+  shouldFlush(options: FlushOptions): boolean;
+  reset(): void;
+}
+
+/**
  * Idle-based flush strategy
  * Flushes after period of inactivity, with safety limits
  */
-class IdleFlushStrategy {
-  constructor(options = {}) {
+class IdleFlushStrategy implements FlushStrategy {
+  options: FlushStrategyOptions;
+  firstUpdateTime: number | null;
+
+  constructor(options: FlushStrategyOptions = {}) {
     this.options = {
       idleMs: options.idleMs || 3000,
       maxUpdates: options.maxUpdates || 100,
@@ -746,19 +830,19 @@ class IdleFlushStrategy {
     this.firstUpdateTime = null;
   }
 
-  shouldFlush({ updateCount, totalBytes }) {
+  shouldFlush({ updateCount, totalBytes }: FlushOptions): boolean {
     // Track when first update arrived
     if (this.firstUpdateTime === null) {
       this.firstUpdateTime = Date.now();
     }
 
     // Safety limits - flush if exceeded
-    if (updateCount >= this.options.maxUpdates) {
+    if (updateCount >= this.options.maxUpdates!) {
       console.log('UpdateStore: Flushing due to max updates');
       return true;
     }
 
-    if (totalBytes >= this.options.maxBytes) {
+    if (totalBytes >= this.options.maxBytes!) {
       console.log('UpdateStore: Flushing due to max bytes');
       return true;
     }
@@ -767,7 +851,7 @@ class IdleFlushStrategy {
     return false;
   }
 
-  reset() {
+  reset(): void {
     this.firstUpdateTime = null;
   }
 }
@@ -776,26 +860,31 @@ class IdleFlushStrategy {
  * Immediate flush strategy (for server-based sync)
  * Flushes every update immediately
  */
-export class ImmediateFlushStrategy {
-  shouldFlush() {
+export class ImmediateFlushStrategy implements FlushStrategy {
+  firstUpdateTime: number | null = null;
+
+  shouldFlush(): boolean {
     return true;
   }
 
-  reset() {}
+  reset(): void {}
 }
 
 /**
  * Count-based flush strategy
  * Flushes after N updates
  */
-export class CountFlushStrategy {
+export class CountFlushStrategy implements FlushStrategy {
+  maxCount: number;
+  firstUpdateTime: number | null = null;
+
   constructor(count = 50) {
     this.maxCount = count;
   }
 
-  shouldFlush({ updateCount }) {
+  shouldFlush({ updateCount }: FlushOptions): boolean {
     return updateCount >= this.maxCount;
   }
 
-  reset() {}
+  reset(): void {}
 }

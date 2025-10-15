@@ -1,5 +1,7 @@
 import Image from '@tiptap/extension-image';
-import { mergeAttributes } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+
+type HandlePosition = 'nw' | 'ne' | 'sw' | 'se';
 
 /**
  * Custom Image extension with resize handles that maintain aspect ratio
@@ -12,8 +14,8 @@ export const ResizableImage = Image.extend({
       ...this.parent?.(),
       width: {
         default: null,
-        parseHTML: element => element.getAttribute('width'),
-        renderHTML: attributes => {
+        parseHTML: (element: HTMLElement) => element.getAttribute('width'),
+        renderHTML: (attributes: { width?: number | null }) => {
           if (!attributes.width) {
             return {};
           }
@@ -24,8 +26,8 @@ export const ResizableImage = Image.extend({
       },
       height: {
         default: null,
-        parseHTML: element => element.getAttribute('height'),
-        renderHTML: attributes => {
+        parseHTML: (element: HTMLElement) => element.getAttribute('height'),
+        renderHTML: (attributes: { height?: number | null }) => {
           if (!attributes.height) {
             return {};
           }
@@ -56,7 +58,7 @@ export const ResizableImage = Image.extend({
       }
 
       // Create resize handles for all 4 corners
-      const handles = ['nw', 'ne', 'sw', 'se'].map(position => {
+      const handles: HTMLDivElement[] = (['nw', 'ne', 'sw', 'se'] as HandlePosition[]).map(position => {
         const handle = document.createElement('div');
         handle.classList.add('image-resize-handle', `handle-${position}`);
         handle.contentEditable = 'false';
@@ -70,7 +72,7 @@ export const ResizableImage = Image.extend({
       let startWidth = 0;
       let startHeight = 0;
       let aspectRatio = 1;
-      let currentHandle = null;
+      let currentHandle: HandlePosition | null = null;
 
       // Load image to get natural dimensions and set initial size
       img.onload = () => {
@@ -98,7 +100,7 @@ export const ResizableImage = Image.extend({
             // Immediately save the dimensions
             editor.commands.command(({ tr }) => {
               tr.setNodeMarkup(pos, undefined, {
-                ...currentNode.attrs,
+                ...currentNode!.attrs,
                 width: newWidth,
                 height: newHeight,
               });
@@ -116,25 +118,25 @@ export const ResizableImage = Image.extend({
         container.classList.add('selected');
       };
 
-      const hideHandles = (e) => {
-        if (!container.contains(e.target)) {
+      const hideHandles = (e: MouseEvent) => {
+        if (!container.contains(e.target as Node)) {
           container.classList.remove('selected');
         }
       };
 
-      img.addEventListener('click', (e) => {
+      img.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation();
         showHandles();
       });
 
       document.addEventListener('click', hideHandles);
 
-      const handleMouseDown = (e) => {
+      const handleMouseDown = (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
 
         isResizing = true;
-        currentHandle = e.target.dataset.position;
+        currentHandle = (e.target as HTMLElement).dataset.position as HandlePosition;
         startX = e.clientX;
         startY = e.clientY;
         startWidth = img.width;
@@ -147,7 +149,7 @@ export const ResizableImage = Image.extend({
         container.classList.add('resizing');
       };
 
-      const handleMouseMove = (e) => {
+      const handleMouseMove = (e: MouseEvent) => {
         if (!isResizing) return;
 
         let deltaX = e.clientX - startX;
@@ -212,7 +214,7 @@ export const ResizableImage = Image.extend({
 
       return {
         dom: container,
-        update: (updatedNode) => {
+        update: (updatedNode: ProseMirrorNode) => {
           if (updatedNode.type !== this.type) {
             return false;
           }

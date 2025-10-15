@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SyncManager } from './sync-manager.js';
+import { SyncManager } from './sync-manager';
 import * as Y from 'yjs';
 
 describe('SyncManager - Note Loading', () => {

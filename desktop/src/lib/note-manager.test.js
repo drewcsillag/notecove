@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NoteManager } from './note-manager.js';
+import { NoteManager } from './note-manager';
 
 // Mock localStorage for web mode
 global.localStorage = {

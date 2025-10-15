@@ -1,11 +1,18 @@
 import { Node, mergeAttributes } from '@tiptap/core';
-import { wrappingInputRule } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+
+export interface TaskItemOptions {
+  nested: boolean;
+  HTMLAttributes: Record<string, any>;
+}
+
+type CheckedState = 'done' | 'nope' | null;
 
 /**
  * Custom TaskItem extension with three states: TODO, DONE, NOPE
  * Based on TipTap's TaskItem but with an additional "nope" state
  */
-export const TaskItem = Node.create({
+export const TaskItem = Node.create<TaskItemOptions>({
   name: 'taskItem',
 
   addOptions() {
@@ -25,13 +32,13 @@ export const TaskItem = Node.create({
     return {
       checked: {
         default: null,
-        parseHTML: element => {
+        parseHTML: (element: HTMLElement): CheckedState => {
           const checked = element.getAttribute('data-checked');
           if (checked === 'done') return 'done';
           if (checked === 'nope') return 'nope';
           return null;
         },
-        renderHTML: attributes => {
+        renderHTML: (attributes: { checked?: CheckedState }): Record<string, any> => {
           if (!attributes.checked) {
             return {};
           }
@@ -92,17 +99,17 @@ export const TaskItem = Node.create({
       checkboxWrapper.style.cursor = 'pointer';
       checkbox.type = 'checkbox';
       checkbox.style.display = 'none'; // Hide the actual checkbox, show only our custom one
-      checkbox.addEventListener('change', event => {
+      checkbox.addEventListener('change', (event: Event) => {
         // Prevent default to handle our custom tri-state logic
         event.preventDefault();
       });
 
       // Handle click for tri-state logic
-      checkboxWrapper.addEventListener('click', event => {
+      checkboxWrapper.addEventListener('click', (event: Event) => {
         event.preventDefault();
         if (typeof getPos === 'function') {
-          const currentState = node.attrs.checked;
-          let newState;
+          const currentState = node.attrs.checked as CheckedState;
+          let newState: CheckedState;
 
           if (currentState === null) {
             newState = 'done';
@@ -127,7 +134,7 @@ export const TaskItem = Node.create({
       listItem.setAttribute('data-type', 'taskItem');
 
       Object.entries(this.options.HTMLAttributes).forEach(([key, value]) => {
-        listItem.setAttribute(key, value);
+        listItem.setAttribute(key, String(value));
       });
 
       listItem.dataset.checked = node.attrs.checked || 'todo';
@@ -136,12 +143,12 @@ export const TaskItem = Node.create({
       listItem.append(checkboxWrapper, content);
 
       Object.entries(HTMLAttributes).forEach(([key, value]) => {
-        listItem.setAttribute(key, value);
+        listItem.setAttribute(key, String(value));
       });
 
       // Update visual state
-      const updateCheckbox = () => {
-        const state = node.attrs.checked;
+      const updateCheckbox = (currentNode: ProseMirrorNode) => {
+        const state = currentNode.attrs.checked as CheckedState;
 
         if (state === 'done') {
           checkbox.checked = true;
@@ -163,19 +170,18 @@ export const TaskItem = Node.create({
         }
       };
 
-      updateCheckbox();
+      updateCheckbox(node);
 
       return {
         dom: listItem,
         contentDOM: content,
-        update: updatedNode => {
+        update: (updatedNode: ProseMirrorNode) => {
           if (updatedNode.type !== this.type) {
             return false;
           }
 
-          // Update the node reference for the updateCheckbox function
-          node = updatedNode;
-          updateCheckbox();
+          // Update checkbox with new node
+          updateCheckbox(updatedNode);
           return true;
         },
       };

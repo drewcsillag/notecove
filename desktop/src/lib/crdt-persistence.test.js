@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { CRDTManager } from './crdt-manager.js';
-import { UpdateStore } from './update-store.js';
-import { SyncManager } from './sync-manager.js';
+import { CRDTManager } from './crdt-manager';
+import { UpdateStore } from './update-store';
+import { SyncManager } from './sync-manager';
 import * as Y from 'yjs';
 import * as fs from 'fs';
 import * as path from 'path';

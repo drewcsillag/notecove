@@ -6,17 +6,44 @@
 import * as Y from 'yjs';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import Collaboration from '@tiptap/extension-collaboration';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
-import { Hashtag } from './extensions/hashtag.js';
-import { TaskList } from './extensions/task-list.js';
-import { TaskItem } from './extensions/task-item.js';
-import { ResizableImage } from './extensions/resizable-image.js';
+import { Hashtag } from './extensions/hashtag';
+import { TaskList } from './extensions/task-list';
+import { TaskItem } from './extensions/task-item';
+import { ResizableImage } from './extensions/resizable-image';
+
+interface Note {
+  id: string;
+  title: string;
+  content: string;
+  created: string;
+  modified: string;
+  tags: string[];
+  deleted: boolean;
+  folderId: string;
+}
+
+type UpdateHandler = (update: Uint8Array, origin: any) => void;
+type CRDTListener = (event: string, data: any) => void;
+
+interface CRDTStats {
+  documentCount: number;
+  documents: string[];
+  pendingUpdates: Array<{
+    noteId: string;
+    updateCount: number;
+  }>;
+}
 
 export class CRDTManager {
+  docs: Map<string, Y.Doc>;
+  updateHandlers: Map<string, UpdateHandler>;
+  listeners: Set<CRDTListener>;
+  pendingUpdates: Map<string, number[][]>;
+
   constructor() {
     // Map of noteId -> Y.Doc
     this.docs = new Map();
@@ -34,26 +61,26 @@ export class CRDTManager {
 
   /**
    * Add a listener for CRDT events
-   * @param {Function} listener - Callback for CRDT events
+   * @param listener - Callback for CRDT events
    */
-  addListener(listener) {
+  addListener(listener: CRDTListener): void {
     this.listeners.add(listener);
   }
 
   /**
    * Remove a listener
-   * @param {Function} listener - Listener to remove
+   * @param listener - Listener to remove
    */
-  removeListener(listener) {
+  removeListener(listener: CRDTListener): void {
     this.listeners.delete(listener);
   }
 
   /**
    * Notify all listeners of CRDT events
-   * @param {string} event - Event type
-   * @param {object} data - Event data
+   * @param event - Event type
+   * @param data - Event data
    */
-  notify(event, data) {
+  notify(event: string, data: any): void {
     this.listeners.forEach(listener => {
       try {
         listener(event, data);
@@ -65,16 +92,16 @@ export class CRDTManager {
 
   /**
    * Get or create Y.Doc for a note
-   * @param {string} noteId - Note ID
-   * @returns {Y.Doc} Yjs document
+   * @param noteId - Note ID
+   * @returns Yjs document
    */
-  getDoc(noteId) {
+  getDoc(noteId: string): Y.Doc {
     if (!this.docs.has(noteId)) {
       const doc = new Y.Doc();
       this.docs.set(noteId, doc);
 
       // Set up update handler to track changes
-      const updateHandler = (update, origin) => {
+      const updateHandler: UpdateHandler = (update, origin) => {
         // Skip updates from remote instances AND from loading (don't re-store loaded updates)
         // Also skip 'silent' origin updates (used for internal operations that shouldn't trigger saves)
         // We want to save all local changes (including those from editor, programmatic updates, etc.)
@@ -83,7 +110,7 @@ export class CRDTManager {
           if (!this.pendingUpdates.has(noteId)) {
             this.pendingUpdates.set(noteId, []);
           }
-          this.pendingUpdates.get(noteId).push(Array.from(update));
+          this.pendingUpdates.get(noteId)!.push(Array.from(update));
 
           this.notify('doc-updated', {
             noteId,
@@ -99,16 +126,16 @@ export class CRDTManager {
       console.log('Created new Y.Doc for note:', noteId);
     }
 
-    return this.docs.get(noteId);
+    return this.docs.get(noteId)!;
   }
 
   /**
    * Initialize a note's CRDT document with content
    * This is used for TipTap integration
-   * @param {string} noteId - Note ID
-   * @param {object} note - Note object with content
+   * @param noteId - Note ID
+   * @param note - Note object with content
    */
-  initializeNote(noteId, note) {
+  initializeNote(noteId: string, note: Note): void {
     const doc = this.getDoc(noteId);
 
     console.log(`[CRDTManager] initializeNote called:`, {
@@ -135,7 +162,7 @@ export class CRDTManager {
         yMetadata.set('created', note.created || new Date().toISOString());
         yMetadata.set('modified', note.modified || new Date().toISOString());
         yMetadata.set('tags', note.tags || []);
-        yMetadata.set('folder', note.folder || null);
+        yMetadata.set('folder', note.folderId || null);
         yMetadata.set('deleted', note.deleted || false);
 
         // Verify what was actually set
@@ -156,10 +183,10 @@ export class CRDTManager {
 
   /**
    * Get the Y.XmlFragment that TipTap uses for content
-   * @param {string} noteId - Note ID
-   * @returns {Y.XmlFragment} The fragment TipTap will use
+   * @param noteId - Note ID
+   * @returns The fragment TipTap will use
    */
-  getContentFragment(noteId) {
+  getContentFragment(noteId: string): Y.XmlFragment {
     const doc = this.getDoc(noteId);
     // TipTap's Collaboration extension uses a fragment named 'default'
     return doc.getXmlFragment('default');
@@ -167,10 +194,10 @@ export class CRDTManager {
 
   /**
    * Extract note data from Y.Doc
-   * @param {string} noteId - Note ID
-   * @returns {object} Note object
+   * @param noteId - Note ID
+   * @returns Note object
    */
-  getNoteFromDoc(noteId) {
+  getNoteFromDoc(noteId: string): Note {
     const doc = this.getDoc(noteId);
 
     const yMetadata = doc.getMap('metadata');
@@ -197,7 +224,7 @@ export class CRDTManager {
     }
 
     // Get title from metadata, or extract from content if empty/untitled
-    let title = yMetadata.get('title');
+    let title = yMetadata.get('title') as string | undefined;
     console.log(`[CRDTManager] getNoteFromDoc - title from metadata: "${title}", typeof: ${typeof title}, content length: ${content.length}`);
 
     // Always extract title from content if metadata title is missing or generic
@@ -223,20 +250,20 @@ export class CRDTManager {
       id: noteId,
       title: title,
       content: content,
-      created: yMetadata.get('created') || new Date().toISOString(),
-      modified: yMetadata.get('modified') || new Date().toISOString(),
-      tags: yMetadata.get('tags') || [],
-      deleted: yMetadata.get('deleted') || false,
-      folderId: yMetadata.get('folder') || 'all-notes'
+      created: (yMetadata.get('created') as string) || new Date().toISOString(),
+      modified: (yMetadata.get('modified') as string) || new Date().toISOString(),
+      tags: (yMetadata.get('tags') as string[]) || [],
+      deleted: (yMetadata.get('deleted') as boolean) || false,
+      folderId: (yMetadata.get('folder') as string) || 'all-notes'
     };
   }
 
   /**
    * Update note metadata (not content - content is handled by TipTap)
-   * @param {string} noteId - Note ID
-   * @param {object} updates - Updates to apply
+   * @param noteId - Note ID
+   * @param updates - Updates to apply
    */
-  updateMetadata(noteId, updates) {
+  updateMetadata(noteId: string, updates: Partial<Note>): void {
     const doc = this.getDoc(noteId);
 
     console.log(`[CRDTManager] updateMetadata(${noteId}):`, updates);
@@ -257,8 +284,8 @@ export class CRDTManager {
       if (updates.tags !== undefined) {
         yMetadata.set('tags', updates.tags);
       }
-      if (updates.folder !== undefined) {
-        yMetadata.set('folder', updates.folder);
+      if (updates.folderId !== undefined) {
+        yMetadata.set('folder', updates.folderId);
       }
       if (updates.deleted !== undefined) {
         yMetadata.set('deleted', updates.deleted);
@@ -272,10 +299,10 @@ export class CRDTManager {
 
   /**
    * Check if a doc is empty
-   * @param {string} noteId - Note ID
-   * @returns {boolean} True if doc is empty
+   * @param noteId - Note ID
+   * @returns True if doc is empty
    */
-  isDocEmpty(noteId) {
+  isDocEmpty(noteId: string): boolean {
     if (!this.docs.has(noteId)) {
       return true;
     }
@@ -298,10 +325,10 @@ export class CRDTManager {
 
   /**
    * Get CRDT state for serialization (full state)
-   * @param {string} noteId - Note ID
-   * @returns {Uint8Array} State vector as Uint8Array
+   * @param noteId - Note ID
+   * @returns State vector as Uint8Array
    */
-  getState(noteId) {
+  getState(noteId: string): Uint8Array {
     const doc = this.getDoc(noteId);
     return Y.encodeStateAsUpdate(doc);
   }
@@ -309,9 +336,9 @@ export class CRDTManager {
   /**
    * Clear all content from a Y.Doc by destroying and recreating it
    * This is necessary because simply deleting content doesn't reset the internal state vector
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  clearDoc(noteId) {
+  clearDoc(noteId: string): void {
     if (!this.docs.has(noteId)) {
       return; // Doc doesn't exist yet, nothing to clear
     }
@@ -319,7 +346,7 @@ export class CRDTManager {
     // Remove the old update handler
     const oldHandler = this.updateHandlers.get(noteId);
     if (oldHandler) {
-      const oldDoc = this.docs.get(noteId);
+      const oldDoc = this.docs.get(noteId)!;
       oldDoc.off('update', oldHandler);
       this.updateHandlers.delete(noteId);
     }
@@ -337,11 +364,11 @@ export class CRDTManager {
 
   /**
    * Apply CRDT state update from external source
-   * @param {string} noteId - Note ID
-   * @param {Array|Uint8Array} state - State update
-   * @param {string} origin - Origin marker (default: 'remote')
+   * @param noteId - Note ID
+   * @param state - State update
+   * @param origin - Origin marker (default: 'remote')
    */
-  applyUpdate(noteId, state, origin = 'remote') {
+  applyUpdate(noteId: string, state: number[] | Uint8Array, origin = 'remote'): void {
     const doc = this.getDoc(noteId);
     const update = state instanceof Uint8Array ? state : new Uint8Array(state);
     Y.applyUpdate(doc, update, origin);
@@ -349,27 +376,27 @@ export class CRDTManager {
 
   /**
    * Get pending updates for a note (to be written to files)
-   * @param {string} noteId - Note ID
-   * @returns {Array} Array of updates
+   * @param noteId - Note ID
+   * @returns Array of updates
    */
-  getPendingUpdates(noteId) {
+  getPendingUpdates(noteId: string): number[][] {
     const updates = this.pendingUpdates.get(noteId) || [];
     return updates;
   }
 
   /**
    * Clear pending updates after they've been written
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  clearPendingUpdates(noteId) {
+  clearPendingUpdates(noteId: string): void {
     this.pendingUpdates.delete(noteId);
   }
 
   /**
    * Remove a note's CRDT document
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  removeDoc(noteId) {
+  removeDoc(noteId: string): void {
     const doc = this.docs.get(noteId);
     if (doc) {
       // Remove update handler
@@ -390,9 +417,9 @@ export class CRDTManager {
 
   /**
    * Get statistics about CRDT state
-   * @returns {object} Statistics
+   * @returns Statistics
    */
-  getStats() {
+  getStats(): CRDTStats {
     return {
       documentCount: this.docs.size,
       documents: Array.from(this.docs.keys()),
@@ -406,10 +433,10 @@ export class CRDTManager {
   /**
    * Convert Y.Doc to HTML using a temporary TipTap editor
    * This is used for generating note previews
-   * @param {Y.Doc} doc - Y.Doc to convert
-   * @returns {string} HTML content
+   * @param doc - Y.Doc to convert
+   * @returns HTML content
    */
-  getHTMLFromDoc(doc) {
+  getHTMLFromDoc(doc: Y.Doc): string {
     try {
       // Get the Y.XmlFragment directly and convert to HTML
       // IMPORTANT: Don't create a TipTap editor with Collaboration here,
@@ -458,10 +485,10 @@ export class CRDTManager {
 
   /**
    * Convert Y.XmlFragment to HTML string
-   * @param {Y.XmlFragment} fragment - Y.XmlFragment to convert
-   * @returns {string} HTML string
+   * @param fragment - Y.XmlFragment to convert
+   * @returns HTML string
    */
-  yXmlFragmentToHTML(fragment) {
+  yXmlFragmentToHTML(fragment: Y.XmlFragment): string {
     // Simple conversion: iterate through fragment and build HTML
     let html = '';
     fragment.forEach((item) => {
@@ -472,10 +499,10 @@ export class CRDTManager {
 
   /**
    * Convert Y.XmlElement to HTML string recursively
-   * @param {Y.XmlElement|Y.XmlText} element - Element to convert
-   * @returns {string} HTML string
+   * @param element - Element to convert
+   * @returns HTML string
    */
-  yXmlElementToHTML(element) {
+  yXmlElementToHTML(element: Y.XmlElement | Y.XmlText): string {
     if (element instanceof Y.XmlText) {
       return element.toString();
     }
@@ -505,7 +532,7 @@ export class CRDTManager {
   /**
    * Clean up resources
    */
-  destroy() {
+  destroy(): void {
     // Destroy all docs
     for (const [noteId, doc] of this.docs.entries()) {
       const handler = this.updateHandlers.get(noteId);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { FolderManager } from './folder-manager.js';
+import { FolderManager } from './folder-manager';
 
 describe('FolderManager', () => {
   let folderManager;

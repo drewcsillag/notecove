@@ -1,16 +1,59 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
-const Store = require('electron-store');
-const path = require('path');
-const fs = require('fs').promises;
-const chokidar = require('chokidar');
-const os = require('os');
+import { app, BrowserWindow, Menu, ipcMain, dialog, IpcMainInvokeEvent, MenuItemConstructorOptions } from 'electron';
+import Store from 'electron-store';
+import * as path from 'path';
+import { promises as fs } from 'fs';
+import chokidar, { FSWatcher } from 'chokidar';
+import * as os from 'os';
+
 const isDev = process.env.NODE_ENV === 'development';
 
+// Type definitions
+interface ParsedArgs {
+  userDataDir: string | null;
+  notesPath: string | null;
+  instance: string | null;
+}
+
+interface WindowGeometry {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+}
+
+interface StoreSchema {
+  windowGeometry: WindowGeometry;
+  theme: string;
+  lastOpenNote: string | null;
+  notesPath: string;
+  documentsPath: string;
+  instance?: string;
+  folders?: any[];
+}
+
+interface FileOperationResult {
+  success: boolean;
+  content?: string;
+  files?: string[];
+  error?: string;
+}
+
+interface WatchResult {
+  success: boolean;
+  watchId?: string;
+  error?: string;
+}
+
+interface FileChangeData {
+  event: string;
+  path: string;
+}
+
 // Parse command-line arguments for multi-instance support
-function parseArgs() {
+function parseArgs(): ParsedArgs {
   const args = process.argv.slice(isDev ? 2 : 1);
 
-  const parsed = {
+  const parsed: ParsedArgs = {
     userDataDir: null,
     notesPath: null,
     instance: null
@@ -58,6 +101,11 @@ const customNotesPath = cmdArgs.notesPath ||
   (cmdArgs.instance ? path.join(os.homedir(), 'Documents', `NoteCove-${cmdArgs.instance}`) : null);
 
 class NoteCoveApp {
+  mainWindow: BrowserWindow | null;
+  watchers: Map<string, FSWatcher>;
+  instanceName: string;
+  store: Store<StoreSchema>;
+
   constructor() {
     this.mainWindow = null;
     this.watchers = new Map(); // File system watchers
@@ -67,7 +115,7 @@ class NoteCoveApp {
     // Default notes path considers instance name
     const defaultNotesPath = customNotesPath || path.join(os.homedir(), 'Documents', 'NoteCove');
 
-    this.store = new Store({
+    this.store = new Store<StoreSchema>({
       defaults: {
         windowGeometry: { width: 1200, height: 800 },
         theme: 'auto',
@@ -95,7 +143,7 @@ class NoteCoveApp {
     this.setupIPC();
   }
 
-  setupApp() {
+  setupApp(): void {
     // Handle app ready
     app.whenReady().then(() => {
       this.createMainWindow();
@@ -136,14 +184,14 @@ class NoteCoveApp {
     });
 
     // Security: Prevent new window creation
-    app.on('web-contents-created', (event, contents) => {
-      contents.on('new-window', (event, url) => {
-        event.preventDefault();
+    app.on('web-contents-created', (_event, contents) => {
+      contents.setWindowOpenHandler(() => {
+        return { action: 'deny' };
       });
     });
   }
 
-  createMainWindow() {
+  createMainWindow(): void {
     const geometry = this.store.get('windowGeometry');
 
     this.mainWindow = new BrowserWindow({
@@ -156,7 +204,6 @@ class NoteCoveApp {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        enableRemoteModule: false,
         preload: path.join(__dirname, 'preload.js')
       },
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
@@ -174,11 +221,13 @@ class NoteCoveApp {
 
     // Show window when ready and send initial maximize state
     this.mainWindow.once('ready-to-show', () => {
-      this.mainWindow.show();
-      // Send initial maximize state
-      const isMaximized = this.mainWindow.isMaximized();
-      console.log('Initial window maximized state:', isMaximized);
-      this.mainWindow.webContents.send('window:maximized', isMaximized);
+      if (this.mainWindow) {
+        this.mainWindow.show();
+        // Send initial maximize state
+        const isMaximized = this.mainWindow.isMaximized();
+        console.log('Initial window maximized state:', isMaximized);
+        this.mainWindow.webContents.send('window:maximized', isMaximized);
+      }
     });
 
     // Handle window closed
@@ -193,34 +242,38 @@ class NoteCoveApp {
     // Track window maximize state changes
     this.mainWindow.on('maximize', () => {
       console.log('Window maximized');
-      this.mainWindow.webContents.send('window:maximized', true);
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('window:maximized', true);
+      }
     });
 
     this.mainWindow.on('unmaximize', () => {
       console.log('Window unmaximized');
-      this.mainWindow.webContents.send('window:maximized', false);
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('window:maximized', false);
+      }
     });
   }
 
-  saveWindowGeometry() {
+  saveWindowGeometry(): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       const bounds = this.mainWindow.getBounds();
       this.store.set('windowGeometry', bounds);
     }
   }
 
-  setupIPC() {
-    // File system operations (will be implemented in later commits)
-    ipcMain.handle('fs:read-file', async (event, filePath) => {
+  setupIPC(): void {
+    // File system operations
+    ipcMain.handle('fs:read-file', async (_event: IpcMainInvokeEvent, filePath: string): Promise<FileOperationResult> => {
       try {
         const content = await fs.readFile(filePath, 'utf8');
         return { success: true, content };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
-    ipcMain.handle('fs:write-file', async (event, filePath, content) => {
+    ipcMain.handle('fs:write-file', async (_event: IpcMainInvokeEvent, filePath: string, content: string): Promise<FileOperationResult> => {
       try {
         // Ensure directory exists
         const dir = path.dirname(filePath);
@@ -229,11 +282,11 @@ class NoteCoveApp {
         await fs.writeFile(filePath, content, 'utf8');
         return { success: true };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
-    ipcMain.handle('fs:exists', async (event, filePath) => {
+    ipcMain.handle('fs:exists', async (_event: IpcMainInvokeEvent, filePath: string): Promise<boolean> => {
       try {
         await fs.access(filePath);
         return true;
@@ -242,30 +295,30 @@ class NoteCoveApp {
       }
     });
 
-    ipcMain.handle('fs:read-dir', async (event, dirPath) => {
+    ipcMain.handle('fs:read-dir', async (_event: IpcMainInvokeEvent, dirPath: string): Promise<FileOperationResult> => {
       try {
         const files = await fs.readdir(dirPath);
         return { success: true, files };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
     // Settings management
-    ipcMain.handle('settings:get', (event, key) => {
+    ipcMain.handle('settings:get', <K extends keyof StoreSchema>(_event: IpcMainInvokeEvent, key: K): StoreSchema[K] => {
       return this.store.get(key);
     });
 
-    ipcMain.handle('settings:set', (event, key, value) => {
+    ipcMain.handle('settings:set', <K extends keyof StoreSchema>(_event: IpcMainInvokeEvent, key: K, value: StoreSchema[K]): boolean => {
       this.store.set(key, value);
       return true;
     });
 
     // File watching
-    ipcMain.handle('fs:watch', async (event, watchPath, watchId) => {
+    ipcMain.handle('fs:watch', async (_event: IpcMainInvokeEvent, watchPath: string, watchId: string): Promise<WatchResult> => {
       try {
         if (this.watchers.has(watchId)) {
-          await this.watchers.get(watchId).close();
+          await this.watchers.get(watchId)?.close();
         }
 
         const watcher = chokidar.watch(watchPath, {
@@ -274,73 +327,74 @@ class NoteCoveApp {
           ignoreInitial: true
         });
 
-        watcher.on('all', (eventType, filePath) => {
+        watcher.on('all', (eventType: string, filePath: string) => {
           if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-            this.mainWindow.webContents.send(`fs:watch:${watchId}`, {
+            const data: FileChangeData = {
               event: eventType,
               path: filePath
-            });
+            };
+            this.mainWindow.webContents.send(`fs:watch:${watchId}`, data);
           }
         });
 
         this.watchers.set(watchId, watcher);
         return { success: true, watchId };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
-    ipcMain.handle('fs:unwatch', async (event, watchId) => {
+    ipcMain.handle('fs:unwatch', async (_event: IpcMainInvokeEvent, watchId: string): Promise<FileOperationResult> => {
       try {
         if (this.watchers.has(watchId)) {
-          await this.watchers.get(watchId).close();
+          await this.watchers.get(watchId)?.close();
           this.watchers.delete(watchId);
         }
         return { success: true };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
     // Directory operations
-    ipcMain.handle('fs:mkdir', async (event, dirPath) => {
+    ipcMain.handle('fs:mkdir', async (_event: IpcMainInvokeEvent, dirPath: string): Promise<FileOperationResult> => {
       try {
         await fs.mkdir(dirPath, { recursive: true });
         return { success: true };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
     // Delete file
-    ipcMain.handle('fs:delete-file', async (event, filePath) => {
+    ipcMain.handle('fs:delete-file', async (_event: IpcMainInvokeEvent, filePath: string): Promise<FileOperationResult> => {
       try {
         await fs.unlink(filePath);
         return { success: true };
       } catch (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: (error as Error).message };
       }
     });
 
     // Dialog operations
-    ipcMain.handle('dialog:show-open', async (event, options) => {
-      const result = await dialog.showOpenDialog(this.mainWindow, options);
+    ipcMain.handle('dialog:show-open', async (_event: IpcMainInvokeEvent, options: Electron.OpenDialogOptions): Promise<Electron.OpenDialogReturnValue> => {
+      const result = await dialog.showOpenDialog(this.mainWindow!, options);
       return result;
     });
 
-    ipcMain.handle('dialog:show-save', async (event, options) => {
-      const result = await dialog.showSaveDialog(this.mainWindow, options);
+    ipcMain.handle('dialog:show-save', async (_event: IpcMainInvokeEvent, options: Electron.SaveDialogOptions): Promise<Electron.SaveDialogReturnValue> => {
+      const result = await dialog.showSaveDialog(this.mainWindow!, options);
       return result;
     });
 
-    ipcMain.handle('dialog:show-message-box', async (event, options) => {
-      const result = await dialog.showMessageBox(this.mainWindow, options);
+    ipcMain.handle('dialog:show-message-box', async (_event: IpcMainInvokeEvent, options: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> => {
+      const result = await dialog.showMessageBox(this.mainWindow!, options);
       return result;
     });
   }
 
-  setupMenu() {
-    const template = [
+  setupMenu(): void {
+    const template: MenuItemConstructorOptions[] = [
       {
         label: 'File',
         submenu: [
@@ -377,7 +431,7 @@ class NoteCoveApp {
           { label: 'Cut', accelerator: 'CmdOrCtrl+X', role: 'cut' },
           { label: 'Copy', accelerator: 'CmdOrCtrl+C', role: 'copy' },
           { label: 'Paste', accelerator: 'CmdOrCtrl+V', role: 'paste' },
-          { label: 'Select All', accelerator: 'CmdOrCtrl+A', role: 'selectall' }
+          { label: 'Select All', accelerator: 'CmdOrCtrl+A', role: 'selectAll' }
         ]
       },
       {
@@ -406,7 +460,7 @@ class NoteCoveApp {
           { label: 'Services', role: 'services', submenu: [] },
           { type: 'separator' },
           { label: 'Hide NoteCove', accelerator: 'Command+H', role: 'hide' },
-          { label: 'Hide Others', accelerator: 'Command+Shift+H', role: 'hideothers' },
+          { label: 'Hide Others', accelerator: 'Command+Shift+H', role: 'hideOthers' },
           { label: 'Show All', role: 'unhide' },
           { type: 'separator' },
           { label: 'Quit', accelerator: 'Command+Q', click: () => app.quit() }
@@ -418,7 +472,7 @@ class NoteCoveApp {
     Menu.setApplicationMenu(menu);
   }
 
-  sendToRenderer(channel, ...args) {
+  sendToRenderer(channel: string, ...args: any[]): void {
     if (this.mainWindow && this.mainWindow.webContents) {
       this.mainWindow.webContents.send(channel, ...args);
     }

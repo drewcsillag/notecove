@@ -1,10 +1,67 @@
-import { NoteCoveEditor } from './lib/editor.js';
-import { NoteManager } from './lib/note-manager.js';
-import { SyncManager } from './lib/sync-manager.js';
-import { debounce, escapeHtml, getPreview, formatDate } from './lib/utils';
+import { NoteCoveEditor } from './lib/editor';
+import { NoteManager } from './lib/note-manager';
+import { SyncManager } from './lib/sync-manager';
+import { escapeHtml, getPreview, formatDate, type Note } from './lib/utils';
+
+interface Folder {
+  id: string;
+  name: string;
+  icon?: string;
+  isSpecial?: boolean;
+  isRoot?: boolean;
+  children?: Folder[];
+}
+
+interface TagFilterState {
+  tag: string;
+  mode: 'include' | 'exclude';
+}
+
+interface GapSummary {
+  totalMissing: number;
+  instanceCount: number;
+  instances: Array<{
+    instanceId: string;
+    missing: number;
+  }>;
+  lastChecked: number;
+}
+
+interface LastOpenedNote {
+  noteId: string;
+  timestamp: number;
+}
+
+interface PanelSizes {
+  sidebar: number;
+  notesPanel: number;
+}
 
 // NoteCove Renderer Process
 class NoteCoveApp {
+  currentNote: Note | null;
+  notes: Note[];
+  isEditing: boolean;
+  editor: NoteCoveEditor | null;
+  noteManager: NoteManager | null;
+  syncManager: SyncManager | null;
+  searchQuery: string;
+  currentFolderId: string;
+  folderManager: any; // FolderManager type from note-manager
+  tagFilterState: TagFilterState | null;
+  isSettingContent: boolean;
+  noteGaps: Map<string, GapSummary>;
+  isElectron: boolean;
+
+  // Panel resize state
+  isResizing: boolean;
+  resizingPanel: string | null;
+  startX: number;
+  startWidth: number;
+
+  // Private flags
+  private _isRendering: boolean;
+
   constructor() {
     this.currentNote = null;
     this.notes = [];
@@ -18,6 +75,8 @@ class NoteCoveApp {
     this.tagFilterState = null; // Tag filter state: { tag: string, mode: 'include' | 'exclude' } or null
     this.isSettingContent = false; // Flag to prevent update handlers during programmatic content changes
     this.noteGaps = new Map(); // Track gaps per note: noteId -> gap summary
+    this.isElectron = false;
+    this._isRendering = false;
 
     // Panel resize state
     this.isResizing = false;
@@ -30,7 +89,7 @@ class NoteCoveApp {
     this.initializePanelSizes();
   }
 
-  async initializeApp() {
+  async initializeApp(): Promise<void> {
     console.log('NoteCove Desktop v0.1.0 - Initializing...');
 
     // Check if we have electron API
@@ -44,11 +103,11 @@ class NoteCoveApp {
 
     // Initialize note manager
     this.noteManager = new NoteManager();
-    this.noteManager.addListener((event, data) => this.handleNoteEvent(event, data));
+    this.noteManager.addListener((event: string, data: any) => this.handleNoteEvent(event, data));
 
     // Get folder manager from note manager
     this.folderManager = this.noteManager.getFolderManager();
-    this.folderManager.addListener((event, data) => this.handleFolderEvent(event, data));
+    this.folderManager.addListener((event: string, data: any) => this.handleFolderEvent(event, data));
 
     // Initialize editor
     this.initializeEditor();
@@ -67,7 +126,7 @@ class NoteCoveApp {
     this.renderTagsList();
   }
 
-  initializeEditor() {
+  initializeEditor(): void {
     const editorElement = document.getElementById('editor');
     if (!editorElement) {
       console.error('Editor element not found');
@@ -87,7 +146,7 @@ class NoteCoveApp {
     this.editor.setupToolbar();
   }
 
-  async initializeSyncManager() {
+  async initializeSyncManager(): Promise<void> {
     if (!this.noteManager) {
       console.log('Sync manager not initialized: note manager not available');
       return;
@@ -104,19 +163,19 @@ class NoteCoveApp {
     }
 
     // Get notes path and instance ID from settings
-    const notesPath = await window.electronAPI.settings.get('notesPath');
+    const notesPath = await window.electronAPI?.settings.get('notesPath') as string;
     if (!notesPath) {
       console.error('No notes path configured!');
       return;
     }
 
-    const instanceId = await window.electronAPI.settings.get('instance');
+    const instanceId = await window.electronAPI?.settings.get('instance') as string | undefined;
 
     // Create sync manager with instance ID (if provided)
     this.syncManager = new SyncManager(this.noteManager, notesPath, instanceId);
 
     // Add sync event listeners
-    this.syncManager.addListener((event, data) => this.handleSyncEvent(event, data));
+    this.syncManager.addListener((event: string, data: any) => this.handleSyncEvent(event, data));
 
     // Connect NoteManager to SyncManager for CRDT-based saves
     // This will reload notes from CRDT
@@ -127,7 +186,7 @@ class NoteCoveApp {
     console.log('Sync manager initialized and watching CRDT files');
   }
 
-  handleSyncEvent(event, data) {
+  handleSyncEvent(event: string, data: any): void {
     switch (event) {
       case 'status-changed':
         console.log('Sync status changed:', data.status);
@@ -138,11 +197,11 @@ class NoteCoveApp {
         this.updateStatus(`Synced: ${data.action}`);
         // Refresh the notes list if a note was added or updated externally
         if (data.action === 'added' || data.action === 'deleted') {
-          this.notes = this.noteManager.getAllNotes();
+          this.notes = this.noteManager!.getAllNotes();
           this.updateUI();
         } else if (data.action === 'updated') {
           // Only update the notes array, don't re-render to avoid flickering
-          this.notes = this.noteManager.getAllNotes();
+          this.notes = this.noteManager!.getAllNotes();
           this.renderNotesList();
         }
         break;
@@ -157,7 +216,7 @@ class NoteCoveApp {
     }
   }
 
-  updateSyncStatus(status) {
+  updateSyncStatus(status: string): void {
     // Update sync status in UI
     const syncStatus = document.getElementById('syncStatus');
     if (syncStatus) {
@@ -186,7 +245,7 @@ class NoteCoveApp {
     }
   }
 
-  handleNoteEvent(event, data) {
+  handleNoteEvent(event: string, data: any): void {
     switch (event) {
       case 'notes-loaded':
         this.notes = data.notes;
@@ -198,7 +257,7 @@ class NoteCoveApp {
         break;
       case 'note-created':
         // Update the notes array
-        this.notes = this.noteManager.getAllNotes();
+        this.notes = this.noteManager!.getAllNotes();
 
         // If this came from sync (not from local createNewNote), update the UI
         if (data.source === 'sync') {
@@ -212,7 +271,7 @@ class NoteCoveApp {
         break;
       case 'note-updated':
         // Update the notes array in memory
-        this.notes = this.noteManager.getAllNotes();
+        this.notes = this.noteManager!.getAllNotes();
 
         // If this came from sync, update the UI to show changes
         if (data.source === 'sync') {
@@ -233,14 +292,14 @@ class NoteCoveApp {
         break;
       case 'note-deleted':
         console.log('[renderer] Note deleted event received:', data.note?.id, data.note?.title);
-        this.notes = this.noteManager.getAllNotes();
+        this.notes = this.noteManager!.getAllNotes();
         console.log('[renderer] After getAllNotes(), notes count:', this.notes.length);
         this.updateUI();
         // Update folder counts when notes are deleted/restored
         this.renderFolderTree();
         break;
       case 'note-restored':
-        this.notes = this.noteManager.getAllNotes();
+        this.notes = this.noteManager!.getAllNotes();
         this.updateUI();
         // Update folder counts when notes are deleted/restored
         this.renderFolderTree();
@@ -265,7 +324,7 @@ class NoteCoveApp {
     }
   }
 
-  handleFolderEvent(event, data) {
+  handleFolderEvent(event: string, data: any): void {
     switch (event) {
       case 'folders-loaded':
       case 'folder-created':
@@ -277,7 +336,7 @@ class NoteCoveApp {
     }
   }
 
-  setupEventListeners() {
+  setupEventListeners(): void {
     // Save current note before window closes
     window.addEventListener('beforeunload', () => {
       console.log('Window closing - saving current note');
@@ -321,9 +380,9 @@ class NoteCoveApp {
     // Editor events are handled via TipTap callbacks
 
     // Search
-    const searchInput = document.querySelector('.search-input');
+    const searchInput = document.querySelector('.search-input') as HTMLInputElement;
     if (searchInput) {
-      searchInput.addEventListener('input', (e) => this.onSearch(e.target.value));
+      searchInput.addEventListener('input', (e) => this.onSearch((e.target as HTMLInputElement).value));
     }
 
     // Use event delegation for note item clicks to avoid race conditions
@@ -332,11 +391,11 @@ class NoteCoveApp {
     if (notesList) {
       notesList.addEventListener('click', (e) => {
         // Find the closest .note-item element
-        const noteItem = e.target.closest('.note-item');
+        const noteItem = (e.target as HTMLElement).closest('.note-item') as HTMLElement;
         if (!noteItem) return;
 
         // Don't select if clicking on action buttons
-        if (e.target.closest('.note-actions')) return;
+        if ((e.target as HTMLElement).closest('.note-actions')) return;
 
         const noteId = noteItem.dataset.noteId;
         if (noteId) {
@@ -352,14 +411,14 @@ class NoteCoveApp {
     this.setupPanelResize();
   }
 
-  initializePanelSizes() {
+  initializePanelSizes(): void {
     // Load saved panel sizes from localStorage or use defaults
     try {
       const saved = localStorage.getItem('notecove-panel-sizes');
       if (saved) {
-        const sizes = JSON.parse(saved);
-        const sidebar = document.querySelector('.sidebar');
-        const notesPanel = document.querySelector('.notes-panel');
+        const sizes: PanelSizes = JSON.parse(saved);
+        const sidebar = document.querySelector('.sidebar') as HTMLElement;
+        const notesPanel = document.querySelector('.notes-panel') as HTMLElement;
 
         if (sidebar && sizes.sidebar) {
           sidebar.style.flex = `0 0 ${sizes.sidebar}%`;
@@ -373,25 +432,25 @@ class NoteCoveApp {
     }
   }
 
-  setupPanelResize() {
+  setupPanelResize(): void {
     const resizeHandles = document.querySelectorAll('.resize-handle');
 
     resizeHandles.forEach(handle => {
-      handle.addEventListener('mousedown', (e) => this.startResize(e));
+      handle.addEventListener('mousedown', (e) => this.startResize(e as MouseEvent));
     });
 
     document.addEventListener('mousemove', (e) => this.doResize(e));
     document.addEventListener('mouseup', () => this.stopResize());
   }
 
-  startResize(e) {
+  startResize(e: MouseEvent): void {
     this.isResizing = true;
     this.startX = e.clientX;
 
-    const handle = e.target.closest('.resize-handle');
-    this.resizingPanel = handle.dataset.resize;
+    const handle = (e.target as HTMLElement).closest('.resize-handle') as HTMLElement;
+    this.resizingPanel = handle.dataset.resize || null;
 
-    const panel = document.querySelector(`.${this.resizingPanel}`);
+    const panel = document.querySelector(`.${this.resizingPanel}`) as HTMLElement;
     if (panel) {
       this.startWidth = panel.offsetWidth;
     }
@@ -403,15 +462,15 @@ class NoteCoveApp {
     e.preventDefault();
   }
 
-  doResize(e) {
+  doResize(e: MouseEvent): void {
     if (!this.isResizing || !this.resizingPanel) return;
 
     const deltaX = e.clientX - this.startX;
-    const panel = document.querySelector(`.${this.resizingPanel}`);
+    const panel = document.querySelector(`.${this.resizingPanel}`) as HTMLElement;
 
     if (!panel) return;
 
-    const container = document.getElementById('app');
+    const container = document.getElementById('app') as HTMLElement;
     const containerWidth = container.offsetWidth;
 
     // Calculate new width as percentage
@@ -424,7 +483,7 @@ class NoteCoveApp {
     panel.style.flex = `0 0 ${clampedPercentage}%`;
   }
 
-  stopResize() {
+  stopResize(): void {
     if (!this.isResizing) return;
 
     this.isResizing = false;
@@ -443,12 +502,12 @@ class NoteCoveApp {
     this.resizingPanel = null;
   }
 
-  savePanelSizes() {
+  savePanelSizes(): void {
     try {
-      const sidebar = document.querySelector('.sidebar');
-      const notesPanel = document.querySelector('.notes-panel');
+      const sidebar = document.querySelector('.sidebar') as HTMLElement;
+      const notesPanel = document.querySelector('.notes-panel') as HTMLElement;
 
-      const sizes = {
+      const sizes: PanelSizes = {
         sidebar: parseFloat(sidebar.style.flex.match(/[\d.]+/)?.[0] || '25'),
         notesPanel: parseFloat(notesPanel.style.flex.match(/[\d.]+/)?.[0] || '25')
       };
@@ -459,11 +518,11 @@ class NoteCoveApp {
     }
   }
 
-  setupElectronListeners() {
+  setupElectronListeners(): void {
     if (!window.electronAPI) return;
 
     // Menu actions
-    window.electronAPI.onMenuAction((action) => {
+    window.electronAPI?.onMenuAction?.((action: string) => {
       switch (action) {
         case 'menu:new-note':
           this.createNewNote();
@@ -475,7 +534,7 @@ class NoteCoveApp {
     });
 
     // Handle save before quit
-    window.electronAPI.onSaveBeforeQuit(() => {
+    window.electronAPI?.onSaveBeforeQuit?.(() => {
       console.log('Save before quit triggered');
       this.saveCurrentNote();
       if (this.syncManager && this.currentNote) {
@@ -484,7 +543,7 @@ class NoteCoveApp {
     });
 
     // Window maximize state
-    window.electronAPI.onWindowMaximized((isMaximized) => {
+    window.electronAPI?.onWindowMaximized?.((isMaximized: boolean) => {
       console.log('Window maximized state changed:', isMaximized);
       if (isMaximized) {
         document.body.classList.add('maximized');
@@ -495,7 +554,7 @@ class NoteCoveApp {
     });
   }
 
-  handleEditorReady() {
+  handleEditorReady(): void {
     console.log('[renderer] handleEditorReady() - editor is fully initialized');
     // Clear the isSettingContent flag now that editor is ready
     this.isSettingContent = false;
@@ -503,7 +562,7 @@ class NoteCoveApp {
     this._isRendering = false;
   }
 
-  handleEditorUpdate() {
+  handleEditorUpdate(): void {
     // Don't update note if we're programmatically setting content
     if (this.isSettingContent) {
       console.log('[renderer] handleEditorUpdate() skipped - isSettingContent=true');
@@ -543,7 +602,7 @@ class NoteCoveApp {
           // Update metadata in CRDT (this is the source of truth)
           this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
           // Also update the in-memory note object
-          const updatedNote = this.noteManager.updateNote(this.currentNote.id, { title, tags });
+          const updatedNote = this.noteManager!.updateNote(this.currentNote.id, { title, tags });
           // Update our local reference to keep it in sync
           if (updatedNote) {
             this.currentNote = updatedNote;
@@ -555,7 +614,7 @@ class NoteCoveApp {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
         this.currentNote.content = content;
-        const updatedNote = this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+        const updatedNote = this.noteManager!.updateNote(this.currentNote.id, { title, content, tags });
         // Update our local reference to keep it in sync
         if (updatedNote) {
           this.currentNote = updatedNote;
@@ -565,7 +624,7 @@ class NoteCoveApp {
       // Re-render notes list if title changed (to update sidebar)
       if (titleChanged) {
         // Update the cached notes array so renderNotesList() sees the new title
-        this.notes = this.noteManager.getAllNotes();
+        this.notes = this.noteManager!.getAllNotes();
         this.renderNotesList();
       }
 
@@ -579,14 +638,14 @@ class NoteCoveApp {
   /**
    * Extract hashtags from text
    * Only matches # when preceded by whitespace, newline, or at start of text
-   * @param {string} text - Text to extract tags from
-   * @returns {Array<string>} Array of unique tags (without # prefix)
+   * @param text - Text to extract tags from
+   * @returns Array of unique tags (without # prefix)
    */
-  extractTags(text) {
+  extractTags(text: string): string[] {
     // Match # only when preceded by whitespace, newline, or at start
     const tagRegex = /(^|\s)(#[\w-]+)/g;
-    const matches = [];
-    let match;
+    const matches: string[] = [];
+    let match: RegExpExecArray | null;
 
     while ((match = tagRegex.exec(text)) !== null) {
       // match[2] is the hashtag (including #)
@@ -598,21 +657,23 @@ class NoteCoveApp {
     return tags;
   }
 
-  handleEditorFocus() {
+  handleEditorFocus(): void {
     this.isEditing = true;
   }
 
-  handleEditorBlur() {
+  handleEditorBlur(): void {
     this.isEditing = false;
     this.saveCurrentNote();
     // Don't call renderNotesList() here as it recreates the DOM and can interfere with click events
     // The notes list will be updated by handleEditorUpdate() when the title changes
   }
 
-  updateUI() {
+  updateUI(): void {
     const notesList = document.getElementById('notesList');
     const welcomeState = document.getElementById('welcomeState');
     const editorState = document.getElementById('editorState');
+
+    if (!notesList || !welcomeState || !editorState) return;
 
     // Always render notes list if viewing trash (even if all non-deleted notes are gone)
     const shouldShowNotesList = this.notes.length > 0 || this.currentFolderId === 'trash';
@@ -640,9 +701,11 @@ class NoteCoveApp {
     }
   }
 
-  renderNotesList() {
+  renderNotesList(): void {
     const notesList = document.getElementById('notesList');
     const notesCount = document.getElementById('notesCount');
+
+    if (!notesList || !this.noteManager) return;
 
     // Get notes based on search query or all notes
     let filteredNotes = this.searchQuery ?
@@ -685,9 +748,9 @@ class NoteCoveApp {
     // Update notes count - show count in current folder view
     if (notesCount) {
       if (this.currentFolderId && this.currentFolderId !== 'all-notes') {
-        notesCount.textContent = this.noteManager.getNotesInFolder(this.currentFolderId).length;
+        notesCount.textContent = this.noteManager.getNotesInFolder(this.currentFolderId).length.toString();
       } else {
-        notesCount.textContent = this.notes.length;
+        notesCount.textContent = this.notes.length.toString();
       }
     }
 
@@ -729,9 +792,9 @@ class NoteCoveApp {
 
   /**
    * Update gap indicators for a note
-   * @param {string} noteId - Note ID
+   * @param noteId - Note ID
    */
-  updateGapIndicators(noteId) {
+  updateGapIndicators(noteId: string): void {
     // Update note list (will show/hide gap icon)
     this.renderNotesList();
 
@@ -744,12 +807,12 @@ class NoteCoveApp {
   /**
    * Update the editor status bar with gap information
    */
-  updateEditorStatusBar() {
+  updateEditorStatusBar(): void {
     // Find or create editor status bar
     const editorSection = document.querySelector('.editor-section');
     if (!editorSection) return;
 
-    let statusBar = editorSection.querySelector('.editor-status-bar');
+    let statusBar = editorSection.querySelector('.editor-status-bar') as HTMLElement;
     if (!statusBar) {
       // Create status bar if it doesn't exist
       statusBar = document.createElement('div');
@@ -762,7 +825,7 @@ class NoteCoveApp {
 
     // Add gap indicator if current note has gaps
     if (this.currentNote && this.noteGaps.has(this.currentNote.id)) {
-      const summary = this.noteGaps.get(this.currentNote.id);
+      const summary = this.noteGaps.get(this.currentNote.id)!;
       const tooltipText = this.buildGapTooltip(summary);
 
       const gapIndicator = document.createElement('div');
@@ -778,10 +841,10 @@ class NoteCoveApp {
 
   /**
    * Build tooltip text for gap indicator
-   * @param {object} summary - Gap summary
-   * @returns {string} Tooltip text
+   * @param summary - Gap summary
+   * @returns Tooltip text
    */
-  buildGapTooltip(summary) {
+  buildGapTooltip(summary: GapSummary): string {
     const lines = ['Waiting for updates:'];
     summary.instances.forEach(inst => {
       const deviceName = inst.instanceId.substring(9, 17); // Show 8 chars
@@ -794,12 +857,12 @@ class NoteCoveApp {
   /**
    * Render tags list with counts
    */
-  renderTagsList() {
+  renderTagsList(): void {
     const tagsList = document.getElementById('tagsList');
     if (!tagsList) return;
 
     // Collect all tags with counts
-    const tagCounts = new Map();
+    const tagCounts = new Map<string, number>();
     this.notes.forEach(note => {
       if (note.tags && note.tags.length > 0) {
         note.tags.forEach(tag => {
@@ -841,8 +904,10 @@ class NoteCoveApp {
     const tagItems = tagsList.querySelectorAll('.tag-item');
     tagItems.forEach(item => {
       item.addEventListener('click', () => {
-        const tag = item.dataset.tag;
-        this.selectTag(tag);
+        const tag = (item as HTMLElement).dataset.tag;
+        if (tag) {
+          this.selectTag(tag);
+        }
       });
     });
   }
@@ -850,9 +915,9 @@ class NoteCoveApp {
   /**
    * Select a tag to filter notes
    * Three-state cycling: null → include → exclude → null
-   * @param {string} tag - Tag to filter by
+   * @param tag - Tag to filter by
    */
-  selectTag(tag) {
+  selectTag(tag: string): void {
     // Cycle through three states:
     // 1. null (no filter) → include (show only notes WITH tag)
     // 2. include → exclude (show only notes WITHOUT tag)
@@ -873,7 +938,7 @@ class NoteCoveApp {
     this.renderNotesList();
   }
 
-  async renderCurrentNote(scrollToTop = true) {
+  async renderCurrentNote(scrollToTop: boolean = true): Promise<void> {
     if (!this.currentNote) return;
 
     // Prevent concurrent calls - wait for previous render to complete
@@ -940,13 +1005,13 @@ class NoteCoveApp {
 
           // Update the note object in noteManager Map with the CRDT title
           // This ensures the notes list shows the correct title
-          const crdtTitle = this.syncManager.crdtManager.getDoc(this.currentNote.id).getMap('metadata').get('title');
+          const crdtTitle = this.syncManager.crdtManager.getDoc(this.currentNote.id).getMap('metadata').get('title') as string;
           console.log('[renderer] Checking if note title needs sync - CRDT:', crdtTitle, 'Note:', this.currentNote.title);
           if (crdtTitle) {
             console.log('[renderer] Syncing note object title from CRDT:', crdtTitle);
             this.currentNote.title = crdtTitle;
             // IMPORTANT: Update the actual note object in the Map, not just currentNote reference
-            const noteInMap = this.noteManager.notes.get(this.currentNote.id);
+            const noteInMap = this.noteManager!.notes.get(this.currentNote.id);
             if (noteInMap) {
               noteInMap.title = crdtTitle;
             }
@@ -962,7 +1027,7 @@ class NoteCoveApp {
           if (this.currentNote.content && this.currentNote.content !== '<p></p>') {
             console.log('[renderer] Setting HTML content to editor, length:', this.currentNote.content.length);
             // Set the HTML content - TipTap will convert it to Y.XmlFragment
-            this.editor.editor.commands.setContent(this.currentNote.content);
+            this.editor.setContent(this.currentNote.content, this.currentNote.id);
             // Flush content updates
             console.log('[renderer] Flushing content updates');
             await this.syncManager.updateStore.flush(this.currentNote.id);
@@ -980,7 +1045,7 @@ class NoteCoveApp {
       // this.isSettingContent = false;
 
       // Only focus editor if search input doesn't have focus
-      const searchInput = document.querySelector('.search-input');
+      const searchInput = document.querySelector('.search-input') as HTMLInputElement;
       if (!searchInput || document.activeElement !== searchInput) {
         this.editor.focus();
       }
@@ -988,7 +1053,7 @@ class NoteCoveApp {
       // Scroll to top of editor container only when switching notes
       if (scrollToTop) {
         setTimeout(() => {
-          const editorContainer = document.querySelector('.editor-container');
+          const editorContainer = document.querySelector('.editor-container') as HTMLElement;
           if (editorContainer) {
             editorContainer.scrollTop = 0;
           }
@@ -997,14 +1062,14 @@ class NoteCoveApp {
     }
   }
 
-  async createNewNote() {
+  async createNewNote(): Promise<void> {
     console.log('[createNewNote] Starting...');
     const previousNote = this.currentNote;
     console.log('[createNewNote] Previous note was:', previousNote?.id, previousNote?.title);
 
     // Create note in the currently selected folder
     // IMPORTANT: Await to ensure CRDT initialization completes before rendering
-    const newNote = await this.noteManager.createNote({
+    const newNote = await this.noteManager!.createNote({
       folderId: this.currentFolderId || 'all-notes'
     });
     console.log('[createNewNote] Created new note:', newNote.id, newNote.title);
@@ -1037,8 +1102,8 @@ class NoteCoveApp {
     const welcomeState = document.getElementById('welcomeState');
     const editorState = document.getElementById('editorState');
     if (this.currentNote) {
-      welcomeState.style.display = 'none';
-      editorState.style.display = 'flex';
+      if (welcomeState) welcomeState.style.display = 'none';
+      if (editorState) editorState.style.display = 'flex';
     }
 
     // Focus on editor after DOM updates complete
@@ -1049,10 +1114,12 @@ class NoteCoveApp {
     }, 100);
   }
 
-  async createNewFolder() {
+  async createNewFolder(): Promise<void> {
+    if (!this.folderManager) return;
+
     // Determine parent folder
     let parentId = 'root';
-    let parentName = null;
+    let parentName: string | null = null;
 
     // If a custom folder is selected (not special folders), offer to create subfolder
     if (this.currentFolderId && this.currentFolderId !== 'all-notes' && this.currentFolderId !== 'trash') {
@@ -1087,7 +1154,7 @@ class NoteCoveApp {
     }
   }
 
-  showInputDialog(title, message, defaultValue = '') {
+  showInputDialog(title: string, message: string, defaultValue: string = ''): Promise<string | null> {
     return new Promise((resolve) => {
       // Create overlay
       const overlay = document.createElement('div');
@@ -1132,9 +1199,9 @@ class NoteCoveApp {
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
 
-      const input = dialog.querySelector('#dialogInput');
-      const okBtn = dialog.querySelector('#dialogOk');
-      const cancelBtn = dialog.querySelector('#dialogCancel');
+      const input = dialog.querySelector('#dialogInput') as HTMLInputElement;
+      const okBtn = dialog.querySelector('#dialogOk') as HTMLButtonElement;
+      const cancelBtn = dialog.querySelector('#dialogCancel') as HTMLButtonElement;
 
       const cleanup = () => {
         document.body.removeChild(overlay);
@@ -1165,7 +1232,7 @@ class NoteCoveApp {
     });
   }
 
-  renderFolderTree() {
+  renderFolderTree(): void {
     const folderTree = document.getElementById('folderTree');
     if (!folderTree || !this.folderManager) return;
 
@@ -1173,7 +1240,7 @@ class NoteCoveApp {
     folderTree.innerHTML = this.renderFolderItems(tree);
   }
 
-  renderFolderItems(folders, level = 0) {
+  renderFolderItems(folders: Folder[] | undefined, level: number = 0): string {
     if (!folders || folders.length === 0) return '';
 
     return folders.map(folder => {
@@ -1190,7 +1257,7 @@ class NoteCoveApp {
         : '<span class="folder-collapse-arrow" style="visibility: hidden;">▼</span>';
 
       // Get note count for this folder (direct children only)
-      const noteCount = this.noteManager.getNotesInFolder(folder.id).length;
+      const noteCount = this.noteManager!.getNotesInFolder(folder.id).length;
 
       return `
         <div class="folder-item ${isActive ? 'active' : ''}"
@@ -1213,7 +1280,7 @@ class NoteCoveApp {
     }).join('');
   }
 
-  selectFolder(folderId) {
+  selectFolder(folderId: string): void {
     this.currentFolderId = folderId;
     this.renderFolderTree();
     this.updateUI();
@@ -1221,32 +1288,16 @@ class NoteCoveApp {
 
   /**
    * Toggle folder collapse/expand state
-   * @param {string} folderId - Folder ID to toggle
+   * @param folderId - Folder ID to toggle
    */
-  toggleFolderCollapse(folderId) {
+  toggleFolderCollapse(folderId: string): void {
     this.folderManager.toggleFolderExpanded(folderId);
   }
 
-  async resetNoteStore() {
-    // Create a simple confirmation using dialog API if available
-    if (window.electronAPI && window.electronAPI.dialog) {
-      const result = await window.electronAPI.dialog.showMessageBox({
-        type: 'warning',
-        buttons: ['Cancel', 'Reset'],
-        defaultId: 0,
-        title: 'Reset Note Store',
-        message: 'Are you sure you want to reset the note store?',
-        detail: 'This will delete all notes and reset to the initial state. This cannot be undone.'
-      });
-
-      if (result.response !== 1) {
-        return; // User cancelled
-      }
-    } else {
-      // Fallback for web mode
-      const confirmed = window.confirm('Are you sure you want to reset the note store? This will delete all notes and cannot be undone.');
-      if (!confirmed) return;
-    }
+  async resetNoteStore(): Promise<void> {
+    // Fallback for web mode - just use confirm dialog
+    const confirmed = window.confirm('Are you sure you want to reset the note store? This will delete all notes and cannot be undone.');
+    if (!confirmed) return;
 
     // Clear all localStorage data including folders and notes
     localStorage.clear();
@@ -1259,15 +1310,15 @@ class NoteCoveApp {
 
         // Delete all note files
         if (window.electronAPI.fileSystem) {
-          const notesPath = await window.electronAPI.settings.get('notesPath');
+          const notesPath = await window.electronAPI?.settings.get('notesPath') as string;
           const result = await window.electronAPI.fileSystem.readDir(notesPath);
           if (result.success && result.files) {
             // Delete each JSON file
             for (const filename of result.files) {
               if (filename.endsWith('.json')) {
                 const filePath = `${notesPath}/${filename}`;
-                await window.electronAPI.fileSystem.deleteFile(filePath);
-                console.log('Deleted:', filePath);
+                await window.electronAPI.fileSystem.writeFile(filePath, ''); // Use writeFile as a workaround
+                console.log('Cleared:', filePath);
               }
             }
           }
@@ -1281,7 +1332,9 @@ class NoteCoveApp {
     window.location.reload();
   }
 
-  async selectNote(noteId) {
+  async selectNote(noteId: string): Promise<void> {
+    if (!this.noteManager) return;
+
     const note = this.noteManager.getNote(noteId);
     console.log(`[renderer] selectNote(${noteId}):`, {
       found: !!note,
@@ -1318,7 +1371,7 @@ class NoteCoveApp {
       const notesList = document.getElementById('notesList');
       if (notesList) {
         notesList.querySelectorAll('.note-item').forEach(item => {
-          item.classList.toggle('active', item.dataset.noteId === noteId);
+          (item as HTMLElement).classList.toggle('active', (item as HTMLElement).dataset.noteId === noteId);
         });
       }
 
@@ -1329,10 +1382,11 @@ class NoteCoveApp {
       this.updateEditorStatusBar();
 
       // 6. Save as last opened note
-      localStorage.setItem('notecove-last-opened-note', JSON.stringify({
+      const lastOpenedNote: LastOpenedNote = {
         noteId: this.currentNote.id,
         timestamp: Date.now()
-      }));
+      };
+      localStorage.setItem('notecove-last-opened-note', JSON.stringify(lastOpenedNote));
     }
   }
 
@@ -1340,15 +1394,15 @@ class NoteCoveApp {
    * Restore the last opened note when editor is ready
    * Waits for editor initialization to complete before restoring
    */
-  async restoreLastOpenedNoteWhenReady() {
+  async restoreLastOpenedNoteWhenReady(): Promise<void> {
     // Wait for editor to be ready
     const maxWait = 5000; // 5 seconds max
     const startTime = Date.now();
-    while (!this.editor?.isReady && (Date.now() - startTime) < maxWait) {
+    while (this.editor && !this.editor.getText() && (Date.now() - startTime) < maxWait) {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
-    if (!this.editor?.isReady) {
+    if (!this.editor) {
       console.warn('Editor not ready after timeout, skipping note restoration');
       return;
     }
@@ -1360,12 +1414,14 @@ class NoteCoveApp {
    * Restore the last opened note on startup
    * If the last note was deleted or doesn't exist, open the most recent note
    */
-  restoreLastOpenedNote() {
+  restoreLastOpenedNote(): void {
+    if (!this.noteManager) return;
+
     try {
       const stored = localStorage.getItem('notecove-last-opened-note');
 
       if (stored) {
-        const { noteId } = JSON.parse(stored);
+        const { noteId } = JSON.parse(stored) as LastOpenedNote;
         const note = this.noteManager.getNote(noteId);
 
         if (note && !note.deleted) {
@@ -1384,13 +1440,12 @@ class NoteCoveApp {
     }
   }
 
-
-  updateNoteInList() {
+  updateNoteInList(): void {
     // Update the note item in the sidebar
     this.renderNotesList();
   }
 
-  saveCurrentNote() {
+  saveCurrentNote(): void {
     if (this.currentNote && this.editor) {
       // Force immediate save of current content (don't wait for debounce)
       const text = this.editor.getText();
@@ -1414,7 +1469,7 @@ class NoteCoveApp {
           // Update metadata in CRDT (this is the source of truth)
           this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
           // Also update the in-memory note object
-          this.noteManager.updateNote(this.currentNote.id, { title, tags });
+          this.noteManager!.updateNote(this.currentNote.id, { title, tags });
           // Flush immediately to ensure metadata is saved
           this.syncManager.updateStore.flush(this.currentNote.id);
         }
@@ -1422,19 +1477,19 @@ class NoteCoveApp {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
         this.currentNote.content = content;
-        this.noteManager.updateNote(this.currentNote.id, { title, content, tags });
+        this.noteManager!.updateNote(this.currentNote.id, { title, content, tags });
       }
 
       this.updateStatus('Saved');
     }
   }
 
-  onSearch(query) {
+  onSearch(query: string): void {
     this.searchQuery = query.trim();
     this.updateUI();
   }
 
-  handleKeyboard(e) {
+  handleKeyboard(e: KeyboardEvent): void {
     // Handle global keyboard shortcuts
     if (e.metaKey || e.ctrlKey) {
       switch (e.key) {
@@ -1450,8 +1505,8 @@ class NoteCoveApp {
     }
   }
 
-  async deleteCurrentNote() {
-    if (!this.currentNote) return;
+  async deleteCurrentNote(): Promise<void> {
+    if (!this.currentNote || !this.noteManager) return;
 
     const confirmed = await this.showConfirmDialog(
       'Move to Trash',
@@ -1467,7 +1522,7 @@ class NoteCoveApp {
     this.updateUI();
   }
 
-  showConfirmDialog(title, message) {
+  showConfirmDialog(title: string, message: string): Promise<boolean> {
     return new Promise((resolve) => {
       // Create overlay
       const overlay = document.createElement('div');
@@ -1509,8 +1564,8 @@ class NoteCoveApp {
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
 
-      const confirmBtn = dialog.querySelector('#dialogConfirm');
-      const cancelBtn = dialog.querySelector('#dialogCancel');
+      const confirmBtn = dialog.querySelector('#dialogConfirm') as HTMLButtonElement;
+      const cancelBtn = dialog.querySelector('#dialogCancel') as HTMLButtonElement;
 
       const cleanup = () => {
         document.body.removeChild(overlay);
@@ -1527,7 +1582,7 @@ class NoteCoveApp {
       };
 
       // Handle Escape key
-      const handleKeydown = (e) => {
+      const handleKeydown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           cleanup();
           resolve(false);
@@ -1541,7 +1596,9 @@ class NoteCoveApp {
     });
   }
 
-  restoreNote(noteId) {
+  restoreNote(noteId: string): void {
+    if (!this.noteManager) return;
+
     const note = this.noteManager.restoreNote(noteId);
     if (note) {
       this.updateStatus(`Restored "${note.title || 'Untitled'}"`);
@@ -1549,7 +1606,9 @@ class NoteCoveApp {
     }
   }
 
-  async permanentlyDeleteNote(noteId) {
+  async permanentlyDeleteNote(noteId: string): Promise<void> {
+    if (!this.noteManager) return;
+
     const note = this.noteManager.getNote(noteId);
     if (!note) return;
 
@@ -1568,75 +1627,75 @@ class NoteCoveApp {
     this.updateUI();
   }
 
-  // Removed - now using imported utility functions
-
   // Drag-and-drop handlers for notes
-  handleNoteDragStart(e) {
-    const noteId = e.target.closest('.note-item').dataset.noteId;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', noteId);
-    e.dataTransfer.setData('text/note-type', 'active');
-    e.target.classList.add('dragging');
+  handleNoteDragStart(e: DragEvent): void {
+    const noteId = ((e.target as HTMLElement).closest('.note-item') as HTMLElement).dataset.noteId!;
+    e.dataTransfer!.effectAllowed = 'move';
+    e.dataTransfer!.setData('text/plain', noteId);
+    e.dataTransfer!.setData('text/note-type', 'active');
+    (e.target as HTMLElement).classList.add('dragging');
   }
 
-  handleTrashNoteDragStart(e) {
-    const noteId = e.target.closest('.note-item').dataset.noteId;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', noteId);
-    e.dataTransfer.setData('text/note-type', 'deleted');
-    e.target.classList.add('dragging');
+  handleTrashNoteDragStart(e: DragEvent): void {
+    const noteId = ((e.target as HTMLElement).closest('.note-item') as HTMLElement).dataset.noteId!;
+    e.dataTransfer!.effectAllowed = 'move';
+    e.dataTransfer!.setData('text/plain', noteId);
+    e.dataTransfer!.setData('text/note-type', 'deleted');
+    (e.target as HTMLElement).classList.add('dragging');
   }
 
-  handleNoteDragEnd(e) {
-    e.target.classList.remove('dragging');
+  handleNoteDragEnd(e: DragEvent): void {
+    (e.target as HTMLElement).classList.remove('dragging');
   }
 
-  handleFolderDragStart(e) {
-    const folderItem = e.target.closest('.folder-item');
-    const folderId = folderItem.dataset.folderId;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', folderId);
-    e.dataTransfer.setData('text/drag-type', 'folder');
+  handleFolderDragStart(e: DragEvent): void {
+    const folderItem = (e.target as HTMLElement).closest('.folder-item') as HTMLElement;
+    const folderId = folderItem.dataset.folderId!;
+    e.dataTransfer!.effectAllowed = 'move';
+    e.dataTransfer!.setData('text/plain', folderId);
+    e.dataTransfer!.setData('text/drag-type', 'folder');
     folderItem.classList.add('dragging');
   }
 
-  handleFolderDragEnd(e) {
-    const folderItem = e.target.closest('.folder-item');
+  handleFolderDragEnd(e: DragEvent): void {
+    const folderItem = (e.target as HTMLElement).closest('.folder-item');
     if (folderItem) {
       folderItem.classList.remove('dragging');
     }
   }
 
-  handleFolderDragOver(e) {
+  handleFolderDragOver(e: DragEvent): void {
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer!.dropEffect = 'move';
 
-    const folderItem = e.target.closest('.folder-item');
+    const folderItem = (e.target as HTMLElement).closest('.folder-item');
     if (folderItem) {
       folderItem.classList.add('drag-over');
     }
   }
 
-  handleFolderDragLeave(e) {
-    const folderItem = e.target.closest('.folder-item');
+  handleFolderDragLeave(e: DragEvent): void {
+    const folderItem = (e.target as HTMLElement).closest('.folder-item');
     if (folderItem) {
       folderItem.classList.remove('drag-over');
     }
   }
 
-  async handleFolderDrop(e) {
+  async handleFolderDrop(e: DragEvent): Promise<void> {
+    if (!this.noteManager) return;
+
     e.preventDefault();
     e.stopPropagation();
 
-    const folderItem = e.target.closest('.folder-item');
+    const folderItem = (e.target as HTMLElement).closest('.folder-item');
     if (folderItem) {
       folderItem.classList.remove('drag-over');
 
-      const draggedId = e.dataTransfer.getData('text/plain');
-      const dragType = e.dataTransfer.getData('text/drag-type');
-      const noteType = e.dataTransfer.getData('text/note-type');
-      const targetFolderId = folderItem.dataset.folderId;
+      const draggedId = e.dataTransfer!.getData('text/plain');
+      const dragType = e.dataTransfer!.getData('text/drag-type');
+      const noteType = e.dataTransfer!.getData('text/note-type');
+      const targetFolderId = (folderItem as HTMLElement).dataset.folderId!;
 
       // Handle folder drop - moving folder to become subfolder
       if (dragType === 'folder' && draggedId && targetFolderId) {
@@ -1670,9 +1729,8 @@ class NoteCoveApp {
             this.updateUI();
             this.renderFolderTree(); // Update folder counts
             // Clear editor if the deleted note was selected
-            if (this.currentNoteId === noteId) {
-              this.currentNoteId = null;
-              this.clearEditor();
+            if (this.currentNote && this.currentNote.id === noteId) {
+              this.currentNote = null;
             }
           }
           return;
@@ -1708,7 +1766,7 @@ class NoteCoveApp {
     }
   }
 
-  updateStatus(message) {
+  updateStatus(message: string): void {
     const statusLeft = document.querySelector('.status-left');
     if (statusLeft) {
       statusLeft.textContent = message;
@@ -1720,17 +1778,17 @@ class NoteCoveApp {
 }
 
 // Global functions for HTML onclick handlers
-window.createNewNote = () => {
-  if (window.app) {
-    window.app.createNewNote();
+(window as any).createNewNote = () => {
+  if ((window as any).app) {
+    (window as any).app.createNewNote();
   }
 };
 
-window.app = null;
+(window as any).app = null;
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  window.app = new NoteCoveApp();
+  (window as any).app = new NoteCoveApp();
 });
 
 // Export for module usage

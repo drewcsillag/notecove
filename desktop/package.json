@@ -10,7 +10,7 @@
     "build": "npm run build:renderer && npm run build:main",
     "rebuild": "npm run build",
     "build:renderer": "vite build",
-    "build:main": "esbuild src/main.js src/preload.js --bundle --platform=node --outdir=dist --external:electron --external:fsevents --loader:.ts=ts --loader:.js=js",
+    "build:main": "esbuild src/main.ts src/preload.ts --bundle --platform=node --outdir=dist --external:electron --external:fsevents --loader:.ts=ts --loader:.js=js",
     "build:dist": "npm run build && electron-builder",
     "test": "vitest",
     "test:e2e": "playwright test",
@@ -40,6 +40,7 @@
   "devDependencies": {
     "@playwright/test": "^1.40.1",
     "@types/chokidar": "^1.7.5",
+    "@types/electron": "^1.4.38",
     "@types/node": "^20.19.21",
     "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
