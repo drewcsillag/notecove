@@ -402,14 +402,22 @@ export class NoteCoveEditor {
           const file = item.getAsFile();
           if (!file) continue;
 
+          console.log('[Editor] Pasting image from clipboard');
+
           // Convert to base64
           const reader = new FileReader();
           reader.onload = (e) => {
             const base64 = e.target.result;
 
-            // Insert using insertContent command to ensure Y.Doc sync
-            const imgHtml = `<img src="${base64}" />`;
-            this.editor.chain().focus().insertContent(imgHtml).run();
+            // Insert using structured content (not HTML string) to ensure Y.Doc sync
+            this.editor.commands.insertContent({
+              type: 'image',
+              attrs: {
+                src: base64
+              }
+            });
+
+            console.log('[Editor] Pasted image inserted');
           };
           reader.readAsDataURL(file);
           break;
@@ -431,14 +439,36 @@ export class NoteCoveEditor {
       const file = e.target.files[0];
       if (!file) return;
 
+      console.log('[Editor] Image file selected:', file.name, 'size:', file.size);
+
       // Convert to base64
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target.result;
+        console.log('[Editor] Image converted to base64, length:', base64.length);
 
-        // Insert the image using insertContent command to ensure Y.Doc sync
-        const imgHtml = `<img src="${base64}" />`;
-        this.editor.chain().focus().insertContent(imgHtml).run();
+        // Check Y.Doc before insertion
+        if (this.yDoc) {
+          const yContent = this.yDoc.getXmlFragment('default');
+          console.log('[Editor] Y.Doc before image insert, length:', yContent.length);
+        }
+
+        // Insert using structured content (not HTML string) to ensure proper Y.Doc sync
+        const inserted = this.editor.commands.insertContent({
+          type: 'image',
+          attrs: {
+            src: base64
+          }
+        });
+
+        console.log('[Editor] Image inserted, success:', inserted);
+
+        // Check Y.Doc after insertion
+        if (this.yDoc) {
+          const yContent = this.yDoc.getXmlFragment('default');
+          console.log('[Editor] Y.Doc after image insert, length:', yContent.length);
+          console.log('[Editor] Y.Doc content:', yContent.toString().substring(0, 200));
+        }
       };
       reader.readAsDataURL(file);
     };

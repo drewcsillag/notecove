@@ -564,7 +564,17 @@ export class UpdateStore {
    * @returns {string} Base64 string
    */
   encodeUpdate(update) {
-    return btoa(String.fromCharCode(...update));
+    // For large updates (images), we can't use spread operator as it causes stack overflow
+    // Process in chunks instead
+    const chunkSize = 8192; // 8KB chunks
+    let binaryString = '';
+
+    for (let i = 0; i < update.length; i += chunkSize) {
+      const chunk = update.subarray(i, Math.min(i + chunkSize, update.length));
+      binaryString += String.fromCharCode(...chunk);
+    }
+
+    return btoa(binaryString);
   }
 
   /**

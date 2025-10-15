@@ -37,9 +37,7 @@ export const ResizableImage = Image.extend({
     };
   },
 
-  // TEMPORARILY DISABLED: Custom NodeView might interfere with Y.js sync
-  // TODO: Re-enable after fixing Y.js synchronization
-  addNodeView_DISABLED() {
+  addNodeView() {
     return ({ node, getPos, editor }) => {
       const container = document.createElement('div');
       container.classList.add('image-container');

@@ -48,7 +48,9 @@
       "Bash(timeout 120 npx playwright test desktop/tests/e2e/image-sync-manual.spec.js:110 --reporter=line --workers=1)",
       "Bash(timeout 120 npx playwright test desktop/tests/e2e/image-sync-manual.spec.js:66 --reporter=line --workers=1)",
       "Bash(timeout 120 npx playwright test desktop/tests/e2e/image-sync-simple.spec.js --reporter=line --workers=1)",
-      "Bash(timeout 120 npx playwright test desktop/*)"
+      "Bash(timeout 120 npx playwright test desktop/*)",
+      "Bash(timeout 120 npx playwright test desktop/tests/e2e/image-sync-simple.spec.js --reporter=line --workers=1 --headed)",
+      "Bash(timeout 120 npx playwright test desktop/tests/e2e/image-sync-ui.spec.js --reporter=line --workers=1)"
     ],
     "deny": [],
     "ask": []
