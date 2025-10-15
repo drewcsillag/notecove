@@ -16,11 +16,11 @@ import { JSDOM } from 'jsdom';
  * Tests the full cycle: edit in TipTap -> CRDT updates -> reload -> content appears
  */
 describe('CRDT Content Persistence with Collaboration', () => {
-  let testDir;
-  let mockNoteManager;
-  let mockFileSystemAPI;
-  let dom;
-  let document;
+  let testDir: string;
+  let mockNoteManager: any;
+  let mockFileSystemAPI: any;
+  let dom: any;
+  let document: any;
 
   beforeEach(() => {
     // Create temporary test directory

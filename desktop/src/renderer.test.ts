@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 
 // Mock dependencies
 vi.mock('./lib/editor.js', () => ({
@@ -50,33 +51,33 @@ describe('NoteCove Renderer', () => {
     `;
 
     // Mock window.electronAPI
-    global.window.electronAPI = null;
+    (global as any).window.electronAPI = null;
   });
 
   describe('Title extraction from first line', () => {
     it('should extract title from first line of content', () => {
-      const text = 'First Line Title\nSecond line\nThird line';
-      const firstLine = text.split('\n')[0].trim();
+      const text: string = 'First Line Title\nSecond line\nThird line';
+      const firstLine: string = text.split('\n')[0].trim();
       expect(firstLine).toBe('First Line Title');
     });
 
     it('should handle empty content', () => {
-      const text = '';
-      const firstLine = text.split('\n')[0].trim();
-      const title = firstLine || 'Untitled';
+      const text: string = '';
+      const firstLine: string = text.split('\n')[0].trim();
+      const title: string = firstLine || 'Untitled';
       expect(title).toBe('Untitled');
     });
 
     it('should handle single line content', () => {
-      const text = 'Only one line';
-      const firstLine = text.split('\n')[0].trim();
+      const text: string = 'Only one line';
+      const firstLine: string = text.split('\n')[0].trim();
       expect(firstLine).toBe('Only one line');
     });
   });
 
   describe('Note preview generation', () => {
     it('should generate preview from content', () => {
-      const content = '<p>This is test content</p>';
+      const content: string = '<p>This is test content</p>';
       // In real implementation, this would strip HTML and create preview
       expect(content).toContain('test content');
     });

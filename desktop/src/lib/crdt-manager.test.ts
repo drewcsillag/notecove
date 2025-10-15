@@ -8,8 +8,8 @@ import { CRDTManager } from './crdt-manager';
 import * as Y from 'yjs';
 
 describe('CRDTManager', () => {
-  let manager;
-  const noteId = 'test-note-123';
+  let manager: CRDTManager;
+  const noteId: string = 'test-note-123';
 
   beforeEach(() => {
     manager = new CRDTManager();
@@ -34,8 +34,8 @@ describe('CRDTManager', () => {
     });
 
     it('should track update events', () => {
-      const updates = [];
-      manager.addListener((event, data) => {
+      const updates: any[] = [];
+      manager.addListener((event: string, data: any) => {
         if (event === 'doc-updated') {
           updates.push(data);
         }

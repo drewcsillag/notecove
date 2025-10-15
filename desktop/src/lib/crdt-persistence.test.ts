@@ -12,9 +12,9 @@ import * as os from 'os';
  * Tests the full cycle: create note -> save to CRDT -> reload from CRDT
  */
 describe('CRDT Persistence Integration', () => {
-  let testDir;
-  let mockNoteManager;
-  let mockFileSystemAPI;
+  let testDir: string;
+  let mockNoteManager: any;
+  let mockFileSystemAPI: any;
 
   beforeEach(() => {
     // Create temporary test directory

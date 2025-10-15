@@ -9,67 +9,71 @@ import * as Y from 'yjs';
 
 // Mock file storage
 class MockFileStorage {
+  files: Map<string, string>;
+  isElectron: boolean;
+  notesPath: string;
+
   constructor() {
     this.files = new Map();
     this.isElectron = true;
     this.notesPath = '/test/notes';
   }
 
-  async writeFile(path, content) {
+  async writeFile(path: string, content: string): Promise<{ success: boolean; error?: string }> {
     this.files.set(path, content);
     return { success: true };
   }
 
-  async readFile(path) {
-    const content = this.files.get(path);
+  async readFile(path: string): Promise<{ success: boolean; content?: string; error?: string }> {
+    const content: string | undefined = this.files.get(path);
     if (content === undefined) {
       return { success: false, error: 'File not found' };
     }
     return { success: true, content };
   }
 
-  async exists(path) {
+  async exists(path: string): Promise<boolean> {
     return this.files.has(path);
   }
 
-  async mkdir(path) {
+  async mkdir(path: string): Promise<{ success: boolean; error?: string }> {
     // Mock - just track that it was called
     return { success: true };
   }
 
-  async readDir(path) {
-    const files = Array.from(this.files.keys())
-      .filter(f => f.startsWith(path + '/'))
-      .map(f => f.substring(path.length + 1));
+  async readDir(path: string): Promise<{ success: boolean; files?: string[]; error?: string }> {
+    const files: string[] = Array.from(this.files.keys())
+      .filter((f: string) => f.startsWith(path + '/'))
+      .map((f: string) => f.substring(path.length + 1));
     return { success: files.length > 0, files };
   }
 }
 
 // Setup global mock
-function setupMocks(fileStorage) {
-  global.window = {
+function setupMocks(fileStorage: MockFileStorage): void {
+  (global as any).window = {
     electronAPI: {
       fileSystem: {
-        writeFile: (path, content) => fileStorage.writeFile(path, content),
-        readFile: (path) => fileStorage.readFile(path),
-        exists: (path) => fileStorage.exists(path),
-        mkdir: (path) => fileStorage.mkdir(path),
-        readDir: (path) => fileStorage.readDir(path)
+        writeFile: (path: string, content: string) => fileStorage.writeFile(path, content),
+        readFile: (path: string) => fileStorage.readFile(path),
+        exists: (path: string) => fileStorage.exists(path),
+        mkdir: (path: string) => fileStorage.mkdir(path),
+        readDir: (path: string) => fileStorage.readDir(path)
       }
     }
   };
 }
 
 describe('UpdateStore', () => {
-  let fileStorage;
-  let store;
-  const noteId = 'test-note-123';
-  const instanceId = 'instance-A';
+  let fileStorage: MockFileStorage;
+  let store: UpdateStore;
+  const noteId: string = 'test-note-123';
+  const instanceId: string = 'instance-A';
 
   beforeEach(() => {
     fileStorage = new MockFileStorage();
     setupMocks(fileStorage);
-    store = new UpdateStore(fileStorage, instanceId);
+    store = new UpdateStore(fileStorage as any, instanceId);
   });
 
   describe('Initialization', () => {
@@ -80,7 +84,7 @@ describe('UpdateStore', () => {
     });
 
     it('should load existing state from meta file', async () => {
-      const meta = {
+      const meta: any = {
         instanceId: 'instance-A',
         lastWrite: 5,
         seen: { 'instance-A': 5, 'instance-B': 3 },
@@ -105,8 +109,8 @@ describe('UpdateStore', () => {
     });
 
     it('should buffer updates and flush on idle', async () => {
-      const update1 = new Uint8Array([1, 2, 3]);
-      const update2 = new Uint8Array([4, 5, 6]);
+      const update1: Uint8Array = new Uint8Array([1, 2, 3]);
+      const update2: Uint8Array = new Uint8Array([4, 5, 6]);
 
       await store.addUpdate(noteId, update1);
       await store.addUpdate(noteId, update2);
@@ -118,38 +122,38 @@ describe('UpdateStore', () => {
       await store.flush(noteId);
 
       // Check file was written
-      const updatePath = '/test/notes/test-note-123/updates/instance-A.000001-000002.yjson';
+      const updatePath: string = '/test/notes/test-note-123/updates/instance-A.000001-000002.yjson';
       expect(fileStorage.files.has(updatePath)).toBe(true);
 
       // Verify content
-      const fileContent = JSON.parse(fileStorage.files.get(updatePath));
+      const fileContent: any = JSON.parse(fileStorage.files.get(updatePath)!);
       expect(fileContent.instance).toBe('instance-A');
       expect(fileContent.sequence).toEqual([1, 2]);
       expect(fileContent.updates.length).toBe(2);
 
       // Check meta was updated
-      const metaPath = '/test/notes/test-note-123/meta/instance-A.json';
-      const meta = JSON.parse(fileStorage.files.get(metaPath));
+      const metaPath: string = '/test/notes/test-note-123/meta/instance-A.json';
+      const meta: any = JSON.parse(fileStorage.files.get(metaPath)!);
       expect(meta.lastWrite).toBe(2);
       expect(meta.seen['instance-A']).toBe(2);
     });
 
     it('should flush immediately with ImmediateFlushStrategy', async () => {
-      store = new UpdateStore(fileStorage, instanceId, {
+      store = new UpdateStore(fileStorage as any, instanceId, {
         flushStrategy: new ImmediateFlushStrategy()
       });
       await store.initialize(noteId);
 
-      const update = new Uint8Array([1, 2, 3]);
+      const update: Uint8Array = new Uint8Array([1, 2, 3]);
       await store.addUpdate(noteId, update);
 
       // Should flush immediately
-      const updatePath = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
+      const updatePath: string = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
       expect(fileStorage.files.has(updatePath)).toBe(true);
     });
 
     it('should flush after N updates with CountFlushStrategy', async () => {
-      store = new UpdateStore(fileStorage, instanceId, {
+      store = new UpdateStore(fileStorage as any, instanceId, {
         flushStrategy: new CountFlushStrategy(3)
       });
       await store.initialize(noteId);
@@ -162,12 +166,12 @@ describe('UpdateStore', () => {
 
       // Should auto-flush after 3 updates
       expect(store.getNoteState(noteId).pendingUpdates.length).toBe(0);
-      const updatePath = '/test/notes/test-note-123/updates/instance-A.000001-000003.yjson';
+      const updatePath: string = '/test/notes/test-note-123/updates/instance-A.000001-000003.yjson';
       expect(fileStorage.files.has(updatePath)).toBe(true);
     });
 
     it('should handle multiple flush cycles correctly', async () => {
-      store = new UpdateStore(fileStorage, instanceId, {
+      store = new UpdateStore(fileStorage as any, instanceId, {
         flushStrategy: new CountFlushStrategy(2)
       });
       await store.initialize(noteId);
@@ -176,33 +180,33 @@ describe('UpdateStore', () => {
       await store.addUpdate(noteId, new Uint8Array([1]));
       await store.addUpdate(noteId, new Uint8Array([2]));
 
-      const file1 = '/test/notes/test-note-123/updates/instance-A.000001-000002.yjson';
+      const file1: string = '/test/notes/test-note-123/updates/instance-A.000001-000002.yjson';
       expect(fileStorage.files.has(file1)).toBe(true);
 
       // Second batch
       await store.addUpdate(noteId, new Uint8Array([3]));
       await store.addUpdate(noteId, new Uint8Array([4]));
 
-      const file2 = '/test/notes/test-note-123/updates/instance-A.000003-000004.yjson';
+      const file2: string = '/test/notes/test-note-123/updates/instance-A.000003-000004.yjson';
       expect(fileStorage.files.has(file2)).toBe(true);
 
       // Verify sequence numbers are correct
-      const content1 = JSON.parse(fileStorage.files.get(file1));
-      const content2 = JSON.parse(fileStorage.files.get(file2));
+      const content1: any = JSON.parse(fileStorage.files.get(file1)!);
+      const content2: any = JSON.parse(fileStorage.files.get(file2)!);
       expect(content1.sequence).toEqual([1, 2]);
       expect(content2.sequence).toEqual([3, 4]);
     });
 
     it('should encode/decode updates correctly', async () => {
-      const originalUpdate = new Uint8Array([1, 2, 3, 255, 0, 128]);
+      const originalUpdate: Uint8Array = new Uint8Array([1, 2, 3, 255, 0, 128]);
 
       await store.addUpdate(noteId, originalUpdate);
       await store.flush(noteId);
 
-      const updatePath = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
-      const fileContent = JSON.parse(fileStorage.files.get(updatePath));
+      const updatePath: string = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
+      const fileContent: any = JSON.parse(fileStorage.files.get(updatePath)!);
 
-      const decodedUpdate = store.decodeUpdate(fileContent.updates[0]);
+      const decodedUpdate: Uint8Array = store.decodeUpdate(fileContent.updates[0]);
       expect(decodedUpdate).toEqual(originalUpdate);
     });
   });
@@ -214,7 +218,7 @@ describe('UpdateStore', () => {
 
     it('should read new updates from other instances', async () => {
       // Simulate instance-B writing updates
-      const instanceBStore = new UpdateStore(fileStorage, 'instance-B');
+      const instanceBStore: UpdateStore = new UpdateStore(fileStorage as any, 'instance-B');
       await instanceBStore.initialize(noteId);
 
       await instanceBStore.addUpdate(noteId, new Uint8Array([10, 20]));
@@ -222,7 +226,7 @@ describe('UpdateStore', () => {
       await instanceBStore.flush(noteId);
 
       // instance-A reads updates
-      const newUpdates = await store.readNewUpdates(noteId);
+      const newUpdates: Array<{ instanceId: string; sequence: number; update: Uint8Array }> = await store.readNewUpdates(noteId);
 
       expect(newUpdates.length).toBe(2);
       expect(newUpdates[0].instanceId).toBe('instance-B');
@@ -230,13 +234,13 @@ describe('UpdateStore', () => {
       expect(newUpdates[1].sequence).toBe(2);
 
       // Verify we marked them as seen in ranges
-      const ranges = store.getNoteState(noteId).seenRanges.get('instance-B');
+      const ranges: Array<[number, number]> | undefined = store.getNoteState(noteId).seenRanges.get('instance-B');
       expect(ranges).toBeDefined();
       expect(ranges).toEqual([[1, 2]]);
     });
 
     it('should only read updates we haven\'t seen', async () => {
-      const instanceBStore = new UpdateStore(fileStorage, 'instance-B');
+      const instanceBStore: UpdateStore = new UpdateStore(fileStorage as any, 'instance-B');
       await instanceBStore.initialize(noteId);
 
       // Write 4 updates
@@ -249,9 +253,9 @@ describe('UpdateStore', () => {
       await instanceBStore.flush(noteId);
 
       // Read first batch
-      let newUpdates = await store.readNewUpdates(noteId);
+      let newUpdates: Array<{ instanceId: string; sequence: number; update: Uint8Array }> = await store.readNewUpdates(noteId);
       expect(newUpdates.length).toBe(4);
-      let ranges = store.getNoteState(noteId).seenRanges.get('instance-B');
+      let ranges: Array<[number, number]> | undefined = store.getNoteState(noteId).seenRanges.get('instance-B');
       expect(ranges).toEqual([[1, 4]]);
 
       // Write more updates
@@ -267,7 +271,7 @@ describe('UpdateStore', () => {
     });
 
     it('should handle partial reads from packed files', async () => {
-      const instanceBStore = new UpdateStore(fileStorage, 'instance-B');
+      const instanceBStore: UpdateStore = new UpdateStore(fileStorage as any, 'instance-B');
       await instanceBStore.initialize(noteId);
 
       // Write 5 updates in one file
@@ -280,15 +284,15 @@ describe('UpdateStore', () => {
       store.getNoteState(noteId).seenRanges.set('instance-B', [[1, 3]]);
 
       // Read - should only get 4 and 5
-      const newUpdates = await store.readNewUpdates(noteId);
+      const newUpdates: Array<{ instanceId: string; sequence: number; update: Uint8Array }> = await store.readNewUpdates(noteId);
       expect(newUpdates.length).toBe(2);
       expect(newUpdates[0].sequence).toBe(4);
       expect(newUpdates[1].sequence).toBe(5);
     });
 
     it('should read from multiple instances correctly', async () => {
-      const instanceB = new UpdateStore(fileStorage, 'instance-B');
-      const instanceC = new UpdateStore(fileStorage, 'instance-C');
+      const instanceB: UpdateStore = new UpdateStore(fileStorage as any, 'instance-B');
+      const instanceC: UpdateStore = new UpdateStore(fileStorage as any, 'instance-C');
 
       await instanceB.initialize(noteId);
       await instanceC.initialize(noteId);
@@ -302,18 +306,18 @@ describe('UpdateStore', () => {
       await instanceC.flush(noteId);
 
       // Instance A reads all
-      const newUpdates = await store.readNewUpdates(noteId);
+      const newUpdates: Array<{ instanceId: string; sequence: number; update: Uint8Array }> = await store.readNewUpdates(noteId);
 
       expect(newUpdates.length).toBe(2);
-      expect(newUpdates.find(u => u.instanceId === 'instance-B')).toBeTruthy();
-      expect(newUpdates.find(u => u.instanceId === 'instance-C')).toBeTruthy();
+      expect(newUpdates.find((u: any) => u.instanceId === 'instance-B')).toBeTruthy();
+      expect(newUpdates.find((u: any) => u.instanceId === 'instance-C')).toBeTruthy();
     });
   });
 
   describe('Multi-instance Scenarios', () => {
     it('should handle concurrent writes without conflicts', async () => {
-      const instanceA = new UpdateStore(fileStorage, 'instance-A');
-      const instanceB = new UpdateStore(fileStorage, 'instance-B');
+      const instanceA: UpdateStore = new UpdateStore(fileStorage as any, 'instance-A');
+      const instanceB: UpdateStore = new UpdateStore(fileStorage as any, 'instance-B');
 
       await instanceA.initialize(noteId);
       await instanceB.initialize(noteId);
@@ -335,7 +339,7 @@ describe('UpdateStore', () => {
     });
 
     it('should maintain correct sequence numbers across restarts', async () => {
-      const instanceA = new UpdateStore(fileStorage, 'instance-A');
+      const instanceA: UpdateStore = new UpdateStore(fileStorage as any, 'instance-A');
       await instanceA.initialize(noteId);
 
       await instanceA.addUpdate(noteId, new Uint8Array([1]));
@@ -343,7 +347,7 @@ describe('UpdateStore', () => {
       await instanceA.flush(noteId);
 
       // Simulate restart
-      const instanceA2 = new UpdateStore(fileStorage, 'instance-A');
+      const instanceA2: UpdateStore = new UpdateStore(fileStorage as any, 'instance-A');
       await instanceA2.initialize(noteId);
 
       expect(instanceA2.getNoteState(noteId).writeCounter).toBe(2);
@@ -351,10 +355,10 @@ describe('UpdateStore', () => {
       await instanceA2.addUpdate(noteId, new Uint8Array([3]));
       await instanceA2.flush(noteId);
 
-      const file = '/test/notes/test-note-123/updates/instance-A.000003.yjson';
+      const file: string = '/test/notes/test-note-123/updates/instance-A.000003.yjson';
       expect(fileStorage.files.has(file)).toBe(true);
 
-      const content = JSON.parse(fileStorage.files.get(file));
+      const content: any = JSON.parse(fileStorage.files.get(file)!);
       expect(content.sequence).toEqual([3, 3]);
     });
   });
@@ -362,23 +366,23 @@ describe('UpdateStore', () => {
   describe('Yjs Integration', () => {
     it('should correctly sync real Yjs documents', async () => {
       // Create two Yjs documents (simulating two instances)
-      const docA = new Y.Doc();
-      const docB = new Y.Doc();
+      const docA: Y.Doc = new Y.Doc();
+      const docB: Y.Doc = new Y.Doc();
 
-      const textA = docA.getText('content');
-      const textB = docB.getText('content');
+      const textA: Y.Text = docA.getText('content');
+      const textB: Y.Text = docB.getText('content');
 
       // Instance A: Write "Hello"
       textA.insert(0, 'Hello');
-      const updateA1 = Y.encodeStateAsUpdate(docA);
+      const updateA1: Uint8Array = Y.encodeStateAsUpdate(docA);
 
       // Instance B: independently writes "World"
       textB.insert(0, 'World');
-      const updateB1 = Y.encodeStateAsUpdate(docB);
+      const updateB1: Uint8Array = Y.encodeStateAsUpdate(docB);
 
       // Store updates
-      const storeA = new UpdateStore(fileStorage, 'instance-A');
-      const storeB = new UpdateStore(fileStorage, 'instance-B');
+      const storeA: UpdateStore = new UpdateStore(fileStorage as any, 'instance-A');
+      const storeB: UpdateStore = new UpdateStore(fileStorage as any, 'instance-B');
 
       await storeA.initialize(noteId);
       await storeB.initialize(noteId);
@@ -390,20 +394,20 @@ describe('UpdateStore', () => {
       await storeB.flush(noteId);
 
       // Instance A reads B's updates
-      const newUpdatesForA = await storeA.readNewUpdates(noteId);
+      const newUpdatesForA: Array<{ update: Uint8Array }> = await storeA.readNewUpdates(noteId);
       for (const { update } of newUpdatesForA) {
         Y.applyUpdate(docA, update);
       }
 
       // Instance B reads A's updates
-      const newUpdatesForB = await storeB.readNewUpdates(noteId);
+      const newUpdatesForB: Array<{ update: Uint8Array }> = await storeB.readNewUpdates(noteId);
       for (const { update } of newUpdatesForB) {
         Y.applyUpdate(docB, update);
       }
 
       // Both should have merged content
-      const contentA = textA.toString();
-      const contentB = textB.toString();
+      const contentA: string = textA.toString();
+      const contentB: string = textB.toString();
 
       expect(contentA).toBe(contentB);
       // Yjs will merge these deterministically
@@ -412,22 +416,22 @@ describe('UpdateStore', () => {
     });
 
     it('should handle complex Yjs operations correctly', async () => {
-      const docA = new Y.Doc();
-      const docB = new Y.Doc();
-      const docC = new Y.Doc();
+      const docA: Y.Doc = new Y.Doc();
+      const docB: Y.Doc = new Y.Doc();
+      const docC: Y.Doc = new Y.Doc();
 
-      const textA = docA.getText('content');
-      const textB = docB.getText('content');
-      const textC = docC.getText('content');
+      const textA: Y.Text = docA.getText('content');
+      const textB: Y.Text = docB.getText('content');
+      const textC: Y.Text = docC.getText('content');
 
       // Setup stores
-      const storeA = new UpdateStore(fileStorage, 'instance-A', {
+      const storeA: UpdateStore = new UpdateStore(fileStorage as any, 'instance-A', {
         flushStrategy: new ImmediateFlushStrategy()
       });
-      const storeB = new UpdateStore(fileStorage, 'instance-B', {
+      const storeB: UpdateStore = new UpdateStore(fileStorage as any, 'instance-B', {
         flushStrategy: new ImmediateFlushStrategy()
       });
-      const storeC = new UpdateStore(fileStorage, 'instance-C', {
+      const storeC: UpdateStore = new UpdateStore(fileStorage as any, 'instance-C', {
         flushStrategy: new ImmediateFlushStrategy()
       });
 
@@ -441,7 +445,7 @@ describe('UpdateStore', () => {
       await storeA.addUpdate(noteId, Y.encodeStateAsUpdate(docA));
 
       // B: Reads A, then adds " World"
-      let updates = await storeB.readNewUpdates(noteId);
+      let updates: Array<{ update: Uint8Array }> = await storeB.readNewUpdates(noteId);
       for (const { update } of updates) {
         Y.applyUpdate(docB, update);
       }
@@ -482,7 +486,7 @@ describe('UpdateStore', () => {
       const originalWriteFile = fileStorage.writeFile;
       fileStorage.writeFile = async () => ({ success: false, error: 'Disk full' });
 
-      const result = await store.flush(noteId);
+      const result: boolean = await store.flush(noteId);
       expect(result).toBe(false);
 
       // Updates should still be in buffer
@@ -490,7 +494,7 @@ describe('UpdateStore', () => {
 
       // Restore and retry
       fileStorage.writeFile = originalWriteFile;
-      const retryResult = await store.flush(noteId);
+      const retryResult: boolean = await store.flush(noteId);
       expect(retryResult).toBe(true);
       expect(store.getNoteState(noteId).pendingUpdates.length).toBe(0);
     });
@@ -518,7 +522,7 @@ describe('UpdateStore', () => {
       );
 
       // Should not throw, should skip corrupted file
-      const updates = await store.readNewUpdates(noteId);
+      const updates: Array<{ instanceId: string; sequence: number; update: Uint8Array }> = await store.readNewUpdates(noteId);
       expect(updates.length).toBe(0);
     });
   });
@@ -533,7 +537,7 @@ describe('UpdateStore', () => {
       await store.cleanup(noteId);
 
       expect(store.getNoteState(noteId).pendingUpdates.length).toBe(0);
-      const updatePath = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
+      const updatePath: string = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
       expect(fileStorage.files.has(updatePath)).toBe(true);
     });
   });

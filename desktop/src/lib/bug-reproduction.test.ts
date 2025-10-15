@@ -18,10 +18,10 @@ import { JSDOM } from 'jsdom';
  * 4. Quit and restart again → Note loses title, gets duplicated
  */
 describe('Bug Reproduction Test', () => {
-  let testDir;
-  let dom;
-  let document;
-  let editorElement;
+  let testDir: string;
+  let dom: any;
+  let document: any;
+  let editorElement: any;
 
   beforeEach(() => {
     testDir = path.join(os.tmpdir(), `bug-test-${Date.now()}`);

@@ -25,10 +25,10 @@ import { JSDOM } from 'jsdom';
  * 10. Open in editor and verify content appears
  */
 describe('Full App Integration Test', () => {
-  let testDir;
-  let dom;
-  let document;
-  let editorElement;
+  let testDir: string;
+  let dom: any;
+  let document: any;
+  let editorElement: any;
 
   beforeEach(() => {
     // Create temporary test directory

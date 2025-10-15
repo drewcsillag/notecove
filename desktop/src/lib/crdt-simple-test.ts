@@ -1,30 +1,31 @@
 /**
  * Simple test to debug CRDT save/load issue
- * Run with: node --loader ./node_modules/vitest/dist/node-loader.mjs src/lib/crdt-simple-test.js
+ * Run with: node --loader ./node_modules/vitest/dist/node-loader.mjs src/lib/crdt-simple-test.ts
  */
 import { CRDTManager } from './crdt-manager';
+import type { Note } from './note-manager';
 import * as Y from 'yjs';
 
 console.log('=== Test 1: Create a note and check if updates are generated ===');
 
-const crdtManager = new CRDTManager();
-const noteId = 'test-note';
+const crdtManager: CRDTManager = new CRDTManager();
+const noteId: string = 'test-note';
 
 // Simulate creating a new note
-const note = {
+const note: Partial<Note> = {
   id: noteId,
   title: 'My Test Title',
   created: new Date().toISOString(),
   modified: new Date().toISOString(),
   tags: ['test'],
-  folder: 'all-notes'
+  folderId: 'all-notes'
 };
 
 console.log('1. Initializing note with title:', note.title);
-crdtManager.initializeNote(noteId, note);
+crdtManager.initializeNote(noteId, note as any);
 
 console.log('2. Getting pending updates...');
-const pendingUpdates = crdtManager.getPendingUpdates(noteId);
+const pendingUpdates: Uint8Array[] = crdtManager.getPendingUpdates(noteId);
 console.log('   Pending updates count:', pendingUpdates.length);
 
 if (pendingUpdates.length > 0) {
@@ -35,7 +36,7 @@ if (pendingUpdates.length > 0) {
 }
 
 console.log('\n3. Reading the note back from CRDT...');
-const loadedNote = crdtManager.getNoteFromDoc(noteId);
+const loadedNote: Note = crdtManager.getNoteFromDoc(noteId);
 console.log('   Loaded title:', loadedNote.title);
 console.log('   Loaded tags:', loadedNote.tags);
 console.log('   Loaded folderId:', loadedNote.folderId);
@@ -48,15 +49,15 @@ if (loadedNote.title === note.title) {
 
 console.log('\n=== Test 2: Apply the update to a new doc ===');
 
-const crdtManager2 = new CRDTManager();
-const noteId2 = 'test-note-2';
+const crdtManager2: CRDTManager = new CRDTManager();
+const noteId2: string = 'test-note-2';
 
 // Simulate loading from updates
 for (const update of pendingUpdates) {
   crdtManager2.applyUpdate(noteId2, new Uint8Array(update), 'load');
 }
 
-const loadedNote2 = crdtManager2.getNoteFromDoc(noteId2);
+const loadedNote2: Note = crdtManager2.getNoteFromDoc(noteId2);
 console.log('Loaded from updates - title:', loadedNote2.title);
 console.log('Loaded from updates - tags:', loadedNote2.tags);
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import {
   escapeHtml,
   getPreview,
@@ -9,55 +10,68 @@ import {
   sanitizeFilename
 } from './utils';
 
+// Mock DOM element interface
+interface MockElement {
+  _innerHTML: string;
+  _textContent: string;
+  innerHTML: string;
+  textContent: string;
+}
+
+// Mock Document interface
+interface MockDocument {
+  createElement: Mock<[], MockElement>;
+}
+
 // Mock DOM for escapeHtml and getPreview tests
 beforeEach(() => {
-  global.document = {
-    createElement: vi.fn(() => {
-      const element = {
+  (global as any).document = {
+    createElement: vi.fn((): MockElement => {
+      const element: MockElement = {
         _innerHTML: '',
         _textContent: '',
-        get innerHTML() {
+        get innerHTML(): string {
           return this._innerHTML;
         },
-        set innerHTML(value) {
+        set innerHTML(value: string) {
           this._innerHTML = value;
           // Strip HTML tags for textContent
           this._textContent = value.replace(/<[^>]*>/g, '');
         },
-        get textContent() {
+        get textContent(): string {
           return this._textContent;
         },
-        set textContent(value) {
+        set textContent(value: string) {
           this._textContent = value;
         }
       };
       return element;
     })
-  };
+  } as MockDocument;
 });
 
 describe('Utils', () => {
   describe('getPreview', () => {
     it('should return empty string for empty content', () => {
       expect(getPreview('')).toBe('');
-      expect(getPreview(null)).toBe('');
-      expect(getPreview(undefined)).toBe('');
+      expect(getPreview(null as any)).toBe('');
+      expect(getPreview(undefined as any)).toBe('');
     });
 
     it('should return full content if shorter than max length', () => {
-      const content = '<p>Short content</p>';
+      const content: string = '<p>Short content</p>';
       expect(getPreview(content)).toBe('Short content');
     });
 
     it('should truncate long content with ellipsis', () => {
-      const content = '<p>This is a very long piece of content that should be truncated</p>';
-      const preview = getPreview(content, 20);
+      const content: string = '<p>This is a very long piece of content that should be truncated</p>';
+      const preview: string = getPreview(content, 20);
       expect(preview).toBe('This is a very long ...');
     });
 
     it('should replace newlines with spaces', () => {
-      const content = '<p>Line 1</p> <p>Line 2</p> <p>Line 3</p>';
-      const preview = getPreview(content);
+      const content: string = '<p>Line 1</p> <p>Line 2</p> <p>Line 3</p>';
+      const preview: string = getPreview(content);
       expect(preview).toBe('Line 1 Line 2 Line 3');
     });
   });
@@ -65,7 +79,7 @@ describe('Utils', () => {
   describe('debounce', () => {
     it('should debounce function calls', (done) => {
       let callCount = 0;
-      const func = debounce(() => {
+      const func: () => void = debounce(() => {
         callCount++;
       }, 50);
 
@@ -84,20 +98,20 @@ describe('Utils', () => {
 
   describe('generateUUID', () => {
     it('should generate valid UUID v4', () => {
-      const uuid = generateUUID();
+      const uuid: string = generateUUID();
       expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     });
 
     it('should generate unique UUIDs', () => {
-      const uuid1 = generateUUID();
-      const uuid2 = generateUUID();
+      const uuid1: string = generateUUID();
+      const uuid2: string = generateUUID();
       expect(uuid1).not.toBe(uuid2);
     });
   });
 
   describe('validateNote', () => {
     it('should validate correct note structure', () => {
-      const note = {
+      const note: any = {
         id: 'test-id',
         title: 'Test Note',
         content: 'Test content',
@@ -109,9 +123,9 @@ describe('Utils', () => {
     });
 
     it('should reject invalid note structures', () => {
-      expect(validateNote(null)).toBe(false);
-      expect(validateNote({})).toBe(false);
-      expect(validateNote({ id: 123 })).toBe(false); // id should be string
+      expect(validateNote(null as any)).toBe(false);
+      expect(validateNote({} as any)).toBe(false);
+      expect(validateNote({ id: 123 } as any)).toBe(false); // id should be string
       expect(validateNote({
         id: 'test',
         title: 'test',
@@ -119,23 +133,23 @@ describe('Utils', () => {
         created: 'test',
         modified: 'test',
         tags: 'not-array'
-      })).toBe(false);
+      } as any)).toBe(false);
     });
   });
 
   describe('sanitizeFilename', () => {
     it('should remove invalid characters', () => {
-      const filename = 'test<>:"/\\|?*file.txt';
+      const filename: string = 'test<>:"/\\|?*file.txt';
       expect(sanitizeFilename(filename)).toBe('testfile.txt');
     });
 
     it('should normalize whitespace', () => {
-      const filename = '  test    file  ';
+      const filename: string = '  test    file  ';
       expect(sanitizeFilename(filename)).toBe('test file');
     });
 
     it('should limit length', () => {
-      const filename = 'a'.repeat(300);
+      const filename: string = 'a'.repeat(300);
       expect(sanitizeFilename(filename).length).toBe(255);
     });
   });
