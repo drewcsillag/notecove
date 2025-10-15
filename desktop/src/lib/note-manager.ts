@@ -198,7 +198,7 @@ export class NoteManager {
         content: '<h1>Welcome to NoteCove</h1><p>This is your first note! NoteCove is designed to be your digital sanctuary for ideas and thoughts.</p><p><strong>Features:</strong></p><ul><li>Rich text editing</li><li>File-based sync</li><li>Offline-first design</li><li>Advanced organization</li></ul><p>Start by editing this note or create a new note. Everything you write is automatically saved.</p>',
         created: new Date().toISOString(),
         modified: new Date().toISOString(),
-        tags: ['welcome', 'getting-started'],
+        tags: [],
         deleted: false,
         folderId: 'all-notes'
       },
@@ -208,7 +208,7 @@ export class NoteManager {
         content: '<h2>Quick Start</h2><p>Here are some tips to get you started with NoteCove:</p><ol><li><strong>Creating Notes:</strong> Use Cmd+N (Mac) or Ctrl+N (Windows/Linux) to create a new note</li><li><strong>Organization:</strong> Use #tags in your notes for easy categorization</li><li><strong>Search:</strong> Use the search box to find notes quickly</li><li><strong>Formatting:</strong> Use the toolbar or keyboard shortcuts for formatting</li></ol><p>Enjoy your note-taking journey! 📝</p>',
         created: new Date(Date.now() - 86400000).toISOString(),
         modified: new Date(Date.now() - 86400000).toISOString(),
-        tags: ['guide', 'tips'],
+        tags: ['tags'],
         deleted: false,
         folderId: 'all-notes'
       }

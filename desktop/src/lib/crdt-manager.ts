@@ -134,6 +134,7 @@ export class CRDTManager {
       titleType: typeof note.title,
       created: note.created,
       isEmpty: doc.getMap('metadata').size === 0,
+      hasContent: !!(note.content && note.content.length > 0),
       fullNote: JSON.stringify(note)
     });
 
@@ -161,14 +162,122 @@ export class CRDTManager {
         console.log(`[CRDTManager] Metadata already exists for ${noteId}, skipping init`);
         console.log(`  - Current title:`, yMetadata.get('title'));
       }
-
-      // For TipTap Collaboration: the content is stored in a Y.XmlFragment
-      // named 'prosemirror' (this is what TipTap's Collaboration extension uses)
-      // We don't manually initialize it here - TipTap will do it when the editor connects
-
     });
 
+    // Initialize content if provided
+    if (note.content && note.content.length > 0) {
+      this.setContentFromHTML(noteId, note.content);
+    }
+
     console.log('Initialized CRDT document for note:', noteId);
+  }
+
+  /**
+   * Set content from HTML string
+   * Creates a temporary editor to parse HTML and sync it to the Y.XmlFragment
+   * @param noteId - Note ID
+   * @param htmlContent - HTML content string
+   */
+  setContentFromHTML(noteId: string, htmlContent: string): void {
+    const doc = this.getDoc(noteId);
+    const fragment = doc.getXmlFragment('default');
+
+    // Only set content if fragment is empty
+    if (fragment.length > 0) {
+      console.log(`[CRDTManager] Content already exists for ${noteId}, skipping`);
+      return;
+    }
+
+    console.log(`[CRDTManager] Setting content from HTML for ${noteId}`);
+
+    // Create a temporary container element
+    const tempContainer = document.createElement('div');
+    tempContainer.style.display = 'none';
+    document.body.appendChild(tempContainer);
+
+    try {
+      // Create a temporary editor with full extensions
+      const tempEditor = new Editor({
+        element: tempContainer,
+        extensions: [
+          StarterKit,
+          Table,
+          TableRow,
+          TableHeader,
+          TableCell,
+          Hashtag,
+          TaskList,
+          TaskItem,
+          ResizableImage
+        ],
+        content: htmlContent,
+        editable: false
+      });
+
+      // Get the ProseMirror state
+      const state = tempEditor.state;
+
+      // Destroy the temporary editor
+      tempEditor.destroy();
+
+      // Now apply the content to the Y.XmlFragment
+      // We need to do this in a transaction
+      doc.transact(() => {
+        // Convert ProseMirror state to Y.XmlFragment
+        // We'll manually insert the content
+        const pmDoc = state.doc;
+
+        // Simple approach: convert each node
+        pmDoc.content.forEach((node, offset, index) => {
+          this.insertPMNodeToFragment(fragment, node);
+        });
+      });
+
+      console.log(`[CRDTManager] Content set successfully for ${noteId}`);
+    } catch (error) {
+      console.error(`[CRDTManager] Error setting content for ${noteId}:`, error);
+    } finally {
+      // Clean up temp container
+      document.body.removeChild(tempContainer);
+    }
+  }
+
+  /**
+   * Helper to insert a ProseMirror node into Y.XmlFragment
+   * @param fragment - Y.XmlFragment to insert into
+   * @param pmNode - ProseMirror node
+   */
+  private insertPMNodeToFragment(fragment: Y.XmlFragment, pmNode: any): void {
+    if (pmNode.isText) {
+      const yText = new Y.XmlText(pmNode.text);
+      // Apply marks if any
+      if (pmNode.marks && pmNode.marks.length > 0) {
+        pmNode.marks.forEach((mark: any) => {
+          yText.setAttribute(mark.type.name, mark.attrs || true);
+        });
+      }
+      fragment.push([yText]);
+    } else {
+      const yElement = new Y.XmlElement(pmNode.type.name);
+
+      // Set attributes
+      if (pmNode.attrs) {
+        Object.entries(pmNode.attrs).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            yElement.setAttribute(key, value);
+          }
+        });
+      }
+
+      // Add child nodes
+      if (pmNode.content && pmNode.content.size > 0) {
+        pmNode.content.forEach((childNode: any) => {
+          this.insertPMNodeToFragment(yElement, childNode);
+        });
+      }
+
+      fragment.push([yElement]);
+    }
   }
 
   /**
