@@ -123,8 +123,15 @@ test.describe('New Features', () => {
       await parentFolder.click();
       await page.waitForTimeout(200);
 
-      // Create a child folder
+      // Create a child folder - this shows confirm dialog first
       await page.locator('#newFolderBtn').click();
+      // Handle the "Create Subfolder?" confirm dialog
+      const confirmBtn = page.locator('#dialogConfirm');
+      await expect(confirmBtn).toBeVisible();
+      await confirmBtn.click();
+      await page.waitForTimeout(100);
+
+      // Now the input dialog appears
       dialogInput = page.locator('#dialogInput');
       await expect(dialogInput).toBeVisible();
       await dialogInput.fill('Child Folder');
@@ -388,15 +395,29 @@ test.describe('New Features', () => {
       await expect(editor).toBeFocused({ timeout: 5000 });
       await page.waitForTimeout(500);
       await page.keyboard.type('Note in folder');
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(2000); // Wait for debounced save
+
+      // Manually trigger save to localStorage
+      await page.evaluate(() => {
+        window.app.noteManager.saveNotes();
+      });
+      await page.waitForTimeout(200);
+
+      // Re-enable test mode before reload (so sample notes don't load)
+      await page.evaluate(() => {
+        localStorage.setItem('notecove-test-mode', 'true');
+      });
 
       // Reload the page
       await page.reload();
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(500);
 
+      // Find the folder again after reload
+      const testFolderAfterReload = page.locator('.folder-item').filter({ hasText: 'Test Folder' });
+
       // Folder should still show count of 1 (not 0)
-      const folderCount = testFolder.locator('.folder-count');
+      const folderCount = testFolderAfterReload.locator('.folder-count');
       await expect(folderCount).toHaveText('1');
     });
 

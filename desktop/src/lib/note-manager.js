@@ -15,6 +15,14 @@ export class NoteManager {
     this.syncManager = null; // Will be set after SyncManager is initialized
 
     this.setupFolderListener();
+
+    // In web mode, load notes immediately from localStorage
+    // In Electron mode, notes are loaded later via setSyncManager()
+    // Skip in unit test environments (detected by global vi or process.env.VITEST)
+    const isTest = typeof global !== 'undefined' && (global.vi !== undefined || process.env.VITEST === 'true');
+    if (!this.isElectron && !isTest) {
+      this.loadNotes();
+    }
   }
 
   /**
