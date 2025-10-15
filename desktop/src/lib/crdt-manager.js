@@ -75,9 +75,9 @@ export class CRDTManager {
 
       // Set up update handler to track changes
       const updateHandler = (update, origin) => {
-        // Only skip updates from remote instances
+        // Skip updates from remote instances AND from loading (don't re-store loaded updates)
         // We want to save all local changes (including those from editor, programmatic updates, etc.)
-        if (origin !== 'remote') {
+        if (origin !== 'remote' && origin !== 'load') {
           // Store the update to be written as an append-only file
           if (!this.pendingUpdates.has(noteId)) {
             this.pendingUpdates.set(noteId, []);
@@ -306,6 +306,35 @@ export class CRDTManager {
   }
 
   /**
+   * Clear all content from a Y.Doc by destroying and recreating it
+   * This is necessary because simply deleting content doesn't reset the internal state vector
+   * @param {string} noteId - Note ID
+   */
+  clearDoc(noteId) {
+    if (!this.docs.has(noteId)) {
+      return; // Doc doesn't exist yet, nothing to clear
+    }
+
+    // Remove the old update handler
+    const oldHandler = this.updateHandlers.get(noteId);
+    if (oldHandler) {
+      const oldDoc = this.docs.get(noteId);
+      oldDoc.off('update', oldHandler);
+      this.updateHandlers.delete(noteId);
+    }
+
+    // Clear pending updates for this note
+    if (this.pendingUpdates.has(noteId)) {
+      this.pendingUpdates.delete(noteId);
+    }
+
+    // Remove the old doc
+    this.docs.delete(noteId);
+
+    // Next call to getDoc will create a fresh one with a new update handler
+  }
+
+  /**
    * Apply CRDT state update from external source
    * @param {string} noteId - Note ID
    * @param {Array|Uint8Array} state - State update
@@ -315,7 +344,6 @@ export class CRDTManager {
     const doc = this.getDoc(noteId);
     const update = state instanceof Uint8Array ? state : new Uint8Array(state);
     Y.applyUpdate(doc, update, origin);
-    console.log('Applied update for note:', noteId);
   }
 
   /**
@@ -382,7 +410,18 @@ export class CRDTManager {
    */
   getHTMLFromDoc(doc) {
     try {
-      // Create a temporary headless editor
+      // Get the Y.XmlFragment directly and convert to HTML
+      // IMPORTANT: Don't create a TipTap editor with Collaboration here,
+      // as it can interfere with the Y.Doc state during loading
+      const fragment = doc.getXmlFragment('default');
+
+      if (fragment.length === 0) {
+        return '<p></p>';
+      }
+
+      // Use TipTap's prosemirrorJSONToYXmlFragment in reverse
+      // to convert Y.XmlFragment to HTML
+      // Create a temporary editor WITHOUT Collaboration to convert to HTML
       const tempEditor = new Editor({
         extensions: [
           StarterKit.configure({
@@ -397,12 +436,10 @@ export class CRDTManager {
           Hashtag,
           TaskList,
           TaskItem,
-          ResizableImage,
-          Collaboration.configure({
-            document: doc,
-            field: 'default'
-          })
-        ]
+          ResizableImage
+          // NOTE: NO Collaboration extension - we don't want to sync with Y.Doc
+        ],
+        content: this.yXmlFragmentToHTML(fragment)
       });
 
       // Get HTML from the editor
@@ -416,6 +453,52 @@ export class CRDTManager {
       console.error('[CRDTManager] Error converting Y.Doc to HTML:', error);
       return '<p></p>';
     }
+  }
+
+  /**
+   * Convert Y.XmlFragment to HTML string
+   * @param {Y.XmlFragment} fragment - Y.XmlFragment to convert
+   * @returns {string} HTML string
+   */
+  yXmlFragmentToHTML(fragment) {
+    // Simple conversion: iterate through fragment and build HTML
+    let html = '';
+    fragment.forEach((item) => {
+      html += this.yXmlElementToHTML(item);
+    });
+    return html || '<p></p>';
+  }
+
+  /**
+   * Convert Y.XmlElement to HTML string recursively
+   * @param {Y.XmlElement|Y.XmlText} element - Element to convert
+   * @returns {string} HTML string
+   */
+  yXmlElementToHTML(element) {
+    if (element instanceof Y.XmlText) {
+      return element.toString();
+    }
+
+    if (element instanceof Y.XmlElement) {
+      const tag = element.nodeName;
+      const attrs = element.getAttributes();
+
+      // Build attributes string
+      let attrsStr = '';
+      for (const [key, value] of Object.entries(attrs)) {
+        attrsStr += ` ${key}="${value}"`;
+      }
+
+      // Build children HTML
+      let childrenHTML = '';
+      element.forEach((child) => {
+        childrenHTML += this.yXmlElementToHTML(child);
+      });
+
+      return `<${tag}${attrsStr}>${childrenHTML}</${tag}>`;
+    }
+
+    return '';
   }
 
   /**

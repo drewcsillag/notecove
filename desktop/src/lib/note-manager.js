@@ -324,9 +324,9 @@ export class NoteManager {
   /**
    * Delete a note (move to trash)
    * @param {string} id - Note ID
-   * @returns {boolean} Success
+   * @returns {Promise<boolean>} Success
    */
-  deleteNote(id) {
+  async deleteNote(id) {
     const note = this.notes.get(id);
     if (!note) {
       return false;
@@ -339,7 +339,7 @@ export class NoteManager {
     };
 
     this.notes.set(id, deletedNote);
-    this.saveNote(deletedNote); // Save asynchronously without blocking
+    await this.saveNote(deletedNote); // Wait for save to complete
     this.notify('note-deleted', { note: deletedNote });
 
     return true;

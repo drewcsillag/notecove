@@ -52,14 +52,17 @@ if (cmdArgs.userDataDir) {
 }
 
 // Set custom notes path for this instance
+// Priority: command-line arg > environment variable > instance-based path
 const customNotesPath = cmdArgs.notesPath ||
+  process.env.NOTECOVE_NOTES_PATH ||
   (cmdArgs.instance ? path.join(os.homedir(), 'Documents', `NoteCove-${cmdArgs.instance}`) : null);
 
 class NoteCoveApp {
   constructor() {
     this.mainWindow = null;
     this.watchers = new Map(); // File system watchers
-    this.instanceName = cmdArgs.instance || 'default';
+    // Priority: command-line arg > environment variable > 'default'
+    this.instanceName = cmdArgs.instance || process.env.NOTECOVE_INSTANCE_ID || 'default';
 
     // Default notes path considers instance name
     const defaultNotesPath = customNotesPath || path.join(os.homedir(), 'Documents', 'NoteCove');
@@ -80,7 +83,10 @@ class NoteCoveApp {
     }
 
     // Store instance name in settings so renderer can use it
-    this.store.set('instance', this.instanceName);
+    // Only store if explicitly provided (not 'default'), so each instance generates unique ID
+    if (this.instanceName !== 'default') {
+      this.store.set('instance', this.instanceName);
+    }
 
     console.log('Instance:', this.instanceName);
     console.log('Notes path:', this.store.get('notesPath'));

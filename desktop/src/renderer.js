@@ -1259,7 +1259,7 @@ class NoteCoveApp {
     window.location.reload();
   }
 
-  selectNote(noteId) {
+  async selectNote(noteId) {
     const note = this.noteManager.getNote(noteId);
     console.log(`[renderer] selectNote(${noteId}):`, {
       found: !!note,
@@ -1271,6 +1271,12 @@ class NoteCoveApp {
       console.log(`[renderer] Setting currentNote to:`, { id: note.id, title: note.title });
       this.currentNote = note;
       this.isEditing = false; // Reset editing state when switching notes
+
+      // IMPORTANT: Load updates from disk BEFORE rendering
+      // This ensures we apply synced updates from other instances
+      if (this.isElectron && this.syncManager) {
+        await this.syncManager.loadNote(noteId);
+      }
 
       // Don't call updateUI() here as it recreates the DOM and breaks event handling
       // Instead, just update what's needed:
@@ -1284,7 +1290,7 @@ class NoteCoveApp {
       }
 
       // 2. Update editor content
-      this.renderCurrentNote();
+      await this.renderCurrentNote();
 
       // 3. Update active state in sidebar (without recreating HTML)
       const notesList = document.getElementById('notesList');

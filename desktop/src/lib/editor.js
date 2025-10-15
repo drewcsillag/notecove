@@ -188,6 +188,9 @@ export class NoteCoveEditor {
       return;
     }
 
+    console.log(`[Editor] setDocument() called for note ${noteId}`);
+    console.trace('[Editor] setDocument() stack trace');
+
     this.yDoc = yDoc;
     this.currentNoteId = noteId;
 
@@ -197,6 +200,7 @@ export class NoteCoveEditor {
     // Need to destroy and recreate editor with new Y.Doc
     // TipTap Collaboration extension doesn't support changing documents dynamically
     if (this.editor) {
+      console.log('[Editor] Destroying existing editor');
       this.editor.destroy();
     }
 
@@ -403,14 +407,9 @@ export class NoteCoveEditor {
           reader.onload = (e) => {
             const base64 = e.target.result;
 
-            // Insert using transaction to ensure Y.Doc update
-            const { state, view } = this.editor;
-            const { tr } = state;
-            const imageNode = state.schema.nodes.image.create({
-              src: base64
-            });
-            tr.replaceSelectionWith(imageNode);
-            view.dispatch(tr);
+            // Insert using insertContent command to ensure Y.Doc sync
+            const imgHtml = `<img src="${base64}" />`;
+            this.editor.chain().focus().insertContent(imgHtml).run();
           };
           reader.readAsDataURL(file);
           break;
@@ -437,18 +436,9 @@ export class NoteCoveEditor {
       reader.onload = (event) => {
         const base64 = event.target.result;
 
-        // Insert the image
-        const { state, view } = this.editor;
-        const { tr } = state;
-
-        // Get image node type
-        const imageNode = state.schema.nodes.image.create({
-          src: base64
-        });
-
-        // Insert at current position
-        tr.replaceSelectionWith(imageNode);
-        view.dispatch(tr);
+        // Insert the image using insertContent command to ensure Y.Doc sync
+        const imgHtml = `<img src="${base64}" />`;
+        this.editor.chain().focus().insertContent(imgHtml).run();
       };
       reader.readAsDataURL(file);
     };

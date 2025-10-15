@@ -566,6 +566,10 @@ export class SyncManager {
 
       console.log(`[SyncManager] Loading note ${noteId} from ${allUpdates.length} CRDT updates`);
 
+      // IMPORTANT: Clear any existing Y.Doc content before loading
+      // This ensures we start fresh and apply all updates in order
+      this.crdtManager.clearDoc(noteId);
+
       // Apply all updates to build the current state
       for (const { instanceId, sequence, update } of allUpdates) {
         this.crdtManager.applyUpdate(noteId, update, 'load');
