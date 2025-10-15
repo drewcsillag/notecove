@@ -1,4 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, _electron as electron } from '@playwright/test';
+import path from 'path';
+import os from 'os';
+import fs from 'fs/promises';
 
 test.describe('Sync Infrastructure', () => {
   test.beforeEach(async ({ page }) => {
@@ -121,11 +124,53 @@ test.describe('Sync Infrastructure', () => {
     expect(validStatuses.some(s => status1.includes(s.replace(/[^\w\s]/g, '')))).toBe(true);
   });
 
-  // NOTE: These tests check for Electron-only features (syncManager) but run in web mode
-  // Skip them since sync functionality is tested in Electron mode by realtime-sync.spec.js
-  test.skip('should have sync event handlers in place', async ({ page }) => {
+});
+
+// Electron-mode tests for sync manager internal functionality
+test.describe('Sync Manager - Electron Mode', () => {
+  let testDir;
+  let electronApp;
+  let window;
+
+  test.beforeEach(async () => {
+    // Create a unique temp directory for each test
+    testDir = path.join(os.tmpdir(), `notecove-test-${Date.now()}`);
+    await fs.mkdir(testDir, { recursive: true });
+
+    // Launch Electron app
+    electronApp = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'instance1'),
+        '--notes-path=' + testDir
+      ],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test'
+      }
+    });
+
+    window = await electronApp.firstWindow();
+    await window.waitForTimeout(1000); // Wait for initialization
+  });
+
+  test.afterEach(async () => {
+    // Close Electron app
+    if (electronApp) {
+      await electronApp.close();
+    }
+
+    // Clean up test directory
+    try {
+      await fs.rm(testDir, { recursive: true, force: true });
+    } catch (error) {
+      console.error('Error cleaning up test directory:', error);
+    }
+  });
+
+  test('should have sync event handlers in place', async () => {
     // Verify sync event handlers are set up
-    const hasEventHandlers = await page.evaluate(() => {
+    const hasEventHandlers = await window.evaluate(() => {
       const sm = window.app?.syncManager;
       if (!sm) return false;
 
@@ -136,9 +181,9 @@ test.describe('Sync Infrastructure', () => {
     expect(hasEventHandlers).toBe(true);
   });
 
-  test.skip('should integrate with note manager', async ({ page }) => {
+  test('should integrate with note manager', async () => {
     // Verify sync manager is connected to note manager
-    const isIntegrated = await page.evaluate(() => {
+    const isIntegrated = await window.evaluate(() => {
       const sm = window.app?.syncManager;
       const nm = window.app?.noteManager;
 
@@ -148,8 +193,7 @@ test.describe('Sync Infrastructure', () => {
       return sm.noteManager === nm;
     });
 
-    if (isIntegrated !== null) {
-      expect(isIntegrated).toBe(true);
-    }
+    expect(isIntegrated).toBe(true);
   });
 });
+
