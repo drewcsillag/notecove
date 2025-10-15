@@ -341,11 +341,24 @@ export class NoteCoveEditor {
       this.executeToolbarAction(action);
     });
 
-    // Update toolbar button states on selection change
-    if (this.editor) {
-      this.editor.on('selectionUpdate', () => {
+    // Create throttled version of updateToolbarState to avoid excessive calls
+    let toolbarUpdateTimeout = null;
+    const throttledUpdateToolbar = () => {
+      if (toolbarUpdateTimeout) return; // Skip if already scheduled
+      toolbarUpdateTimeout = setTimeout(() => {
         this.updateToolbarState();
-      });
+        toolbarUpdateTimeout = null;
+      }, 50); // Update at most every 50ms
+    };
+
+    // Update toolbar button states on selection change and content updates
+    // We listen to both events because:
+    // - selectionUpdate: Fires when selection changes (e.g., clicking in text)
+    // - update: Fires for all editor changes including keyboard shortcuts
+    // We throttle updates to avoid excessive calls during rapid changes
+    if (this.editor) {
+      this.editor.on('selectionUpdate', throttledUpdateToolbar);
+      this.editor.on('update', throttledUpdateToolbar);
     }
   }
 

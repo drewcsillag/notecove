@@ -13,7 +13,7 @@ test.describe('Enhanced Editor Features', () => {
     await page.waitForLoadState('networkidle');
 
     // Create a new note
-    await page.locator('.new-note-btn').click();
+    await page.locator('#newNoteBtn').click();
   });
 
   test('should toggle task list with TODO/DONE/NOPE states', async ({ page }) => {
@@ -165,11 +165,8 @@ test.describe('Enhanced Editor Features', () => {
     // E2E tests for this drag interaction in Playwright/Electron proved unreliable.
   });
 
-  test.skip('should maintain toolbar button active states', async ({ page }) => {
-    // TODO: Added immediate toolbar state update after actions, but test still fails.
-    // The issue appears to be that formatting isn't reliably applied to selected text
-    // when clicking toolbar buttons in the test environment. This works in manual testing.
-    // Possible causes: selection is lost when clicking, or TipTap's transaction batching
+  test('should maintain toolbar button active states', async ({ page }) => {
+    // Use keyboard shortcuts instead of clicking buttons to preserve selection
     const editor = page.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await page.waitForTimeout(500);
@@ -180,41 +177,28 @@ test.describe('Enhanced Editor Features', () => {
     // Select all text (use Meta/Command on Mac, Control on others)
     const isMac = process.platform === 'darwin';
     await page.keyboard.press(isMac ? 'Meta+a' : 'Control+a');
-
-    // Click bold button
-    const boldButton = page.locator('[data-action="bold"]');
-    await boldButton.click();
-
-    // Wait for toolbar state to update by checking if button gets active class
-    // The toolbar updates on selection/transaction events which may take a moment
-    await page.waitForTimeout(500);
-
-    // Move cursor to trigger selection update
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowLeft');
     await page.waitForTimeout(200);
 
+    // Apply bold using keyboard shortcut (Cmd+B or Ctrl+B)
+    await page.keyboard.press(isMac ? 'Meta+b' : 'Control+b');
+    await page.waitForTimeout(300);
+
     // Verify bold button is active
+    const boldButton = page.locator('[data-action="bold"]');
     await expect(boldButton).toHaveClass(/active/);
 
-    // Click italic button
-    const italicButton = page.locator('[data-action="italic"]');
-    await italicButton.click();
-
-    // Re-select the text to ensure formatting is applied
-    await page.keyboard.press(isMac ? 'Meta+a' : 'Control+a');
-    await page.waitForTimeout(500);
+    // Apply italic using keyboard shortcut (Cmd+I or Ctrl+I)
+    await page.keyboard.press(isMac ? 'Meta+i' : 'Control+i');
+    await page.waitForTimeout(300);
 
     // Verify both bold and italic are active
+    const italicButton = page.locator('[data-action="italic"]');
     await expect(boldButton).toHaveClass(/active/);
     await expect(italicButton).toHaveClass(/active/);
 
-    // Click bold again to toggle off
-    await boldButton.click();
-
-    // Re-select to ensure state is updated
-    await page.keyboard.press(isMac ? 'Meta+a' : 'Control+a');
-    await page.waitForTimeout(500);
+    // Toggle bold off using keyboard shortcut
+    await page.keyboard.press(isMac ? 'Meta+b' : 'Control+b');
+    await page.waitForTimeout(300);
 
     // Verify bold is no longer active but italic still is
     await expect(boldButton).not.toHaveClass(/active/);
@@ -268,7 +252,7 @@ test.describe('Enhanced Editor Features', () => {
     await expect(taskItems).toHaveCount(1);
   });
 
-  test.skip('should persist task states after note switch', async ({ page }) => {
+  test('should persist task states after note switch', async ({ page }) => {
     // TODO: Still having issues with note content not loading after switch.
     // Note switching works in other tests, but this specific scenario needs investigation.
     const editor = page.locator('#editor .ProseMirror');
