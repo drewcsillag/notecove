@@ -365,12 +365,6 @@ class NoteCoveApp {
       newFolderBtn.addEventListener('click', () => this.createNewFolder());
     }
 
-    // Reset store button
-    const resetStoreBtn = document.getElementById('resetStoreBtn');
-    if (resetStoreBtn) {
-      resetStoreBtn.addEventListener('click', () => this.resetNoteStore());
-    }
-
     // Delete note button
     const deleteNoteBtn = document.getElementById('deleteNoteBtn');
     if (deleteNoteBtn) {
@@ -1292,44 +1286,6 @@ class NoteCoveApp {
    */
   toggleFolderCollapse(folderId: string): void {
     this.folderManager.toggleFolderExpanded(folderId);
-  }
-
-  async resetNoteStore(): Promise<void> {
-    // Fallback for web mode - just use confirm dialog
-    const confirmed = window.confirm('Are you sure you want to reset the note store? This will delete all notes and cannot be undone.');
-    if (!confirmed) return;
-
-    // Clear all localStorage data including folders and notes
-    localStorage.clear();
-
-    // Clear folders and notes from Electron settings (if in Electron mode)
-    if (window.electronAPI && window.electronAPI.settings) {
-      try {
-        // Reset folders to empty array so they reinitialize to defaults
-        await window.electronAPI.settings.set('folders', []);
-
-        // Delete all note files
-        if (window.electronAPI.fileSystem) {
-          const notesPath = await window.electronAPI?.settings.get('notesPath') as string;
-          const result = await window.electronAPI.fileSystem.readDir(notesPath);
-          if (result.success && result.files) {
-            // Delete each JSON file
-            for (const filename of result.files) {
-              if (filename.endsWith('.json')) {
-                const filePath = `${notesPath}/${filename}`;
-                await window.electronAPI.fileSystem.writeFile(filePath, ''); // Use writeFile as a workaround
-                console.log('Cleared:', filePath);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to clear Electron data:', error);
-      }
-    }
-
-    // Reload the page to get a fresh start with default folders
-    window.location.reload();
   }
 
   async selectNote(noteId: string): Promise<void> {
