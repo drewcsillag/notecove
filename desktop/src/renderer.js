@@ -88,6 +88,16 @@ class NoteCoveApp {
       return;
     }
 
+    // Only initialize sync manager in Electron mode
+    if (!this.isElectron) {
+      console.log('Skipping sync manager initialization in web mode');
+      // In web mode, load sample notes if no notes exist
+      if (this.noteManager.getAllNotes().length === 0) {
+        await this.noteManager.loadSampleNotes();
+      }
+      return;
+    }
+
     // Get notes path and instance ID from settings
     const notesPath = await window.electronAPI.settings.get('notesPath');
     if (!notesPath) {
