@@ -232,16 +232,18 @@ describe('CRDTManager', () => {
       expect(metadata.get('folderId')).toBe('projects');
     });
 
-    it('should update modified timestamp', async () => {
+    it('should update modified timestamp when explicitly provided', async () => {
       const doc = manager.getDoc(noteId);
       const metadata = doc.getMap('metadata');
       const originalModified = metadata.get('modified');
 
       // Wait a bit to ensure timestamp changes
       await new Promise(resolve => setTimeout(resolve, 10));
-      manager.updateMetadata(noteId, { title: 'Updated' });
+      const newTimestamp = new Date().toISOString();
+      manager.updateMetadata(noteId, { title: 'Updated', modified: newTimestamp });
 
       const newModified = metadata.get('modified');
+      expect(newModified).toBe(newTimestamp);
       expect(newModified).not.toBe(originalModified);
     });
 

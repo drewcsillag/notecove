@@ -350,10 +350,14 @@ export class NoteManager {
       return null;
     }
 
+    // Only update modified timestamp if content actually changed
+    // (not when just extracting title/tags from existing content)
+    const contentChanged = updates.content !== undefined;
+
     const updatedNote: Note = {
       ...note,
       ...updates,
-      modified: new Date().toISOString()
+      modified: contentChanged ? new Date().toISOString() : note.modified
     };
 
     this.notes.set(id, updatedNote);

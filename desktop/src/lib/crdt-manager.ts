@@ -95,7 +95,17 @@ export class CRDTManager {
         // Skip updates from remote instances AND from loading (don't re-store loaded updates)
         // Also skip 'silent' origin updates (used for internal operations that shouldn't trigger saves)
         // We want to save all local changes (including those from editor, programmatic updates, etc.)
-        if (origin !== 'remote' && origin !== 'load' && origin !== 'silent') {
+        if (origin !== 'remote' && origin !== 'load' && origin !== 'silent' && origin !== 'auto-modified') {
+          // Update modified timestamp for content changes (not metadata-only updates)
+          // Skip auto-update for: metadata-only changes, initialization
+          // Use 'auto-modified' origin to prevent infinite loop when updating timestamp
+          if (origin !== 'metadata' && origin !== 'init') {
+            doc.transact(() => {
+              const yMetadata = doc.getMap('metadata');
+              yMetadata.set('modified', new Date().toISOString());
+            }, 'auto-modified');
+          }
+
           // Store the update to be written as an append-only file
           if (!this.pendingUpdates.has(noteId)) {
             this.pendingUpdates.set(noteId, []);
@@ -138,8 +148,8 @@ export class CRDTManager {
       fullNote: JSON.stringify(note)
     });
 
-    // Transact WITHOUT 'silent' so update events are triggered
-    // This ensures the metadata is saved to update files
+    // Use 'init' origin so update listener doesn't auto-update modified timestamp
+    // We want to preserve the original modified timestamp from the note
     doc.transact(() => {
       // Store metadata in a Y.Map
       const yMetadata = doc.getMap('metadata');
@@ -162,7 +172,7 @@ export class CRDTManager {
         console.log(`[CRDTManager] Metadata already exists for ${noteId}, skipping init`);
         console.log(`  - Current title:`, yMetadata.get('title'));
       }
-    });
+    }, 'init'); // Use 'init' origin to prevent auto-update of modified timestamp
 
     // Initialize content if provided
     if (note.content && note.content.length > 0) {
@@ -367,6 +377,7 @@ export class CRDTManager {
 
     console.log(`[CRDTManager] updateMetadata(${noteId}):`, updates);
 
+    // Use 'metadata' origin so update listener knows not to auto-update modified timestamp
     doc.transact(() => {
       const yMetadata = doc.getMap('metadata');
 
@@ -377,8 +388,11 @@ export class CRDTManager {
         yMetadata.set('title', updates.title);
       }
 
-      // Update timestamp
-      yMetadata.set('modified', new Date().toISOString());
+      // Only update modified timestamp if explicitly provided
+      // Don't auto-update it for metadata-only changes (title/tags extraction)
+      if (updates.modified !== undefined) {
+        yMetadata.set('modified', updates.modified);
+      }
 
       if (updates.tags !== undefined) {
         yMetadata.set('tags', updates.tags);
@@ -393,7 +407,7 @@ export class CRDTManager {
 
       console.log(`  - Title after update:`, yMetadata.get('title'));
       console.log(`  - FolderId after update:`, yMetadata.get('folderId'));
-    });
+    }, 'metadata'); // Pass origin so update listener knows this is metadata-only
 
     console.log('Updated metadata for note:', noteId);
   }
