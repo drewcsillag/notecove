@@ -344,7 +344,7 @@ export class NoteManager {
    * @param updates - Updates to apply
    * @returns Updated note or null
    */
-  updateNote(id: string, updates: Partial<Note>): Note | null {
+  async updateNote(id: string, updates: Partial<Note>): Promise<Note | null> {
     const note = this.notes.get(id);
     if (!note || note.deleted) {
       return null;
@@ -364,7 +364,7 @@ export class NoteManager {
       const metadataUpdates: Record<string, any> = {};
       if (updates.title !== undefined) metadataUpdates.title = updates.title;
       if (updates.tags !== undefined) metadataUpdates.tags = updates.tags;
-      if (updates.folderId !== undefined) metadataUpdates.folder = updates.folderId;
+      if (updates.folderId !== undefined) metadataUpdates.folderId = updates.folderId;
       if (updates.deleted !== undefined) metadataUpdates.deleted = updates.deleted;
 
       if (Object.keys(metadataUpdates).length > 0) {
@@ -372,7 +372,16 @@ export class NoteManager {
       }
     }
 
-    this.saveNote(updatedNote); // Save asynchronously without blocking
+    // IMPORTANT: Await saveNote when updating critical metadata (folder, deleted status)
+    // This ensures the update is flushed to disk before returning, preventing race conditions
+    // where the sync loop might reload the note from disk before the flush completes
+    const hasCriticalMetadata = updates.folderId !== undefined || updates.deleted !== undefined;
+    if (hasCriticalMetadata) {
+      await this.saveNote(updatedNote);
+    } else {
+      this.saveNote(updatedNote); // Non-critical updates can be async
+    }
+
     this.notify('note-updated', { note: updatedNote, updates });
 
     return updatedNote;
@@ -536,7 +545,7 @@ export class NoteManager {
       return null;
     }
 
-    return this.updateNote(noteId, { folderId });
+    return await this.updateNote(noteId, { folderId });
   }
 
   /**

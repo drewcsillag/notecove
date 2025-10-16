@@ -62,6 +62,9 @@ class NoteCoveApp {
   // Private flags
   private _isRendering: boolean;
 
+  // Context menu state
+  contextMenuFolderId: string | null;
+
   constructor() {
     this.currentNote = null;
     this.notes = [];
@@ -77,6 +80,7 @@ class NoteCoveApp {
     this.noteGaps = new Map(); // Track gaps per note: noteId -> gap summary
     this.isElectron = false;
     this._isRendering = false;
+    this.contextMenuFolderId = null;
 
     // Panel resize state
     this.isResizing = false;
@@ -401,6 +405,34 @@ class NoteCoveApp {
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => this.handleKeyboard(e));
 
+    // Context menu click handlers
+    const contextMenu = document.getElementById('folderContextMenu');
+    if (contextMenu) {
+      contextMenu.addEventListener('click', (e) => {
+        const menuItem = (e.target as HTMLElement).closest('.context-menu-item') as HTMLElement;
+        if (menuItem && !menuItem.classList.contains('disabled')) {
+          const action = menuItem.dataset.action;
+          if (action) {
+            this.handleFolderContextMenuAction(action);
+          }
+        }
+      });
+    }
+
+    // Right-click context menu for custom folders (use event delegation)
+    const folderTree = document.getElementById('folderTree');
+    if (folderTree) {
+      folderTree.addEventListener('contextmenu', (e) => {
+        const folderItem = (e.target as HTMLElement).closest('.folder-item-custom') as HTMLElement;
+        if (folderItem) {
+          const folderId = folderItem.dataset.folderId;
+          if (folderId) {
+            this.showFolderContextMenu(e as MouseEvent, folderId);
+          }
+        }
+      });
+    }
+
     // Setup panel resize handlers
     this.setupPanelResize();
   }
@@ -556,7 +588,7 @@ class NoteCoveApp {
     this._isRendering = false;
   }
 
-  handleEditorUpdate(): void {
+  async handleEditorUpdate(): Promise<void> {
     // Don't update note if we're programmatically setting content
     if (this.isSettingContent) {
       console.log('[renderer] handleEditorUpdate() skipped - isSettingContent=true');
@@ -596,7 +628,7 @@ class NoteCoveApp {
           // Update metadata in CRDT (this is the source of truth)
           this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
           // Also update the in-memory note object
-          const updatedNote = this.noteManager!.updateNote(this.currentNote.id, { title, tags });
+          const updatedNote = await this.noteManager!.updateNote(this.currentNote.id, { title, tags });
           // Update our local reference to keep it in sync
           if (updatedNote) {
             this.currentNote = updatedNote;
@@ -608,7 +640,7 @@ class NoteCoveApp {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
         this.currentNote.content = content;
-        const updatedNote = this.noteManager!.updateNote(this.currentNote.id, { title, content, tags });
+        const updatedNote = await this.noteManager!.updateNote(this.currentNote.id, { title, content, tags });
         // Update our local reference to keep it in sync
         if (updatedNote) {
           this.currentNote = updatedNote;
@@ -1254,7 +1286,7 @@ class NoteCoveApp {
       const noteCount = this.noteManager!.getNotesInFolder(folder.id).length;
 
       return `
-        <div class="folder-item ${isActive ? 'active' : ''}"
+        <div class="folder-item ${isActive ? 'active' : ''} ${isDraggable ? 'folder-item-custom' : ''}"
              style="padding-left: ${indent + 8}px"
              data-folder-id="${folder.id}"
              ${isDraggable ? 'draggable="true"' : ''}
@@ -1408,7 +1440,7 @@ class NoteCoveApp {
     this.renderNotesList();
   }
 
-  saveCurrentNote(): void {
+  async saveCurrentNote(): Promise<void> {
     if (this.currentNote && this.editor) {
       // Force immediate save of current content (don't wait for debounce)
       const text = this.editor.getText();
@@ -1432,7 +1464,7 @@ class NoteCoveApp {
           // Update metadata in CRDT (this is the source of truth)
           this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
           // Also update the in-memory note object
-          this.noteManager!.updateNote(this.currentNote.id, { title, tags });
+          await this.noteManager!.updateNote(this.currentNote.id, { title, tags });
           // Flush immediately to ensure metadata is saved
           this.syncManager.updateStore.flush(this.currentNote.id);
         }
@@ -1440,7 +1472,7 @@ class NoteCoveApp {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
         this.currentNote.content = content;
-        this.noteManager!.updateNote(this.currentNote.id, { title, content, tags });
+        await this.noteManager!.updateNote(this.currentNote.id, { title, content, tags });
       }
 
       this.updateStatus('Saved');
@@ -1662,9 +1694,14 @@ class NoteCoveApp {
 
       // Handle folder drop - moving folder to become subfolder
       if (dragType === 'folder' && draggedId && targetFolderId) {
-        const movedFolder = await this.noteManager.getFolderManager().moveFolder(draggedId, targetFolderId);
+        // If dropped on "All Notes", move to root level instead
+        const actualTargetId = targetFolderId === 'all-notes' ? 'root' : targetFolderId;
+        const movedFolder = await this.noteManager.getFolderManager().moveFolder(draggedId, actualTargetId);
         if (movedFolder) {
-          this.updateStatus(`Moved folder to "${this.noteManager.getFolderManager().getFolder(targetFolderId)?.name || 'folder'}"`);
+          const targetName = actualTargetId === 'root'
+            ? 'top level'
+            : this.noteManager.getFolderManager().getFolder(actualTargetId)?.name || 'folder';
+          this.updateStatus(`Moved folder to ${targetName}`);
           this.renderFolderTree();
         } else {
           this.updateStatus('Cannot move folder there');
@@ -1725,6 +1762,151 @@ class NoteCoveApp {
           this.updateUI();
           this.renderFolderTree(); // Update folder counts
         }
+      }
+    }
+  }
+
+  /**
+   * Show folder context menu
+   */
+  showFolderContextMenu(event: MouseEvent, folderId: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.noteManager) return;
+
+    const folder = this.noteManager.getFolderManager().getFolder(folderId);
+    if (!folder || folder.isSpecial || folder.isRoot) return;
+
+    this.contextMenuFolderId = folderId;
+
+    const contextMenu = document.getElementById('folderContextMenu') as HTMLElement;
+    if (!contextMenu) return;
+
+    // Position the menu at the mouse cursor
+    contextMenu.style.left = `${event.clientX}px`;
+    contextMenu.style.top = `${event.clientY}px`;
+    contextMenu.style.display = 'block';
+
+    // Show/hide "Move to Root" option based on whether folder is nested
+    const moveToRootItem = contextMenu.querySelector('[data-action="move-to-root"]') as HTMLElement;
+    if (moveToRootItem) {
+      if (folder.parentId === 'root') {
+        moveToRootItem.classList.add('disabled');
+      } else {
+        moveToRootItem.classList.remove('disabled');
+      }
+    }
+
+    // Close menu on any click outside
+    setTimeout(() => {
+      const closeMenu = (e: MouseEvent) => {
+        if (!contextMenu.contains(e.target as Node)) {
+          this.hideFolderContextMenu();
+          document.removeEventListener('click', closeMenu);
+        }
+      };
+      document.addEventListener('click', closeMenu);
+    }, 0);
+  }
+
+  /**
+   * Hide folder context menu
+   */
+  hideFolderContextMenu(): void {
+    const contextMenu = document.getElementById('folderContextMenu') as HTMLElement;
+    if (contextMenu) {
+      contextMenu.style.display = 'none';
+    }
+    this.contextMenuFolderId = null;
+  }
+
+  /**
+   * Handle folder context menu action
+   */
+  async handleFolderContextMenuAction(action: string): Promise<void> {
+    if (!this.noteManager || !this.contextMenuFolderId) return;
+
+    const folderId = this.contextMenuFolderId;
+    const folder = this.noteManager.getFolderManager().getFolder(folderId);
+    if (!folder) return;
+
+    this.hideFolderContextMenu();
+
+    switch (action) {
+      case 'rename':
+        await this.renameFolderDialog(folderId);
+        break;
+
+      case 'move-to-root':
+        if (folder.parentId !== 'root') {
+          const movedFolder = await this.noteManager.getFolderManager().moveFolder(folderId, 'root');
+          if (movedFolder) {
+            this.updateStatus(`Moved "${folder.name}" to top level`);
+            this.renderFolderTree();
+          }
+        }
+        break;
+
+      case 'delete':
+        await this.deleteFolderDialog(folderId);
+        break;
+    }
+  }
+
+  /**
+   * Show rename folder dialog
+   */
+  async renameFolderDialog(folderId: string): Promise<void> {
+    if (!this.noteManager) return;
+
+    const folder = this.noteManager.getFolderManager().getFolder(folderId);
+    if (!folder) return;
+
+    const newName = prompt('Rename folder:', folder.name);
+    if (newName && newName.trim() && newName.trim() !== folder.name) {
+      const updated = await this.noteManager.getFolderManager().updateFolder(folderId, { name: newName.trim() });
+      if (updated) {
+        this.updateStatus(`Renamed folder to "${newName.trim()}"`);
+        this.renderFolderTree();
+      }
+    }
+  }
+
+  /**
+   * Show delete folder dialog
+   */
+  async deleteFolderDialog(folderId: string): Promise<void> {
+    if (!this.noteManager) return;
+
+    const folder = this.noteManager.getFolderManager().getFolder(folderId);
+    if (!folder) return;
+
+    // Check if folder has notes
+    const notesInFolder = this.noteManager.getNotesInFolder(folderId);
+    if (notesInFolder.length > 0) {
+      alert(`Cannot delete folder "${folder.name}" - it contains ${notesInFolder.length} note(s). Please move or delete the notes first.`);
+      return;
+    }
+
+    // Check if folder has children
+    const hasChildren = this.noteManager.getFolderManager().hasChildFolders(folderId);
+    if (hasChildren) {
+      alert(`Cannot delete folder "${folder.name}" - it contains subfolders. Please delete or move the subfolders first.`);
+      return;
+    }
+
+    const confirmed = confirm(`Are you sure you want to delete the folder "${folder.name}"?`);
+    if (confirmed) {
+      const success = await this.noteManager.getFolderManager().deleteFolder(folderId);
+      if (success) {
+        this.updateStatus(`Deleted folder "${folder.name}"`);
+        // If we were viewing this folder, switch to All Notes
+        if (this.currentFolderId === folderId) {
+          this.currentFolderId = 'all-notes';
+        }
+        this.renderFolderTree();
+        this.updateUI();
       }
     }
   }

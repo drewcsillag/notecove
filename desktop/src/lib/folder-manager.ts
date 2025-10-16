@@ -127,7 +127,22 @@ export class FolderManager {
       let storedFolders: Folder[] | null = null;
 
       // Try CRDT-based storage first (for multi-instance sync)
-      if (this.isElectron && this.crdtManager) {
+      if (this.isElectron && this.crdtManager && this.updateStore) {
+        // IMPORTANT: Load updates from disk first before checking the Y.Doc
+        // Otherwise the CRDT will be empty even if there are saved updates
+        console.log('[FolderManager] Loading folder updates from disk...');
+        const updates = await this.updateStore.readAllUpdates('.folders');
+        console.log(`[FolderManager] Found ${updates.length} total folder updates`);
+
+        // Apply updates to CRDT
+        if (updates.length > 0) {
+          for (const { instanceId, sequence, update } of updates) {
+            this.crdtManager.applyUpdate('.folders', update, 'load');
+          }
+          console.log('[FolderManager] Applied folder updates to CRDT');
+        }
+
+        // Now read from CRDT
         const foldersDoc = this.crdtManager.getDoc('.folders');
         if (!this.crdtManager.isDocEmpty('.folders')) {
           const yMap = foldersDoc.getMap('folders');
@@ -141,16 +156,11 @@ export class FolderManager {
         }
       }
 
-      // Fall back to settings/localStorage if no CRDT storage
-      if (!storedFolders || storedFolders.length === 0) {
-        if (this.isElectron) {
-          storedFolders = (await window.electronAPI?.settings.get('folders')) || null;
-        } else {
-          // Web mode - use localStorage
-          const stored = localStorage.getItem('notecove-folders');
-          if (stored) {
-            storedFolders = JSON.parse(stored);
-          }
+      // In web mode (non-Electron), fall back to localStorage
+      if (!this.isElectron && (!storedFolders || storedFolders.length === 0)) {
+        const stored = localStorage.getItem('notecove-folders');
+        if (stored) {
+          storedFolders = JSON.parse(stored);
         }
       }
 
@@ -158,6 +168,8 @@ export class FolderManager {
         storedFolders.forEach(folder => {
           this.folders.set(folder.id, folder);
         });
+      } else {
+        console.log('[FolderManager] No custom folders found');
       }
 
       this.notify('folders-loaded', { folders: this.getFolderTree() });
@@ -204,12 +216,8 @@ export class FolderManager {
         } else {
           console.log('[FolderManager] WARNING: No updateStore available for flush!');
         }
-
-        // Also save to settings as backup
-        await window.electronAPI?.settings.set('folders', customFolders);
-      } else if (this.isElectron) {
-        await window.electronAPI?.settings.set('folders', customFolders);
-      } else {
+      } else if (!this.isElectron) {
+        // In web mode (non-Electron), fall back to localStorage
         localStorage.setItem('notecove-folders', JSON.stringify(customFolders));
       }
     } catch (error) {

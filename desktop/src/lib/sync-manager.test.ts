@@ -143,7 +143,7 @@ describe('SyncManager - Note Loading', () => {
         yMetadata.set('created', new Date().toISOString());
         yMetadata.set('modified', new Date().toISOString());
         yMetadata.set('tags', []);
-        yMetadata.set('folder', 'all-notes');
+        yMetadata.set('folderId', 'all-notes');
       }, 'silent');
 
       // Get the actual CRDT update
@@ -180,7 +180,7 @@ describe('SyncManager - Note Loading', () => {
           yMetadata.set('created', modifiedDate);
           yMetadata.set('modified', modifiedDate);
           yMetadata.set('tags', []);
-          yMetadata.set('folder', 'all-notes');
+          yMetadata.set('folderId', 'all-notes');
         }, 'silent');
         return Y.encodeStateAsUpdate(testDoc);
       };
@@ -251,7 +251,7 @@ describe('SyncManager - Note Loading', () => {
         yMetadata.set('created', new Date().toISOString());
         yMetadata.set('modified', new Date().toISOString());
         yMetadata.set('tags', ['test']);
-        yMetadata.set('folder', 'all-notes');
+        yMetadata.set('folderId', 'all-notes');
       }, 'silent');
 
       const update: Uint8Array = Y.encodeStateAsUpdate(testDoc);

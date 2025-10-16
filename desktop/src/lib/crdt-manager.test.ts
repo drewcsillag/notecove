@@ -114,7 +114,7 @@ describe('CRDTManager', () => {
       expect(metadata.get('created')).toBe('2025-01-01T00:00:00Z');
       expect(metadata.get('modified')).toBe('2025-01-01T00:00:00Z');
       expect(metadata.get('tags')).toEqual(['test', 'demo']);
-      expect(metadata.get('folder')).toBe('work');
+      expect(metadata.get('folderId')).toBe('work');
     });
 
     it('should not reinitialize already initialized note', () => {
@@ -157,7 +157,7 @@ describe('CRDTManager', () => {
 
       expect(metadata.get('title')).toBe('Test Note');
       expect(metadata.get('tags')).toEqual([]);
-      expect(metadata.get('folder')).toBe(null);
+      expect(metadata.get('folderId')).toBe(null);
       expect(metadata.get('created')).toBeDefined();
       expect(metadata.get('modified')).toBeDefined();
     });
@@ -229,7 +229,7 @@ describe('CRDTManager', () => {
 
       const doc = manager.getDoc(noteId);
       const metadata = doc.getMap('metadata');
-      expect(metadata.get('folder')).toBe('projects');
+      expect(metadata.get('folderId')).toBe('projects');
     });
 
     it('should update modified timestamp', async () => {
@@ -257,7 +257,7 @@ describe('CRDTManager', () => {
 
       expect(metadata.get('title')).toBe('Updated Title');
       expect(metadata.get('tags')).toEqual(['new', 'tags']);
-      expect(metadata.get('folder')).toBe('archive');
+      expect(metadata.get('folderId')).toBe('archive');
     });
   });
 

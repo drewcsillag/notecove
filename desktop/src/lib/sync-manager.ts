@@ -463,7 +463,7 @@ export class SyncManager {
           criticalMetadata.deleted = note.deleted;
         }
         if (note.folderId !== undefined) {
-          criticalMetadata.folder = note.folderId; // Note: CRDT uses 'folder', not 'folderId'
+          criticalMetadata.folderId = note.folderId;
         }
 
         if (Object.keys(criticalMetadata).length > 0) {

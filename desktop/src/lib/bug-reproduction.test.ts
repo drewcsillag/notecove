@@ -199,7 +199,7 @@ describe('Bug Reproduction Test', () => {
       // Extract title and update metadata
       const text = editor.getText();
       const title = text.split('\n')[0].trim();
-      noteManager.updateNote(newNote.id, { title, tags: [] });
+      await noteManager.updateNote(newNote.id, { title, tags: [] });
 
       await syncManager.updateStore.flush(newNote.id);
 
@@ -289,7 +289,7 @@ describe('Bug Reproduction Test', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
       const text = editor.getText();
       const title = text.split('\n')[0].trim();
-      noteManager.updateNote(note.id, { title, tags: [] });
+      await noteManager.updateNote(note.id, { title, tags: [] });
       await syncManager.updateStore.flush(note.id);
     }
 

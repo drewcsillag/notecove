@@ -93,7 +93,7 @@ describe('NoteManager', () => {
       // Small delay to ensure timestamp difference
       await new Promise((resolve: (value: void) => void) => setTimeout(resolve, 10));
 
-      const updated: Note | null = noteManager.updateNote(note.id, {
+      const updated: Note | null = await noteManager.updateNote(note.id, {
         title: 'Updated',
         content: 'New content'
       });
@@ -103,8 +103,8 @@ describe('NoteManager', () => {
       expect(updated!.modified).not.toBe(note.modified);
     });
 
-    it('should return null for non-existent note', () => {
-      const result: Note | null = noteManager.updateNote('non-existent-id', { title: 'Test' });
+    it('should return null for non-existent note', async () => {
+      const result: Note | null = await noteManager.updateNote('non-existent-id', { title: 'Test' });
 
       expect(result).toBeNull();
     });
@@ -113,7 +113,7 @@ describe('NoteManager', () => {
       const note: Note = await noteManager.createNote({ title: 'Test' });
       noteManager.deleteNote(note.id);
 
-      const result: Note | null = noteManager.updateNote(note.id, { title: 'Updated' });
+      const result: Note | null = await noteManager.updateNote(note.id, { title: 'Updated' });
 
       expect(result).toBeNull();
     });

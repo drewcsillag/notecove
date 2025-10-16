@@ -165,7 +165,7 @@ describe('Full App Integration Test', () => {
     console.log('Extracted title:', title);
 
     // Update the note metadata (this triggers CRDT metadata update)
-    noteManager1.updateNote(newNote.id, { title, tags: [] });
+    await noteManager1.updateNote(newNote.id, { title, tags: [] });
     console.log('Updated note metadata');
 
     // Step 7: Flush updates to disk

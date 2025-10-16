@@ -153,7 +153,7 @@ export class CRDTManager {
         yMetadata.set('created', note.created || new Date().toISOString());
         yMetadata.set('modified', note.modified || new Date().toISOString());
         yMetadata.set('tags', note.tags || []);
-        yMetadata.set('folder', note.folderId || null);
+        yMetadata.set('folderId', note.folderId || null);
         yMetadata.set('deleted', note.deleted || false);
 
         // Verify what was actually set
@@ -308,7 +308,7 @@ export class CRDTManager {
       created: yMetadata.get('created'),
       modified: yMetadata.get('modified'),
       tags: yMetadata.get('tags'),
-      folder: yMetadata.get('folder')
+      folderId: yMetadata.get('folderId')
     });
 
     // For content, we need to convert the Y.XmlFragment to HTML string
@@ -353,7 +353,7 @@ export class CRDTManager {
       modified: (yMetadata.get('modified') as string) || new Date().toISOString(),
       tags: (yMetadata.get('tags') as string[]) || [],
       deleted: (yMetadata.get('deleted') as boolean) || false,
-      folderId: (yMetadata.get('folder') as string) || 'all-notes'
+      folderId: (yMetadata.get('folderId') as string) || 'all-notes'
     };
   }
 
@@ -384,13 +384,15 @@ export class CRDTManager {
         yMetadata.set('tags', updates.tags);
       }
       if (updates.folderId !== undefined) {
-        yMetadata.set('folder', updates.folderId);
+        console.log(`  - Setting folderId to:`, updates.folderId);
+        yMetadata.set('folderId', updates.folderId);
       }
       if (updates.deleted !== undefined) {
         yMetadata.set('deleted', updates.deleted);
       }
 
       console.log(`  - Title after update:`, yMetadata.get('title'));
+      console.log(`  - FolderId after update:`, yMetadata.get('folderId'));
     });
 
     console.log('Updated metadata for note:', noteId);
