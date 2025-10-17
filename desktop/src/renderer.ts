@@ -144,7 +144,9 @@ class NoteCoveApp {
       onBlur: () => this.handleEditorBlur(),
       onReady: () => this.handleEditorReady(),
       isSettingContent: () => this.isSettingContent,
-      onNavigateToNote: (noteTitle: string) => this.handleNoteLinkClick(noteTitle)
+      onNavigateToNote: (noteId: string | null, noteTitle: string) => this.handleNoteLinkClick(noteId, noteTitle),
+      onFindNoteByTitle: (title: string) => this.findNoteByTitle(title),
+      onValidateNoteLink: (noteId: string | null, title: string) => this.validateNoteLink(noteId, title)
     });
 
     // Setup the formatting toolbar
@@ -1324,23 +1326,67 @@ class NoteCoveApp {
   }
 
   /**
-   * Handle clicking on a note link in the editor
-   * Finds a note by title and navigates to it
+   * Find a note by title (used by note link extension)
+   * @param title - Note title to search for
+   * @returns Note object with id and title, or null if not found
    */
-  async handleNoteLinkClick(noteTitle: string): Promise<void> {
-    if (!this.noteManager) return;
+  findNoteByTitle(title: string): { id: string; title: string } | null {
+    if (!this.noteManager) return null;
 
-    console.log(`[NoteLink] Clicked link to: "${noteTitle}"`);
-
-    // Find note by title (case-insensitive search)
     const notes = this.noteManager.getAllNotes();
-    const targetNote = notes.find(note =>
-      !note.deleted && note.title.toLowerCase() === noteTitle.toLowerCase()
+    const foundNote = notes.find(note =>
+      !note.deleted && note.title.toLowerCase() === title.toLowerCase()
     );
 
-    if (targetNote) {
-      console.log(`[NoteLink] Found note:`, { id: targetNote.id, title: targetNote.title });
-      await this.selectNote(targetNote.id);
+    return foundNote ? { id: foundNote.id, title: foundNote.title } : null;
+  }
+
+  /**
+   * Validate a note link (check if target note exists)
+   * @param noteId - Note ID (preferred)
+   * @param title - Note title (fallback)
+   * @returns true if the note exists and is not deleted, false otherwise
+   */
+  validateNoteLink(noteId: string | null, title: string): boolean {
+    if (!this.noteManager) return false;
+
+    // Try to validate by ID first (most reliable)
+    if (noteId) {
+      const note = this.noteManager.getNote(noteId);
+      return note !== null && !note.deleted;
+    }
+
+    // Fallback: validate by title
+    const foundNote = this.findNoteByTitle(title);
+    return foundNote !== null;
+  }
+
+  /**
+   * Handle clicking on a note link in the editor
+   * Navigates to the linked note using ID (preferred) or title (fallback)
+   */
+  async handleNoteLinkClick(noteId: string | null, noteTitle: string): Promise<void> {
+    if (!this.noteManager) return;
+
+    console.log(`[NoteLink] Clicked link:`, { noteId, noteTitle });
+
+    // Try to navigate by ID first (most reliable)
+    if (noteId) {
+      const note = this.noteManager.getNote(noteId);
+      if (note && !note.deleted) {
+        console.log(`[NoteLink] Found note by ID:`, { id: note.id, title: note.title });
+        await this.selectNote(noteId);
+        return;
+      } else {
+        console.warn(`[NoteLink] Note ID ${noteId} not found or deleted, trying title...`);
+      }
+    }
+
+    // Fallback: find by title (case-insensitive)
+    const foundNote = this.findNoteByTitle(noteTitle);
+    if (foundNote) {
+      console.log(`[NoteLink] Found note by title:`, foundNote);
+      await this.selectNote(foundNote.id);
     } else {
       console.warn(`[NoteLink] Note not found: "${noteTitle}"`);
       // Could optionally show a notification to the user

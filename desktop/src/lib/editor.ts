@@ -23,7 +23,9 @@ export interface NoteCoveEditorOptions {
   onReady?: () => void;
   isSettingContent?: () => boolean;
   yDoc?: Y.Doc | null;
-  onNavigateToNote?: (noteTitle: string) => void;
+  onNavigateToNote?: (noteId: string | null, noteTitle: string) => void;
+  onFindNoteByTitle?: (title: string) => { id: string; title: string } | null;
+  onValidateNoteLink?: (noteId: string | null, title: string) => boolean;
 }
 
 interface FormatState {
@@ -89,6 +91,8 @@ export class NoteCoveEditor {
       isSettingContent: () => false,
       yDoc: null,
       onNavigateToNote: () => {},
+      onFindNoteByTitle: () => null,
+      onValidateNoteLink: () => true,
       ...options
     };
 
@@ -121,8 +125,14 @@ export class NoteCoveEditor {
       }),
       Hashtag,
       NoteLink.configure({
-        onNavigate: (title: string) => {
-          this.options.onNavigateToNote(title);
+        onNavigate: (noteId: string | null, title: string) => {
+          this.options.onNavigateToNote(noteId, title);
+        },
+        findNoteByTitle: (title: string) => {
+          return this.options.onFindNoteByTitle(title);
+        },
+        validateNoteLink: (noteId: string | null, title: string) => {
+          return this.options.onValidateNoteLink(noteId, title);
         },
       }),
       TaskList,

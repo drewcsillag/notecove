@@ -81,7 +81,14 @@
       "Bash(npm run build:main:*)",
       "Bash(npm run build:renderer:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(timeout 120 npx playwright test tests/e2e/basic.spec.js tests/e2e/editor-features.spec.js --reporter=line --workers=1)"
+      "Bash(timeout 120 npx playwright test tests/e2e/basic.spec.js tests/e2e/editor-features.spec.js --reporter=line --workers=1)",
+      "Bash(timeout 120 npx playwright test:*)",
+      "Bash(git checkout:*)",
+      "Read(//Users/drew/**)",
+      "Bash(node /Users/drew/devel/nc/desktop/scripts/decode-updates.js:*)",
+      "Bash(node:*)",
+      "Bash(timeout 30 npx electron:*)",
+      "Bash(timeout 15 npx electron:*)"
     ],
     "deny": [],
     "ask": []

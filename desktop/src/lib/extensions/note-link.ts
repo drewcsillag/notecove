@@ -1,15 +1,19 @@
 import { Mark, mergeAttributes } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 export interface NoteLinkOptions {
   HTMLAttributes: Record<string, any>;
-  onNavigate?: (title: string) => void;
+  onNavigate?: (noteId: string, title: string) => void;
+  findNoteByTitle?: (title: string) => { id: string; title: string } | null;
+  validateNoteLink?: (noteId: string | null, title: string) => boolean;
 }
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     noteLink: {
-      setNoteLink: (title: string) => ReturnType;
+      setNoteLink: (title: string, noteId?: string) => ReturnType;
       unsetNoteLink: () => ReturnType;
     };
   }
@@ -26,6 +30,8 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
     return {
       HTMLAttributes: {},
       onNavigate: undefined,
+      findNoteByTitle: undefined,
+      validateNoteLink: undefined,
     };
   },
 
@@ -40,6 +46,18 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
           }
           return {
             'data-note-title': attributes.title,
+          };
+        },
+      },
+      noteId: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-note-id'),
+        renderHTML: attributes => {
+          if (!attributes.noteId) {
+            return {};
+          }
+          return {
+            'data-note-id': attributes.noteId,
           };
         },
       },
@@ -69,9 +87,9 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
   addCommands() {
     return {
       setNoteLink:
-        (title: string) =>
+        (title: string, noteId?: string) =>
         ({ commands }) => {
-          return commands.setMark(this.name, { title });
+          return commands.setMark(this.name, { title, noteId });
         },
       unsetNoteLink:
         () =>
@@ -83,6 +101,7 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
 
   addProseMirrorPlugins() {
     const onNavigate = this.options.onNavigate;
+    const findNoteByTitle = this.options.findNoteByTitle;
 
     return [
       // Input rule plugin to detect [[...]] as user types
@@ -110,13 +129,26 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
               const matchStart = from - linkMatch[0].length + text.length;
               const matchEnd = from + text.length;
 
+              // Look up the note to get its ID
+              let noteId: string | null = null;
+              if (findNoteByTitle) {
+                const foundNote = findNoteByTitle(noteTitle);
+                if (foundNote) {
+                  noteId = foundNote.id;
+                }
+              }
+
               // Replace [[Note Title]] with just "Note Title" and apply mark
+              // Store both title and noteId (if found)
               tr.delete(matchStart, matchEnd)
                 .insertText(noteTitle, matchStart)
                 .addMark(
                   matchStart,
                   matchStart + noteTitle.length,
-                  state.schema.marks.noteLink.create({ title: noteTitle })
+                  state.schema.marks.noteLink.create({
+                    title: noteTitle,
+                    noteId: noteId
+                  })
                 );
 
               dispatch(tr);
@@ -137,9 +169,11 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
             const noteLinkMark = marks.find(mark => mark.type.name === 'noteLink');
             if (noteLinkMark) {
               event.preventDefault();
+              const noteId = noteLinkMark.attrs.noteId;
               const title = noteLinkMark.attrs.title;
-              if (title) {
-                onNavigate(title);
+              // Prefer noteId if available, fallback to title
+              if (noteId || title) {
+                onNavigate(noteId, title);
               }
               return true;
             }
@@ -148,6 +182,65 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
           },
         },
       }),
+
+      // Decoration plugin to mark broken links
+      new Plugin({
+        key: new PluginKey('noteLinkValidation'),
+        state: {
+          init(_, { doc }) {
+            return findBrokenLinks(doc, this.spec?.validateNoteLink);
+          },
+          apply(transaction, oldState) {
+            if (!transaction.docChanged) return oldState;
+            return findBrokenLinks(transaction.doc, this.spec?.validateNoteLink);
+          }
+        },
+        props: {
+          decorations(state) {
+            return this.getState(state);
+          }
+        },
+        spec: {
+          validateNoteLink: this.options.validateNoteLink
+        }
+      }),
     ];
   },
 });
+
+/**
+ * Find all note links and create decorations for broken ones
+ */
+function findBrokenLinks(
+  doc: ProseMirrorNode,
+  validateNoteLink?: (noteId: string | null, title: string) => boolean
+): DecorationSet {
+  const decorations: Decoration[] = [];
+
+  if (!validateNoteLink) {
+    return DecorationSet.empty;
+  }
+
+  doc.descendants((node, pos) => {
+    if (!node.marks) return;
+
+    node.marks.forEach(mark => {
+      if (mark.type.name === 'noteLink') {
+        const noteId = mark.attrs.noteId;
+        const title = mark.attrs.title;
+
+        // Check if this link is broken
+        const isValid = validateNoteLink(noteId, title);
+        if (!isValid) {
+          decorations.push(
+            Decoration.inline(pos, pos + node.nodeSize, {
+              class: 'note-link-broken'
+            })
+          );
+        }
+      }
+    });
+  });
+
+  return DecorationSet.create(doc, decorations);
+}
