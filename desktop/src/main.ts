@@ -148,7 +148,7 @@ class NoteCoveApp {
     app.whenReady().then(() => {
       // Set dock icon on macOS (for development mode)
       if (process.platform === 'darwin') {
-        const iconPath = path.join(__dirname, '../assets/icon.png');
+        const iconPath = path.join(__dirname, '../assets/icon.icns');
         app.dock.setIcon(iconPath);
       }
 
