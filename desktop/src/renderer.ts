@@ -980,6 +980,51 @@ class NoteCoveApp {
     this.renderNotesList();
   }
 
+  /**
+   * Render backlinks panel showing notes that link to the current note
+   */
+  renderBacklinks(): void {
+    const backlinksPanel = document.getElementById('backlinksPanel');
+    const backlinksList = document.getElementById('backlinksList');
+    const backlinksCount = document.getElementById('backlinksCount');
+
+    if (!backlinksPanel || !backlinksList || !backlinksCount || !this.noteManager || !this.currentNote) {
+      return;
+    }
+
+    // Get backlinks for the current note
+    const backlinks = this.noteManager.getBacklinks(this.currentNote.id);
+
+    // Update count
+    backlinksCount.textContent = backlinks.length.toString();
+
+    // Show/hide panel based on whether there are backlinks
+    if (backlinks.length === 0) {
+      backlinksPanel.style.display = 'none';
+      return;
+    }
+
+    backlinksPanel.style.display = 'block';
+
+    // Render backlinks
+    backlinksList.innerHTML = backlinks.map(({ note, context }) => `
+      <div class="backlink-item" data-note-id="${note.id}">
+        <div class="backlink-item-title">${escapeHtml(note.title)}</div>
+        <div class="backlink-item-context">${escapeHtml(context)}</div>
+      </div>
+    `).join('');
+
+    // Add click handlers
+    backlinksList.querySelectorAll('.backlink-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const noteId = (item as HTMLElement).dataset.noteId;
+        if (noteId) {
+          this.selectNote(noteId);
+        }
+      });
+    });
+  }
+
   async renderCurrentNote(scrollToTop: boolean = true): Promise<void> {
     if (!this.currentNote) return;
 
@@ -1547,10 +1592,13 @@ class NoteCoveApp {
       // 4. Update tags list
       this.renderTagsList();
 
-      // 5. Update editor status bar (gap indicators)
+      // 5. Update backlinks panel
+      this.renderBacklinks();
+
+      // 6. Update editor status bar (gap indicators)
       this.updateEditorStatusBar();
 
-      // 6. Save as last opened note
+      // 7. Save as last opened note
       const lastOpenedNote: LastOpenedNote = {
         noteId: this.currentNote.id,
         timestamp: Date.now()

@@ -520,6 +520,70 @@ export class NoteManager {
   }
 
   /**
+   * Get all notes that link to a specific note (backlinks)
+   * @param noteId - The note ID to find backlinks for
+   * @returns Array of notes that contain links to this note
+   */
+  getBacklinks(noteId: string): Array<{ note: Note; context: string }> {
+    const targetNote = this.getNote(noteId);
+    if (!targetNote) {
+      console.log('[getBacklinks] Target note not found:', noteId);
+      return [];
+    }
+
+    console.log('[getBacklinks] Finding backlinks for:', targetNote.title, targetNote.id);
+
+    const backlinks: Array<{ note: Note; context: string }> = [];
+
+    // Check all notes for links to this note
+    this.getAllNotes().forEach(note => {
+      // Skip the note itself
+      if (note.id === noteId) return;
+
+      console.log('[getBacklinks] Checking note:', note.title, 'content length:', note.content?.length);
+
+      // Parse the note content to find note links
+      // Note links are stored as: <span data-note-link data-note-id="..." data-note-title="...">title</span>
+      // Handle attributes in any order and optional noteId
+      const linkPattern = /<span[^>]*data-note-link[^>]*>([^<]*)<\/span>/g;
+      let match;
+
+      while ((match = linkPattern.exec(note.content)) !== null) {
+        const fullMatch = match[0];
+        const linkText = match[1];
+
+        // Extract noteId if present
+        const noteIdMatch = fullMatch.match(/data-note-id="([^"]*)"/);
+        const linkedNoteId = noteIdMatch ? noteIdMatch[1] : null;
+
+        console.log('[getBacklinks]   Found link:', { linkText, linkedNoteId });
+
+        // Check if this link points to our target note (by ID or by title)
+        if ((linkedNoteId && linkedNoteId === noteId) || linkText === targetNote.title) {
+          console.log('[getBacklinks]   ✓ Match! Link points to target note');
+
+          // Extract context around the link (100 chars before and after)
+          const linkStart = match.index;
+          const linkEnd = linkStart + match[0].length;
+          const contextStart = Math.max(0, linkStart - 100);
+          const contextEnd = Math.min(note.content.length, linkEnd + 100);
+
+          // Get the context and strip HTML tags for display
+          let context = note.content.substring(contextStart, contextEnd);
+          context = context.replace(/<[^>]*>/g, ''); // Remove HTML tags
+          context = '...' + context.trim() + '...';
+
+          backlinks.push({ note, context });
+          break; // Only count each note once
+        }
+      }
+    });
+
+    console.log('[getBacklinks] Found', backlinks.length, 'backlinks');
+    return backlinks;
+  }
+
+  /**
    * Get all unique tags
    * @returns Array of tag objects with counts
    */

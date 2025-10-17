@@ -581,6 +581,84 @@
       overflow-y: auto;
     }
 
+    /* Backlinks Panel */
+    .backlinks-panel {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .backlinks-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--background);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .backlinks-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .backlinks-count {
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: var(--surface);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .backlinks-list {
+      padding: 8px 24px 16px 24px;
+    }
+
+    .backlink-item {
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      background: var(--background);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .backlink-item:hover {
+      background: var(--surface);
+      border-color: var(--primary-color);
+      transform: translateX(2px);
+    }
+
+    .backlink-item-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .backlink-item-context {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .backlinks-empty {
+      padding: 16px 12px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-style: italic;
+    }
+
     .editor {
       font-size: 16px;
       line-height: 1.6;
@@ -1246,6 +1324,15 @@
         </div>
         <div class="editor-container">
           <div class="editor" id="editor" data-placeholder="Start writing..."></div>
+        </div>
+        <div class="backlinks-panel" id="backlinksPanel" style="display: none;">
+          <div class="backlinks-header">
+            <span class="backlinks-title">🔗 Linked References</span>
+            <span class="backlinks-count" id="backlinksCount">0</span>
+          </div>
+          <div class="backlinks-list" id="backlinksList">
+            <!-- Backlinks will be rendered here -->
+          </div>
         </div>
       </div>
     </div>
