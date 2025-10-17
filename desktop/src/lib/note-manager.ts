@@ -532,6 +532,7 @@ export class NoteManager {
     }
 
     console.log('[getBacklinks] Finding backlinks for:', targetNote.title, targetNote.id);
+    console.log('[getBacklinks] Mode:', this.isElectron ? 'Electron (CRDT)' : 'Web');
 
     const backlinks: Array<{ note: Note; context: string }> = [];
 
@@ -540,23 +541,47 @@ export class NoteManager {
       // Skip the note itself
       if (note.id === noteId) return;
 
-      console.log('[getBacklinks] Checking note:', note.title, 'content length:', note.content?.length);
+      // Get note content (different in Electron vs Web mode)
+      let noteContent: string;
+      if (this.isElectron && this.syncManager) {
+        // In Electron mode, get HTML from CRDT
+        try {
+          const yDoc = this.syncManager.crdtManager.getContentDoc(note.id);
+          const yContent = yDoc.getXmlFragment('default');
+          noteContent = yContent.toString();
+        } catch (error) {
+          console.log('[getBacklinks] Error getting CRDT content for', note.title, error);
+          return;
+        }
+      } else {
+        // In Web mode, use note.content
+        noteContent = note.content;
+      }
+
+      console.log('[getBacklinks] Checking note:', note.title, 'content length:', noteContent?.length);
+
+      // Debug: show first 300 chars of content for Source Note
+      if (note.title === 'Source Note') {
+        console.log('[getBacklinks] Source Note content preview:', noteContent?.substring(0, 300));
+      }
+
+      if (!noteContent) return;
 
       // Parse the note content to find note links
-      // Note links are stored as: <span data-note-link data-note-id="..." data-note-title="...">title</span>
-      // Handle attributes in any order and optional noteId
-      const linkPattern = /<span[^>]*data-note-link[^>]*>([^<]*)<\/span>/g;
+      // In Electron mode (CRDT), links are stored as: <noteLink noteId="..." title="...">text</noteLink>
+      // In Web mode, links are stored as: <span data-note-link data-note-id="..." data-note-title="...">text</span>
+
+      // Try CRDT format first (Electron mode)
+      let linkPattern = /<noteLink[^>]*noteId="([^"]*)"[^>]*>([^<]*)<\/noteLink>/g;
       let match;
+      let foundAnyLinks = false;
 
-      while ((match = linkPattern.exec(note.content)) !== null) {
-        const fullMatch = match[0];
-        const linkText = match[1];
+      while ((match = linkPattern.exec(noteContent)) !== null) {
+        foundAnyLinks = true;
+        const linkedNoteId = match[1];
+        const linkText = match[2];
 
-        // Extract noteId if present
-        const noteIdMatch = fullMatch.match(/data-note-id="([^"]*)"/);
-        const linkedNoteId = noteIdMatch ? noteIdMatch[1] : null;
-
-        console.log('[getBacklinks]   Found link:', { linkText, linkedNoteId });
+        console.log('[getBacklinks]   Found CRDT link:', { linkText, linkedNoteId });
 
         // Check if this link points to our target note (by ID or by title)
         if ((linkedNoteId && linkedNoteId === noteId) || linkText === targetNote.title) {
@@ -566,15 +591,50 @@ export class NoteManager {
           const linkStart = match.index;
           const linkEnd = linkStart + match[0].length;
           const contextStart = Math.max(0, linkStart - 100);
-          const contextEnd = Math.min(note.content.length, linkEnd + 100);
+          const contextEnd = Math.min(noteContent.length, linkEnd + 100);
+
+          // Get the context and strip XML/HTML tags for display
+          let context = noteContent.substring(contextStart, contextEnd);
+          context = context.replace(/<[^>]*>/g, ''); // Remove tags
+          context = '...' + context.trim() + '...';
+
+          backlinks.push({ note, context });
+          break; // Only count each note once
+        }
+      }
+
+      // If no CRDT links found, try HTML format (Web mode)
+      if (!foundAnyLinks) {
+        linkPattern = /<span[^>]*data-note-link[^>]*>([^<]*)<\/span>/g;
+
+        while ((match = linkPattern.exec(noteContent)) !== null) {
+          const fullMatch = match[0];
+          const linkText = match[1];
+
+          // Extract noteId if present
+          const noteIdMatch = fullMatch.match(/data-note-id="([^"]*)"/);
+          const linkedNoteId = noteIdMatch ? noteIdMatch[1] : null;
+
+          console.log('[getBacklinks]   Found HTML link:', { linkText, linkedNoteId });
+
+          // Check if this link points to our target note (by ID or by title)
+          if ((linkedNoteId && linkedNoteId === noteId) || linkText === targetNote.title) {
+            console.log('[getBacklinks]   ✓ Match! Link points to target note');
+
+          // Extract context around the link (100 chars before and after)
+          const linkStart = match.index;
+          const linkEnd = linkStart + match[0].length;
+          const contextStart = Math.max(0, linkStart - 100);
+          const contextEnd = Math.min(noteContent.length, linkEnd + 100);
 
           // Get the context and strip HTML tags for display
-          let context = note.content.substring(contextStart, contextEnd);
+          let context = noteContent.substring(contextStart, contextEnd);
           context = context.replace(/<[^>]*>/g, ''); // Remove HTML tags
           context = '...' + context.trim() + '...';
 
           backlinks.push({ note, context });
           break; // Only count each note once
+        }
         }
       }
     });

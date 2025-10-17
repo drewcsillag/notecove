@@ -984,16 +984,30 @@ class NoteCoveApp {
    * Render backlinks panel showing notes that link to the current note
    */
   renderBacklinks(): void {
+    console.log('[renderBacklinks] Called');
     const backlinksPanel = document.getElementById('backlinksPanel');
     const backlinksList = document.getElementById('backlinksList');
     const backlinksCount = document.getElementById('backlinksCount');
 
+    console.log('[renderBacklinks] Elements:', {
+      panel: !!backlinksPanel,
+      list: !!backlinksList,
+      count: !!backlinksCount,
+      noteManager: !!this.noteManager,
+      currentNote: !!this.currentNote,
+      currentNoteId: this.currentNote?.id,
+      currentNoteTitle: this.currentNote?.title
+    });
+
     if (!backlinksPanel || !backlinksList || !backlinksCount || !this.noteManager || !this.currentNote) {
+      console.log('[renderBacklinks] Missing required elements, returning early');
       return;
     }
 
     // Get backlinks for the current note
+    console.log('[renderBacklinks] Getting backlinks for note:', this.currentNote.id);
     const backlinks = this.noteManager.getBacklinks(this.currentNote.id);
+    console.log('[renderBacklinks] Got', backlinks.length, 'backlinks');
 
     // Update count
     backlinksCount.textContent = backlinks.length.toString();
