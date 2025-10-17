@@ -88,7 +88,8 @@
       "Bash(node /Users/drew/devel/nc/desktop/scripts/decode-updates.js:*)",
       "Bash(node:*)",
       "Bash(timeout 30 npx electron:*)",
-      "Bash(timeout 15 npx electron:*)"
+      "Bash(timeout 15 npx electron:*)",
+      "Bash(timeout 180 npx playwright test:*)"
     ],
     "deny": [],
     "ask": []

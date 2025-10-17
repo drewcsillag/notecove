@@ -102,6 +102,7 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
   addProseMirrorPlugins() {
     const onNavigate = this.options.onNavigate;
     const findNoteByTitle = this.options.findNoteByTitle;
+    const validateNoteLink = this.options.validateNoteLink;
 
     return [
       // Input rule plugin to detect [[...]] as user types
@@ -188,20 +189,17 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
         key: new PluginKey('noteLinkValidation'),
         state: {
           init(_, { doc }) {
-            return findBrokenLinks(doc, this.spec?.validateNoteLink);
+            return findBrokenLinks(doc, validateNoteLink);
           },
           apply(transaction, oldState) {
             if (!transaction.docChanged) return oldState;
-            return findBrokenLinks(transaction.doc, this.spec?.validateNoteLink);
+            return findBrokenLinks(transaction.doc, validateNoteLink);
           }
         },
         props: {
           decorations(state) {
             return this.getState(state);
           }
-        },
-        spec: {
-          validateNoteLink: this.options.validateNoteLink
         }
       }),
     ];
@@ -222,24 +220,27 @@ function findBrokenLinks(
   }
 
   doc.descendants((node, pos) => {
-    if (!node.marks) return;
+    // Only check text nodes that have marks
+    if (!node.isText || !node.marks || node.marks.length === 0) {
+      return;
+    }
 
-    node.marks.forEach(mark => {
-      if (mark.type.name === 'noteLink') {
-        const noteId = mark.attrs.noteId;
-        const title = mark.attrs.title;
+    // Check if this text node has a noteLink mark
+    const noteLinkMark = node.marks.find(mark => mark.type.name === 'noteLink');
+    if (noteLinkMark) {
+      const noteId = noteLinkMark.attrs.noteId;
+      const title = noteLinkMark.attrs.title;
 
-        // Check if this link is broken
-        const isValid = validateNoteLink(noteId, title);
-        if (!isValid) {
-          decorations.push(
-            Decoration.inline(pos, pos + node.nodeSize, {
-              class: 'note-link-broken'
-            })
-          );
-        }
+      // Check if this link is broken
+      const isValid = validateNoteLink(noteId, title);
+      if (!isValid) {
+        decorations.push(
+          Decoration.inline(pos, pos + node.nodeSize, {
+            class: 'note-link-broken'
+          })
+        );
       }
-    });
+    }
   });
 
   return DecorationSet.create(doc, decorations);
