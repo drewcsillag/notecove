@@ -3,14 +3,15 @@ import { test, expect } from '@playwright/test';
 test.describe('Note Content Loss Bug', () => {
   test.beforeEach(async ({ page }) => {
     // Clear localStorage to start fresh
-    await page.goto('/');
+    await page.goto('/?test-mode');
     await page.evaluate(() => {
       localStorage.clear();
-      localStorage.setItem('notecove-test-mode', 'true');
       localStorage.setItem('notecove-notes', JSON.stringify([]));
     });
     await page.reload();
     await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
   });
 
   test('should preserve note content when switching between notes', async ({ page }) => {
@@ -63,7 +64,7 @@ test.describe('Note Content Loss Bug', () => {
 
     // Verify title in sidebar is still correct
     const activeTitleElement = page.locator('.note-item.active .note-title');
-    const titleText = await activeTitleElement.textContent();
+    const titleText = (await activeTitleElement.textContent()).trim();
     console.log('First note title in sidebar:', titleText);
 
     expect(titleText).toBe('First Note Title');

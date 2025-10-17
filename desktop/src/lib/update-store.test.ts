@@ -200,13 +200,16 @@ describe('UpdateStore', () => {
     it('should encode/decode updates correctly', async () => {
       const originalUpdate: Uint8Array = new Uint8Array([1, 2, 3, 255, 0, 128]);
 
-      await store.addUpdate(noteId, originalUpdate);
+      await store.addUpdate(noteId, originalUpdate, 'content');
       await store.flush(noteId);
 
       const updatePath: string = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
       const fileContent: any = JSON.parse(fileStorage.files.get(updatePath)!);
 
-      const decodedUpdate: Uint8Array = store.decodeUpdate(fileContent.updates[0]);
+      // Handle both old format (string) and new format (object with data and type)
+      const updateEntry = fileContent.updates[0];
+      const base64Data = typeof updateEntry === 'string' ? updateEntry : updateEntry.data;
+      const decodedUpdate: Uint8Array = store.decodeUpdate(base64Data);
       expect(decodedUpdate).toEqual(originalUpdate);
     });
   });

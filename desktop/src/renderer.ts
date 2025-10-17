@@ -116,13 +116,13 @@ class NoteCoveApp {
     // Initialize editor
     this.initializeEditor();
 
-    // Initialize sync manager (will reload notes from CRDT)
-    await this.initializeSyncManager();
-
-    // In web mode, load notes now that everything is initialized
+    // In web mode, load notes from localStorage BEFORE checking if sample notes should be loaded
     if (!this.isElectron) {
       await this.noteManager.loadNotes();
     }
+
+    // Initialize sync manager (will reload notes from CRDT in Electron mode, or check for sample notes in web mode)
+    await this.initializeSyncManager();
 
     // Update UI after notes are loaded
     this.updateUI();
@@ -162,9 +162,14 @@ class NoteCoveApp {
     // Only initialize sync manager in Electron mode
     if (!this.isElectron) {
       console.log('Skipping sync manager initialization in web mode');
-      // In web mode, load sample notes if no notes exist
-      if (this.noteManager.getAllNotes().length === 0) {
+      console.log('[renderer] Test mode check:', this.noteManager.isTestMode());
+      console.log('[renderer] Notes count:', this.noteManager.getAllNotes().length);
+      // In web mode, load sample notes if no notes exist (and not in test mode)
+      if (this.noteManager.getAllNotes().length === 0 && !this.noteManager.isTestMode()) {
+        console.log('[renderer] Loading sample notes');
         await this.noteManager.loadSampleNotes();
+      } else {
+        console.log('[renderer] NOT loading sample notes');
       }
       return;
     }

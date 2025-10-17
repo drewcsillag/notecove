@@ -2,15 +2,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('NoteCove Basic Functionality', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage and set empty notes array to prevent sample notes from loading
-    await page.goto('/');
+    // Use URL parameter for test mode (more reliable than localStorage)
+    await page.goto('/?test-mode');
     await page.evaluate(() => {
       localStorage.clear();
-      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
       localStorage.setItem('notecove-notes', JSON.stringify([]));
     });
     await page.reload();
     await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
   });
 
   test('should load the application', async ({ page }) => {

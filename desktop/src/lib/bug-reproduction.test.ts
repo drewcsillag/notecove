@@ -86,7 +86,7 @@ describe('Bug Reproduction Test', () => {
     delete global.Node;
   });
 
-  it('should reproduce: sample notes show snippets but empty bodies', async () => {
+  it('should properly initialize sample notes in CRDT (bug was fixed)', async () => {
     // === APP START #1 ===
     console.log('\n=== APP START #1: Fresh start ===');
 
@@ -108,11 +108,11 @@ describe('Bug Reproduction Test', () => {
 
     // They have HTML content in memory
     expect(welcomeNote.content).toContain('Welcome to NoteCove');
-    expect(guideNote.content).toContain('Quick Start');
+    expect(guideNote.content).toContain('Getting Started Guide');
 
     console.log('Sample notes have content in memory:', welcomeNote.content.length, 'chars');
 
-    // But if we open one in the editor...
+    // Now if we open one in the editor, it should have content (bug was fixed)
     const yDoc1 = syncManager1.getDoc(welcomeNote.id);
     const editor1 = new Editor({
       element: editorElement,
@@ -124,15 +124,15 @@ describe('Bug Reproduction Test', () => {
 
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    // The editor should be EMPTY because Y.XmlFragment is empty
+    // The editor should have content because sample notes are now properly initialized
     const editorContent = editor1.getHTML();
     console.log('Editor content for Welcome note:', editorContent);
-    expect(editorContent).toBe('<p></p>'); // Empty!
+    expect(editorContent).toContain('Welcome to NoteCove'); // Has content!
 
     editor1.destroy();
     await syncManager1.destroy();
 
-    console.log('✓ Confirmed: Sample notes have content in memory but empty Y.Doc');
+    console.log('✓ Confirmed: Sample notes are properly initialized in Y.Doc (bug fixed)');
   });
 
   it('should reproduce: creating note affects existing notes', async () => {

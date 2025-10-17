@@ -158,6 +158,10 @@ describe('CRDT Persistence Integration', () => {
     const syncManager2 = new SyncManager(mockNoteManager, testDir, instanceId);
     const loaded1 = await syncManager2.loadNote(noteId);
     expect(loaded1.title).toBe('Version 1');
+    const initialModified = loaded1.modified;
+
+    // Wait a bit to ensure timestamp will be different
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // === Update Metadata via CRDT Manager (this is how metadata should be updated) ===
     syncManager2.crdtManager.updateMetadata(noteId, {
@@ -176,7 +180,7 @@ describe('CRDT Persistence Integration', () => {
     expect(loaded2.tags).toEqual(['updated']);
     // Note: modified timestamp is auto-updated by updateMetadata(), so we just check it exists
     expect(loaded2.modified).toBeDefined();
-    expect(new Date(loaded2.modified).getTime()).toBeGreaterThan(new Date('2025-10-13T20:00:00.000Z').getTime());
+    expect(new Date(loaded2.modified).getTime()).toBeGreaterThanOrEqual(new Date(initialModified).getTime());
 
     await syncManager3.destroy();
   });

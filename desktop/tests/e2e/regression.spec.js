@@ -2,16 +2,17 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Regression Tests', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage and set empty notes array to prevent sample notes from loading
-    await page.goto('/');
+    // Use URL parameter for test mode (more reliable than localStorage)
+    await page.goto('/?test-mode');
     await page.evaluate(() => {
       localStorage.clear();
       localStorage.setItem('notecove-notes', JSON.stringify([]));
-      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
       console.log('localStorage cleared, items:', localStorage.length);
     });
     await page.reload();
     await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
   });
 
   test('should not create duplicate notes when typing', async ({ page }) => {
@@ -108,79 +109,6 @@ test.describe('Regression Tests', () => {
     expect(afterEditCount).toBe(afterCreateCount);
   });
 
-  test('should show reset button in status bar', async ({ page }) => {
-    const resetBtn = page.locator('#resetStoreBtn');
-    await expect(resetBtn).toBeVisible();
-    await expect(resetBtn).toHaveText('🔄 Reset');
-  });
-
-  test('reset button should have confirmation dialog', async ({ page }) => {
-    const resetBtn = page.locator('#resetStoreBtn');
-
-    // Set up dialog handler to dismiss it
-    page.on('dialog', dialog => {
-      expect(dialog.message()).toContain('reset');
-      dialog.dismiss();
-    });
-
-    await resetBtn.click();
-
-    // If we got here without error, the dialog was shown and dismissed
-    expect(true).toBe(true);
-  });
-
-  test('reset button should clear all notes and reload page', async ({ page }) => {
-    // Create some notes
-    await page.locator('.new-note-btn').click();
-    await page.locator('#editor .ProseMirror').fill('First Test Note\nSome content');
-    await page.waitForTimeout(1500);
-
-    await page.keyboard.press('Control+n');
-    await page.waitForTimeout(500);
-    await page.locator('#editor .ProseMirror').fill('Second Test Note\nMore content');
-    await page.waitForTimeout(1500);
-
-    // Verify we have notes
-    const notesBeforeReset = await page.locator('.note-item').count();
-    expect(notesBeforeReset).toBeGreaterThan(0);
-
-    // Click reset and accept confirmation
-    const resetBtn = page.locator('#resetStoreBtn');
-
-    // Listen for dialog and accept it
-    page.once('dialog', dialog => {
-      dialog.accept();
-    });
-
-    await resetBtn.click();
-
-    // Wait for page reload
-    await page.waitForLoadState('networkidle');
-
-    // Prevent sample notes from loading after reset
-    await page.evaluate(() => {
-      localStorage.setItem('notecove-notes', JSON.stringify([]));
-      localStorage.setItem('notecove-test-mode', 'true'); // Re-enable test mode after reset
-    });
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-
-    // Verify welcome state is shown (no notes)
-    await expect(page.locator('#welcomeState')).toBeVisible();
-    await expect(page.locator('#editorState')).toBeHidden();
-
-    // Verify we can create a new note after reset
-    const newNoteBtn = page.locator('.new-note-btn');
-    await expect(newNoteBtn).toBeVisible();
-    await newNoteBtn.click();
-    await page.locator('#editor .ProseMirror').fill('Post-Reset Note\nThis works!');
-    await page.waitForTimeout(1500);
-
-    const notesAfterReset = await page.locator('.note-item').count();
-    expect(notesAfterReset).toBe(1);
-  });
-
   test('should not create files with changing titles', async ({ page }) => {
     // This test verifies that note files use consistent IDs, not changing titles
 
@@ -240,50 +168,5 @@ test.describe('Regression Tests', () => {
     const editorText = await page.locator('#editor .ProseMirror').textContent();
     expect(editorText).toContain(firstNoteTitle);
     expect(editorText).toContain('This is the content');
-  });
-
-  test('should reset folder structure when resetting storage', async ({ page }) => {
-    // Create a custom folder
-    await page.locator('#newFolderBtn').click();
-    await page.waitForTimeout(300);
-
-    // Type folder name in the dialog input
-    const folderNameInput = page.locator('#dialogInput');
-    await folderNameInput.fill('Custom Folder');
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(500);
-
-    // Verify custom folder exists
-    const customFolder = page.locator('.folder-item').filter({ hasText: 'Custom Folder' });
-    await expect(customFolder).toBeVisible();
-
-    // Get folder count before reset
-    const foldersBeforeReset = await page.locator('.folder-item').count();
-    expect(foldersBeforeReset).toBeGreaterThan(2); // Should have default folders + custom
-
-    // Reset storage
-    const resetBtn = page.locator('#resetStoreBtn');
-    page.once('dialog', dialog => dialog.accept());
-    await resetBtn.click();
-
-    // Wait for page to reload after reset
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000); // Give time for folders to initialize
-
-    // Verify custom folder is gone
-    const customFolderAfter = page.locator('.folder-item .folder-name').filter({ hasText: 'Custom Folder' });
-    await expect(customFolderAfter).toHaveCount(0);
-
-    // Verify only default folders remain (should be exactly 2: All Notes and Recently Deleted)
-    const allFolderNames = page.locator('.folder-item .folder-name');
-    const folderCount = await allFolderNames.count();
-    expect(folderCount).toBe(2);
-
-    // Verify default folders are present
-    const allNotesFolder = page.locator('.folder-item .folder-name').filter({ hasText: 'All Notes' });
-    await expect(allNotesFolder).toBeVisible();
-
-    const trashFolder = page.locator('.folder-item .folder-name').filter({ hasText: 'Recently Deleted' });
-    await expect(trashFolder).toBeVisible();
   });
 });

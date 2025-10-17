@@ -171,7 +171,19 @@ export class NoteManager {
    * @returns True if in test mode
    */
   isTestMode(): boolean {
-    // Check localStorage for test mode flag
+    // Check URL parameter first (most reliable for tests)
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('test-mode')) {
+          return true;
+        }
+      }
+    } catch (error) {
+      // Ignore URL parsing errors
+    }
+
+    // Fallback to localStorage for backward compatibility
     try {
       return localStorage.getItem('notecove-test-mode') === 'true';
     } catch (error) {

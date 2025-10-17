@@ -2,15 +2,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('New Features', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage and set empty notes array to prevent sample notes from loading
-    await page.goto('/');
+    // Use URL parameter for test mode (more reliable than localStorage)
+    await page.goto('/?test-mode');
     await page.evaluate(() => {
       localStorage.clear();
       localStorage.setItem('notecove-notes', JSON.stringify([]));
-      localStorage.setItem('notecove-test-mode', 'true'); // Enable test mode to skip sample notes
     });
     await page.reload();
     await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
   });
 
   test.describe('Three-State Tag Filtering', () => {
@@ -236,6 +237,8 @@ test.describe('New Features', () => {
       // Reload the page
       await page.reload();
       await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
       await page.waitForTimeout(500);
 
       // Folder should still be collapsed
@@ -288,12 +291,13 @@ test.describe('New Features', () => {
 
       // Enable test mode before reload to prevent sample notes from loading
       await page.evaluate(() => {
-        localStorage.setItem('notecove-test-mode', 'true');
       });
 
       // Reload the page
       await page.reload();
       await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
       await page.waitForTimeout(3000); // Increased timeout for async operations
 
       // Wait for notes to be loaded and visible in list
@@ -347,12 +351,13 @@ test.describe('New Features', () => {
 
       // Enable test mode before reload to prevent sample notes from loading
       await page.evaluate(() => {
-        localStorage.setItem('notecove-test-mode', 'true');
       });
 
       // Reload the page
       await page.reload();
       await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
       await page.waitForTimeout(2000);
 
       // Wait for notes to be loaded
@@ -430,12 +435,13 @@ test.describe('New Features', () => {
 
       // Re-enable test mode before reload (so sample notes don't load)
       await page.evaluate(() => {
-        localStorage.setItem('notecove-test-mode', 'true');
       });
 
       // Reload the page
       await page.reload();
       await page.waitForLoadState('networkidle');
+    // Add extra wait to ensure app is fully initialized
+    await page.waitForTimeout(500);
       await page.waitForTimeout(500);
 
       // Find the folder again after reload
