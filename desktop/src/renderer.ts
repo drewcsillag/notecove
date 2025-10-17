@@ -143,7 +143,8 @@ class NoteCoveApp {
       onFocus: () => this.handleEditorFocus(),
       onBlur: () => this.handleEditorBlur(),
       onReady: () => this.handleEditorReady(),
-      isSettingContent: () => this.isSettingContent
+      isSettingContent: () => this.isSettingContent,
+      onNavigateToNote: (noteTitle: string) => this.handleNoteLinkClick(noteTitle)
     });
 
     // Setup the formatting toolbar
@@ -1320,6 +1321,30 @@ class NoteCoveApp {
    */
   toggleFolderCollapse(folderId: string): void {
     this.folderManager.toggleFolderExpanded(folderId);
+  }
+
+  /**
+   * Handle clicking on a note link in the editor
+   * Finds a note by title and navigates to it
+   */
+  async handleNoteLinkClick(noteTitle: string): Promise<void> {
+    if (!this.noteManager) return;
+
+    console.log(`[NoteLink] Clicked link to: "${noteTitle}"`);
+
+    // Find note by title (case-insensitive search)
+    const notes = this.noteManager.getAllNotes();
+    const targetNote = notes.find(note =>
+      !note.deleted && note.title.toLowerCase() === noteTitle.toLowerCase()
+    );
+
+    if (targetNote) {
+      console.log(`[NoteLink] Found note:`, { id: targetNote.id, title: targetNote.title });
+      await this.selectNote(targetNote.id);
+    } else {
+      console.warn(`[NoteLink] Note not found: "${noteTitle}"`);
+      // Could optionally show a notification to the user
+    }
   }
 
   async selectNote(noteId: string): Promise<void> {

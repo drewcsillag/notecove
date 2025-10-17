@@ -684,6 +684,20 @@
       text-decoration: underline;
     }
 
+    /* Note Links */
+    .editor span[data-note-link] {
+      color: var(--accent-color);
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+
+    .editor span[data-note-link]:hover {
+      border-bottom-color: var(--accent-color);
+    }
+
     /* Task Lists */
     .editor ul[data-type="taskList"] {
       list-style: none;

@@ -11,6 +11,7 @@ import { Hashtag } from './extensions/hashtag';
 import { TaskList } from './extensions/task-list';
 import { TaskItem } from './extensions/task-item';
 import { ResizableImage } from './extensions/resizable-image';
+import { NoteLink } from './extensions/note-link';
 import { initTableResizing } from './table-resize';
 
 export interface NoteCoveEditorOptions {
@@ -22,6 +23,7 @@ export interface NoteCoveEditorOptions {
   onReady?: () => void;
   isSettingContent?: () => boolean;
   yDoc?: Y.Doc | null;
+  onNavigateToNote?: (noteTitle: string) => void;
 }
 
 interface FormatState {
@@ -86,6 +88,7 @@ export class NoteCoveEditor {
       onReady: () => {}, // Called when editor is fully initialized
       isSettingContent: () => false,
       yDoc: null,
+      onNavigateToNote: () => {},
       ...options
     };
 
@@ -117,6 +120,11 @@ export class NoteCoveEditor {
         }
       }),
       Hashtag,
+      NoteLink.configure({
+        onNavigate: (title: string) => {
+          this.options.onNavigateToNote(title);
+        },
+      }),
       TaskList,
       TaskItem.configure({
         nested: true,
