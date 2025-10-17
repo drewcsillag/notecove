@@ -108,15 +108,24 @@ export class SyncManager {
   }
 
   /**
-   * Set up listener for CRDT update events
+   * Set up listener for CRDT update events (both content and metadata)
    */
   setupCRDTListener(): void {
     this.crdtManager.addListener(async (event, data) => {
-      if (event === 'doc-updated') {
-        // CRDT document was updated locally
-        // Add update to UpdateStore buffer (will be flushed on idle)
+      if (event === 'content-updated') {
+        // Content update - pass 'content' type to UpdateStore
         const { noteId, update } = data;
-        await this.updateStore.addUpdate(noteId, new Uint8Array(update));
+        await this.updateStore.addUpdate(noteId, new Uint8Array(update), 'content');
+      }
+      else if (event === 'metadata-updated') {
+        // Metadata update - pass 'metadata' type to UpdateStore
+        const { noteId, update } = data;
+        await this.updateStore.addUpdate(noteId, new Uint8Array(update), 'metadata');
+      }
+      // Backward compatibility: also handle old 'doc-updated' event
+      else if (event === 'doc-updated') {
+        const { noteId, update } = data;
+        await this.updateStore.addUpdate(noteId, new Uint8Array(update), 'content');
       }
     });
   }
@@ -382,10 +391,14 @@ export class SyncManager {
 
       console.log(`Syncing ${newUpdates.length} updates for note ${noteId}`);
 
-      // Apply each update to the CRDT
-      for (const { instanceId, sequence, update } of newUpdates) {
-        this.crdtManager.applyUpdate(noteId, update, 'remote');
-        console.log(`Applied update ${sequence} from ${instanceId} to note ${noteId}`);
+      // Apply each update to the correct CRDT doc based on type
+      for (const { instanceId, sequence, update, type } of newUpdates) {
+        if (type === 'content') {
+          this.crdtManager.applyContentUpdate(noteId, update, 'remote');
+        } else if (type === 'metadata') {
+          this.crdtManager.applyMetadataUpdate(noteId, update, 'remote');
+        }
+        console.log(`Applied ${type} update ${sequence} from ${instanceId} to note ${noteId}`);
       }
 
       // Extract the merged note from CRDT
@@ -595,40 +608,64 @@ export class SyncManager {
         return null;
       }
 
-      console.log(`[SyncManager] Loading note ${noteId} from ${allUpdates.length} CRDT updates`);
+      console.log(`[📥 LOAD] Loading note ${noteId} from ${allUpdates.length} CRDT updates`);
 
-      // IMPORTANT: Clear any existing Y.Doc content before loading
-      // This ensures we start fresh and apply all updates in order
-      this.crdtManager.clearDoc(noteId);
+      // IMPORTANT: Do NOT clearDoc()! Y.js updates are incremental diffs that expect previous state.
+      // Clearing the doc and then applying incremental updates causes corruption.
+      // Instead, just apply updates to the existing (or new) Y.Doc.
 
       // Apply all updates to build the current state
-      for (const { update } of allUpdates) {
-        this.crdtManager.applyUpdate(noteId, update, 'load');
+      // Use the type tag to apply each update to the correct Y.Doc
+      let prevKeyCount = 0;
+      for (let i = 0; i < allUpdates.length; i++) {
+        const { update, sequence, instanceId, type } = allUpdates[i];
+        console.log(`[📥 LOAD] Applying update ${i+1}/${allUpdates.length} (type: ${type}, seq ${sequence}, instance ${instanceId}, size ${update.length} bytes)`);
+
+        // Apply to the correct doc based on type
+        if (type === 'content') {
+          this.crdtManager.applyContentUpdate(noteId, update, 'load');
+        } else if (type === 'metadata') {
+          this.crdtManager.applyMetadataUpdate(noteId, update, 'load');
+        }
+
+        // Debug: check metadata after EVERY update to find where keys disappear
+        const metadataDoc = this.crdtManager.getMetadataDoc(noteId);
+        const yMeta = metadataDoc.getMap('metadata');
+        const keys = Array.from(yMeta.keys());
+
+        // Only log if key count changed
+        if (i === 0 || keys.length !== prevKeyCount) {
+          console.log(`[📥 LOAD]   After update ${i+1}: metadata has ${yMeta.size} keys: [${keys.join(', ')}]`);
+          prevKeyCount = keys.length;
+        }
       }
+      console.log(`[📥 LOAD] All updates applied for note ${noteId}`);
 
       // Check metadata AFTER applying all updates
-      const doc = this.crdtManager.getDoc(noteId);
-      const yMetadata = doc.getMap('metadata');
+      const metadataDoc = this.crdtManager.getMetadataDoc(noteId);
+      const yMetadata = metadataDoc.getMap('metadata');
       const metadataTitle = yMetadata.get('title');
-      console.log(`[SyncManager] After applying updates, metadata title: "${metadataTitle}"`);
+
+      // Debug: log ALL metadata keys and values
+      const allKeys = Array.from(yMetadata.keys());
+      console.log(`[📥 LOAD] Metadata has ${yMetadata.size} keys: [${allKeys.join(', ')}]`);
+      console.log(`[📥 LOAD] Metadata values:`,
+        `title="${metadataTitle}"`,
+        `created="${yMetadata.get('created')}"`,
+        `modified="${yMetadata.get('modified')}"`,
+        `tags="${JSON.stringify(yMetadata.get('tags'))}"`,
+        `folderId="${yMetadata.get('folderId')}"`,
+        `deleted="${yMetadata.get('deleted')}"`
+      );
 
       // Extract the merged note from CRDT
       const note = this.crdtManager.getNoteFromDoc(noteId);
       note.id = noteId;
       console.log(`[SyncManager] Extracted note title from getNoteFromDoc: "${note.title}"`);
 
-      // If we extracted a title from content (because metadata title was empty/Untitled),
-      // update the metadata to persist it for next load
-      if ((!metadataTitle || metadataTitle === 'Untitled') && note.title && note.title !== 'Untitled') {
-        console.log(`[SyncManager] Persisting extracted title to metadata: "${note.title}"`);
-        this.crdtManager.updateMetadata(noteId, { title: note.title });
-        // Flush the metadata update immediately
-        const flushResult = await this.updateStore.flush(noteId);
-        console.log(`[SyncManager] Flush result:`, flushResult);
-        // Verify the title is now in metadata
-        const newMetadataTitle = yMetadata.get('title');
-        console.log(`[SyncManager] After flush, metadata title: "${newMetadataTitle}"`);
-      }
+      // IMPORTANT: Do NOT persist extracted titles back to the Y.Doc during load!
+      // This creates conflicting CRDT updates that corrupt metadata due to Y.js conflict resolution.
+      // The extracted title is used for display purposes only.
 
       return note;
     } catch (error) {
@@ -639,11 +676,13 @@ export class SyncManager {
 
   /**
    * Get the CRDT document for a note (for TipTap integration)
+   * @deprecated Use getContentDoc() directly from crdtManager
    * @param noteId - Note ID
-   * @returns Yjs document
+   * @returns Yjs document (content doc)
    */
   getDoc(noteId: string): Y.Doc {
-    return this.crdtManager.getDoc(noteId);
+    console.warn('[SyncManager] getDoc() is deprecated - use crdtManager.getContentDoc()');
+    return this.crdtManager.getContentDoc(noteId);
   }
 
   /**

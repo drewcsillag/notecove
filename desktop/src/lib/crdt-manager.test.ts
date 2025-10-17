@@ -36,12 +36,12 @@ describe('CRDTManager', () => {
     it('should track update events', () => {
       const updates: any[] = [];
       manager.addListener((event: string, data: any) => {
-        if (event === 'doc-updated') {
+        if (event === 'content-updated') {
           updates.push(data);
         }
       });
 
-      const doc = manager.getDoc(noteId);
+      const doc = manager.getContentDoc(noteId);
       const text = doc.getText('test');
       text.insert(0, 'Hello');
 
@@ -85,11 +85,12 @@ describe('CRDTManager', () => {
     });
 
     it('should remove documents correctly', () => {
-      const doc = manager.getDoc(noteId);
-      expect(manager.docs.has(noteId)).toBe(true);
+      const doc = manager.getContentDoc(noteId);
+      expect(manager.contentDocs.has(noteId)).toBe(true);
 
       manager.removeDoc(noteId);
-      expect(manager.docs.has(noteId)).toBe(false);
+      expect(manager.contentDocs.has(noteId)).toBe(false);
+      expect(manager.metadataDocs.has(noteId)).toBe(false);
     });
   });
 
@@ -107,8 +108,8 @@ describe('CRDTManager', () => {
 
       manager.initializeNote(noteId, note);
 
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
 
       expect(metadata.get('title')).toBe('Test Note');
       expect(metadata.get('created')).toBe('2025-01-01T00:00:00Z');
@@ -136,8 +137,8 @@ describe('CRDTManager', () => {
 
       manager.initializeNote(noteId, note2);
 
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
 
       // Should keep original values
       expect(metadata.get('title')).toBe('Original Title');
@@ -152,8 +153,8 @@ describe('CRDTManager', () => {
 
       manager.initializeNote(noteId, note);
 
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
 
       expect(metadata.get('title')).toBe('Test Note');
       expect(metadata.get('tags')).toEqual([]);
@@ -178,12 +179,12 @@ describe('CRDTManager', () => {
     it('should track changes to content fragment', () => {
       const updates = [];
       manager.addListener((event, data) => {
-        if (event === 'doc-updated') {
+        if (event === 'content-updated') {
           updates.push(data);
         }
       });
 
-      const doc = manager.getDoc(noteId);
+      const doc = manager.getContentDoc(noteId);
       const fragment = manager.getContentFragment(noteId);
 
       // Simulate TipTap editing the fragment
@@ -211,30 +212,30 @@ describe('CRDTManager', () => {
     it('should update title', () => {
       manager.updateMetadata(noteId, { title: 'New Title' });
 
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
       expect(metadata.get('title')).toBe('New Title');
     });
 
     it('should update tags', () => {
       manager.updateMetadata(noteId, { tags: ['tag1', 'tag2', 'tag3'] });
 
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
       expect(metadata.get('tags')).toEqual(['tag1', 'tag2', 'tag3']);
     });
 
     it('should update folder', () => {
       manager.updateMetadata(noteId, { folderId: 'projects' });
 
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
       expect(metadata.get('folderId')).toBe('projects');
     });
 
     it('should update modified timestamp when explicitly provided', async () => {
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
       const originalModified = metadata.get('modified');
 
       // Wait a bit to ensure timestamp changes
@@ -254,8 +255,8 @@ describe('CRDTManager', () => {
         folderId: 'archive'
       });
 
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
 
       expect(metadata.get('title')).toBe('Updated Title');
       expect(metadata.get('tags')).toEqual(['new', 'tags']);
@@ -321,9 +322,11 @@ describe('CRDTManager', () => {
         title: 'Test Note'
       });
 
-      const state = manager.getState(noteId);
-      expect(state).toBeInstanceOf(Uint8Array);
-      expect(state.length).toBeGreaterThan(0);
+      const contentState = Y.encodeStateAsUpdate(manager.getContentDoc(noteId));
+      const metadataState = Y.encodeStateAsUpdate(manager.getMetadataDoc(noteId));
+      expect(contentState).toBeInstanceOf(Uint8Array);
+      expect(metadataState).toBeInstanceOf(Uint8Array);
+      expect(metadataState.length).toBeGreaterThan(0);
     });
 
     it('should apply update from external source', () => {
@@ -337,11 +340,13 @@ describe('CRDTManager', () => {
         title: 'Test Note'
       });
 
-      // Get the state from manager 1
-      const state = manager1.getState(noteId);
+      // Get both content and metadata states from manager 1
+      const contentState = Y.encodeStateAsUpdate(manager1.getContentDoc(noteId));
+      const metadataState = Y.encodeStateAsUpdate(manager1.getMetadataDoc(noteId));
 
-      // Apply to manager 2
-      manager2.applyUpdate(noteId, state);
+      // Apply both to manager 2
+      manager2.applyContentUpdate(noteId, contentState, 'remote');
+      manager2.applyMetadataUpdate(noteId, metadataState, 'remote');
 
       // Manager 2 should have the same note
       const note = manager2.getNoteFromDoc(noteId);
@@ -349,25 +354,25 @@ describe('CRDTManager', () => {
     });
 
     it('should track pending updates', () => {
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
 
       // Make a change (not silent or remote)
       metadata.set('title', 'Test');
 
-      const pending = manager.getPendingUpdates(noteId);
+      const pending = manager.getPendingMetadataUpdates(noteId);
       expect(pending.length).toBeGreaterThan(0);
     });
 
     it('should clear pending updates', () => {
-      const doc = manager.getDoc(noteId);
-      const metadata = doc.getMap('metadata');
+      const metadataDoc = manager.getMetadataDoc(noteId);
+      const metadata = metadataDoc.getMap('metadata');
 
       metadata.set('title', 'Test');
-      expect(manager.getPendingUpdates(noteId).length).toBeGreaterThan(0);
+      expect(manager.getPendingMetadataUpdates(noteId).length).toBeGreaterThan(0);
 
       manager.clearPendingUpdates(noteId);
-      expect(manager.getPendingUpdates(noteId).length).toBe(0);
+      expect(manager.getPendingMetadataUpdates(noteId).length).toBe(0);
     });
   });
 
@@ -382,15 +387,15 @@ describe('CRDTManager', () => {
 
       // Manager 1: Set title to "Hello"
       manager1.updateMetadata(noteId, { title: 'Hello' });
-      const update1 = manager1.getState(noteId);
+      const update1 = Y.encodeStateAsUpdate(manager1.getMetadataDoc(noteId));
 
       // Manager 2: Set title to "World"
       manager2.updateMetadata(noteId, { title: 'World' });
-      const update2 = manager2.getState(noteId);
+      const update2 = Y.encodeStateAsUpdate(manager2.getMetadataDoc(noteId));
 
-      // Apply updates to each other
-      manager1.applyUpdate(noteId, update2, 'remote');
-      manager2.applyUpdate(noteId, update1, 'remote');
+      // Apply metadata updates to each other
+      manager1.applyMetadataUpdate(noteId, update2, 'remote');
+      manager2.applyMetadataUpdate(noteId, update1, 'remote');
 
       // Both should converge to the same state (Yjs picks one deterministically)
       const note1 = manager1.getNoteFromDoc(noteId);
@@ -450,21 +455,21 @@ describe('CRDTManager', () => {
 
       manager1.initializeNote(noteId, { id: noteId, title: 'Start' });
 
-      // Sync initial state
-      const state0 = manager1.getState(noteId);
-      manager2.applyUpdate(noteId, state0);
+      // Sync initial metadata state
+      const metadataState0 = Y.encodeStateAsUpdate(manager1.getMetadataDoc(noteId));
+      manager2.applyMetadataUpdate(noteId, metadataState0, 'remote');
 
       // Manager 1 makes multiple edits
       manager1.updateMetadata(noteId, { title: 'Edit 1' });
       manager1.updateMetadata(noteId, { tags: ['tag1'] });
       manager1.updateMetadata(noteId, { folderId: 'work' });
 
-      // Get incremental updates
-      const pendingUpdates = manager1.getPendingUpdates(noteId);
+      // Get incremental metadata updates
+      const pendingUpdates = manager1.getPendingMetadataUpdates(noteId);
 
       // Apply each update to manager 2
       for (const update of pendingUpdates) {
-        manager2.applyUpdate(noteId, new Uint8Array(update), 'remote');
+        manager2.applyMetadataUpdate(noteId, new Uint8Array(update), 'remote');
       }
 
       // Both should be in sync
@@ -473,7 +478,7 @@ describe('CRDTManager', () => {
 
       expect(note1.title).toBe(note2.title);
       expect(note1.tags).toEqual(note2.tags);
-      expect(note1.folder).toBe(note2.folder);
+      expect(note1.folderId).toBe(note2.folderId);
     });
   });
 
@@ -500,14 +505,17 @@ describe('CRDTManager', () => {
     });
 
     it('should cleanup all resources', () => {
-      manager.getDoc('note-1');
-      manager.getDoc('note-2');
+      manager.getContentDoc('note-1');
+      manager.getContentDoc('note-2');
 
       manager.destroy();
 
-      expect(manager.docs.size).toBe(0);
-      expect(manager.updateHandlers.size).toBe(0);
-      expect(manager.pendingUpdates.size).toBe(0);
+      expect(manager.contentDocs.size).toBe(0);
+      expect(manager.metadataDocs.size).toBe(0);
+      expect(manager.contentUpdateHandlers.size).toBe(0);
+      expect(manager.metadataUpdateHandlers.size).toBe(0);
+      expect(manager.pendingContentUpdates.size).toBe(0);
+      expect(manager.pendingMetadataUpdates.size).toBe(0);
     });
   });
 
@@ -546,7 +554,7 @@ describe('CRDTManager', () => {
       const note = manager.getNoteFromDoc(noteId);
       expect(note.title).toBe('Update 99');
 
-      const pending = manager.getPendingUpdates(noteId);
+      const pending = manager.getPendingMetadataUpdates(noteId);
       expect(pending.length).toBeGreaterThan(0);
     });
   });

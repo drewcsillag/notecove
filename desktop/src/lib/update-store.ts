@@ -6,16 +6,23 @@
  * Updates are batched into files based on configurable flush strategy
  */
 
+export type UpdateType = 'content' | 'metadata';
+
 interface FileStorage {
   isElectron: boolean;
   notesPath: string;
+}
+
+interface PendingUpdate {
+  data: Uint8Array;
+  type: UpdateType;
 }
 
 interface NoteState {
   seen: Map<string, number>;
   seenRanges: Map<string, Array<[number, number]>>;
   writeCounter: number;
-  pendingUpdates: Uint8Array[];
+  pendingUpdates: PendingUpdate[];
   pendingStartSeq: number | null;
 }
 
@@ -30,7 +37,10 @@ interface PackedFile {
   instance: string;
   sequence: [number, number];
   timestamp: string;
-  updates: string[];
+  updates: Array<string | {  // Support both old (string) and new (object) formats
+    data: string;
+    type: UpdateType;
+  }>;
 }
 
 interface FlushOptions {
@@ -46,10 +56,11 @@ interface FlushStrategyOptions {
   flushStrategy?: FlushStrategy;
 }
 
-interface UpdateWithMetadata {
+export interface UpdateWithMetadata {
   instanceId: string;
   sequence: number;
   update: Uint8Array;
+  type: UpdateType;
 }
 
 interface GapSummary {
@@ -235,8 +246,9 @@ export class UpdateStore {
    * Will be flushed according to flush strategy
    * @param noteId - Note ID
    * @param update - CRDT update data
+   * @param type - Update type ('content' or 'metadata')
    */
-  async addUpdate(noteId: string, update: Uint8Array): Promise<void> {
+  async addUpdate(noteId: string, update: Uint8Array, type: UpdateType): Promise<void> {
     if (!this.isElectron) return;
 
     const state = this.getNoteState(noteId);
@@ -246,7 +258,7 @@ export class UpdateStore {
       state.pendingStartSeq = state.writeCounter + 1;
     }
 
-    state.pendingUpdates.push(update);
+    state.pendingUpdates.push({ data: update, type });
 
     // Check if we should flush based on strategy
     const shouldFlush = this.flushStrategy.shouldFlush({
@@ -288,7 +300,7 @@ export class UpdateStore {
    */
   getTotalBytes(noteId: string): number {
     const state = this.getNoteState(noteId);
-    return state.pendingUpdates.reduce((sum, update) => sum + update.length, 0);
+    return state.pendingUpdates.reduce((sum, update) => sum + update.data.length, 0);
   }
 
   /**
@@ -330,7 +342,10 @@ export class UpdateStore {
         instance: this.instanceId,
         sequence: [startSeq, endSeq],  // Range [start, end] inclusive
         timestamp: new Date().toISOString(),
-        updates: state.pendingUpdates.map(u => this.encodeUpdate(u))
+        updates: state.pendingUpdates.map(u => ({
+          data: this.encodeUpdate(u.data),
+          type: u.type
+        }))
       };
 
       // Write packed file
@@ -412,8 +427,23 @@ export class UpdateStore {
         // Read ALL updates from this file
         for (let i = 0; i < packedFile.updates.length; i++) {
           const seq = fileStartSeq + i;
-          const update = this.decodeUpdate(packedFile.updates[i]);
-          allUpdates.push({ instanceId, sequence: seq, update });
+          const updateEntry = packedFile.updates[i];
+
+          // Backward compatibility: handle old format (string) and new format (object)
+          let update: Uint8Array;
+          let type: UpdateType;
+
+          if (typeof updateEntry === 'string') {
+            // Old format: just the base64 string
+            update = this.decodeUpdate(updateEntry);
+            type = 'content'; // Default to content for backward compat
+          } else {
+            // New format: object with data and type
+            update = this.decodeUpdate(updateEntry.data);
+            type = updateEntry.type;
+          }
+
+          allUpdates.push({ instanceId, sequence: seq, update, type });
         }
       }
 
@@ -505,8 +535,23 @@ export class UpdateStore {
             continue;
           }
 
-          const update = this.decodeUpdate(packedFile.updates[i]);
-          newUpdates.push({ instanceId, sequence: seq, update });
+          const updateEntry = packedFile.updates[i];
+
+          // Backward compatibility: handle old format (string) and new format (object)
+          let update: Uint8Array;
+          let type: UpdateType;
+
+          if (typeof updateEntry === 'string') {
+            // Old format: just the base64 string
+            update = this.decodeUpdate(updateEntry);
+            type = 'content'; // Default to content for backward compat
+          } else {
+            // New format: object with data and type
+            update = this.decodeUpdate(updateEntry.data);
+            type = updateEntry.type;
+          }
+
+          newUpdates.push({ instanceId, sequence: seq, update, type });
           hasNewUpdates = true;
         }
 

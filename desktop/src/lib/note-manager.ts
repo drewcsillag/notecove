@@ -309,6 +309,8 @@ export class NoteManager {
     const note: Note = {
       id: generateUUID(),
       title: '',
+      // IMPORTANT: Leave content empty - TipTap will initialize it when editor attaches
+      // Do NOT pre-set '<p></p>' as this creates Y.js encoding mismatches
       content: '',
       created: now,
       modified: now,
@@ -326,7 +328,7 @@ export class NoteManager {
     // After CRDT initialization, sync the note object with CRDT metadata
     // (e.g., empty title becomes "Untitled" in CRDT)
     if (this.isElectron && this.syncManager) {
-      const crdtTitle = this.syncManager.crdtManager.getDoc(note.id).getMap('metadata').get('title');
+      const crdtTitle = this.syncManager.crdtManager.getMetadataDoc(note.id).getMap('metadata').get('title');
       if (crdtTitle && crdtTitle !== note.title) {
         note.title = crdtTitle as string;
         this.notes.set(note.id, note);

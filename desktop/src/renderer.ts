@@ -986,9 +986,11 @@ class NoteCoveApp {
       // Set flag to prevent handleEditorUpdate from firing during programmatic content change
       this.isSettingContent = true;
 
-      // In Electron mode with CRDT, bind editor to Y.Doc
+      // In Electron mode with CRDT, bind editor to CONTENT Y.Doc
+      // IMPORTANT: Pass only content Y.Doc to TipTap, not metadata doc
+      // This prevents our metadata updates from interfering with TipTap's cursor tracking
       if (this.isElectron && this.syncManager) {
-        const yDoc = this.syncManager.getDoc(this.currentNote.id);
+        const yDoc = this.syncManager.crdtManager.getContentDoc(this.currentNote.id);
 
         // Initialize the Y.Doc with metadata if it's empty
         // This ensures sample notes and new notes have proper metadata
@@ -1031,7 +1033,7 @@ class NoteCoveApp {
 
           // Update the note object in noteManager Map with the CRDT title
           // This ensures the notes list shows the correct title
-          const crdtTitle = this.syncManager.crdtManager.getDoc(this.currentNote.id).getMap('metadata').get('title') as string;
+          const crdtTitle = this.syncManager.crdtManager.getMetadataDoc(this.currentNote.id).getMap('metadata').get('title') as string;
           console.log('[renderer] Checking if note title needs sync - CRDT:', crdtTitle, 'Note:', this.currentNote.title);
           if (crdtTitle) {
             console.log('[renderer] Syncing note object title from CRDT:', crdtTitle);
@@ -1337,15 +1339,23 @@ class NoteCoveApp {
       deleted: note?.deleted
     });
     if (note && !note.deleted) {
-      this.saveCurrentNote(); // Save previous note
-      console.log(`[renderer] Setting currentNote to:`, { id: note.id, title: note.title });
+      console.log(`[🔄 SWITCH] Switching from ${this.currentNote?.id} to ${noteId}`);
+      await this.saveCurrentNote(); // Save previous note - MUST await to prevent race condition
+      console.log(`[🔄 SWITCH] Previous note saved, now switching to:`, { id: note.id, title: note.title });
       this.currentNote = note;
       this.isEditing = false; // Reset editing state when switching notes
 
       // IMPORTANT: Load updates from disk BEFORE rendering
-      // This ensures we apply synced updates from other instances
+      // But ONLY if the Y.Doc doesn't already exist in memory
+      // If it exists, rely on the sync cycle to apply any new updates
       if (this.isElectron && this.syncManager) {
-        await this.syncManager.loadNote(noteId);
+        const docAlreadyExists = this.syncManager.crdtManager.hasDoc(noteId);
+        if (!docAlreadyExists) {
+          console.log(`[🔄 SWITCH] Y.Doc doesn't exist for ${noteId}, loading from disk...`);
+          await this.syncManager.loadNote(noteId);
+        } else {
+          console.log(`[🔄 SWITCH] Y.Doc already exists for ${noteId}, skipping loadNote()`);
+        }
       }
 
       // Don't call updateUI() here as it recreates the DOM and breaks event handling
@@ -1461,12 +1471,17 @@ class NoteCoveApp {
         const shouldUpdate = !(title === 'Untitled' && this.currentNote.title && this.currentNote.title !== 'Untitled');
 
         if (shouldUpdate) {
+          console.log(`[💾 SAVE] Saving note ${this.currentNote.id} - Title: "${title}"`);
           // Update metadata in CRDT (this is the source of truth)
           this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
+          // Update modified timestamp (safe to do after metadata update, won't interfere with TipTap)
+          this.syncManager.crdtManager.updateModifiedTimestamp(this.currentNote.id);
           // Also update the in-memory note object
           await this.noteManager!.updateNote(this.currentNote.id, { title, tags });
-          // Flush immediately to ensure metadata is saved
-          this.syncManager.updateStore.flush(this.currentNote.id);
+          // Flush immediately to ensure metadata is saved - MUST await to prevent race condition
+          console.log(`[💾 SAVE] Flushing updates to disk...`);
+          await this.syncManager.updateStore.flush(this.currentNote.id);
+          console.log(`[💾 SAVE] Flush complete for note ${this.currentNote.id}`);
         }
       } else {
         // Web mode: save content as HTML

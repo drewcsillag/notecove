@@ -29,24 +29,38 @@ interface CRDTStats {
 }
 
 export class CRDTManager {
-  docs: Map<string, Y.Doc>;
-  updateHandlers: Map<string, UpdateHandler>;
+  // IMPORTANT: We maintain TWO separate Y.Docs per note:
+  // 1. contentDocs: Content (Y.XmlFragment) - TipTap's domain, never touched by our code
+  // 2. metadataDocs: Metadata (Y.Map) - Our domain, programmatic updates only
+  // This separation prevents our metadata updates from interfering with TipTap's cursor tracking
+  contentDocs: Map<string, Y.Doc>;
+  metadataDocs: Map<string, Y.Doc>;
+  contentUpdateHandlers: Map<string, UpdateHandler>;
+  metadataUpdateHandlers: Map<string, UpdateHandler>;
   listeners: Set<CRDTListener>;
-  pendingUpdates: Map<string, number[][]>;
+  pendingContentUpdates: Map<string, number[][]>;
+  pendingMetadataUpdates: Map<string, number[][]>;
 
   constructor() {
-    // Map of noteId -> Y.Doc
-    this.docs = new Map();
+    // Map of noteId -> content Y.Doc (contains only Y.XmlFragment 'default')
+    this.contentDocs = new Map();
 
-    // Map of noteId -> update handlers
-    this.updateHandlers = new Map();
+    // Map of noteId -> metadata Y.Doc (contains only Y.Map 'metadata')
+    this.metadataDocs = new Map();
+
+    // Map of noteId -> update handlers for content
+    this.contentUpdateHandlers = new Map();
+
+    // Map of noteId -> update handlers for metadata
+    this.metadataUpdateHandlers = new Map();
 
     // Listeners for CRDT events
     this.listeners = new Set();
 
     // Track pending updates that need to be written
-    // Map of noteId -> Array of updates
-    this.pendingUpdates = new Map();
+    // Separate tracking for content and metadata updates
+    this.pendingContentUpdates = new Map();
+    this.pendingMetadataUpdates = new Map();
   }
 
   /**
@@ -81,79 +95,211 @@ export class CRDTManager {
   }
 
   /**
-   * Get or create Y.Doc for a note
+   * Get or create content Y.Doc for a note
+   * Content Y.Doc contains ONLY Y.XmlFragment 'default' for TipTap
    * @param noteId - Note ID
-   * @returns Yjs document
+   * @returns Content Y.Doc
    */
-  getDoc(noteId: string): Y.Doc {
-    if (!this.docs.has(noteId)) {
+  getContentDoc(noteId: string): Y.Doc {
+    if (!this.contentDocs.has(noteId)) {
       const doc = new Y.Doc();
-      this.docs.set(noteId, doc);
+      this.contentDocs.set(noteId, doc);
 
-      // Set up update handler to track changes
+      // Set up update handler for content
       const updateHandler: UpdateHandler = (update, origin) => {
-        // Skip updates from remote instances AND from loading (don't re-store loaded updates)
-        // Also skip 'silent' origin updates (used for internal operations that shouldn't trigger saves)
-        // We want to save all local changes (including those from editor, programmatic updates, etc.)
-        if (origin !== 'remote' && origin !== 'load' && origin !== 'silent' && origin !== 'auto-modified') {
-          // Update modified timestamp for content changes (not metadata-only updates)
-          // Skip auto-update for: metadata-only changes, initialization
-          // Use 'auto-modified' origin to prevent infinite loop when updating timestamp
-          if (origin !== 'metadata' && origin !== 'init') {
-            doc.transact(() => {
-              const yMetadata = doc.getMap('metadata');
-              yMetadata.set('modified', new Date().toISOString());
-            }, 'auto-modified');
-          }
+        const originStr = typeof origin === 'string' ? origin :
+                         origin === null ? 'null' :
+                         origin === undefined ? 'undefined' :
+                         'editor';
 
-          // Store the update to be written as an append-only file
-          if (!this.pendingUpdates.has(noteId)) {
-            this.pendingUpdates.set(noteId, []);
-          }
-          this.pendingUpdates.get(noteId)!.push(Array.from(update));
+        // Skip updates from remote/load/silent
+        if (originStr !== 'remote' && originStr !== 'load' && originStr !== 'silent') {
+          console.log(`[🔔 CONTENT] Generated content update for ${noteId}, origin="${originStr}"`);
 
-          this.notify('doc-updated', {
+          // Store content update
+          if (!this.pendingContentUpdates.has(noteId)) {
+            this.pendingContentUpdates.set(noteId, []);
+          }
+          this.pendingContentUpdates.get(noteId)!.push(Array.from(update));
+
+          const updateCount = this.pendingContentUpdates.get(noteId)!.length;
+          console.log(`[🔔 CONTENT] Stored content update #${updateCount} for ${noteId}`);
+
+          this.notify('content-updated', {
             noteId,
             update: Array.from(update),
+            updateCount,
             timestamp: new Date()
           });
         }
       };
 
       doc.on('update', updateHandler);
-      this.updateHandlers.set(noteId, updateHandler);
+      this.contentUpdateHandlers.set(noteId, updateHandler);
 
-      console.log('Created new Y.Doc for note:', noteId);
+      console.log('Created new content Y.Doc for note:', noteId);
     }
 
-    return this.docs.get(noteId)!;
+    return this.contentDocs.get(noteId)!;
   }
 
   /**
-   * Initialize a note's CRDT document with content
+   * Get or create metadata Y.Doc for a note
+   * Metadata Y.Doc contains ONLY Y.Map 'metadata' for programmatic updates
+   * @param noteId - Note ID
+   * @returns Metadata Y.Doc
+   */
+  getMetadataDoc(noteId: string): Y.Doc {
+    if (!this.metadataDocs.has(noteId)) {
+      const doc = new Y.Doc();
+      this.metadataDocs.set(noteId, doc);
+
+      // Set up update handler for metadata
+      const updateHandler: UpdateHandler = (update, origin) => {
+        const originStr = typeof origin === 'string' ? origin :
+                         origin === null ? 'null' :
+                         origin === undefined ? 'undefined' :
+                         'metadata';
+
+        // Skip updates from remote/load/silent
+        if (originStr !== 'remote' && originStr !== 'load' && originStr !== 'silent') {
+          const yMetadata = doc.getMap('metadata');
+          const keys = Array.from(yMetadata.keys());
+          console.log(`[🔔 METADATA] Generated metadata update for ${noteId}, origin="${originStr}", keys: [${keys.join(', ')}]`);
+
+          // Store metadata update
+          if (!this.pendingMetadataUpdates.has(noteId)) {
+            this.pendingMetadataUpdates.set(noteId, []);
+          }
+          this.pendingMetadataUpdates.get(noteId)!.push(Array.from(update));
+
+          const updateCount = this.pendingMetadataUpdates.get(noteId)!.length;
+          console.log(`[🔔 METADATA] Stored metadata update #${updateCount} for ${noteId}`);
+
+          this.notify('metadata-updated', {
+            noteId,
+            update: Array.from(update),
+            updateCount,
+            timestamp: new Date()
+          });
+        }
+      };
+
+      doc.on('update', updateHandler);
+      this.metadataUpdateHandlers.set(noteId, updateHandler);
+
+      console.log('Created new metadata Y.Doc for note:', noteId);
+    }
+
+    return this.metadataDocs.get(noteId)!;
+  }
+
+  /**
+   * DEPRECATED: Get or create Y.Doc for a note (old single-doc API)
+   * Use getContentDoc() or getMetadataDoc() instead
+   * This is kept temporarily for backward compatibility during migration
+   * Returns the content doc for backward compatibility
+   * @param noteId - Note ID
+   * @returns Content Y.Doc
+   */
+  getDoc(noteId: string): Y.Doc {
+    console.warn('[CRDTManager] getDoc() is deprecated - use getContentDoc() or getMetadataDoc()');
+    return this.getContentDoc(noteId);
+  }
+
+  /**
+   * Check if content Y.Doc exists for a note (without creating one)
+   * @param noteId - Note ID
+   * @returns true if content doc exists in memory
+   */
+  hasContentDoc(noteId: string): boolean {
+    return this.contentDocs.has(noteId);
+  }
+
+  /**
+   * Check if metadata Y.Doc exists for a note (without creating one)
+   * @param noteId - Note ID
+   * @returns true if metadata doc exists in memory
+   */
+  hasMetadataDoc(noteId: string): boolean {
+    return this.metadataDocs.has(noteId);
+  }
+
+  /**
+   * DEPRECATED: Check if a Y.Doc exists for a note
+   * Use hasContentDoc() or hasMetadataDoc() instead
+   * @param noteId - Note ID
+   * @returns true if content doc exists in memory
+   */
+  hasDoc(noteId: string): boolean {
+    console.warn('[CRDTManager] hasDoc() is deprecated - use hasContentDoc() or hasMetadataDoc()');
+    return this.hasContentDoc(noteId);
+  }
+
+  /**
+   * Get pending content update count for a note
+   * @param noteId - Note ID
+   * @returns Number of pending content updates
+   */
+  getPendingContentUpdateCount(noteId: string): number {
+    return this.pendingContentUpdates.get(noteId)?.length || 0;
+  }
+
+  /**
+   * Get pending metadata update count for a note
+   * @param noteId - Note ID
+   * @returns Number of pending metadata updates
+   */
+  getPendingMetadataUpdateCount(noteId: string): number {
+    return this.pendingMetadataUpdates.get(noteId)?.length || 0;
+  }
+
+  /**
+   * Get and clear pending content updates for a note
+   * Used by UpdateStore when flushing to disk
+   * @param noteId - Note ID
+   * @returns Array of pending content updates
+   */
+  getPendingContentUpdates(noteId: string): number[][] {
+    const updates = this.pendingContentUpdates.get(noteId) || [];
+    this.pendingContentUpdates.delete(noteId);
+    return updates;
+  }
+
+  /**
+   * Get and clear pending metadata updates for a note
+   * Used by UpdateStore when flushing to disk
+   * @param noteId - Note ID
+   * @returns Array of pending metadata updates
+   */
+  getPendingMetadataUpdates(noteId: string): number[][] {
+    const updates = this.pendingMetadataUpdates.get(noteId) || [];
+    this.pendingMetadataUpdates.delete(noteId);
+    return updates;
+  }
+
+  /**
+   * Initialize a note's CRDT documents (both content and metadata)
    * This is used for TipTap integration
    * @param noteId - Note ID
    * @param note - Note object with content
    */
   initializeNote(noteId: string, note: Note): void {
-    const doc = this.getDoc(noteId);
-
     console.log(`[CRDTManager] initializeNote called:`, {
       noteId,
       title: note.title,
       titleType: typeof note.title,
       created: note.created,
-      isEmpty: doc.getMap('metadata').size === 0,
       hasContent: !!(note.content && note.content.length > 0),
       fullNote: JSON.stringify(note)
     });
 
-    // Use 'init' origin so update listener doesn't auto-update modified timestamp
-    // We want to preserve the original modified timestamp from the note
-    doc.transact(() => {
-      // Store metadata in a Y.Map
-      const yMetadata = doc.getMap('metadata');
+    // Initialize metadata Y.Doc
+    const metadataDoc = this.getMetadataDoc(noteId);
+    const yMetadata = metadataDoc.getMap('metadata');
 
+    // Use 'init' origin so update listener doesn't auto-update modified timestamp
+    metadataDoc.transact(() => {
       // Only initialize if empty
       if (yMetadata.size === 0) {
         const titleToSet = note.title || 'Untitled';
@@ -165,21 +311,25 @@ export class CRDTManager {
         yMetadata.set('tags', note.tags || []);
         yMetadata.set('folderId', note.folderId || null);
         yMetadata.set('deleted', note.deleted || false);
+        yMetadata.set('contentVersion', 0); // Track correlation with content updates
 
-        // Verify what was actually set
         console.log(`  - Verified title in Y.Map:`, yMetadata.get('title'));
       } else {
         console.log(`[CRDTManager] Metadata already exists for ${noteId}, skipping init`);
         console.log(`  - Current title:`, yMetadata.get('title'));
       }
-    }, 'init'); // Use 'init' origin to prevent auto-update of modified timestamp
+    }, 'init');
 
-    // Initialize content if provided
+    // Initialize content Y.Doc if content provided
     if (note.content && note.content.length > 0) {
       this.setContentFromHTML(noteId, note.content);
     }
+    // IMPORTANT: For empty notes, do NOT pre-initialize any content structure
+    // Let TipTap's Collaboration extension create the initial document structure
+    // when the editor attaches. This ensures perfect alignment between TipTap's
+    // internal state and the Y.XmlFragment structure.
 
-    console.log('Initialized CRDT document for note:', noteId);
+    console.log('Initialized CRDT documents (content + metadata) for note:', noteId);
   }
 
   /**
@@ -189,8 +339,8 @@ export class CRDTManager {
    * @param htmlContent - HTML content string
    */
   setContentFromHTML(noteId: string, htmlContent: string): void {
-    const doc = this.getDoc(noteId);
-    const fragment = doc.getXmlFragment('default');
+    const contentDoc = this.getContentDoc(noteId);
+    const fragment = contentDoc.getXmlFragment('default');
 
     // Only set content if fragment is empty
     if (fragment.length > 0) {
@@ -232,13 +382,13 @@ export class CRDTManager {
 
       // Now apply the content to the Y.XmlFragment
       // We need to do this in a transaction
-      doc.transact(() => {
+      contentDoc.transact(() => {
         // Convert ProseMirror state to Y.XmlFragment
         // We'll manually insert the content
         const pmDoc = state.doc;
 
         // Simple approach: convert each node
-        pmDoc.content.forEach((node, offset, index) => {
+        pmDoc.content.forEach((node, _offset, _index) => {
           this.insertPMNodeToFragment(fragment, node);
         });
       });
@@ -274,7 +424,7 @@ export class CRDTManager {
       if (pmNode.attrs) {
         Object.entries(pmNode.attrs).forEach(([key, value]) => {
           if (value !== null && value !== undefined) {
-            yElement.setAttribute(key, value);
+            yElement.setAttribute(key, String(value));
           }
         });
       }
@@ -296,20 +446,20 @@ export class CRDTManager {
    * @returns The fragment TipTap will use
    */
   getContentFragment(noteId: string): Y.XmlFragment {
-    const doc = this.getDoc(noteId);
+    const contentDoc = this.getContentDoc(noteId);
     // TipTap's Collaboration extension uses a fragment named 'default'
-    return doc.getXmlFragment('default');
+    return contentDoc.getXmlFragment('default');
   }
 
   /**
-   * Extract note data from Y.Doc
+   * Extract note data from both Y.Docs (content + metadata)
    * @param noteId - Note ID
    * @returns Note object
    */
   getNoteFromDoc(noteId: string): Note {
-    const doc = this.getDoc(noteId);
-
-    const yMetadata = doc.getMap('metadata');
+    // Get metadata from metadata Y.Doc
+    const metadataDoc = this.getMetadataDoc(noteId);
+    const yMetadata = metadataDoc.getMap('metadata');
 
     // Debug: log what's in metadata
     console.log(`[CRDTManager] getNoteFromDoc(${noteId}):`, {
@@ -318,18 +468,19 @@ export class CRDTManager {
       created: yMetadata.get('created'),
       modified: yMetadata.get('modified'),
       tags: yMetadata.get('tags'),
-      folderId: yMetadata.get('folderId')
+      folderId: yMetadata.get('folderId'),
+      contentVersion: yMetadata.get('contentVersion')
     });
 
-    // For content, we need to convert the Y.XmlFragment to HTML string
-    // This is used when loading notes
-    const fragment = doc.getXmlFragment('default');
+    // Get content from content Y.Doc
+    const contentDoc = this.getContentDoc(noteId);
+    const fragment = contentDoc.getXmlFragment('default');
 
     // Convert Y.XmlFragment to HTML string
     let content = '<p></p>'; // Empty content by default
     if (fragment.length > 0) {
-      // Extract actual HTML content from Y.Doc
-      content = this.getHTMLFromDoc(doc);
+      // Extract actual HTML content from content Y.Doc
+      content = this.getHTMLFromDoc(contentDoc);
     }
 
     // Get title from metadata, or extract from content if empty/untitled
@@ -373,66 +524,112 @@ export class CRDTManager {
    * @param updates - Updates to apply
    */
   updateMetadata(noteId: string, updates: Partial<Note>): void {
-    const doc = this.getDoc(noteId);
+    const metadataDoc = this.getMetadataDoc(noteId);
 
     console.log(`[CRDTManager] updateMetadata(${noteId}):`, updates);
 
     // Use 'metadata' origin so update listener knows not to auto-update modified timestamp
-    doc.transact(() => {
-      const yMetadata = doc.getMap('metadata');
+    metadataDoc.transact(() => {
+      const yMetadata = metadataDoc.getMap('metadata');
 
-      console.log(`  - Current title before update:`, yMetadata.get('title'));
+      // Update contentVersion to track correlation with content updates
+      const contentUpdateCount = this.getPendingContentUpdateCount(noteId);
+      yMetadata.set('contentVersion', contentUpdateCount);
 
-      if (updates.title !== undefined) {
+      // Log ALL metadata keys BEFORE any changes
+      const keysBefore = Array.from(yMetadata.keys());
+      console.log(`  - BEFORE: ${keysBefore.length} keys: [${keysBefore.join(', ')}]`);
+      console.log(`  - BEFORE values: title="${yMetadata.get('title')}", tags=${JSON.stringify(yMetadata.get('tags'))}, folderId="${yMetadata.get('folderId')}", deleted=${yMetadata.get('deleted')}`);
+
+      // IMPORTANT: Only call set() if the value is actually changing
+      // Redundant set() calls can create problematic Y.js updates that corrupt metadata when loaded from disk
+
+      if (updates.title !== undefined && yMetadata.get('title') !== updates.title) {
         console.log(`  - Setting title to:`, updates.title);
         yMetadata.set('title', updates.title);
       }
 
       // Only update modified timestamp if explicitly provided
       // Don't auto-update it for metadata-only changes (title/tags extraction)
-      if (updates.modified !== undefined) {
+      if (updates.modified !== undefined && yMetadata.get('modified') !== updates.modified) {
         yMetadata.set('modified', updates.modified);
       }
 
       if (updates.tags !== undefined) {
-        yMetadata.set('tags', updates.tags);
+        // For arrays, compare by JSON stringification since Y.js Array comparison might not work as expected
+        const currentTags = yMetadata.get('tags');
+        const tagsChanged = JSON.stringify(currentTags) !== JSON.stringify(updates.tags);
+        if (tagsChanged) {
+          console.log(`  - Setting tags to:`, updates.tags);
+          yMetadata.set('tags', updates.tags);
+        }
       }
-      if (updates.folderId !== undefined) {
+
+      if (updates.folderId !== undefined && yMetadata.get('folderId') !== updates.folderId) {
         console.log(`  - Setting folderId to:`, updates.folderId);
         yMetadata.set('folderId', updates.folderId);
       }
-      if (updates.deleted !== undefined) {
+
+      if (updates.deleted !== undefined && yMetadata.get('deleted') !== updates.deleted) {
+        console.log(`  - Setting deleted to:`, updates.deleted);
         yMetadata.set('deleted', updates.deleted);
       }
 
-      console.log(`  - Title after update:`, yMetadata.get('title'));
-      console.log(`  - FolderId after update:`, yMetadata.get('folderId'));
+      // Log ALL metadata keys AFTER changes
+      const keysAfter = Array.from(yMetadata.keys());
+      console.log(`  - AFTER: ${keysAfter.length} keys: [${keysAfter.join(', ')}]`);
+      console.log(`  - AFTER values: title="${yMetadata.get('title')}", tags=${JSON.stringify(yMetadata.get('tags'))}, folderId="${yMetadata.get('folderId')}", deleted=${yMetadata.get('deleted')}`);
     }, 'metadata'); // Pass origin so update listener knows this is metadata-only
 
     console.log('Updated metadata for note:', noteId);
   }
 
   /**
-   * Check if a doc is empty
+   * Update the modified timestamp for a note
+   * This should be called at safe times (e.g., on blur, on save) to avoid
+   * interfering with TipTap's cursor tracking
    * @param noteId - Note ID
-   * @returns True if doc is empty
+   */
+  updateModifiedTimestamp(noteId: string): void {
+    const metadataDoc = this.getMetadataDoc(noteId);
+
+    metadataDoc.transact(() => {
+      const yMetadata = metadataDoc.getMap('metadata');
+      yMetadata.set('modified', new Date().toISOString());
+
+      // Update contentVersion to track correlation
+      const contentUpdateCount = this.getPendingContentUpdateCount(noteId);
+      yMetadata.set('contentVersion', contentUpdateCount);
+    }, 'metadata'); // Use 'metadata' origin to prevent re-triggering update handler
+  }
+
+  /**
+   * Check if docs are empty (both content and metadata)
+   * @param noteId - Note ID
+   * @returns True if both docs are empty
    */
   isDocEmpty(noteId: string): boolean {
-    if (!this.docs.has(noteId)) {
-      return true;
-    }
-    const doc = this.getDoc(noteId);
-
-    // For folder documents, check the 'folders' map
+    // For folder documents, check the old single-doc structure
     if (noteId === '.folders') {
+      if (!this.contentDocs.has(noteId)) {
+        return true;
+      }
+      const doc = this.getContentDoc(noteId);
       const yFolders = doc.getMap('folders');
       return yFolders.size === 0;
     }
 
-    // For note documents, check BOTH metadata AND content
+    // For note documents, check BOTH content and metadata Y.Docs
     // Content might sync before metadata is initialized
-    const yMetadata = doc.getMap('metadata');
-    const yContent = doc.getXmlFragment('default');
+    if (!this.contentDocs.has(noteId) && !this.metadataDocs.has(noteId)) {
+      return true;
+    }
+
+    const contentDoc = this.getContentDoc(noteId);
+    const metadataDoc = this.getMetadataDoc(noteId);
+
+    const yMetadata = metadataDoc.getMap('metadata');
+    const yContent = contentDoc.getXmlFragment('default');
 
     // Doc is only empty if BOTH metadata and content are empty
     return yMetadata.size === 0 && yContent.length === 0;
@@ -449,85 +646,129 @@ export class CRDTManager {
   }
 
   /**
-   * Clear all content from a Y.Doc by destroying and recreating it
+   * Clear all docs (content and metadata) by destroying and recreating them
    * This is necessary because simply deleting content doesn't reset the internal state vector
    * @param noteId - Note ID
    */
   clearDoc(noteId: string): void {
-    if (!this.docs.has(noteId)) {
-      return; // Doc doesn't exist yet, nothing to clear
+    // Clear content doc
+    if (this.contentDocs.has(noteId)) {
+      const oldHandler = this.contentUpdateHandlers.get(noteId);
+      if (oldHandler) {
+        const oldDoc = this.contentDocs.get(noteId)!;
+        oldDoc.off('update', oldHandler);
+        this.contentUpdateHandlers.delete(noteId);
+      }
+      this.contentDocs.delete(noteId);
+      this.pendingContentUpdates.delete(noteId);
     }
 
-    // Remove the old update handler
-    const oldHandler = this.updateHandlers.get(noteId);
-    if (oldHandler) {
-      const oldDoc = this.docs.get(noteId)!;
-      oldDoc.off('update', oldHandler);
-      this.updateHandlers.delete(noteId);
+    // Clear metadata doc
+    if (this.metadataDocs.has(noteId)) {
+      const oldHandler = this.metadataUpdateHandlers.get(noteId);
+      if (oldHandler) {
+        const oldDoc = this.metadataDocs.get(noteId)!;
+        oldDoc.off('update', oldHandler);
+        this.metadataUpdateHandlers.delete(noteId);
+      }
+      this.metadataDocs.delete(noteId);
+      this.pendingMetadataUpdates.delete(noteId);
     }
 
-    // Clear pending updates for this note
-    if (this.pendingUpdates.has(noteId)) {
-      this.pendingUpdates.delete(noteId);
-    }
-
-    // Remove the old doc
-    this.docs.delete(noteId);
-
-    // Next call to getDoc will create a fresh one with a new update handler
+    // Next calls to getContentDoc/getMetadataDoc will create fresh ones
   }
 
   /**
-   * Apply CRDT state update from external source
+   * Apply content update from external source (e.g., loading from disk)
+   * @param noteId - Note ID
+   * @param state - State update
+   * @param origin - Origin marker (default: 'load')
+   */
+  applyContentUpdate(noteId: string, state: number[] | Uint8Array, origin = 'load'): void {
+    const contentDoc = this.getContentDoc(noteId);
+    const update = state instanceof Uint8Array ? state : new Uint8Array(state);
+    Y.applyUpdate(contentDoc, update, origin);
+  }
+
+  /**
+   * Apply metadata update from external source (e.g., loading from disk)
+   * @param noteId - Note ID
+   * @param state - State update
+   * @param origin - Origin marker (default: 'load')
+   */
+  applyMetadataUpdate(noteId: string, state: number[] | Uint8Array, origin = 'load'): void {
+    const metadataDoc = this.getMetadataDoc(noteId);
+    const update = state instanceof Uint8Array ? state : new Uint8Array(state);
+    Y.applyUpdate(metadataDoc, update, origin);
+  }
+
+  /**
+   * DEPRECATED: Apply CRDT state update from external source
+   * Use applyContentUpdate() or applyMetadataUpdate() instead
    * @param noteId - Note ID
    * @param state - State update
    * @param origin - Origin marker (default: 'remote')
    */
   applyUpdate(noteId: string, state: number[] | Uint8Array, origin = 'remote'): void {
-    const doc = this.getDoc(noteId);
-    const update = state instanceof Uint8Array ? state : new Uint8Array(state);
-    Y.applyUpdate(doc, update, origin);
+    console.warn('[CRDTManager] applyUpdate() is deprecated - use applyContentUpdate() or applyMetadataUpdate()');
+    // For backward compatibility, apply to content doc
+    this.applyContentUpdate(noteId, state, origin);
   }
 
   /**
-   * Get pending updates for a note (to be written to files)
+   * DEPRECATED: Get pending updates for a note
+   * Use getPendingContentUpdates() or getPendingMetadataUpdates() instead
    * @param noteId - Note ID
-   * @returns Array of updates
+   * @returns Array of content updates (for backward compatibility)
    */
   getPendingUpdates(noteId: string): number[][] {
-    const updates = this.pendingUpdates.get(noteId) || [];
-    return updates;
+    console.warn('[CRDTManager] getPendingUpdates() is deprecated - use getPendingContentUpdates() or getPendingMetadataUpdates()');
+    return this.pendingContentUpdates.get(noteId) || [];
   }
 
   /**
-   * Clear pending updates after they've been written
+   * DEPRECATED: Clear pending updates after they've been written
+   * Use getPendingContentUpdates/getPendingMetadataUpdates which auto-clear
    * @param noteId - Note ID
    */
   clearPendingUpdates(noteId: string): void {
-    this.pendingUpdates.delete(noteId);
+    console.warn('[CRDTManager] clearPendingUpdates() is deprecated');
+    this.pendingContentUpdates.delete(noteId);
+    this.pendingMetadataUpdates.delete(noteId);
   }
 
   /**
-   * Remove a note's CRDT document
+   * Remove a note's CRDT documents (both content and metadata)
    * @param noteId - Note ID
    */
   removeDoc(noteId: string): void {
-    const doc = this.docs.get(noteId);
-    if (doc) {
-      // Remove update handler
-      const handler = this.updateHandlers.get(noteId);
+    // Remove content doc
+    const contentDoc = this.contentDocs.get(noteId);
+    if (contentDoc) {
+      const handler = this.contentUpdateHandlers.get(noteId);
       if (handler) {
-        doc.off('update', handler);
-        this.updateHandlers.delete(noteId);
+        contentDoc.off('update', handler);
+        this.contentUpdateHandlers.delete(noteId);
       }
-
-      // Destroy doc
-      doc.destroy();
-      this.docs.delete(noteId);
-      this.pendingUpdates.delete(noteId);
-
-      console.log('Removed CRDT document for note:', noteId);
+      contentDoc.destroy();
+      this.contentDocs.delete(noteId);
+      this.pendingContentUpdates.delete(noteId);
     }
+
+    // Remove metadata doc
+    const metadataDoc = this.metadataDocs.get(noteId);
+    if (metadataDoc) {
+      const handler = this.metadataUpdateHandlers.get(noteId);
+      if (handler) {
+        metadataDoc.off('update', handler);
+        this.metadataUpdateHandlers.delete(noteId);
+      }
+      metadataDoc.destroy();
+      this.metadataDocs.delete(noteId);
+      this.pendingMetadataUpdates.delete(noteId);
+    }
+
+    console.log('Removed CRDT documents (content + metadata) for note:', noteId);
   }
 
   /**
@@ -535,13 +776,29 @@ export class CRDTManager {
    * @returns Statistics
    */
   getStats(): CRDTStats {
+    // Count unique note IDs across both doc types
+    const allNoteIds = new Set([
+      ...this.contentDocs.keys(),
+      ...this.metadataDocs.keys()
+    ]);
+
+    // Combine pending updates from both types
+    const pendingUpdates: Array<{ noteId: string; updateCount: number }> = [];
+    for (const noteId of allNoteIds) {
+      const contentCount = this.pendingContentUpdates.get(noteId)?.length || 0;
+      const metadataCount = this.pendingMetadataUpdates.get(noteId)?.length || 0;
+      if (contentCount > 0 || metadataCount > 0) {
+        pendingUpdates.push({
+          noteId,
+          updateCount: contentCount + metadataCount
+        });
+      }
+    }
+
     return {
-      documentCount: this.docs.size,
-      documents: Array.from(this.docs.keys()),
-      pendingUpdates: Array.from(this.pendingUpdates.entries()).map(([noteId, updates]) => ({
-        noteId,
-        updateCount: updates.length
-      }))
+      documentCount: allNoteIds.size,
+      documents: Array.from(allNoteIds),
+      pendingUpdates
     };
   }
 
@@ -645,23 +902,36 @@ export class CRDTManager {
   }
 
   /**
-   * Clean up resources
+   * Clean up resources (both content and metadata docs)
    */
   destroy(): void {
-    // Destroy all docs
-    for (const [noteId, doc] of this.docs.entries()) {
-      const handler = this.updateHandlers.get(noteId);
+    // Destroy all content docs
+    for (const [noteId, doc] of this.contentDocs.entries()) {
+      const handler = this.contentUpdateHandlers.get(noteId);
       if (handler) {
         doc.off('update', handler);
       }
       doc.destroy();
     }
 
-    this.docs.clear();
-    this.updateHandlers.clear();
-    this.listeners.clear();
-    this.pendingUpdates.clear();
+    // Destroy all metadata docs
+    for (const [noteId, doc] of this.metadataDocs.entries()) {
+      const handler = this.metadataUpdateHandlers.get(noteId);
+      if (handler) {
+        doc.off('update', handler);
+      }
+      doc.destroy();
+    }
 
-    console.log('CRDT Manager destroyed');
+    // Clear all maps
+    this.contentDocs.clear();
+    this.metadataDocs.clear();
+    this.contentUpdateHandlers.clear();
+    this.metadataUpdateHandlers.clear();
+    this.listeners.clear();
+    this.pendingContentUpdates.clear();
+    this.pendingMetadataUpdates.clear();
+
+    console.log('CRDT Manager destroyed (content + metadata docs)');
   }
 }
