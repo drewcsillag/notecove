@@ -205,7 +205,7 @@ export class NoteManager {
       {
         id: 'sample-getting-started',
         title: 'Getting Started Guide',
-        content: '<h2>Quick Start</h2><p>Here are some tips to get you started with NoteCove:</p><ol><li><strong>Creating Notes:</strong> Use Cmd+N (Mac) or Ctrl+N (Windows/Linux) to create a new note</li><li><strong>Organization:</strong> Use #tags in your notes for easy categorization</li><li><strong>Search:</strong> Use the search box to find notes quickly</li><li><strong>Formatting:</strong> Use the toolbar or keyboard shortcuts for formatting</li></ol><p>Enjoy your note-taking journey! 📝</p>',
+        content: '<h1>Getting Started Guide</h1><p>Here are some tips to get you started with NoteCove:</p><ol><li><strong>Creating Notes:</strong> Use Cmd+N (Mac) or Ctrl+N (Windows/Linux) to create a new note</li><li><strong>Organization:</strong> Use #tags in your notes for easy categorization</li><li><strong>Search:</strong> Use the search box to find notes quickly</li><li><strong>Formatting:</strong> Use the toolbar or keyboard shortcuts for formatting</li></ol><p>Enjoy your note-taking journey! 📝</p>',
         created: new Date(Date.now() - 86400000).toISOString(),
         modified: new Date(Date.now() - 86400000).toISOString(),
         tags: ['tags'],

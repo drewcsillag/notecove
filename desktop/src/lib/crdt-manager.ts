@@ -492,16 +492,29 @@ export class CRDTManager {
                            (typeof title === 'string' && (title.trim() === '' || title.trim().toLowerCase() === 'untitled'));
 
     if (needsExtraction && content && content.length > 0) {
-      // Extract title from content (first line of text)
-      // Replace block-level HTML elements with newlines to preserve structure
-      const textWithNewlines = content
-        .replace(/<\/(p|div|h[1-6]|li|br)>/gi, '\n')  // Add newline after closing block tags
-        .replace(/<br\s*\/?>/gi, '\n');                 // Convert <br> to newline
-      const textContent = textWithNewlines.replace(/<[^>]*>/g, ''); // Strip remaining HTML tags
-      const firstLine = textContent.split('\n')[0].trim();
-      const extractedTitle = firstLine || 'Untitled';
-      console.log(`[CRDTManager] Extracted title from content: "${extractedTitle}"`);
-      title = extractedTitle;
+      // Prefer extracting from H1 if present
+      const h1Match = content.match(/<h1[^>]*>(.*?)<\/h1>/i);
+      if (h1Match && h1Match[1]) {
+        // Extract text from H1, removing any nested HTML tags
+        const h1Text = h1Match[1].replace(/<[^>]*>/g, '').trim();
+        if (h1Text) {
+          title = h1Text;
+          console.log(`[CRDTManager] Extracted title from H1: "${title}"`);
+        }
+      }
+
+      // Fallback: Extract from first line of any content
+      if (!title || title === 'Untitled') {
+        // Replace block-level HTML elements with newlines to preserve structure
+        const textWithNewlines = content
+          .replace(/<\/(p|div|h[1-6]|li|br)>/gi, '\n')  // Add newline after closing block tags
+          .replace(/<br\s*\/?>/gi, '\n');                 // Convert <br> to newline
+        const textContent = textWithNewlines.replace(/<[^>]*>/g, ''); // Strip remaining HTML tags
+        const firstLine = textContent.split('\n')[0].trim();
+        const extractedTitle = firstLine || 'Untitled';
+        console.log(`[CRDTManager] Extracted title from first line: "${extractedTitle}"`);
+        title = extractedTitle;
+      }
     } else if (!title) {
       title = 'Untitled';
     }

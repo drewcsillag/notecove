@@ -176,6 +176,9 @@ export class NoteCoveEditor {
         // Setup paste image handling
         this.setupPasteHandler();
 
+        // Initialize H1 structure for new empty notes
+        this.initializeNewNoteStructure();
+
         // Clear binding flag after debounce period to allow initial sync
         if (this._isBindingDocument) {
           setTimeout(() => {
@@ -231,6 +234,24 @@ export class NoteCoveEditor {
       element.classList.remove('is-empty');
       element.removeAttribute('data-placeholder');
     }
+  }
+
+  /**
+   * Initialize H1 structure for new empty notes
+   * This runs when the editor is created, and if the document is completely empty,
+   * it inserts an H1 heading followed by a paragraph
+   */
+  private initializeNewNoteStructure(): void {
+    // Only initialize if document is completely empty
+    if (!this.editor.isEmpty) {
+      return;
+    }
+
+    // Insert H1 for title, followed by paragraph for body
+    this.editor.commands.setContent('<h1></h1><p></p>');
+
+    // Focus on the H1
+    this.editor.commands.focus('start');
   }
 
   /**
