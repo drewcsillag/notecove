@@ -34,6 +34,9 @@ declare module '@tiptap/core' {
 export const NoteLink = Mark.create<NoteLinkOptions>({
   name: 'noteLink',
 
+  // Don't extend the mark to new content typed at the end
+  inclusive: false,
+
   addOptions() {
     return {
       HTMLAttributes: {},
