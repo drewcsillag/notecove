@@ -14,6 +14,8 @@ import { Hashtag } from './extensions/hashtag';
 import { TaskList } from './extensions/task-list';
 import { TaskItem } from './extensions/task-item';
 import { ResizableImage } from './extensions/resizable-image';
+import { NoteLink } from './extensions/note-link';
+import Collaboration from '@tiptap/extension-collaboration';
 import type { Note } from './utils';
 
 type UpdateHandler = (update: Uint8Array, origin: any) => void;
@@ -912,6 +914,179 @@ export class CRDTManager {
     }
 
     return '';
+  }
+
+  /**
+   * Find all notes that contain links to a specific note by checking CRDT documents
+   * @param targetNoteId - The note ID to search for in links
+   * @returns Array of note IDs that contain links to the target note
+   */
+  findNotesLinkingTo(targetNoteId: string): string[] {
+    const linkingNotes: string[] = [];
+
+    // Check all content documents for noteLink marks
+    for (const [noteId, contentDoc] of this.contentDocs.entries()) {
+      const fragment = contentDoc.getXmlFragment('default');
+
+      // Skip empty documents
+      if (fragment.length === 0) {
+        continue;
+      }
+
+      // Create a temporary editor to traverse the document
+      const tempContainer = document.createElement('div');
+      tempContainer.style.display = 'none';
+      document.body.appendChild(tempContainer);
+
+      try {
+        const tempEditor = new Editor({
+          element: tempContainer,
+          extensions: [
+            StarterKit,
+            NoteLink,
+            Collaboration.configure({
+              document: contentDoc,
+              field: 'default'
+            })
+          ],
+          editable: false
+        });
+
+        // Check if this note has any links to the target
+        let hasLink = false;
+        tempEditor.state.doc.descendants((node) => {
+          if (node.marks) {
+            node.marks.forEach(mark => {
+              if (mark.type.name === 'noteLink' && mark.attrs.noteId === targetNoteId) {
+                hasLink = true;
+              }
+            });
+          }
+        });
+
+        if (hasLink) {
+          linkingNotes.push(noteId);
+        }
+
+        tempEditor.destroy();
+      } finally {
+        document.body.removeChild(tempContainer);
+      }
+    }
+
+    return linkingNotes;
+  }
+
+  /**
+   * Update noteLink marks in a CRDT document when a linked note's title changes
+   * Uses TipTap to properly update the Y.Doc without going behind its back
+   * @param noteId - The note containing links to update
+   * @param targetNoteId - The note ID whose links should be updated
+   * @param newTitle - The new title to set in the links
+   */
+  updateNoteLinkMarks(noteId: string, targetNoteId: string, newTitle: string): void {
+    const contentDoc = this.getContentDoc(noteId);
+    const fragment = contentDoc.getXmlFragment('default');
+
+    // If the document is empty, there are no links to update
+    if (fragment.length === 0) {
+      return;
+    }
+
+    console.log(`[CRDTManager] Updating noteLink marks in ${noteId} for target ${targetNoteId}`);
+
+    // Create a temporary container element (required by TipTap)
+    const tempContainer = document.createElement('div');
+    tempContainer.style.display = 'none';
+    document.body.appendChild(tempContainer);
+
+    try {
+      // Create a temporary editor with Collaboration extension to bind to the Y.Doc
+      const tempEditor = new Editor({
+        element: tempContainer,
+        extensions: [
+          StarterKit.configure({
+            heading: { levels: [1, 2, 3] },
+            bulletList: { keepMarks: true },
+            orderedList: { keepMarks: true }
+          }),
+          Table.configure({ resizable: false }),
+          TableRow,
+          TableHeader,
+          TableCell,
+          Hashtag,
+          TaskList,
+          TaskItem,
+          ResizableImage,
+          NoteLink,
+          Collaboration.configure({
+            document: contentDoc,
+            field: 'default'
+          })
+        ],
+        editable: false
+      });
+
+      // Update link marks one at a time to avoid position tracking issues
+      // We need to re-traverse the document after each update because positions change
+      let updateCount = 0;
+      let foundLink = true;
+
+      // Keep updating until no more links are found
+      while (foundLink) {
+        foundLink = false;
+        let linkPos = -1;
+        let linkSize = 0;
+        let linkMark = null;
+
+        // Find the first (earliest) noteLink mark in the current document state
+        // that needs updating (title doesn't match newTitle yet)
+        tempEditor.state.doc.descendants((node, pos) => {
+          if (!foundLink && node.isText && node.marks) {
+            node.marks.forEach(mark => {
+              if (mark.type.name === 'noteLink' &&
+                  mark.attrs.noteId === targetNoteId &&
+                  mark.attrs.title !== newTitle) {
+                // Found a link that needs updating
+                foundLink = true;
+                linkPos = pos;
+                linkSize = node.nodeSize;
+                linkMark = mark;
+              }
+            });
+          }
+        });
+
+        // If we found a link, update it
+        if (foundLink && linkMark) {
+          const tr = tempEditor.state.tr;
+
+          // Create updated mark
+          const newMark = linkMark.type.create({
+            ...linkMark.attrs,
+            title: newTitle
+          });
+
+          // Delete old text and insert new text with the updated mark
+          tr.delete(linkPos, linkPos + linkSize);
+          tr.insert(linkPos, tempEditor.state.schema.text(newTitle, [newMark]));
+
+          // Apply this transaction
+          tempEditor.view.dispatch(tr);
+          updateCount++;
+        }
+      }
+
+      if (updateCount > 0) {
+        console.log(`[CRDTManager] Updated ${updateCount} noteLink marks and text in ${noteId}`);
+      }
+
+      // Destroy the temporary editor
+      tempEditor.destroy();
+    } finally {
+      // Clean up the temp container
+      document.body.removeChild(tempContainer);
+    }
   }
 
   /**

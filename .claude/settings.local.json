@@ -89,7 +89,11 @@
       "Bash(node:*)",
       "Bash(timeout 30 npx electron:*)",
       "Bash(timeout 15 npx electron:*)",
-      "Bash(timeout 180 npx playwright test:*)"
+      "Bash(timeout 180 npx playwright test:*)",
+      "Bash(timeout 90 npx playwright test:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:tiptap.dev)",
+      "Read(//private/var/folders/1t/7bmd0khn3qscl0gy9v2by7t00000gn/T/notecove-image-persist-test-pMY9Vw/.notecove/114e0bd7-a9a2-4da2-a69e-ce55fd32b7cd/attachments/**)"
     ],
     "deny": [],
     "ask": []

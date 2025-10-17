@@ -215,4 +215,109 @@ describe('NoteManager', () => {
       expect(notes.map((n: Note) => n.title)).toContain('Note 2');
     });
   });
+
+  describe('note link updates', () => {
+    it('should find notes linking to a specific note', async () => {
+      // Create target note
+      const targetNote: Note = await noteManager.createNote({
+        title: 'Target Note',
+        content: '<p>Target content</p>'
+      });
+
+      // Create source note with a link to target
+      const sourceNote: Note = await noteManager.createNote({
+        title: 'Source Note',
+        content: `<p>Check out <span data-note-link data-note-id="${targetNote.id}" data-note-title="Target Note">Target Note</span></p>`
+      });
+
+      const linkingNotes = noteManager.findNotesLinkingTo(targetNote.id);
+
+      expect(linkingNotes).toContain(sourceNote.id);
+      expect(linkingNotes).toHaveLength(1);
+    });
+
+    it('should update link text when note title changes', async () => {
+      // Create target note
+      const targetNote: Note = await noteManager.createNote({
+        title: 'Original Title',
+        content: '<p>Target content</p>'
+      });
+
+      // Create source note with a link to target
+      const sourceNote: Note = await noteManager.createNote({
+        title: 'Source Note',
+        content: `<p>Check out <span data-note-link data-note-id="${targetNote.id}" data-note-title="Original Title">Original Title</span></p>`
+      });
+
+      // Update the target note's title
+      await noteManager.updateNote(targetNote.id, { title: 'New Title' });
+
+      // Wait for async link update to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Check that the source note's content was updated
+      const updatedSource = noteManager.getNote(sourceNote.id);
+      expect(updatedSource?.content).toContain('New Title');
+      expect(updatedSource?.content).toContain(`data-note-title="New Title"`);
+      expect(updatedSource?.content).not.toContain('Original Title');
+    });
+
+    it('should update multiple notes linking to the same note', async () => {
+      // Create target note
+      const targetNote: Note = await noteManager.createNote({
+        title: 'Shared Target',
+        content: '<p>Target content</p>'
+      });
+
+      // Create two source notes with links to target
+      const source1: Note = await noteManager.createNote({
+        title: 'Source 1',
+        content: `<p>Link to <span data-note-link data-note-id="${targetNote.id}" data-note-title="Shared Target">Shared Target</span></p>`
+      });
+
+      const source2: Note = await noteManager.createNote({
+        title: 'Source 2',
+        content: `<p>Another link to <span data-note-link data-note-id="${targetNote.id}" data-note-title="Shared Target">Shared Target</span></p>`
+      });
+
+      // Update the target note's title
+      await noteManager.updateNote(targetNote.id, { title: 'Updated Target' });
+
+      // Wait for async link updates to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Check that both source notes were updated
+      const updatedSource1 = noteManager.getNote(source1.id);
+      const updatedSource2 = noteManager.getNote(source2.id);
+
+      expect(updatedSource1?.content).toContain('Updated Target');
+      expect(updatedSource2?.content).toContain('Updated Target');
+    });
+
+    it('should not update links when other note properties change', async () => {
+      // Create target note
+      const targetNote: Note = await noteManager.createNote({
+        title: 'Target',
+        content: '<p>Original content</p>'
+      });
+
+      // Create source note with a link
+      const sourceNote: Note = await noteManager.createNote({
+        title: 'Source',
+        content: `<p>Link to <span data-note-link data-note-id="${targetNote.id}" data-note-title="Target">Target</span></p>`
+      });
+
+      const originalContent = sourceNote.content;
+
+      // Update target note's content (not title)
+      await noteManager.updateNote(targetNote.id, { content: '<p>New content</p>' });
+
+      // Wait a bit
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Source note should not have changed
+      const updatedSource = noteManager.getNote(sourceNote.id);
+      expect(updatedSource?.content).toBe(originalContent);
+    });
+  });
 });

@@ -402,6 +402,14 @@ export class NoteManager {
 
     this.notify('note-updated', { note: updatedNote, updates });
 
+    // If the title changed, update all links pointing to this note
+    if (updates.title !== undefined) {
+      // Wait for link updates to complete to ensure consistency
+      await this.updateLinksToNote(id, updates.title).catch(err => {
+        console.error('[Link Update] Error updating links:', err);
+      });
+    }
+
     return updatedNote;
   }
 
@@ -593,5 +601,95 @@ export class NoteManager {
     };
 
     return addCounts(tree);
+  }
+
+  /**
+   * Find all notes that contain links to a specific note
+   * @param targetNoteId - The note ID to search for in links
+   * @returns Array of note IDs that link to the target note
+   */
+  findNotesLinkingTo(targetNoteId: string): string[] {
+    const linkingNotes: string[] = [];
+
+    // In web mode, search in HTML content
+    if (!this.isElectron) {
+      for (const [noteId, note] of this.notes.entries()) {
+        // Skip deleted notes
+        if (note.deleted) continue;
+
+        if (note.content) {
+          // Check if content contains a link to the target note
+          // Links are stored as: <span data-note-link data-note-id="targetId" data-note-title="title">text</span>
+          const linkPattern = new RegExp(`data-note-id="${targetNoteId}"`, 'i');
+          if (linkPattern.test(note.content)) {
+            linkingNotes.push(noteId);
+          }
+        }
+      }
+    } else {
+      // In Electron mode, check CRDT documents
+      if (this.syncManager) {
+        return this.syncManager.crdtManager.findNotesLinkingTo(targetNoteId);
+      }
+    }
+
+    return linkingNotes;
+  }
+
+  /**
+   * Update all links to a note with a new title
+   * @param targetNoteId - The note ID whose links should be updated
+   * @param newTitle - The new title to display in links
+   */
+  async updateLinksToNote(targetNoteId: string, newTitle: string): Promise<void> {
+    const linkingNotes = this.findNotesLinkingTo(targetNoteId);
+
+    console.log(`[Link Update] Found ${linkingNotes.length} notes linking to ${targetNoteId}, updating to title: "${newTitle}"`);
+
+    for (const noteId of linkingNotes) {
+      const note = this.notes.get(noteId);
+      if (!note || note.deleted) continue;
+
+      // In web mode, update HTML content
+      if (!this.isElectron && note.content) {
+        const updatedContent = this.updateLinkTextInHTML(note.content, targetNoteId, newTitle);
+        if (updatedContent !== note.content) {
+          await this.updateNote(noteId, { content: updatedContent });
+          console.log(`[Link Update] Updated links in note ${noteId}`);
+        }
+      } else if (this.isElectron && this.syncManager) {
+        // In Electron mode, update CRDT content using TipTap
+        this.syncManager.crdtManager.updateNoteLinkMarks(noteId, targetNoteId, newTitle);
+        // Flush the CRDT changes to disk
+        this.syncManager.updateStore.flush(noteId);
+        console.log(`[Link Update] Updated links in note ${noteId} (CRDT mode)`);
+      }
+    }
+  }
+
+  /**
+   * Update link text in HTML content
+   * @param htmlContent - HTML content containing note links
+   * @param targetNoteId - The note ID to find in links
+   * @param newTitle - The new title to set
+   * @returns Updated HTML content
+   */
+  private updateLinkTextInHTML(htmlContent: string, targetNoteId: string, newTitle: string): string {
+    // Parse HTML and update links
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+
+    // Find all note link spans with matching note ID
+    const links = doc.querySelectorAll(`span[data-note-link][data-note-id="${targetNoteId}"]`);
+
+    links.forEach(link => {
+      // Update the data-note-title attribute
+      link.setAttribute('data-note-title', newTitle);
+      // Update the text content
+      link.textContent = newTitle;
+    });
+
+    // Serialize back to HTML
+    return doc.body.innerHTML;
   }
 }

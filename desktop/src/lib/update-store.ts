@@ -220,7 +220,10 @@ export class UpdateStore {
       const result = await window.electronAPI?.fileSystem.readFile(metaPath);
 
       if (result?.success && result.content) {
-        const meta: MetaFile = JSON.parse(result.content);
+        // Decode Uint8Array to string for JSON parsing
+        const decoder = new TextDecoder();
+        const jsonString = decoder.decode(result.content);
+        const meta: MetaFile = JSON.parse(jsonString);
         state.writeCounter = meta.lastWrite || 0;
         state.seen = new Map(Object.entries(meta.seen || {}));
         console.log(`UpdateStore initialized for ${noteId}:`, {
@@ -421,7 +424,10 @@ export class UpdateStore {
           continue;
         }
 
-        const packedFile: PackedFile = JSON.parse(readResult.content);
+        // Decode Uint8Array to string for JSON parsing
+        const decoder = new TextDecoder();
+        const jsonString = decoder.decode(readResult.content);
+        const packedFile: PackedFile = JSON.parse(jsonString);
         const [fileStartSeq] = packedFile.sequence;
 
         // Read ALL updates from this file
@@ -521,7 +527,10 @@ export class UpdateStore {
           continue;
         }
 
-        const packedFile: PackedFile = JSON.parse(readResult.content);
+        // Decode Uint8Array to string for JSON parsing
+        const decoder = new TextDecoder();
+        const jsonString = decoder.decode(readResult.content);
+        const packedFile: PackedFile = JSON.parse(jsonString);
 
         // Extract updates we haven't seen
         const [fileStartSeq] = packedFile.sequence;

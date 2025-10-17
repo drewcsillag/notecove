@@ -13,6 +13,7 @@ import { TaskItem } from './extensions/task-item';
 import { ResizableImage } from './extensions/resizable-image';
 import { NoteLink } from './extensions/note-link';
 import { initTableResizing } from './table-resize';
+import type { AttachmentManager } from './attachment-manager';
 
 export interface NoteCoveEditorOptions {
   autofocus?: boolean;
@@ -26,6 +27,8 @@ export interface NoteCoveEditorOptions {
   onNavigateToNote?: (noteId: string | null, noteTitle: string) => void;
   onFindNoteByTitle?: (title: string) => { id: string; title: string } | null;
   onValidateNoteLink?: (noteId: string | null, title: string) => boolean;
+  onSearchNotes?: (query: string) => { id: string; title: string }[];
+  attachmentManager?: AttachmentManager;
 }
 
 interface FormatState {
@@ -134,6 +137,9 @@ export class NoteCoveEditor {
         validateNoteLink: (noteId: string | null, title: string) => {
           return this.options.onValidateNoteLink(noteId, title);
         },
+        searchNotes: this.options.onSearchNotes ? (query: string) => {
+          return this.options.onSearchNotes!(query);
+        } : undefined,
       }),
       TaskList,
       TaskItem.configure({
@@ -142,6 +148,8 @@ export class NoteCoveEditor {
       ResizableImage.configure({
         inline: true,
         allowBase64: true,
+        attachmentManager: this.options.attachmentManager,
+        currentNoteId: () => this.currentNoteId,
       }),
       Table.configure({
         resizable: true,
@@ -260,11 +268,25 @@ export class NoteCoveEditor {
    * it inserts an H1 heading followed by a paragraph
    */
   private initializeNewNoteStructure(): void {
-    // Only initialize if document is completely empty
-    if (!this.editor.isEmpty) {
+    console.log('[Editor] initializeNewNoteStructure called - isBindingDocument:', this._isBindingDocument, 'isEmpty:', this.editor?.isEmpty);
+
+    // TEMPORARILY DISABLED - testing if this is causing image loss
+    return;
+
+    // Don't initialize if we're binding to an existing Y.Doc
+    // The Collaboration extension will load content from the Y.Doc asynchronously
+    if (this._isBindingDocument) {
+      console.log('[Editor] Skipping initialization because we are binding to existing Y.Doc');
       return;
     }
 
+    // Only initialize if document is completely empty
+    if (!this.editor.isEmpty) {
+      console.log('[Editor] Skipping initialization because editor is not empty');
+      return;
+    }
+
+    console.log('[Editor] Initializing new note structure with <h1></h1><p></p>');
     // Insert H1 for title, followed by paragraph for body
     this.editor.commands.setContent('<h1></h1><p></p>');
 
@@ -283,8 +305,31 @@ export class NoteCoveEditor {
       return;
     }
 
+    // DEBUG: Log the OLD Y.Doc before we switch
+    if (this.yDoc && this.currentNoteId) {
+      const oldYContent = this.yDoc.getXmlFragment('default');
+      console.log(`[Editor] setDocument - OLD Y.Doc (${this.currentNoteId}) before destroy:`, {
+        length: oldYContent.length,
+        hasImage: oldYContent.toString().includes('<image'),
+        preview: oldYContent.toString().substring(0, 200)
+      });
+    }
+
+    const oldYDoc = this.yDoc;
+    const oldNoteId = this.currentNoteId;
+
     this.yDoc = yDoc;
     this.currentNoteId = noteId;
+
+    console.log(`[Editor] setDocument - Switching from ${oldNoteId} to ${noteId}`);
+
+    // DEBUG: Check NEW Y.Doc BEFORE binding to editor
+    const newYContent = yDoc.getXmlFragment('default');
+    console.log(`[Editor] setDocument - NEW Y.Doc (${noteId}) BEFORE editor binding:`, {
+      length: newYContent.length,
+      hasImage: newYContent.toString().includes('<image'),
+      preview: newYContent.toString().substring(0, 300)
+    });
 
     // Set flag to prevent updates during editor recreation
     this._isBindingDocument = true;
@@ -292,7 +337,19 @@ export class NoteCoveEditor {
     // Need to destroy and recreate editor with new Y.Doc
     // TipTap Collaboration extension doesn't support changing documents dynamically
     if (this.editor) {
+      console.log('[Editor] setDocument - About to destroy editor');
       this.editor.destroy();
+      console.log('[Editor] setDocument - Editor destroyed');
+    }
+
+    // DEBUG: Check if OLD Y.Doc was corrupted during editor destruction
+    if (oldYDoc && oldNoteId) {
+      const oldYContent = oldYDoc.getXmlFragment('default');
+      console.log(`[Editor] setDocument - OLD Y.Doc (${oldNoteId}) AFTER destroy:`, {
+        length: oldYContent.length,
+        hasImage: oldYContent.toString().includes('<image'),
+        preview: oldYContent.toString().substring(0, 200)
+      });
     }
 
     if (this.cleanupTableResizing) {
@@ -302,6 +359,14 @@ export class NoteCoveEditor {
 
     this.isReady = false;
     this.initializeEditor();
+
+    // DEBUG: Check NEW Y.Doc AFTER editor initialization
+    const newYContentAfter = yDoc.getXmlFragment('default');
+    console.log(`[Editor] setDocument - NEW Y.Doc (${noteId}) AFTER editor binding:`, {
+      length: newYContentAfter.length,
+      hasImage: newYContentAfter.toString().includes('<image'),
+      preview: newYContentAfter.toString().substring(0, 300)
+    });
   }
 
   /**
@@ -522,20 +587,60 @@ export class NoteCoveEditor {
           const file = item.getAsFile();
           if (!file) continue;
 
-          // Convert to base64
-          const reader = new FileReader();
-          reader.onload = (e: ProgressEvent<FileReader>) => {
-            const base64 = e.target?.result as string;
+          // In Electron mode with AttachmentManager, save as attachment
+          if (this.options.attachmentManager && this.currentNoteId) {
+            try {
+              // Read file as Uint8Array (browser-compatible)
+              const arrayBuffer = await file.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
 
-            // Insert using structured content (not HTML string) to ensure Y.Doc sync
-            this.editor.commands.insertContent({
-              type: 'image',
-              attrs: {
-                src: base64
-              }
-            });
-          };
-          reader.readAsDataURL(file);
+              // Save as attachment
+              const attachment = await this.options.attachmentManager.saveAttachment(
+                this.currentNoteId,
+                file.name || `pasted-image-${Date.now()}.png`,
+                uint8Array
+              );
+
+              console.log('[Editor] Saved pasted image as attachment:', attachment.id);
+
+              // Insert with attachment reference and explicit placeholder src
+              // IMPORTANT: src is required by TipTap Image extension - Y.js won't apply defaults during sync
+              this.editor.commands.insertContent({
+                type: 'image',
+                attrs: {
+                  attachmentId: attachment.id,
+                  src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect fill="transparent" width="1" height="1"/></svg>'
+                }
+              });
+            } catch (err) {
+              console.error('[Editor] Failed to save pasted image as attachment:', err);
+              // Fall back to base64 if attachment save fails
+              const reader = new FileReader();
+              reader.onload = (e: ProgressEvent<FileReader>) => {
+                const base64 = e.target?.result as string;
+                this.editor.commands.insertContent({
+                  type: 'image',
+                  attrs: {
+                    src: base64
+                  }
+                });
+              };
+              reader.readAsDataURL(file);
+            }
+          } else {
+            // Non-Electron mode or no attachment manager - use base64
+            const reader = new FileReader();
+            reader.onload = (e: ProgressEvent<FileReader>) => {
+              const base64 = e.target?.result as string;
+              this.editor.commands.insertContent({
+                type: 'image',
+                attrs: {
+                  src: base64
+                }
+              });
+            };
+            reader.readAsDataURL(file);
+          }
           break;
         }
       }
@@ -556,20 +661,60 @@ export class NoteCoveEditor {
       const file = target.files?.[0];
       if (!file) return;
 
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = (event: ProgressEvent<FileReader>) => {
-        const base64 = event.target?.result as string;
+      // In Electron mode with AttachmentManager, save as attachment
+      if (this.options.attachmentManager && this.currentNoteId) {
+        try {
+          // Read file as Uint8Array (browser-compatible)
+          const arrayBuffer = await file.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
 
-        // Insert using structured content (not HTML string) to ensure proper Y.Doc sync
-        this.editor.commands.insertContent({
-          type: 'image',
-          attrs: {
-            src: base64
-          }
-        });
-      };
-      reader.readAsDataURL(file);
+          // Save as attachment
+          const attachment = await this.options.attachmentManager.saveAttachment(
+            this.currentNoteId,
+            file.name,
+            uint8Array
+          );
+
+          console.log('[Editor] Saved selected image as attachment:', attachment.id);
+
+          // Insert with attachment reference and explicit placeholder src
+          // IMPORTANT: src is required by TipTap Image extension - Y.js won't apply defaults during sync
+          this.editor.commands.insertContent({
+            type: 'image',
+            attrs: {
+              attachmentId: attachment.id,
+              src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect fill="transparent" width="1" height="1"/></svg>'
+            }
+          });
+        } catch (err) {
+          console.error('[Editor] Failed to save selected image as attachment:', err);
+          // Fall back to base64 if attachment save fails
+          const reader = new FileReader();
+          reader.onload = (event: ProgressEvent<FileReader>) => {
+            const base64 = event.target?.result as string;
+            this.editor.commands.insertContent({
+              type: 'image',
+              attrs: {
+                src: base64
+              }
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      } else {
+        // Non-Electron mode or no attachment manager - use base64
+        const reader = new FileReader();
+        reader.onload = (event: ProgressEvent<FileReader>) => {
+          const base64 = event.target?.result as string;
+          this.editor.commands.insertContent({
+            type: 'image',
+            attrs: {
+              src: base64
+            }
+          });
+        };
+        reader.readAsDataURL(file);
+      }
     };
 
     input.click();

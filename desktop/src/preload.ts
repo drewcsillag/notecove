@@ -2,8 +2,8 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 // Type definitions for the Electron API exposed to the renderer
 interface FileSystemAPI {
-  readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>;
-  writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>;
+  readFile: (path: string) => Promise<{ success: boolean; content?: Uint8Array; error?: string }>;
+  writeFile: (path: string, content: string | Uint8Array) => Promise<{ success: boolean; error?: string }>;
   exists: (path: string) => Promise<boolean>;
   readDir: (path: string) => Promise<{ success: boolean; files?: string[]; error?: string }>;
   mkdir: (path: string) => Promise<{ success: boolean; error?: string }>;

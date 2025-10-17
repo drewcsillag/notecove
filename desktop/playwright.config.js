@@ -23,6 +23,15 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'electron',
+      testDir: './tests/e2e-electron',
+      // Electron tests don't need a web server
+      use: {
+        // Electron-specific settings
+        viewport: null, // Electron manages its own window
+      },
     }
   ],
 
@@ -30,5 +39,7 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
+    // Only start web server for chromium tests, not electron
+    timeout: 120 * 1000,
   },
 });

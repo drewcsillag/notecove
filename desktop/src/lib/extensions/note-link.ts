@@ -2,12 +2,20 @@ import { Mark, mergeAttributes } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Suggestion } from '@tiptap/suggestion';
+import { createNoteLinkSuggestion, type NoteSuggestion } from './note-link-suggestion';
 
 export interface NoteLinkOptions {
   HTMLAttributes: Record<string, any>;
   onNavigate?: (noteId: string, title: string) => void;
   findNoteByTitle?: (title: string) => { id: string; title: string } | null;
   validateNoteLink?: (noteId: string | null, title: string) => boolean;
+  /**
+   * Function to search for notes matching a query (for autocomplete)
+   * @param query - The search string
+   * @returns Array of matching notes
+   */
+  searchNotes?: (query: string) => NoteSuggestion[];
 }
 
 declare module '@tiptap/core' {
@@ -32,6 +40,7 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
       onNavigate: undefined,
       findNoteByTitle: undefined,
       validateNoteLink: undefined,
+      searchNotes: undefined,
     };
   },
 
@@ -103,12 +112,28 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
     const onNavigate = this.options.onNavigate;
     const findNoteByTitle = this.options.findNoteByTitle;
     const validateNoteLink = this.options.validateNoteLink;
+    const searchNotes = this.options.searchNotes;
 
-    return [
-      // Input rule plugin to detect [[...]] as user types
+    const plugins: Plugin[] = [];
+
+    // Add autocomplete suggestion plugin if searchNotes is provided
+    if (searchNotes) {
+      plugins.push(
+        Suggestion({
+          editor: this.editor,
+          ...createNoteLinkSuggestion({
+            searchNotes,
+          }),
+        })
+      );
+    }
+
+    // Add input handler and click handler plugin
+    plugins.push(
       new Plugin({
         key: new PluginKey('noteLinkInput'),
         props: {
+          // Handle manual typing of [[Note Title]]
           handleTextInput(view, from, to, text) {
             const { state, dispatch } = view;
             const { tr } = state;
@@ -182,9 +207,11 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
             return false;
           },
         },
-      }),
+      })
+    );
 
-      // Decoration plugin to mark broken links
+    // Add validation/decoration plugin for broken links
+    plugins.push(
       new Plugin({
         key: new PluginKey('noteLinkValidation'),
         state: {
@@ -201,8 +228,10 @@ export const NoteLink = Mark.create<NoteLinkOptions>({
             return this.getState(state);
           }
         }
-      }),
-    ];
+      })
+    );
+
+    return plugins;
   },
 });
 

@@ -4,6 +4,7 @@
  */
 import { CRDTManager } from './crdt-manager';
 import { UpdateStore } from './update-store';
+import { AttachmentManager } from './attachment-manager';
 import { generateUUID, type Note } from './utils';
 import type { NoteManager } from './note-manager';
 import * as Y from 'yjs';
@@ -30,6 +31,7 @@ export class SyncManager {
   crdtManager: CRDTManager;
   instanceId: string;
   updateStore: UpdateStore;
+  attachmentManager: AttachmentManager;
   initializedNotes: Set<string>;
   syncInterval: NodeJS.Timeout | null;
 
@@ -54,6 +56,47 @@ export class SyncManager {
       notesPath: this.notesPath
     };
     this.updateStore = new UpdateStore(storageInterface, this.instanceId);
+
+    // Create AttachmentManager (pass full storage interface with file operations)
+    const attachmentStorageInterface = {
+      isElectron: this.isElectron,
+      notesPath: this.notesPath,
+      readFile: async (path: string): Promise<Uint8Array> => {
+        if (!this.isElectron) throw new Error('File operations only available in Electron');
+        const result = await window.electronAPI.fileSystem.readFile(path);
+        if (!result.success || !result.content) {
+          throw new Error(result.error || 'Failed to read file');
+        }
+        // Electron serializes Uint8Array as {type: 'Buffer', data: [...]}
+        // Convert it back to Uint8Array
+        if (result.content && typeof result.content === 'object' && 'type' in result.content && result.content.type === 'Buffer') {
+          return new Uint8Array((result.content as any).data);
+        }
+        return result.content;
+      },
+      writeFile: async (path: string, data: Uint8Array): Promise<void> => {
+        if (!this.isElectron) throw new Error('File operations only available in Electron');
+        // Electron IPC can handle Uint8Array directly
+        await window.electronAPI.fileSystem.writeFile(path, data);
+      },
+      exists: async (path: string) => {
+        if (!this.isElectron) throw new Error('File operations only available in Electron');
+        return await window.electronAPI.fileSystem.exists(path);
+      },
+      mkdir: async (path: string) => {
+        if (!this.isElectron) throw new Error('File operations only available in Electron');
+        await window.electronAPI.fileSystem.mkdir(path);
+      },
+      deleteFile: async (path: string) => {
+        if (!this.isElectron) throw new Error('File operations only available in Electron');
+        await window.electronAPI.fileSystem.deleteFile(path);
+      },
+      readDir: async (path: string) => {
+        if (!this.isElectron) throw new Error('File operations only available in Electron');
+        return await window.electronAPI.fileSystem.readDir(path);
+      }
+    };
+    this.attachmentManager = new AttachmentManager(attachmentStorageInterface);
 
     // Track which notes are initialized with UpdateStore
     this.initializedNotes = new Set();
@@ -640,6 +683,15 @@ export class SyncManager {
         }
       }
       console.log(`[📥 LOAD] All updates applied for note ${noteId}`);
+
+      // DEBUG: Check content Y.Doc AFTER applying all updates
+      const contentDocAfterLoad = this.crdtManager.getContentDoc(noteId);
+      const yContentAfterLoad = contentDocAfterLoad.getXmlFragment('default');
+      console.log(`[📥 LOAD] Content Y.Doc after loading all updates:`, {
+        length: yContentAfterLoad.length,
+        hasImage: yContentAfterLoad.toString().includes('<image'),
+        preview: yContentAfterLoad.toString().substring(0, 300)
+      });
 
       // Check metadata AFTER applying all updates
       const metadataDoc = this.crdtManager.getMetadataDoc(noteId);

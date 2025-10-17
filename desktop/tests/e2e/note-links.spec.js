@@ -196,6 +196,68 @@ test.describe('Note Linking Functionality', () => {
       // The key test is that we navigated to the note with "Target content"
       expect(content).toContain('Target content');
     });
+
+    test('should update link text when linked note title changes', async ({ page }) => {
+      // Create target note
+      await page.locator('#newNoteBtn').click();
+      const editor = page.locator('#editor .ProseMirror');
+      await expect(editor).toBeFocused({ timeout: 5000 });
+      await page.waitForTimeout(500);
+
+      await page.keyboard.type('Original Title');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('Target content here');
+      await page.waitForTimeout(1500);
+
+      // Create source note with link to target
+      await page.keyboard.press('Control+n');
+      await expect(editor).toBeFocused({ timeout: 5000 });
+      await page.waitForTimeout(500);
+
+      await page.keyboard.type('Source Note');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('Check out [[Original Title]]');
+      await page.waitForTimeout(1500);
+
+      // Get source note ID for later
+      const sourceNoteId = await page.evaluate(() => {
+        const notes = JSON.parse(localStorage.getItem('notecove-notes') || '[]');
+        return notes.find(n => n.title === 'Source Note')?.id;
+      });
+
+      // Get target note ID
+      const targetNoteId = await page.evaluate(() => {
+        const notes = JSON.parse(localStorage.getItem('notecove-notes') || '[]');
+        return notes.find(n => n.title === 'Original Title')?.id;
+      });
+
+      // Switch to target note and rename it
+      await page.locator(`.note-item[data-note-id="${targetNoteId}"]`).click();
+      await page.waitForTimeout(500);
+
+      // Update the note content using fill (more reliable than keyboard typing)
+      await editor.fill('New Title\n\nTarget content here');
+      await page.waitForTimeout(2000);
+
+      // Wait for async link update to complete
+      await page.waitForTimeout(1000);
+
+      // Switch back to source note
+      await page.locator(`.note-item[data-note-id="${sourceNoteId}"]`).click();
+      await page.waitForTimeout(500);
+
+      // Verify the link text has been updated
+      const link = page.locator('#editor span[data-note-link]');
+      await expect(link).toHaveText('New Title');
+
+      // Verify the data-note-title attribute has been updated
+      await expect(link).toHaveAttribute('data-note-title', 'New Title');
+
+      // Verify old title is not present
+      const editorContent = await editor.textContent();
+      expect(editorContent).not.toContain('Original Title');
+      expect(editorContent).toContain('New Title');
+    });
   });
 
   test.describe('Phase 2: Robustness - Broken Link Detection', () => {

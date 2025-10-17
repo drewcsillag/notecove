@@ -124,6 +124,12 @@ class NoteCoveApp {
     // Initialize sync manager (will reload notes from CRDT in Electron mode, or check for sample notes in web mode)
     await this.initializeSyncManager();
 
+    // Now that syncManager is initialized, update editor with attachmentManager
+    if (this.editor && this.syncManager) {
+      (this.editor as any).options.attachmentManager = this.syncManager.attachmentManager;
+      console.log('[renderer] AttachmentManager connected to editor');
+    }
+
     // Update UI after notes are loaded
     this.updateUI();
     this.renderFolderTree();
@@ -146,7 +152,9 @@ class NoteCoveApp {
       isSettingContent: () => this.isSettingContent,
       onNavigateToNote: (noteId: string | null, noteTitle: string) => this.handleNoteLinkClick(noteId, noteTitle),
       onFindNoteByTitle: (title: string) => this.findNoteByTitle(title),
-      onValidateNoteLink: (noteId: string | null, title: string) => this.validateNoteLink(noteId, title)
+      onValidateNoteLink: (noteId: string | null, title: string) => this.validateNoteLink(noteId, title),
+      onSearchNotes: (query: string) => this.searchNotes(query),
+      attachmentManager: this.syncManager?.attachmentManager
     });
 
     // Setup the formatting toolbar
@@ -1103,6 +1111,12 @@ class NoteCoveApp {
     const previousNote = this.currentNote;
     console.log('[createNewNote] Previous note was:', previousNote?.id, previousNote?.title);
 
+    // Save the current note before creating a new one (critical for Electron mode)
+    if (previousNote) {
+      console.log('[createNewNote] Saving previous note before switching...');
+      await this.saveCurrentNote();
+    }
+
     // Create note in the currently selected folder
     // IMPORTANT: Await to ensure CRDT initialization completes before rendering
     const newNote = await this.noteManager!.createNote({
@@ -1347,6 +1361,74 @@ class NoteCoveApp {
   }
 
   /**
+   * Search for notes matching a query string (for autocomplete)
+   * Returns notes sorted by relevance
+   */
+  searchNotes(query: string): { id: string; title: string }[] {
+    if (!this.noteManager) return [];
+
+    console.log('[searchNotes] Query:', JSON.stringify(query), 'Length:', query.length);
+
+    const lowerQuery = query.toLowerCase().trim();
+    if (!lowerQuery) {
+      // No query - return recent notes
+      const notes = this.noteManager.getAllNotes();
+      const results = notes
+        .filter(note => !note.deleted)
+        .sort((a, b) => new Date(b.modified || b.created).getTime() - new Date(a.modified || a.created).getTime())
+        .slice(0, 10)
+        .map(note => ({ id: note.id, title: note.title }));
+      console.log('[searchNotes] No query - returning', results.length, 'recent notes');
+      return results;
+    }
+
+    // Search for notes matching the query
+    const notes = this.noteManager.getAllNotes();
+    console.log('[searchNotes] Searching', notes.length, 'notes for:', lowerQuery);
+    const matches = notes
+      .filter(note => {
+        if (note.deleted) return false;
+        return note.title.toLowerCase().includes(lowerQuery);
+      })
+      .map(note => {
+        // Calculate relevance score
+        const titleLower = note.title.toLowerCase();
+        let score = 0;
+
+        // Exact match gets highest score
+        if (titleLower === lowerQuery) {
+          score = 1000;
+        }
+        // Starts with query gets high score
+        else if (titleLower.startsWith(lowerQuery)) {
+          score = 100;
+        }
+        // Contains query gets medium score
+        else {
+          score = 10;
+        }
+
+        // Boost score for recently modified notes
+        const daysSinceModified = (Date.now() - new Date(note.modified || note.created).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceModified < 7) {
+          score += 5;
+        }
+
+        return {
+          id: note.id,
+          title: note.title,
+          score
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map(({ id, title }) => ({ id, title }));
+
+    console.log('[searchNotes] Found', matches.length, 'matches:', matches.map(m => m.title));
+    return matches;
+  }
+
+  /**
    * Validate a note link (check if target note exists)
    * @param noteId - Note ID (preferred)
    * @param title - Note title (fallback)
@@ -1401,6 +1483,13 @@ class NoteCoveApp {
   async selectNote(noteId: string): Promise<void> {
     if (!this.noteManager) return;
 
+    // Debug: Track where selectNote is being called from
+    const stack = new Error().stack?.split('\n').slice(2, 5).join('\n');
+    console.log(`[🔀 SELECT NOTE] Attempting to switch to: ${noteId}`, {
+      from: this.currentNote?.id,
+      stack
+    });
+
     // If this is already the current note, don't reload it
     // This prevents losing unsaved title/tag updates during debounce
     if (this.currentNote && this.currentNote.id === noteId) {
@@ -1421,16 +1510,15 @@ class NoteCoveApp {
       this.currentNote = note;
       this.isEditing = false; // Reset editing state when switching notes
 
-      // IMPORTANT: Load updates from disk BEFORE rendering
-      // But ONLY if the Y.Doc doesn't already exist in memory
-      // If it exists, rely on the sync cycle to apply any new updates
+      // IMPORTANT: Load from disk if Y.Doc doesn't exist yet
+      // Do NOT clear existing Y.Docs - Y.js updates are incremental diffs that need previous state
       if (this.isElectron && this.syncManager) {
-        const docAlreadyExists = this.syncManager.crdtManager.hasDoc(noteId);
-        if (!docAlreadyExists) {
+        const docExists = this.syncManager.crdtManager.hasDoc(noteId);
+        if (!docExists) {
           console.log(`[🔄 SWITCH] Y.Doc doesn't exist for ${noteId}, loading from disk...`);
           await this.syncManager.loadNote(noteId);
         } else {
-          console.log(`[🔄 SWITCH] Y.Doc already exists for ${noteId}, skipping loadNote()`);
+          console.log(`[🔄 SWITCH] Using existing Y.Doc for ${noteId}`);
         }
       }
 
@@ -1498,6 +1586,12 @@ class NoteCoveApp {
   restoreLastOpenedNote(): void {
     if (!this.noteManager) return;
 
+    // Don't restore if a note is already open (e.g., user just created a new note)
+    if (this.currentNote) {
+      console.log('[restoreLastOpenedNote] Skipping - note already open:', this.currentNote.id);
+      return;
+    }
+
     try {
       const stored = localStorage.getItem('notecove-last-opened-note');
 
@@ -1528,6 +1622,20 @@ class NoteCoveApp {
 
   async saveCurrentNote(): Promise<void> {
     if (this.currentNote && this.editor) {
+      console.log('[saveCurrentNote] Starting save for note:', this.currentNote.id);
+
+      // DEBUG: Check Y.Doc BEFORE save operations
+      if (this.syncManager) {
+        const yDoc = this.syncManager.crdtManager.getContentDoc(this.currentNote.id);
+        const yContent = yDoc.getXmlFragment('default');
+        console.log('[saveCurrentNote] Y.Doc BEFORE save:', {
+          noteId: this.currentNote.id,
+          length: yContent.length,
+          hasImage: yContent.toString().includes('<image'),
+          preview: yContent.toString().substring(0, 200)
+        });
+      }
+
       // Force immediate save of current content (don't wait for debounce)
       const text = this.editor.getText();
       const firstLine = text.split('\n')[0].trim();
@@ -1547,23 +1655,76 @@ class NoteCoveApp {
         const shouldUpdate = !(title === 'Untitled' && this.currentNote.title && this.currentNote.title !== 'Untitled');
 
         if (shouldUpdate) {
-          console.log(`[💾 SAVE] Saving note ${this.currentNote.id} - Title: "${title}"`);
-          // Update metadata in CRDT (this is the source of truth)
-          this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
-          // Update modified timestamp (safe to do after metadata update, won't interfere with TipTap)
-          this.syncManager.crdtManager.updateModifiedTimestamp(this.currentNote.id);
-          // Also update the in-memory note object
-          await this.noteManager!.updateNote(this.currentNote.id, { title, tags });
-          // Flush immediately to ensure metadata is saved - MUST await to prevent race condition
-          console.log(`[💾 SAVE] Flushing updates to disk...`);
-          await this.syncManager.updateStore.flush(this.currentNote.id);
-          console.log(`[💾 SAVE] Flush complete for note ${this.currentNote.id}`);
+          // Check if title or tags actually changed
+          const titleChanged = title !== this.currentNote.title;
+          const tagsChanged = JSON.stringify(tags) !== JSON.stringify(this.currentNote.tags);
+          const metadataChanged = titleChanged || tagsChanged;
+
+          console.log(`[💾 SAVE] Saving note ${this.currentNote.id} - Title: "${title}" (changed: ${metadataChanged})`);
+
+          if (metadataChanged) {
+            // DEBUG: Check Y.Doc BEFORE updateMetadata
+            const yDocBeforeMetadata = this.syncManager.crdtManager.getContentDoc(this.currentNote.id);
+            const yContentBeforeMetadata = yDocBeforeMetadata.getXmlFragment('default');
+            console.log('[💾 SAVE] Y.Doc before updateMetadata:', {
+              hasImage: yContentBeforeMetadata.toString().includes('<image')
+            });
+
+            // Update metadata in CRDT (this is the source of truth)
+            this.syncManager.crdtManager.updateMetadata(this.currentNote.id, { title, tags });
+
+            // DEBUG: Check Y.Doc AFTER updateMetadata
+            const yDocAfterMetadata = this.syncManager.crdtManager.getContentDoc(this.currentNote.id);
+            const yContentAfterMetadata = yDocAfterMetadata.getXmlFragment('default');
+            console.log('[💾 SAVE] Y.Doc after updateMetadata:', {
+              hasImage: yContentAfterMetadata.toString().includes('<image')
+            });
+
+            // Only update modified timestamp if metadata actually changed
+            this.syncManager.crdtManager.updateModifiedTimestamp(this.currentNote.id);
+
+            // DEBUG: Check Y.Doc AFTER updateModifiedTimestamp
+            const yDocAfterTimestamp = this.syncManager.crdtManager.getContentDoc(this.currentNote.id);
+            const yContentAfterTimestamp = yDocAfterTimestamp.getXmlFragment('default');
+            console.log('[💾 SAVE] Y.Doc after updateModifiedTimestamp:', {
+              hasImage: yContentAfterTimestamp.toString().includes('<image')
+            });
+
+            // Update the in-memory note object WITHOUT calling updateMetadata again
+            // (we already updated metadata above - calling updateNote would duplicate it)
+            const note = this.noteManager!.notes.get(this.currentNote.id);
+            if (note) {
+              note.title = title;
+              note.tags = tags;
+              note.modified = new Date().toISOString(); // Update in-memory timestamp to match CRDT
+              this.noteManager!.notes.set(this.currentNote.id, note);
+            }
+
+            // Flush immediately to ensure metadata is saved - MUST await to prevent race condition
+            console.log(`[💾 SAVE] Flushing updates to disk...`);
+            await this.syncManager.updateStore.flush(this.currentNote.id);
+            console.log(`[💾 SAVE] Flush complete for note ${this.currentNote.id}`);
+          } else {
+            console.log(`[💾 SAVE] No changes detected, skipping metadata update for ${this.currentNote.id}`);
+          }
         }
       } else {
         // Web mode: save content as HTML
         const content = this.editor.getContent();
         this.currentNote.content = content;
         await this.noteManager!.updateNote(this.currentNote.id, { title, content, tags });
+      }
+
+      // DEBUG: Check Y.Doc AFTER save operations
+      if (this.syncManager) {
+        const yDoc = this.syncManager.crdtManager.getContentDoc(this.currentNote.id);
+        const yContent = yDoc.getXmlFragment('default');
+        console.log('[saveCurrentNote] Y.Doc AFTER save:', {
+          noteId: this.currentNote.id,
+          length: yContent.length,
+          hasImage: yContent.toString().includes('<image'),
+          preview: yContent.toString().substring(0, 200)
+        });
       }
 
       this.updateStatus('Saved');

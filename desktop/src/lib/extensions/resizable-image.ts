@@ -1,17 +1,58 @@
 import Image from '@tiptap/extension-image';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { AttachmentManager } from '../attachment-manager';
 
 type HandlePosition = 'nw' | 'ne' | 'sw' | 'se';
 
+export interface ResizableImageOptions {
+  attachmentManager?: AttachmentManager;
+  currentNoteId?: () => string | null;
+}
+
 /**
  * Custom Image extension with resize handles that maintain aspect ratio
+ * Supports both base64 images (legacy) and attachment references (new)
  */
-export const ResizableImage = Image.extend({
+export const ResizableImage = Image.extend<ResizableImageOptions>({
   name: 'image',
+
+  addOptions() {
+    return {
+      ...this.parent?.(),
+      attachmentManager: undefined,
+      currentNoteId: () => null,
+    };
+  },
 
   addAttributes() {
     return {
       ...this.parent?.(),
+      // src attribute - optional when attachmentId is present
+      src: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('src'),
+        renderHTML: (attributes: { src?: string | null }) => {
+          if (!attributes.src) {
+            return {};
+          }
+          return {
+            src: attributes.src,
+          };
+        },
+      },
+      // Attachment ID - if present, load image from attachments folder
+      attachmentId: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-attachment-id'),
+        renderHTML: (attributes: { attachmentId?: string | null }) => {
+          if (!attributes.attachmentId) {
+            return {};
+          }
+          return {
+            'data-attachment-id': attributes.attachmentId,
+          };
+        },
+      },
       width: {
         default: null,
         parseHTML: (element: HTMLElement) => element.getAttribute('width'),
@@ -45,9 +86,54 @@ export const ResizableImage = Image.extend({
       container.classList.add('image-container');
 
       const img = document.createElement('img');
-      img.src = node.attrs.src;
       img.alt = node.attrs.alt || '';
       img.title = node.attrs.title || '';
+
+      // Load image source - either from attachment or direct src
+      const loadImageSrc = async () => {
+        const { attachmentId, src } = node.attrs;
+        const attachmentManager = this.options.attachmentManager;
+        const getCurrentNoteId = this.options.currentNoteId;
+
+        // Priority 1: Load from attachment if attachmentId is present
+        if (attachmentId && attachmentManager && getCurrentNoteId) {
+          const noteId = getCurrentNoteId();
+          console.log(`[ResizableImage] Loading attachment ${attachmentId} for note ${noteId}`);
+          if (noteId) {
+            try {
+              const dataURL = await attachmentManager.loadAttachmentAsDataURL(noteId, attachmentId);
+              if (dataURL) {
+                console.log(`[ResizableImage] Successfully loaded attachment ${attachmentId}, size: ${dataURL.length} bytes`);
+                img.src = dataURL;
+                return;
+              } else {
+                console.warn(`[ResizableImage] Attachment not found: ${attachmentId} for note ${noteId}`);
+              }
+            } catch (err) {
+              console.error(`[ResizableImage] Failed to load attachment ${attachmentId} for note ${noteId}:`, err);
+            }
+          } else {
+            console.warn(`[ResizableImage] noteId is null, cannot load attachment ${attachmentId}`);
+          }
+        } else {
+          console.log(`[ResizableImage] Missing dependencies:`, {
+            hasAttachmentId: !!attachmentId,
+            hasAttachmentManager: !!attachmentManager,
+            hasGetCurrentNoteId: !!getCurrentNoteId
+          });
+        }
+
+        // Priority 2: Use direct src (base64 or URL) - backward compatibility
+        if (src) {
+          img.src = src;
+        } else {
+          // No src and attachment failed to load - show placeholder
+          img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="%23ddd" width="200" height="200"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">Image not found</text></svg>';
+        }
+      };
+
+      // Load image source asynchronously
+      loadImageSrc();
 
       // Apply stored dimensions
       if (node.attrs.width) {
@@ -219,9 +305,36 @@ export const ResizableImage = Image.extend({
             return false;
           }
 
-          img.src = updatedNode.attrs.src;
           img.alt = updatedNode.attrs.alt || '';
           img.title = updatedNode.attrs.title || '';
+
+          // Reload image source (may have changed from attachment to base64 or vice versa)
+          const reloadImageSrc = async () => {
+            const { attachmentId, src } = updatedNode.attrs;
+            const attachmentManager = this.options.attachmentManager;
+            const getCurrentNoteId = this.options.currentNoteId;
+
+            if (attachmentId && attachmentManager && getCurrentNoteId) {
+              const noteId = getCurrentNoteId();
+              if (noteId) {
+                try {
+                  const dataURL = await attachmentManager.loadAttachmentAsDataURL(noteId, attachmentId);
+                  if (dataURL) {
+                    img.src = dataURL;
+                  } else {
+                    if (src) img.src = src;
+                  }
+                } catch (err) {
+                  console.error(`[ResizableImage] Failed to reload attachment ${attachmentId}:`, err);
+                  if (src) img.src = src;
+                }
+              }
+            } else if (src) {
+              img.src = src;
+            }
+          };
+
+          reloadImageSrc();
 
           if (updatedNode.attrs.width) {
             img.width = updatedNode.attrs.width;

@@ -273,22 +273,48 @@ class NoteCoveApp {
     // File system operations
     ipcMain.handle('fs:read-file', async (_event: IpcMainInvokeEvent, filePath: string): Promise<FileOperationResult> => {
       try {
-        const content = await fs.readFile(filePath, 'utf8');
+        // Read as Buffer, which Electron will serialize as Uint8Array
+        const buffer = await fs.readFile(filePath);
+        const content = new Uint8Array(buffer);
         return { success: true, content };
       } catch (error) {
         return { success: false, error: (error as Error).message };
       }
     });
 
-    ipcMain.handle('fs:write-file', async (_event: IpcMainInvokeEvent, filePath: string, content: string): Promise<FileOperationResult> => {
+    ipcMain.handle('fs:write-file', async (_event: IpcMainInvokeEvent, filePath: string, content: string | Uint8Array | any): Promise<FileOperationResult> => {
       try {
         // Ensure directory exists
         const dir = path.dirname(filePath);
         await fs.mkdir(dir, { recursive: true });
 
-        await fs.writeFile(filePath, content, 'utf8');
+        // Debug: log what we received
+        const isString = typeof content === 'string';
+        const isUint8Array = content instanceof Uint8Array;
+        const isBuffer = Buffer.isBuffer(content);
+        const contentType = isString ? 'string' : isUint8Array ? 'Uint8Array' : isBuffer ? 'Buffer' : typeof content;
+
+        console.log(`[IPC fs:write-file] ${path.basename(filePath)}:`, {
+          type: contentType,
+          length: content.length,
+          hasTypedArray: content?.constructor?.name
+        });
+
+        // Handle both string and binary data
+        if (typeof content === 'string') {
+          await fs.writeFile(filePath, content, 'utf8');
+        } else if (content instanceof Uint8Array || Buffer.isBuffer(content)) {
+          // Uint8Array or Buffer - write as binary
+          await fs.writeFile(filePath, Buffer.from(content));
+        } else if (content && typeof content === 'object' && content.type === 'Buffer' && Array.isArray(content.data)) {
+          // Electron serializes Uint8Array as {type: 'Buffer', data: [...]}
+          await fs.writeFile(filePath, Buffer.from(content.data));
+        } else {
+          throw new Error(`Unsupported content type: ${typeof content}`);
+        }
         return { success: true };
       } catch (error) {
+        console.error(`[IPC fs:write-file] Error writing ${filePath}:`, error);
         return { success: false, error: (error as Error).message };
       }
     });
