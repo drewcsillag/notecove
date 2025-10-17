@@ -208,7 +208,7 @@ class NoteCoveApp {
       },
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
       show: false, // Don't show until ready
-      icon: path.join(__dirname, '../assets/icon.png') // Will add icon later
+      icon: path.join(__dirname, '../assets/icon.png')
     });
 
     // Load the app
