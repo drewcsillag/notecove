@@ -434,4 +434,156 @@ test.describe('Tag Operations - Electron Mode (CRDT)', () => {
 
     console.log('[Test] Tags only detected in valid contexts');
   });
+
+  test('should filter tags by search query', async () => {
+    // Create notes with different tags
+    await window.click('#newNoteBtn');
+    const editor = window.locator('#editor .ProseMirror');
+    await editor.waitFor({ state: 'visible' });
+    await window.waitForTimeout(500);
+
+    await editor.fill('Note 1\n\n#project #work');
+    await window.waitForTimeout(1500);
+
+    await window.keyboard.press('Control+n');
+    await window.waitForTimeout(500);
+
+    await editor.fill('Note 2\n\n#personal #important');
+    await window.waitForTimeout(1500);
+
+    await window.keyboard.press('Control+n');
+    await window.waitForTimeout(500);
+
+    await editor.fill('Note 3\n\n#programming');
+    await window.waitForTimeout(1500);
+
+    // All tags should be visible initially (including any from welcome notes)
+    const allTagsVisible = await window.locator('.tag-item').count();
+    expect(allTagsVisible).toBeGreaterThanOrEqual(5); // At least our 5 test tags
+
+    // Search for "pro"
+    const tagSearchInput = window.locator('#tagSearchInput');
+    await tagSearchInput.fill('pro');
+    await window.waitForTimeout(500);
+
+    // Only project and programming should be visible
+    const filteredTagsCount = await window.locator('.tag-item').count();
+    expect(filteredTagsCount).toBe(2);
+
+    const projectVisible = await window.locator('.tag-item[data-tag="project"]').isVisible();
+    const programmingVisible = await window.locator('.tag-item[data-tag="programming"]').isVisible();
+    expect(projectVisible).toBe(true);
+    expect(programmingVisible).toBe(true);
+
+    // work should not be visible
+    const workVisible = await window.locator('.tag-item[data-tag="work"]').count();
+    expect(workVisible).toBe(0);
+
+    console.log('[Test] Tag search filters tags correctly');
+
+    // Clear search
+    await tagSearchInput.fill('');
+    await window.waitForTimeout(500);
+
+    // All tags should be visible again
+    const allTagsVisibleAgain = await window.locator('.tag-item').count();
+    expect(allTagsVisibleAgain).toBeGreaterThanOrEqual(5);
+
+    console.log('[Test] Clearing search shows all tags again');
+  });
+
+  test('should show and hide clear button based on filter state', async () => {
+    // Create a note with tags
+    await window.click('#newNoteBtn');
+    const editor = window.locator('#editor .ProseMirror');
+    await editor.waitFor({ state: 'visible' });
+    await window.waitForTimeout(500);
+
+    await editor.fill('Tagged Note\n\n#testing #features');
+    await window.waitForTimeout(2000);
+
+    // Clear button should not be visible initially
+    const clearBtn = window.locator('#clearTagFilterBtn');
+    let clearBtnVisible = await clearBtn.isVisible();
+    expect(clearBtnVisible).toBe(false);
+
+    console.log('[Test] Clear button hidden when no filter active');
+
+    // Click on a tag to activate filter
+    await window.click('.tag-item[data-tag="testing"]');
+    await window.waitForTimeout(500);
+
+    // Clear button should now be visible
+    clearBtnVisible = await clearBtn.isVisible();
+    expect(clearBtnVisible).toBe(true);
+
+    console.log('[Test] Clear button visible when filter active');
+
+    // Click clear button
+    await clearBtn.click();
+    await window.waitForTimeout(500);
+
+    // Clear button should be hidden again
+    clearBtnVisible = await clearBtn.isVisible();
+    expect(clearBtnVisible).toBe(false);
+
+    // All notes should be visible again
+    const notesCount = await window.locator('.note-item').count();
+    expect(notesCount).toBeGreaterThan(0);
+
+    console.log('[Test] Clear button clears filter and hides itself');
+  });
+
+  test('should clear tag filter without clearing search input', async () => {
+    // Create notes with tags
+    await window.click('#newNoteBtn');
+    const editor = window.locator('#editor .ProseMirror');
+    await editor.waitFor({ state: 'visible' });
+    await window.waitForTimeout(500);
+
+    await editor.fill('Note 1\n\n#alpha #beta');
+    await window.waitForTimeout(1500);
+
+    await window.keyboard.press('Control+n');
+    await window.waitForTimeout(500);
+
+    await editor.fill('Note 2\n\n#gamma');
+    await window.waitForTimeout(1500);
+
+    // Set a search query
+    const tagSearchInput = window.locator('#tagSearchInput');
+    await tagSearchInput.fill('alp');
+    await window.waitForTimeout(500);
+
+    // Only alpha should be visible
+    let visibleTags = await window.locator('.tag-item').count();
+    expect(visibleTags).toBe(1);
+
+    // Click on alpha tag to filter
+    await window.click('.tag-item[data-tag="alpha"]');
+    await window.waitForTimeout(500);
+
+    // Clear button should be visible
+    const clearBtn = window.locator('#clearTagFilterBtn');
+    let clearBtnVisible = await clearBtn.isVisible();
+    expect(clearBtnVisible).toBe(true);
+
+    // Click clear button
+    await clearBtn.click();
+    await window.waitForTimeout(500);
+
+    // Search input should still have "alp"
+    const searchValue = await tagSearchInput.inputValue();
+    expect(searchValue).toBe('alp');
+
+    // Only alpha should still be visible (search not cleared)
+    visibleTags = await window.locator('.tag-item').count();
+    expect(visibleTags).toBe(1);
+
+    // But filter should be cleared (all notes visible, including welcome notes)
+    const allNotesVisible = await window.locator('.note-item').count();
+    expect(allNotesVisible).toBeGreaterThanOrEqual(2); // At least our 2 test notes
+
+    console.log('[Test] Clear button does not clear search input');
+  });
 });

@@ -240,18 +240,27 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .tag-search-box {
-      padding: 8px 12px;
+    .tags-header-with-search {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: nowrap;
+    }
+
+    .tag-search-inline {
       position: relative;
-      border-bottom: 1px solid var(--border);
+      flex: 1;
+      min-width: 120px;
+      display: flex;
+      align-items: center;
     }
 
     .tag-search-input {
       width: 100%;
-      padding: 6px 10px 6px 28px;
+      padding: 4px 8px 4px 24px;
       border: 1px solid var(--border);
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 11px;
       background: var(--background);
       transition: border-color 0.2s;
     }
@@ -263,12 +272,27 @@
 
     .tag-search-icon {
       position: absolute;
-      left: 20px;
-      top: 50%;
-      transform: translateY(-50%);
+      left: 6px;
       color: var(--text-secondary);
-      font-size: 12px;
+      font-size: 11px;
       pointer-events: none;
+    }
+
+    .btn-clear-tag-filter {
+      padding: 4px 8px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text-primary);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .btn-clear-tag-filter:hover {
+      background: var(--background);
+      border-color: var(--border-focus);
     }
 
     .notes-section {
@@ -1400,15 +1424,15 @@
         </div>
 
         <div class="tags-section">
-          <div class="section-header">
+          <div class="section-header tags-header-with-search">
             <span class="section-title">Tags</span>
-            <button class="section-action" id="clearTagFilterBtn" title="Clear tag filter" style="display: none;">
-              ✕
+            <div class="tag-search-inline">
+              <div class="tag-search-icon">🔍</div>
+              <input type="text" class="tag-search-input" id="tagSearchInput" placeholder="Search tags...">
+            </div>
+            <button class="btn-clear-tag-filter" id="clearTagFilterBtn" style="display: none;">
+              Clear
             </button>
-          </div>
-          <div class="tag-search-box">
-            <div class="tag-search-icon">🔍</div>
-            <input type="text" class="tag-search-input" id="tagSearchInput" placeholder="Search tags...">
           </div>
           <div class="tags-list" id="tagsList">
             <!-- Tags will be populated here -->
