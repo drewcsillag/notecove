@@ -41,7 +41,7 @@ export class NoteManager {
       this.folderManager.updateStore = syncManager.updateStore;
       this.folderManager.notesPath = syncManager.notesPath;
       // Initialize folder CRDT document
-      await syncManager.updateStore.initialize('.folders');
+      await syncManager.updateStore.initialize('folders');
       // Reload folders with CRDT support
       await this.folderManager.loadCustomFolders();
     }
@@ -452,7 +452,7 @@ export class NoteManager {
       if (this.isElectron && this.syncManager) {
         try {
           // Delete the note directory from filesystem
-          const notePath = `${this.syncManager.notesPath}/${id}`;
+          const notePath = `${this.syncManager.notesPath}/notes/${id}`;
           const exists = await window.electronAPI?.fileSystem.exists(notePath);
 
           if (exists) {
@@ -494,6 +494,35 @@ export class NoteManager {
     this.notify('note-restored', { note: restoredNote });
 
     return restoredNote;
+  }
+
+  /**
+   * Empty trash - permanently delete all notes in trash
+   * @returns Number of notes deleted
+   */
+  async emptyTrash(): Promise<number> {
+    // Get all deleted notes
+    const deletedNotes = this.getDeletedNotes();
+
+    if (deletedNotes.length === 0) {
+      return 0;
+    }
+
+    console.log(`[NoteManager] Emptying trash: ${deletedNotes.length} notes`);
+
+    // Delete each note permanently
+    let deletedCount = 0;
+    for (const note of deletedNotes) {
+      const success = await this.permanentlyDeleteNote(note.id);
+      if (success) {
+        deletedCount++;
+      }
+    }
+
+    // Notify that trash was emptied
+    this.notify('trash-emptied', { count: deletedCount });
+
+    return deletedCount;
   }
 
   /**

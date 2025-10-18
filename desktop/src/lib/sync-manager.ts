@@ -307,14 +307,14 @@ export class SyncManager {
     if (!this.isElectron) return;
 
     try {
-      // Sync the .folders CRDT document just like any other note
-      const folderId = '.folders';
+      // Sync the folders CRDT document just like any other note
+      const folderId = 'folders';
 
       console.log('[syncFolders] Checking for folder changes...');
 
       // Initialize UpdateStore for folders if not done yet
       if (!this.initializedNotes.has(folderId)) {
-        console.log('[syncFolders] Initializing UpdateStore for .folders');
+        console.log('[syncFolders] Initializing UpdateStore for folders');
         await this.updateStore.initialize(folderId);
         this.initializedNotes.add(folderId);
       }
@@ -362,13 +362,14 @@ export class SyncManager {
       }
 
       // Check if notes directory exists
-      const exists = await window.electronAPI?.fileSystem.exists(this.notesPath);
+      const notesDir = `${this.notesPath}/notes`;
+      const exists = await window.electronAPI?.fileSystem.exists(notesDir);
       if (!exists) {
         return;
       }
 
       // Read all subdirectories (each is a note)
-      const result = await window.electronAPI?.fileSystem.readDir(this.notesPath);
+      const result = await window.electronAPI?.fileSystem.readDir(notesDir);
       if (!result || !result.success) {
         return;
       }
@@ -383,7 +384,7 @@ export class SyncManager {
         if (item.startsWith('.') || knownNoteIds.has(item)) continue;
 
         const noteId = item;
-        const noteDir = `${this.notesPath}/${noteId}`;
+        const noteDir = `${this.notesPath}/notes/${noteId}`;
 
         // Check if updates directory exists (indicates this is a real note)
         const updatesDir = `${noteDir}/updates`;
@@ -567,14 +568,15 @@ export class SyncManager {
       }
 
       // Check if notes directory exists
-      const exists = await window.electronAPI?.fileSystem.exists(this.notesPath);
+      const notesDir = `${this.notesPath}/notes`;
+      const exists = await window.electronAPI?.fileSystem.exists(notesDir);
       console.log('Notes directory exists:', exists);
       if (!exists) {
         return [];
       }
 
       // Read all subdirectories (each is a note)
-      const result = await window.electronAPI?.fileSystem.readDir(this.notesPath);
+      const result = await window.electronAPI?.fileSystem.readDir(notesDir);
       if (!result || !result.success) {
         console.error('Failed to read notes directory:', result?.error);
         return [];
@@ -593,7 +595,7 @@ export class SyncManager {
         const noteId = item;
         console.log(`Checking note directory: ${noteId}`);
 
-        const noteDir = `${this.notesPath}/${noteId}`;
+        const noteDir = `${this.notesPath}/notes/${noteId}`;
 
         // Check if updates directory exists (indicates this is a real note)
         const updatesDir = `${noteDir}/updates`;

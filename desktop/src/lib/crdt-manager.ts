@@ -627,7 +627,7 @@ export class CRDTManager {
    */
   isDocEmpty(noteId: string): boolean {
     // For folder documents, check the old single-doc structure
-    if (noteId === '.folders') {
+    if (noteId === 'folders') {
       if (!this.contentDocs.has(noteId)) {
         return true;
       }

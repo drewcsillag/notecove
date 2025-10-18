@@ -630,14 +630,31 @@ export class UpdateStore {
     if (!this.isElectron) return;
 
     const notesPath = this.fileStorage.notesPath;
-    const noteDir = `${notesPath}/${noteId}`;
-    const updatesDir = `${noteDir}/updates`;
-    const metaDir = `${noteDir}/meta`;
 
-    for (const dir of [noteDir, updatesDir, metaDir]) {
-      const exists = await window.electronAPI?.fileSystem.exists(dir);
-      if (!exists) {
-        await window.electronAPI?.fileSystem.mkdir(dir);
+    // Special case: folders metadata goes in top-level 'folders/' directory
+    if (noteId === 'folders') {
+      const noteDir = `${notesPath}/folders`;
+      const updatesDir = `${noteDir}/updates`;
+      const metaDir = `${noteDir}/meta`;
+
+      for (const dir of [noteDir, updatesDir, metaDir]) {
+        const exists = await window.electronAPI?.fileSystem.exists(dir);
+        if (!exists) {
+          await window.electronAPI?.fileSystem.mkdir(dir);
+        }
+      }
+    } else {
+      // Regular notes go in 'notes/' subdirectory
+      const notesDir = `${notesPath}/notes`;
+      const noteDir = `${notesDir}/${noteId}`;
+      const updatesDir = `${noteDir}/updates`;
+      const metaDir = `${noteDir}/meta`;
+
+      for (const dir of [notesDir, noteDir, updatesDir, metaDir]) {
+        const exists = await window.electronAPI?.fileSystem.exists(dir);
+        if (!exists) {
+          await window.electronAPI?.fileSystem.mkdir(dir);
+        }
       }
     }
   }
@@ -649,7 +666,11 @@ export class UpdateStore {
    */
   getMetaPath(noteId: string): string {
     const notesPath = this.fileStorage.notesPath;
-    return `${notesPath}/${noteId}/meta/${this.instanceId}.json`;
+    // Special case: folders metadata goes in top-level 'folders/' directory
+    if (noteId === 'folders') {
+      return `${notesPath}/folders/meta/${this.instanceId}.json`;
+    }
+    return `${notesPath}/notes/${noteId}/meta/${this.instanceId}.json`;
   }
 
   /**
@@ -659,7 +680,11 @@ export class UpdateStore {
    */
   getUpdatesDir(noteId: string): string {
     const notesPath = this.fileStorage.notesPath;
-    return `${notesPath}/${noteId}/updates`;
+    // Special case: folders metadata goes in top-level 'folders/' directory
+    if (noteId === 'folders') {
+      return `${notesPath}/folders/updates`;
+    }
+    return `${notesPath}/notes/${noteId}/updates`;
   }
 
   /**
@@ -724,7 +749,9 @@ export class UpdateStore {
     if (!this.isElectron) return [];
 
     try {
-      const metaDir = `${this.fileStorage.notesPath}/${noteId}/meta`;
+      // Use helper method to get correct path (handles folders vs notes distinction)
+      const metaPath = this.getMetaPath(noteId);
+      const metaDir = metaPath.substring(0, metaPath.lastIndexOf('/'));
       const result = await window.electronAPI?.fileSystem.readDir(metaDir);
 
       if (!result?.success) {

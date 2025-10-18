@@ -131,20 +131,20 @@ export class FolderManager {
         // IMPORTANT: Load updates from disk first before checking the Y.Doc
         // Otherwise the CRDT will be empty even if there are saved updates
         console.log('[FolderManager] Loading folder updates from disk...');
-        const updates = await this.updateStore.readAllUpdates('.folders');
+        const updates = await this.updateStore.readAllUpdates('folders');
         console.log(`[FolderManager] Found ${updates.length} total folder updates`);
 
         // Apply updates to CRDT
         if (updates.length > 0) {
           for (const { instanceId, sequence, update } of updates) {
-            this.crdtManager.applyUpdate('.folders', update, 'load');
+            this.crdtManager.applyUpdate('folders', update, 'load');
           }
           console.log('[FolderManager] Applied folder updates to CRDT');
         }
 
         // Now read from CRDT
-        const foldersDoc = this.crdtManager.getDoc('.folders');
-        if (!this.crdtManager.isDocEmpty('.folders')) {
+        const foldersDoc = this.crdtManager.getDoc('folders');
+        if (!this.crdtManager.isDocEmpty('folders')) {
           const yMap = foldersDoc.getMap('folders');
           storedFolders = [];
 
@@ -197,7 +197,7 @@ export class FolderManager {
       // Save to CRDT for multi-instance sync
       if (this.isElectron && this.crdtManager) {
         console.log('[FolderManager] Saving folders to CRDT...');
-        const foldersDoc = this.crdtManager.getDoc('.folders');
+        const foldersDoc = this.crdtManager.getDoc('folders');
 
         foldersDoc.transact(() => {
           const yMap = foldersDoc.getMap('folders');
@@ -235,7 +235,7 @@ export class FolderManager {
         // (Updates are automatically added to buffer by CRDT listener)
         if (this.updateStore) {
           console.log('[FolderManager] Flushing folder updates...');
-          await this.updateStore.flush('.folders');
+          await this.updateStore.flush('folders');
           console.log('[FolderManager] Flushed folder updates immediately');
         } else {
           console.log('[FolderManager] WARNING: No updateStore available for flush!');

@@ -94,11 +94,11 @@ describe('Folder Deletion Sync', () => {
     console.log('Created folder:', testFolder.id, testFolder.name);
 
     // Flush updates to disk
-    await syncManager1.updateStore.flush('.folders');
+    await syncManager1.updateStore.flush('folders');
     console.log('Flushed updates to disk');
 
     // Check that folder exists in CRDT
-    const yDoc1 = syncManager1.crdtManager.getDoc('.folders');
+    const yDoc1 = syncManager1.crdtManager.getDoc('folders');
     const yMap1 = yDoc1.getMap('folders');
     console.log('Y.Map has', yMap1.size, 'folders');
     expect(yMap1.has(testFolder.id)).toBe(true);
@@ -134,7 +134,7 @@ describe('Folder Deletion Sync', () => {
     console.log('Folder removed from Y.Map in instance 1');
 
     // Flush deletion to disk
-    await syncManager1.updateStore.flush('.folders');
+    await syncManager1.updateStore.flush('folders');
     console.log('Flushed deletion to disk');
 
     // ============================================================

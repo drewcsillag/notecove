@@ -941,7 +941,16 @@ class NoteCoveApp {
     // Check if we're in trash view
     const isTrashView = this.currentFolderId === 'trash';
 
-    notesList.innerHTML = filteredNotes.map(note => `
+    // Add Empty Trash button if in trash view and there are notes
+    const emptyTrashButton = isTrashView && filteredNotes.length > 0 ? `
+      <div style="padding: 8px; border-bottom: 1px solid var(--border-color);">
+        <button class="empty-trash-btn" onclick="app.emptyTrash()" style="width: 100%; padding: 8px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
+          Empty Trash (${filteredNotes.length})
+        </button>
+      </div>
+    ` : '';
+
+    notesList.innerHTML = emptyTrashButton + filteredNotes.map(note => `
       <div class="note-item ${this.currentNote?.id === note.id ? 'active' : ''}"
            ${!isTrashView ? 'draggable="true"' : 'draggable="true"'}
            data-note-id="${note.id}"
@@ -2227,6 +2236,27 @@ class NoteCoveApp {
     this.updateUI();
   }
 
+  async emptyTrash(): Promise<void> {
+    if (!this.noteManager) return;
+
+    const deletedNotes = this.noteManager.getDeletedNotes();
+    if (deletedNotes.length === 0) return;
+
+    const confirmed = await this.showConfirmDialog(
+      'Empty Trash',
+      `Permanently delete all ${deletedNotes.length} note${deletedNotes.length > 1 ? 's' : ''} in trash? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    const count = await this.noteManager.emptyTrash();
+    if (this.currentNote?.deleted) {
+      this.currentNote = null;
+    }
+    this.updateStatus(`Permanently deleted ${count} note${count > 1 ? 's' : ''}`);
+    this.updateUI();
+  }
+
   // Drag-and-drop handlers for notes
   handleNoteDragStart(e: DragEvent): void {
     const noteId = ((e.target as HTMLElement).closest('.note-item') as HTMLElement).dataset.noteId!;
@@ -2381,7 +2411,10 @@ class NoteCoveApp {
     if (!this.noteManager) return;
 
     const folder = this.noteManager.getFolderManager().getFolder(folderId);
-    if (!folder || folder.isSpecial || folder.isRoot) return;
+
+    // Allow context menu for trash folder, but not other special folders
+    if (!folder || folder.isRoot) return;
+    if (folder.isSpecial && folderId !== 'trash') return;
 
     this.contextMenuFolderId = folderId;
 
@@ -2393,14 +2426,32 @@ class NoteCoveApp {
     contextMenu.style.top = `${event.clientY}px`;
     contextMenu.style.display = 'block';
 
-    // Show/hide "Move to Root" option based on whether folder is nested
+    // Show/hide menu items based on folder type
+    const isTrash = folderId === 'trash';
+
+    // Hide standard folder options for trash
+    const renameItem = contextMenu.querySelector('[data-action="rename"]') as HTMLElement;
+    const deleteItem = contextMenu.querySelector('[data-action="delete"]') as HTMLElement;
     const moveToRootItem = contextMenu.querySelector('[data-action="move-to-root"]') as HTMLElement;
-    if (moveToRootItem) {
-      if (folder.parentId === 'root') {
-        moveToRootItem.classList.add('disabled');
-      } else {
-        moveToRootItem.classList.remove('disabled');
+    const emptyTrashItem = contextMenu.querySelector('[data-action="empty-trash"]') as HTMLElement;
+
+    if (isTrash) {
+      if (renameItem) renameItem.style.display = 'none';
+      if (deleteItem) deleteItem.style.display = 'none';
+      if (moveToRootItem) moveToRootItem.style.display = 'none';
+      if (emptyTrashItem) emptyTrashItem.style.display = 'block';
+    } else {
+      if (renameItem) renameItem.style.display = 'block';
+      if (deleteItem) deleteItem.style.display = 'block';
+      if (moveToRootItem) {
+        moveToRootItem.style.display = 'block';
+        if (folder.parentId === 'root') {
+          moveToRootItem.classList.add('disabled');
+        } else {
+          moveToRootItem.classList.remove('disabled');
+        }
       }
+      if (emptyTrashItem) emptyTrashItem.style.display = 'none';
     }
 
     // Close menu on any click outside
@@ -2455,6 +2506,10 @@ class NoteCoveApp {
 
       case 'delete':
         await this.deleteFolderDialog(folderId);
+        break;
+
+      case 'empty-trash':
+        await this.emptyTrash();
         break;
     }
   }
