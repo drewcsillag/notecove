@@ -270,9 +270,6 @@ export class NoteCoveEditor {
   private initializeNewNoteStructure(): void {
     console.log('[Editor] initializeNewNoteStructure called - isBindingDocument:', this._isBindingDocument, 'isEmpty:', this.editor?.isEmpty);
 
-    // TEMPORARILY DISABLED - testing if this is causing image loss
-    return;
-
     // Don't initialize if we're binding to an existing Y.Doc
     // The Collaboration extension will load content from the Y.Doc asynchronously
     if (this._isBindingDocument) {
@@ -380,7 +377,17 @@ export class NoteCoveEditor {
       if (noteId) {
         this.currentNoteId = noteId;
       }
-      this.editor.commands.setContent(content || '');
+
+      // If content is empty or just a paragraph, initialize with H1 structure
+      const trimmedContent = (content || '').trim();
+      if (!trimmedContent || trimmedContent === '<p></p>' || trimmedContent === '<p><br></p>') {
+        console.log('[Editor] setContent: Empty content, initializing with H1 structure');
+        this.editor.commands.setContent('<h1></h1><p></p>');
+        this.editor.commands.focus('start');
+      } else {
+        this.editor.commands.setContent(content || '');
+      }
+
       this.updatePlaceholder();
 
       // Notify that editor is ready (in case renderer is waiting with isSettingContent flag)
