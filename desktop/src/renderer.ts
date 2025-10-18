@@ -1,6 +1,7 @@
 import { NoteCoveEditor } from './lib/editor';
 import { NoteManager } from './lib/note-manager';
 import { SyncManager } from './lib/sync-manager';
+import { SyncDirectoryManager } from './lib/sync-directory-manager';
 import { escapeHtml, getPreview, formatDate, normalizeTextContent, type Note } from './lib/utils';
 
 interface Folder {
@@ -45,6 +46,7 @@ class NoteCoveApp {
   editor: NoteCoveEditor | null;
   noteManager: NoteManager | null;
   syncManager: SyncManager | null;
+  syncDirectoryManager: SyncDirectoryManager;
   searchQuery: string;
   tagSearchQuery: string;
   currentFolderId: string;
@@ -78,6 +80,7 @@ class NoteCoveApp {
     this.editor = null;
     this.noteManager = null;
     this.syncManager = null;
+    this.syncDirectoryManager = new SyncDirectoryManager();
     this.searchQuery = '';
     this.tagSearchQuery = '';
     this.currentFolderId = 'all-notes'; // Default to All Notes folder
@@ -124,6 +127,9 @@ class NoteCoveApp {
     // Get folder manager from note manager
     this.folderManager = this.noteManager.getFolderManager();
     this.folderManager.addListener((event: string, data: any) => this.handleFolderEvent(event, data));
+
+    // Initialize sync directory manager
+    await this.syncDirectoryManager.initialize();
 
     // Initialize editor
     this.initializeEditor();
@@ -2729,16 +2735,69 @@ class NoteCoveApp {
     if (!listEl) return;
 
     // Get sync directories from manager
-    // TODO: Initialize syncDirectoryManager when implementing full multi-directory support
-    // const directories = this.syncDirectoryManager.getDirectories();
+    const directories = this.syncDirectoryManager.getDirectories();
 
-    // For now, show placeholder
-    listEl.innerHTML = `
-      <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
-        <p style="margin-bottom: 12px;">No sync directories configured yet.</p>
-        <p style="font-size: 13px;">Click "Add Directory" to create your first sync directory.</p>
+    if (directories.length === 0) {
+      listEl.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+          <p style="margin-bottom: 12px;">No sync directories configured yet.</p>
+          <p style="font-size: 13px;">Click "Add Directory" to create your first sync directory.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Render directory list
+    listEl.innerHTML = directories.map(dir => `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        margin-bottom: 12px;
+      ">
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px; color: var(--text-primary);">
+            ${escapeHtml(dir.name)}
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">
+            ${escapeHtml(dir.path)}
+          </div>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
+            Created: ${formatDate(new Date(dir.created))}
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button
+            onclick="app.renameSyncDirectory('${dir.id}')"
+            style="
+              padding: 6px 12px;
+              border: 1px solid var(--border);
+              background: var(--background);
+              color: var(--text-primary);
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 13px;
+            "
+          >Rename</button>
+          <button
+            onclick="app.removeSyncDirectory('${dir.id}')"
+            style="
+              padding: 6px 12px;
+              border: 1px solid #ef4444;
+              background: var(--background);
+              color: #ef4444;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 13px;
+            "
+          >Remove</button>
+        </div>
       </div>
-    `;
+    `).join('');
   }
 
   /**
@@ -2927,19 +2986,14 @@ class NoteCoveApp {
         return;
       }
 
-      // TODO: Add directory using syncDirectoryManager when implementing full multi-directory support
-      // try {
-      //   await this.syncDirectoryManager.addDirectory(name, path);
-      //   this.renderSyncDirectoriesList();
-      //   document.body.removeChild(overlay);
-      //   this.updateStatus(`Added sync directory: ${name}`);
-      // } catch (error) {
-      //   alert(`Failed to add sync directory: ${error.message}`);
-      // }
-
-      // For now, just show a message
-      alert(`Sync directory feature coming soon!\n\nName: ${name}\nPath: ${path}`);
-      document.body.removeChild(overlay);
+      try {
+        await this.syncDirectoryManager.addDirectory(name, path);
+        await this.renderSyncDirectoriesList();
+        document.body.removeChild(overlay);
+        this.updateStatus(`Added sync directory: ${name}`);
+      } catch (error: any) {
+        alert(`Failed to add sync directory: ${error.message}`);
+      }
     });
 
     // Close on overlay click
@@ -2951,6 +3005,49 @@ class NoteCoveApp {
 
     // Focus name input
     nameInput.focus();
+  }
+
+  /**
+   * Rename a sync directory
+   */
+  async renameSyncDirectory(id: string): Promise<void> {
+    const directory = this.syncDirectoryManager.getDirectories().find(d => d.id === id);
+    if (!directory) return;
+
+    const newName = prompt('Rename sync directory:', directory.name);
+    if (newName && newName.trim() && newName.trim() !== directory.name) {
+      try {
+        await this.syncDirectoryManager.updateDirectory(id, { name: newName.trim() });
+        await this.renderSyncDirectoriesList();
+        this.updateStatus(`Renamed to "${newName.trim()}"`);
+      } catch (error: any) {
+        alert(`Failed to rename sync directory: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Remove a sync directory
+   */
+  async removeSyncDirectory(id: string): Promise<void> {
+    const directory = this.syncDirectoryManager.getDirectories().find(d => d.id === id);
+    if (!directory) return;
+
+    const confirmed = await this.showConfirmDialog(
+      'Remove Sync Directory',
+      `Are you sure you want to remove "${directory.name}"? This will not delete any files, only remove it from your sync directory list.`,
+      'Remove'
+    );
+
+    if (confirmed) {
+      try {
+        await this.syncDirectoryManager.removeDirectory(id);
+        await this.renderSyncDirectoriesList();
+        this.updateStatus(`Removed "${directory.name}"`);
+      } catch (error: any) {
+        alert(`Failed to remove sync directory: ${error.message}`);
+      }
+    }
   }
 }
 
