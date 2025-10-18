@@ -17,6 +17,13 @@ export default defineConfig({
     // Add some default timeouts
     actionTimeout: 10000,
     navigationTimeout: 10000,
+    // Enable code coverage collection
+    ...(process.env.COVERAGE && {
+      contextOptions: {
+        // Collect coverage for both web and Electron contexts
+        recordVideo: undefined,
+      },
+    }),
   },
 
   projects: [

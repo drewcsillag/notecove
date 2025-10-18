@@ -101,7 +101,9 @@
       "Bash(timeout 360 npx playwright test:*)",
       "Bash(timeout 10 npx electron:*)",
       "Bash(timeout 5 npx electron:*)",
-      "Bash(timeout 240 npx playwright test:*)"
+      "Bash(timeout 240 npx playwright test:*)",
+      "Bash(find:*)",
+      "Bash(timeout 360 npm run test:e2e:electron:coverage)"
     ],
     "deny": [],
     "ask": []
