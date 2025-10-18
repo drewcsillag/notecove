@@ -240,6 +240,37 @@
       border-bottom: 1px solid var(--border);
     }
 
+    .tag-search-box {
+      padding: 8px 12px;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tag-search-input {
+      width: 100%;
+      padding: 6px 10px 6px 28px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 12px;
+      background: var(--background);
+      transition: border-color 0.2s;
+    }
+
+    .tag-search-input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+    }
+
+    .tag-search-icon {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
     .notes-section {
       flex: 1;
       min-height: 0;
@@ -1371,6 +1402,13 @@
         <div class="tags-section">
           <div class="section-header">
             <span class="section-title">Tags</span>
+            <button class="section-action" id="clearTagFilterBtn" title="Clear tag filter" style="display: none;">
+              ✕
+            </button>
+          </div>
+          <div class="tag-search-box">
+            <div class="tag-search-icon">🔍</div>
+            <input type="text" class="tag-search-input" id="tagSearchInput" placeholder="Search tags...">
           </div>
           <div class="tags-list" id="tagsList">
             <!-- Tags will be populated here -->

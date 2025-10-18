@@ -46,6 +46,7 @@ class NoteCoveApp {
   noteManager: NoteManager | null;
   syncManager: SyncManager | null;
   searchQuery: string;
+  tagSearchQuery: string;
   currentFolderId: string;
   folderManager: any; // FolderManager type from note-manager
   tagFilterState: TagFilterState | null;
@@ -78,6 +79,7 @@ class NoteCoveApp {
     this.noteManager = null;
     this.syncManager = null;
     this.searchQuery = '';
+    this.tagSearchQuery = '';
     this.currentFolderId = 'all-notes'; // Default to All Notes folder
     this.folderManager = null;
     this.tagFilterState = null; // Tag filter state: { tag: string, mode: 'include' | 'exclude' } or null
@@ -410,6 +412,21 @@ class NoteCoveApp {
     const searchInput = document.querySelector('.search-input') as HTMLInputElement;
     if (searchInput) {
       searchInput.addEventListener('input', (e) => this.onSearch((e.target as HTMLInputElement).value));
+    }
+
+    // Tag search
+    const tagSearchInput = document.getElementById('tagSearchInput') as HTMLInputElement;
+    if (tagSearchInput) {
+      tagSearchInput.addEventListener('input', (e) => {
+        this.tagSearchQuery = (e.target as HTMLInputElement).value.toLowerCase();
+        this.renderTagsList();
+      });
+    }
+
+    // Clear tag filter button
+    const clearTagFilterBtn = document.getElementById('clearTagFilterBtn');
+    if (clearTagFilterBtn) {
+      clearTagFilterBtn.addEventListener('click', () => this.clearTagFilter());
     }
 
     // Use event delegation for note item clicks to avoid race conditions
@@ -1019,6 +1036,12 @@ class NoteCoveApp {
     const tagsList = document.getElementById('tagsList');
     if (!tagsList) return;
 
+    // Update clear button visibility
+    const clearBtn = document.getElementById('clearTagFilterBtn');
+    if (clearBtn) {
+      clearBtn.style.display = this.tagFilterState ? 'block' : 'none';
+    }
+
     // Collect all tags with counts
     const tagCounts = new Map<string, number>();
     this.notes.forEach(note => {
@@ -1030,14 +1053,21 @@ class NoteCoveApp {
     });
 
     // Sort tags alphabetically
-    const sortedTags = Array.from(tagCounts.entries()).sort((a, b) =>
+    let sortedTags = Array.from(tagCounts.entries()).sort((a, b) =>
       a[0].localeCompare(b[0])
     );
+
+    // Filter by search query if present
+    if (this.tagSearchQuery) {
+      sortedTags = sortedTags.filter(([tag]) =>
+        tag.toLowerCase().includes(this.tagSearchQuery)
+      );
+    }
 
     if (sortedTags.length === 0) {
       tagsList.innerHTML = `
         <div style="padding: 8px; text-align: center; color: var(--text-secondary); font-size: 12px;">
-          No tags yet
+          ${this.tagSearchQuery ? 'No matching tags' : 'No tags yet'}
         </div>
       `;
       return;
@@ -1092,6 +1122,15 @@ class NoteCoveApp {
       this.tagFilterState = null;
     }
 
+    this.renderTagsList();
+    this.renderNotesList();
+  }
+
+  /**
+   * Clear the active tag filter
+   */
+  clearTagFilter(): void {
+    this.tagFilterState = null;
     this.renderTagsList();
     this.renderNotesList();
   }
