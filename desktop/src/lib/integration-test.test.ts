@@ -59,8 +59,8 @@ describe('Full App Integration Test', () => {
         },
         readFile: (filePath) => {
           try {
-            const content = fs.readFileSync(filePath, 'utf8');
-            return Promise.resolve({ success: true, content });
+            const content = fs.readFileSync(filePath); // Returns Buffer which is compatible with Uint8Array
+            return Promise.resolve({ success: true, content: Uint8Array.from(content) });
           } catch (error) {
             return Promise.resolve({ success: false, error: error.message });
           }
