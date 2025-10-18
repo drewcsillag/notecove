@@ -14,7 +14,8 @@ export class NoteManager {
   isElectron: boolean;
   folderManager: FolderManager;
   watchId: string | null;
-  syncManager: SyncManager | null;
+  syncManager: SyncManager | null; // Legacy: primary sync manager for single-directory mode
+  syncManagers: Map<string, SyncManager>; // Map of syncDirectoryId -> SyncManager
 
   constructor() {
     this.notes = new Map();
@@ -23,6 +24,7 @@ export class NoteManager {
     this.folderManager = new FolderManager();
     this.watchId = null;
     this.syncManager = null; // Will be set after SyncManager is initialized
+    this.syncManagers = new Map(); // Multiple sync managers for multi-directory support
 
     this.setupFolderListener();
   }
@@ -50,6 +52,76 @@ export class NoteManager {
     console.log('NoteManager: Reloading notes from CRDT');
     await this.loadNotes();
     this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
+  }
+
+  /**
+   * Add a sync manager for a specific sync directory
+   * @param syncDirectoryId - ID of the sync directory
+   * @param syncManager - SyncManager instance for this directory
+   */
+  async addSyncManagerForDirectory(syncDirectoryId: string, syncManager: SyncManager): Promise<void> {
+    this.syncManagers.set(syncDirectoryId, syncManager);
+    console.log(`NoteManager: Added SyncManager for directory ${syncDirectoryId}`);
+
+    // If this is the first sync manager, also set as primary (for backwards compatibility)
+    if (!this.syncManager) {
+      this.syncManager = syncManager;
+
+      // Update FolderManager with CRDT manager
+      if (syncManager.crdtManager) {
+        this.folderManager.crdtManager = syncManager.crdtManager;
+        this.folderManager.updateStore = syncManager.updateStore;
+        this.folderManager.notesPath = syncManager.notesPath;
+        await syncManager.updateStore.initialize('folders');
+        await this.folderManager.loadCustomFolders();
+      }
+    }
+
+    // Load notes from this sync directory
+    await this.loadNotesFromDirectory(syncDirectoryId, syncManager);
+  }
+
+  /**
+   * Load notes from a specific sync directory
+   * @param syncDirectoryId - ID of the sync directory
+   * @param syncManager - SyncManager instance for this directory
+   */
+  async loadNotesFromDirectory(syncDirectoryId: string, syncManager: SyncManager): Promise<void> {
+    console.log(`NoteManager: Loading notes from directory ${syncDirectoryId}`);
+    const notes = await syncManager.loadAllNotes();
+
+    // Tag each note with its sync directory ID
+    notes.forEach(note => {
+      note.syncDirectoryId = syncDirectoryId;
+      this.notes.set(note.id, note);
+    });
+
+    console.log(`NoteManager: Loaded ${notes.length} notes from directory ${syncDirectoryId}`);
+    this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
+  }
+
+  /**
+   * Get the sync manager for a specific note
+   * @param noteId - Note ID
+   * @returns SyncManager instance or null
+   */
+  getSyncManagerForNote(noteId: string): SyncManager | null {
+    const note = this.notes.get(noteId);
+    if (!note?.syncDirectoryId) {
+      return this.syncManager; // Fallback to primary sync manager
+    }
+    return this.syncManagers.get(note.syncDirectoryId) || null;
+  }
+
+  /**
+   * Get notes for a specific sync directory
+   * @param syncDirectoryId - ID of the sync directory
+   * @returns Array of notes
+   */
+  getNotesForDirectory(syncDirectoryId: string): Note[] {
+    return Array.from(this.notes.values()).filter(
+      note => note.syncDirectoryId === syncDirectoryId
+    );
   }
 
   /**

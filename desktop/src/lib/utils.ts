@@ -14,6 +14,7 @@ export interface Note {
   tags: string[];
   folderId?: string;
   deleted?: boolean;
+  syncDirectoryId?: string; // ID of the sync directory this note belongs to
 }
 
 /**

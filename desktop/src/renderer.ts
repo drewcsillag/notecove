@@ -203,28 +203,40 @@ class NoteCoveApp {
       return;
     }
 
-    // Get notes path and instance ID from settings
-    const notesPath = await window.electronAPI?.settings.get('notesPath') as string;
-    if (!notesPath) {
-      console.error('No notes path configured!');
+    // Get instance ID from settings
+    const instanceId = await window.electronAPI?.settings.get('instance') as string | undefined;
+
+    // Get all sync directories
+    const syncDirs = this.syncDirectoryManager.getDirectories();
+
+    if (syncDirs.length === 0) {
+      console.warn('No sync directories configured!');
       return;
     }
 
-    const instanceId = await window.electronAPI?.settings.get('instance') as string | undefined;
+    // Create sync manager for each directory
+    for (const syncDir of syncDirs) {
+      console.log(`Initializing sync manager for directory: ${syncDir.name} (${syncDir.path})`);
 
-    // Create sync manager with instance ID (if provided)
-    this.syncManager = new SyncManager(this.noteManager, notesPath, instanceId);
+      const syncManager = new SyncManager(this.noteManager, syncDir.path, instanceId);
 
-    // Add sync event listeners
-    this.syncManager.addListener((event: string, data: any) => this.handleSyncEvent(event, data));
+      // Add sync event listeners
+      syncManager.addListener((event: string, data: any) => this.handleSyncEvent(event, data));
 
-    // Connect NoteManager to SyncManager for CRDT-based saves
-    // This will reload notes from CRDT
-    await this.noteManager.setSyncManager(this.syncManager);
+      // Add to NoteManager's sync manager map
+      await this.noteManager.addSyncManagerForDirectory(syncDir.id, syncManager);
 
-    // Start watching CRDT files for sync
-    this.syncManager.startWatching();
-    console.log('Sync manager initialized and watching CRDT files');
+      // Start watching CRDT files for sync
+      syncManager.startWatching();
+      console.log(`Sync manager initialized for directory ${syncDir.name}`);
+    }
+
+    // Set primary sync manager reference for backwards compatibility
+    if (syncDirs.length > 0) {
+      this.syncManager = this.noteManager.syncManager;
+    }
+
+    console.log(`Initialized ${syncDirs.length} sync manager(s)`);
   }
 
   handleSyncEvent(event: string, data: any): void {
@@ -1653,14 +1665,7 @@ class NoteCoveApp {
 
     const syncDirs = this.syncDirectoryManager.getDirectories();
 
-    // If there are no sync directories or only one, render folders normally (backwards compatible)
-    if (syncDirs.length <= 1) {
-      const tree = this.folderManager.getFolderTree();
-      folderTree.innerHTML = this.renderFolderItems(tree);
-      return;
-    }
-
-    // Multiple sync directories - render with grouping
+    // Render sync directories with grouping
     let html = '';
     for (const syncDir of syncDirs) {
       const isExpanded = syncDir.isExpanded;
