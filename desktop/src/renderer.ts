@@ -1651,8 +1651,65 @@ class NoteCoveApp {
     const folderTree = document.getElementById('folderTree');
     if (!folderTree || !this.folderManager) return;
 
+    const syncDirs = this.syncDirectoryManager.getDirectories();
+
+    // If there are no sync directories or only one, render folders normally (backwards compatible)
+    if (syncDirs.length <= 1) {
+      const tree = this.folderManager.getFolderTree();
+      folderTree.innerHTML = this.renderFolderItems(tree);
+      return;
+    }
+
+    // Multiple sync directories - render with grouping
+    let html = '';
+    for (const syncDir of syncDirs) {
+      const isExpanded = syncDir.isExpanded;
+
+      html += `
+        <div class="sync-directory-group" data-sync-dir-id="${syncDir.id}">
+          <div class="sync-directory-header"
+               onclick="app.toggleSyncDirectory('${syncDir.id}')"
+               style="
+                 padding: 8px 12px;
+                 display: flex;
+                 align-items: center;
+                 gap: 8px;
+                 cursor: pointer;
+                 font-weight: 600;
+                 color: var(--text-primary);
+                 background: var(--surface);
+                 border-radius: 4px;
+                 margin-bottom: 4px;
+                 user-select: none;
+               ">
+            <span class="collapse-arrow">${isExpanded ? '▼' : '▶'}</span>
+            <span style="font-size: 18px;">💼</span>
+            <span>${escapeHtml(syncDir.name)}</span>
+          </div>
+          ${isExpanded ? this.renderFoldersForSyncDirectory(syncDir.id) : ''}
+        </div>
+      `;
+    }
+
+    folderTree.innerHTML = html;
+  }
+
+  /**
+   * Render folders for a specific sync directory
+   */
+  renderFoldersForSyncDirectory(syncDirId: string): string {
+    // TODO: When NoteManager supports multiple directories, filter folders by syncDirId
+    // For now, just render all folders
     const tree = this.folderManager.getFolderTree();
-    folderTree.innerHTML = this.renderFolderItems(tree);
+    return `<div class="sync-directory-folders">${this.renderFolderItems(tree)}</div>`;
+  }
+
+  /**
+   * Toggle sync directory expand/collapse
+   */
+  async toggleSyncDirectory(syncDirId: string): Promise<void> {
+    await this.syncDirectoryManager.toggleExpanded(syncDirId);
+    this.renderFolderTree();
   }
 
   renderFolderItems(folders: Folder[] | undefined, level: number = 0): string {
