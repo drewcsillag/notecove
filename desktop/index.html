@@ -21,6 +21,20 @@
       --border-focus: #2D5840;
       --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
       --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+      /* Editor line spacing - adjust this value to change vertical spacing between lines */
+      /* Default: 1.6, Tighter: 1.4-1.5, Looser: 1.7-1.8 */
+      --editor-line-height: 1.2;
+
+      /* Editor paragraph spacing - adjust this value to change spacing between paragraphs */
+      /* Default: 0.5rem, Tighter: 0.25rem-0.4rem, Looser: 0.6rem-0.8rem */
+      --editor-paragraph-spacing: 0.2rem;
+
+      /* Editor container padding - adjust to change space around the editor */
+      /* Vertical (top/bottom): Default: 24px, Tighter: 8px-12px, Looser: 32px-40px */
+      --editor-padding-vertical: 2px;
+      /* Horizontal (left/right): Default: 24px, Tighter: 16px-20px, Looser: 32px-40px */
+      --editor-padding-horizontal: 24px;
     }
 
     * {
@@ -620,7 +634,7 @@
 
     .editor-container {
       flex: 1;
-      padding: 24px;
+      padding: var(--editor-padding-vertical) var(--editor-padding-horizontal);
       overflow-y: auto;
     }
 
@@ -760,7 +774,7 @@
 
     .editor {
       font-size: 16px;
-      line-height: 1.6;
+      line-height: var(--editor-line-height);
       color: var(--text-primary);
       outline: none;
     }
@@ -801,7 +815,7 @@
     }
 
     .editor p {
-      margin: 0.5rem 0;
+      margin: var(--editor-paragraph-spacing) 0;
     }
 
     .editor ul, .editor ol {
