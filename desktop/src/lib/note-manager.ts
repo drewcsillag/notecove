@@ -497,6 +497,16 @@ export class NoteManager {
   }
 
   /**
+   * Get all deleted notes (notes in trash)
+   * @returns Array of deleted notes
+   */
+  getDeletedNotes(): Note[] {
+    return Array.from(this.notes.values())
+      .filter(note => note.deleted)
+      .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
+  }
+
+  /**
    * Empty trash - permanently delete all notes in trash
    * @returns Number of notes deleted
    */
