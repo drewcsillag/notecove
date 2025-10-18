@@ -16,12 +16,15 @@ test.describe('Backlinks Panel - Electron Mode', () => {
 
     // Launch Electron app
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test'
       }
     });
 

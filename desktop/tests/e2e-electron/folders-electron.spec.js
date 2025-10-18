@@ -16,12 +16,15 @@ test.describe('Folder Persistence - Electron Mode (CRDT)', () => {
 
     // Launch Electron app
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test'
       }
     });
 
@@ -61,18 +64,20 @@ test.describe('Folder Persistence - Electron Mode (CRDT)', () => {
 
     // Close app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     console.log('Closed app, reopening...');
 
     // Relaunch app with same data directory
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -123,18 +128,20 @@ test.describe('Folder Persistence - Electron Mode (CRDT)', () => {
 
     // Close app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     console.log('Closed app, reopening...');
 
     // Relaunch app
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -191,18 +198,20 @@ test.describe('Folder Persistence - Electron Mode (CRDT)', () => {
 
     // Close app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     console.log('Closed app, reopening...');
 
     // Relaunch app
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -273,18 +282,20 @@ test.describe('Folder Persistence - Electron Mode (CRDT)', () => {
 
     // Close app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     console.log('Closed app, reopening...');
 
     // Relaunch app
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -373,18 +384,20 @@ test.describe('Folder Persistence - Electron Mode (CRDT)', () => {
 
     // Close app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     console.log('Closed app, reopening...');
 
     // Relaunch app
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -431,12 +444,15 @@ test.describe('Folder Multi-Instance Sync - Electron Mode (CRDT)', () => {
 
     // Launch first Electron instance
     electronApp1 = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -448,12 +464,15 @@ test.describe('Folder Multi-Instance Sync - Electron Mode (CRDT)', () => {
 
     // Launch second Electron instance
     electronApp2 = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -693,12 +712,15 @@ test.describe('Folder Validation - Electron Mode (CRDT)', () => {
     console.log('Test directory:', testDir);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -732,7 +754,7 @@ test.describe('Folder Validation - Electron Mode (CRDT)', () => {
     await window.waitForTimeout(200);
 
     // Create a note in the folder
-    await window.locator('.new-note-btn').click();
+    await window.locator('#newNoteBtn').click();
     const editor = window.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await window.waitForTimeout(500);
@@ -769,15 +791,17 @@ test.describe('Folder Validation - Electron Mode (CRDT)', () => {
 
     // Close and reopen app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -854,15 +878,17 @@ test.describe('Folder Validation - Electron Mode (CRDT)', () => {
 
     // Close and reopen app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -890,12 +916,15 @@ test.describe('Folder Notes Association - Electron Mode (CRDT)', () => {
     console.log('Test directory:', testDir);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -947,18 +976,20 @@ test.describe('Folder Notes Association - Electron Mode (CRDT)', () => {
 
     // Close app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     console.log('Closed app, reopening...');
 
     // Relaunch app
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -1003,7 +1034,7 @@ test.describe('Folder Notes Association - Electron Mode (CRDT)', () => {
     await folderA.click();
     await window.waitForTimeout(200);
 
-    await window.locator('.new-note-btn').click();
+    await window.locator('#newNoteBtn').click();
     const editor = window.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await window.waitForTimeout(500);
@@ -1030,15 +1061,17 @@ test.describe('Folder Notes Association - Electron Mode (CRDT)', () => {
 
     // Close and reopen app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -1086,7 +1119,7 @@ test.describe('Folder Notes Association - Electron Mode (CRDT)', () => {
     await workFolder.click();
     await window.waitForTimeout(200);
 
-    await window.locator('.new-note-btn').click();
+    await window.locator('#newNoteBtn').click();
     const editor = window.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await window.waitForTimeout(500);
@@ -1101,7 +1134,7 @@ test.describe('Folder Notes Association - Electron Mode (CRDT)', () => {
     await personalFolder.click();
     await window.waitForTimeout(200);
 
-    await window.locator('.new-note-btn').click();
+    await window.locator('#newNoteBtn').click();
     await expect(editor).toBeFocused({ timeout: 5000 });
     await window.waitForTimeout(500);
 
@@ -1114,15 +1147,17 @@ test.describe('Folder Notes Association - Electron Mode (CRDT)', () => {
 
     // Close and reopen app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -1163,12 +1198,15 @@ test.describe('Trash Operations - Electron Mode (CRDT)', () => {
     console.log('Test directory:', testDir);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -1188,7 +1226,7 @@ test.describe('Trash Operations - Electron Mode (CRDT)', () => {
 
   test('should persist note restore from trash across app restarts', async () => {
     // Create a note
-    await window.locator('.new-note-btn').click();
+    await window.locator('#newNoteBtn').click();
     const editor = window.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await window.waitForTimeout(500);
@@ -1232,15 +1270,17 @@ test.describe('Trash Operations - Electron Mode (CRDT)', () => {
 
     // Close and reopen app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -1267,7 +1307,7 @@ test.describe('Trash Operations - Electron Mode (CRDT)', () => {
 
   test('should persist permanent deletion from trash across app restarts', async () => {
     // Create a note
-    await window.locator('.new-note-btn').click();
+    await window.locator('#newNoteBtn').click();
     const editor = window.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await window.waitForTimeout(500);
@@ -1307,15 +1347,17 @@ test.describe('Trash Operations - Electron Mode (CRDT)', () => {
 
     // Close and reopen app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
@@ -1351,7 +1393,7 @@ test.describe('Trash Operations - Electron Mode (CRDT)', () => {
     await window.waitForTimeout(500);
 
     // Create and delete a note
-    await window.locator('.new-note-btn').click();
+    await window.locator('#newNoteBtn').click();
     const editor = window.locator('#editor .ProseMirror');
     await expect(editor).toBeFocused({ timeout: 5000 });
     await window.waitForTimeout(500);
@@ -1391,15 +1433,17 @@ test.describe('Trash Operations - Electron Mode (CRDT)', () => {
 
     // Close and reopen app
     await electronApp.close();
-    await window.waitForTimeout(500);
 
     electronApp = await electron.launch({
-      args: [path.join(process.cwd(), 'dist/main.js')],
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--notes-path=' + path.join(testDir, '.notecove'),
+        '--instance=test-' + Date.now()
+      ],
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        NOTECOVE_TEST_MODE: 'true',
-        NOTECOVE_DATA_PATH: testDir
+        NODE_ENV: 'test',
       }
     });
 
