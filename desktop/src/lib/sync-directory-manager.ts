@@ -33,9 +33,56 @@ export class SyncDirectoryManager {
 
   /**
    * Initialize the manager and load configuration
+   * Creates a default sync directory if none exist
    */
   async initialize(): Promise<void> {
     await this.loadConfig();
+
+    // If no sync directories exist, create a default one
+    if (this.config.directories.length === 0) {
+      await this.createDefaultSyncDirectory();
+    }
+  }
+
+  /**
+   * Create a default sync directory
+   */
+  private async createDefaultSyncDirectory(): Promise<void> {
+    console.log('[SyncDirManager] Creating default sync directory');
+
+    let defaultPath: string | undefined;
+
+    if (this.isElectron) {
+      // Get notesPath from electron-store settings
+      try {
+        const storedPath = await window.electronAPI?.settings.get('notesPath');
+        console.log('[SyncDirManager] Stored path from settings:', storedPath);
+        if (storedPath) {
+          defaultPath = storedPath as string;
+        } else {
+          // Fallback to getUserDataPath
+          const userDataPath = await window.electronAPI?.fileSystem.getUserDataPath();
+          console.log('[SyncDirManager] User data path:', userDataPath);
+          defaultPath = userDataPath;
+        }
+      } catch (error) {
+        console.error('[SyncDirManager] Failed to get default path:', error);
+        throw new Error('Failed to determine default sync directory path');
+      }
+    } else {
+      // Browser mode - use a default name
+      defaultPath = 'browser-notes';
+    }
+
+    if (!defaultPath) {
+      console.error('[SyncDirManager] Could not determine default sync directory path');
+      throw new Error('Could not determine default sync directory path');
+    }
+
+    console.log('[SyncDirManager] Adding default sync directory with path:', defaultPath);
+    // Create default sync directory
+    await this.addDirectory('My Notes', defaultPath);
+    console.log('[SyncDirManager] Created default sync directory:', defaultPath);
   }
 
   /**

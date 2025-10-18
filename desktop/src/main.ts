@@ -469,6 +469,10 @@ class NoteCoveApp {
         return [];
       }
     });
+
+    ipcMain.handle('fs:get-user-data-path', async (): Promise<string> => {
+      return this.store.get('notesPath');
+    });
   }
 
   setupMenu(): void {

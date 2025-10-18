@@ -71,6 +71,7 @@
   "build": {
     "appId": "com.notecove.desktop",
     "productName": "NoteCove",
+    "electronVersion": "38.2.2",
     "directories": {
       "output": "dist-electron"
     },

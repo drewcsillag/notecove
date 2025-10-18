@@ -2809,57 +2809,20 @@ class NoteCoveApp {
       return;
     }
 
-    // Render directory list
-    listEl.innerHTML = directories.map(dir => `
-      <div style="
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        background: var(--surface);
-        margin-bottom: 12px;
-      ">
-        <div style="flex: 1;">
-          <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px; color: var(--text-primary);">
-            ${escapeHtml(dir.name)}
-          </div>
-          <div style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">
-            ${escapeHtml(dir.path)}
-          </div>
-          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
-            Created: ${formatDate(new Date(dir.created))}
-          </div>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button
-            onclick="app.renameSyncDirectory('${dir.id}')"
-            style="
-              padding: 6px 12px;
-              border: 1px solid var(--border);
-              background: var(--background);
-              color: var(--text-primary);
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 13px;
-            "
-          >Rename</button>
-          <button
-            onclick="app.removeSyncDirectory('${dir.id}')"
-            style="
-              padding: 6px 12px;
-              border: 1px solid #ef4444;
-              background: var(--background);
-              color: #ef4444;
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 13px;
-            "
-          >Remove</button>
-        </div>
-      </div>
-    `).join('');
+    // Render directory list (inline HTML to avoid whitespace in test selectors)
+    listEl.innerHTML = directories.map(dir =>
+      `<div class="sync-directory-group" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); margin-bottom: 12px;">` +
+      `<div class="sync-directory-info" style="flex: 1;">` +
+      `<div class="sync-directory-name" style="font-weight: 600; font-size: 15px; margin-bottom: 4px; color: var(--text-primary);">${escapeHtml(dir.name)}</div>` +
+      `<div style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">${escapeHtml(dir.path)}</div>` +
+      `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Created: ${formatDate(new Date(dir.created))}</div>` +
+      `</div>` +
+      `<div style="display: flex; gap: 8px;">` +
+      `<button onclick="app.renameSyncDirectory('${dir.id}')" style="padding: 6px 12px; border: 1px solid var(--border); background: var(--background); color: var(--text-primary); border-radius: 4px; cursor: pointer; font-size: 13px;">Rename</button>` +
+      `<button onclick="app.removeSyncDirectory('${dir.id}')" style="padding: 6px 12px; border: 1px solid #ef4444; background: var(--background); color: #ef4444; border-radius: 4px; cursor: pointer; font-size: 13px;">Remove</button>` +
+      `</div>` +
+      `</div>`
+    ).join('');
   }
 
   /**
@@ -3076,7 +3039,7 @@ class NoteCoveApp {
     const directory = this.syncDirectoryManager.getDirectories().find(d => d.id === id);
     if (!directory) return;
 
-    const newName = prompt('Rename sync directory:', directory.name);
+    const newName = await this.showInputDialog('Rename Sync Directory', 'Enter new name:', directory.name);
     if (newName && newName.trim() && newName.trim() !== directory.name) {
       try {
         await this.syncDirectoryManager.updateDirectory(id, { name: newName.trim() });
