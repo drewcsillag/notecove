@@ -53,12 +53,10 @@ describe('NoteLink Extension', () => {
       editor.commands.setTextSelection({ from: 1, to: 'Check out this note'.length + 1 });
       editor.commands.setNoteLink('Existing Note', 'note-123');
 
-      const marks = editor.state.selection.$from.marks();
-      const noteLinkMark = marks.find(mark => mark.type.name === 'noteLink');
-
-      expect(noteLinkMark).toBeDefined();
-      expect(noteLinkMark?.attrs.title).toBe('Existing Note');
-      expect(noteLinkMark?.attrs.noteId).toBe('note-123');
+      // Check the HTML output instead of internal marks
+      const html = editor.getHTML();
+      expect(html).toContain('data-note-title="Existing Note"');
+      expect(html).toContain('data-note-id="note-123"');
     });
 
     it('should create link without ID for non-existent notes', () => {
@@ -68,12 +66,10 @@ describe('NoteLink Extension', () => {
       editor.commands.setTextSelection({ from: 1, to: 'Missing note'.length + 1 });
       editor.commands.setNoteLink('Missing Note');
 
-      const marks = editor.state.selection.$from.marks();
-      const noteLinkMark = marks.find(mark => mark.type.name === 'noteLink');
-
-      expect(noteLinkMark).toBeDefined();
-      expect(noteLinkMark?.attrs.title).toBe('Missing Note');
-      expect(noteLinkMark?.attrs.noteId).toBeNull();
+      // Check the HTML output instead of internal marks
+      const html = editor.getHTML();
+      expect(html).toContain('data-note-title="Missing Note"');
+      expect(html).not.toContain('data-note-id');
     });
   });
 
@@ -153,13 +149,15 @@ describe('NoteLink Extension', () => {
       editor.commands.setTextSelection({ from: 1, to: 'Test text'.length + 1 });
       editor.commands.setNoteLink('Target', 'id-123');
 
-      let marks = editor.state.selection.$from.marks();
-      expect(marks.some(m => m.type.name === 'noteLink')).toBe(true);
+      // Check that the mark was applied
+      let html = editor.getHTML();
+      expect(html).toContain('data-note-link');
 
       editor.commands.unsetNoteLink();
 
-      marks = editor.state.selection.$from.marks();
-      expect(marks.some(m => m.type.name === 'noteLink')).toBe(false);
+      // Check that the mark was removed
+      html = editor.getHTML();
+      expect(html).not.toContain('data-note-link');
     });
   });
 

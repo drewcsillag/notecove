@@ -7,8 +7,8 @@ import * as Y from 'yjs';
 interface MockFileSystemAPI {
   exists: Mock<[string], Promise<boolean>>;
   readDir: Mock<[string], Promise<{ success: boolean; files?: string[]; error?: string }>>;
-  readFile: Mock<[string], Promise<{ success: boolean; content?: string; error?: string }>>;
-  writeFile: Mock<[string, string], Promise<{ success: boolean; error?: string }>>;
+  readFile: Mock<[string], Promise<{ success: boolean; content?: Uint8Array; error?: string }>>;
+  writeFile: Mock<[string, string | Uint8Array], Promise<{ success: boolean; error?: string }>>;
   mkdir: Mock<[string], Promise<{ success: boolean; error?: string }>>;
 }
 
@@ -161,7 +161,7 @@ describe('SyncManager - Note Loading', () => {
 
       mockFileSystemAPI.readFile.mockResolvedValue({
         success: true,
-        content: JSON.stringify(packedFile)
+        content: new TextEncoder().encode(JSON.stringify(packedFile))
       });
 
       const notes: Note[] = await syncManager.loadAllNotes();
@@ -207,11 +207,11 @@ describe('SyncManager - Note Loading', () => {
 
       mockFileSystemAPI.readFile.mockResolvedValue({
         success: true,
-        content: JSON.stringify({
+        content: new TextEncoder().encode(JSON.stringify({
           instance: 'test-instance',
           sequence: [1, 1],
           updates: [Buffer.from(createTestUpdate('Test Note', new Date().toISOString())).toString('base64')]
-        })
+        }))
       });
 
       const notes: Note[] = await syncManager.loadAllNotes();
@@ -263,11 +263,11 @@ describe('SyncManager - Note Loading', () => {
 
       mockFileSystemAPI.readFile.mockResolvedValue({
         success: true,
-        content: JSON.stringify({
+        content: new TextEncoder().encode(JSON.stringify({
           instance: 'test-instance',
           sequence: [1, 1],
           updates: [Buffer.from(update).toString('base64')]
-        })
+        }))
       });
 
       const note: Note | null = await syncManager.loadNote(noteId);

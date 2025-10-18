@@ -9,7 +9,7 @@ import * as Y from 'yjs';
 
 // Mock file storage
 class MockFileStorage {
-  files: Map<string, string>;
+  files: Map<string, Uint8Array>;
   isElectron: boolean;
   notesPath: string;
 
@@ -19,13 +19,17 @@ class MockFileStorage {
     this.notesPath = '/test/notes';
   }
 
-  async writeFile(path: string, content: string): Promise<{ success: boolean; error?: string }> {
-    this.files.set(path, content);
+  async writeFile(path: string, content: string | Uint8Array): Promise<{ success: boolean; error?: string }> {
+    // Convert string to Uint8Array if needed
+    const uint8Content = typeof content === 'string'
+      ? new TextEncoder().encode(content)
+      : content;
+    this.files.set(path, uint8Content);
     return { success: true };
   }
 
-  async readFile(path: string): Promise<{ success: boolean; content?: string; error?: string }> {
-    const content: string | undefined = this.files.get(path);
+  async readFile(path: string): Promise<{ success: boolean; content?: Uint8Array; error?: string }> {
+    const content: Uint8Array | undefined = this.files.get(path);
     if (content === undefined) {
       return { success: false, error: 'File not found' };
     }
@@ -62,6 +66,13 @@ function setupMocks(fileStorage: MockFileStorage): void {
       }
     }
   };
+}
+
+// Helper to decode Uint8Array to JSON
+function decodeJSON(uint8Array: Uint8Array): any {
+  const decoder = new TextDecoder();
+  const jsonString = decoder.decode(uint8Array);
+  return JSON.parse(jsonString);
 }
 
 describe('UpdateStore', () => {
@@ -126,14 +137,14 @@ describe('UpdateStore', () => {
       expect(fileStorage.files.has(updatePath)).toBe(true);
 
       // Verify content
-      const fileContent: any = JSON.parse(fileStorage.files.get(updatePath)!);
+      const fileContent: any = decodeJSON(fileStorage.files.get(updatePath)!);
       expect(fileContent.instance).toBe('instance-A');
       expect(fileContent.sequence).toEqual([1, 2]);
       expect(fileContent.updates.length).toBe(2);
 
       // Check meta was updated
       const metaPath: string = '/test/notes/test-note-123/meta/instance-A.json';
-      const meta: any = JSON.parse(fileStorage.files.get(metaPath)!);
+      const meta: any = decodeJSON(fileStorage.files.get(metaPath)!);
       expect(meta.lastWrite).toBe(2);
       expect(meta.seen['instance-A']).toBe(2);
     });
@@ -191,8 +202,8 @@ describe('UpdateStore', () => {
       expect(fileStorage.files.has(file2)).toBe(true);
 
       // Verify sequence numbers are correct
-      const content1: any = JSON.parse(fileStorage.files.get(file1)!);
-      const content2: any = JSON.parse(fileStorage.files.get(file2)!);
+      const content1: any = decodeJSON(fileStorage.files.get(file1)!);
+      const content2: any = decodeJSON(fileStorage.files.get(file2)!);
       expect(content1.sequence).toEqual([1, 2]);
       expect(content2.sequence).toEqual([3, 4]);
     });
@@ -204,7 +215,7 @@ describe('UpdateStore', () => {
       await store.flush(noteId);
 
       const updatePath: string = '/test/notes/test-note-123/updates/instance-A.000001.yjson';
-      const fileContent: any = JSON.parse(fileStorage.files.get(updatePath)!);
+      const fileContent: any = decodeJSON(fileStorage.files.get(updatePath)!);
 
       // Handle both old format (string) and new format (object with data and type)
       const updateEntry = fileContent.updates[0];
@@ -361,7 +372,7 @@ describe('UpdateStore', () => {
       const file: string = '/test/notes/test-note-123/updates/instance-A.000003.yjson';
       expect(fileStorage.files.has(file)).toBe(true);
 
-      const content: any = JSON.parse(fileStorage.files.get(file)!);
+      const content: any = decodeJSON(fileStorage.files.get(file)!);
       expect(content.sequence).toEqual([3, 3]);
     });
   });
