@@ -469,7 +469,7 @@ class NoteCoveApp {
     const folderTree = document.getElementById('folderTree');
     if (folderTree) {
       folderTree.addEventListener('contextmenu', (e) => {
-        const folderItem = (e.target as HTMLElement).closest('.folder-item-custom') as HTMLElement;
+        const folderItem = (e.target as HTMLElement).closest('.folder-item') as HTMLElement;
         if (folderItem) {
           const folderId = folderItem.dataset.folderId;
           if (folderId) {
