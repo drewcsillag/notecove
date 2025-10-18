@@ -7,6 +7,9 @@ import * as os from 'os';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// Set app name (used for dock/taskbar and menus)
+app.setName('NoteCove');
+
 // Type definitions
 interface ParsedArgs {
   userDataDir: string | null;
@@ -146,6 +149,9 @@ class NoteCoveApp {
   setupApp(): void {
     // Handle app ready
     app.whenReady().then(() => {
+      // Set app name again for macOS (must be called after ready)
+      app.setName('NoteCove');
+
       // Set dock icon on macOS (for development mode)
       // Use trimmed version that fills more of the dock icon space
       if (process.platform === 'darwin') {
