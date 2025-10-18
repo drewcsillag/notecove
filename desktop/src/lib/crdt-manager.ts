@@ -86,14 +86,16 @@ export class CRDTManager {
    * @param event - Event type
    * @param data - Event data
    */
-  notify(event: string, data: any): void {
-    this.listeners.forEach(listener => {
+  async notify(event: string, data: any): Promise<void> {
+    // Call all listeners and wait for them to complete (supports async listeners)
+    const promises = Array.from(this.listeners).map(async listener => {
       try {
-        listener(event, data);
+        await listener(event, data);
       } catch (error) {
         console.error('Error in CRDT listener:', error);
       }
     });
+    await Promise.all(promises);
   }
 
   /**

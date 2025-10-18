@@ -164,6 +164,14 @@ export class FolderManager {
         }
       }
 
+      // Clear custom folders before loading (keep special/root folders)
+      const customFolderIds = Array.from(this.folders.keys())
+        .filter(id => {
+          const folder = this.folders.get(id);
+          return folder && !folder.isSpecial && !folder.isRoot;
+        });
+      customFolderIds.forEach(id => this.folders.delete(id));
+
       if (storedFolders && Array.isArray(storedFolders)) {
         storedFolders.forEach(folder => {
           this.folders.set(folder.id, folder);
@@ -206,6 +214,11 @@ export class FolderManager {
         });
 
         console.log('[FolderManager] Saved folders to CRDT:', customFolders.length);
+
+        // Wait for CRDT events to propagate to listeners
+        // The transact() triggers Y.js update events, which fire synchronously,
+        // but the CRDTManager listeners are async and need time to add updates to UpdateStore
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         // Flush immediately so other instances see the changes
         // (Updates are automatically added to buffer by CRDT listener)
