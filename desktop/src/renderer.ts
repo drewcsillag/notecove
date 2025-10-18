@@ -59,6 +59,11 @@ class NoteCoveApp {
   startX: number;
   startWidth: number;
 
+  // Sidebar sections resize state
+  isSidebarResizing: boolean;
+  startY: number;
+  startFolderHeight: number;
+
   // Private flags
   private _isRendering: boolean;
 
@@ -87,6 +92,11 @@ class NoteCoveApp {
     this.resizingPanel = null;
     this.startX = 0;
     this.startWidth = 0;
+
+    // Sidebar sections resize state
+    this.isSidebarResizing = false;
+    this.startY = 0;
+    this.startFolderHeight = 0;
 
     this.initializeApp();
     this.setupEventListeners();
@@ -472,6 +482,15 @@ class NoteCoveApp {
           notesPanel.style.flex = `0 0 ${sizes.notesPanel}%`;
         }
       }
+
+      // Load saved folder section height
+      const savedFolderHeight = localStorage.getItem('notecove-folder-section-height');
+      if (savedFolderHeight) {
+        const folderSection = document.querySelector('.folder-section') as HTMLElement;
+        if (folderSection) {
+          folderSection.style.flex = `0 0 ${savedFolderHeight}px`;
+        }
+      }
     } catch (error) {
       console.error('Failed to load panel sizes:', error);
     }
@@ -484,8 +503,20 @@ class NoteCoveApp {
       handle.addEventListener('mousedown', (e) => this.startResize(e as MouseEvent));
     });
 
-    document.addEventListener('mousemove', (e) => this.doResize(e));
-    document.addEventListener('mouseup', () => this.stopResize());
+    // Setup sidebar sections resize (folders/tags)
+    const sidebarResizeHandle = document.getElementById('sidebarResizeHandle');
+    if (sidebarResizeHandle) {
+      sidebarResizeHandle.addEventListener('mousedown', (e) => this.startSidebarSectionsResize(e as MouseEvent));
+    }
+
+    document.addEventListener('mousemove', (e) => {
+      this.doResize(e);
+      this.doSidebarSectionsResize(e);
+    });
+    document.addEventListener('mouseup', () => {
+      this.stopResize();
+      this.stopSidebarSectionsResize();
+    });
   }
 
   startResize(e: MouseEvent): void {
@@ -560,6 +591,88 @@ class NoteCoveApp {
       localStorage.setItem('notecove-panel-sizes', JSON.stringify(sizes));
     } catch (error) {
       console.error('Failed to save panel sizes:', error);
+    }
+  }
+
+  startSidebarSectionsResize(e: MouseEvent): void {
+    this.isSidebarResizing = true;
+    this.startY = e.clientY;
+
+    const folderSection = document.querySelector('.folder-section') as HTMLElement;
+    if (folderSection) {
+      this.startFolderHeight = folderSection.offsetHeight;
+    }
+
+    const handle = document.getElementById('sidebarResizeHandle');
+    if (handle) {
+      handle.classList.add('resizing');
+    }
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+
+    e.preventDefault();
+  }
+
+  doSidebarSectionsResize(e: MouseEvent): void {
+    if (!this.isSidebarResizing) return;
+
+    const deltaY = e.clientY - this.startY;
+    const folderSection = document.querySelector('.folder-section') as HTMLElement;
+    const tagsSection = document.querySelector('.tags-section') as HTMLElement;
+
+    if (!folderSection || !tagsSection) return;
+
+    // Calculate new height
+    const newFolderHeight = this.startFolderHeight + deltaY;
+
+    // Get the total available height
+    const sidebarContent = document.querySelector('.sidebar-content') as HTMLElement;
+    if (!sidebarContent) return;
+
+    const totalHeight = sidebarContent.offsetHeight;
+    const handleHeight = 6; // Height of resize handle
+
+    // Enforce minimum heights
+    const minFolderHeight = 100;
+    const minTagsHeight = 80;
+    const maxFolderHeight = totalHeight - minTagsHeight - handleHeight;
+
+    const clampedFolderHeight = Math.max(minFolderHeight, Math.min(maxFolderHeight, newFolderHeight));
+
+    // Update folder section flex-basis
+    folderSection.style.flex = `0 0 ${clampedFolderHeight}px`;
+  }
+
+  stopSidebarSectionsResize(): void {
+    if (!this.isSidebarResizing) return;
+
+    this.isSidebarResizing = false;
+
+    const handle = document.getElementById('sidebarResizeHandle');
+    if (handle) {
+      handle.classList.remove('resizing');
+    }
+
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+
+    // Save sidebar section sizes
+    this.saveSidebarSectionSizes();
+  }
+
+  saveSidebarSectionSizes(): void {
+    try {
+      const folderSection = document.querySelector('.folder-section') as HTMLElement;
+
+      if (folderSection && folderSection.style.flex) {
+        const folderHeight = parseInt(folderSection.style.flex.match(/(\d+)px/)?.[1] || '0');
+        if (folderHeight > 0) {
+          localStorage.setItem('notecove-folder-section-height', folderHeight.toString());
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save sidebar section sizes:', error);
     }
   }
 
