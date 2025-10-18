@@ -2256,6 +2256,7 @@ class NoteCoveApp {
     }
     this.updateStatus(`Permanently deleted ${count} note${count > 1 ? 's' : ''}`);
     this.updateUI();
+    this.renderFolderTree(); // Update folder counts
   }
 
   // Drag-and-drop handlers for notes
