@@ -2131,7 +2131,7 @@ class NoteCoveApp {
     this.updateUI();
   }
 
-  showConfirmDialog(title: string, message: string): Promise<boolean> {
+  showConfirmDialog(title: string, message: string, confirmButtonText: string = 'Move to Trash'): Promise<boolean> {
     return new Promise((resolve) => {
       // Create overlay
       const overlay = document.createElement('div');
@@ -2166,7 +2166,7 @@ class NoteCoveApp {
                   background: var(--background); color: var(--text-primary); border-radius: 4px;
                   cursor: pointer;">Cancel</button>
           <button id="dialogConfirm" style="padding: 8px 16px; border: none; background: #ef4444;
-                  color: white; border-radius: 4px; cursor: pointer;">Move to Trash</button>
+                  color: white; border-radius: 4px; cursor: pointer;">${confirmButtonText}</button>
         </div>
       `;
 
@@ -2244,7 +2244,8 @@ class NoteCoveApp {
 
     const confirmed = await this.showConfirmDialog(
       'Empty Trash',
-      `Permanently delete all ${deletedNotes.length} note${deletedNotes.length > 1 ? 's' : ''} in trash? This cannot be undone.`
+      `Permanently delete all ${deletedNotes.length} note${deletedNotes.length > 1 ? 's' : ''} in trash? This cannot be undone.`,
+      'Empty Trash'
     );
 
     if (!confirmed) return;
