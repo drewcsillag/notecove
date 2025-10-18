@@ -180,6 +180,7 @@ test.describe('Multi-Instance Note Sync - Electron Mode (CRDT)', () => {
   });
 
   test('should sync note deletion between instances', async () => {
+    test.setTimeout(60000); // Increase timeout to allow for sync cycles
     // Launch first instance
     const app1 = await electron.launch({
       args: [
@@ -253,6 +254,11 @@ test.describe('Multi-Instance Note Sync - Electron Mode (CRDT)', () => {
     await window1.click(`.note-item[data-note-id="${deleteNoteId}"]`);
     await window1.waitForTimeout(500);
     await window1.click('#deleteNoteBtn');
+    await window1.waitForTimeout(500);
+
+    // Confirm deletion
+    const confirmButton = window1.locator('#dialogConfirm');
+    await confirmButton.click();
     await window1.waitForTimeout(2000);
 
     console.log('[Test] Deleted note in instance 1');
@@ -470,6 +476,7 @@ test.describe('Multi-Instance Note Sync - Electron Mode (CRDT)', () => {
   });
 
   test('should sync note restore from trash between instances', async () => {
+    test.setTimeout(60000); // Increase timeout to allow for sync cycles
     // Launch first instance
     const app1 = await electron.launch({
       args: [
@@ -503,6 +510,11 @@ test.describe('Multi-Instance Note Sync - Electron Mode (CRDT)', () => {
     });
 
     await window1.click('#deleteNoteBtn');
+    await window1.waitForTimeout(500);
+
+    // Confirm deletion
+    const confirmButton = window1.locator('#dialogConfirm');
+    await confirmButton.click();
     await window1.waitForTimeout(2000);
 
     console.log('[Test] Deleted note with ID:', noteId);
@@ -523,7 +535,7 @@ test.describe('Multi-Instance Note Sync - Electron Mode (CRDT)', () => {
 
     const window2 = await app2.firstWindow();
     await window2.waitForLoadState('domcontentloaded');
-    await window2.waitForTimeout(2000);
+    await window2.waitForTimeout(3000); // Wait for sync
 
     // Verify note is in trash in instance 2
     const recentlyDeleted2 = window2.locator('.folder-item').filter({ hasText: 'Recently Deleted' });

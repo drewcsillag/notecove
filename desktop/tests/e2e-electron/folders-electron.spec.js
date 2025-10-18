@@ -898,8 +898,8 @@ test.describe('Folder Validation - Electron Mode (CRDT)', () => {
 
     // Both folders should still exist
     const restoredParent = window.locator('.folder-item').filter({ hasText: 'Parent with Child' });
-    // Use exact text match to avoid matching "Parent with Child"
-    const restoredChild = window.locator('.folder-item').filter({ hasText: /^▼ 📁 Child$/ });
+    // Match Child folder by checking folder-name span with exact text match
+    const restoredChild = window.locator('.folder-item .folder-name:text-is("Child")');
     await expect(restoredParent).toBeVisible({ timeout: 5000 });
     await expect(restoredChild).toBeVisible({ timeout: 5000 });
 
