@@ -1,7 +1,7 @@
 import { NoteCoveEditor } from './lib/editor';
 import { NoteManager } from './lib/note-manager';
 import { SyncManager } from './lib/sync-manager';
-import { escapeHtml, getPreview, formatDate, type Note } from './lib/utils';
+import { escapeHtml, getPreview, formatDate, normalizeTextContent, type Note } from './lib/utils';
 
 interface Folder {
   id: string;
@@ -1237,8 +1237,8 @@ class NoteCoveApp {
             }
           }
 
-          // Strip HTML/XML tags and limit length
-          content = content.replace(/<[^>]*>/g, '');
+          // Normalize content: strip markup and normalize whitespace
+          content = normalizeTextContent(content);
           const maxLength = 300;
           if (content.length > maxLength) {
             content = content.substring(0, maxLength) + '...';

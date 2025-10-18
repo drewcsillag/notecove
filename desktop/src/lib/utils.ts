@@ -26,6 +26,33 @@ export function escapeHtml(text: string): string {
 }
 
 /**
+ * Normalize text content by stripping markup and normalizing whitespace
+ * Handles both HTML/XML tags and wiki-style markup like [[links]]
+ * @param content - Content with markup
+ * @returns Plain text with normalized whitespace
+ */
+export function normalizeTextContent(content: string): string {
+  if (!content) return '';
+
+  let text = content;
+
+  // Replace block-level closing tags with space to preserve word boundaries
+  // This prevents "word1</p><p>word2" from becoming "word1word2"
+  text = text.replace(/<\/(p|div|h[1-6]|li|blockquote|pre)>/gi, ' ');
+
+  // Strip all remaining HTML/XML tags (including <noteLink>, <span>, etc.)
+  text = text.replace(/<[^>]*>/g, '');
+
+  // Strip wiki-style links [[link text]]
+  text = text.replace(/\[\[([^\]]+)\]\]/g, '$1');
+
+  // Normalize whitespace: replace newlines and multiple spaces with single space
+  text = text.replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
+/**
  * Generate a preview of note content
  * @param content - Full note content (HTML or plain text)
  * @param maxLength - Maximum preview length
@@ -34,19 +61,8 @@ export function escapeHtml(text: string): string {
 export function getPreview(content: string, maxLength: number = 60): string {
   if (!content) return '';
 
-  // Strip HTML tags to get plain text
-  let plainText = '';
-  if (typeof document !== 'undefined') {
-    const div = document.createElement('div');
-    div.innerHTML = content;
-    plainText = div.textContent || div.innerText || '';
-  } else {
-    // Fallback for environments without DOM (e.g., tests)
-    plainText = content.replace(/<[^>]*>/g, '');
-  }
-
-  // Remove newlines and extra whitespace
-  const cleaned = plainText.replace(/\s+/g, ' ').trim();
+  // Use normalizeTextContent for consistent text processing
+  const cleaned = normalizeTextContent(content);
 
   // Truncate to max length
   const preview = cleaned.substring(0, maxLength);

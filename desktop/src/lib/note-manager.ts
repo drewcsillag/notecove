@@ -1,4 +1,4 @@
-import { generateUUID, validateNote, type Note } from './utils';
+import { generateUUID, validateNote, normalizeTextContent, type Note } from './utils';
 import { FolderManager } from './folder-manager';
 import { SyncManager } from './sync-manager';
 
@@ -593,10 +593,10 @@ export class NoteManager {
           const contextStart = Math.max(0, linkStart - 100);
           const contextEnd = Math.min(noteContent.length, linkEnd + 100);
 
-          // Get the context and strip XML/HTML tags for display
+          // Get the context and normalize it (strip markup and normalize whitespace)
           let context = noteContent.substring(contextStart, contextEnd);
-          context = context.replace(/<[^>]*>/g, ''); // Remove tags
-          context = '...' + context.trim() + '...';
+          context = normalizeTextContent(context);
+          context = '...' + context + '...';
 
           backlinks.push({ note, context });
           break; // Only count each note once
@@ -627,10 +627,10 @@ export class NoteManager {
           const contextStart = Math.max(0, linkStart - 100);
           const contextEnd = Math.min(noteContent.length, linkEnd + 100);
 
-          // Get the context and strip HTML tags for display
+          // Get the context and normalize it (strip markup and normalize whitespace)
           let context = noteContent.substring(contextStart, contextEnd);
-          context = context.replace(/<[^>]*>/g, ''); // Remove HTML tags
-          context = '...' + context.trim() + '...';
+          context = normalizeTextContent(context);
+          context = '...' + context + '...';
 
           backlinks.push({ note, context });
           break; // Only count each note once
