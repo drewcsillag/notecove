@@ -1703,10 +1703,17 @@ class NoteCoveApp {
    * Render folders for a specific sync directory
    */
   renderFoldersForSyncDirectory(syncDirId: string): string {
-    // TODO: When NoteManager supports multiple directories, filter folders by syncDirId
-    // For now, just render all folders
-    const tree = this.folderManager.getFolderTree();
-    return `<div class="sync-directory-folders">${this.renderFolderItems(tree)}</div>`;
+    if (!this.noteManager) return '';
+
+    // Get the folder manager for this specific sync directory
+    const folderManager = this.noteManager.getFolderManagerForDirectory(syncDirId);
+    if (!folderManager) {
+      console.warn(`No FolderManager found for sync directory ${syncDirId}`);
+      return '';
+    }
+
+    const tree = folderManager.getFolderTree();
+    return `<div class="sync-directory-folders">${this.renderFolderItems(tree, 0, syncDirId)}</div>`;
   }
 
   /**
@@ -1717,14 +1724,19 @@ class NoteCoveApp {
     this.renderFolderTree();
   }
 
-  renderFolderItems(folders: Folder[] | undefined, level: number = 0): string {
+  renderFolderItems(folders: Folder[] | undefined, level: number = 0, syncDirId?: string): string {
     if (!folders || folders.length === 0) return '';
+
+    // Get the appropriate folder manager
+    const folderManager = syncDirId && this.noteManager
+      ? this.noteManager.getFolderManagerForDirectory(syncDirId) || this.folderManager
+      : this.folderManager;
 
     return folders.map(folder => {
       const indent = level * 16;
       const icon = folder.icon || '📁';
       const hasChildren = folder.children && folder.children.length > 0;
-      const isExpanded = this.folderManager.isFolderExpanded(folder.id);
+      const isExpanded = folderManager.isFolderExpanded(folder.id);
       const isActive = this.currentFolderId === folder.id;
       const isDraggable = !folder.isSpecial && !folder.isRoot;
 
@@ -1752,7 +1764,7 @@ class NoteCoveApp {
           <span class="folder-name">${escapeHtml(folder.name)}</span>
           <span class="folder-count">${noteCount}</span>
         </div>
-        ${hasChildren && isExpanded ? this.renderFolderItems(folder.children, level + 1) : ''}
+        ${hasChildren && isExpanded ? this.renderFolderItems(folder.children, level + 1, syncDirId) : ''}
       `;
     }).join('');
   }

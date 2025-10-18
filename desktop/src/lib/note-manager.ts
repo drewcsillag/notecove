@@ -12,7 +12,8 @@ export class NoteManager {
   notes: Map<string, Note>;
   listeners: Set<NoteListener>;
   isElectron: boolean;
-  folderManager: FolderManager;
+  folderManager: FolderManager; // Legacy: primary folder manager for backwards compatibility
+  folderManagers: Map<string, FolderManager>; // Map of syncDirectoryId -> FolderManager
   watchId: string | null;
   syncManager: SyncManager | null; // Legacy: primary sync manager for single-directory mode
   syncManagers: Map<string, SyncManager>; // Map of syncDirectoryId -> SyncManager
@@ -21,7 +22,8 @@ export class NoteManager {
     this.notes = new Map();
     this.listeners = new Set();
     this.isElectron = window.electronAPI?.isElectron || false;
-    this.folderManager = new FolderManager();
+    this.folderManager = new FolderManager(); // Primary folder manager (for backwards compatibility)
+    this.folderManagers = new Map(); // Multiple folder managers for multi-directory support
     this.watchId = null;
     this.syncManager = null; // Will be set after SyncManager is initialized
     this.syncManagers = new Map(); // Multiple sync managers for multi-directory support
@@ -63,18 +65,24 @@ export class NoteManager {
     this.syncManagers.set(syncDirectoryId, syncManager);
     console.log(`NoteManager: Added SyncManager for directory ${syncDirectoryId}`);
 
+    // Create a dedicated FolderManager for this sync directory
+    const folderManager = new FolderManager();
+    this.folderManagers.set(syncDirectoryId, folderManager);
+
+    // Initialize FolderManager with CRDT manager for this sync directory
+    if (syncManager.crdtManager) {
+      folderManager.crdtManager = syncManager.crdtManager;
+      folderManager.updateStore = syncManager.updateStore;
+      folderManager.notesPath = syncManager.notesPath;
+      await syncManager.updateStore.initialize('folders');
+      await folderManager.loadCustomFolders();
+      console.log(`NoteManager: Initialized FolderManager for directory ${syncDirectoryId}`);
+    }
+
     // If this is the first sync manager, also set as primary (for backwards compatibility)
     if (!this.syncManager) {
       this.syncManager = syncManager;
-
-      // Update FolderManager with CRDT manager
-      if (syncManager.crdtManager) {
-        this.folderManager.crdtManager = syncManager.crdtManager;
-        this.folderManager.updateStore = syncManager.updateStore;
-        this.folderManager.notesPath = syncManager.notesPath;
-        await syncManager.updateStore.initialize('folders');
-        await this.folderManager.loadCustomFolders();
-      }
+      this.folderManager = folderManager;
     }
 
     // Load notes from this sync directory
@@ -101,6 +109,9 @@ export class NoteManager {
       this.notes.delete(noteId);
     }
 
+    // Remove the folder manager for this sync directory
+    this.folderManagers.delete(syncDirectoryId);
+
     // Clean up and destroy the sync manager
     await syncManager.destroy();
     this.syncManagers.delete(syncDirectoryId);
@@ -109,9 +120,22 @@ export class NoteManager {
     // If this was the primary sync manager, set a new one
     if (this.syncManager === syncManager) {
       const remainingManagers = Array.from(this.syncManagers.values());
+      const remainingSyncDirIds = Array.from(this.syncManagers.keys());
       this.syncManager = remainingManagers.length > 0 ? remainingManagers[0] : null;
-      console.log(`NoteManager: Updated primary SyncManager`);
+      this.folderManager = remainingSyncDirIds.length > 0
+        ? this.folderManagers.get(remainingSyncDirIds[0])!
+        : new FolderManager();
+      console.log(`NoteManager: Updated primary SyncManager and FolderManager`);
     }
+  }
+
+  /**
+   * Get the folder manager for a specific sync directory
+   * @param syncDirectoryId - ID of the sync directory
+   * @returns FolderManager instance for the sync directory, or null if not found
+   */
+  getFolderManagerForDirectory(syncDirectoryId: string): FolderManager | null {
+    return this.folderManagers.get(syncDirectoryId) || null;
   }
 
   /**
