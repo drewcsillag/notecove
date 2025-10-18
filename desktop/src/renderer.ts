@@ -134,6 +134,9 @@ class NoteCoveApp {
     this.updateUI();
     this.renderFolderTree();
     this.renderTagsList();
+
+    // Setup note link hover preview
+    this.setupNoteLinkHoverPreview();
   }
 
   initializeEditor(): void {
@@ -1036,6 +1039,142 @@ class NoteCoveApp {
           this.selectNote(noteId);
         }
       });
+    });
+  }
+
+  /**
+   * Setup hover preview for note links
+   */
+  setupNoteLinkHoverPreview(): void {
+    const preview = document.getElementById('noteLinkPreview');
+    if (!preview) return;
+
+    const previewTitle = preview.querySelector('.note-link-preview-title') as HTMLElement;
+    const previewContent = preview.querySelector('.note-link-preview-content') as HTMLElement;
+    if (!previewTitle || !previewContent) return;
+
+    let hoverTimeout: NodeJS.Timeout | null = null;
+    let currentLink: Element | null = null;
+
+    // Use event delegation on the editor
+    const editor = document.getElementById('editor');
+    if (!editor) return;
+
+    editor.addEventListener('mouseover', (e) => {
+      const target = e.target as HTMLElement;
+
+      // Check if hovering over a note link
+      const noteLink = target.closest('[data-note-link]');
+      if (!noteLink) {
+        // Not hovering over a link, hide preview
+        if (hoverTimeout) {
+          clearTimeout(hoverTimeout);
+          hoverTimeout = null;
+        }
+        preview.classList.remove('visible');
+        preview.style.display = 'none';
+        currentLink = null;
+        return;
+      }
+
+      // Same link, don't update
+      if (noteLink === currentLink) return;
+      currentLink = noteLink;
+
+      // Clear any existing timeout
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout);
+      }
+
+      // Show preview after short delay
+      hoverTimeout = setTimeout(() => {
+        const noteId = noteLink.getAttribute('data-note-id');
+        const noteTitle = noteLink.getAttribute('data-note-title') || noteLink.textContent || '';
+
+        if (!noteId && !noteTitle) return;
+
+        // Get the note
+        let note: Note | undefined;
+        if (noteId) {
+          note = this.noteManager?.getNote(noteId);
+        }
+        if (!note && noteTitle) {
+          // Try to find by title
+          const allNotes = this.noteManager?.getAllNotes() || [];
+          note = allNotes.find(n => n.title === noteTitle);
+        }
+
+        if (!note) {
+          previewTitle.textContent = noteTitle;
+          previewContent.textContent = 'Note not found';
+        } else {
+          previewTitle.textContent = note.title;
+
+          // Get note content (strip HTML tags for preview)
+          let content = note.content || '';
+
+          // In Electron mode, try to get from CRDT
+          if (this.isElectron && this.syncManager) {
+            try {
+              const yDoc = this.syncManager.crdtManager.getContentDoc(note.id);
+              const yContent = yDoc.getXmlFragment('default');
+              content = yContent.toString();
+            } catch (error) {
+              // Fall back to note.content
+            }
+          }
+
+          // Strip HTML/XML tags and limit length
+          content = content.replace(/<[^>]*>/g, '');
+          const maxLength = 300;
+          if (content.length > maxLength) {
+            content = content.substring(0, maxLength) + '...';
+          }
+
+          previewContent.textContent = content || '(Empty note)';
+        }
+
+        // Position the preview near the cursor
+        const rect = noteLink.getBoundingClientRect();
+        const x = rect.left;
+        const y = rect.bottom + 8; // 8px below the link
+
+        // Check if preview would go off screen
+        const previewWidth = 400; // max-width from CSS
+        const previewHeight = 250; // estimated max height
+
+        let finalX = x;
+        let finalY = y;
+
+        // Adjust horizontal position if needed
+        if (x + previewWidth > window.innerWidth) {
+          finalX = window.innerWidth - previewWidth - 16;
+        }
+
+        // Adjust vertical position if needed (show above if not enough space below)
+        if (y + previewHeight > window.innerHeight) {
+          finalY = rect.top - previewHeight - 8;
+        }
+
+        preview.style.left = `${finalX}px`;
+        preview.style.top = `${finalY}px`;
+        preview.style.display = 'block';
+
+        // Trigger reflow to enable transition
+        preview.offsetHeight;
+        preview.classList.add('visible');
+      }, 300); // 300ms delay before showing
+    });
+
+    // Hide preview when mouse leaves editor
+    editor.addEventListener('mouseleave', () => {
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout);
+        hoverTimeout = null;
+      }
+      preview.classList.remove('visible');
+      preview.style.display = 'none';
+      currentLink = null;
     });
   }
 
