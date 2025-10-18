@@ -2582,12 +2582,388 @@ class NoteCoveApp {
       }, 2000);
     }
   }
+
+  /**
+   * Open settings panel
+   */
+  openSettings(): void {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'settingsOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+
+    // Create settings panel
+    const panel = document.createElement('div');
+    panel.style.cssText = `
+      background: var(--background);
+      border-radius: 8px;
+      width: 700px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    `;
+
+    panel.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border);">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Settings</h2>
+        <button id="settingsClose" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); line-height: 1;">×</button>
+      </div>
+
+      <div style="display: flex; border-bottom: 1px solid var(--border); padding: 0 24px;">
+        <button class="settings-tab active" data-tab="sync-directories" style="padding: 12px 16px; background: none; border: none; border-bottom: 2px solid var(--primary-color); cursor: pointer; font-weight: 500; color: var(--primary-color);">
+          Sync Directories
+        </button>
+        <button class="settings-tab" data-tab="general" style="padding: 12px 16px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 500; color: var(--text-secondary);">
+          General
+        </button>
+      </div>
+
+      <div style="padding: 24px; max-height: calc(80vh - 140px); overflow-y: auto;">
+        <!-- Sync Directories Tab -->
+        <div id="syncDirectoriesTab" class="settings-tab-content" style="display: block;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Sync Directories</h3>
+            <button id="addSyncDirectoryBtn" style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
+              + Add Directory
+            </button>
+          </div>
+
+          <div id="syncDirectoriesList">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- General Tab -->
+        <div id="generalTab" class="settings-tab-content" style="display: none;">
+          <p style="color: var(--text-secondary);">General settings coming soon...</p>
+        </div>
+      </div>
+    `;
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    // Setup tab switching
+    const tabs = panel.querySelectorAll('.settings-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const tabName = target.dataset.tab;
+
+        // Update tab styles
+        tabs.forEach(t => {
+          const el = t as HTMLElement;
+          if (el.dataset.tab === tabName) {
+            el.style.borderBottomColor = 'var(--primary-color)';
+            el.style.color = 'var(--primary-color)';
+          } else {
+            el.style.borderBottomColor = 'transparent';
+            el.style.color = 'var(--text-secondary)';
+          }
+        });
+
+        // Show/hide tab content
+        const tabContents = panel.querySelectorAll('.settings-tab-content');
+        tabContents.forEach(content => {
+          const el = content as HTMLElement;
+          el.style.display = el.id === `${tabName}Tab` ? 'block' : 'none';
+        });
+      });
+    });
+
+    // Render sync directories list
+    this.renderSyncDirectoriesList();
+
+    // Close button
+    const closeBtn = panel.querySelector('#settingsClose');
+    closeBtn?.addEventListener('click', () => this.closeSettings());
+
+    // Add directory button
+    const addBtn = panel.querySelector('#addSyncDirectoryBtn');
+    addBtn?.addEventListener('click', () => this.showAddSyncDirectoryDialog());
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        this.closeSettings();
+      }
+    });
+
+    // Close on Escape key
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        this.closeSettings();
+        document.removeEventListener('keydown', handleKeydown);
+      }
+    };
+    document.addEventListener('keydown', handleKeydown);
+  }
+
+  /**
+   * Close settings panel
+   */
+  closeSettings(): void {
+    const overlay = document.getElementById('settingsOverlay');
+    if (overlay) {
+      document.body.removeChild(overlay);
+    }
+  }
+
+  /**
+   * Render sync directories list in settings
+   */
+  async renderSyncDirectoriesList(): Promise<void> {
+    const listEl = document.getElementById('syncDirectoriesList');
+    if (!listEl) return;
+
+    // Get sync directories from manager
+    // TODO: Initialize syncDirectoryManager when implementing full multi-directory support
+    // const directories = this.syncDirectoryManager.getDirectories();
+
+    // For now, show placeholder
+    listEl.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+        <p style="margin-bottom: 12px;">No sync directories configured yet.</p>
+        <p style="font-size: 13px;">Click "Add Directory" to create your first sync directory.</p>
+      </div>
+    `;
+  }
+
+  /**
+   * Show add sync directory dialog
+   */
+  async showAddSyncDirectoryDialog(): Promise<void> {
+    // Detect cloud storage providers
+    const { CloudStorageDetector } = await import('./lib/cloud-storage-detector');
+    const detector = new CloudStorageDetector();
+    const providers = await detector.detectProviders();
+
+    // Create dialog overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'addSyncDirectoryOverlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: var(--background);
+      border-radius: 8px;
+      padding: 24px;
+      width: 500px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+
+    let providerButtons = '';
+    if (providers.length > 0) {
+      providerButtons = `
+        <div style="margin-bottom: 20px;">
+          <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--text-primary);">Quick Select</h4>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+            ${providers.map(p => `
+              <button class="cloud-provider-btn" data-provider-id="${p.id}" style="
+                padding: 12px;
+                border: 1px solid var(--border);
+                background: var(--surface);
+                border-radius: 4px;
+                cursor: pointer;
+                text-align: left;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: border-color 0.2s, background 0.2s;
+              " onmouseover="this.style.borderColor='var(--primary-color)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-size: 20px;">${p.icon}</span>
+                <span style="font-weight: 500; color: var(--text-primary);">${p.name}</span>
+              </button>
+            `).join('')}
+          </div>
+          <div style="text-align: center; margin: 16px 0; color: var(--text-secondary); font-size: 13px;">or</div>
+        </div>
+      `;
+    }
+
+    dialog.innerHTML = `
+      <h3 style="margin: 0 0 20px 0; color: var(--text-primary);">Add Sync Directory</h3>
+
+      ${providerButtons}
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; font-weight: 500; color: var(--text-primary);">Name</label>
+        <input type="text" id="syncDirName" placeholder="e.g., Work, Personal" style="
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid var(--border);
+          border-radius: 4px;
+          font-size: 14px;
+          font-family: inherit;
+        ">
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 6px; font-weight: 500; color: var(--text-primary);">Path</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="syncDirPath" readonly placeholder="Click Browse to select..." style="
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            background: var(--surface);
+          ">
+          <button id="browseDirBtn" style="
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: var(--background);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+          ">Browse...</button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button id="cancelAddDir" style="
+          padding: 8px 16px;
+          border: 1px solid var(--border);
+          background: var(--background);
+          color: var(--text-primary);
+          border-radius: 4px;
+          cursor: pointer;
+        ">Cancel</button>
+        <button id="confirmAddDir" style="
+          padding: 8px 16px;
+          border: none;
+          background: var(--primary-color);
+          color: white;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+        ">Add</button>
+      </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    const nameInput = dialog.querySelector('#syncDirName') as HTMLInputElement;
+    const pathInput = dialog.querySelector('#syncDirPath') as HTMLInputElement;
+    const browseBtn = dialog.querySelector('#browseDirBtn');
+    const cancelBtn = dialog.querySelector('#cancelAddDir');
+    const confirmBtn = dialog.querySelector('#confirmAddDir');
+
+    // Provider button handlers
+    const providerBtns = dialog.querySelectorAll('.cloud-provider-btn');
+    providerBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const providerId = (btn as HTMLElement).dataset.providerId;
+        const provider = providers.find(p => p.id === providerId);
+        if (provider) {
+          nameInput.value = detector.getSuggestedName(provider);
+          pathInput.value = detector.getSuggestedPath(provider);
+        }
+      });
+    });
+
+    // Browse button handler
+    browseBtn?.addEventListener('click', async () => {
+      if (window.electronAPI?.isElectron) {
+        try {
+          const result = await window.electronAPI.dialog.showOpen({
+            properties: ['openDirectory', 'createDirectory'],
+            title: 'Select Sync Directory'
+          });
+
+          if (!result.canceled && result.filePaths.length > 0) {
+            pathInput.value = result.filePaths[0];
+          }
+        } catch (error) {
+          console.error('Failed to show directory picker:', error);
+        }
+      }
+    });
+
+    // Cancel button
+    cancelBtn?.addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+
+    // Confirm button
+    confirmBtn?.addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      const path = pathInput.value.trim();
+
+      if (!name) {
+        alert('Please enter a name for the sync directory.');
+        nameInput.focus();
+        return;
+      }
+
+      if (!path) {
+        alert('Please select a path for the sync directory.');
+        return;
+      }
+
+      // TODO: Add directory using syncDirectoryManager when implementing full multi-directory support
+      // try {
+      //   await this.syncDirectoryManager.addDirectory(name, path);
+      //   this.renderSyncDirectoriesList();
+      //   document.body.removeChild(overlay);
+      //   this.updateStatus(`Added sync directory: ${name}`);
+      // } catch (error) {
+      //   alert(`Failed to add sync directory: ${error.message}`);
+      // }
+
+      // For now, just show a message
+      alert(`Sync directory feature coming soon!\n\nName: ${name}\nPath: ${path}`);
+      document.body.removeChild(overlay);
+    });
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
+
+    // Focus name input
+    nameInput.focus();
+  }
 }
 
 // Global functions for HTML onclick handlers
 (window as any).createNewNote = () => {
   if ((window as any).app) {
     (window as any).app.createNewNote();
+  }
+};
+
+(window as any).openSettings = () => {
+  if ((window as any).app) {
+    (window as any).app.openSettings();
   }
 };
 

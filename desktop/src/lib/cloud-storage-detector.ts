@@ -108,8 +108,8 @@ export class CloudStorageDetector {
         paths.push(oneDrivePath);
       }
 
-      // Check for business/work accounts
-      const onedriveCommercial = await this.expandPath('%USERPROFILE%\\OneDrive - ');
+      // TODO: Check for business/work accounts
+      // const onedriveCommercial = await this.expandPath('%USERPROFILE%\\OneDrive - ');
       // Would need to enumerate to find exact names
     }
 
@@ -265,7 +265,7 @@ export class CloudStorageDetector {
   private async getPlatform(): Promise<string> {
     if (!this.isElectron) return 'browser';
     try {
-      return await window.electronAPI.system.getPlatform();
+      return await window.electronAPI?.system.getPlatform() || 'unknown';
     } catch (error) {
       console.error('Failed to get platform:', error);
       return 'unknown';
@@ -278,7 +278,7 @@ export class CloudStorageDetector {
   private async pathExists(path: string): Promise<boolean> {
     if (!this.isElectron) return false;
     try {
-      return await window.electronAPI.fileSystem.exists(path);
+      return await window.electronAPI?.fileSystem.exists(path) || false;
     } catch (error) {
       return false;
     }
@@ -290,7 +290,7 @@ export class CloudStorageDetector {
   private async expandPath(path: string): Promise<string> {
     if (!this.isElectron) return path;
     try {
-      return await window.electronAPI.fileSystem.expandPath(path);
+      return await window.electronAPI?.fileSystem.expandPath(path) || path;
     } catch (error) {
       console.error('Failed to expand path:', error);
       return path;
@@ -303,7 +303,7 @@ export class CloudStorageDetector {
   private async listDirectory(path: string): Promise<string[]> {
     if (!this.isElectron) return [];
     try {
-      return await window.electronAPI.fileSystem.listDirectory(path);
+      return await window.electronAPI?.fileSystem.listDirectory(path) || [];
     } catch (error) {
       console.error('Failed to list directory:', error);
       return [];
