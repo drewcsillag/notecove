@@ -82,6 +82,39 @@ export class NoteManager {
   }
 
   /**
+   * Remove a sync manager for a specific sync directory
+   * @param syncDirectoryId - ID of the sync directory to remove
+   */
+  async removeSyncManagerForDirectory(syncDirectoryId: string): Promise<void> {
+    const syncManager = this.syncManagers.get(syncDirectoryId);
+    if (!syncManager) {
+      console.warn(`NoteManager: No SyncManager found for directory ${syncDirectoryId}`);
+      return;
+    }
+
+    // Remove notes from this sync directory
+    const notesToRemove = Array.from(this.notes.values())
+      .filter(note => note.syncDirectoryId === syncDirectoryId)
+      .map(note => note.id);
+
+    for (const noteId of notesToRemove) {
+      this.notes.delete(noteId);
+    }
+
+    // Clean up and destroy the sync manager
+    await syncManager.destroy();
+    this.syncManagers.delete(syncDirectoryId);
+    console.log(`NoteManager: Removed SyncManager for directory ${syncDirectoryId}, removed ${notesToRemove.length} notes`);
+
+    // If this was the primary sync manager, set a new one
+    if (this.syncManager === syncManager) {
+      const remainingManagers = Array.from(this.syncManagers.values());
+      this.syncManager = remainingManagers.length > 0 ? remainingManagers[0] : null;
+      console.log(`NoteManager: Updated primary SyncManager`);
+    }
+  }
+
+  /**
    * Load notes from a specific sync directory
    * @param syncDirectoryId - ID of the sync directory
    * @param syncManager - SyncManager instance for this directory

@@ -3012,8 +3012,27 @@ class NoteCoveApp {
       }
 
       try {
-        await this.syncDirectoryManager.addDirectory(name, path);
+        const newDirectory = await this.syncDirectoryManager.addDirectory(name, path);
+
+        // Initialize sync manager for the new directory
+        if (this.isElectron && this.noteManager) {
+          const instanceId = await window.electronAPI?.settings.get('instance') as string | undefined;
+          const syncManager = new SyncManager(this.noteManager, newDirectory.path, instanceId);
+
+          // Add sync event listeners
+          syncManager.addListener((event: string, data: any) => this.handleSyncEvent(event, data));
+
+          // Add to NoteManager's sync manager map
+          await this.noteManager.addSyncManagerForDirectory(newDirectory.id, syncManager);
+
+          // Start watching CRDT files for sync
+          syncManager.startWatching();
+          console.log(`Sync manager initialized for new directory: ${newDirectory.name}`);
+        }
+
+        // Update UI
         await this.renderSyncDirectoriesList();
+        this.renderFolderTree();
         document.body.removeChild(overlay);
         this.updateStatus(`Added sync directory: ${name}`);
       } catch (error: any) {
@@ -3066,8 +3085,18 @@ class NoteCoveApp {
 
     if (confirmed) {
       try {
+        // Remove sync manager and its notes
+        if (this.noteManager) {
+          await this.noteManager.removeSyncManagerForDirectory(id);
+        }
+
+        // Remove from sync directory manager
         await this.syncDirectoryManager.removeDirectory(id);
+
+        // Update UI
         await this.renderSyncDirectoriesList();
+        this.renderFolderTree();
+        this.renderNotesList();
         this.updateStatus(`Removed "${directory.name}"`);
       } catch (error: any) {
         alert(`Failed to remove sync directory: ${error.message}`);
