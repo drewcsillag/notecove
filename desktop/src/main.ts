@@ -440,6 +440,35 @@ class NoteCoveApp {
       const result = await dialog.showMessageBox(this.mainWindow!, options);
       return result;
     });
+
+    // System operations
+    ipcMain.handle('system:get-platform', (): string => {
+      return process.platform;
+    });
+
+    // Path operations
+    ipcMain.handle('fs:expand-path', async (_event: IpcMainInvokeEvent, pathStr: string): Promise<string> => {
+      const os = await import('os');
+      // Expand ~ to home directory
+      let expanded = pathStr.replace(/^~/, os.homedir());
+      // Expand Windows environment variables like %USERPROFILE%
+      expanded = expanded.replace(/%([^%]+)%/g, (_match, envVar) => {
+        return process.env[envVar] || '';
+      });
+      return expanded;
+    });
+
+    ipcMain.handle('fs:list-directory', async (_event: IpcMainInvokeEvent, dirPath: string): Promise<string[]> => {
+      try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        return entries
+          .filter(entry => entry.isDirectory())
+          .map(entry => entry.name);
+      } catch (error) {
+        console.error('Failed to list directory:', error);
+        return [];
+      }
+    });
   }
 
   setupMenu(): void {

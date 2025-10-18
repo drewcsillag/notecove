@@ -11,6 +11,13 @@ interface FileSystemAPI {
   deleteDir: (path: string) => Promise<{ success: boolean; error?: string }>;
   watch: (path: string, watchId: string) => Promise<{ success: boolean; watchId?: string; error?: string }>;
   unwatch: (watchId: string) => Promise<{ success: boolean; error?: string }>;
+  expandPath: (path: string) => Promise<string>;
+  listDirectory: (path: string) => Promise<string[]>;
+  getUserDataPath: () => Promise<string>;
+}
+
+interface SystemAPI {
+  getPlatform: () => Promise<string>;
 }
 
 interface FileChangeData {
@@ -41,6 +48,9 @@ export interface ElectronAPI {
 
   // File system operations
   fileSystem: FileSystemAPI;
+
+  // System operations
+  system: SystemAPI;
 
   // File change events
   onFileChange: (watchId: string, callback: (event: IpcRendererEvent, data: FileChangeData) => void) => void;
@@ -89,7 +99,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       // Set up listener for this watch ID
       return await ipcRenderer.invoke('fs:watch', path, watchId);
     },
-    unwatch: (watchId: string) => ipcRenderer.invoke('fs:unwatch', watchId)
+    unwatch: (watchId: string) => ipcRenderer.invoke('fs:unwatch', watchId),
+    expandPath: (path: string) => ipcRenderer.invoke('fs:expand-path', path),
+    listDirectory: (path: string) => ipcRenderer.invoke('fs:list-directory', path),
+    getUserDataPath: () => ipcRenderer.invoke('fs:get-user-data-path')
+  },
+
+  // System operations
+  system: {
+    getPlatform: () => ipcRenderer.invoke('system:get-platform')
   },
 
   // File change events
