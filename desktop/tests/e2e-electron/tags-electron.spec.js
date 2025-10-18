@@ -224,12 +224,12 @@ test.describe('Tag Operations - Electron Mode (CRDT)', () => {
     // Verify tag counts
     const commonCount = await window.evaluate(() => {
       const tagItem = document.querySelector('.tag-item[data-tag="common"]');
-      return tagItem?.textContent?.match(/\((\d+)\)/)?.[1];
+      return tagItem?.querySelector('.tag-count')?.textContent;
     });
 
     const rareCount = await window.evaluate(() => {
       const tagItem = document.querySelector('.tag-item[data-tag="rare"]');
-      return tagItem?.textContent?.match(/\((\d+)\)/)?.[1];
+      return tagItem?.querySelector('.tag-count')?.textContent;
     });
 
     expect(commonCount).toBe('3');
