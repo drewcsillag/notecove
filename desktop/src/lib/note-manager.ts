@@ -449,14 +449,22 @@ export class NoteManager {
     const success = this.notes.delete(id);
     if (success) {
       // Delete the file in Electron mode
-      if (this.isElectron) {
+      if (this.isElectron && this.syncManager) {
         try {
-          // Note: fileStorage is not available in this TypeScript version
-          console.warn('permanentlyDeleteNote: file deletion not implemented');
+          // Delete the note directory from filesystem
+          const notePath = `${this.syncManager.notesPath}/${id}`;
+          const exists = await window.electronAPI?.fileSystem.exists(notePath);
+
+          if (exists) {
+            // Delete the entire note directory (including updates, meta, attachments)
+            await window.electronAPI?.fileSystem.deleteDir(notePath);
+            console.log(`[NoteManager] Permanently deleted note directory: ${id}`);
+          }
         } catch (error) {
-          console.error('Failed to delete note file:', error);
+          console.error('Failed to delete note directory:', error);
+          // Continue anyway - the note is already removed from the Map
         }
-      } else {
+      } else if (!this.isElectron) {
         await this.saveNotes();
       }
       this.notify('note-permanently-deleted', { id });

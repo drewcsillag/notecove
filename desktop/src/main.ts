@@ -415,6 +415,16 @@ class NoteCoveApp {
       }
     });
 
+    // Delete directory recursively
+    ipcMain.handle('fs:delete-dir', async (_event: IpcMainInvokeEvent, dirPath: string): Promise<FileOperationResult> => {
+      try {
+        await fs.rm(dirPath, { recursive: true, force: true });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
     // Dialog operations
     ipcMain.handle('dialog:show-open', async (_event: IpcMainInvokeEvent, options: Electron.OpenDialogOptions): Promise<Electron.OpenDialogReturnValue> => {
       const result = await dialog.showOpenDialog(this.mainWindow!, options);

@@ -8,6 +8,7 @@ interface FileSystemAPI {
   readDir: (path: string) => Promise<{ success: boolean; files?: string[]; error?: string }>;
   mkdir: (path: string) => Promise<{ success: boolean; error?: string }>;
   deleteFile: (path: string) => Promise<{ success: boolean; error?: string }>;
+  deleteDir: (path: string) => Promise<{ success: boolean; error?: string }>;
   watch: (path: string, watchId: string) => Promise<{ success: boolean; watchId?: string; error?: string }>;
   unwatch: (watchId: string) => Promise<{ success: boolean; error?: string }>;
 }
@@ -83,6 +84,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readDir: (path: string) => ipcRenderer.invoke('fs:read-dir', path),
     mkdir: (path: string) => ipcRenderer.invoke('fs:mkdir', path),
     deleteFile: (path: string) => ipcRenderer.invoke('fs:delete-file', path),
+    deleteDir: (path: string) => ipcRenderer.invoke('fs:delete-dir', path),
     watch: async (path: string, watchId: string) => {
       // Set up listener for this watch ID
       return await ipcRenderer.invoke('fs:watch', path, watchId);

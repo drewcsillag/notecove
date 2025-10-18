@@ -202,13 +202,24 @@ export class FolderManager {
         foldersDoc.transact(() => {
           const yMap = foldersDoc.getMap('folders');
 
-          // Clear existing folders
-          yMap.clear();
+          // Get current folder IDs in CRDT
+          const existingIds = Array.from(yMap.keys());
 
-          // Add all custom folders
+          // Get new folder IDs
+          const newIds = new Set(customFolders.map(f => f.id));
+
+          // Delete folders that no longer exist (individually, for proper CRDT sync)
+          existingIds.forEach(id => {
+            if (!newIds.has(id)) {
+              console.log(`[FolderManager]   Deleting folder from CRDT: ${id}`);
+              yMap.delete(id);
+            }
+          });
+
+          // Add or update all custom folders
           customFolders.forEach(folder => {
             const { id, ...folderData } = folder;
-            console.log(`[FolderManager]   Adding folder: ${folder.name} (${id})`);
+            console.log(`[FolderManager]   Setting folder: ${folder.name} (${id})`);
             yMap.set(id, folderData);
           });
         });

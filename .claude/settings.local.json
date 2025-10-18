@@ -103,7 +103,10 @@
       "Bash(timeout 5 npx electron:*)",
       "Bash(timeout 240 npx playwright test:*)",
       "Bash(find:*)",
-      "Bash(timeout 360 npm run test:e2e:electron:coverage)"
+      "Bash(timeout 360 npm run test:e2e:electron:coverage)",
+      "Bash(timeout 300 npm run test:e2e:electron:*)",
+      "Bash(timeout 600 npx playwright test:*)",
+      "Read(//private/tmp/**)"
     ],
     "deny": [],
     "ask": []
