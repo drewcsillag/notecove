@@ -159,6 +159,17 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     // Verify second directory shows count of 1
     const secondCount = await secondAllNotes.locator('.folder-count').textContent();
+
+    // Debug: Check what notes are actually in the list
+    if (parseInt(secondCount) !== 1) {
+      const notesList = await window.locator('#notesList .note-item .note-title').allTextContents();
+      console.log(`ERROR: Second directory count is ${secondCount}, expected 1`);
+      console.log('Notes in list:', notesList);
+
+      // Take a screenshot for debugging
+      await window.screenshot({ path: 'debug-test2-notes.png' });
+    }
+
     expect(parseInt(secondCount)).toBe(1);
 
   });

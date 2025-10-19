@@ -316,9 +316,8 @@ export class CRDTManager {
         yMetadata.set('folderId', note.folderId || null);
         yMetadata.set('deleted', note.deleted || false);
         yMetadata.set('contentVersion', 0); // Track correlation with content updates
-        if (note.syncDirectoryId) {
-          yMetadata.set('syncDirectoryId', note.syncDirectoryId);
-        }
+        // Always set syncDirectoryId, even if undefined (for proper filtering)
+        yMetadata.set('syncDirectoryId', note.syncDirectoryId || null);
 
         console.log(`  - Verified title in Y.Map:`, yMetadata.get('title'));
       } else {
