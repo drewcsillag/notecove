@@ -392,15 +392,16 @@ export class NoteManager {
   async saveNote(note: Note): Promise<void> {
     try {
       if (this.isElectron) {
-        // MUST use SyncManager for CRDT-based sync
-        if (!this.syncManager) {
-          console.error('ERROR: Trying to save note before SyncManager is ready!');
-          console.error('Note:', note.id, note.title);
+        // Get the correct SyncManager for this note's directory
+        const syncManager = this.getSyncManagerForNote(note.id);
+        if (!syncManager) {
+          console.error('ERROR: No SyncManager found for note!');
+          console.error('Note:', note.id, note.title, 'syncDirectoryId:', note.syncDirectoryId);
           console.trace('saveNote called from:');
           return;
         }
-        console.log('Saving note with CRDT sync:', note.id);
-        await this.syncManager.saveNoteWithCRDT(note);
+        console.log('Saving note with CRDT sync:', note.id, 'to directory:', note.syncDirectoryId || 'primary');
+        await syncManager.saveNoteWithCRDT(note);
       } else {
         // Web mode - use localStorage
         await this.saveNotes();
@@ -461,6 +462,11 @@ export class NoteManager {
       ...noteData
     };
 
+    // Validate that the sync directory exists if specified
+    if (note.syncDirectoryId && !this.syncManagers.has(note.syncDirectoryId)) {
+      throw new Error(`Sync directory ${note.syncDirectoryId} not found`);
+    }
+
     this.notes.set(note.id, note);
     // IMPORTANT: Await saveNote() to ensure CRDT is fully initialized before continuing
     // This prevents race conditions where the editor binds to a partially-initialized Y.Doc
@@ -468,11 +474,14 @@ export class NoteManager {
 
     // After CRDT initialization, sync the note object with CRDT metadata
     // (e.g., empty title becomes "Untitled" in CRDT)
-    if (this.isElectron && this.syncManager) {
-      const crdtTitle = this.syncManager.crdtManager.getMetadataDoc(note.id).getMap('metadata').get('title');
-      if (crdtTitle && crdtTitle !== note.title) {
-        note.title = crdtTitle as string;
-        this.notes.set(note.id, note);
+    if (this.isElectron) {
+      const syncManager = this.getSyncManagerForNote(note.id);
+      if (syncManager) {
+        const crdtTitle = syncManager.crdtManager.getMetadataDoc(note.id).getMap('metadata').get('title');
+        if (crdtTitle && crdtTitle !== note.title) {
+          note.title = crdtTitle as string;
+          this.notes.set(note.id, note);
+        }
       }
     }
 

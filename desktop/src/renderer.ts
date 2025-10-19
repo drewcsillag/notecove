@@ -909,9 +909,37 @@ class NoteCoveApp {
       this.noteManager.searchNotes(this.searchQuery) :
       this.notes;
 
+    // Filter by sync directory if one is selected
+    if (this.currentSyncDirectoryId) {
+      filteredNotes = filteredNotes.filter(note => {
+        // Handle notes without syncDirectoryId (legacy/migrated notes)
+        // They belong to the primary sync directory
+        if (!note.syncDirectoryId) {
+          // Get the first (primary) sync directory ID
+          const syncDirs = this.syncDirectoryManager?.getDirectories() || [];
+          const primaryDirId = syncDirs.length > 0 ? syncDirs[0].id : null;
+          return this.currentSyncDirectoryId === primaryDirId;
+        }
+        return note.syncDirectoryId === this.currentSyncDirectoryId;
+      });
+    }
+
     // Filter by folder if not "all-notes"
     if (this.currentFolderId && this.currentFolderId !== 'all-notes') {
       filteredNotes = this.noteManager.getNotesInFolder(this.currentFolderId);
+
+      // Also filter by sync directory
+      if (this.currentSyncDirectoryId) {
+        filteredNotes = filteredNotes.filter(note => {
+          // Handle notes without syncDirectoryId (legacy/migrated notes)
+          if (!note.syncDirectoryId) {
+            const syncDirs = this.syncDirectoryManager?.getDirectories() || [];
+            const primaryDirId = syncDirs.length > 0 ? syncDirs[0].id : null;
+            return this.currentSyncDirectoryId === primaryDirId;
+          }
+          return note.syncDirectoryId === this.currentSyncDirectoryId;
+        });
+      }
 
       // Apply search filter if there's a query
       if (this.searchQuery) {
@@ -1498,12 +1526,13 @@ class NoteCoveApp {
       await this.saveCurrentNote();
     }
 
-    // Create note in the currently selected folder
+    // Create note in the currently selected folder and sync directory
     // IMPORTANT: Await to ensure CRDT initialization completes before rendering
     const newNote = await this.noteManager!.createNote({
-      folderId: this.currentFolderId || 'all-notes'
+      folderId: this.currentFolderId || 'all-notes',
+      syncDirectoryId: this.currentSyncDirectoryId || undefined
     });
-    console.log('[createNewNote] Created new note:', newNote.id, newNote.title);
+    console.log('[createNewNote] Created new note:', newNote.id, newNote.title, 'in sync directory:', newNote.syncDirectoryId);
 
     this.currentNote = newNote;
     console.log('[createNewNote] Set this.currentNote to:', this.currentNote.id);
@@ -1511,9 +1540,13 @@ class NoteCoveApp {
 
     // In Electron mode, flush the new note immediately to ensure it's persisted
     // The Y.Doc is now fully initialized, so all subsequent updates will be captured
-    if (this.isElectron && this.syncManager) {
-      console.log('[createNewNote] Flushing note to disk:', this.currentNote.id);
-      await this.syncManager.updateStore.flush(newNote.id);
+    if (this.isElectron) {
+      // Get the correct sync manager for this note's directory
+      const syncManager = this.noteManager!.getSyncManagerForNote(newNote.id);
+      if (syncManager) {
+        console.log('[createNewNote] Flushing note to disk:', this.currentNote.id);
+        await syncManager.updateStore.flush(newNote.id);
+      }
     }
 
     // Don't call updateUI() here as it recreates the DOM and can interfere with click events
