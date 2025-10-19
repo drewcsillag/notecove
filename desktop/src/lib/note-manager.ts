@@ -884,18 +884,28 @@ export class NoteManager {
   /**
    * Get notes in a specific folder
    * @param folderId - Folder ID
+   * @param syncDirectoryId - Optional sync directory ID to filter by
    * @returns Notes in the folder
    */
-  getNotesInFolder(folderId: string): Note[] {
+  getNotesInFolder(folderId: string, syncDirectoryId?: string): Note[] {
+    let notes: Note[];
+
     if (folderId === 'all-notes') {
-      return this.getAllNotes();
+      notes = this.getAllNotes();
     } else if (folderId === 'trash') {
-      return Array.from(this.notes.values())
+      notes = Array.from(this.notes.values())
         .filter(note => note.deleted)
         .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
     } else {
-      return this.getAllNotes().filter(note => note.folderId === folderId);
+      notes = this.getAllNotes().filter(note => note.folderId === folderId);
     }
+
+    // Filter by sync directory if specified
+    if (syncDirectoryId) {
+      notes = notes.filter(note => note.syncDirectoryId === syncDirectoryId);
+    }
+
+    return notes;
   }
 
   /**

@@ -938,20 +938,8 @@ class NoteCoveApp {
 
     // Filter by folder if not "all-notes"
     if (this.currentFolderId && this.currentFolderId !== 'all-notes') {
-      filteredNotes = this.noteManager.getNotesInFolder(this.currentFolderId);
-
-      // Also filter by sync directory
-      if (this.currentSyncDirectoryId) {
-        filteredNotes = filteredNotes.filter(note => {
-          // Handle notes without syncDirectoryId (legacy/migrated notes)
-          if (!note.syncDirectoryId) {
-            const syncDirs = this.syncDirectoryManager?.getDirectories() || [];
-            const primaryDirId = syncDirs.length > 0 ? syncDirs[0].id : null;
-            return this.currentSyncDirectoryId === primaryDirId;
-          }
-          return note.syncDirectoryId === this.currentSyncDirectoryId;
-        });
-      }
+      // Pass sync directory ID to getNotesInFolder to filter correctly
+      filteredNotes = this.noteManager.getNotesInFolder(this.currentFolderId, this.currentSyncDirectoryId || undefined);
 
       // Apply search filter if there's a query
       if (this.searchQuery) {
@@ -982,12 +970,16 @@ class NoteCoveApp {
       }
     }
 
-    // Update notes count - show count in current folder view
+    // Update notes count - show count in current folder view, filtered by sync directory
     if (notesCount) {
       if (this.currentFolderId && this.currentFolderId !== 'all-notes') {
-        notesCount.textContent = this.noteManager.getNotesInFolder(this.currentFolderId).length.toString();
+        notesCount.textContent = this.noteManager.getNotesInFolder(this.currentFolderId, this.currentSyncDirectoryId || undefined).length.toString();
       } else {
-        notesCount.textContent = this.notes.length.toString();
+        // For "all-notes", filter by current sync directory
+        const allNotes = this.currentSyncDirectoryId
+          ? this.notes.filter(note => note.syncDirectoryId === this.currentSyncDirectoryId)
+          : this.notes;
+        notesCount.textContent = allNotes.length.toString();
       }
     }
 
@@ -1805,8 +1797,8 @@ class NoteCoveApp {
         ? `<span class="folder-collapse-arrow" onclick="event.stopPropagation(); app.toggleFolderCollapse('${folder.id}')">${isExpanded ? '▼' : '▶'}</span>`
         : '<span class="folder-collapse-arrow" style="visibility: hidden;">▼</span>';
 
-      // Get note count for this folder (direct children only)
-      const noteCount = this.noteManager!.getNotesInFolder(folder.id).length;
+      // Get note count for this folder (direct children only), filtered by sync directory
+      const noteCount = this.noteManager!.getNotesInFolder(folder.id, syncDirId).length;
 
       return `
         <div class="folder-item ${isActive ? 'active' : ''} ${isDraggable ? 'folder-item-custom' : ''}"
@@ -2713,8 +2705,8 @@ class NoteCoveApp {
     const folder = folderManager.getFolder(folderId);
     if (!folder) return;
 
-    // Check if folder has notes
-    const notesInFolder = this.noteManager.getNotesInFolder(folderId);
+    // Check if folder has notes (within this sync directory)
+    const notesInFolder = this.noteManager.getNotesInFolder(folderId, this.currentSyncDirectoryId || undefined);
     if (notesInFolder.length > 0) {
       alert(`Cannot delete folder "${folder.name}" - it contains ${notesInFolder.length} note(s). Please move or delete the notes first.`);
       return;
