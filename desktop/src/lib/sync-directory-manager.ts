@@ -155,7 +155,7 @@ export class SyncDirectoryManager {
     const maxOrder = this.config.directories.reduce((max, d) => Math.max(max, d.order), -1);
 
     const directory: SyncDirectory = {
-      id: this.generateId(),
+      id: this.generateId(path), // Generate stable ID from path
       name,
       path,
       created: now,
@@ -257,9 +257,20 @@ export class SyncDirectoryManager {
   }
 
   /**
-   * Generate a unique ID for a sync directory
+   * Generate a deterministic ID for a sync directory based on its path
+   * This ensures the same path always gets the same ID, which is critical
+   * for note persistence when removing and re-adding directories.
    */
-  private generateId(): string {
-    return `sync-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  private generateId(path: string): string {
+    // Create a simple hash from the path
+    let hash = 0;
+    for (let i = 0; i < path.length; i++) {
+      const char = path.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    // Convert to positive number and base36 string
+    const hashStr = Math.abs(hash).toString(36);
+    return `sync-${hashStr}`;
   }
 }
