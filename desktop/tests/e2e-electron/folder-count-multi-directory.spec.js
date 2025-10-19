@@ -43,18 +43,25 @@ test.describe('Folder Counts - Multi-Directory', () => {
   });
 
   test('new sync directory should show 0 note count in All Notes', async () => {
-    // Create a note in primary directory
-    await window.click('#newNoteBtn');
-    await window.keyboard.type('Primary Note');
-    await window.waitForTimeout(500);
+    // Wait for app to fully initialize and any welcome notes to be created
+    await window.waitForTimeout(1000);
 
-    // Verify primary directory shows count of 1
+    // Get initial count in primary directory
     const primaryAllNotes = window.locator('.sync-directory-group').first()
       .locator('.folder-item').filter({ hasText: 'All Notes' });
-    const primaryCount = await primaryAllNotes.locator('.folder-count').textContent();
-    expect(parseInt(primaryCount)).toBe(1);
+    const initialCount = parseInt(await primaryAllNotes.locator('.folder-count').textContent());
 
-    console.log('[Test] Primary directory has count of 1');
+    // Create a note in primary directory
+    await window.click('#newNoteBtn');
+    await window.waitForTimeout(300);
+    await window.keyboard.type('Primary Note');
+    await window.waitForTimeout(1000); // Wait for note to be created and UI to update
+
+    // Verify primary directory count increased by 1
+    const primaryCount = parseInt(await primaryAllNotes.locator('.folder-count').textContent());
+    expect(primaryCount).toBe(initialCount + 1);
+
+    console.log(`[Test] Primary directory count increased from ${initialCount} to ${primaryCount}`);
 
     // Add second sync directory
     await window.click('button[aria-label="Settings"]');
@@ -97,11 +104,11 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     console.log('[Test] Second directory correctly shows count of 0');
 
-    // Verify primary directory still shows count of 1
-    const primaryCountAfter = await primaryAllNotes.locator('.folder-count').textContent();
-    expect(parseInt(primaryCountAfter)).toBe(1);
+    // Verify primary directory still shows same count as before
+    const primaryCountAfter = parseInt(await primaryAllNotes.locator('.folder-count').textContent());
+    expect(primaryCountAfter).toBe(primaryCount);
 
-    console.log('[Test] Primary directory still shows count of 1');
+    console.log(`[Test] Primary directory still shows count of ${primaryCount}`);
   });
 
   test('folder counts should be scoped per sync directory', async () => {
