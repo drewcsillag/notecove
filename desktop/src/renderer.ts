@@ -74,6 +74,11 @@ class NoteCoveApp {
   // Context menu state
   contextMenuFolderId: string | null;
 
+  // Multi-select state
+  selectedNoteIds: Set<string>;
+  isMultiSelectMode: boolean;
+  lastSelectedNoteId: string | null; // For shift-click range selection
+
   constructor() {
     this.currentNote = null;
     this.notes = [];
@@ -90,6 +95,9 @@ class NoteCoveApp {
     this.tagFilterState = null; // Tag filter state: { tag: string, mode: 'include' | 'exclude' } or null
     this.isSettingContent = false; // Flag to prevent update handlers during programmatic content changes
     this.noteGaps = new Map(); // Track gaps per note: noteId -> gap summary
+    this.selectedNoteIds = new Set();
+    this.isMultiSelectMode = false;
+    this.lastSelectedNoteId = null;
     this.isElectron = false;
     this._isRendering = false;
     this.contextMenuFolderId = null;
@@ -465,7 +473,7 @@ class NoteCoveApp {
 
         const noteId = noteItem.dataset.noteId;
         if (noteId) {
-          this.selectNote(noteId);
+          this.handleNoteClick(noteId, e as MouseEvent);
         }
       });
     }
@@ -1824,6 +1832,7 @@ class NoteCoveApp {
   selectFolder(folderId: string, syncDirId?: string): void {
     this.currentFolderId = folderId;
     this.currentSyncDirectoryId = syncDirId || null;
+    this.clearSelection(); // Clear multi-select when changing folders
     this.renderFolderTree();
     this.updateUI();
   }
@@ -1970,6 +1979,180 @@ class NoteCoveApp {
       console.warn(`[NoteLink] Note not found: "${noteTitle}"`);
       // Could optionally show a notification to the user
     }
+  }
+
+  /**
+   * Handle note click with multi-select support
+   */
+  handleNoteClick(noteId: string, event: MouseEvent): void {
+    const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+    const isShift = event.shiftKey;
+
+    if (isCtrlOrCmd) {
+      // Cmd/Ctrl + Click: Toggle selection
+      this.toggleNoteSelection(noteId);
+    } else if (isShift) {
+      // Shift + Click: Range selection
+      this.rangeSelectNotes(noteId);
+    } else {
+      // Regular click: Clear selection and select single note
+      this.clearSelection();
+      this.selectNote(noteId);
+    }
+  }
+
+  /**
+   * Toggle selection of a single note
+   */
+  toggleNoteSelection(noteId: string): void {
+    if (this.selectedNoteIds.has(noteId)) {
+      this.selectedNoteIds.delete(noteId);
+    } else {
+      this.selectedNoteIds.add(noteId);
+    }
+
+    this.isMultiSelectMode = this.selectedNoteIds.size > 0;
+    this.lastSelectedNoteId = noteId;
+    this.updateSelectionUI();
+  }
+
+  /**
+   * Select range of notes from last selected to current
+   */
+  rangeSelectNotes(noteId: string): void {
+    if (!this.noteManager) return;
+
+    const visibleNotes = this.getFilteredNotes();
+    const noteIds = visibleNotes.map(n => n.id);
+
+    const currentIndex = noteIds.indexOf(noteId);
+    const lastIndex = this.lastSelectedNoteId ? noteIds.indexOf(this.lastSelectedNoteId) : -1;
+
+    if (currentIndex === -1) return;
+
+    // If no last selected note, just select this one
+    if (lastIndex === -1) {
+      this.selectedNoteIds.clear();
+      this.selectedNoteIds.add(noteId);
+      this.lastSelectedNoteId = noteId;
+    } else {
+      // Select all notes in range
+      const startIndex = Math.min(currentIndex, lastIndex);
+      const endIndex = Math.max(currentIndex, lastIndex);
+
+      for (let i = startIndex; i <= endIndex; i++) {
+        this.selectedNoteIds.add(noteIds[i]);
+      }
+    }
+
+    this.isMultiSelectMode = this.selectedNoteIds.size > 0;
+    this.updateSelectionUI();
+  }
+
+  /**
+   * Clear all selections
+   */
+  clearSelection(): void {
+    this.selectedNoteIds.clear();
+    this.isMultiSelectMode = false;
+    this.lastSelectedNoteId = null;
+    this.updateSelectionUI();
+  }
+
+  /**
+   * Select all visible notes
+   */
+  selectAllNotes(): void {
+    const visibleNotes = this.getFilteredNotes();
+    this.selectedNoteIds.clear();
+    visibleNotes.forEach(note => this.selectedNoteIds.add(note.id));
+    this.isMultiSelectMode = this.selectedNoteIds.size > 0;
+
+    if (visibleNotes.length > 0) {
+      this.lastSelectedNoteId = visibleNotes[visibleNotes.length - 1].id;
+    }
+
+    this.updateSelectionUI();
+  }
+
+  /**
+   * Update UI to reflect current selection state
+   */
+  updateSelectionUI(): void {
+    // Update note item styling
+    const noteItems = document.querySelectorAll('.note-item');
+    noteItems.forEach(item => {
+      const noteId = (item as HTMLElement).dataset.noteId;
+      if (noteId && this.selectedNoteIds.has(noteId)) {
+        item.classList.add('selected');
+      } else {
+        item.classList.remove('selected');
+      }
+    });
+
+    // Update selection badge
+    this.updateSelectionBadge();
+  }
+
+  /**
+   * Update the floating selection count badge
+   */
+  updateSelectionBadge(): void {
+    let badge = document.getElementById('selectionBadge');
+
+    if (this.selectedNoteIds.size > 0) {
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.id = 'selectionBadge';
+        badge.className = 'selection-badge';
+        document.body.appendChild(badge);
+      }
+      badge.textContent = `${this.selectedNoteIds.size} note${this.selectedNoteIds.size > 1 ? 's' : ''} selected`;
+      badge.style.display = 'block';
+    } else if (badge) {
+      badge.style.display = 'none';
+    }
+  }
+
+  /**
+   * Get filtered notes based on current folder/search/tag filters
+   */
+  getFilteredNotes(): Note[] {
+    if (!this.noteManager) return [];
+
+    let filteredNotes: Note[];
+
+    // Filter by folder
+    if (this.currentFolderId === 'all-notes') {
+      filteredNotes = this.noteManager.getAllNotes();
+    } else if (this.currentFolderId === 'trash') {
+      filteredNotes = Array.from(this.noteManager['notes'].values())
+        .filter(note => note.deleted)
+        .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
+    } else {
+      filteredNotes = this.noteManager.getNotesInFolder(this.currentFolderId, this.currentSyncDirectoryId || undefined);
+    }
+
+    // Apply search filter
+    if (this.searchQuery) {
+      const query = this.searchQuery.toLowerCase();
+      filteredNotes = filteredNotes.filter(note =>
+        note.title.toLowerCase().includes(query) ||
+        note.content.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply tag filter
+    if (this.tagFilterState) {
+      const { tag, mode } = this.tagFilterState;
+      filteredNotes = filteredNotes.filter(note => {
+        const hasTags = note.tags && note.tags.length > 0;
+        const hasTag = hasTags && note.tags!.includes(tag);
+        return mode === 'include' ? hasTag : !hasTag;
+      });
+    }
+
+    return filteredNotes;
   }
 
   async selectNote(noteId: string): Promise<void> {
@@ -2232,6 +2415,15 @@ class NoteCoveApp {
   }
 
   handleKeyboard(e: KeyboardEvent): void {
+    // Handle Escape key to clear selection
+    if (e.key === 'Escape') {
+      if (this.selectedNoteIds.size > 0) {
+        e.preventDefault();
+        this.clearSelection();
+        return;
+      }
+    }
+
     // Handle global keyboard shortcuts
     if (e.metaKey || e.ctrlKey) {
       switch (e.key) {
@@ -2242,6 +2434,16 @@ class NoteCoveApp {
         case 's':
           e.preventDefault();
           this.saveCurrentNote();
+          break;
+        case 'a':
+          // Cmd/Ctrl+A: Select all notes (only if focus is on notes panel)
+          const activeElement = document.activeElement;
+          const isInNotesPanel = activeElement?.closest('#notesList') ||
+                                activeElement?.closest('.notes-panel');
+          if (isInNotesPanel || activeElement?.tagName === 'BODY') {
+            e.preventDefault();
+            this.selectAllNotes();
+          }
           break;
       }
     }
