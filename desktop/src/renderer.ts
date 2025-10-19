@@ -50,6 +50,7 @@ class NoteCoveApp {
   searchQuery: string;
   tagSearchQuery: string;
   currentFolderId: string;
+  currentSyncDirectoryId: string | null; // Track which sync directory the current folder belongs to
   folderManager: any; // FolderManager type from note-manager
   tagFilterState: TagFilterState | null;
   isSettingContent: boolean;
@@ -84,6 +85,7 @@ class NoteCoveApp {
     this.searchQuery = '';
     this.tagSearchQuery = '';
     this.currentFolderId = 'all-notes'; // Default to All Notes folder
+    this.currentSyncDirectoryId = null; // Will be set to the first sync directory
     this.folderManager = null;
     this.tagFilterState = null; // Tag filter state: { tag: string, mode: 'include' | 'exclude' } or null
     this.isSettingContent = false; // Flag to prevent update handlers during programmatic content changes
@@ -234,6 +236,8 @@ class NoteCoveApp {
     // Set primary sync manager reference for backwards compatibility
     if (syncDirs.length > 0) {
       this.syncManager = this.noteManager.syncManager;
+      // Set the first sync directory as the current one
+      this.currentSyncDirectoryId = syncDirs[0].id;
     }
 
     console.log(`Initialized ${syncDirs.length} sync manager(s)`);
@@ -1737,7 +1741,9 @@ class NoteCoveApp {
       const icon = folder.icon || '📁';
       const hasChildren = folder.children && folder.children.length > 0;
       const isExpanded = folderManager.isFolderExpanded(folder.id);
-      const isActive = this.currentFolderId === folder.id;
+      // Only highlight if both folder ID and sync directory ID match
+      const isActive = this.currentFolderId === folder.id &&
+                       this.currentSyncDirectoryId === syncDirId;
       const isDraggable = !folder.isSpecial && !folder.isRoot;
 
       // Show collapse arrow only if folder has children
@@ -1755,7 +1761,7 @@ class NoteCoveApp {
              ${isDraggable ? 'draggable="true"' : ''}
              ${isDraggable ? 'ondragstart="app.handleFolderDragStart(event)"' : ''}
              ${isDraggable ? 'ondragend="app.handleFolderDragEnd(event)"' : ''}
-             onclick="app.selectFolder('${folder.id}')"
+             onclick="app.selectFolder('${folder.id}', '${syncDirId || ''}')"
              ondragover="app.handleFolderDragOver(event)"
              ondragleave="app.handleFolderDragLeave(event)"
              ondrop="app.handleFolderDrop(event)">
@@ -1769,8 +1775,9 @@ class NoteCoveApp {
     }).join('');
   }
 
-  selectFolder(folderId: string): void {
+  selectFolder(folderId: string, syncDirId?: string): void {
     this.currentFolderId = folderId;
+    this.currentSyncDirectoryId = syncDirId || null;
     this.renderFolderTree();
     this.updateUI();
   }

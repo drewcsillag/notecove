@@ -235,4 +235,61 @@ test.describe('Sync Directory Management - Electron Mode', () => {
     console.log('[Test] New arrow:', newArrow);
     expect(newArrow).not.toBe(initialArrow);
   });
+
+  test('should highlight folder in only one sync directory at a time', async () => {
+    // Create and add a second sync directory
+    const syncPath = path.join(testDir, 'second-sync-dir');
+    await fs.mkdir(syncPath, { recursive: true });
+
+    await window.click('.settings-btn');
+    await window.waitForTimeout(500);
+    await window.click('#addSyncDirectoryBtn');
+    await window.waitForTimeout(500);
+
+    await window.locator('#syncDirName').fill('Second Workspace');
+    await window.evaluate((p) => {
+      document.querySelector('#syncDirPath').value = p;
+    }, syncPath);
+    await window.click('#confirmAddDir');
+    await window.waitForTimeout(1000);
+
+    // Close settings
+    await window.click('#settingsClose');
+    await window.waitForTimeout(500);
+
+    // Now we should have two sync directories
+    const syncDirGroups = window.locator('.sync-directory-group');
+    const count = await syncDirGroups.count();
+    console.log('[Test] Number of sync directories:', count);
+    expect(count).toBe(2);
+
+    // Click "All Notes" folder in the first sync directory
+    const firstAllNotes = window.locator('.folder-item').filter({ hasText: 'All Notes' }).first();
+    await firstAllNotes.click();
+    await window.waitForTimeout(500);
+
+    // Count how many "All Notes" folders are highlighted (active)
+    const activeFolders = window.locator('.folder-item.active');
+    const activeCount = await activeFolders.count();
+    console.log('[Test] Number of active folders:', activeCount);
+
+    // Only ONE folder should be highlighted, not multiple
+    expect(activeCount).toBe(1);
+
+    // Verify the highlighted folder is in the first sync directory
+    const activeFolder = activeFolders.first();
+    const activeFolderText = await activeFolder.textContent();
+    console.log('[Test] Active folder text:', activeFolderText);
+    expect(activeFolderText).toContain('All Notes');
+
+    // Click "All Notes" in the second sync directory
+    const secondAllNotes = window.locator('.folder-item').filter({ hasText: 'All Notes' }).nth(1);
+    await secondAllNotes.click();
+    await window.waitForTimeout(500);
+
+    // Again, only ONE folder should be highlighted
+    const activeCount2 = await activeFolders.count();
+    console.log('[Test] Number of active folders after second click:', activeCount2);
+    expect(activeCount2).toBe(1);
+  });
 });
