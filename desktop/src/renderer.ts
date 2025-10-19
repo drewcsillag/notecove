@@ -1548,13 +1548,22 @@ class NoteCoveApp {
   async createNewFolder(): Promise<void> {
     if (!this.folderManager) return;
 
+    // Get the appropriate folder manager for the current sync directory
+    let folderManager = this.folderManager; // Default to primary
+    if (this.noteManager && this.currentSyncDirectoryId) {
+      const syncDirFolderManager = this.noteManager.getFolderManagerForDirectory(this.currentSyncDirectoryId);
+      if (syncDirFolderManager) {
+        folderManager = syncDirFolderManager;
+      }
+    }
+
     // Determine parent folder
     let parentId = 'root';
     let parentName: string | null = null;
 
     // If a custom folder is selected (not special folders), offer to create subfolder
     if (this.currentFolderId && this.currentFolderId !== 'all-notes' && this.currentFolderId !== 'trash') {
-      const currentFolder = this.folderManager.getFolder(this.currentFolderId);
+      const currentFolder = folderManager.getFolder(this.currentFolderId);
       if (currentFolder && !currentFolder.isSpecial) {
         const createSubfolder = await this.showConfirmDialog(
           'Create Subfolder?',
@@ -1573,7 +1582,7 @@ class NoteCoveApp {
     if (!folderName || !folderName.trim()) return;
 
     try {
-      const folder = await this.folderManager.createFolder(folderName, parentId);
+      const folder = await folderManager.createFolder(folderName, parentId);
       if (parentName) {
         this.updateStatus(`Created subfolder "${folder.name}" in "${parentName}"`);
       } else {
@@ -2573,7 +2582,17 @@ class NoteCoveApp {
     if (!this.noteManager || !this.contextMenuFolderId) return;
 
     const folderId = this.contextMenuFolderId;
-    const folder = this.noteManager.getFolderManager().getFolder(folderId);
+
+    // Get the appropriate folder manager for the current sync directory
+    let folderManager = this.noteManager.getFolderManager(); // Default to primary
+    if (this.currentSyncDirectoryId) {
+      const syncDirFolderManager = this.noteManager.getFolderManagerForDirectory(this.currentSyncDirectoryId);
+      if (syncDirFolderManager) {
+        folderManager = syncDirFolderManager;
+      }
+    }
+
+    const folder = folderManager.getFolder(folderId);
     if (!folder) return;
 
     this.hideFolderContextMenu();
@@ -2585,7 +2604,7 @@ class NoteCoveApp {
 
       case 'move-to-root':
         if (folder.parentId !== 'root') {
-          const movedFolder = await this.noteManager.getFolderManager().moveFolder(folderId, 'root');
+          const movedFolder = await folderManager.moveFolder(folderId, 'root');
           if (movedFolder) {
             this.updateStatus(`Moved "${folder.name}" to top level`);
             this.renderFolderTree();
@@ -2609,12 +2628,21 @@ class NoteCoveApp {
   async renameFolderDialog(folderId: string): Promise<void> {
     if (!this.noteManager) return;
 
-    const folder = this.noteManager.getFolderManager().getFolder(folderId);
+    // Get the appropriate folder manager for the current sync directory
+    let folderManager = this.noteManager.getFolderManager(); // Default to primary
+    if (this.currentSyncDirectoryId) {
+      const syncDirFolderManager = this.noteManager.getFolderManagerForDirectory(this.currentSyncDirectoryId);
+      if (syncDirFolderManager) {
+        folderManager = syncDirFolderManager;
+      }
+    }
+
+    const folder = folderManager.getFolder(folderId);
     if (!folder) return;
 
     const newName = prompt('Rename folder:', folder.name);
     if (newName && newName.trim() && newName.trim() !== folder.name) {
-      const updated = await this.noteManager.getFolderManager().updateFolder(folderId, { name: newName.trim() });
+      const updated = await folderManager.updateFolder(folderId, { name: newName.trim() });
       if (updated) {
         this.updateStatus(`Renamed folder to "${newName.trim()}"`);
         this.renderFolderTree();
@@ -2628,7 +2656,16 @@ class NoteCoveApp {
   async deleteFolderDialog(folderId: string): Promise<void> {
     if (!this.noteManager) return;
 
-    const folder = this.noteManager.getFolderManager().getFolder(folderId);
+    // Get the appropriate folder manager for the current sync directory
+    let folderManager = this.noteManager.getFolderManager(); // Default to primary
+    if (this.currentSyncDirectoryId) {
+      const syncDirFolderManager = this.noteManager.getFolderManagerForDirectory(this.currentSyncDirectoryId);
+      if (syncDirFolderManager) {
+        folderManager = syncDirFolderManager;
+      }
+    }
+
+    const folder = folderManager.getFolder(folderId);
     if (!folder) return;
 
     // Check if folder has notes
@@ -2639,7 +2676,7 @@ class NoteCoveApp {
     }
 
     // Check if folder has children
-    const hasChildren = this.noteManager.getFolderManager().hasChildFolders(folderId);
+    const hasChildren = folderManager.hasChildFolders(folderId);
     if (hasChildren) {
       alert(`Cannot delete folder "${folder.name}" - it contains subfolders. Please delete or move the subfolders first.`);
       return;
@@ -2647,7 +2684,7 @@ class NoteCoveApp {
 
     const confirmed = confirm(`Are you sure you want to delete the folder "${folder.name}"?`);
     if (confirmed) {
-      const success = await this.noteManager.getFolderManager().deleteFolder(folderId);
+      const success = await folderManager.deleteFolder(folderId);
       if (success) {
         this.updateStatus(`Deleted folder "${folder.name}"`);
         // If we were viewing this folder, switch to All Notes
