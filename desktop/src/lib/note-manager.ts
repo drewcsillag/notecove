@@ -147,21 +147,23 @@ export class NoteManager {
     console.log(`NoteManager: Loading notes from directory ${syncDirectoryId}`);
     const notes = await syncManager.loadAllNotes();
 
-    // Tag each note with its sync directory ID and persist to CRDT
+    // Load notes and respect their syncDirectoryId from CRDT metadata
     for (const note of notes) {
-      note.syncDirectoryId = syncDirectoryId;
-      this.notes.set(note.id, note);
+      // If note already has syncDirectoryId from CRDT metadata, keep it
+      // Otherwise, set it to current syncDirectoryId (for migration of old notes)
+      if (!note.syncDirectoryId) {
+        console.log(`[loadNotesFromDirectory] Note ${note.id} has no syncDirectoryId, setting to ${syncDirectoryId}`);
+        note.syncDirectoryId = syncDirectoryId;
 
-      // Persist syncDirectoryId to CRDT metadata if not already there
-      // This ensures notes loaded from older CRDT files get tagged properly
-      if (syncManager.crdtManager) {
-        const metadata = syncManager.crdtManager.getMetadataDoc(note.id).getMap('metadata');
-        const existingSyncDirId = metadata.get('syncDirectoryId');
-        if (existingSyncDirId !== syncDirectoryId) {
-          console.log(`[loadNotesFromDirectory] Updating syncDirectoryId in CRDT for note ${note.id}`);
+        // Persist to CRDT for future loads
+        if (syncManager.crdtManager) {
           syncManager.crdtManager.updateMetadata(note.id, { syncDirectoryId });
         }
+      } else {
+        console.log(`[loadNotesFromDirectory] Note ${note.id} has syncDirectoryId: ${note.syncDirectoryId}`);
       }
+
+      this.notes.set(note.id, note);
     }
 
     console.log(`NoteManager: Loaded ${notes.length} notes from directory ${syncDirectoryId}`);
@@ -429,12 +431,24 @@ export class NoteManager {
   }
 
   /**
-   * Get all notes
+   * Get all notes from active sync directories
    * @returns Array of notes
    */
   getAllNotes(): Note[] {
+    // Get list of active sync directory IDs
+    const activeSyncDirIds = Array.from(this.syncManagers.keys());
+
     return Array.from(this.notes.values())
-      .filter(note => !note.deleted)
+      .filter(note => {
+        // Exclude deleted notes
+        if (note.deleted) return false;
+
+        // Include notes without syncDirectoryId (legacy notes)
+        if (!note.syncDirectoryId) return true;
+
+        // Only include notes from active sync directories
+        return activeSyncDirIds.includes(note.syncDirectoryId);
+      })
       .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
   }
 

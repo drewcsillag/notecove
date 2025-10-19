@@ -3178,6 +3178,23 @@ class NoteCoveApp {
 
     if (confirmed) {
       try {
+        // Check if current note belongs to the directory being removed
+        if (this.currentNote) {
+          const note = this.noteManager?.getNote(this.currentNote);
+          if (note && note.syncDirectoryId === id) {
+            // Clear the editor and current note since it's being removed
+            this.currentNote = null;
+            if (this.editor) {
+              this.editor.commands.setContent('');
+            }
+            // Clear the editor panel title
+            const titleElement = document.querySelector('.editor-note-title');
+            if (titleElement) {
+              titleElement.textContent = '';
+            }
+          }
+        }
+
         // Remove sync manager and its notes
         if (this.noteManager) {
           await this.noteManager.removeSyncManagerForDirectory(id);
