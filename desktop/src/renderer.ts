@@ -1581,7 +1581,7 @@ class NoteCoveApp {
     // Create note in the currently selected folder and sync directory
     // IMPORTANT: Await to ensure CRDT initialization completes before rendering
     const newNote = await this.noteManager!.createNote({
-      folderId: this.currentFolderId || 'all-notes',
+      folderId: (this.currentFolderId && this.currentFolderId !== 'all-notes') ? this.currentFolderId : '',
       syncDirectoryId: this.currentSyncDirectoryId || undefined
     });
 
@@ -1604,6 +1604,7 @@ class NoteCoveApp {
     // 1. Add the new note to the notes list (uses event delegation for clicks)
     this.renderNotesList();
     this.renderTagsList();
+    this.renderFolderTree(); // Update folder counts
 
     // 2. Update editor content
     await this.renderCurrentNote();
