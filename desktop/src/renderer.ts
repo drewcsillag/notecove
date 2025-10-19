@@ -957,20 +957,13 @@ class NoteCoveApp {
 
     if (!notesList || !this.noteManager) return;
 
-    console.log('[renderNotesList] Starting, currentSyncDirectoryId:', this.currentSyncDirectoryId, 'currentFolderId:', this.currentFolderId);
-    console.log('[renderNotesList] Total notes in memory:', this.notes.length);
-
     // Get notes based on search query or all notes
     let filteredNotes = this.searchQuery ?
       this.noteManager.searchNotes(this.searchQuery) :
       this.notes;
 
-    console.log('[renderNotesList] After search filter:', filteredNotes.length);
-
     // Filter by sync directory if one is selected
     if (this.currentSyncDirectoryId) {
-      console.log('[renderNotesList] Filtering by sync directory:', this.currentSyncDirectoryId);
-      const beforeCount = filteredNotes.length;
       filteredNotes = filteredNotes.filter(note => {
         // Handle notes without syncDirectoryId (legacy/migrated notes)
         // They belong to the primary sync directory
@@ -978,15 +971,10 @@ class NoteCoveApp {
           // Get the first (primary) sync directory ID
           const syncDirs = this.syncDirectoryManager?.getDirectories() || [];
           const primaryDirId = syncDirs.length > 0 ? syncDirs[0].id : null;
-          const matches = this.currentSyncDirectoryId === primaryDirId;
-          console.log('[renderNotesList] Note', note.id, 'has no syncDirectoryId, primaryDirId:', primaryDirId, 'matches:', matches);
-          return matches;
+          return this.currentSyncDirectoryId === primaryDirId;
         }
-        const matches = note.syncDirectoryId === this.currentSyncDirectoryId;
-        console.log('[renderNotesList] Note', note.id, 'syncDirectoryId:', note.syncDirectoryId, 'matches:', matches);
-        return matches;
+        return note.syncDirectoryId === this.currentSyncDirectoryId;
       });
-      console.log('[renderNotesList] After sync directory filter:', filteredNotes.length, '(was', beforeCount, ')');
     }
 
     // Filter by folder if not "all-notes"
@@ -1583,13 +1571,10 @@ class NoteCoveApp {
   }
 
   async createNewNote(): Promise<void> {
-    console.log('[createNewNote] Starting...');
     const previousNote = this.currentNote;
-    console.log('[createNewNote] Previous note was:', previousNote?.id, previousNote?.title);
 
     // Save the current note before creating a new one (critical for Electron mode)
     if (previousNote) {
-      console.log('[createNewNote] Saving previous note before switching...');
       await this.saveCurrentNote();
     }
 
@@ -1599,10 +1584,8 @@ class NoteCoveApp {
       folderId: this.currentFolderId || 'all-notes',
       syncDirectoryId: this.currentSyncDirectoryId || undefined
     });
-    console.log('[createNewNote] Created new note:', newNote.id, newNote.title, 'in sync directory:', newNote.syncDirectoryId);
 
     this.currentNote = newNote;
-    console.log('[createNewNote] Set this.currentNote to:', this.currentNote.id);
     this.isEditing = false; // Reset editing state to ensure editor gets cleared
 
     // In Electron mode, flush the new note immediately to ensure it's persisted
@@ -1611,7 +1594,6 @@ class NoteCoveApp {
       // Get the correct sync manager for this note's directory
       const syncManager = this.noteManager!.getSyncManagerForNote(newNote.id);
       if (syncManager) {
-        console.log('[createNewNote] Flushing note to disk:', this.currentNote.id);
         await syncManager.updateStore.flush(newNote.id);
       }
     }
@@ -1620,13 +1602,10 @@ class NoteCoveApp {
     // Instead, just update what's needed:
 
     // 1. Add the new note to the notes list (uses event delegation for clicks)
-    console.log('[createNewNote] Before renderNotesList, this.currentNote is:', this.currentNote.id);
     this.renderNotesList();
-    console.log('[createNewNote] After renderNotesList, this.currentNote is:', this.currentNote.id);
     this.renderTagsList();
 
     // 2. Update editor content
-    console.log('[createNewNote] Before renderCurrentNote, this.currentNote is:', this.currentNote.id);
     await this.renderCurrentNote();
 
     // 3. Show editor state if it's hidden
@@ -2043,26 +2022,14 @@ class NoteCoveApp {
     const isCtrlOrCmd = event.ctrlKey || event.metaKey;
     const isShift = event.shiftKey;
 
-    console.log('[handleNoteClick]', {
-      noteId,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      shiftKey: event.shiftKey,
-      isCtrlOrCmd,
-      isShift
-    });
-
     if (isCtrlOrCmd) {
       // Cmd/Ctrl + Click: Toggle selection
-      console.log('[handleNoteClick] Toggling selection');
       this.toggleNoteSelection(noteId);
     } else if (isShift) {
       // Shift + Click: Range selection
-      console.log('[handleNoteClick] Range selecting');
       this.rangeSelectNotes(noteId);
     } else {
       // Regular click: Clear selection and select single note
-      console.log('[handleNoteClick] Regular click');
       this.clearSelection();
       this.selectNote(noteId);
     }
@@ -2072,14 +2039,6 @@ class NoteCoveApp {
    * Toggle selection of a single note
    */
   toggleNoteSelection(noteId: string): void {
-    console.log('[toggleNoteSelection] Before:', {
-      noteId,
-      wasSelected: this.selectedNoteIds.has(noteId),
-      currentSelectionSize: this.selectedNoteIds.size,
-      selectedIds: Array.from(this.selectedNoteIds),
-      currentNoteId: this.currentNote?.id
-    });
-
     // If starting a new multi-select and clicking a different note than the active one,
     // automatically include the active note in the selection
     // BUT only if the active note is not in trash and exists in the current filtered view
@@ -2087,25 +2046,17 @@ class NoteCoveApp {
       const activeNoteInFilteredView = this.getFilteredNotes().some(n => n.id === this.currentNote!.id);
       if (activeNoteInFilteredView) {
         this.selectedNoteIds.add(this.currentNote.id);
-        console.log('[toggleNoteSelection] Auto-included active note:', this.currentNote.id);
       }
     }
 
     if (this.selectedNoteIds.has(noteId)) {
       this.selectedNoteIds.delete(noteId);
-      console.log('[toggleNoteSelection] Removed from selection');
     } else {
       this.selectedNoteIds.add(noteId);
-      console.log('[toggleNoteSelection] Added to selection');
     }
 
     this.isMultiSelectMode = this.selectedNoteIds.size > 0;
     this.lastSelectedNoteId = noteId;
-
-    console.log('[toggleNoteSelection] After:', {
-      newSelectionSize: this.selectedNoteIds.size,
-      selectedIds: Array.from(this.selectedNoteIds)
-    });
 
     this.updateSelectionUI();
   }
@@ -2207,15 +2158,18 @@ class NoteCoveApp {
   updateSelectionBadge(): void {
     let badge = document.getElementById('selectionBadge');
 
-    // Only show badge when 2+ notes are selected
-    if (this.selectedNoteIds.size > 1) {
+    // Show badge when 1+ notes are selected
+    if (this.selectedNoteIds.size >= 1) {
       if (!badge) {
         badge = document.createElement('div');
         badge.id = 'selectionBadge';
         badge.className = 'selection-badge';
         document.body.appendChild(badge);
       }
-      badge.textContent = `${this.selectedNoteIds.size} notes selected`;
+      const text = this.selectedNoteIds.size === 1
+        ? '1 note selected'
+        : `${this.selectedNoteIds.size} notes selected`;
+      badge.textContent = text;
       badge.style.display = 'block';
     } else if (badge) {
       badge.style.display = 'none';
@@ -2345,6 +2299,9 @@ class NoteCoveApp {
 
     // Clear selection
     this.clearSelection();
+
+    // Refresh notes from manager
+    this.notes = this.noteManager.getAllNotes();
 
     // Refresh notes list
     this.renderNotesList();

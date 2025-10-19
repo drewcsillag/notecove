@@ -489,7 +489,7 @@ export class NoteManager {
       modified: now,
       tags: [],
       deleted: false,
-      folderId: 'all-notes',
+      folderId: '', // Empty string for root-level notes (not 'all-notes' which is a view ID)
       ...noteData
     };
 
@@ -905,7 +905,8 @@ export class NoteManager {
     let notes: Note[];
 
     if (folderId === 'all-notes') {
-      notes = this.getAllNotes();
+      // "All Notes" should only show notes at the root level (not in any folder)
+      notes = this.getAllNotes().filter(note => !note.folderId || note.folderId === 'root' || note.folderId === '');
     } else if (folderId === 'trash') {
       notes = Array.from(this.notes.values())
         .filter(note => note.deleted)
@@ -926,32 +927,63 @@ export class NoteManager {
    * Move note to a different folder
    * @param noteId - Note ID
    * @param folderId - Target folder ID
+   * @param targetSyncDirectoryId - Optional target sync directory ID for cross-directory moves
    * @returns Updated note or null
    */
-  async moveNoteToFolder(noteId: string, folderId: string): Promise<Note | null> {
+  async moveNoteToFolder(
+    noteId: string,
+    folderId: string,
+    targetSyncDirectoryId?: string
+  ): Promise<Note | null> {
+    console.log(`[moveNoteToFolder] Called with noteId: ${noteId}, folderId: ${folderId}, targetSyncDirectoryId: ${targetSyncDirectoryId}`);
+
     const note = this.notes.get(noteId);
     if (!note || note.deleted) {
+      console.error(`[moveNoteToFolder] Note ${noteId} not found or deleted`);
       return null;
     }
 
-    // Get the correct folder manager for the note's sync directory
+    console.log(`[moveNoteToFolder] Note found, current folderId: ${note.folderId}, current syncDirectoryId: ${note.syncDirectoryId}`);
+
+    // Get the note's current sync directory
     const noteSyncDirId = note.syncDirectoryId || this.primarySyncDirectoryId;
-    const folderManager = noteSyncDirId
-      ? this.getFolderManagerForDirectory(noteSyncDirId)
+    console.log(`[moveNoteToFolder] Note sync directory: ${noteSyncDirId}, primary: ${this.primarySyncDirectoryId}`);
+
+    // If no target sync directory specified, assume same directory move
+    const targetSyncDirId = targetSyncDirectoryId || noteSyncDirId;
+    console.log(`[moveNoteToFolder] Target sync directory: ${targetSyncDirId}`);
+
+    // Get the folder manager for the target sync directory
+    const targetFolderManager = targetSyncDirId
+      ? this.getFolderManagerForDirectory(targetSyncDirId)
       : this.folderManager;
 
-    if (!folderManager) {
-      console.error(`No folder manager found for sync directory ${noteSyncDirId}`);
+    if (!targetFolderManager) {
+      console.error(`[moveNoteToFolder] No folder manager found for target sync directory ${targetSyncDirId}`);
       return null;
     }
+    console.log(`[moveNoteToFolder] Target folder manager found`);
 
-    const folder = folderManager.getFolder(folderId);
+    // Verify target folder exists
+    const folder = targetFolderManager.getFolder(folderId);
     if (!folder) {
-      console.error(`Folder ${folderId} not found in sync directory ${noteSyncDirId}`);
+      console.error(`[moveNoteToFolder] Folder ${folderId} not found in sync directory ${targetSyncDirId}`);
       return null;
     }
+    console.log(`[moveNoteToFolder] Target folder found: ${folder.name}`);
 
-    return await this.updateNote(noteId, { folderId });
+    // Same directory move - just update the folder ID
+    if (noteSyncDirId === targetSyncDirId) {
+      console.log(`[moveNoteToFolder] Same directory move, updating note folderId from ${note.folderId} to ${folderId}`);
+      const result = await this.updateNote(noteId, { folderId });
+      console.log(`[moveNoteToFolder] Update result:`, result ? `success, new folderId: ${result.folderId}` : 'failed');
+      return result;
+    }
+
+    // Cross-directory move - TODO: Will implement in Phase 4C
+    // For now, just log and return null
+    console.log(`[moveNoteToFolder] Cross-directory move not yet implemented: ${noteSyncDirId} -> ${targetSyncDirId}`);
+    return null;
   }
 
   /**

@@ -535,7 +535,7 @@ export class CRDTManager {
       modified: (yMetadata.get('modified') as string) || new Date().toISOString(),
       tags: (yMetadata.get('tags') as string[]) || [],
       deleted: (yMetadata.get('deleted') as boolean) || false,
-      folderId: (yMetadata.get('folderId') as string) || 'all-notes',
+      folderId: (yMetadata.get('folderId') as string) || '', // Empty string for root-level notes
       syncDirectoryId: yMetadata.get('syncDirectoryId') as string | undefined
     };
   }
@@ -558,16 +558,10 @@ export class CRDTManager {
       const contentUpdateCount = this.getPendingContentUpdateCount(noteId);
       yMetadata.set('contentVersion', contentUpdateCount);
 
-      // Log ALL metadata keys BEFORE any changes
-      const keysBefore = Array.from(yMetadata.keys());
-      console.log(`  - BEFORE: ${keysBefore.length} keys: [${keysBefore.join(', ')}]`);
-      console.log(`  - BEFORE values: title="${yMetadata.get('title')}", tags=${JSON.stringify(yMetadata.get('tags'))}, folderId="${yMetadata.get('folderId')}", deleted=${yMetadata.get('deleted')}`);
-
       // IMPORTANT: Only call set() if the value is actually changing
       // Redundant set() calls can create problematic Y.js updates that corrupt metadata when loaded from disk
 
       if (updates.title !== undefined && yMetadata.get('title') !== updates.title) {
-        console.log(`  - Setting title to:`, updates.title);
         yMetadata.set('title', updates.title);
       }
 
@@ -582,33 +576,22 @@ export class CRDTManager {
         const currentTags = yMetadata.get('tags');
         const tagsChanged = JSON.stringify(currentTags) !== JSON.stringify(updates.tags);
         if (tagsChanged) {
-          console.log(`  - Setting tags to:`, updates.tags);
           yMetadata.set('tags', updates.tags);
         }
       }
 
       if (updates.folderId !== undefined && yMetadata.get('folderId') !== updates.folderId) {
-        console.log(`  - Setting folderId to:`, updates.folderId);
         yMetadata.set('folderId', updates.folderId);
       }
 
       if (updates.deleted !== undefined && yMetadata.get('deleted') !== updates.deleted) {
-        console.log(`  - Setting deleted to:`, updates.deleted);
         yMetadata.set('deleted', updates.deleted);
       }
 
       if (updates.syncDirectoryId !== undefined && yMetadata.get('syncDirectoryId') !== updates.syncDirectoryId) {
-        console.log(`  - Setting syncDirectoryId to:`, updates.syncDirectoryId);
         yMetadata.set('syncDirectoryId', updates.syncDirectoryId);
       }
-
-      // Log ALL metadata keys AFTER changes
-      const keysAfter = Array.from(yMetadata.keys());
-      console.log(`  - AFTER: ${keysAfter.length} keys: [${keysAfter.join(', ')}]`);
-      console.log(`  - AFTER values: title="${yMetadata.get('title')}", tags=${JSON.stringify(yMetadata.get('tags'))}, folderId="${yMetadata.get('folderId')}", deleted=${yMetadata.get('deleted')}, syncDirectoryId="${yMetadata.get('syncDirectoryId')}"`);
     }, 'metadata'); // Pass origin so update listener knows this is metadata-only
-
-    console.log('Updated metadata for note:', noteId);
   }
 
   /**

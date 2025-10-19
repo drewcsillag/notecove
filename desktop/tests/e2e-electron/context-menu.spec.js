@@ -69,7 +69,7 @@ test.describe('Note Context Menu', () => {
   });
 
   test('should select note when right-clicking unselected note', async () => {
-    // Create two notes
+    // Create three notes
     await window.click('#newNoteBtn');
     await window.waitForTimeout(300);
     await window.keyboard.type('Note 1');
@@ -80,26 +80,39 @@ test.describe('Note Context Menu', () => {
     await window.keyboard.type('Note 2');
     await window.waitForTimeout(1000);
 
-    // Select note 1 with Cmd+Click
+    await window.click('#newNoteBtn');
+    await window.waitForTimeout(300);
+    await window.keyboard.type('Note 3');
+    await window.waitForTimeout(1000);
+
+    // Note 3 is now the active note. Select note 1 with Cmd+Click
+    // Auto-include will select both Note 3 (active) and Note 1 (clicked)
     const note1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
     await note1.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(300);
 
-    // Verify note 1 is selected
-    let hasSelected = await note1.evaluate(el => el.classList.contains('selected'));
-    expect(hasSelected).toBe(true);
+    // Verify both note 1 and note 3 are selected (auto-include behavior)
+    let hasSelected1 = await note1.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected1).toBe(true);
 
-    // Right-click on unselected note 2
+    const note3 = window.locator('.note-item').filter({ hasText: 'Note 3' });
+    let hasSelected3 = await note3.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected3).toBe(true);
+
+    // Right-click on unselected note 2 (which is NOT in the current selection)
     const note2 = window.locator('.note-item').filter({ hasText: 'Note 2' });
     await note2.click({ button: 'right' });
     await window.waitForTimeout(300);
 
-    // Verify only note 2 is selected now
-    hasSelected = await note1.evaluate(el => el.classList.contains('selected'));
-    expect(hasSelected).toBe(false);
+    // Verify only note 2 is selected now (right-click clears previous selection)
+    hasSelected1 = await note1.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected1).toBe(false);
 
-    hasSelected = await note2.evaluate(el => el.classList.contains('selected'));
-    expect(hasSelected).toBe(true);
+    hasSelected3 = await note3.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected3).toBe(false);
+
+    const hasSelected2 = await note2.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected2).toBe(true);
 
     // Verify badge shows "1 note selected"
     const badge = window.locator('#selectionBadge');
@@ -108,7 +121,7 @@ test.describe('Note Context Menu', () => {
   });
 
   test('should keep selection when right-clicking selected note', async () => {
-    // Create two notes
+    // Create three notes
     await window.click('#newNoteBtn');
     await window.waitForTimeout(300);
     await window.keyboard.type('Note 1');
@@ -119,35 +132,47 @@ test.describe('Note Context Menu', () => {
     await window.keyboard.type('Note 2');
     await window.waitForTimeout(1000);
 
-    // Select both notes with Cmd+Click
+    await window.click('#newNoteBtn');
+    await window.waitForTimeout(300);
+    await window.keyboard.type('Note 3');
+    await window.waitForTimeout(1000);
+
+    // Note 3 is active. Select note 1 with Cmd+Click
+    // Auto-include will select both Note 3 (active) and Note 1 (clicked)
     const note1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
     await note1.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(200);
 
+    // Add note 2 to the selection with Cmd+Click
     const note2 = window.locator('.note-item').filter({ hasText: 'Note 2' });
     await note2.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(300);
 
-    // Verify both are selected
+    // Verify all three are selected
     let hasSelected1 = await note1.evaluate(el => el.classList.contains('selected'));
     let hasSelected2 = await note2.evaluate(el => el.classList.contains('selected'));
+    const note3 = window.locator('.note-item').filter({ hasText: 'Note 3' });
+    let hasSelected3 = await note3.evaluate(el => el.classList.contains('selected'));
     expect(hasSelected1).toBe(true);
     expect(hasSelected2).toBe(true);
+    expect(hasSelected3).toBe(true);
 
     // Right-click on note 1 (which is already selected)
     await note1.click({ button: 'right' });
     await window.waitForTimeout(300);
 
-    // Verify both notes are still selected
+    // Verify all three notes are still selected
     hasSelected1 = await note1.evaluate(el => el.classList.contains('selected'));
     hasSelected2 = await note2.evaluate(el => el.classList.contains('selected'));
+    hasSelected3 = await note3.evaluate(el => el.classList.contains('selected'));
     expect(hasSelected1).toBe(true);
     expect(hasSelected2).toBe(true);
+    expect(hasSelected3).toBe(true);
 
-    // Verify badge shows "2 notes selected"
+    // Verify badge shows "3 notes selected"
     const badge = window.locator('#selectionBadge');
     const badgeText = await badge.textContent();
-    expect(badgeText).toBe('2 notes selected');
+    expect(badgeText).toBe('3 notes selected');
   });
 
   test('should hide menu when clicking outside', async () => {
@@ -258,8 +283,8 @@ test.describe('Note Context Menu', () => {
     noteCount = await notesList.count();
     expect(noteCount).toBe(0);
 
-    // Navigate to Trash folder
-    const trashFolder = window.locator('.folder-item').filter({ hasText: 'Trash' });
+    // Navigate to Recently Deleted folder
+    const trashFolder = window.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
     await trashFolder.click();
     await window.waitForTimeout(500);
 
@@ -282,7 +307,8 @@ test.describe('Note Context Menu', () => {
     let noteCount = await notesList.count();
     expect(noteCount).toBe(3);
 
-    // Select notes 1 and 2 with Cmd+Click
+    // Note 3 is active. Select note 1 with Cmd+Click
+    // Auto-include will select both Note 3 (active) and Note 1 (clicked)
     const note1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
     await note1.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(200);
@@ -291,10 +317,10 @@ test.describe('Note Context Menu', () => {
     await note2.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(300);
 
-    // Verify badge shows "2 notes selected"
+    // Verify badge shows "3 notes selected" (auto-include adds Note 3)
     const badge = window.locator('#selectionBadge');
     let badgeText = await badge.textContent();
-    expect(badgeText).toBe('2 notes selected');
+    expect(badgeText).toBe('3 notes selected');
 
     // Right-click on one of the selected notes
     await note1.click({ button: 'right' });
@@ -302,34 +328,38 @@ test.describe('Note Context Menu', () => {
 
     // Click "Delete" in context menu
     const contextMenu = window.locator('#noteContextMenu');
-    const deleteOption = contextMenu.locator('[data-action="delete"]');
+    const deleteMenuText = window.locator('#deleteMenuText');
 
     // Verify delete option shows correct text for multiple notes
-    const deleteText = await deleteOption.textContent();
-    expect(deleteText).toContain('2'); // Should say "Delete 2 notes" or similar
+    const deleteText = await deleteMenuText.textContent();
+    expect(deleteText).toContain('3'); // Should say "Delete 3 notes" or similar
 
-    await deleteOption.click();
+    // Ensure context menu is visible before clicking delete
+    await expect(contextMenu).toBeVisible();
+
+    // Click the delete menu item
+    const deleteOption = contextMenu.locator('[data-action="delete"]');
+    await expect(deleteOption).toBeVisible();
+    await deleteOption.click({ force: true });
     await window.waitForTimeout(500);
 
-    // Verify only 1 note remains in All Notes
+    // Verify all notes are deleted (0 remaining in All Notes)
     notesList = window.locator('#notesList .note-item');
     noteCount = await notesList.count();
-    expect(noteCount).toBe(1);
+    expect(noteCount).toBe(0);
 
-    // Verify Note 3 is the remaining note
-    const note3 = window.locator('.note-item').filter({ hasText: 'Note 3' });
-    await expect(note3).toBeVisible();
-
-    // Navigate to Trash
-    const trashFolder = window.locator('.folder-item').filter({ hasText: 'Trash' });
+    // Navigate to Recently Deleted
+    const trashFolder = window.locator('.folder-item').filter({ hasText: 'Recently Deleted' });
     await trashFolder.click();
     await window.waitForTimeout(500);
 
-    // Verify both deleted notes are in trash
+    // Verify all three deleted notes are in trash
     const trashedNote1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
     const trashedNote2 = window.locator('.note-item').filter({ hasText: 'Note 2' });
+    const trashedNote3 = window.locator('.note-item').filter({ hasText: 'Note 3' });
     await expect(trashedNote1).toBeVisible();
     await expect(trashedNote2).toBeVisible();
+    await expect(trashedNote3).toBeVisible();
   });
 
   test('should show context menu at correct position', async () => {
@@ -360,7 +390,7 @@ test.describe('Note Context Menu', () => {
   });
 
   test('should update delete option text based on selection count', async () => {
-    // Create two notes
+    // Create three notes
     await window.click('#newNoteBtn');
     await window.waitForTimeout(300);
     await window.keyboard.type('Note 1');
@@ -369,6 +399,11 @@ test.describe('Note Context Menu', () => {
     await window.click('#newNoteBtn');
     await window.waitForTimeout(300);
     await window.keyboard.type('Note 2');
+    await window.waitForTimeout(1000);
+
+    await window.click('#newNoteBtn');
+    await window.waitForTimeout(300);
+    await window.keyboard.type('Note 3');
     await window.waitForTimeout(1000);
 
     // Right-click on single note (unselected)
@@ -380,13 +415,14 @@ test.describe('Note Context Menu', () => {
     let contextMenu = window.locator('#noteContextMenu');
     let deleteOption = contextMenu.locator('[data-action="delete"]');
     let deleteText = await deleteOption.textContent();
-    expect(deleteText).toMatch(/Delete( note)?$/i); // "Delete" or "Delete note"
+    expect(deleteText).toContain('Delete'); // May include emoji
 
     // Close menu
     await window.keyboard.press('Escape');
     await window.waitForTimeout(200);
 
-    // Select both notes
+    // Select notes 1 and 2 with Cmd+Click
+    // Note 3 is active, so auto-include will add it too
     await note1.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(200);
     const note2 = window.locator('.note-item').filter({ hasText: 'Note 2' });
@@ -397,10 +433,10 @@ test.describe('Note Context Menu', () => {
     await note1.click({ button: 'right' });
     await window.waitForTimeout(300);
 
-    // Verify delete option shows plural text
+    // Verify delete option shows plural text for 3 notes
     contextMenu = window.locator('#noteContextMenu');
     deleteOption = contextMenu.locator('[data-action="delete"]');
     deleteText = await deleteOption.textContent();
-    expect(deleteText).toContain('2'); // Should say "Delete 2 notes"
+    expect(deleteText).toContain('3'); // Should say "Delete 3 notes" (auto-include adds Note 3)
   });
 });

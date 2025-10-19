@@ -61,8 +61,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const primaryCount = parseInt(await primaryAllNotes.locator('.folder-count').textContent());
     expect(primaryCount).toBe(initialCount + 1);
 
-    console.log(`[Test] Primary directory count increased from ${initialCount} to ${primaryCount}`);
-
     // Add second sync directory
     await window.click('button[aria-label="Settings"]');
     await window.waitForTimeout(300);
@@ -94,7 +92,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await closeBtn.click();
     await window.waitForTimeout(500);
 
-    console.log('[Test] Added second sync directory');
 
     // Verify second directory shows count of 0
     const secondAllNotes = window.locator('.sync-directory-group').nth(1)
@@ -102,13 +99,11 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const secondCount = await secondAllNotes.locator('.folder-count').textContent();
     expect(parseInt(secondCount)).toBe(0);
 
-    console.log('[Test] Second directory correctly shows count of 0');
 
     // Verify primary directory still shows same count as before
     const primaryCountAfter = parseInt(await primaryAllNotes.locator('.folder-count').textContent());
     expect(primaryCountAfter).toBe(primaryCount);
 
-    console.log(`[Test] Primary directory still shows count of ${primaryCount}`);
   });
 
   test('folder counts should be scoped per sync directory', async () => {
@@ -155,7 +150,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.keyboard.type('Secondary Note');
     await window.waitForTimeout(500);
 
-    console.log('[Test] Created notes in both directories');
 
     // Verify primary directory shows count of 1
     const primaryAllNotes = window.locator('.sync-directory-group').first()
@@ -167,7 +161,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const secondCount = await secondAllNotes.locator('.folder-count').textContent();
     expect(parseInt(secondCount)).toBe(1);
 
-    console.log('[Test] Each directory correctly shows count of 1');
   });
 
   test('folder counts should remain correct after removing and re-adding sync directory', async () => {
@@ -223,7 +216,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.keyboard.type('Project Note');
     await window.waitForTimeout(500);
 
-    console.log('[Test] Created folder with note in Projects directory');
 
     // Verify folder shows count of 1
     let folderCount = await clientWorkFolder.locator('.folder-count').textContent();
@@ -248,7 +240,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await closeBtn.click();
     await window.waitForTimeout(500);
 
-    console.log('[Test] Removed Projects directory');
 
     // Close and reopen the app
     await electronApp.close();
@@ -269,7 +260,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.waitForLoadState('domcontentloaded');
     await window.waitForTimeout(1500);
 
-    console.log('[Test] App restarted');
 
     // Re-add the Projects sync directory
     await window.click('button[aria-label="Settings"]');
@@ -292,7 +282,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await closeBtn.click();
     await window.waitForTimeout(500);
 
-    console.log('[Test] Re-added Projects directory');
 
     // Select the Projects directory
     const projectsAllNotesAgain = window.locator('.sync-directory-group').nth(1)
@@ -307,7 +296,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     let folderCountAgain = await clientWorkFolderAgain.locator('.folder-count').textContent();
     expect(parseInt(folderCountAgain)).toBe(1);
 
-    console.log('[Test] Folder shows correct count of 1');
 
     // Click on the folder
     await clientWorkFolderAgain.click();
@@ -317,7 +305,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const noteItem = window.locator('.note-item').filter({ hasText: 'Project Note' });
     await expect(noteItem).toBeVisible();
 
-    console.log('[Test] Note correctly appears in folder after re-adding directory!');
   });
 
   test('notes should stay in correct sync directory across app restart', async () => {
@@ -373,7 +360,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.keyboard.type('Design Note');
     await window.waitForTimeout(500);
 
-    console.log('[Test] Created note in Projects/Design folder');
 
     // Restart the app
     await electronApp.close();
@@ -394,7 +380,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.waitForLoadState('domcontentloaded');
     await window.waitForTimeout(1500);
 
-    console.log('[Test] App restarted');
 
     // Verify note is still in Projects directory
     const restoredProjectsAllNotes = window.locator('.sync-directory-group').nth(1)
@@ -423,7 +408,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const primaryNoteCount = await primaryAllNotes.locator('.folder-count').textContent();
     expect(parseInt(primaryNoteCount)).toBe(0);
 
-    console.log('[Test] Note correctly stayed in Projects directory after restart!');
   });
 
   test('removed sync directory notes should not show in UI', async () => {
@@ -464,7 +448,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.keyboard.type('Project Doc');
     await window.waitForTimeout(500);
 
-    console.log('[Test] Created note in Projects directory');
 
     // Verify Projects shows count of 1
     let projectsCount = await projectsAllNotes.locator('.folder-count').textContent();
@@ -488,7 +471,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await closeBtn.click();
     await window.waitForTimeout(500);
 
-    console.log('[Test] Removed Projects directory');
 
     // Verify primary directory shows count of 0
     const primaryAllNotes = window.locator('.sync-directory-group').first()
@@ -500,7 +482,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const editorTitle = await window.locator('.editor-note-title').textContent();
     expect(editorTitle).toBe('');
 
-    console.log('[Test] Notes from removed directory correctly hidden from UI!');
 
     // Restart app and verify count is still 0
     await electronApp.close();
@@ -521,7 +502,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.waitForLoadState('domcontentloaded');
     await window.waitForTimeout(1500);
 
-    console.log('[Test] App restarted');
 
     // Verify primary directory STILL shows count of 0
     const restoredPrimaryAllNotes = window.locator('.sync-directory-group').first()
@@ -529,6 +509,5 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const restoredPrimaryCount = await restoredPrimaryAllNotes.locator('.folder-count').textContent();
     expect(parseInt(restoredPrimaryCount)).toBe(0);
 
-    console.log('[Test] Count remains 0 after restart - notes correctly filtered!');
   });
 });

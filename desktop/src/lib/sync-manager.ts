@@ -462,7 +462,6 @@ export class SyncManager {
       // Notify UI to update based on what changed
       if (mergedNote.deleted) {
         // If note was deleted, notify as deletion
-        console.log(`[syncNote] Notifying note-deleted for ${noteId}`);
         this.noteManager.notify('note-deleted', {
           note: mergedNote,
           source: 'sync'
