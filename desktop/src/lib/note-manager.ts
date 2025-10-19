@@ -934,8 +934,20 @@ export class NoteManager {
       return null;
     }
 
-    const folder = this.folderManager.getFolder(folderId);
+    // Get the correct folder manager for the note's sync directory
+    const noteSyncDirId = note.syncDirectoryId || this.primarySyncDirectoryId;
+    const folderManager = noteSyncDirId
+      ? this.getFolderManagerForDirectory(noteSyncDirId)
+      : this.folderManager;
+
+    if (!folderManager) {
+      console.error(`No folder manager found for sync directory ${noteSyncDirId}`);
+      return null;
+    }
+
+    const folder = folderManager.getFolder(folderId);
     if (!folder) {
+      console.error(`Folder ${folderId} not found in sync directory ${noteSyncDirId}`);
       return null;
     }
 
