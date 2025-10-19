@@ -62,7 +62,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     expect(primaryCount).toBe(initialCount + 1);
 
     // Add second sync directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);
@@ -82,13 +82,13 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const nameInput = window.locator('input[placeholder*="name" i]').last();
     await nameInput.fill('Second Workspace');
 
-    // Save the directory
-    const saveBtn = window.locator('button').filter({ hasText: 'Save' });
-    await saveBtn.click();
+    // Add the directory
+    const addBtn = window.locator('button#confirmAddDir');
+    await addBtn.click();
     await window.waitForTimeout(500);
 
     // Close settings
-    const closeBtn = window.locator('button[aria-label="Close settings"]');
+    const closeBtn = window.locator('button#settingsClose');
     await closeBtn.click();
     await window.waitForTimeout(500);
 
@@ -113,7 +113,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.waitForTimeout(500);
 
     // Add second sync directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);
@@ -131,11 +131,11 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const nameInput = window.locator('input[placeholder*="name" i]').last();
     await nameInput.fill('Second Workspace');
 
-    const saveBtn = window.locator('button').filter({ hasText: 'Save' });
-    await saveBtn.click();
+    const addBtn = window.locator('button#confirmAddDir');
+    await addBtn.click();
     await window.waitForTimeout(500);
 
-    const closeBtn = window.locator('button[aria-label="Close settings"]');
+    const closeBtn = window.locator('button#settingsClose');
     await closeBtn.click();
     await window.waitForTimeout(500);
 
@@ -165,7 +165,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
   test('folder counts should remain correct after removing and re-adding sync directory', async () => {
     // Add second sync directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);
@@ -183,11 +183,11 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const nameInput = window.locator('input[placeholder*="name" i]').last();
     await nameInput.fill('Projects');
 
-    const saveBtn = window.locator('button').filter({ hasText: 'Save' });
-    await saveBtn.click();
+    const addBtn = window.locator('button#confirmAddDir');
+    await addBtn.click();
     await window.waitForTimeout(500);
 
-    const closeBtn = window.locator('button[aria-label="Close settings"]');
+    const closeBtn = window.locator('button#settingsClose');
     await closeBtn.click();
     await window.waitForTimeout(500);
 
@@ -198,10 +198,10 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.waitForTimeout(500);
 
     // Create a folder in second directory
-    await window.click('button[aria-label="Add folder"]');
+    await window.click('#newFolderBtn');
     await window.waitForTimeout(300);
 
-    const folderNameInput = window.locator('input[placeholder*="folder name" i]');
+    const folderNameInput = window.locator('#dialogInput');
     await folderNameInput.fill('Client Work');
     await folderNameInput.press('Enter');
     await window.waitForTimeout(500);
@@ -222,7 +222,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     expect(parseInt(folderCount)).toBe(1);
 
     // Remove the Projects sync directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);
@@ -262,7 +262,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
 
     // Re-add the Projects sync directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);
@@ -309,7 +309,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
   test('notes should stay in correct sync directory across app restart', async () => {
     // Add second sync directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);
@@ -327,11 +327,11 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const nameInput = window.locator('input[placeholder*="name" i]').last();
     await nameInput.fill('Projects');
 
-    const saveBtn = window.locator('button').filter({ hasText: 'Save' });
-    await saveBtn.click();
+    const addBtn = window.locator('button#confirmAddDir');
+    await addBtn.click();
     await window.waitForTimeout(500);
 
-    const closeBtn = window.locator('button[aria-label="Close settings"]');
+    const closeBtn = window.locator('button#settingsClose');
     await closeBtn.click();
     await window.waitForTimeout(500);
 
@@ -342,10 +342,10 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.waitForTimeout(500);
 
     // Create a folder in Projects directory
-    await window.click('button[aria-label="Add folder"]');
+    await window.click('#newFolderBtn');
     await window.waitForTimeout(300);
 
-    const folderNameInput = window.locator('input[placeholder*="folder name" i]');
+    const folderNameInput = window.locator('#dialogInput');
     await folderNameInput.fill('Design');
     await folderNameInput.press('Enter');
     await window.waitForTimeout(500);
@@ -363,7 +363,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     // Restart the app
     await electronApp.close();
-    await window.waitForTimeout(1000);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     electronApp = await electron.launch({
       args: [
@@ -412,7 +412,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
   test('removed sync directory notes should not show in UI', async () => {
     // Add second sync directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);
@@ -430,11 +430,11 @@ test.describe('Folder Counts - Multi-Directory', () => {
     const nameInput = window.locator('input[placeholder*="name" i]').last();
     await nameInput.fill('Projects');
 
-    const saveBtn = window.locator('button').filter({ hasText: 'Save' });
-    await saveBtn.click();
+    const addBtn = window.locator('button#confirmAddDir');
+    await addBtn.click();
     await window.waitForTimeout(500);
 
-    const closeBtn = window.locator('button[aria-label="Close settings"]');
+    const closeBtn = window.locator('button#settingsClose');
     await closeBtn.click();
     await window.waitForTimeout(500);
 
@@ -454,7 +454,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     expect(parseInt(projectsCount)).toBe(1);
 
     // Remove Projects directory
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);

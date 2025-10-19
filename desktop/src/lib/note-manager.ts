@@ -313,7 +313,17 @@ export class NoteManager {
    * @returns True if in test mode
    */
   isTestMode(): boolean {
-    // Check URL parameter first (most reliable for tests)
+    // Check if running in Electron test mode via NODE_ENV
+    try {
+      const nodeEnv = (window as any).electronAPI?.nodeEnv;
+      if (typeof window !== 'undefined' && nodeEnv === 'test') {
+        return true;
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+
+    // Check URL parameter (for web tests)
     try {
       if (typeof window !== 'undefined' && window.location) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -327,10 +337,15 @@ export class NoteManager {
 
     // Fallback to localStorage for backward compatibility
     try {
-      return localStorage.getItem('notecove-test-mode') === 'true';
+      const localStorageValue = localStorage.getItem('notecove-test-mode');
+      if (localStorageValue === 'true') {
+        return true;
+      }
     } catch (error) {
       return false;
     }
+
+    return false;
   }
 
   /**

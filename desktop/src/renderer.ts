@@ -1018,7 +1018,15 @@ class NoteCoveApp {
       } else {
         // For "all-notes", filter by current sync directory
         const allNotes = this.currentSyncDirectoryId
-          ? this.notes.filter(note => note.syncDirectoryId === this.currentSyncDirectoryId)
+          ? this.notes.filter(note => {
+              // Handle notes without syncDirectoryId (legacy/migrated notes)
+              if (!note.syncDirectoryId) {
+                const syncDirs = this.syncDirectoryManager?.getDirectories() || [];
+                const primaryDirId = syncDirs.length > 0 ? syncDirs[0].id : null;
+                return this.currentSyncDirectoryId === primaryDirId;
+              }
+              return note.syncDirectoryId === this.currentSyncDirectoryId;
+            })
           : this.notes;
         notesCount.textContent = allNotes.length.toString();
       }
@@ -3200,9 +3208,11 @@ class NoteCoveApp {
 
         // Show/hide tab content
         const tabContents = panel.querySelectorAll('.settings-tab-content');
+        // Convert hyphenated tab name to camelCase (e.g. "sync-directories" -> "syncDirectories")
+        const camelCaseTabName = tabName!.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
         tabContents.forEach(content => {
           const el = content as HTMLElement;
-          el.style.display = el.id === `${tabName}Tab` ? 'block' : 'none';
+          el.style.display = el.id === `${camelCaseTabName}Tab` ? 'block' : 'none';
         });
       });
     });
@@ -3352,7 +3362,7 @@ class NoteCoveApp {
 
       <div style="margin-bottom: 16px;">
         <label style="display: block; margin-bottom: 6px; font-weight: 500; color: var(--text-primary);">Name</label>
-        <input type="text" id="syncDirName" placeholder="e.g., Work, Personal" style="
+        <input type="text" id="syncDirName" placeholder="Enter directory name (e.g., Work, Personal)" style="
           width: 100%;
           padding: 8px 12px;
           border: 1px solid var(--border);
@@ -3365,7 +3375,7 @@ class NoteCoveApp {
       <div style="margin-bottom: 20px;">
         <label style="display: block; margin-bottom: 6px; font-weight: 500; color: var(--text-primary);">Path</label>
         <div style="display: flex; gap: 8px;">
-          <input type="text" id="syncDirPath" readonly placeholder="Click Browse to select..." style="
+          <input type="text" id="syncDirPath" placeholder="Enter path or click Browse..." style="
             flex: 1;
             padding: 8px 12px;
             border: 1px solid var(--border);

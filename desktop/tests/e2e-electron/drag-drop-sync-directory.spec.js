@@ -113,7 +113,7 @@ test.describe('Drag and Drop - Sync Directory', () => {
     await window.waitForTimeout(1000);
 
     // Add second sync directory via Settings UI
-    await window.click('button[aria-label="Settings"]');
+    await window.click('.settings-btn');
     await window.waitForTimeout(300);
     await window.click('text=Sync Directories');
     await window.waitForTimeout(300);

@@ -65,6 +65,7 @@ export interface ElectronAPI {
   platform: NodeJS.Platform;
   version: string;
   isElectron: boolean;
+  nodeEnv?: string;
 }
 
 // Expose protected methods that allow the renderer process to use
@@ -133,5 +134,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App info
   platform: process.platform,
   version: process.versions.electron,
-  isElectron: true
+  isElectron: true,
+  nodeEnv: process.env.NODE_ENV
 } as ElectronAPI);
