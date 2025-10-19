@@ -904,13 +904,20 @@ class NoteCoveApp {
 
     if (!notesList || !this.noteManager) return;
 
+    console.log('[renderNotesList] Starting, currentSyncDirectoryId:', this.currentSyncDirectoryId, 'currentFolderId:', this.currentFolderId);
+    console.log('[renderNotesList] Total notes in memory:', this.notes.length);
+
     // Get notes based on search query or all notes
     let filteredNotes = this.searchQuery ?
       this.noteManager.searchNotes(this.searchQuery) :
       this.notes;
 
+    console.log('[renderNotesList] After search filter:', filteredNotes.length);
+
     // Filter by sync directory if one is selected
     if (this.currentSyncDirectoryId) {
+      console.log('[renderNotesList] Filtering by sync directory:', this.currentSyncDirectoryId);
+      const beforeCount = filteredNotes.length;
       filteredNotes = filteredNotes.filter(note => {
         // Handle notes without syncDirectoryId (legacy/migrated notes)
         // They belong to the primary sync directory
@@ -918,10 +925,15 @@ class NoteCoveApp {
           // Get the first (primary) sync directory ID
           const syncDirs = this.syncDirectoryManager?.getDirectories() || [];
           const primaryDirId = syncDirs.length > 0 ? syncDirs[0].id : null;
-          return this.currentSyncDirectoryId === primaryDirId;
+          const matches = this.currentSyncDirectoryId === primaryDirId;
+          console.log('[renderNotesList] Note', note.id, 'has no syncDirectoryId, primaryDirId:', primaryDirId, 'matches:', matches);
+          return matches;
         }
-        return note.syncDirectoryId === this.currentSyncDirectoryId;
+        const matches = note.syncDirectoryId === this.currentSyncDirectoryId;
+        console.log('[renderNotesList] Note', note.id, 'syncDirectoryId:', note.syncDirectoryId, 'matches:', matches);
+        return matches;
       });
+      console.log('[renderNotesList] After sync directory filter:', filteredNotes.length, '(was', beforeCount, ')');
     }
 
     // Filter by folder if not "all-notes"

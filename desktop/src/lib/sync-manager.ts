@@ -514,13 +514,16 @@ export class SyncManager {
         this.crdtManager.initializeNote(note.id, note);
       } else {
         // Always update critical metadata that changes outside the editor
-        // (deleted flag, folder assignments) even if the CRDT already exists
+        // (deleted flag, folder assignments, sync directory) even if the CRDT already exists
         const criticalMetadata: Record<string, any> = {};
         if (note.deleted !== undefined) {
           criticalMetadata.deleted = note.deleted;
         }
         if (note.folderId !== undefined) {
           criticalMetadata.folderId = note.folderId;
+        }
+        if (note.syncDirectoryId !== undefined) {
+          criticalMetadata.syncDirectoryId = note.syncDirectoryId;
         }
 
         if (Object.keys(criticalMetadata).length > 0) {

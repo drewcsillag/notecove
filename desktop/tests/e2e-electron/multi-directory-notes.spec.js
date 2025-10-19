@@ -28,6 +28,14 @@ test.describe('Multi-Directory Note Creation - Electron Mode', () => {
 
     // Get the first window
     window = await electronApp.firstWindow();
+
+    // Capture console logs
+    window.on('console', msg => {
+      if (msg.text().includes('[NoteManager') || msg.text().includes('[createNewNote]') || msg.text().includes('syncDirectoryId')) {
+        console.log(`[Browser Console] ${msg.text()}`);
+      }
+    });
+
     await window.waitForLoadState('domcontentloaded');
     await window.waitForTimeout(1000);
   });

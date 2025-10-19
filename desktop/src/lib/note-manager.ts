@@ -147,11 +147,22 @@ export class NoteManager {
     console.log(`NoteManager: Loading notes from directory ${syncDirectoryId}`);
     const notes = await syncManager.loadAllNotes();
 
-    // Tag each note with its sync directory ID
-    notes.forEach(note => {
+    // Tag each note with its sync directory ID and persist to CRDT
+    for (const note of notes) {
       note.syncDirectoryId = syncDirectoryId;
       this.notes.set(note.id, note);
-    });
+
+      // Persist syncDirectoryId to CRDT metadata if not already there
+      // This ensures notes loaded from older CRDT files get tagged properly
+      if (syncManager.crdtManager) {
+        const metadata = syncManager.crdtManager.getMetadataDoc(note.id).getMap('metadata');
+        const existingSyncDirId = metadata.get('syncDirectoryId');
+        if (existingSyncDirId !== syncDirectoryId) {
+          console.log(`[loadNotesFromDirectory] Updating syncDirectoryId in CRDT for note ${note.id}`);
+          syncManager.crdtManager.updateMetadata(note.id, { syncDirectoryId });
+        }
+      }
+    }
 
     console.log(`NoteManager: Loaded ${notes.length} notes from directory ${syncDirectoryId}`);
     this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
@@ -393,21 +404,27 @@ export class NoteManager {
     try {
       if (this.isElectron) {
         // Get the correct SyncManager for this note's directory
+        console.log('[NoteManager.saveNote] Looking up SyncManager for note:', note.id, 'syncDirectoryId:', note.syncDirectoryId);
+        console.log('[NoteManager.saveNote] Available sync managers:', Array.from(this.syncManagers.keys()));
         const syncManager = this.getSyncManagerForNote(note.id);
         if (!syncManager) {
           console.error('ERROR: No SyncManager found for note!');
           console.error('Note:', note.id, note.title, 'syncDirectoryId:', note.syncDirectoryId);
+          console.error('Available syncManagers:', Array.from(this.syncManagers.keys()));
           console.trace('saveNote called from:');
           return;
         }
-        console.log('Saving note with CRDT sync:', note.id, 'to directory:', note.syncDirectoryId || 'primary');
+        console.log('[NoteManager.saveNote] Found SyncManager, saving note to directory:', note.syncDirectoryId || 'primary');
+        console.log('[NoteManager.saveNote] SyncManager notesPath:', syncManager.notesPath);
         await syncManager.saveNoteWithCRDT(note);
+        console.log('[NoteManager.saveNote] Successfully saved note:', note.id);
       } else {
         // Web mode - use localStorage
         await this.saveNotes();
       }
     } catch (error) {
-      console.error('Failed to save note:', error);
+      console.error('[NoteManager.saveNote] Failed to save note:', error);
+      console.error('[NoteManager.saveNote] Note details:', note.id, note.syncDirectoryId);
     }
   }
 
@@ -462,15 +479,22 @@ export class NoteManager {
       ...noteData
     };
 
+    console.log('[NoteManager.createNote] Creating note:', note.id, 'syncDirectoryId:', note.syncDirectoryId, 'folderId:', note.folderId);
+
     // Validate that the sync directory exists if specified
     if (note.syncDirectoryId && !this.syncManagers.has(note.syncDirectoryId)) {
+      console.error('[NoteManager.createNote] Sync directory not found:', note.syncDirectoryId);
+      console.error('[NoteManager.createNote] Available directories:', Array.from(this.syncManagers.keys()));
       throw new Error(`Sync directory ${note.syncDirectoryId} not found`);
     }
 
     this.notes.set(note.id, note);
+    console.log('[NoteManager.createNote] Note added to map, calling saveNote...');
+
     // IMPORTANT: Await saveNote() to ensure CRDT is fully initialized before continuing
     // This prevents race conditions where the editor binds to a partially-initialized Y.Doc
     await this.saveNote(note);
+    console.log('[NoteManager.createNote] saveNote completed');
 
     // After CRDT initialization, sync the note object with CRDT metadata
     // (e.g., empty title becomes "Untitled" in CRDT)
@@ -479,12 +503,14 @@ export class NoteManager {
       if (syncManager) {
         const crdtTitle = syncManager.crdtManager.getMetadataDoc(note.id).getMap('metadata').get('title');
         if (crdtTitle && crdtTitle !== note.title) {
+          console.log('[NoteManager.createNote] Syncing title from CRDT:', crdtTitle);
           note.title = crdtTitle as string;
           this.notes.set(note.id, note);
         }
       }
     }
 
+    console.log('[NoteManager.createNote] Notifying listeners of note creation');
     this.notify('note-created', { note });
 
     return note;
@@ -515,16 +541,25 @@ export class NoteManager {
     this.notes.set(id, updatedNote);
 
     // In Electron mode with CRDT, update metadata directly
-    // This ensures title/tags/folder changes are reflected in CRDT
-    if (this.isElectron && this.syncManager) {
-      const metadataUpdates: Record<string, any> = {};
-      if (updates.title !== undefined) metadataUpdates.title = updates.title;
-      if (updates.tags !== undefined) metadataUpdates.tags = updates.tags;
-      if (updates.folderId !== undefined) metadataUpdates.folderId = updates.folderId;
-      if (updates.deleted !== undefined) metadataUpdates.deleted = updates.deleted;
+    // This ensures title/tags/folder/syncDirectory changes are reflected in CRDT
+    if (this.isElectron) {
+      const syncManager = this.getSyncManagerForNote(id);
+      if (syncManager) {
+        const metadataUpdates: Record<string, any> = {};
+        if (updates.title !== undefined) metadataUpdates.title = updates.title;
+        if (updates.tags !== undefined) metadataUpdates.tags = updates.tags;
+        if (updates.folderId !== undefined) metadataUpdates.folderId = updates.folderId;
+        if (updates.deleted !== undefined) metadataUpdates.deleted = updates.deleted;
+        if (updates.syncDirectoryId !== undefined) metadataUpdates.syncDirectoryId = updates.syncDirectoryId;
 
-      if (Object.keys(metadataUpdates).length > 0) {
-        this.syncManager.crdtManager.updateMetadata(id, metadataUpdates);
+        // Also ensure syncDirectoryId is preserved in CRDT even if not in updates
+        if (updatedNote.syncDirectoryId && !metadataUpdates.syncDirectoryId) {
+          metadataUpdates.syncDirectoryId = updatedNote.syncDirectoryId;
+        }
+
+        if (Object.keys(metadataUpdates).length > 0) {
+          syncManager.crdtManager.updateMetadata(id, metadataUpdates);
+        }
       }
     }
 
