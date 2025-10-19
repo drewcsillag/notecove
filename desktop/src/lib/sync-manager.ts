@@ -712,13 +712,14 @@ export class SyncManager {
         `modified="${yMetadata.get('modified')}"`,
         `tags="${JSON.stringify(yMetadata.get('tags'))}"`,
         `folderId="${yMetadata.get('folderId')}"`,
-        `deleted="${yMetadata.get('deleted')}"`
+        `deleted="${yMetadata.get('deleted')}"`,
+        `syncDirectoryId="${yMetadata.get('syncDirectoryId')}"`
       );
 
       // Extract the merged note from CRDT
       const note = this.crdtManager.getNoteFromDoc(noteId);
       note.id = noteId;
-      console.log(`[SyncManager] Extracted note title from getNoteFromDoc: "${note.title}"`);
+      console.log(`[SyncManager] Extracted note from getNoteFromDoc: title="${note.title}", syncDirectoryId="${note.syncDirectoryId}"`);
 
       // IMPORTANT: Do NOT persist extracted titles back to the Y.Doc during load!
       // This creates conflicting CRDT updates that corrupt metadata due to Y.js conflict resolution.

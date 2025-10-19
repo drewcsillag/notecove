@@ -108,7 +108,8 @@
       "Bash(timeout 600 npx playwright test:*)",
       "Read(//private/tmp/**)",
       "WebFetch(domain:localhost)",
-      "Bash(timeout 120 npm run test:e2e:electron -- --grep \"should prevent deleting folder with subfolders and persist validation\" --reporter=line --workers=1)"
+      "Bash(timeout 120 npm run test:e2e:electron -- --grep \"should prevent deleting folder with subfolders and persist validation\" --reporter=line --workers=1)",
+      "Bash(timeout 240 npm run test:e2e:electron -- --grep \"folders|sync-directories|basic|editor|crdt\" --reporter=line --workers=1)"
     ],
     "deny": [],
     "ask": []

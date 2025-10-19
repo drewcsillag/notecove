@@ -316,6 +316,9 @@ export class CRDTManager {
         yMetadata.set('folderId', note.folderId || null);
         yMetadata.set('deleted', note.deleted || false);
         yMetadata.set('contentVersion', 0); // Track correlation with content updates
+        if (note.syncDirectoryId) {
+          yMetadata.set('syncDirectoryId', note.syncDirectoryId);
+        }
 
         console.log(`  - Verified title in Y.Map:`, yMetadata.get('title'));
       } else {
@@ -473,6 +476,7 @@ export class CRDTManager {
       modified: yMetadata.get('modified'),
       tags: yMetadata.get('tags'),
       folderId: yMetadata.get('folderId'),
+      syncDirectoryId: yMetadata.get('syncDirectoryId'),
       contentVersion: yMetadata.get('contentVersion')
     });
 
@@ -531,7 +535,8 @@ export class CRDTManager {
       modified: (yMetadata.get('modified') as string) || new Date().toISOString(),
       tags: (yMetadata.get('tags') as string[]) || [],
       deleted: (yMetadata.get('deleted') as boolean) || false,
-      folderId: (yMetadata.get('folderId') as string) || 'all-notes'
+      folderId: (yMetadata.get('folderId') as string) || 'all-notes',
+      syncDirectoryId: yMetadata.get('syncDirectoryId') as string | undefined
     };
   }
 
@@ -592,10 +597,15 @@ export class CRDTManager {
         yMetadata.set('deleted', updates.deleted);
       }
 
+      if (updates.syncDirectoryId !== undefined && yMetadata.get('syncDirectoryId') !== updates.syncDirectoryId) {
+        console.log(`  - Setting syncDirectoryId to:`, updates.syncDirectoryId);
+        yMetadata.set('syncDirectoryId', updates.syncDirectoryId);
+      }
+
       // Log ALL metadata keys AFTER changes
       const keysAfter = Array.from(yMetadata.keys());
       console.log(`  - AFTER: ${keysAfter.length} keys: [${keysAfter.join(', ')}]`);
-      console.log(`  - AFTER values: title="${yMetadata.get('title')}", tags=${JSON.stringify(yMetadata.get('tags'))}, folderId="${yMetadata.get('folderId')}", deleted=${yMetadata.get('deleted')}`);
+      console.log(`  - AFTER values: title="${yMetadata.get('title')}", tags=${JSON.stringify(yMetadata.get('tags'))}, folderId="${yMetadata.get('folderId')}", deleted=${yMetadata.get('deleted')}, syncDirectoryId="${yMetadata.get('syncDirectoryId')}"`);
     }, 'metadata'); // Pass origin so update listener knows this is metadata-only
 
     console.log('Updated metadata for note:', noteId);

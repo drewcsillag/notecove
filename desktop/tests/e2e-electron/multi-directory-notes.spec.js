@@ -204,8 +204,14 @@ test.describe('Multi-Directory Note Creation - Electron Mode', () => {
     });
 
     window = await electronApp.firstWindow();
+
+    // Capture console logs for the restarted app BEFORE waiting
+    window.on('console', msg => {
+      console.log(`[Browser Console RESTART] ${msg.text()}`);
+    });
+
     await window.waitForLoadState('domcontentloaded');
-    await window.waitForTimeout(1500);
+    await window.waitForTimeout(3000); // Wait longer for notes to load
 
     console.log('[Test] App reopened');
 

@@ -95,6 +95,7 @@ export class SyncDirectoryManager {
       if (stored) {
         try {
           this.config = JSON.parse(stored);
+          console.log(`[SyncDirManager] Loaded ${this.config.directories.length} directories from localStorage`);
         } catch (error) {
           console.error('Failed to parse sync directories config:', error);
         }
@@ -106,14 +107,18 @@ export class SyncDirectoryManager {
     try {
       const userDataPath = await window.electronAPI.fileSystem.getUserDataPath();
       const configPath = `${userDataPath}/${this.configPath}`;
+      console.log('[SyncDirManager] Loading config from:', configPath);
 
       const result = await window.electronAPI.fileSystem.readFile(configPath);
       if (result.success && result.content) {
         const text = new TextDecoder().decode(result.content);
         this.config = JSON.parse(text);
+        console.log(`[SyncDirManager] Loaded ${this.config.directories.length} directories:`, this.config.directories.map(d => ({ name: d.name, path: d.path })));
+      } else {
+        console.log('[SyncDirManager] Config file not found or empty, result:', result);
       }
     } catch (error) {
-      console.log('No existing sync directories config, starting fresh');
+      console.log('[SyncDirManager] No existing sync directories config, starting fresh. Error:', error);
     }
   }
 
