@@ -60,7 +60,7 @@ test.describe('Multi-Select Notes', () => {
     const hasSelectedClass = await noteItem.evaluate(el => el.classList.contains('selected'));
     expect(hasSelectedClass).toBe(false);
 
-    // Verify selection badge is NOT visible
+    // Verify selection badge is NOT visible (badge only shows for 2+ notes)
     const badge = window.locator('#selectionBadge');
     const badgeVisible = await badge.isVisible().catch(() => false);
     expect(badgeVisible).toBe(false);
@@ -78,47 +78,50 @@ test.describe('Multi-Select Notes', () => {
     await window.keyboard.type('Note 2');
     await window.waitForTimeout(1000);
 
-    // Cmd/Ctrl + Click on first note
+    // Note 2 is currently active. Cmd/Ctrl + Click on Note 1 should select both
     const note1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
     await note1.click({ modifiers: ['Meta'] }); // Use Meta for macOS
     await window.waitForTimeout(300);
 
-    // Verify note 1 is selected
+    // Verify both note 1 and note 2 (active) are selected due to auto-include
     let hasSelected = await note1.evaluate(el => el.classList.contains('selected'));
     expect(hasSelected).toBe(true);
 
-    // Verify badge shows "1 note selected"
-    const badge = window.locator('#selectionBadge');
-    await expect(badge).toBeVisible();
-    const badgeText = await badge.textContent();
-    expect(badgeText).toBe('1 note selected');
-
-    // Cmd/Ctrl + Click on second note
     const note2 = window.locator('.note-item').filter({ hasText: 'Note 2' });
-    await note2.click({ modifiers: ['Meta'] });
-    await window.waitForTimeout(300);
-
-    // Verify both notes are selected
-    hasSelected = await note1.evaluate(el => el.classList.contains('selected'));
-    expect(hasSelected).toBe(true);
     hasSelected = await note2.evaluate(el => el.classList.contains('selected'));
     expect(hasSelected).toBe(true);
 
-    // Verify badge shows "2 notes selected"
-    const badgeText2 = await badge.textContent();
-    expect(badgeText2).toBe('2 notes selected');
+    // Verify badge shows "2 notes selected" (auto-included active note)
+    const badge = window.locator('#selectionBadge');
+    await expect(badge).toBeVisible();
+    let badgeText = await badge.textContent();
+    expect(badgeText).toBe('2 notes selected');
 
-    // Cmd/Ctrl + Click on first note again to deselect
+    // Cmd/Ctrl + Click on note 2 (currently selected) to deselect it
+    await note2.click({ modifiers: ['Meta'] });
+    await window.waitForTimeout(300);
+
+    // Verify only note 1 remains selected
+    hasSelected = await note1.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected).toBe(true);
+    hasSelected = await note2.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected).toBe(false);
+
+    // Verify badge is hidden (only 1 note selected, badge only shows for 2+)
+    let badgeVisible = await badge.isVisible();
+    expect(badgeVisible).toBe(false);
+
+    // Cmd/Ctrl + Click on note 1 to deselect
     await note1.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(300);
 
-    // Verify note 1 is no longer selected
+    // Verify no notes are selected
     hasSelected = await note1.evaluate(el => el.classList.contains('selected'));
     expect(hasSelected).toBe(false);
 
-    // Verify badge shows "1 note selected"
-    const badgeText3 = await badge.textContent();
-    expect(badgeText3).toBe('1 note selected');
+    // Verify badge is still hidden
+    badgeVisible = await badge.isVisible();
+    expect(badgeVisible).toBe(false);
   });
 
   test('should range select with Shift + click', async () => {
@@ -130,34 +133,32 @@ test.describe('Multi-Select Notes', () => {
       await window.waitForTimeout(800);
     }
 
-    // Cmd/Ctrl + Click on first note
+    // Note 5 is currently active. Cmd/Ctrl + Click on Note 1 selects notes 1 and 5 (auto-include)
     const note1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
     await note1.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(300);
 
-    // Shift + Click on third note
+    // Shift + Click on Note 3 should select range from Note 1 to Note 3
     const note3 = window.locator('.note-item').filter({ hasText: 'Note 3' });
     await note3.click({ modifiers: ['Shift'] });
     await window.waitForTimeout(300);
 
-    // Verify notes 1, 2, and 3 are selected
-    for (let i = 1; i <= 3; i++) {
+    // Verify notes 1, 2, 3, and 5 (auto-included active) are selected
+    for (let i of [1, 2, 3, 5]) {
       const note = window.locator('.note-item').filter({ hasText: `Note ${i}` });
       const hasSelected = await note.evaluate(el => el.classList.contains('selected'));
       expect(hasSelected).toBe(true);
     }
 
-    // Verify notes 4 and 5 are NOT selected
-    for (let i = 4; i <= 5; i++) {
-      const note = window.locator('.note-item').filter({ hasText: `Note ${i}` });
-      const hasSelected = await note.evaluate(el => el.classList.contains('selected'));
-      expect(hasSelected).toBe(false);
-    }
+    // Verify note 4 is NOT selected
+    const note4 = window.locator('.note-item').filter({ hasText: 'Note 4' });
+    const hasSelected4 = await note4.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected4).toBe(false);
 
-    // Verify badge shows "3 notes selected"
+    // Verify badge shows "4 notes selected" (1, 2, 3, and auto-included 5)
     const badge = window.locator('#selectionBadge');
     const badgeText = await badge.textContent();
-    expect(badgeText).toBe('3 notes selected');
+    expect(badgeText).toBe('4 notes selected');
   });
 
   test('should select all notes with Cmd/Ctrl + A', async () => {
@@ -243,15 +244,15 @@ test.describe('Multi-Select Notes', () => {
 
     const badge = window.locator('#selectionBadge');
 
-    // Select 1 note
+    // Note 5 is active. Cmd+Click on Note 1 selects both Note 1 and Note 5 (auto-include)
     const note1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
     await note1.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(300);
 
     let badgeText = await badge.textContent();
-    expect(badgeText).toBe('1 note selected');
+    expect(badgeText).toBe('2 notes selected'); // Note 1 and auto-included Note 5
 
-    // Select 2 more notes
+    // Select 2 more notes (Note 2 and Note 3)
     const note2 = window.locator('.note-item').filter({ hasText: 'Note 2' });
     await note2.click({ modifiers: ['Meta'] });
     await window.waitForTimeout(200);
@@ -261,7 +262,7 @@ test.describe('Multi-Select Notes', () => {
     await window.waitForTimeout(300);
 
     badgeText = await badge.textContent();
-    expect(badgeText).toBe('3 notes selected');
+    expect(badgeText).toBe('4 notes selected'); // Notes 1, 2, 3, and 5
   });
 
   test('should clear selection when switching folders', async () => {
@@ -338,13 +339,69 @@ test.describe('Multi-Select Notes', () => {
     hasSelectedClass = await noteItem.evaluate(el => el.classList.contains('selected'));
     expect(hasSelectedClass).toBe(true);
 
-    // Verify the selected styling is applied (primary color background)
+    // Verify the selected styling is applied (blue background)
     const backgroundColor = await noteItem.evaluate(el => {
       const styles = window.getComputedStyle(el);
       return styles.backgroundColor;
     });
 
-    // Should have some background color applied (not default)
-    expect(backgroundColor).toBeTruthy();
+    // Should have blue background (rgb(30, 64, 175) = #1E40AF)
+    expect(backgroundColor).toBe('rgb(30, 64, 175)');
+  });
+
+  test('should clear selection when clicking away', async () => {
+    // Create three notes
+    await window.click('#newNoteBtn');
+    await window.waitForTimeout(300);
+    await window.keyboard.type('Note 1');
+    await window.waitForTimeout(1000);
+
+    await window.click('#newNoteBtn');
+    await window.waitForTimeout(300);
+    await window.keyboard.type('Note 2');
+    await window.waitForTimeout(1000);
+
+    await window.click('#newNoteBtn');
+    await window.waitForTimeout(300);
+    await window.keyboard.type('Note 3');
+    await window.waitForTimeout(1000);
+
+    // Note 3 is active. Cmd+Click Note 1 will select both Note 1 and Note 3 (auto-include)
+    const note1 = window.locator('.note-item').filter({ hasText: 'Note 1' });
+    const note2 = window.locator('.note-item').filter({ hasText: 'Note 2' });
+    const note3 = window.locator('.note-item').filter({ hasText: 'Note 3' });
+
+    await note1.click({ modifiers: ['Meta'] });
+    await window.waitForTimeout(300);
+
+    // Now Cmd+Click Note 2 to add it to selection (total: Note 1, Note 2, Note 3)
+    await note2.click({ modifiers: ['Meta'] });
+    await window.waitForTimeout(300);
+
+    // Verify all three are selected
+    let hasSelected1 = await note1.evaluate(el => el.classList.contains('selected'));
+    let hasSelected2 = await note2.evaluate(el => el.classList.contains('selected'));
+    let hasSelected3 = await note3.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected1).toBe(true);
+    expect(hasSelected2).toBe(true);
+    expect(hasSelected3).toBe(true);
+
+    // Click on the status bar (not on notes, not in editor/sidebar/toolbar)
+    const statusBar = window.locator('.status-bar');
+    await statusBar.click();
+    await window.waitForTimeout(300);
+
+    // Verify selection is cleared for all notes
+    hasSelected1 = await note1.evaluate(el => el.classList.contains('selected'));
+    hasSelected2 = await note2.evaluate(el => el.classList.contains('selected'));
+    hasSelected3 = await note3.evaluate(el => el.classList.contains('selected'));
+    expect(hasSelected1).toBe(false);
+    expect(hasSelected2).toBe(false);
+    expect(hasSelected3).toBe(false);
+
+    // Verify badge is hidden
+    const badge = window.locator('#selectionBadge');
+    const badgeVisible = await badge.isVisible();
+    expect(badgeVisible).toBe(false);
   });
 });

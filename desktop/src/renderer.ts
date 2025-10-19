@@ -476,6 +476,18 @@ class NoteCoveApp {
           this.handleNoteClick(noteId, e as MouseEvent);
         }
       });
+
+      // Right-click context menu for notes
+      notesList.addEventListener('contextmenu', (e) => {
+        const noteItem = (e.target as HTMLElement).closest('.note-item') as HTMLElement;
+        if (noteItem) {
+          const noteId = noteItem.dataset.noteId;
+          if (noteId) {
+            e.preventDefault();
+            this.showNoteContextMenu(e as MouseEvent, noteId);
+          }
+        }
+      });
     }
 
     // Global keyboard shortcuts
@@ -494,6 +506,39 @@ class NoteCoveApp {
         }
       });
     }
+
+    // Note context menu click handlers
+    const noteContextMenu = document.getElementById('noteContextMenu');
+    if (noteContextMenu) {
+      noteContextMenu.addEventListener('click', (e) => {
+        const menuItem = (e.target as HTMLElement).closest('.context-menu-item') as HTMLElement;
+        if (menuItem) {
+          const action = menuItem.dataset.action;
+          if (action) {
+            this.handleNoteContextMenuAction(action);
+          }
+        }
+      });
+    }
+
+    // Hide context menus when clicking outside or pressing Escape
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.context-menu') && !target.closest('.note-item')) {
+        this.hideNoteContextMenu();
+        // Clear selection when clicking away (unless clicking in editor or other UI elements)
+        if (!target.closest('.ProseMirror') && !target.closest('.sidebar') && !target.closest('.toolbar')) {
+          this.clearSelection();
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.hideNoteContextMenu();
+        // Note: Escape key already clears selection via handleKeyboard()
+      }
+    });
 
     // Right-click context menu for custom folders (use event delegation)
     const folderTree = document.getElementById('folderTree');
@@ -1998,14 +2043,26 @@ class NoteCoveApp {
     const isCtrlOrCmd = event.ctrlKey || event.metaKey;
     const isShift = event.shiftKey;
 
+    console.log('[handleNoteClick]', {
+      noteId,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+      isCtrlOrCmd,
+      isShift
+    });
+
     if (isCtrlOrCmd) {
       // Cmd/Ctrl + Click: Toggle selection
+      console.log('[handleNoteClick] Toggling selection');
       this.toggleNoteSelection(noteId);
     } else if (isShift) {
       // Shift + Click: Range selection
+      console.log('[handleNoteClick] Range selecting');
       this.rangeSelectNotes(noteId);
     } else {
       // Regular click: Clear selection and select single note
+      console.log('[handleNoteClick] Regular click');
       this.clearSelection();
       this.selectNote(noteId);
     }
@@ -2015,14 +2072,41 @@ class NoteCoveApp {
    * Toggle selection of a single note
    */
   toggleNoteSelection(noteId: string): void {
+    console.log('[toggleNoteSelection] Before:', {
+      noteId,
+      wasSelected: this.selectedNoteIds.has(noteId),
+      currentSelectionSize: this.selectedNoteIds.size,
+      selectedIds: Array.from(this.selectedNoteIds),
+      currentNoteId: this.currentNote?.id
+    });
+
+    // If starting a new multi-select and clicking a different note than the active one,
+    // automatically include the active note in the selection
+    // BUT only if the active note is not in trash and exists in the current filtered view
+    if (this.selectedNoteIds.size === 0 && this.currentNote && noteId !== this.currentNote.id) {
+      const activeNoteInFilteredView = this.getFilteredNotes().some(n => n.id === this.currentNote!.id);
+      if (activeNoteInFilteredView) {
+        this.selectedNoteIds.add(this.currentNote.id);
+        console.log('[toggleNoteSelection] Auto-included active note:', this.currentNote.id);
+      }
+    }
+
     if (this.selectedNoteIds.has(noteId)) {
       this.selectedNoteIds.delete(noteId);
+      console.log('[toggleNoteSelection] Removed from selection');
     } else {
       this.selectedNoteIds.add(noteId);
+      console.log('[toggleNoteSelection] Added to selection');
     }
 
     this.isMultiSelectMode = this.selectedNoteIds.size > 0;
     this.lastSelectedNoteId = noteId;
+
+    console.log('[toggleNoteSelection] After:', {
+      newSelectionSize: this.selectedNoteIds.size,
+      selectedIds: Array.from(this.selectedNoteIds)
+    });
+
     this.updateSelectionUI();
   }
 
@@ -2040,8 +2124,21 @@ class NoteCoveApp {
 
     if (currentIndex === -1) return;
 
-    // If no last selected note, just select this one
-    if (lastIndex === -1) {
+    // If starting a new range selection, auto-include the active note
+    if (lastIndex === -1 && this.currentNote && noteId !== this.currentNote.id) {
+      this.selectedNoteIds.add(this.currentNote.id);
+      const activeNoteIndex = noteIds.indexOf(this.currentNote.id);
+      if (activeNoteIndex !== -1) {
+        // Range select from active note to clicked note
+        const startIndex = Math.min(currentIndex, activeNoteIndex);
+        const endIndex = Math.max(currentIndex, activeNoteIndex);
+        for (let i = startIndex; i <= endIndex; i++) {
+          this.selectedNoteIds.add(noteIds[i]);
+        }
+        this.lastSelectedNoteId = noteId;
+      }
+    } else if (lastIndex === -1) {
+      // No active note or clicking the active note, just select this one
       this.selectedNoteIds.clear();
       this.selectedNoteIds.add(noteId);
       this.lastSelectedNoteId = noteId;
@@ -2110,14 +2207,15 @@ class NoteCoveApp {
   updateSelectionBadge(): void {
     let badge = document.getElementById('selectionBadge');
 
-    if (this.selectedNoteIds.size > 0) {
+    // Only show badge when 2+ notes are selected
+    if (this.selectedNoteIds.size > 1) {
       if (!badge) {
         badge = document.createElement('div');
         badge.id = 'selectionBadge';
         badge.className = 'selection-badge';
         document.body.appendChild(badge);
       }
-      badge.textContent = `${this.selectedNoteIds.size} note${this.selectedNoteIds.size > 1 ? 's' : ''} selected`;
+      badge.textContent = `${this.selectedNoteIds.size} notes selected`;
       badge.style.display = 'block';
     } else if (badge) {
       badge.style.display = 'none';
@@ -2163,6 +2261,101 @@ class NoteCoveApp {
     }
 
     return filteredNotes;
+  }
+
+  /**
+   * Show context menu for notes
+   */
+  showNoteContextMenu(event: MouseEvent, noteId: string): void {
+    // If right-clicking an unselected note, clear selection and select only that note
+    // If right-clicking a selected note, keep current selection
+    if (!this.selectedNoteIds.has(noteId)) {
+      this.selectedNoteIds.clear();
+      this.selectedNoteIds.add(noteId);
+      this.isMultiSelectMode = true;
+      this.lastSelectedNoteId = noteId;
+      this.updateSelectionUI();
+    }
+
+    const menu = document.getElementById('noteContextMenu');
+    if (!menu) return;
+
+    // Update delete menu text based on selection count
+    const deleteText = document.getElementById('deleteMenuText');
+    if (deleteText) {
+      if (this.selectedNoteIds.size > 1) {
+        deleteText.textContent = `Delete ${this.selectedNoteIds.size} notes`;
+      } else {
+        deleteText.textContent = 'Delete';
+      }
+    }
+
+    // Position menu at mouse location
+    menu.style.left = `${event.clientX}px`;
+    menu.style.top = `${event.clientY}px`;
+    menu.style.display = 'block';
+  }
+
+  /**
+   * Hide note context menu
+   */
+  hideNoteContextMenu(): void {
+    const menu = document.getElementById('noteContextMenu');
+    if (menu) {
+      menu.style.display = 'none';
+    }
+  }
+
+  /**
+   * Handle note context menu actions
+   */
+  async handleNoteContextMenuAction(action: string): Promise<void> {
+    this.hideNoteContextMenu();
+
+    switch (action) {
+      case 'new':
+        this.createNewNote();
+        break;
+
+      case 'delete':
+        await this.deleteSelectedNotes();
+        break;
+
+      default:
+        console.warn('Unknown note context menu action:', action);
+    }
+  }
+
+  /**
+   * Delete all selected notes (move to trash)
+   */
+  async deleteSelectedNotes(): Promise<void> {
+    if (!this.noteManager || this.selectedNoteIds.size === 0) return;
+
+    const noteIds = Array.from(this.selectedNoteIds);
+
+    for (const noteId of noteIds) {
+      const note = this.noteManager.getNote(noteId);
+      if (note && !note.deleted) {
+        note.deleted = true;
+        note.modified = new Date().toISOString();
+        await this.noteManager.saveNote(note);
+      }
+    }
+
+    // Clear selection
+    this.clearSelection();
+
+    // Refresh notes list
+    this.renderNotesList();
+
+    // If current note was deleted, clear editor
+    if (this.currentNote && noteIds.includes(this.currentNote.id)) {
+      this.currentNote = null;
+      if (this.editor) {
+        this.editor.commands.setContent('');
+      }
+    }
   }
 
   async selectNote(noteId: string): Promise<void> {
