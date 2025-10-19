@@ -543,14 +543,18 @@
     }
 
     .note-item.selected {
-      background: var(--primary);
+      background: var(--primary-color);
       color: white;
-      border: 2px solid var(--primary);
+    }
+
+    .note-item.selected .note-title,
+    .note-item.selected .note-preview,
+    .note-item.selected .note-meta {
+      color: white;
     }
 
     .note-item.selected:hover {
-      background: var(--primary);
-      opacity: 0.9;
+      background: var(--accent-color);
     }
 
     .note-actions {
@@ -1435,13 +1439,13 @@
       position: fixed;
       bottom: 20px;
       right: 20px;
-      background: var(--primary);
+      background: var(--primary-color);
       color: white;
       padding: 12px 20px;
       border-radius: 24px;
       font-size: 14px;
       font-weight: 500;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       z-index: 1000;
       display: none;
       animation: slideIn 0.2s ease-out;

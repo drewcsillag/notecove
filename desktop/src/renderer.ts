@@ -1012,8 +1012,15 @@ class NoteCoveApp {
       </div>
     ` : '';
 
-    notesList.innerHTML = emptyTrashButton + filteredNotes.map(note => `
-      <div class="note-item ${this.currentNote?.id === note.id ? 'active' : ''}"
+    notesList.innerHTML = emptyTrashButton + filteredNotes.map(note => {
+      const isActive = this.currentNote?.id === note.id;
+      const isSelected = this.selectedNoteIds.has(note.id);
+      const classes = ['note-item'];
+      if (isActive) classes.push('active');
+      if (isSelected) classes.push('selected');
+
+      return `
+      <div class="${classes.join(' ')}"
            ${!isTrashView ? 'draggable="true"' : 'draggable="true"'}
            data-note-id="${note.id}"
            ${!isTrashView ? 'ondragstart="app.handleNoteDragStart(event)" ondragend="app.handleNoteDragEnd(event)"' : 'ondragstart="app.handleTrashNoteDragStart(event)" ondragend="app.handleNoteDragEnd(event)"'}>
@@ -1030,7 +1037,10 @@ class NoteCoveApp {
           </div>
         ` : ''}
       </div>
-    `).join('');
+    `}).join('');
+
+    // Update selection badge to reflect current state after re-render
+    this.updateSelectionBadge();
 
     // Note: Click event listeners are set up once using event delegation in initializeEventListeners()
     // No need to add individual listeners here, which prevents race conditions when DOM is recreated
