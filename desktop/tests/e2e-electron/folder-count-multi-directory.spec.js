@@ -312,4 +312,216 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     console.log('[Test] Note correctly appears in folder after re-adding directory!');
   });
+
+  test('notes should stay in correct sync directory across app restart', async () => {
+    // Add second sync directory
+    await window.click('button[aria-label="Settings"]');
+    await window.waitForTimeout(300);
+    await window.click('text=Sync Directories');
+    await window.waitForTimeout(300);
+
+    const addDirBtn = window.locator('button').filter({ hasText: 'Add Directory' });
+    await addDirBtn.click();
+    await window.waitForTimeout(300);
+
+    const secondDir = path.join(testDir, 'second-sync-dir');
+    await fs.mkdir(secondDir, { recursive: true });
+
+    const pathInput = window.locator('input[placeholder*="path" i]').last();
+    await pathInput.fill(secondDir);
+
+    const nameInput = window.locator('input[placeholder*="name" i]').last();
+    await nameInput.fill('Projects');
+
+    const saveBtn = window.locator('button').filter({ hasText: 'Save' });
+    await saveBtn.click();
+    await window.waitForTimeout(500);
+
+    const closeBtn = window.locator('button[aria-label="Close settings"]');
+    await closeBtn.click();
+    await window.waitForTimeout(500);
+
+    // Select Projects directory
+    const projectsAllNotes = window.locator('.sync-directory-group').nth(1)
+      .locator('.folder-item').filter({ hasText: 'All Notes' });
+    await projectsAllNotes.click();
+    await window.waitForTimeout(500);
+
+    // Create a folder in Projects directory
+    await window.click('button[aria-label="Add folder"]');
+    await window.waitForTimeout(300);
+
+    const folderNameInput = window.locator('input[placeholder*="folder name" i]');
+    await folderNameInput.fill('Design');
+    await folderNameInput.press('Enter');
+    await window.waitForTimeout(500);
+
+    // Select the new folder
+    const designFolder = window.locator('.folder-item').filter({ hasText: 'Design' });
+    await designFolder.click();
+    await window.waitForTimeout(500);
+
+    // Create a note in the folder
+    await window.click('#newNoteBtn');
+    await window.keyboard.type('Design Note');
+    await window.waitForTimeout(500);
+
+    console.log('[Test] Created note in Projects/Design folder');
+
+    // Restart the app
+    await electronApp.close();
+    await window.waitForTimeout(1000);
+
+    electronApp = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--instance=test-' + Date.now()
+      ],
+      env: {
+        NODE_ENV: 'test'
+      }
+    });
+
+    window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+    await window.waitForTimeout(1500);
+
+    console.log('[Test] App restarted');
+
+    // Verify note is still in Projects directory
+    const restoredProjectsAllNotes = window.locator('.sync-directory-group').nth(1)
+      .locator('.folder-item').filter({ hasText: 'All Notes' });
+    await restoredProjectsAllNotes.click();
+    await window.waitForTimeout(500);
+
+    // Check folder count
+    const restoredDesignFolder = window.locator('.folder-item').filter({ hasText: 'Design' });
+    const folderCount = await restoredDesignFolder.locator('.folder-count').textContent();
+    expect(parseInt(folderCount)).toBe(1);
+
+    // Click folder and verify note appears
+    await restoredDesignFolder.click();
+    await window.waitForTimeout(500);
+
+    const noteItem = window.locator('.note-item').filter({ hasText: 'Design Note' });
+    await expect(noteItem).toBeVisible();
+
+    // Verify note is NOT in primary directory
+    const primaryAllNotes = window.locator('.sync-directory-group').first()
+      .locator('.folder-item').filter({ hasText: 'All Notes' });
+    await primaryAllNotes.click();
+    await window.waitForTimeout(500);
+
+    const primaryNoteCount = await primaryAllNotes.locator('.folder-count').textContent();
+    expect(parseInt(primaryNoteCount)).toBe(0);
+
+    console.log('[Test] Note correctly stayed in Projects directory after restart!');
+  });
+
+  test('removed sync directory notes should not show in UI', async () => {
+    // Add second sync directory
+    await window.click('button[aria-label="Settings"]');
+    await window.waitForTimeout(300);
+    await window.click('text=Sync Directories');
+    await window.waitForTimeout(300);
+
+    const addDirBtn = window.locator('button').filter({ hasText: 'Add Directory' });
+    await addDirBtn.click();
+    await window.waitForTimeout(300);
+
+    const secondDir = path.join(testDir, 'second-sync-dir');
+    await fs.mkdir(secondDir, { recursive: true });
+
+    const pathInput = window.locator('input[placeholder*="path" i]').last();
+    await pathInput.fill(secondDir);
+
+    const nameInput = window.locator('input[placeholder*="name" i]').last();
+    await nameInput.fill('Projects');
+
+    const saveBtn = window.locator('button').filter({ hasText: 'Save' });
+    await saveBtn.click();
+    await window.waitForTimeout(500);
+
+    const closeBtn = window.locator('button[aria-label="Close settings"]');
+    await closeBtn.click();
+    await window.waitForTimeout(500);
+
+    // Create a note in Projects directory
+    const projectsAllNotes = window.locator('.sync-directory-group').nth(1)
+      .locator('.folder-item').filter({ hasText: 'All Notes' });
+    await projectsAllNotes.click();
+    await window.waitForTimeout(500);
+
+    await window.click('#newNoteBtn');
+    await window.keyboard.type('Project Doc');
+    await window.waitForTimeout(500);
+
+    console.log('[Test] Created note in Projects directory');
+
+    // Verify Projects shows count of 1
+    let projectsCount = await projectsAllNotes.locator('.folder-count').textContent();
+    expect(parseInt(projectsCount)).toBe(1);
+
+    // Remove Projects directory
+    await window.click('button[aria-label="Settings"]');
+    await window.waitForTimeout(300);
+    await window.click('text=Sync Directories');
+    await window.waitForTimeout(300);
+
+    const projectsRow = window.locator('.sync-directory-group').filter({ hasText: 'Projects' });
+    const removeBtn = projectsRow.locator('button').filter({ hasText: 'Remove' });
+    await removeBtn.click();
+    await window.waitForTimeout(300);
+
+    // Confirm removal in dialog
+    await window.locator('button').filter({ hasText: 'Remove' }).last().click();
+    await window.waitForTimeout(500);
+
+    await closeBtn.click();
+    await window.waitForTimeout(500);
+
+    console.log('[Test] Removed Projects directory');
+
+    // Verify primary directory shows count of 0
+    const primaryAllNotes = window.locator('.sync-directory-group').first()
+      .locator('.folder-item').filter({ hasText: 'All Notes' });
+    const primaryCount = await primaryAllNotes.locator('.folder-count').textContent();
+    expect(parseInt(primaryCount)).toBe(0);
+
+    // Verify editor is cleared
+    const editorTitle = await window.locator('.editor-note-title').textContent();
+    expect(editorTitle).toBe('');
+
+    console.log('[Test] Notes from removed directory correctly hidden from UI!');
+
+    // Restart app and verify count is still 0
+    await electronApp.close();
+    await window.waitForTimeout(1000);
+
+    electronApp = await electron.launch({
+      args: [
+        path.join(process.cwd(), 'dist/main.js'),
+        '--user-data-dir=' + path.join(testDir, 'user-data'),
+        '--instance=test-' + Date.now()
+      ],
+      env: {
+        NODE_ENV: 'test'
+      }
+    });
+
+    window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+    await window.waitForTimeout(1500);
+
+    console.log('[Test] App restarted');
+
+    // Verify primary directory STILL shows count of 0
+    const restoredPrimaryAllNotes = window.locator('.sync-directory-group').first()
+      .locator('.folder-item').filter({ hasText: 'All Notes' });
+    const restoredPrimaryCount = await restoredPrimaryAllNotes.locator('.folder-count').textContent();
+    expect(parseInt(restoredPrimaryCount)).toBe(0);
+
+    console.log('[Test] Count remains 0 after restart - notes correctly filtered!');
+  });
 });
