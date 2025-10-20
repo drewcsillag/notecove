@@ -38,6 +38,18 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Close the app
     await electronApp.close();
 
+    // Kill any lingering Electron processes
+    const { exec } = require('child_process');
+    await new Promise((resolve) => {
+      exec('pkill -9 Electron', (error) => {
+        // Ignore errors - process might not exist
+        resolve();
+      });
+    });
+
+    // Wait a bit for processes to fully terminate
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     // Clean up test directory
     try {
       await fs.rm(testDir, { recursive: true, force: true });
