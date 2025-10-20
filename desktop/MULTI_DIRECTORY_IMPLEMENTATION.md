@@ -351,18 +351,53 @@ Implement multi-directory sync with:
 **Implementation Notes:**
 - Cross-directory moves use **soft delete** instead of hard delete
 - Deleted version saved to source directory filesystem (deleted: true)
-- Other instances see note in Recently Deleted via CRDT sync
-- No file watching needed - CRDT handles synchronization
 - Same UUID preserved across directories (links stay intact)
 - Single instance with both directories shows note only in target (acceptable limitation)
+
+**Known Issue - Multi-Instance Sync:**
+- ⚠️ **CRDT sync between separate Electron instances is not currently working**
+- Created test: `tests/e2e-electron/cross-directory-two-instances.spec.js`
+- Test confirms: Notes created in Instance 1 never appear in Instance 2
+- Root cause: `SyncManager.performSync()` runs but updates don't propagate
+- Impact: Other instances won't see cross-directory moves (original user-reported bug still exists)
+- **This is a broader CRDT sync issue, not specific to cross-directory moves**
+- Should be addressed in a dedicated CRDT sync investigation phase
 
 **Git Commits:**
 1. `aa4bd76` - Add E2E test for cross-directory note moves and fix test selectors
 2. `d2b2931` - Change cross-directory move to use soft delete (Recently Deleted)
+3. Added two-instance test to verify sync behavior (currently failing)
 
-#### 4C: "Moved To" Metadata Enhancement (Future)
+#### 4C: Fix Multi-Instance CRDT Sync
+**Status:** Not Started - Critical Issue
+**Priority:** HIGH - Multi-instance sync currently broken
+
+**Problem:**
+- CRDT sync between separate Electron instances is not working
+- Notes created in one instance never appear in another instance watching same directory
+- `SyncManager.performSync()` runs every 2 seconds but updates don't propagate
+- This affects ALL multi-instance scenarios, not just cross-directory moves
+
+**Investigation Needed:**
+- [ ] Add debug logging to `performSync()`, `scanForNewNotes()`, and `syncNote()`
+- [ ] Verify UpdateStore is writing files correctly to filesystem
+- [ ] Verify UpdateStore is reading new files from filesystem
+- [ ] Check if Y.js state is being properly encoded/decoded
+- [ ] Test if issue is in write path, read path, or both
+- [ ] Create minimal reproduction test case
+
+**Expected Behavior:**
+1. Instance 1 creates note → writes CRDT updates to filesystem
+2. Instance 2's `performSync()` scans filesystem → finds new updates
+3. Instance 2 applies updates → note appears in UI
+
+**Test Case:**
+- `tests/e2e-electron/cross-directory-two-instances.spec.js` demonstrates the issue
+- Can be used to verify fix
+
+#### 4D: "Moved To" Metadata Enhancement (Future)
 **Status:** Not Started - Deferred to later phase
-**Priority:** Low - Current soft delete works for multi-instance sync
+**Priority:** Low - Depends on 4C being fixed first
 
 This enhancement would add semantic "moved to" metadata instead of just marking as deleted:
 
@@ -391,10 +426,10 @@ This enhancement would add semantic "moved to" metadata instead of just marking 
 - Enables "undo move" functionality
 
 **Why Deferred:**
-- Current soft delete solves the primary issue (multi-instance sync)
-- Adds complexity without critical user value
+- Depends on Phase 4C (fixing multi-instance sync) being completed first
+- Adds complexity without critical user value until sync works
 - Can be added incrementally without breaking changes
-- Focus on completing Phase 5 (Drag Enhancements) first
+- Focus on fixing core CRDT sync issue first
 
 #### E2E Tests to Write:
 ```
