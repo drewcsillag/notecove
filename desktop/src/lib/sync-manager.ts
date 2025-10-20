@@ -234,7 +234,7 @@ export class SyncManager {
     this.updateStatus('syncing');
 
     try {
-      console.log('[performSync] Starting sync cycle...');
+      console.log(`[performSync] Starting sync cycle for directory: ${this.notesPath} (instance: ${this.instanceId})`);
 
       // First, scan for new notes created by other instances
       await this.scanForNewNotes();
@@ -358,28 +358,36 @@ export class SyncManager {
 
     try {
       if (!this.notesPath || this.notesPath === 'localStorage') {
+        console.log('[scanForNewNotes] Skipping - invalid notes path:', this.notesPath);
         return;
       }
 
       // Check if notes directory exists
       const notesDir = `${this.notesPath}/notes`;
+      console.log('[scanForNewNotes] Checking directory:', notesDir);
       const exists = await window.electronAPI?.fileSystem.exists(notesDir);
       if (!exists) {
+        console.log('[scanForNewNotes] Notes directory does not exist:', notesDir);
         return;
       }
 
       // Read all subdirectories (each is a note)
       const result = await window.electronAPI?.fileSystem.readDir(notesDir);
       if (!result || !result.success) {
+        console.log('[scanForNewNotes] Failed to read directory:', result);
         return;
       }
 
+      console.log(`[scanForNewNotes] Found ${(result.files || []).length} items in notes directory`);
+
       // Get currently known note IDs
       const knownNoteIds = new Set(this.noteManager.getAllNotes().map(n => n.id));
+      console.log('[scanForNewNotes] Currently known note IDs:', Array.from(knownNoteIds));
 
       // Check each directory
       if (!result) return;
       for (const item of result.files || []) {
+        console.log('[scanForNewNotes] Checking item:', item, 'known:', knownNoteIds.has(item));
         // Skip hidden files and already-known notes
         if (item.startsWith('.') || knownNoteIds.has(item)) continue;
 
