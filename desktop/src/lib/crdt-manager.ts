@@ -317,6 +317,7 @@ export class CRDTManager {
         yMetadata.set('deleted', note.deleted || false);
         yMetadata.set('contentVersion', 0); // Track correlation with content updates
         // Always set syncDirectoryId, even if undefined (for proper filtering)
+        console.log(`[CRDTManager] Setting syncDirectoryId for note ${noteId}: ${note.syncDirectoryId || null}`);
         yMetadata.set('syncDirectoryId', note.syncDirectoryId || null);
 
         console.log(`  - Verified title in Y.Map:`, yMetadata.get('title'));

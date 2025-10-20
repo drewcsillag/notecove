@@ -107,6 +107,9 @@ test.describe('Folder Counts - Multi-Directory', () => {
   });
 
   test('folder counts should be scoped per sync directory', async () => {
+    // Listen to console logs
+    window.on('console', msg => console.log('BROWSER:', msg.text()));
+
     // Create a note in primary directory
     await window.click('#newNoteBtn');
     await window.keyboard.type('Primary Note');
