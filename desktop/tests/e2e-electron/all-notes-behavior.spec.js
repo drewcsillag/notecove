@@ -48,7 +48,7 @@ test.describe('All Notes Virtual Folder Behavior', () => {
 
   test('should show all notes in All Notes regardless of folder', async () => {
     // Add sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -91,7 +91,7 @@ test.describe('All Notes Virtual Folder Behavior', () => {
 
   test('should show correct count in All Notes folder badge', async () => {
     // Add sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -137,13 +137,13 @@ test.describe('All Notes Virtual Folder Behavior', () => {
 
   test('should scope All Notes to individual sync directories', async () => {
     // Add primary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
 
     // Add secondary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', secondaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -195,7 +195,7 @@ test.describe('All Notes Virtual Folder Behavior', () => {
 
   test('should show notes from custom folders in All Notes after move', async () => {
     // Add sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -245,7 +245,7 @@ test.describe('All Notes Virtual Folder Behavior', () => {
 
   test('should allow moving note from custom folder to All Notes (root level)', async () => {
     // Add sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -294,7 +294,7 @@ test.describe('All Notes Virtual Folder Behavior', () => {
 
   test('should maintain All Notes count when moving notes between folders', async () => {
     // Add sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);

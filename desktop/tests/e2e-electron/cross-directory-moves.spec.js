@@ -11,6 +11,35 @@ test.describe('Cross-Directory Note Moves', () => {
   let primaryDir;
   let secondaryDir;
 
+  // Helper function to add a sync directory
+  async function addSyncDirectory(dirPath, dirName) {
+    // Open settings
+    await window.click('.settings-btn');
+    await window.waitForTimeout(300);
+
+    // Click Add Directory button
+    const addDirBtn = window.locator('button').filter({ hasText: 'Add Directory' });
+    await addDirBtn.click();
+    await window.waitForTimeout(300);
+
+    // Fill in path and name
+    const pathInput = window.locator('input[placeholder*="path" i]').last();
+    await pathInput.fill(dirPath);
+
+    const nameInput = window.locator('input[placeholder*="name" i]').last();
+    await nameInput.fill(dirName);
+
+    // Confirm
+    const addBtn = window.locator('button#confirmAddDir');
+    await addBtn.click();
+    await window.waitForTimeout(500);
+
+    // Close settings
+    const closeBtn = window.locator('button#settingsClose');
+    await closeBtn.click();
+    await window.waitForTimeout(500);
+  }
+
   test.beforeEach(async () => {
     // Create temporary directories for testing
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'notecove-cross-dir-test-'));
@@ -48,16 +77,10 @@ test.describe('Cross-Directory Note Moves', () => {
 
   test('should show confirmation dialog for cross-directory move', async () => {
     // Add primary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
-    await window.fill('input[type="text"]', primaryDir);
-    await window.click('button:has-text("Add Directory")');
-    await window.waitForTimeout(500);
+    await addSyncDirectory(primaryDir, 'primary');
 
     // Add secondary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
-    await window.fill('input[type="text"]', secondaryDir);
-    await window.click('button:has-text("Add Directory")');
-    await window.waitForTimeout(500);
+    await addSyncDirectory(secondaryDir, 'secondary');
 
     // Create a note in primary directory
     await window.click('button:has-text("New Note")');
@@ -109,13 +132,13 @@ test.describe('Cross-Directory Note Moves', () => {
 
   test('should move note to All Notes in another sync directory', async () => {
     // Add primary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
 
     // Add secondary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', secondaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -163,13 +186,13 @@ test.describe('Cross-Directory Note Moves', () => {
 
   test('should move note to custom folder in another sync directory', async () => {
     // Add primary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
 
     // Add secondary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', secondaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -222,13 +245,13 @@ test.describe('Cross-Directory Note Moves', () => {
 
   test('should move multiple notes across directories', async () => {
     // Add primary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
 
     // Add secondary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', secondaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -285,12 +308,12 @@ test.describe('Cross-Directory Note Moves', () => {
 
   test('should respect "dont ask again" preference', async () => {
     // Add primary and secondary directories
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
 
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', secondaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);
@@ -348,7 +371,7 @@ test.describe('Cross-Directory Note Moves', () => {
 
   test('should not show confirmation for same-directory moves', async () => {
     // Add primary sync directory
-    await window.click('[data-testid="add-sync-directory-btn"]');
+    await window.click('#addSyncDirectoryBtn');
     await window.fill('input[type="text"]', primaryDir);
     await window.click('button:has-text("Add Directory")');
     await window.waitForTimeout(500);

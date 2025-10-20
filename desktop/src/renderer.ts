@@ -2600,11 +2600,15 @@ class NoteCoveApp {
    * Handle folder selection in picker
    */
   private async handleFolderPickerSelection(folderId: string, syncDirectoryId: string): Promise<void> {
+    console.log(`[handleFolderPickerSelection] Called with folderId: ${folderId}, syncDirectoryId: ${syncDirectoryId}`);
+
     const modal = document.getElementById('folderPickerModal');
     if (!modal) return;
 
     const action = (modal as any).dataset.action as 'move' | 'duplicate';
     const noteIds = Array.from(this.selectedNoteIds);
+
+    console.log(`[handleFolderPickerSelection] Action: ${action}, noteIds: ${noteIds.join(', ')}`);
 
     if (noteIds.length === 0 || !this.noteManager) return;
 
@@ -2613,17 +2617,23 @@ class NoteCoveApp {
       const note = this.noteManager?.getNote(noteId);
       if (!note) return false;
       const noteSyncDirId = note.syncDirectoryId || this.noteManager?.primarySyncDirectoryId;
+      console.log(`[handleFolderPickerSelection] Note ${noteId}: currentSyncDir=${noteSyncDirId}, targetSyncDir=${syncDirectoryId}, isCross=${noteSyncDirId !== syncDirectoryId}`);
       return noteSyncDirId !== syncDirectoryId;
     });
+
+    console.log(`[handleFolderPickerSelection] isCrossDirectory: ${isCrossDirectory}`);
 
     // If it's a cross-directory move and action is 'move', show confirmation dialog
     if (action === 'move' && isCrossDirectory) {
       // Check "don't ask again" preference
       const dontAskAgain = localStorage.getItem('dontAskCrossDirectoryMove') === 'true';
 
+      console.log(`[handleFolderPickerSelection] Cross-directory move detected, dontAskAgain: ${dontAskAgain}`);
+
       if (!dontAskAgain) {
         // Show confirmation dialog and wait for user response
         const confirmed = await this.showCrossDirectoryMoveDialog(noteIds.length, syncDirectoryId);
+        console.log(`[handleFolderPickerSelection] Confirmation result: ${confirmed}`);
         if (!confirmed) {
           // User cancelled, just hide the folder picker
           this.hideFolderPicker();
@@ -2633,10 +2643,13 @@ class NoteCoveApp {
     }
 
     // Perform the action for each selected note
+    console.log(`[handleFolderPickerSelection] Starting move operations...`);
     for (const noteId of noteIds) {
       if (action === 'move') {
         // Pass target sync directory ID to support cross-directory moves
-        await this.noteManager.moveNoteToFolder(noteId, folderId, syncDirectoryId);
+        console.log(`[handleFolderPickerSelection] Moving note ${noteId} to folder ${folderId} in sync directory ${syncDirectoryId}`);
+        const result = await this.noteManager.moveNoteToFolder(noteId, folderId, syncDirectoryId);
+        console.log(`[handleFolderPickerSelection] Move result for ${noteId}:`, result ? 'success' : 'failed');
       } else {
         // Duplicate not yet implemented (Phase 4B)
         console.log('[TODO] Duplicate note to folder not yet implemented');
@@ -2647,9 +2660,11 @@ class NoteCoveApp {
     this.hideFolderPicker();
 
     // Refresh UI
+    console.log(`[handleFolderPickerSelection] Refreshing UI...`);
     this.notes = this.noteManager.getAllNotes();
     this.renderNotesList();
     this.renderFolderTree();
+    console.log(`[handleFolderPickerSelection] Complete`);
   }
 
   async selectNote(noteId: string): Promise<void> {
