@@ -2459,12 +2459,14 @@ class NoteCoveApp {
 
     treeContainer.innerHTML = '';
 
-    // Get current note's folder
+    // Get current note's folder and sync directory
     let currentFolderId: string | null = null;
+    let currentSyncDirectoryId: string | null = null;
     if (this.selectedNoteIds.size === 1) {
       const noteId = Array.from(this.selectedNoteIds)[0];
       const note = this.noteManager.getNote(noteId);
       currentFolderId = note?.folderId || 'all-notes';
+      currentSyncDirectoryId = note?.syncDirectoryId || this.noteManager.primarySyncDirectoryId;
     }
 
     // Render folders for each sync directory
@@ -2483,10 +2485,14 @@ class NoteCoveApp {
 
       const folders = folderManager.getAllFolders();
 
+      // Check if this is the same sync directory as the current note
+      const isSameSyncDirectory = syncDir.id === currentSyncDirectoryId;
+
       // Add special folders first (All Notes, Recently Deleted)
       // All at the same indentation level as root custom folders
-      const allNotesIsDisabled = action === 'move' && currentFolderId === 'all-notes';
-      const allNotesIsCurrent = currentFolderId === 'all-notes';
+      // Only disable if it's a move to the same folder in the same sync directory
+      const allNotesIsDisabled = action === 'move' && currentFolderId === 'all-notes' && isSameSyncDirectory;
+      const allNotesIsCurrent = currentFolderId === 'all-notes' && isSameSyncDirectory;
       const allNotesItem = this.createFolderPickerItem(
         'all-notes',
         'All Notes',
@@ -2498,8 +2504,8 @@ class NoteCoveApp {
       treeContainer.appendChild(allNotesItem);
 
       // Add Recently Deleted option
-      const trashIsDisabled = action === 'move' && currentFolderId === 'trash';
-      const trashIsCurrent = currentFolderId === 'trash';
+      const trashIsDisabled = action === 'move' && currentFolderId === 'trash' && isSameSyncDirectory;
+      const trashIsCurrent = currentFolderId === 'trash' && isSameSyncDirectory;
       const trashItem = this.createFolderPickerItem(
         'trash',
         'Recently Deleted',
@@ -2517,8 +2523,9 @@ class NoteCoveApp {
         );
 
         for (const folder of childFolders) {
-          const isDisabled = action === 'move' && folder.id === currentFolderId;
-          const isCurrent = folder.id === currentFolderId;
+          // Only disable if it's the same folder in the same sync directory
+          const isDisabled = action === 'move' && folder.id === currentFolderId && isSameSyncDirectory;
+          const isCurrent = folder.id === currentFolderId && isSameSyncDirectory;
           const item = this.createFolderPickerItem(
             folder.id,
             folder.name,
