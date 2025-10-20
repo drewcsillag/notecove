@@ -4,7 +4,7 @@
 **Date Completed (Phase 1):** 2025-10-19
 **Date Completed (Phase 2):** 2025-10-19
 **Date Completed (Phase 3):** 2025-10-19
-**Status:** Phase 3 - ✅ COMPLETE (Context menu with delete functionality and UX refinements)
+**Status:** Phase 4A - 🔄 IN PROGRESS (Folder picker dialog - 8/11 tests passing)
 
 ## Table of Contents
 1. [Implementation Plan](#implementation-plan)
@@ -269,17 +269,58 @@ Implement multi-directory sync with:
 ---
 
 ### Phase 4: Folder Picker and Cross-Directory Operations
-**Status:** Not Started
+**Status:** Phase 4A - In Progress (8/11 tests passing)
 
-#### 4A: Folder Picker Dialog
-- [ ] Create modal dialog UI
-- [ ] Render folder tree for all sync directories
-- [ ] Group by sync directory with visual separator
-- [ ] Show folder hierarchy (indentation)
-- [ ] Highlight/disable current folder
-- [ ] Show sync directory name/icon for each section
-- [ ] Handle folder selection
-- [ ] Handle cancel/close
+#### 4A: Folder Picker Dialog ✅ Mostly Complete
+**Status:** Core functionality implemented, 3 tests failing related to note filtering after move
+- [x] Create modal dialog UI (already existed in HTML/CSS)
+- [x] Render folder tree for all sync directories
+- [x] Group by sync directory with visual separator
+- [x] Show folder hierarchy (indentation)
+- [x] Highlight/disable current folder for move operations
+- [x] Mark current folder for duplicate operations (not disabled)
+- [x] Show sync directory name/icon for each section
+- [x] Handle folder selection
+- [x] Handle cancel/close (X button, Cancel button, Escape key)
+- [x] Update modal title based on action and selection count
+- [x] Implement `showFolderPicker(action)` method
+- [x] Implement `hideFolderPicker()` method
+- [x] Implement `renderFolderPickerTree(action)` method
+- [x] Update `handleNoteContextMenuAction()` to call showFolderPicker for 'move' and 'duplicate'
+- [ ] **BUG: Notes not filtering correctly after move operation (3 tests failing)**
+
+**Implementation Details:**
+- **Files Modified:**
+  - `src/renderer.ts:2259-2282` - Updated handleNoteContextMenuAction() to handle 'move' and 'duplicate'
+  - `src/renderer.ts:2319-2356` - Added showFolderPicker() method
+  - `src/renderer.ts:2358-2366` - Added hideFolderPicker() method
+  - `src/renderer.ts:2368-2459` - Added renderFolderPickerTree() method
+  - `src/renderer.ts:2461-2501` - Added createFolderPickerItem() helper method
+  - `src/renderer.ts:2503-2532` - Added handleFolderPickerSelection() method
+  - `src/renderer.ts:557-576` - Added event listeners for close/cancel/escape
+
+**Test Coverage:**
+✅ **8/11 E2E Tests Passing** - `tests/e2e-electron/folder-picker.spec.js`
+- ✓ should show folder picker when clicking "Move to..." in context menu
+- ✓ should show folder picker when clicking "Duplicate to..." in context menu
+- ✓ should update title based on number of selected notes
+- ✓ should close folder picker when clicking X button
+- ✓ should close folder picker when clicking Cancel button
+- ✓ should close folder picker when pressing Escape
+- ✓ should display folders in picker tree
+- ✓ should disable current folder for move operations
+- ❌ should move note to selected folder (same directory) - Note still visible in source folder
+- ❌ should move multiple notes to selected folder - Notes still visible in source folder
+- ✓ should allow current folder for duplicate operations
+
+**Known Issues:**
+- Move operation executes but UI doesn't filter notes correctly from source folder view
+- Folder counts update correctly (Target Folder shows correct count)
+- Issue appears to be in renderNotesList filtering logic after move
+
+**Git Commits:**
+1. `c81461a` - Fix: Add event listeners and method aliases to SyncDirectoryManager (13 unit tests fixed)
+2. `efbc857` - feat: Implement Phase 4A - Folder Picker Dialog (8/11 tests passing)
 
 #### 4B: Cross-Directory Note Operations (NoteManager)
 - [ ] Update `moveNoteToFolder()` signature to accept `targetSyncDirectoryId`
