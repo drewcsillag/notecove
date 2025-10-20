@@ -47,8 +47,8 @@ test.describe('Folder Counts - Multi-Directory', () => {
       });
     });
 
-    // Wait a bit for processes to fully terminate
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait for processes to fully terminate
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Clean up test directory
     try {
@@ -56,6 +56,9 @@ test.describe('Folder Counts - Multi-Directory', () => {
     } catch (error) {
       console.error('Failed to clean up test directory:', error);
     }
+
+    // Wait after cleanup before next test starts
+    await new Promise(resolve => setTimeout(resolve, 1000));
   });
 
   test('new sync directory should show 0 note count in All Notes', async () => {
@@ -167,27 +170,13 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Create a note in second directory
     await window.click('#newNoteBtn');
     await window.keyboard.type('Secondary Note');
-    await window.waitForTimeout(2000); // Increase wait time for note to be fully created and title extracted
-
-    // Wait for folder counts to update
-    await window.waitForTimeout(500);
+    await window.waitForTimeout(1500); // Wait for note to be created and title extracted
 
     // Verify primary directory shows count of 1
     const primaryAllNotes = window.locator('.sync-directory-group').first()
       .locator('.folder-item').filter({ hasText: 'All Notes' });
     const primaryCount = await primaryAllNotes.locator('.folder-count').textContent();
     expect(parseInt(primaryCount)).toBe(1);
-
-    // Wait for the second directory's folder count to stabilize at 1
-    await window.waitForFunction(() => {
-      const secondGroup = document.querySelectorAll('.sync-directory-group')[1];
-      if (!secondGroup) return false;
-      const allNotesFolder = Array.from(secondGroup.querySelectorAll('.folder-item'))
-        .find(item => item.textContent?.includes('All Notes'));
-      if (!allNotesFolder) return false;
-      const countEl = allNotesFolder.querySelector('.folder-count');
-      return countEl && countEl.textContent === '1';
-    }, { timeout: 5000 });
 
     // Verify second directory shows count of 1
     const secondCount = await secondAllNotes.locator('.folder-count').textContent();
@@ -280,7 +269,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.click('#newNoteBtn');
     await window.keyboard.type('Project Note');
     await window.waitForTimeout(1500); // Wait for title extraction to complete
-
 
     // Verify folder shows count of 1
     let folderCount = await clientWorkFolder.locator('.folder-count').textContent();
@@ -425,7 +413,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.keyboard.type('Design Note');
     await window.waitForTimeout(1500); // Wait for title extraction to complete
 
-
     // Restart the app
     await electronApp.close();
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -512,7 +499,6 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.click('#newNoteBtn');
     await window.keyboard.type('Project Doc');
     await window.waitForTimeout(1500); // Wait for title extraction to complete
-
 
     // Verify Projects shows count of 1
     let projectsCount = await projectsAllNotes.locator('.folder-count').textContent();
