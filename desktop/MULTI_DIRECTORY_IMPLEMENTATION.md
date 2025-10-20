@@ -4,7 +4,8 @@
 **Date Completed (Phase 1):** 2025-10-19
 **Date Completed (Phase 2):** 2025-10-19
 **Date Completed (Phase 3):** 2025-10-19
-**Status:** Phase 4A - 🔄 IN PROGRESS (Folder picker dialog - 8/11 tests passing)
+**Date Completed (Phase 4A):** 2025-10-19
+**Status:** Phase 4A - ✅ COMPLETE (Folder picker dialog - 11/11 tests passing)
 
 ## Table of Contents
 1. [Implementation Plan](#implementation-plan)
@@ -269,10 +270,10 @@ Implement multi-directory sync with:
 ---
 
 ### Phase 4: Folder Picker and Cross-Directory Operations
-**Status:** Phase 4A - In Progress (8/11 tests passing)
+**Status:** Phase 4A - ✅ COMPLETE (11/11 tests passing)
 
-#### 4A: Folder Picker Dialog ✅ Mostly Complete
-**Status:** Core functionality implemented, 3 tests failing related to note filtering after move
+#### 4A: Folder Picker Dialog ✅ COMPLETE
+**Status:** All functionality implemented and tested - 11/11 tests passing
 - [x] Create modal dialog UI (already existed in HTML/CSS)
 - [x] Render folder tree for all sync directories
 - [x] Group by sync directory with visual separator
@@ -287,7 +288,11 @@ Implement multi-directory sync with:
 - [x] Implement `hideFolderPicker()` method
 - [x] Implement `renderFolderPickerTree(action)` method
 - [x] Update `handleNoteContextMenuAction()` to call showFolderPicker for 'move' and 'duplicate'
-- [ ] **BUG: Notes not filtering correctly after move operation (3 tests failing)**
+- [x] **FIX: Fixed duplicate "All Notes" in picker (exclude special folders from recursive render)**
+- [x] **FIX: Fixed folder indentation (all root folders at level: 1)**
+- [x] **FIX: Added "Recently Deleted" to folder picker**
+- [x] **FIX: Fixed note filtering after move operations (simplified renderNotesList logic)**
+- [x] **FIX: Fixed duplicate operation highlighting (set currentFolderId for both move and duplicate)**
 
 **Implementation Details:**
 - **Files Modified:**
@@ -300,7 +305,7 @@ Implement multi-directory sync with:
   - `src/renderer.ts:557-576` - Added event listeners for close/cancel/escape
 
 **Test Coverage:**
-✅ **8/11 E2E Tests Passing** - `tests/e2e-electron/folder-picker.spec.js`
+✅ **11/11 E2E Tests Passing** - `tests/e2e-electron/folder-picker.spec.js`
 - ✓ should show folder picker when clicking "Move to..." in context menu
 - ✓ should show folder picker when clicking "Duplicate to..." in context menu
 - ✓ should update title based on number of selected notes
@@ -309,18 +314,17 @@ Implement multi-directory sync with:
 - ✓ should close folder picker when pressing Escape
 - ✓ should display folders in picker tree
 - ✓ should disable current folder for move operations
-- ❌ should move note to selected folder (same directory) - Note still visible in source folder
-- ❌ should move multiple notes to selected folder - Notes still visible in source folder
+- ✓ should move note to selected folder (same directory)
+- ✓ should move multiple notes to selected folder
 - ✓ should allow current folder for duplicate operations
-
-**Known Issues:**
-- Move operation executes but UI doesn't filter notes correctly from source folder view
-- Folder counts update correctly (Target Folder shows correct count)
-- Issue appears to be in renderNotesList filtering logic after move
 
 **Git Commits:**
 1. `c81461a` - Fix: Add event listeners and method aliases to SyncDirectoryManager (13 unit tests fixed)
 2. `efbc857` - feat: Implement Phase 4A - Folder Picker Dialog (8/11 tests passing)
+3. `bde1591` - Fix: Include 'all-notes' folderId in getNotesInFolder filtering (folder count regression)
+4. `d84db6c` - Fix: Remove duplicate "All Notes" from folder picker (filter special folders)
+5. `075c9b9` - Fix: Adjust folder picker indentation and add "Recently Deleted"
+6. `f43a246` - Fix: Folder picker move operations and duplicate highlighting (11/11 tests passing)
 
 #### 4B: Cross-Directory Note Operations (NoteManager)
 - [ ] Update `moveNoteToFolder()` signature to accept `targetSyncDirectoryId`
