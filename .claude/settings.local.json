@@ -111,7 +111,9 @@
       "Bash(timeout 120 npm run test:e2e:electron -- --grep \"should prevent deleting folder with subfolders and persist validation\" --reporter=line --workers=1)",
       "Bash(timeout 240 npm run test:e2e:electron -- --grep \"folders|sync-directories|basic|editor|crdt\" --reporter=line --workers=1)",
       "Bash(timeout 360 npm run test:e2e:electron -- --reporter=line)",
-      "Bash(timeout 420 npx playwright test desktop/tests/e2e-electron/folder-count-multi-directory.spec.js --reporter=line --workers=1)"
+      "Bash(timeout 420 npx playwright test desktop/tests/e2e-electron/folder-count-multi-directory.spec.js --reporter=line --workers=1)",
+      "Bash(timeout 420 npx playwright test tests/e2e-electron/folder-picker.spec.js --reporter=line --workers=1)",
+      "Bash(xargs cat)"
     ],
     "deny": [],
     "ask": []

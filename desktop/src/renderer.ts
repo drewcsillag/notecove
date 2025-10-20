@@ -554,6 +554,27 @@ class NoteCoveApp {
       });
     }
 
+    // Folder picker modal event listeners
+    const folderPickerClose = document.getElementById('folderPickerClose');
+    if (folderPickerClose) {
+      folderPickerClose.addEventListener('click', () => this.hideFolderPicker());
+    }
+
+    const folderPickerCancel = document.getElementById('folderPickerCancel');
+    if (folderPickerCancel) {
+      folderPickerCancel.addEventListener('click', () => this.hideFolderPicker());
+    }
+
+    // Add escape key handler for folder picker modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('folderPickerModal');
+        if (modal && modal.style.display !== 'none') {
+          this.hideFolderPicker();
+        }
+      }
+    });
+
     // Setup panel resize handlers
     this.setupPanelResize();
   }
@@ -2268,6 +2289,14 @@ class NoteCoveApp {
         await this.deleteSelectedNotes();
         break;
 
+      case 'move':
+        this.showFolderPicker('move');
+        break;
+
+      case 'duplicate':
+        this.showFolderPicker('duplicate');
+        break;
+
       default:
         console.warn('Unknown note context menu action:', action);
     }
@@ -2306,6 +2335,211 @@ class NoteCoveApp {
         this.editor.commands.setContent('');
       }
     }
+  }
+
+  /**
+   * Show folder picker modal for moving or duplicating notes
+   */
+  showFolderPicker(action: 'move' | 'duplicate'): void {
+    const modal = document.getElementById('folderPickerModal');
+    const title = document.getElementById('folderPickerTitle');
+
+    if (!modal || !title) return;
+
+    // Store the action for later use
+    (modal as any).dataset.action = action;
+
+    // Update modal title based on action and selection count
+    const selectedCount = this.selectedNoteIds.size;
+    let titleText = '';
+
+    if (action === 'move') {
+      if (selectedCount === 1) {
+        titleText = 'Move to Folder';
+      } else {
+        titleText = `Move ${selectedCount} Notes to Folder`;
+      }
+    } else {
+      if (selectedCount === 1) {
+        titleText = 'Duplicate to Folder';
+      } else {
+        titleText = `Duplicate ${selectedCount} Notes to Folder`;
+      }
+    }
+
+    title.textContent = titleText;
+
+    // Render folder tree in picker
+    this.renderFolderPickerTree(action);
+
+    // Show modal
+    modal.style.display = 'flex';
+  }
+
+  /**
+   * Hide folder picker modal
+   */
+  hideFolderPicker(): void {
+    const modal = document.getElementById('folderPickerModal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  }
+
+  /**
+   * Render folder tree in the folder picker
+   */
+  renderFolderPickerTree(action: 'move' | 'duplicate'): void {
+    const treeContainer = document.getElementById('folderPickerTree');
+    if (!treeContainer || !this.noteManager) return;
+
+    treeContainer.innerHTML = '';
+
+    // Get current note's folder (for move operations, we'll disable it)
+    let currentFolderId: string | null = null;
+    if (action === 'move' && this.selectedNoteIds.size === 1) {
+      const noteId = Array.from(this.selectedNoteIds)[0];
+      const note = this.noteManager.getNote(noteId);
+      currentFolderId = note?.folderId || 'all-notes';
+    }
+
+    // Render folders for each sync directory
+    const syncDirectories = this.syncDirectoryManager?.getAllSyncDirectories() || [];
+
+    for (const syncDir of syncDirectories) {
+      // Create section header for sync directory
+      const sectionHeader = document.createElement('div');
+      sectionHeader.className = 'folder-picker-section-header';
+      sectionHeader.textContent = syncDir.name;
+      treeContainer.appendChild(sectionHeader);
+
+      // Get folders for this sync directory
+      const folderManager = this.noteManager.getFolderManagerForDirectory(syncDir.id);
+      if (!folderManager) continue;
+
+      const folders = folderManager.getAllFolders();
+
+      // Add "All Notes" option for this sync directory
+      const allNotesIsDisabled = action === 'move' && currentFolderId === 'all-notes';
+      const allNotesIsCurrent = currentFolderId === 'all-notes';
+      const allNotesItem = this.createFolderPickerItem(
+        'all-notes',
+        'All Notes',
+        syncDir.id,
+        0,
+        allNotesIsDisabled,
+        allNotesIsCurrent
+      );
+      treeContainer.appendChild(allNotesItem);
+
+      // Render folder tree
+      const renderFolderTree = (parentId: string, level: number) => {
+        const childFolders = folders.filter(f => f.parentId === parentId);
+
+        for (const folder of childFolders) {
+          const isDisabled = action === 'move' && folder.id === currentFolderId;
+          const isCurrent = folder.id === currentFolderId;
+          const item = this.createFolderPickerItem(
+            folder.id,
+            folder.name,
+            syncDir.id,
+            level,
+            isDisabled,
+            isCurrent
+          );
+          treeContainer.appendChild(item);
+
+          // Recursively render child folders
+          renderFolderTree(folder.id, level + 1);
+        }
+      };
+
+      renderFolderTree('root', 1);
+    }
+  }
+
+  /**
+   * Create a folder picker item element
+   */
+  private createFolderPickerItem(
+    folderId: string,
+    folderName: string,
+    syncDirectoryId: string,
+    level: number,
+    isDisabled: boolean,
+    isCurrent: boolean
+  ): HTMLElement {
+    const item = document.createElement('div');
+    item.className = 'folder-picker-item';
+    if (isDisabled) {
+      item.classList.add('disabled');
+    }
+    if (isCurrent) {
+      item.classList.add('current');
+    }
+
+    item.dataset.folderId = folderId;
+    item.dataset.syncDirectoryId = syncDirectoryId;
+
+    // Add indentation
+    const indent = document.createElement('span');
+    indent.className = 'folder-picker-item-indent';
+    indent.style.width = `${level * 20}px`;
+    item.appendChild(indent);
+
+    // Add folder icon
+    const icon = document.createElement('span');
+    icon.className = 'folder-picker-item-icon';
+    icon.textContent = '📁';
+    item.appendChild(icon);
+
+    // Add folder name
+    const name = document.createElement('span');
+    name.className = 'folder-picker-item-name';
+    name.textContent = folderName;
+    item.appendChild(name);
+
+    // Add click handler
+    if (!isDisabled) {
+      item.addEventListener('click', () => {
+        this.handleFolderPickerSelection(folderId, syncDirectoryId);
+      });
+    }
+
+    return item;
+  }
+
+  /**
+   * Handle folder selection in picker
+   */
+  private async handleFolderPickerSelection(folderId: string, syncDirectoryId: string): Promise<void> {
+    const modal = document.getElementById('folderPickerModal');
+    if (!modal) return;
+
+    const action = (modal as any).dataset.action as 'move' | 'duplicate';
+    const noteIds = Array.from(this.selectedNoteIds);
+
+    if (noteIds.length === 0 || !this.noteManager) return;
+
+    // Perform the action for each selected note
+    for (const noteId of noteIds) {
+      if (action === 'move') {
+        // For now, only support same-directory moves (Phase 4A)
+        // Cross-directory moves will be implemented in Phase 4C
+        await this.noteManager.moveNoteToFolder(noteId, folderId);
+      } else {
+        // Duplicate not yet implemented (Phase 4B)
+        console.log('[TODO] Duplicate note to folder not yet implemented');
+      }
+    }
+
+    // Hide modal
+    this.hideFolderPicker();
+
+    // Refresh UI
+    this.notes = this.noteManager.getAllNotes();
+    this.renderNotesList();
+    this.renderFolderTree();
   }
 
   async selectNote(noteId: string): Promise<void> {
