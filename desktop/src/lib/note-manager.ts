@@ -144,32 +144,24 @@ export class NoteManager {
    * @param syncManager - SyncManager instance for this directory
    */
   async loadNotesFromDirectory(syncDirectoryId: string, syncManager: SyncManager): Promise<void> {
-    console.log(`[loadNotesFromDirectory] Loading notes from directory ${syncDirectoryId}`);
-    console.log(`[loadNotesFromDirectory] SyncManager notesPath: ${syncManager.notesPath}`);
     const notes = await syncManager.loadAllNotes();
-    console.log(`[loadNotesFromDirectory] Loaded ${notes.length} notes from filesystem`);
 
     // Load notes and respect their syncDirectoryId from CRDT metadata
     for (const note of notes) {
       // If note already has syncDirectoryId from CRDT metadata, keep it
       // Otherwise, set it to current syncDirectoryId (for migration of old notes)
       if (!note.syncDirectoryId) {
-        console.log(`[loadNotesFromDirectory] Note ${note.id} has no syncDirectoryId, setting to ${syncDirectoryId}`);
         note.syncDirectoryId = syncDirectoryId;
 
         // Persist to CRDT for future loads
         if (syncManager.crdtManager) {
           syncManager.crdtManager.updateMetadata(note.id, { syncDirectoryId });
         }
-      } else {
-        console.log(`[loadNotesFromDirectory] Note ${note.id} has syncDirectoryId: ${note.syncDirectoryId}`);
       }
 
       this.notes.set(note.id, note);
-      console.log(`[loadNotesFromDirectory] Added note ${note.id} to this.notes. Total notes: ${this.notes.size}`);
     }
 
-    console.log(`[loadNotesFromDirectory] Finished loading ${notes.length} notes from directory ${syncDirectoryId}. Total notes in manager: ${this.notes.size}`);
     this.notify('notes-loaded', { notes: Array.from(this.notes.values()) });
   }
 
@@ -933,15 +925,9 @@ export class NoteManager {
       notes = this.getAllNotes().filter(note => note.folderId === folderId);
     }
 
-    console.log(`[getNotesInFolder] folderId=${folderId}, syncDirectoryId=${syncDirectoryId}, notes before sync filter: ${notes.length}`);
-    if (notes.length > 0 && notes.length < 5) {
-      console.log(`[getNotesInFolder] Notes:`, notes.map(n => ({ id: n.id, syncDirectoryId: n.syncDirectoryId, title: n.title })));
-    }
-
     // Filter by sync directory if specified
     if (syncDirectoryId) {
       notes = notes.filter(note => note.syncDirectoryId === syncDirectoryId);
-      console.log(`[getNotesInFolder] After sync directory filter: ${notes.length}`);
     }
 
     return notes;

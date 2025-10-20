@@ -964,12 +964,9 @@ class NoteCoveApp {
 
     // Filter by sync directory if one is selected
     if (this.currentSyncDirectoryId) {
-      console.log(`[renderNotesList] Filtering notes for syncDirectoryId: ${this.currentSyncDirectoryId}`);
-      console.log(`[renderNotesList] Before filter: ${filteredNotes.length} notes:`, filteredNotes.map(n => ({ id: n.id, syncDirectoryId: n.syncDirectoryId })));
       filteredNotes = filteredNotes.filter(note => {
         return note.syncDirectoryId === this.currentSyncDirectoryId;
       });
-      console.log(`[renderNotesList] After filter: ${filteredNotes.length} notes`);
     }
 
     // Filter by folder if not "all-notes"
@@ -1575,12 +1572,10 @@ class NoteCoveApp {
 
     // Create note in the currently selected folder and sync directory
     // IMPORTANT: Await to ensure CRDT initialization completes before rendering
-    console.log(`[createNewNote] Creating note with syncDirectoryId: ${this.currentSyncDirectoryId}`);
     const newNote = await this.noteManager!.createNote({
       folderId: (this.currentFolderId && this.currentFolderId !== 'all-notes') ? this.currentFolderId : '',
       syncDirectoryId: this.currentSyncDirectoryId || undefined
     });
-    console.log(`[createNewNote] Created note ${newNote.id} with syncDirectoryId: ${newNote.syncDirectoryId}`);
 
     this.currentNote = newNote;
     this.isEditing = false; // Reset editing state to ensure editor gets cleared
@@ -1750,12 +1745,10 @@ class NoteCoveApp {
   }
 
   renderFolderTree(): void {
-    console.log('[renderFolderTree] Called');
     const folderTree = document.getElementById('folderTree');
     if (!folderTree || !this.folderManager) return;
 
     const syncDirs = this.syncDirectoryManager.getDirectories();
-    console.log(`[renderFolderTree] Rendering ${syncDirs.length} sync directories`);
 
     // Render sync directories with grouping
     let html = '';
@@ -1840,9 +1833,7 @@ class NoteCoveApp {
         : '<span class="folder-collapse-arrow" style="visibility: hidden;">▼</span>';
 
       // Get note count for this folder (direct children only), filtered by sync directory
-      const notesInFolder = this.noteManager!.getNotesInFolder(folder.id, syncDirId);
-      const noteCount = notesInFolder.length;
-      console.log(`[renderFolderItems] folder="${folder.name}" (${folder.id}), syncDirId=${syncDirId}, count=${noteCount}`);
+      const noteCount = this.noteManager!.getNotesInFolder(folder.id, syncDirId).length;
 
       return `
         <div class="folder-item ${isActive ? 'active' : ''} ${isDraggable ? 'folder-item-custom' : ''}"

@@ -14,11 +14,15 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await fs.mkdir(testDir, { recursive: true });
 
     // Launch Electron app
+    const primaryNotesPath = path.join(testDir, 'primary-notes');
+    await fs.mkdir(primaryNotesPath, { recursive: true });
+
     electronApp = await electron.launch({
       args: [
         path.join(process.cwd(), 'dist/main.js'),
         '--user-data-dir=' + path.join(testDir, 'user-data'),
-        '--instance=test-' + Date.now()
+        '--instance=test-' + Date.now(),
+        '--notes-path=' + primaryNotesPath  // Explicitly set notes path to unique test directory
       ],
       env: {
         NODE_ENV: 'test'
