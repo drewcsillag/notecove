@@ -2419,23 +2419,37 @@ class NoteCoveApp {
 
       const folders = folderManager.getAllFolders();
 
-      // Add "All Notes" option for this sync directory
+      // Add special folders first (All Notes, Recently Deleted)
+      // All at the same indentation level as root custom folders
       const allNotesIsDisabled = action === 'move' && currentFolderId === 'all-notes';
       const allNotesIsCurrent = currentFolderId === 'all-notes';
       const allNotesItem = this.createFolderPickerItem(
         'all-notes',
         'All Notes',
         syncDir.id,
-        0,
+        1, // Same level as custom folders
         allNotesIsDisabled,
         allNotesIsCurrent
       );
       treeContainer.appendChild(allNotesItem);
 
-      // Render folder tree (excluding special folders which are rendered manually)
+      // Add Recently Deleted option
+      const trashIsDisabled = action === 'move' && currentFolderId === 'trash';
+      const trashIsCurrent = currentFolderId === 'trash';
+      const trashItem = this.createFolderPickerItem(
+        'trash',
+        'Recently Deleted',
+        syncDir.id,
+        1, // Same level as custom folders
+        trashIsDisabled,
+        trashIsCurrent
+      );
+      treeContainer.appendChild(trashItem);
+
+      // Render custom folder tree (excluding special folders)
       const renderFolderTree = (parentId: string, level: number) => {
         const childFolders = folders.filter(f =>
-          f.parentId === parentId && !f.isSpecial // Exclude special folders like 'all-notes', 'trash'
+          f.parentId === parentId && !f.isSpecial // Exclude special folders
         );
 
         for (const folder of childFolders) {
