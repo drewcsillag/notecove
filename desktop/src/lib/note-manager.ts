@@ -915,25 +915,33 @@ export class NoteManager {
     let notes: Note[];
 
     if (folderId === 'all-notes') {
-      // "All Notes" should only show notes at the root level (not in any folder)
-      // Include notes with folderId === 'all-notes' (the default), as well as legacy values
-      notes = this.getAllNotes().filter(note =>
-        !note.folderId ||
-        note.folderId === 'all-notes' ||
-        note.folderId === 'root' ||
-        note.folderId === ''
-      );
+      // "All Notes" is a virtual folder that shows ALL notes in the sync directory
+      // When a syncDirectoryId is provided, it shows all notes in that directory
+      // When no syncDirectoryId is provided, it shows all notes across all directories
+      if (syncDirectoryId) {
+        // Show ALL notes (regardless of folder) in this sync directory
+        notes = this.getAllNotes().filter(note => note.syncDirectoryId === syncDirectoryId);
+      } else {
+        // No sync directory specified - show all notes across all directories
+        notes = this.getAllNotes();
+      }
     } else if (folderId === 'trash') {
       notes = Array.from(this.notes.values())
         .filter(note => note.deleted)
         .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
-    } else {
-      notes = this.getAllNotes().filter(note => note.folderId === folderId);
-    }
 
-    // Filter by sync directory if specified
-    if (syncDirectoryId) {
-      notes = notes.filter(note => note.syncDirectoryId === syncDirectoryId);
+      // Filter by sync directory if specified
+      if (syncDirectoryId) {
+        notes = notes.filter(note => note.syncDirectoryId === syncDirectoryId);
+      }
+    } else {
+      // Regular folder - show notes in that specific folder
+      notes = this.getAllNotes().filter(note => note.folderId === folderId);
+
+      // Filter by sync directory if specified
+      if (syncDirectoryId) {
+        notes = notes.filter(note => note.syncDirectoryId === syncDirectoryId);
+      }
     }
 
     return notes;
@@ -980,13 +988,18 @@ export class NoteManager {
     }
     console.log(`[moveNoteToFolder] Target folder manager found`);
 
-    // Verify target folder exists
-    const folder = targetFolderManager.getFolder(folderId);
-    if (!folder) {
-      console.error(`[moveNoteToFolder] Folder ${folderId} not found in sync directory ${targetSyncDirId}`);
-      return null;
+    // Verify target folder exists (special folders like 'all-notes' and 'trash' are always valid)
+    const isSpecialFolder = folderId === 'all-notes' || folderId === 'trash';
+    if (!isSpecialFolder) {
+      const folder = targetFolderManager.getFolder(folderId);
+      if (!folder) {
+        console.error(`[moveNoteToFolder] Folder ${folderId} not found in sync directory ${targetSyncDirId}`);
+        return null;
+      }
+      console.log(`[moveNoteToFolder] Target folder found: ${folder.name}`);
+    } else {
+      console.log(`[moveNoteToFolder] Target is special folder: ${folderId}`);
     }
-    console.log(`[moveNoteToFolder] Target folder found: ${folder.name}`);
 
     // Same directory move - just update the folder ID
     if (noteSyncDirId === targetSyncDirId) {
