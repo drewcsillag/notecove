@@ -117,7 +117,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Create a note in primary directory
     await window.click('#newNoteBtn');
     await window.keyboard.type('Primary Note');
-    await window.waitForTimeout(500);
+    await window.waitForTimeout(1500); // Wait for title extraction to complete
 
     // Add second sync directory
     await window.click('.settings-btn');
@@ -155,7 +155,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Create a note in second directory
     await window.click('#newNoteBtn');
     await window.keyboard.type('Secondary Note');
-    await window.waitForTimeout(500);
+    await window.waitForTimeout(1500); // Increase wait time for note to be fully created and title extracted
 
 
     // Verify primary directory shows count of 1
@@ -172,6 +172,28 @@ test.describe('Folder Counts - Multi-Directory', () => {
       const notesList = await window.locator('#notesList .note-item .note-title').allTextContents();
       console.log(`ERROR: Second directory count is ${secondCount}, expected 1`);
       console.log('Notes in list:', notesList);
+      console.log('Test directory path:', testDir);
+      console.log('Second sync dir path:', secondDir);
+
+      // Log sync directory info from the browser console
+      const syncDirsInfo = await window.evaluate(() => {
+        const renderer = window.renderer;
+        const noteManager = renderer?.noteManager;
+        if (!noteManager) return { error: 'No noteManager found' };
+
+        const allNotes = Array.from(noteManager.notes.values());
+        return {
+          totalNotes: allNotes.length,
+          notes: allNotes.map(n => ({
+            id: n.id,
+            title: n.title,
+            syncDirectoryId: n.syncDirectoryId
+          })),
+          currentSyncDirId: renderer.currentSyncDirectoryId,
+          syncManagerKeys: Array.from(noteManager.syncManagers.keys())
+        };
+      });
+      console.log('Browser state:', JSON.stringify(syncDirsInfo, null, 2));
 
       // Take a screenshot for debugging
       await window.screenshot({ path: 'debug-test2-notes.png' });
@@ -232,7 +254,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Create a note in the folder
     await window.click('#newNoteBtn');
     await window.keyboard.type('Project Note');
-    await window.waitForTimeout(500);
+    await window.waitForTimeout(1500); // Wait for title extraction to complete
 
 
     // Verify folder shows count of 1
@@ -376,7 +398,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Create a note in the folder
     await window.click('#newNoteBtn');
     await window.keyboard.type('Design Note');
-    await window.waitForTimeout(500);
+    await window.waitForTimeout(1500); // Wait for title extraction to complete
 
 
     // Restart the app
@@ -464,7 +486,7 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     await window.click('#newNoteBtn');
     await window.keyboard.type('Project Doc');
-    await window.waitForTimeout(500);
+    await window.waitForTimeout(1500); // Wait for title extraction to complete
 
 
     // Verify Projects shows count of 1
