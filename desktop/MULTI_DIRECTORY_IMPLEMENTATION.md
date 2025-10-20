@@ -326,16 +326,17 @@ Implement multi-directory sync with:
 5. `075c9b9` - Fix: Adjust folder picker indentation and add "Recently Deleted"
 6. `f43a246` - Fix: Folder picker move operations and duplicate highlighting (11/11 tests passing)
 
-#### 4B: Cross-Directory Note Operations (NoteManager)
-- [ ] Update `moveNoteToFolder()` signature to accept `targetSyncDirectoryId`
-- [ ] Implement same-directory move (simple - just update folderId)
-- [ ] Implement cross-directory move:
-  - [ ] Check UUID conflict in target directory
-  - [ ] Show confirmation dialog
-  - [ ] Copy CRDT data to target UpdateStore
-  - [ ] Update note's `syncDirectoryId` and `folderId`
-  - [ ] Delete from source UpdateStore
-  - [ ] Update UI
+#### 4B: Cross-Directory Note Operations (NoteManager) ✅ COMPLETE
+**Status:** Core functionality complete - Soft delete implementation working
+- [x] Update `moveNoteToFolder()` signature to accept `targetSyncDirectoryId`
+- [x] Implement same-directory move (simple - just update folderId)
+- [x] Implement cross-directory move:
+  - [x] Check UUID conflict in target directory
+  - [x] Show confirmation dialog with "Don't ask again" checkbox
+  - [x] Copy CRDT data to target directory
+  - [x] Update note's `syncDirectoryId` and `folderId`
+  - [x] **Soft delete from source (save deleted: true to source filesystem)**
+  - [x] Update UI
 - [ ] Implement `duplicateNoteToDirectory()`:
   - [ ] Generate new UUID
   - [ ] Copy content/metadata
@@ -346,6 +347,54 @@ Implement multi-directory sync with:
   - [ ] Track successes/failures
   - [ ] Return summary
   - [ ] Show progress for >10 notes
+
+**Implementation Notes:**
+- Cross-directory moves use **soft delete** instead of hard delete
+- Deleted version saved to source directory filesystem (deleted: true)
+- Other instances see note in Recently Deleted via CRDT sync
+- No file watching needed - CRDT handles synchronization
+- Same UUID preserved across directories (links stay intact)
+- Single instance with both directories shows note only in target (acceptable limitation)
+
+**Git Commits:**
+1. `aa4bd76` - Add E2E test for cross-directory note moves and fix test selectors
+2. `d2b2931` - Change cross-directory move to use soft delete (Recently Deleted)
+
+#### 4C: "Moved To" Metadata Enhancement (Future)
+**Status:** Not Started - Deferred to later phase
+**Priority:** Low - Current soft delete works for multi-instance sync
+
+This enhancement would add semantic "moved to" metadata instead of just marking as deleted:
+
+**Tasks:**
+- [ ] Add `movedTo` field to Note interface:
+  ```typescript
+  interface Note {
+    // ... existing fields
+    movedTo?: {
+      syncDirectoryId: string;
+      folderId: string;
+      movedAt: string; // ISO timestamp
+    };
+  }
+  ```
+- [ ] Update cross-directory move to set `movedTo` metadata
+- [ ] Update UI to show "Moved to [Directory]/[Folder]" instead of just "Deleted"
+- [ ] Add "Follow Move" action in context menu to jump to target location
+- [ ] Update Recently Deleted view to distinguish between deleted and moved notes
+- [ ] Consider auto-cleanup of moved notes from source after N days
+
+**Benefits:**
+- Better UX - users see where note was moved to
+- Can follow moves between directories
+- Clearer distinction between deleted and moved notes
+- Enables "undo move" functionality
+
+**Why Deferred:**
+- Current soft delete solves the primary issue (multi-instance sync)
+- Adds complexity without critical user value
+- Can be added incrementally without breaking changes
+- Focus on completing Phase 5 (Drag Enhancements) first
 
 #### E2E Tests to Write:
 ```
