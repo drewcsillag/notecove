@@ -119,6 +119,13 @@ test.describe('Cross-Directory Move - Simple Test', () => {
     const primaryCountAfter = await primaryAllNotesAfter.locator('.folder-count').textContent();
     expect(parseInt(primaryCountAfter)).toBe(0);
 
+    // NOTE: The deleted version is saved to the source directory's filesystem
+    // for other instances to see via CRDT sync, but it won't appear in this
+    // instance's UI because this.notes only has one entry per note ID.
+    // The deleted state will be visible to other instances that load from
+    // the source directory.
+
+    // Verify note appears in secondary directory
     const secondaryAllNotesFolder = window.locator('.sync-directory-group').nth(1)
       .locator('.folder-item').filter({ hasText: 'All Notes' });
     const secondaryCount = await secondaryAllNotesFolder.locator('.folder-count').textContent();

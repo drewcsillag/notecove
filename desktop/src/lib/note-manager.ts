@@ -1048,22 +1048,26 @@ export class NoteManager {
       return null;
     }
 
-    // Delete from source directory (filesystem only, note is already saved to target)
+    // Soft-delete from source directory (move to Recently Deleted in source)
+    // This ensures other instances watching the source directory see the note disappear
+    // via CRDT sync rather than relying on file watching
     try {
-      const notePath = `${sourceSyncManager.notesPath}/notes/${noteId}`;
-      const exists = await window.electronAPI?.fileSystem.exists(notePath);
+      // Create a deleted version of the note in the source directory
+      const deletedSourceNote: Note = {
+        ...note, // Use original note from source
+        deleted: true,
+        modified: new Date().toISOString()
+      };
 
-      if (exists) {
-        // Delete the entire note directory from source (including updates, meta, attachments)
-        await window.electronAPI?.fileSystem.deleteDir(notePath);
-        console.log(`[moveNoteToFolder] Deleted note directory from source: ${noteId}`);
-      }
+      // Save the deleted state to source directory
+      await sourceSyncManager.saveNoteWithCRDT(deletedSourceNote);
+      console.log(`[moveNoteToFolder] Marked note as deleted in source directory: ${noteId}`);
     } catch (error) {
-      console.error(`[moveNoteToFolder] Failed to delete note directory from source:`, error);
+      console.error(`[moveNoteToFolder] Failed to mark note as deleted in source:`, error);
       // Don't fail the operation - the note is already in the target directory
     }
 
-    // Update in-memory note
+    // Update in-memory note to point to target directory
     this.notes.set(noteId, fullNote);
     console.log(`[moveNoteToFolder] Cross-directory move complete: ${noteId} moved to ${targetSyncDirId}/${folderId}`);
 
