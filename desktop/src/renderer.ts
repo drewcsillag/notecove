@@ -983,15 +983,8 @@ class NoteCoveApp {
       this.noteManager.searchNotes(this.searchQuery) :
       this.notes;
 
-    // Filter by sync directory if one is selected
-    if (this.currentSyncDirectoryId) {
-      filteredNotes = filteredNotes.filter(note => {
-        return note.syncDirectoryId === this.currentSyncDirectoryId;
-      });
-    }
-
-    // Filter by folder if not "all-notes"
-    if (this.currentFolderId && this.currentFolderId !== 'all-notes') {
+    // Filter by folder (including "all-notes")
+    if (this.currentFolderId) {
       // Pass sync directory ID to getNotesInFolder to filter correctly
       filteredNotes = this.noteManager.getNotesInFolder(this.currentFolderId, this.currentSyncDirectoryId || undefined);
 
@@ -1006,6 +999,11 @@ class NoteCoveApp {
           );
         });
       }
+    } else if (this.currentSyncDirectoryId) {
+      // If no folder selected but sync directory is selected, filter by sync directory only
+      filteredNotes = filteredNotes.filter(note => {
+        return note.syncDirectoryId === this.currentSyncDirectoryId;
+      });
     }
 
     // Filter by tag (include or exclude mode)
@@ -2395,9 +2393,9 @@ class NoteCoveApp {
 
     treeContainer.innerHTML = '';
 
-    // Get current note's folder (for move operations, we'll disable it)
+    // Get current note's folder
     let currentFolderId: string | null = null;
-    if (action === 'move' && this.selectedNoteIds.size === 1) {
+    if (this.selectedNoteIds.size === 1) {
       const noteId = Array.from(this.selectedNoteIds)[0];
       const note = this.noteManager.getNote(noteId);
       currentFolderId = note?.folderId || 'all-notes';
