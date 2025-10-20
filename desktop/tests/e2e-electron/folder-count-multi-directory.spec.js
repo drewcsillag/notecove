@@ -73,6 +73,9 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Create a note in primary directory
     await window.click('#newNoteBtn');
     await window.waitForTimeout(300);
+    // Wait for editor to be focused and ready
+    await window.locator('.ProseMirror').click();
+    await window.waitForTimeout(100);
     await window.keyboard.type('Primary Note');
     await window.waitForTimeout(1000); // Wait for note to be created and UI to update
 
@@ -129,8 +132,34 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Listen to console logs
     window.on('console', msg => console.log('BROWSER:', msg.text()));
 
+    // Wait a bit for renderer to initialize
+    await window.waitForTimeout(500);
+
+    // DEBUG: Log initial state at start of test
+    const initialState = await window.evaluate(() => {
+      const renderer = window.renderer;
+      const noteManager = renderer?.noteManager;
+      if (!noteManager) return { error: 'No noteManager found' };
+
+      const allNotes = Array.from(noteManager.notes.values());
+      const notesDir = noteManager.syncManagers.values().next().value?.notesPath;
+      return {
+        testStartTotalNotes: allNotes.length,
+        testStartNotes: allNotes.map(n => ({
+          id: n.id.substring(0, 8),
+          title: n.title,
+          syncDirectoryId: n.syncDirectoryId
+        })),
+        syncManagerKeys: Array.from(noteManager.syncManagers.keys()),
+        primaryNotesPath: notesDir
+      };
+    });
+    console.log('=== TEST #2 START STATE ===', JSON.stringify(initialState, null, 2));
+
     // Create a note in primary directory
     await window.click('#newNoteBtn');
+    await window.locator('.ProseMirror').click();
+    await window.waitForTimeout(100);
     await window.keyboard.type('Primary Note');
     await window.waitForTimeout(1500); // Wait for title extraction to complete
 
@@ -169,6 +198,8 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     // Create a note in second directory
     await window.click('#newNoteBtn');
+    await window.locator('.ProseMirror').click();
+    await window.waitForTimeout(100);
     await window.keyboard.type('Secondary Note');
     await window.waitForTimeout(1500); // Wait for note to be created and title extracted
 
@@ -267,6 +298,8 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     // Create a note in the folder
     await window.click('#newNoteBtn');
+    await window.locator('.ProseMirror').click();
+    await window.waitForTimeout(100);
     await window.keyboard.type('Project Note');
     await window.waitForTimeout(1500); // Wait for title extraction to complete
 
@@ -410,6 +443,8 @@ test.describe('Folder Counts - Multi-Directory', () => {
 
     // Create a note in the folder
     await window.click('#newNoteBtn');
+    await window.locator('.ProseMirror').click();
+    await window.waitForTimeout(100);
     await window.keyboard.type('Design Note');
     await window.waitForTimeout(1500); // Wait for title extraction to complete
 
@@ -497,6 +532,8 @@ test.describe('Folder Counts - Multi-Directory', () => {
     await window.waitForTimeout(500);
 
     await window.click('#newNoteBtn');
+    await window.locator('.ProseMirror').click();
+    await window.waitForTimeout(100);
     await window.keyboard.type('Project Doc');
     await window.waitForTimeout(1500); // Wait for title extraction to complete
 
