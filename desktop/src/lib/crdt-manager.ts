@@ -535,7 +535,7 @@ export class CRDTManager {
       modified: (yMetadata.get('modified') as string) || new Date().toISOString(),
       tags: (yMetadata.get('tags') as string[]) || [],
       deleted: (yMetadata.get('deleted') as boolean) || false,
-      folderId: (yMetadata.get('folderId') as string) || '', // Empty string for root-level notes
+      folderId: (yMetadata.get('folderId') as string) || 'all-notes', // Default to all-notes for root-level notes
       syncDirectoryId: yMetadata.get('syncDirectoryId') as string | undefined
     };
   }

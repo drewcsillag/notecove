@@ -4,12 +4,13 @@ import { SyncDirectoryManager } from './sync-directory-manager';
 // Mock window.electronAPI
 (global as any).window = {
   electronAPI: {
+    isElectron: true,
     fileSystem: {
       getUserDataPath: vi.fn().mockResolvedValue('/mock/user/data/path'),
       pathExists: vi.fn().mockResolvedValue(false),
       ensureDir: vi.fn().mockResolvedValue(undefined),
-      readJSON: vi.fn().mockResolvedValue([]),
-      writeJSON: vi.fn().mockResolvedValue(undefined)
+      readFile: vi.fn().mockResolvedValue({ success: false }),
+      writeFile: vi.fn().mockResolvedValue(undefined)
     },
     settings: {
       get: vi.fn().mockResolvedValue(null),
@@ -26,7 +27,8 @@ describe('SyncDirectoryManager', () => {
     vi.clearAllMocks();
 
     // Reset window.electronAPI mocks
-    (window.electronAPI!.fileSystem.readJSON as any).mockResolvedValue([]);
+    (window.electronAPI!.fileSystem.readFile as any).mockResolvedValue({ success: false });
+    (window.electronAPI!.fileSystem.writeFile as any).mockResolvedValue(undefined);
     (window.electronAPI!.fileSystem.getUserDataPath as any).mockResolvedValue('/mock/user/data/path');
     (window.electronAPI!.settings.get as any).mockResolvedValue(null);
 
@@ -36,7 +38,7 @@ describe('SyncDirectoryManager', () => {
   describe('initialization', () => {
     it('should initialize with default sync directory', async () => {
       // Mock that no sync directories exist yet
-      (window.electronAPI!.fileSystem.readJSON as any).mockResolvedValue([]);
+      (window.electronAPI!.fileSystem.readFile as any).mockResolvedValue({ success: false });
 
       await syncDirManager.initialize();
 
@@ -49,22 +51,36 @@ describe('SyncDirectoryManager', () => {
     });
 
     it('should load existing sync directories from storage', async () => {
-      const existingDirs = [
-        {
-          id: 'sync-123',
-          name: 'Work Notes',
-          path: '/path/to/work',
-          color: '#ff0000'
-        },
-        {
-          id: 'sync-456',
-          name: 'Personal Notes',
-          path: '/path/to/personal',
-          color: '#00ff00'
-        }
-      ];
+      const existingConfig = {
+        directories: [
+          {
+            id: 'sync-123',
+            name: 'Work Notes',
+            path: '/path/to/work',
+            created: '2024-01-01T00:00:00.000Z',
+            lastAccessed: '2024-01-01T00:00:00.000Z',
+            isExpanded: true,
+            order: 0
+          },
+          {
+            id: 'sync-456',
+            name: 'Personal Notes',
+            path: '/path/to/personal',
+            created: '2024-01-01T00:00:00.000Z',
+            lastAccessed: '2024-01-01T00:00:00.000Z',
+            isExpanded: true,
+            order: 1
+          }
+        ]
+      };
 
-      (window.electronAPI!.fileSystem.readJSON as any).mockResolvedValue(existingDirs);
+      const configContent = JSON.stringify(existingConfig);
+      const configBuffer = new TextEncoder().encode(configContent);
+
+      (window.electronAPI!.fileSystem.readFile as any).mockResolvedValue({
+        success: true,
+        content: configBuffer
+      });
 
       await syncDirManager.initialize();
 

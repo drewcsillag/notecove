@@ -18,10 +18,18 @@ export interface SyncDirectoryConfig {
   // No activeDirectoryId - all directories are active simultaneously
 }
 
+export type SyncDirectoryEvent =
+  | { type: 'sync-directory-added'; syncDirectory: SyncDirectory }
+  | { type: 'sync-directory-removed'; syncDirectoryId: string }
+  | { type: 'sync-directory-updated'; syncDirectory: SyncDirectory };
+
+export type SyncDirectoryEventListener = (eventType: string, data: any) => void;
+
 export class SyncDirectoryManager {
   private config: SyncDirectoryConfig;
   private configPath: string;
   private isElectron: boolean;
+  private listeners: Set<SyncDirectoryEventListener> = new Set();
 
   constructor() {
     this.isElectron = window.electronAPI?.isElectron || false;
@@ -166,6 +174,7 @@ export class SyncDirectoryManager {
 
     this.config.directories.push(directory);
     await this.saveConfig();
+    this.notifyListeners('sync-directory-added', { syncDirectory: directory });
     return directory;
   }
 
@@ -173,6 +182,11 @@ export class SyncDirectoryManager {
    * Remove a sync directory
    */
   async removeDirectory(id: string): Promise<void> {
+    // Prevent removing the last sync directory
+    if (this.config.directories.length === 1) {
+      throw new Error('Cannot remove the last sync directory');
+    }
+
     const index = this.config.directories.findIndex(d => d.id === id);
     if (index === -1) {
       throw new Error('Sync directory not found');
@@ -180,6 +194,7 @@ export class SyncDirectoryManager {
 
     this.config.directories.splice(index, 1);
     await this.saveConfig();
+    this.notifyListeners('sync-directory-removed', { syncDirectoryId: id });
   }
 
   /**
@@ -272,5 +287,49 @@ export class SyncDirectoryManager {
     // Convert to positive number and base36 string
     const hashStr = Math.abs(hash).toString(36);
     return `sync-${hashStr}`;
+  }
+
+  /**
+   * Add event listener
+   */
+  addListener(listener: SyncDirectoryEventListener): void {
+    this.listeners.add(listener);
+  }
+
+  /**
+   * Remove event listener
+   */
+  removeListener(listener: SyncDirectoryEventListener): void {
+    this.listeners.delete(listener);
+  }
+
+  /**
+   * Notify all listeners of an event
+   */
+  private notifyListeners(eventType: string, data: any): void {
+    this.listeners.forEach(listener => {
+      try {
+        listener(eventType, data);
+      } catch (error) {
+        console.error('[SyncDirectoryManager] Error in listener:', error);
+      }
+    });
+  }
+
+  // Method aliases for backward compatibility with tests
+  async addSyncDirectory(name: string, path: string): Promise<SyncDirectory> {
+    return this.addDirectory(name, path);
+  }
+
+  async removeSyncDirectory(id: string): Promise<void> {
+    return this.removeDirectory(id);
+  }
+
+  getAllSyncDirectories(): SyncDirectory[] {
+    return this.getDirectories();
+  }
+
+  getSyncDirectory(id: string): SyncDirectory | null {
+    return this.getDirectory(id);
   }
 }
