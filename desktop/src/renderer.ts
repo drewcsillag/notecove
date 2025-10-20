@@ -2432,9 +2432,11 @@ class NoteCoveApp {
       );
       treeContainer.appendChild(allNotesItem);
 
-      // Render folder tree
+      // Render folder tree (excluding special folders which are rendered manually)
       const renderFolderTree = (parentId: string, level: number) => {
-        const childFolders = folders.filter(f => f.parentId === parentId);
+        const childFolders = folders.filter(f =>
+          f.parentId === parentId && !f.isSpecial // Exclude special folders like 'all-notes', 'trash'
+        );
 
         for (const folder of childFolders) {
           const isDisabled = action === 'move' && folder.id === currentFolderId;
