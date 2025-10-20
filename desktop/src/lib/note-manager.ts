@@ -996,10 +996,65 @@ export class NoteManager {
       return result;
     }
 
-    // Cross-directory move - TODO: Will implement in Phase 4C
-    // For now, just log and return null
-    console.log(`[moveNoteToFolder] Cross-directory move not yet implemented: ${noteSyncDirId} -> ${targetSyncDirId}`);
-    return null;
+    // Cross-directory move
+    console.log(`[moveNoteToFolder] Cross-directory move: ${noteSyncDirId} -> ${targetSyncDirId}`);
+
+    // Get source and target sync managers
+    const sourceSyncManager = this.syncManagers.get(noteSyncDirId);
+    const targetSyncManager = this.syncManagers.get(targetSyncDirId);
+
+    if (!sourceSyncManager || !targetSyncManager) {
+      console.error(`[moveNoteToFolder] Missing sync manager - source: ${!!sourceSyncManager}, target: ${!!targetSyncManager}`);
+      return null;
+    }
+
+    // Check if note with same ID already exists in target directory (UUID conflict)
+    const conflictNote = await targetSyncManager.loadNote(noteId);
+    if (conflictNote) {
+      console.warn(`[moveNoteToFolder] UUID conflict detected - note ${noteId} already exists in target directory`);
+      // TODO: Auto-duplicate with new UUID and show warning
+      return null;
+    }
+
+    // Load the full note from source directory (includes CRDT state)
+    const fullNote = await sourceSyncManager.loadNote(noteId);
+    if (!fullNote) {
+      console.error(`[moveNoteToFolder] Failed to load note ${noteId} from source directory`);
+      return null;
+    }
+
+    // Update note's sync directory and folder
+    fullNote.syncDirectoryId = targetSyncDirId;
+    fullNote.folderId = folderId;
+    fullNote.modified = new Date().toISOString();
+
+    // Save to target directory
+    const saved = await targetSyncManager.saveNoteWithCRDT(fullNote);
+    if (!saved) {
+      console.error(`[moveNoteToFolder] Failed to save note ${noteId} to target directory`);
+      return null;
+    }
+
+    // Delete from source directory (filesystem only, note is already saved to target)
+    try {
+      const notePath = `${sourceSyncManager.notesPath}/notes/${noteId}`;
+      const exists = await window.electronAPI?.fileSystem.exists(notePath);
+
+      if (exists) {
+        // Delete the entire note directory from source (including updates, meta, attachments)
+        await window.electronAPI?.fileSystem.deleteDir(notePath);
+        console.log(`[moveNoteToFolder] Deleted note directory from source: ${noteId}`);
+      }
+    } catch (error) {
+      console.error(`[moveNoteToFolder] Failed to delete note directory from source:`, error);
+      // Don't fail the operation - the note is already in the target directory
+    }
+
+    // Update in-memory note
+    this.notes.set(noteId, fullNote);
+    console.log(`[moveNoteToFolder] Cross-directory move complete: ${noteId} moved to ${targetSyncDirId}/${folderId}`);
+
+    return fullNote;
   }
 
   /**

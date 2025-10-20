@@ -1929,6 +1929,27 @@
     </div>
   </div>
 
+  <!-- Cross-Directory Move Confirmation Dialog -->
+  <div id="crossDirectoryMoveDialog" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Move to Different Sync Directory?</h3>
+        <button class="modal-close" id="crossDirectoryMoveClose">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="crossDirectoryMoveMessage"></p>
+        <div class="form-check" style="margin-top: 1rem;">
+          <input type="checkbox" id="dontAskAgainCheckbox" class="form-check-input">
+          <label for="dontAskAgainCheckbox" class="form-check-label">Don't ask again</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="crossDirectoryMoveCancel">Cancel</button>
+        <button class="btn btn-primary" id="crossDirectoryMoveConfirm">Move</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="src/renderer.js"></script>
 </body>
 </html>

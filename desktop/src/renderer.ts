@@ -2385,6 +2385,72 @@ class NoteCoveApp {
   }
 
   /**
+   * Show cross-directory move confirmation dialog
+   * @param noteCount - Number of notes being moved
+   * @param targetSyncDirectoryId - Target sync directory ID
+   * @returns Promise that resolves to true if confirmed, false if cancelled
+   */
+  private showCrossDirectoryMoveDialog(noteCount: number, targetSyncDirectoryId: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('crossDirectoryMoveDialog');
+      const message = document.getElementById('crossDirectoryMoveMessage');
+      const confirmBtn = document.getElementById('crossDirectoryMoveConfirm');
+      const cancelBtn = document.getElementById('crossDirectoryMoveCancel');
+      const closeBtn = document.getElementById('crossDirectoryMoveClose');
+      const checkbox = document.getElementById('dontAskAgainCheckbox') as HTMLInputElement;
+
+      if (!modal || !message || !confirmBtn || !cancelBtn || !closeBtn || !checkbox) {
+        resolve(false);
+        return;
+      }
+
+      // Get target sync directory name
+      const targetSyncDir = this.syncDirectoryManager?.getSyncDirectory(targetSyncDirectoryId);
+      const targetName = targetSyncDir?.name || 'another sync directory';
+
+      // Set message
+      const noteText = noteCount === 1 ? 'this note' : `these ${noteCount} notes`;
+      message.textContent = `Are you sure you want to move ${noteText} to "${targetName}"? The note${noteCount > 1 ? 's' : ''} will be copied to the new location and removed from the current sync directory.`;
+
+      // Reset checkbox
+      checkbox.checked = false;
+
+      // Handle confirm
+      const handleConfirm = () => {
+        // Save "don't ask again" preference
+        if (checkbox.checked) {
+          localStorage.setItem('dontAskCrossDirectoryMove', 'true');
+        }
+        cleanup();
+        modal.style.display = 'none';
+        resolve(true);
+      };
+
+      // Handle cancel
+      const handleCancel = () => {
+        cleanup();
+        modal.style.display = 'none';
+        resolve(false);
+      };
+
+      // Cleanup event listeners
+      const cleanup = () => {
+        confirmBtn.removeEventListener('click', handleConfirm);
+        cancelBtn.removeEventListener('click', handleCancel);
+        closeBtn.removeEventListener('click', handleCancel);
+      };
+
+      // Add event listeners
+      confirmBtn.addEventListener('click', handleConfirm);
+      cancelBtn.addEventListener('click', handleCancel);
+      closeBtn.addEventListener('click', handleCancel);
+
+      // Show modal
+      modal.style.display = 'flex';
+    });
+  }
+
+  /**
    * Render folder tree in the folder picker
    */
   renderFolderPickerTree(action: 'move' | 'duplicate'): void {
@@ -2535,12 +2601,35 @@ class NoteCoveApp {
 
     if (noteIds.length === 0 || !this.noteManager) return;
 
+    // Check if any notes are moving to a different sync directory
+    const isCrossDirectory = noteIds.some(noteId => {
+      const note = this.noteManager?.getNote(noteId);
+      if (!note) return false;
+      const noteSyncDirId = note.syncDirectoryId || this.noteManager?.primarySyncDirectoryId;
+      return noteSyncDirId !== syncDirectoryId;
+    });
+
+    // If it's a cross-directory move and action is 'move', show confirmation dialog
+    if (action === 'move' && isCrossDirectory) {
+      // Check "don't ask again" preference
+      const dontAskAgain = localStorage.getItem('dontAskCrossDirectoryMove') === 'true';
+
+      if (!dontAskAgain) {
+        // Show confirmation dialog and wait for user response
+        const confirmed = await this.showCrossDirectoryMoveDialog(noteIds.length, syncDirectoryId);
+        if (!confirmed) {
+          // User cancelled, just hide the folder picker
+          this.hideFolderPicker();
+          return;
+        }
+      }
+    }
+
     // Perform the action for each selected note
     for (const noteId of noteIds) {
       if (action === 'move') {
-        // For now, only support same-directory moves (Phase 4A)
-        // Cross-directory moves will be implemented in Phase 4C
-        await this.noteManager.moveNoteToFolder(noteId, folderId);
+        // Pass target sync directory ID to support cross-directory moves
+        await this.noteManager.moveNoteToFolder(noteId, folderId, syncDirectoryId);
       } else {
         // Duplicate not yet implemented (Phase 4B)
         console.log('[TODO] Duplicate note to folder not yet implemented');
