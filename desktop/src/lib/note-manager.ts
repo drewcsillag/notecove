@@ -916,7 +916,13 @@ export class NoteManager {
 
     if (folderId === 'all-notes') {
       // "All Notes" should only show notes at the root level (not in any folder)
-      notes = this.getAllNotes().filter(note => !note.folderId || note.folderId === 'root' || note.folderId === '');
+      // Include notes with folderId === 'all-notes' (the default), as well as legacy values
+      notes = this.getAllNotes().filter(note =>
+        !note.folderId ||
+        note.folderId === 'all-notes' ||
+        note.folderId === 'root' ||
+        note.folderId === ''
+      );
     } else if (folderId === 'trash') {
       notes = Array.from(this.notes.values())
         .filter(note => note.deleted)
