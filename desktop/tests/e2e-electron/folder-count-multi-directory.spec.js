@@ -155,14 +155,27 @@ test.describe('Folder Counts - Multi-Directory', () => {
     // Create a note in second directory
     await window.click('#newNoteBtn');
     await window.keyboard.type('Secondary Note');
-    await window.waitForTimeout(1500); // Increase wait time for note to be fully created and title extracted
+    await window.waitForTimeout(2000); // Increase wait time for note to be fully created and title extracted
 
+    // Wait for folder counts to update
+    await window.waitForTimeout(500);
 
     // Verify primary directory shows count of 1
     const primaryAllNotes = window.locator('.sync-directory-group').first()
       .locator('.folder-item').filter({ hasText: 'All Notes' });
     const primaryCount = await primaryAllNotes.locator('.folder-count').textContent();
     expect(parseInt(primaryCount)).toBe(1);
+
+    // Wait for the second directory's folder count to stabilize at 1
+    await window.waitForFunction(() => {
+      const secondGroup = document.querySelectorAll('.sync-directory-group')[1];
+      if (!secondGroup) return false;
+      const allNotesFolder = Array.from(secondGroup.querySelectorAll('.folder-item'))
+        .find(item => item.textContent?.includes('All Notes'));
+      if (!allNotesFolder) return false;
+      const countEl = allNotesFolder.querySelector('.folder-count');
+      return countEl && countEl.textContent === '1';
+    }, { timeout: 5000 });
 
     // Verify second directory shows count of 1
     const secondCount = await secondAllNotes.locator('.folder-count').textContent();
