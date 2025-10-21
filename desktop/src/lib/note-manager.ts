@@ -1080,6 +1080,182 @@ export class NoteManager {
   }
 
   /**
+   * Duplicate note to a different folder (potentially cross-directory)
+   * @param noteId - Note ID to duplicate
+   * @param folderId - Target folder ID
+   * @param targetSyncDirectoryId - Optional target sync directory ID for cross-directory duplicates
+   * @returns Duplicated note with new UUID or null
+   */
+  async duplicateNoteToFolder(
+    noteId: string,
+    folderId: string,
+    targetSyncDirectoryId?: string
+  ): Promise<Note | null> {
+    console.log(`[duplicateNoteToFolder] Called with noteId: ${noteId}, folderId: ${folderId}, targetSyncDirectoryId: ${targetSyncDirectoryId}`);
+
+    const note = this.notes.get(noteId);
+    if (!note || note.deleted) {
+      console.error(`[duplicateNoteToFolder] Note ${noteId} not found or deleted`);
+      return null;
+    }
+
+    console.log(`[duplicateNoteToFolder] Note found, current folderId: ${note.folderId}, current syncDirectoryId: ${note.syncDirectoryId}`);
+
+    // Get the note's current sync directory
+    const noteSyncDirId = note.syncDirectoryId || this.primarySyncDirectoryId;
+    console.log(`[duplicateNoteToFolder] Note sync directory: ${noteSyncDirId}, primary: ${this.primarySyncDirectoryId}`);
+
+    // If no target sync directory specified, assume same directory duplicate
+    const targetSyncDirId = targetSyncDirectoryId || noteSyncDirId;
+    console.log(`[duplicateNoteToFolder] Target sync directory: ${targetSyncDirId}`);
+
+    // Get the folder manager for the target sync directory
+    const targetFolderManager = targetSyncDirId
+      ? this.getFolderManagerForDirectory(targetSyncDirId)
+      : this.folderManager;
+
+    if (!targetFolderManager) {
+      console.error(`[duplicateNoteToFolder] No folder manager found for target sync directory ${targetSyncDirId}`);
+      return null;
+    }
+    console.log(`[duplicateNoteToFolder] Target folder manager found`);
+
+    // Verify target folder exists (special folders like 'all-notes' and 'trash' are always valid)
+    const isSpecialFolder = folderId === 'all-notes' || folderId === 'trash';
+    if (!isSpecialFolder) {
+      const folder = targetFolderManager.getFolder(folderId);
+      if (!folder) {
+        console.error(`[duplicateNoteToFolder] Folder ${folderId} not found in sync directory ${targetSyncDirId}`);
+        return null;
+      }
+      console.log(`[duplicateNoteToFolder] Target folder found: ${folder.name}`);
+    } else {
+      console.log(`[duplicateNoteToFolder] Target is special folder: ${folderId}`);
+    }
+
+    // Get source sync manager to load full note
+    const sourceSyncManager = this.syncManagers.get(noteSyncDirId);
+    if (!sourceSyncManager) {
+      console.error(`[duplicateNoteToFolder] Missing source sync manager for ${noteSyncDirId}`);
+      return null;
+    }
+
+    // Load the full note from source directory (includes CRDT state)
+    const fullNote = await sourceSyncManager.loadNote(noteId);
+    if (!fullNote) {
+      console.error(`[duplicateNoteToFolder] Failed to load note ${noteId} from source directory`);
+      return null;
+    }
+
+    // Create duplicate with new UUID
+    const now = new Date().toISOString();
+    const duplicateNote: Note = {
+      ...fullNote,
+      id: generateUUID(), // Generate new UUID for duplicate
+      created: now,
+      modified: now,
+      syncDirectoryId: targetSyncDirId,
+      folderId: folderId,
+      deleted: false
+    };
+
+    console.log(`[duplicateNoteToFolder] Created duplicate with new UUID: ${duplicateNote.id}`);
+
+    // Get target sync manager
+    const targetSyncManager = this.syncManagers.get(targetSyncDirId);
+    if (!targetSyncManager) {
+      console.error(`[duplicateNoteToFolder] Missing target sync manager for ${targetSyncDirId}`);
+      return null;
+    }
+
+    // Save to target directory
+    const saved = await targetSyncManager.saveNoteWithCRDT(duplicateNote);
+    if (!saved) {
+      console.error(`[duplicateNoteToFolder] Failed to save duplicate note ${duplicateNote.id} to target directory`);
+      return null;
+    }
+
+    // Add to in-memory notes
+    this.notes.set(duplicateNote.id, duplicateNote);
+    console.log(`[duplicateNoteToFolder] Duplicate note created: ${duplicateNote.id} in ${targetSyncDirId}/${folderId}`);
+
+    // Notify about new note
+    this.notify('note-created', { note: duplicateNote, source: 'user' });
+
+    return duplicateNote;
+  }
+
+  /**
+   * Move multiple notes to a folder (bulk operation)
+   * @param noteIds - Array of note IDs to move
+   * @param folderId - Target folder ID
+   * @param targetSyncDirectoryId - Optional target sync directory ID for cross-directory moves
+   * @returns Object with successful and failed note IDs
+   */
+  async moveNotesToFolder(
+    noteIds: string[],
+    folderId: string,
+    targetSyncDirectoryId?: string
+  ): Promise<{ successes: Note[]; failures: Array<{ noteId: string; error: string }> }> {
+    console.log(`[moveNotesToFolder] Moving ${noteIds.length} notes to folder ${folderId}, targetSyncDirId: ${targetSyncDirectoryId}`);
+
+    const successes: Note[] = [];
+    const failures: Array<{ noteId: string; error: string }> = [];
+
+    for (const noteId of noteIds) {
+      try {
+        const result = await this.moveNoteToFolder(noteId, folderId, targetSyncDirectoryId);
+        if (result) {
+          successes.push(result);
+        } else {
+          failures.push({ noteId, error: 'Move operation returned null' });
+        }
+      } catch (error) {
+        console.error(`[moveNotesToFolder] Failed to move note ${noteId}:`, error);
+        failures.push({ noteId, error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    }
+
+    console.log(`[moveNotesToFolder] Completed: ${successes.length} succeeded, ${failures.length} failed`);
+    return { successes, failures };
+  }
+
+  /**
+   * Duplicate multiple notes to a folder (bulk operation)
+   * @param noteIds - Array of note IDs to duplicate
+   * @param folderId - Target folder ID
+   * @param targetSyncDirectoryId - Optional target sync directory ID for cross-directory duplicates
+   * @returns Object with successful and failed note IDs
+   */
+  async duplicateNotesToFolder(
+    noteIds: string[],
+    folderId: string,
+    targetSyncDirectoryId?: string
+  ): Promise<{ successes: Note[]; failures: Array<{ noteId: string; error: string }> }> {
+    console.log(`[duplicateNotesToFolder] Duplicating ${noteIds.length} notes to folder ${folderId}, targetSyncDirId: ${targetSyncDirectoryId}`);
+
+    const successes: Note[] = [];
+    const failures: Array<{ noteId: string; error: string }> = [];
+
+    for (const noteId of noteIds) {
+      try {
+        const result = await this.duplicateNoteToFolder(noteId, folderId, targetSyncDirectoryId);
+        if (result) {
+          successes.push(result);
+        } else {
+          failures.push({ noteId, error: 'Duplicate operation returned null' });
+        }
+      } catch (error) {
+        console.error(`[duplicateNotesToFolder] Failed to duplicate note ${noteId}:`, error);
+        failures.push({ noteId, error: error instanceof Error ? error.message : 'Unknown error' });
+      }
+    }
+
+    console.log(`[duplicateNotesToFolder] Completed: ${successes.length} succeeded, ${failures.length} failed`);
+    return { successes, failures };
+  }
+
+  /**
    * Get folder manager instance
    * @returns Folder manager
    */

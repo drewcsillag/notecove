@@ -2642,17 +2642,24 @@ class NoteCoveApp {
       }
     }
 
-    // Perform the action for each selected note
-    console.log(`[handleFolderPickerSelection] Starting move operations...`);
-    for (const noteId of noteIds) {
-      if (action === 'move') {
-        // Pass target sync directory ID to support cross-directory moves
-        console.log(`[handleFolderPickerSelection] Moving note ${noteId} to folder ${folderId} in sync directory ${syncDirectoryId}`);
-        const result = await this.noteManager.moveNoteToFolder(noteId, folderId, syncDirectoryId);
-        console.log(`[handleFolderPickerSelection] Move result for ${noteId}:`, result ? 'success' : 'failed');
-      } else {
-        // Duplicate not yet implemented (Phase 4B)
-        console.log('[TODO] Duplicate note to folder not yet implemented');
+    // Perform the action using bulk operations
+    console.log(`[handleFolderPickerSelection] Starting ${action} operations for ${noteIds.length} notes...`);
+
+    if (action === 'move') {
+      const result = await this.noteManager.moveNotesToFolder(noteIds, folderId, syncDirectoryId);
+      console.log(`[handleFolderPickerSelection] Move completed: ${result.successes.length} succeeded, ${result.failures.length} failed`);
+
+      if (result.failures.length > 0) {
+        console.error('[handleFolderPickerSelection] Failed moves:', result.failures);
+        // TODO: Show error message to user
+      }
+    } else if (action === 'duplicate') {
+      const result = await this.noteManager.duplicateNotesToFolder(noteIds, folderId, syncDirectoryId);
+      console.log(`[handleFolderPickerSelection] Duplicate completed: ${result.successes.length} succeeded, ${result.failures.length} failed`);
+
+      if (result.failures.length > 0) {
+        console.error('[handleFolderPickerSelection] Failed duplicates:', result.failures);
+        // TODO: Show error message to user
       }
     }
 
