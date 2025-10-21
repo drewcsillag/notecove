@@ -114,7 +114,8 @@
       "Bash(timeout 420 npx playwright test desktop/tests/e2e-electron/folder-count-multi-directory.spec.js --reporter=line --workers=1)",
       "Bash(timeout 420 npx playwright test tests/e2e-electron/folder-picker.spec.js --reporter=line --workers=1)",
       "Bash(xargs cat)",
-      "Bash(timeout 420 npx playwright test tests/e2e-electron/cross-directory-moves.spec.js --reporter=line --workers=1)"
+      "Bash(timeout 420 npx playwright test tests/e2e-electron/cross-directory-moves.spec.js --reporter=line --workers=1)",
+      "Bash(timeout 420 npx playwright test tests/e2e-electron/cross-directory-two-instances.spec.js --reporter=line --workers=1)"
     ],
     "deny": [],
     "ask": []

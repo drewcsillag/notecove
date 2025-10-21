@@ -407,6 +407,15 @@ export class SyncManager {
         const note = await this.loadNote(noteId);
 
         if (note) {
+          // Filter out deleted notes - they should only appear in "Recently Deleted" folder
+          // Don't add them to the notes map to prevent deleted versions from overwriting active versions
+          if (note.deleted) {
+            console.log(`[SyncManager] Note ${noteId} is deleted, not adding to notes map`);
+            // Still notify UI so it can update Recently Deleted count
+            this.noteManager.notify('note-deleted', { note, source: 'sync' });
+            continue;
+          }
+
           // Add to NoteManager
           this.noteManager.notes.set(noteId, note);
 
@@ -461,21 +470,26 @@ export class SyncManager {
         id: mergedNote.id,
         title: mergedNote.title,
         deleted: mergedNote.deleted,
-        folderId: mergedNote.folderId
+        folderId: mergedNote.folderId,
+        syncDirectoryId: mergedNote.syncDirectoryId
       });
-
-      // Update in NoteManager (this will NOT trigger a save because we're not calling saveNote)
-      this.noteManager.notes.set(noteId, mergedNote);
 
       // Notify UI to update based on what changed
       if (mergedNote.deleted) {
-        // If note was deleted, notify as deletion
+        // If note was deleted, remove it from notes map and notify as deletion
+        // This prevents deleted versions from overwriting active versions in other directories
+        this.noteManager.notes.delete(noteId);
+        console.log(`[syncNote] Note ${noteId} deleted, removed from notes map`);
+
         this.noteManager.notify('note-deleted', {
           note: mergedNote,
           source: 'sync'
         });
       } else {
-        // Normal update
+        // Normal update - update in NoteManager
+        // (this will NOT trigger a save because we're not calling saveNote)
+        this.noteManager.notes.set(noteId, mergedNote);
+
         this.noteManager.notify('note-updated', {
           note: mergedNote,
           source: 'sync'
