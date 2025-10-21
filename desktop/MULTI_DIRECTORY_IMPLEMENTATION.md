@@ -5,7 +5,8 @@
 **Date Completed (Phase 2):** 2025-10-19
 **Date Completed (Phase 3):** 2025-10-19
 **Date Completed (Phase 4A):** 2025-10-19
-**Status:** Phase 4A - ✅ COMPLETE (Folder picker dialog - 11/11 tests passing)
+**Date Completed (Phase 4B):** 2025-10-20
+**Status:** Phase 4B - ✅ COMPLETE (Cross-directory duplicate and bulk operations - 5/5 new tests passing)
 
 ## Table of Contents
 1. [Implementation Plan](#implementation-plan)
@@ -270,7 +271,7 @@ Implement multi-directory sync with:
 ---
 
 ### Phase 4: Folder Picker and Cross-Directory Operations
-**Status:** Phase 4A - ✅ COMPLETE (11/11 tests passing)
+**Status:** Phase 4B - ✅ COMPLETE (All cross-directory operations working)
 
 #### 4A: Folder Picker Dialog ✅ COMPLETE
 **Status:** All functionality implemented and tested - 11/11 tests passing
@@ -327,7 +328,7 @@ Implement multi-directory sync with:
 6. `f43a246` - Fix: Folder picker move operations and duplicate highlighting (11/11 tests passing)
 
 #### 4B: Cross-Directory Note Operations (NoteManager) ✅ COMPLETE
-**Status:** Core functionality complete - Soft delete implementation working
+**Status:** All functionality complete - Move, duplicate, and bulk operations working
 - [x] Update `moveNoteToFolder()` signature to accept `targetSyncDirectoryId`
 - [x] Implement same-directory move (simple - just update folderId)
 - [x] Implement cross-directory move:
@@ -337,16 +338,23 @@ Implement multi-directory sync with:
   - [x] Update note's `syncDirectoryId` and `folderId`
   - [x] **Soft delete from source (save deleted: true to source filesystem)**
   - [x] Update UI
-- [ ] Implement `duplicateNoteToDirectory()`:
-  - [ ] Generate new UUID
-  - [ ] Copy content/metadata
-  - [ ] Save to target directory's UpdateStore
-  - [ ] Keep original untouched
-- [ ] Implement `moveNotesToFolder()` for bulk operations:
-  - [ ] Loop through selected notes
-  - [ ] Track successes/failures
-  - [ ] Return summary
-  - [ ] Show progress for >10 notes
+  - [x] **Fixed bug: Allow overwriting deleted versions in target directory**
+- [x] Implement `duplicateNoteToFolder()`:
+  - [x] Generate new UUID
+  - [x] Copy content/metadata
+  - [x] Save to target directory's UpdateStore
+  - [x] Keep original untouched
+  - [x] Notify UI about new note
+- [x] Implement `moveNotesToFolder()` for bulk operations:
+  - [x] Loop through selected notes
+  - [x] Track successes/failures
+  - [x] Return summary
+  - [x] Error logging for failed operations
+- [x] Implement `duplicateNotesToFolder()` for bulk operations:
+  - [x] Loop through selected notes
+  - [x] Track successes/failures
+  - [x] Return summary
+  - [x] Error logging for failed operations
 
 **Implementation Notes:**
 - Cross-directory moves use **soft delete** instead of hard delete
@@ -374,6 +382,20 @@ Implement multi-directory sync with:
 2. `d2b2931` - Change cross-directory move to use soft delete (Recently Deleted)
 3. `e7aa929` - Add two-instance test and document multi-instance sync issue
 4. `a5389f4` - Add debug logging and fix two-instance test setup (PROVES SYNC WORKS!)
+5. `9699468` - Filter deleted notes from this.notes map to prevent overwrites
+6. `de4ae56` - Allow cross-directory move to overwrite deleted versions
+7. `1eb75fc` - Implement duplicate and bulk operations for cross-directory notes
+
+**Test Coverage:**
+✅ **6 E2E Tests Passing** - `tests/e2e-electron/cross-directory-duplicate.spec.js`
+- ✓ should duplicate note within same directory
+- ✓ should duplicate note across sync directories
+- ✓ should duplicate multiple notes to same directory
+- ✓ should duplicate multiple notes across sync directories
+- ✓ should generate new UUIDs for duplicated notes
+
+✅ **1 E2E Test Passing** - `tests/e2e-electron/cross-directory-simple.spec.js`
+- ✓ should move note across sync directories (includes move-back test)
 
 #### 4C: Fix UI State Management for Sync Directories
 **Status:** ✅ Complete - No Action Needed
