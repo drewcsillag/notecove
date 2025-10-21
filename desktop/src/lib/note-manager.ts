@@ -1023,10 +1023,15 @@ export class NoteManager {
 
     // Check if note with same ID already exists in target directory (UUID conflict)
     const conflictNote = await targetSyncManager.loadNote(noteId);
-    if (conflictNote) {
-      console.warn(`[moveNoteToFolder] UUID conflict detected - note ${noteId} already exists in target directory`);
+    if (conflictNote && !conflictNote.deleted) {
+      // Only reject if the existing note is active (not deleted)
+      // If it's deleted, we can overwrite it with the moved note
+      console.warn(`[moveNoteToFolder] UUID conflict detected - active note ${noteId} already exists in target directory`);
       // TODO: Auto-duplicate with new UUID and show warning
       return null;
+    }
+    if (conflictNote?.deleted) {
+      console.log(`[moveNoteToFolder] Deleted version of note ${noteId} exists in target, will be overwritten`);
     }
 
     // Load the full note from source directory (includes CRDT state)
