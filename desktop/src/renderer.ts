@@ -3317,7 +3317,8 @@ class NoteCoveApp {
           this.renderFolderTree();
         }
         // Otherwise, move the notes using bulk operation
-        else if (folderId !== 'all-notes') {
+        // Allow cross-directory moves to 'all-notes', but skip same-directory 'all-notes' drops
+        else if (folderId !== 'all-notes' || isCrossDirectory) {
           const result = await this.noteManager!.moveNotesToFolder(noteIds, folderId, targetSyncDirId || undefined);
           console.log(`[handleFolderDrop] Move result: ${result.successes.length} succeeded, ${result.failures.length} failed`);
 
