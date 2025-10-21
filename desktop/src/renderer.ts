@@ -1858,6 +1858,7 @@ class NoteCoveApp {
         <div class="folder-item ${isActive ? 'active' : ''} ${isDraggable ? 'folder-item-custom' : ''}"
              style="padding-left: ${indent + 8}px"
              data-folder-id="${folder.id}"
+             data-sync-directory-id="${syncDirId || ''}"
              ${isDraggable ? 'draggable="true"' : ''}
              ${isDraggable ? 'ondragstart="app.handleFolderDragStart(event)"' : ''}
              ${isDraggable ? 'ondragend="app.handleFolderDragEnd(event)"' : ''}
@@ -2645,8 +2646,11 @@ class NoteCoveApp {
     // Perform the action using bulk operations
     console.log(`[handleFolderPickerSelection] Starting ${action} operations for ${noteIds.length} notes...`);
 
+    // Convert empty string to undefined for same-directory operations
+    const targetSyncDirId = syncDirectoryId || undefined;
+
     if (action === 'move') {
-      const result = await this.noteManager.moveNotesToFolder(noteIds, folderId, syncDirectoryId);
+      const result = await this.noteManager.moveNotesToFolder(noteIds, folderId, targetSyncDirId);
       console.log(`[handleFolderPickerSelection] Move completed: ${result.successes.length} succeeded, ${result.failures.length} failed`);
 
       if (result.failures.length > 0) {
@@ -2654,7 +2658,7 @@ class NoteCoveApp {
         // TODO: Show error message to user
       }
     } else if (action === 'duplicate') {
-      const result = await this.noteManager.duplicateNotesToFolder(noteIds, folderId, syncDirectoryId);
+      const result = await this.noteManager.duplicateNotesToFolder(noteIds, folderId, targetSyncDirId);
       console.log(`[handleFolderPickerSelection] Duplicate completed: ${result.successes.length} succeeded, ${result.failures.length} failed`);
 
       if (result.failures.length > 0) {
@@ -3116,10 +3120,41 @@ class NoteCoveApp {
   // Drag-and-drop handlers for notes
   handleNoteDragStart(e: DragEvent): void {
     const noteId = ((e.target as HTMLElement).closest('.note-item') as HTMLElement).dataset.noteId!;
+
+    // If dragging a selected note, drag all selected notes
+    // If dragging an unselected note, only drag that note
+    let notesToDrag: string[];
+    if (this.selectedNoteIds.has(noteId)) {
+      // Dragging a selected note - include all selected notes
+      notesToDrag = Array.from(this.selectedNoteIds);
+    } else {
+      // Dragging an unselected note - only drag this note
+      notesToDrag = [noteId];
+    }
+
     e.dataTransfer!.effectAllowed = 'move';
-    e.dataTransfer!.setData('text/plain', noteId);
+    e.dataTransfer!.setData('text/plain', JSON.stringify(notesToDrag));
     e.dataTransfer!.setData('text/note-type', 'active');
+    e.dataTransfer!.setData('text/drag-count', notesToDrag.length.toString());
     (e.target as HTMLElement).classList.add('dragging');
+
+    // Show drag count indicator if dragging multiple notes
+    if (notesToDrag.length > 1) {
+      const dragImage = document.createElement('div');
+      dragImage.className = 'drag-count-indicator';
+      dragImage.textContent = `${notesToDrag.length} notes`;
+      dragImage.style.position = 'absolute';
+      dragImage.style.top = '-1000px';
+      dragImage.style.padding = '8px 12px';
+      dragImage.style.backgroundColor = 'var(--primary-color)';
+      dragImage.style.color = 'white';
+      dragImage.style.borderRadius = '4px';
+      dragImage.style.fontSize = '14px';
+      dragImage.style.fontWeight = '500';
+      document.body.appendChild(dragImage);
+      e.dataTransfer!.setDragImage(dragImage, 0, 0);
+      setTimeout(() => document.body.removeChild(dragImage), 0);
+    }
   }
 
   handleTrashNoteDragStart(e: DragEvent): void {
@@ -3200,27 +3235,60 @@ class NoteCoveApp {
         return;
       }
 
-      // Handle note drop
-      const noteId = draggedId;
+      // Handle note drop - parse note IDs (could be single or multiple)
+      let noteIds: string[];
+      try {
+        noteIds = JSON.parse(draggedId);
+        if (!Array.isArray(noteIds)) {
+          noteIds = [draggedId]; // Fallback for old single-note format
+        }
+      } catch {
+        noteIds = [draggedId]; // Fallback for old single-note format
+      }
+
       const folderId = targetFolderId;
+      const targetSyncDirId = (folderItem as HTMLElement).dataset.syncDirectoryId || '';
 
-      if (noteId && folderId) {
-        const note = this.noteManager.getNote(noteId);
-        if (!note) return;
+      if (noteIds.length > 0 && folderId) {
+        // Get all notes to check sync directories
+        const notes = noteIds.map(id => this.noteManager!.getNote(id)).filter(n => n !== null) as Note[];
+        if (notes.length === 0) return;
 
-        // If dropping an active note into trash, delete it
-        if (folderId === 'trash' && noteType === 'active' && !note.deleted) {
+        // Detect if this is a cross-directory drag
+        const isCrossDirectory = notes.some(note => {
+          const noteSyncDirId = note.syncDirectoryId || this.noteManager!.primarySyncDirectoryId;
+          return noteSyncDirId !== targetSyncDirId && targetSyncDirId !== '';
+        });
+
+        console.log(`[handleFolderDrop] Dragging ${noteIds.length} notes to ${folderId}, cross-directory: ${isCrossDirectory}, target sync dir: ${targetSyncDirId}`);
+
+        // If cross-directory drag and not to trash, show confirmation
+        if (isCrossDirectory && folderId !== 'trash') {
+          const dontAskAgain = localStorage.getItem('dontAskCrossDirectoryMove') === 'true';
+          if (!dontAskAgain) {
+            const confirmed = await this.showCrossDirectoryMoveDialog(noteIds.length, targetSyncDirId);
+            if (!confirmed) {
+              console.log('[handleFolderDrop] Cross-directory move cancelled by user');
+              return;
+            }
+          }
+        }
+
+        // Handle trash operations
+        if (folderId === 'trash' && noteType === 'active') {
           const confirmed = await this.showConfirmDialog(
             'Move to Trash',
-            `Are you sure you want to move "${note.title || 'Untitled'}" to trash?`
+            `Are you sure you want to move ${noteIds.length} note${noteIds.length > 1 ? 's' : ''} to trash?`
           );
           if (confirmed) {
-            await this.noteManager.deleteNote(noteId);
-            this.updateStatus(`Moved "${note.title || 'Untitled'}" to trash`);
+            for (const noteId of noteIds) {
+              await this.noteManager!.deleteNote(noteId);
+            }
+            this.updateStatus(`Moved ${noteIds.length} note${noteIds.length > 1 ? 's' : ''} to trash`);
             this.updateUI();
-            this.renderFolderTree(); // Update folder counts
+            this.renderFolderTree();
             // Clear editor if the deleted note was selected
-            if (this.currentNote && this.currentNote.id === noteId) {
+            if (this.currentNote && noteIds.includes(this.currentNote.id)) {
               this.currentNote = null;
             }
           }
@@ -3233,25 +3301,34 @@ class NoteCoveApp {
           return;
         }
 
-        // If dragging from trash, restore the note
-        if (noteType === 'deleted' && note.deleted) {
-          // Restore and move to the target folder
-          const restoredNote = this.noteManager.restoreNote(noteId);
-          if (restoredNote && folderId !== 'all-notes') {
-            await this.noteManager.moveNoteToFolder(noteId, folderId);
-            this.updateStatus(`Restored "${note.title || 'Untitled'}" to folder`);
+        // If dragging from trash, restore the notes
+        if (noteType === 'deleted') {
+          for (const noteId of noteIds) {
+            const note = this.noteManager!.getNote(noteId);
+            if (note && note.deleted) {
+              const restoredNote = this.noteManager!.restoreNote(noteId);
+              if (restoredNote && folderId !== 'all-notes') {
+                await this.noteManager!.moveNoteToFolder(noteId, folderId, targetSyncDirId || undefined);
+              }
+            }
+          }
+          this.updateStatus(`Restored ${noteIds.length} note${noteIds.length > 1 ? 's' : ''}`);
+          this.updateUI();
+          this.renderFolderTree();
+        }
+        // Otherwise, move the notes using bulk operation
+        else if (folderId !== 'all-notes') {
+          const result = await this.noteManager!.moveNotesToFolder(noteIds, folderId, targetSyncDirId || undefined);
+          console.log(`[handleFolderDrop] Move result: ${result.successes.length} succeeded, ${result.failures.length} failed`);
+
+          if (result.failures.length > 0) {
+            console.error('[handleFolderDrop] Failed moves:', result.failures);
+            this.updateStatus(`Moved ${result.successes.length} of ${noteIds.length} notes`);
           } else {
-            this.updateStatus(`Restored "${note.title || 'Untitled'}"`);
+            this.updateStatus(`Moved ${noteIds.length} note${noteIds.length > 1 ? 's' : ''} to folder`);
           }
           this.updateUI();
-          this.renderFolderTree(); // Update folder counts
-        }
-        // Otherwise, just move the note
-        else if (!note.deleted && note.folderId !== folderId && folderId !== 'all-notes') {
-          await this.noteManager.moveNoteToFolder(noteId, folderId);
-          this.updateStatus(`Moved "${note.title || 'Untitled'}" to folder`);
-          this.updateUI();
-          this.renderFolderTree(); // Update folder counts
+          this.renderFolderTree();
         }
       }
     }
