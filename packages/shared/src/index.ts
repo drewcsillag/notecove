@@ -7,6 +7,4 @@
  */
 
 export * from './types';
-
-// CRDT logic will be implemented in Phase 1.3
-// export * from './crdt';
+export * from './crdt';
