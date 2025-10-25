@@ -15,6 +15,10 @@ const checks = [
   { name: 'Build', cmd: 'pnpm build' },
   { name: 'Unit Tests', cmd: 'pnpm test' },
   { name: 'Coverage', cmd: 'pnpm test:coverage' },
+  {
+    name: 'Rebuild for Electron',
+    cmd: 'cd packages/desktop && npx @electron/rebuild > /dev/null 2>&1',
+  },
   { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
 ];
 

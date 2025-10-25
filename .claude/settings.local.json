@@ -38,7 +38,12 @@
       "Bash(npx @electron/rebuild)",
       "Bash(pnpm --filter @notecove/desktop test:*)",
       "WebFetch(domain:github.com)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebFetch(domain:tiptap.dev)",
+      "WebFetch(domain:docs.yjs.dev)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm --filter @notecove/shared test title-extractor)",
+      "Bash(/dev/null)"
     ],
     "deny": [],
     "ask": []

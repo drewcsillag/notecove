@@ -41,6 +41,8 @@ test.afterAll(async () => {
 
 test.describe('NoteCove Desktop App', () => {
   test('should launch and display the main window', async () => {
+    // Wait for app to be ready
+    await page.waitForSelector('body', { timeout: 10000 });
     // Verify window is visible
     expect(await page.isVisible('body')).toBe(true);
   });
@@ -61,9 +63,9 @@ test.describe('NoteCove Desktop App', () => {
   });
 
   test('should display the editor panel', async () => {
-    // Check for editor panel title
-    const title = await page.locator('text=Editor').first();
-    await expect(title).toBeVisible();
+    // Check for TipTap editor (look for ProseMirror container)
+    const editor = await page.locator('.ProseMirror').first();
+    await expect(editor).toBeVisible();
   });
 
   test('should have Material-UI theme applied', async () => {

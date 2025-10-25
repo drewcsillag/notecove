@@ -5,6 +5,11 @@
 // Mock i18n before any imports
 jest.mock('../i18n', () => ({}));
 
+// Mock TipTap editor
+jest.mock('../components/EditorPanel/TipTapEditor', () => ({
+  TipTapEditor: () => <div data-testid="tiptap-editor">TipTap Editor</div>,
+}));
+
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import App from '../App';
@@ -69,7 +74,7 @@ describe('App', () => {
 
   it('should render editor panel content', () => {
     render(<App />);
-    expect(screen.getByText('editor.title')).toBeInTheDocument();
+    expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument();
   });
 
   it('should use Material-UI theme', () => {

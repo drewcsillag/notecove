@@ -13,3 +13,4 @@ export {
   decodeUpdateFile,
   type UpdateFileMetadata,
 } from './update-format';
+export { extractTitleFromFragment, extractTitleFromDoc } from './title-extractor';

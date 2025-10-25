@@ -2,7 +2,7 @@
  * Electron Main Process
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu, shell } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
@@ -13,6 +13,7 @@ import { CRDTManagerImpl } from './crdt/crdt-manager';
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
 let ipcHandlers: IPCHandlers | null = null;
+const allWindows: BrowserWindow[] = [];
 
 function createWindow(): void {
   // Create the browser window
@@ -34,8 +35,17 @@ function createWindow(): void {
   });
 
   mainWindow.on('closed', () => {
-    mainWindow = null;
+    const index = allWindows.indexOf(mainWindow as BrowserWindow);
+    if (index > -1) {
+      allWindows.splice(index, 1);
+    }
+    if (mainWindow === mainWindow) {
+      mainWindow = null;
+    }
   });
+
+  // Track window
+  allWindows.push(mainWindow);
 
   // Load the renderer
   // In test mode, always use the built files, not the dev server
@@ -70,6 +80,76 @@ async function initializeDatabase(): Promise<Database> {
 }
 
 // App lifecycle
+// Create application menu
+function createMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => createWindow(),
+        },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [{ role: 'minimize' }, { role: 'close' }],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Demo: Open 2nd Window',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => {
+            createWindow();
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Learn More',
+          click: async () => {
+            await shell.openExternal('https://github.com/anthropics/notecove');
+          },
+        },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 void app.whenReady().then(async () => {
   try {
     if (process.env['NODE_ENV'] === 'test') {
@@ -129,6 +209,9 @@ void app.whenReady().then(async () => {
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] IPC handlers ready, creating window...');
     }
+
+    // Create menu
+    createMenu();
 
     createWindow();
 

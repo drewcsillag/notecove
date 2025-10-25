@@ -1,25 +1,25 @@
 /**
  * Editor Panel Component
  *
- * Displays the note editor.
- * Placeholder implementation - will be replaced with TipTap editor in later phase.
+ * Displays the TipTap note editor with formatting toolbar.
  */
 
-import React from 'react';
-import { Box, Typography } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import React, { useState } from 'react';
+import { Box } from '@mui/material';
+import { TipTapEditor } from './TipTapEditor';
 
 export const EditorPanel: React.FC = () => {
-  const { t } = useTranslation();
+  // TODO: Get current note ID from app state
+  const [currentNoteId] = useState<string | null>(null);
+
+  const handleTitleChange = (title: string) => {
+    // TODO: Update note title in main process via IPC
+    console.log('Note title changed:', title);
+  };
 
   return (
-    <Box sx={{ padding: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        {t('editor.title')}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        {t('editor.placeholder')}
-      </Typography>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <TipTapEditor noteId={currentNoteId} onTitleChange={handleTitleChange} />
     </Box>
   );
 };
