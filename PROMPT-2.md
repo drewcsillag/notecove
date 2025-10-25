@@ -1,6 +1,6 @@
 # Plan Creation Stage
 
-Based on our full exchange, now, produce a markdown plan document (`http://plan.md`).
+Based on our full exchange, now, produce a markdown plan document (`http://PLAN.md`).
 
 Requirements for the plan:
 
@@ -15,7 +15,7 @@ Requirements for the plan:
 
 Markdown Template Example:
 
-```http://plan.md (example)
+```http://PLAN.md (example)
 # (Example) Feature Implementation Plan
 
 **Overall Progress:** `0%`
