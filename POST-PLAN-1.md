@@ -95,6 +95,7 @@ Implement a lightweight "title extraction" utility that can parse Yjs Y.XmlFragm
 
 It also aligns better with your TDD approach - we can write tests for the editor and CRDT integration, then build the UI that consumes it.
 
+> Agree with option A
 ---
 
 ## Issue 4: iOS and Yjs - Recreating vs Porting vs WASM?
@@ -262,12 +263,24 @@ Clarify that:
 
 1. **Phase 1 Reordering:** Agree with moving testing framework setup to 1.2?
 
+> Agree
+
 2. **Phase 2 Reordering:** Agree with building editor first (2.3), then organizational UI (2.4-2.6)?
+
+> AGree
 
 3. **iOS Architecture:** Agree with the hybrid approach (native UI + JavaScriptCore for CRDT + WebView for editor)? Or would you prefer a different approach?
 
+> Do we have any issue surrounding the folder trees and CRDT stuff?
+
 4. **Code Sharing Strategy:** Should we structure `packages/shared` to be runnable in both Node.js (Electron) and JavaScriptCore (iOS)?
+
+> yes
 
 5. **Alternative Consideration:** Would you be open to using WKWebView for the editor on desktop too (instead of direct Electron renderer)? This would make desktop and iOS more similar. Or prefer to keep Electron renderer with direct React/TipTap?
 
+> I'm ok if desktop and ios are a bit different as the constraints and interactions are different.
+
 Please let me know your preferences, and I'll update the PLAN.md accordingly before we proceed to implementation.
+
+> Other thing: As CI/CD doesn't happen until phase 5, to ensure tests run and remain passing, we'll want some local "CI" script/command to run all lints, tests, etc. to ensure that changes need to pass before merging to main, before we have real CI/CD

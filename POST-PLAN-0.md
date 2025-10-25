@@ -6,4 +6,3 @@ considered here (not that it's necessarily the right choice)?
 Respond in a file named POST-PLAN-1.md
 
 
-### script/command to run all lints, tests, etc. that changes need to pass before merging to main
