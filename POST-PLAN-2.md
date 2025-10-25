@@ -13,6 +13,7 @@ Thanks for the responses! Let me address your question about folder trees and th
 ### How Folder Hierarchy Works with CRDTs
 
 **Desktop (Electron):**
+
 1. Folder structure is a separate Yjs document per SD (stored in `<SD>/folders/updates/`)
 2. Main process maintains in-memory Yjs document for folder structure
 3. When user creates/renames/moves folders:
@@ -30,6 +31,7 @@ Thanks for the responses! Let me address your question about folder trees and th
 
 **iOS (with JavaScriptCore):**
 Same basic flow, but:
+
 1. Swift layer detects file changes (FileManager notifications)
 2. Swift calls into JavaScriptCore bridge to apply updates
 3. JavaScriptCore runs our TypeScript CRDT logic (from `packages/shared`)
@@ -39,6 +41,7 @@ Same basic flow, but:
 **Potential Concerns & Solutions:**
 
 ### Concern 1: Folder TreeView in SwiftUI vs React
+
 - **Issue:** Rendering a tree structure that can be modified via CRDT updates
 - **Solution:**
   - Both React (MUI TreeView) and SwiftUI (List with OutlineGroup) can handle dynamic trees
@@ -46,6 +49,7 @@ Same basic flow, but:
   - No fundamental incompatibility
 
 ### Concern 2: JavaScriptCore Bridge Performance
+
 - **Issue:** Every folder operation requires crossing Swift ↔ JS bridge
 - **Mitigation:**
   - Folder operations are infrequent (compared to typing in editor)
@@ -54,8 +58,10 @@ Same basic flow, but:
   - SQLite cache provides fast reads (no bridge needed for display)
 
 ### Concern 3: Yjs Y.Map for Folders
+
 - **Issue:** Is Y.Map the right structure for a hierarchy?
 - **Structure:**
+
   ```typescript
   // Root Yjs document for an SD's folders
   const foldersDoc = new Y.Doc();
@@ -65,19 +71,20 @@ Same basic flow, but:
   foldersMap.set('folder-uuid-1', {
     id: 'folder-uuid-1',
     name: 'Work',
-    parentId: null,  // null = root level
+    parentId: null, // null = root level
     sdId: 'sd-uuid',
-    order: 0
+    order: 0,
   });
 
   foldersMap.set('folder-uuid-2', {
     id: 'folder-uuid-2',
     name: 'Projects',
-    parentId: 'folder-uuid-1',  // child of Work
+    parentId: 'folder-uuid-1', // child of Work
     sdId: 'sd-uuid',
-    order: 0
+    order: 0,
   });
   ```
+
 - **Why this works:**
   - Y.Map handles concurrent creates/updates/deletes correctly
   - `parentId` references create hierarchy
@@ -86,6 +93,7 @@ Same basic flow, but:
   - Deleting a folder: set `deleted: true` (like notes)
 
 ### Concern 4: Circular Parent References
+
 - **Issue:** What if CRDT merge creates circular reference (A is parent of B, B is parent of A)?
 - **Solution:**
   - Validation layer in our code (not in CRDT)
@@ -94,6 +102,7 @@ Same basic flow, but:
   - In practice, unlikely due to instance-id write isolation
 
 ### Concern 5: "All Notes" and "Recently Deleted" Virtual Folders
+
 - **Issue:** These aren't real folders in CRDT
 - **Solution:**
   - They're UI-only constructs
@@ -105,6 +114,7 @@ Same basic flow, but:
 **Is there a specific concern you had in mind?** If so, let me know and I can address it specifically.
 
 > No issue, thanks for the clarification
+
 ---
 
 ## Local "CI" Script Requirement
@@ -118,6 +128,7 @@ Same basic flow, but:
 Add to Phase 1.2 (Testing Framework Setup):
 
 **New Task:**
+
 - [ ] 🟥 Create local CI verification script
   - `pnpm ci-local` command that runs:
     - `pnpm lint` (ESLint on all packages)
@@ -131,6 +142,7 @@ Add to Phase 1.2 (Testing Framework Setup):
   - Can be run before committing/merging
 
 **Example output:**
+
 ```bash
 $ pnpm ci-local
 
@@ -149,6 +161,7 @@ Safe to commit/merge.
 
 **Integration with CLAUDE.md:**
 Your CLAUDE.md already says:
+
 > "before saying that a feature is completed, run all tests to ensure we didn't break anything, you should have a script that acts like a CI build until we have a real CI system"
 
 This `pnpm ci-local` script fulfills that requirement.
@@ -157,6 +170,7 @@ This `pnpm ci-local` script fulfills that requirement.
 We could also set up a pre-commit hook (using husky) that runs `pnpm ci-local` automatically before every commit. But this might be annoying during active development. Your preference?
 
 **When to run:**
+
 - Before merging feature branch to main
 - Before saying a feature is complete
 - After fixing a bug (to ensure fix works and didn't break other things)
@@ -172,6 +186,7 @@ We could also set up a pre-commit hook (using husky) that runs `pnpm ci-local` a
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Configure Jest for unit tests
   - TypeScript support
   - Coverage reporting (target: 70% overall, ~100% for CRDT/storage)
@@ -199,6 +214,7 @@ We could also set up a pre-commit hook (using husky) that runs `pnpm ci-local` a
   - `pnpm test:coverage` - Coverage report
 
 **Acceptance Criteria:**
+
 - All test frameworks are configured
 - Can run unit tests with coverage
 - Can run E2E tests
@@ -213,6 +229,7 @@ We could also set up a pre-commit hook (using husky) that runs `pnpm ci-local` a
 Based on all our discussions, here are the changes to make to PLAN.md:
 
 ### 1. Reorder Phase 1
+
 ```
 1.1 Project Setup & Repository Structure
 1.2 Testing Framework Setup ← was 1.5, add local CI script
@@ -223,6 +240,7 @@ Based on all our discussions, here are the changes to make to PLAN.md:
 ```
 
 ### 2. Update Section 2.1 (Electron App Structure)
+
 - Remove misleading `saveNote` from IPC commands list
 - Clarify IPC commands:
   - `loadNote`, `unloadNote`, `createNote`, `deleteNote`, `moveNote`, `getNoteMetadata`
@@ -230,6 +248,7 @@ Based on all our discussions, here are the changes to make to PLAN.md:
 - Add explanation of CRDT flow: renderer → main → disk → other renderers
 
 ### 3. Reorder Phase 2
+
 ```
 2.1 Electron App Structure
 2.2 Three-Panel Layout
@@ -242,6 +261,7 @@ Based on all our discussions, here are the changes to make to PLAN.md:
 ```
 
 ### 4. Add iOS Architecture Explanation
+
 Before Phase 3, add new section:
 
 ```markdown
@@ -289,6 +309,7 @@ Before diving into Phase 3 (iOS implementation), here's how iOS will differ from
 ```
 
 ### 5. Update Phase 3 Tasks
+
 Add clarifications to each iOS task about what's rewritten in Swift vs what's shared.
 
 ---
@@ -296,16 +317,19 @@ Add clarifications to each iOS task about what's rewritten in Swift vs what's sh
 ## Questions
 
 1. **Pre-commit Hook:** Do you want automatic `pnpm ci-local` before every commit, or just manual usage?
-> manual
+
+   > manual
 
 2. **Coverage Enforcement:** Should `pnpm ci-local` fail if coverage drops below 70% (or below ~100% for CRDT/storage)?
-> yes
+
+   > yes
 
 3. **E2E in Local CI:** Should `pnpm ci-local` include E2E tests (slower) or just unit tests? Or make it optional (`pnpm ci-local --skip-e2e`)?
-> I like the optional ability to skip the e2e checks
+
+   > I like the optional ability to skip the e2e checks
 
 4. **Plan Update:** Should I now update PLAN.md with all these changes, or any other concerns first?
-> yes
+   > yes
 
 > something else to do is to make sure to document the various designs that you come up with that are complicated enough that they're not obvious from the plan docs
 

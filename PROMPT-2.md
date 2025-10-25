@@ -43,4 +43,3 @@ Markdown Template Example:
 If you make subsidiary plan files, todos files, memory files and so on, make sure they're linked from the plan.md file. As the subsidiary plans change through implementation and contact with reality, make sure the top level plans as well as any subsequent subsidiary plan files are updated, while showing the user the nature of the changes.
 
 Again, for clarity, it's still not time to build yet. Just write the clear plan document. No extra complexity or extra scope beyond what we discussed. The plan should lead to simple, elegant, minimal code that does the job perfectly.
-

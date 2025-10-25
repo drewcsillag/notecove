@@ -9,10 +9,12 @@ Final clarifications before planning
 **Q1.1:** You asked for a suggestion on note history UI. Here's my recommendation:
 
 **History Button in Editor Toolbar:**
+
 - Add a "History" button/icon in the editor toolbar (clock icon)
 - Opens a modal/sidebar showing history view
 
 **History View:**
+
 - Left side: Timeline list showing:
   - Date/time of each change
   - User who made the change
@@ -21,6 +23,7 @@ Final clarifications before planning
 - Bottom: "Restore to this version" button
 
 **Additional Features:**
+
 - Slider at top to scrub through versions quickly
 - "Compare" mode showing diff view between two versions
   - Additions in green, deletions in red
@@ -28,10 +31,12 @@ Final clarifications before planning
 - Filter by user (if multiple users have edited)
 
 **Simple Initial Version:**
+
 - Start with basic list of versions with restore capability
 - Add diff view in a later iteration if too complex initially
 
 Does this approach sound good?
+
 > sounds great!
 
 ---
@@ -41,11 +46,13 @@ Does this approach sound good?
 **Q2.1:** For your use case of "query notes for things I can't readily query via search" (like finding undone todos in documents matching a pattern), here's my recommendation:
 
 **Command-line interface + Library approach:**
+
 - Create a TypeScript/JavaScript library that can read/query the CRDT files and SQLite cache
 - Provide a CLI tool built on this library
 - Users can write scripts using the library or use CLI for common queries
 
 **Example:**
+
 ```bash
 # CLI usage
 notecove query "todo:incomplete AND title:project*"
@@ -61,12 +68,14 @@ const notes = await db.query({
 ```
 
 **Why this approach:**
+
 - No need for running server (REST/gRPC requires app to be running)
 - Direct file access is fast and doesn't require IPC
 - Scriptable and composable with other tools
 - Can still add REST API later if needed
 
 **Alternative - IPC with running app:**
+
 - If app is running, CLI can communicate via IPC for faster queries (using cached data)
 - Falls back to direct file reading if app isn't running
 
@@ -81,12 +90,14 @@ Does this approach work for your use case?
 **Q3.1:** For icons and Apache v2 license compatibility, I can suggest:
 
 **Icon Options:**
+
 - **Material Design Icons** (Apache 2.0 licensed) - comprehensive, professional
 - **Heroicons** (MIT) - clean, modern, good for UI
 - **Lucide** (ISC) - fork of Feather icons, very clean
 - **Bootstrap Icons** (MIT) - comprehensive set
 
 For the app icon/logo itself:
+
 - Should we use a generated/designed logo, or text-based?
 - Color scheme preference?
 - Any design direction (minimalist, colorful, etc.)?
@@ -96,6 +107,7 @@ Or should I plan to use placeholder and defer actual design?
 > MUI's icon set sounds like a good choice, falling back to the others if there's a gap we need covered that they cover.
 > color scheme, I like brown as the main accent color -- though not sure how it will go with dark mode -- blue seems pretty universal there.
 > I want clean, I don't want garish colors, or lots of colors
+
 ---
 
 ## 4. Rollback Rule - Understood
@@ -103,6 +115,7 @@ Or should I plan to use placeholder and defer actual design?
 **Q4.1:** Understood on the rollback rule. To confirm my understanding:
 
 When you specify a requirement (like using a specific widget/technology):
+
 - I should implement it as specified
 - If I encounter difficulties, I should explain the problem and ask for guidance
 - I should NOT pivot to alternatives without discussing first
@@ -110,7 +123,8 @@ When you specify a requirement (like using a specific widget/technology):
 
 Acknowledged. I'll make sure to communicate blockers rather than changing direction.
 
->thank you
+> thank you
+
 ---
 
 ## 5. Search Scope Selector
@@ -118,6 +132,7 @@ Acknowledged. I'll make sure to communicate blockers rather than changing direct
 **Q5.1:** You said search should be "user selectable, defaulting to current SD" for cross-SD search.
 
 Where should this selector be placed?
+
 - A) Dropdown next to the search box (Current SD / All SDs / Current Folder Only)
 - B) Icon/button next to search box that cycles through options
 - C) In search settings/preferences
@@ -126,18 +141,22 @@ Where should this selector be placed?
 Which UI pattern?
 
 > D and B
+
 ---
 
 ## 6. Tri-State Checkbox Visual
 
 **Q6.1:** For the tri-state checkbox with `[N]` for NOPE, should the visual rendering be:
+
 - Checkbox with "N" letter inside?
 - Checkbox with X-through icon (strikethrough style)?
 - Different color (red/gray)?
 - Custom icon?
 
 What should the actual checkbox look like visually (not just the markdown)?
+
 > different color -- red
+
 ---
 
 ## 7. Phase 4 vs MVP Boundary
@@ -145,6 +164,7 @@ What should the actual checkbox look like visually (not just the markdown)?
 **Q7.1:** Just to clarify the phase structure:
 
 You confirmed:
+
 - Phase 1: Core Foundation
 - Phase 2: Desktop UI (basic editing, folders)
 - Phase 3: iOS App (basic editing, folders)
@@ -165,11 +185,13 @@ Or is MVP = Phases 1-3, and Phase 4 is post-MVP enhancements?
 **Q8.1:** You want to plan for CD (code signing, app store distribution).
 
 For code signing:
+
 - **macOS**: Will you have an Apple Developer account for signing?
 - **Windows**: Will you have a code signing certificate?
 - **iOS**: Requires Apple Developer account (same as macOS)
 
 Should the plan assume you'll set these up, or should we use:
+
 - Ad-hoc signing for development/testing initially?
 - Plan the infrastructure but defer actual signing until ready for distribution?
 
@@ -182,11 +204,13 @@ Should the plan assume you'll set these up, or should we use:
 **Q9.1:** You said checkboxes work "only in list items."
 
 Should they work in:
+
 - Bullet lists only? (`- [ ] Task`)
 - Numbered lists too? (`1. [ ] Task`)
 - Both?
 
 > both
+
 ---
 
 ## 10. Settings Sync Clarification
@@ -194,6 +218,7 @@ Should they work in:
 **Q10.1:** You said settings stored in "Electron store" (local).
 
 This means each device/instance has independent settings, right? So:
+
 - Desktop Mac might have different SDs configured than Desktop Windows
 - iOS would have its own settings
 - Each instance manages its own SD list, theme preference, etc.
@@ -201,6 +226,7 @@ This means each device/instance has independent settings, right? So:
 Correct?
 
 > correct
+
 ---
 
 ## Notes

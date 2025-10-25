@@ -11,6 +11,7 @@
 NoteCove is a cross-platform notes application (Desktop + iOS) with offline-first architecture and file-based CRDT synchronization. The app syncs via shared file systems (Dropbox, Google Drive, iCloud) without requiring internet servers.
 
 **Tech Stack:**
+
 - **Desktop**: Electron + TypeScript + React + TipTap + Yjs + Material-UI
 - **iOS**: Swift + SwiftUI (with JavaScriptCore for CRDT, WKWebView for editor)
 - **Build System**: Turborepo + pnpm workspaces + Vite
@@ -30,17 +31,20 @@ NoteCove is a cross-platform notes application (Desktop + iOS) with offline-firs
 Before diving into implementation, here's how iOS differs from desktop:
 
 **Desktop (Electron) Architecture:**
+
 - Main process: Node.js running TypeScript (CRDT logic, file I/O, SQLite)
 - Renderer process: Chromium running React + TipTap
 - Communication: IPC between main and renderer
 
 **iOS Architecture:**
+
 - Native Swift layer: File I/O, SQLite (using GRDB), FileManager notifications
 - JavaScriptCore bridge: Runs our TypeScript shared CRDT logic (from `packages/shared`)
 - SwiftUI: All UI except editor (folder tree, note list, settings, tags)
 - WKWebView: Embedded TipTap editor (same as desktop, but in WebView)
 
 **Code Sharing Strategy:**
+
 - `packages/shared`: TypeScript CRDT logic, types, utilities
   - Runs in Node.js on desktop (Electron main process)
   - Runs in JavaScriptCore on iOS (via Swift bridge)
@@ -50,12 +54,14 @@ Before diving into implementation, here's how iOS differs from desktop:
 - Editor: TipTap in both (direct in Electron, WKWebView on iOS)
 
 **Why This Approach:**
+
 - Maximum code sharing for critical CRDT logic (guaranteed compatibility)
 - Native performance and feel on iOS
 - Same editor experience on both platforms
 - Proven pattern (many apps use native UI + WebView for rich content)
 
 **Folder Tree CRDT on iOS:**
+
 - Same Yjs document structure as desktop
 - Same file format on disk
 - Swift code handles file I/O
@@ -72,6 +78,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Initialize git repository with proper .gitignore
 - [ ] 🟥 Set up monorepo structure with Turborepo + pnpm workspaces
   - `/packages/desktop` - Electron app
@@ -91,6 +98,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Configure Turborepo for task orchestration and caching
 
 **Acceptance Criteria:**
+
 - Monorepo builds successfully
 - All linting passes
 - TypeScript compiles without errors
@@ -103,6 +111,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Configure Jest for unit tests
   - TypeScript support
   - Coverage reporting (target: 70% overall, ~100% for CRDT/storage)
@@ -133,6 +142,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - `pnpm test:coverage` - Coverage report
 
 **Acceptance Criteria:**
+
 - All test frameworks are configured
 - Can run unit tests with coverage
 - Can run E2E tests
@@ -141,6 +151,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - Coverage enforcement works
 
 **Usage:**
+
 - Run `pnpm ci-local` before merging to main
 - Run `pnpm ci-local` before saying feature is complete
 - Run `pnpm ci-local` after fixing bugs
@@ -153,6 +164,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Design Yjs document structure for notes
   - Y.Doc per note with Y.XmlFragment for TipTap content
   - Metadata: `{ id: UUID, created: timestamp, modified: timestamp, folderId: UUID | null, deleted: boolean }`
@@ -181,6 +193,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Yjs handles this, but test thoroughly
 
 **Acceptance Criteria:**
+
 - Can create and update Yjs documents
 - Updates are written to correct file structure
 - Updates can be read and merged from multiple instances
@@ -191,6 +204,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Test Coverage:** ~100%
 
 **Design Docs:**
+
 - Create `/docs/crdt-structure.md` documenting Yjs document design
 
 ---
@@ -200,6 +214,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement SD (Sync Directory) structure creation
   - `<SD-root>/notes/<note-id>/updates/`
   - `<SD-root>/notes/<note-id>/meta/`
@@ -225,6 +240,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Network drive disconnected: Continue working, resume when reconnected
 
 **Acceptance Criteria:**
+
 - Can create SD structure on disk
 - File watching detects changes reliably
 - Updates sync between simulated instances
@@ -234,6 +250,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Test Coverage:** ~100% (critical for data integrity)
 
 **Design Docs:**
+
 - Create `/docs/file-sync-protocol.md` documenting sync mechanism and error handling
 
 ---
@@ -243,6 +260,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Set up SQLite database with better-sqlite3
 - [ ] 🟥 Design schema for note index
   - `notes` table: id, title, sdId, folderId, created, modified, deleted, content_preview
@@ -275,6 +293,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Re-index as needed
 
 **Acceptance Criteria:**
+
 - SQLite database is created and accessible
 - Can index notes and folders from CRDT files
 - FTS5 search works correctly
@@ -285,6 +304,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Test Coverage:** ~100% (critical for data integrity)
 
 **Design Docs:**
+
 - Create `/docs/sqlite-schema.md` documenting database schema and caching strategy
 
 ---
@@ -294,6 +314,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Set up logging framework
   - Log to file in app data directory
   - Log levels: debug, info, warn, error
@@ -307,6 +328,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Or shows log viewer in app
 
 **Acceptance Criteria:**
+
 - Errors are logged to file
 - Can view logs from UI
 - Errors don't crash the app
@@ -320,6 +342,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Set up Electron with electron-vite
   - Main process configuration
   - Renderer process configuration
@@ -360,6 +383,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Document this IPC protocol in `/docs/ipc-protocol.md`
 
 **Acceptance Criteria:**
+
 - Electron app launches
 - React renders in window
 - MUI components work
@@ -367,6 +391,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - Main process can manage CRDT documents
 
 **Design Docs:**
+
 - Create `/docs/ipc-protocol.md` documenting IPC commands, events, and flow
 
 ---
@@ -376,6 +401,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement resizable panel system
   - Three panels: Folder/Tags (25%) | Notes List (25%) | Editor (50%)
   - Draggable splitters between panels
@@ -389,6 +415,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Handle narrow windows gracefully
 
 **Acceptance Criteria:**
+
 - Three panels render correctly
 - Splitters can be dragged
 - Panel widths persist across restarts
@@ -403,6 +430,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Note:** Moved earlier in phase order to enable note content display in other components
 
 **Tasks:**
+
 - [ ] 🟥 Set up TipTap editor with Yjs binding
   - Start with Simple Template from TipTap docs
   - Integrate with Yjs document from main process (via IPC)
@@ -436,6 +464,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Handle "Untitled" case (only whitespace)
 
 **Acceptance Criteria:**
+
 - Editor renders and is editable
 - Formatting works (toolbar + shortcuts)
 - Changes sync to CRDT immediately (via IPC to main process)
@@ -444,6 +473,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - Can extract title from note content
 
 **Design Docs:**
+
 - Document TipTap + Yjs compatibility findings in `/docs/tiptap-yjs-compatibility.md`
 
 ---
@@ -453,6 +483,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement folder tree component (MUI TreeView)
   - Header: "FOLDERS" + plus icon
   - Tree per SD (labeled with SD name)
@@ -483,6 +514,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Alert user
 
 **Acceptance Criteria:**
+
 - Folder tree displays correctly for all SDs
 - Can create, rename, move, delete folders
 - Drag & drop works correctly
@@ -498,6 +530,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement tags panel below folder tree
   - Header: "TAGS" + search box
   - Draggable splitter between folder tree and tags panel
@@ -515,6 +548,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Update tag index in SQLite (tags, note_tags tables)
 
 **Acceptance Criteria:**
+
 - Tags panel displays all tags
 - Can toggle tag states (off/positive/negative)
 - Tag search filters tag list (fuzzy)
@@ -528,6 +562,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement notes list component
   - Header: search box
   - Sub-header: "NOTES" + note count + plus button
@@ -582,6 +617,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Update title in real-time as user types (via CRDT updates)
 
 **Acceptance Criteria:**
+
 - Notes list displays correctly
 - Search works (live, with options, scoped)
 - Can create, select, pin, delete notes
@@ -598,6 +634,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement settings window (separate Electron window)
   - Modal dialog style
   - Accessible via: Cmd/Ctrl+, or menu (Preferences/Settings)
@@ -623,6 +660,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Store settings in Electron store (local, per-instance)
 
 **Acceptance Criteria:**
+
 - Settings window opens
 - Can add/remove/enable/disable/configure SDs
 - Settings persist across restarts
@@ -636,6 +674,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement native application menu
   - macOS: native menu bar
   - Windows/Linux: in-window menu bar
@@ -667,6 +706,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - About NoteCove (shows version, license info)
 
 **Acceptance Criteria:**
+
 - Menus render correctly on all platforms
 - All menu items work
 - Keyboard shortcuts function correctly
@@ -679,6 +719,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement global keyboard shortcuts
   - Navigation: Cmd/Ctrl+1/2/3 (focus folder/notes/editor)
   - Navigation: Cmd/Ctrl+↑/↓ (navigate notes list)
@@ -701,6 +742,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Platform-specific handling (Cmd on macOS, Ctrl elsewhere)
 
 **Acceptance Criteria:**
+
 - All shortcuts work correctly
 - Shortcuts don't conflict
 - Platform conventions followed
@@ -712,6 +754,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement main window
   - Three-panel layout
   - Persist size and position (app_state table)
@@ -730,6 +773,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - All stored in SQLite app_state table
 
 **Acceptance Criteria:**
+
 - Main window opens with saved state
 - Can open notes in separate windows
 - Secondary windows sync correctly with main window
@@ -742,6 +786,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement "Recently Deleted" folder behavior
   - System folder (protected, can't rename/delete)
   - Always at bottom of SD tree
@@ -765,6 +810,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Confirmation dialog showing count of affected items
 
 **Acceptance Criteria:**
+
 - Deleted notes appear in "Recently Deleted"
 - Can restore notes
 - Can permanently delete notes
@@ -778,6 +824,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement history button in editor toolbar (clock icon)
 - [ ] 🟥 Implement history modal/sidebar
   - Left side: Timeline list
@@ -796,6 +843,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Filter by user
 
 **Acceptance Criteria:**
+
 - History view shows timeline of changes
 - Can preview old versions
 - Can restore to old version
@@ -809,6 +857,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement first-run detection
 - [ ] 🟥 Implement welcome screen
   - Welcome message
@@ -822,6 +871,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Skip wizard if necessary settings provided
 
 **Acceptance Criteria:**
+
 - Welcome wizard shows on first run
 - Can configure basic settings
 - Default SD created if needed
@@ -834,6 +884,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement drag from external apps
   - Drag text file → create new note with content
   - Drag to folder → create in that folder
@@ -843,6 +894,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Exports as plain text or markdown
 
 **Acceptance Criteria:**
+
 - Can drag text files into app
 - Can drag notes out of app
 - Visual feedback during drag
@@ -854,6 +906,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement ARIA labels and proper semantic HTML
 - [ ] 🟥 Ensure full keyboard navigation
 - [ ] 🟥 Test with screen readers (VoiceOver on macOS, NVDA on Windows)
@@ -862,6 +915,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Font size adjustment (via zoom)
 
 **Acceptance Criteria:**
+
 - Screen readers can navigate app
 - All functionality accessible via keyboard
 - Focus indicators are clear
@@ -876,6 +930,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Create Xcode project in `/packages/ios`
 - [ ] 🟥 Configure for latest iOS (research current version)
 - [ ] 🟥 Target iPhone + iPad (universal)
@@ -891,12 +946,14 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Add iOS app to Turborepo build pipeline (as separate task)
 
 **Acceptance Criteria:**
+
 - Xcode project builds successfully
 - Can install on device via Xcode (7-day expiration with free account)
 - Basic SwiftUI app launches
 - JavaScriptCore bridge can execute `packages/shared` code
 
 **Design Docs:**
+
 - Create `/docs/ios-jscore-bridge.md` documenting Swift ↔ JSCore bridge design
 
 ---
@@ -906,6 +963,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement Swift layer for CRDT operations
   - File I/O: Reading/writing .yjson files (rewrite in Swift)
   - Sequence numbering, packing logic (rewrite in Swift)
@@ -920,6 +978,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - FTS5 for search
 
 **Acceptance Criteria:**
+
 - iOS app can read/write CRDT files
 - Syncs correctly with desktop instances
 - File watching detects changes
@@ -934,6 +993,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement tab bar navigation
   - Tab 1: Notes (hierarchical: SD list → folder list → note list → editor)
   - Tab 2: Tags (combined folder/tag view with segmented control)
@@ -956,6 +1016,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Add folder / Add note (context-aware)
 
 **Acceptance Criteria:**
+
 - Tab navigation works
 - Can navigate through SD → folders → notes → editor
 - UI feels native and responsive
@@ -967,6 +1028,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement combined folder and tag view in Tags tab
   - Segmented control: Folders / Tags
   - Or collapsible sections
@@ -976,6 +1038,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Tag search
 
 **Acceptance Criteria:**
+
 - Can access folders and tags easily
 - Tag filtering works
 
@@ -986,6 +1049,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement WKWebView editor embedding TipTap
   - Same TipTap configuration as desktop
   - JavaScript ↔ Swift bridge for CRDT updates
@@ -999,6 +1063,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Real-time updates from other instances
 
 **Acceptance Criteria:**
+
 - Editor works for basic text editing
 - Formatting toolbar functions
 - Changes sync to CRDT
@@ -1012,6 +1077,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement settings view
   - SD management (same as desktop)
   - Username and mention handle
@@ -1022,6 +1088,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Store settings in UserDefaults (iOS equivalent of Electron store)
 
 **Acceptance Criteria:**
+
 - Settings view works
 - Can configure SDs
 - Settings persist
@@ -1033,11 +1100,13 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement "Recently Deleted" folder (same logic as desktop)
 - [ ] 🟥 Implement swipe actions for deletion and restoration
 - [ ] 🟥 Implement permanent deletion
 
 **Acceptance Criteria:**
+
 - Deleted notes go to "Recently Deleted"
 - Can restore notes
 - Can permanently delete
@@ -1049,6 +1118,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement search in note list
   - Use UISearchBar
   - Same search logic as desktop (full content, FTS5)
@@ -1056,6 +1126,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Implement search scope selector (Current SD / All SDs)
 
 **Acceptance Criteria:**
+
 - Search works and is fast
 - Results update as typing
 - Scope selector works
@@ -1067,11 +1138,13 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement VoiceOver support
 - [ ] 🟥 Implement Dynamic Type (font size scaling)
 - [ ] 🟥 Test with accessibility features enabled
 
 **Acceptance Criteria:**
+
 - VoiceOver can navigate app
 - Font sizes scale correctly
 - Passes basic accessibility audits
@@ -1083,6 +1156,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Implement history view (similar to desktop)
   - List of versions
   - Preview
@@ -1090,6 +1164,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Access via editor toolbar or menu
 
 **Acceptance Criteria:**
+
 - Can view history
 - Can restore old versions
 
@@ -1102,6 +1177,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Implement tag parsing from note content
   - `#tagname` syntax
   - Case-insensitive
@@ -1118,6 +1194,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Tag count badges
 
 **Acceptance Criteria:**
+
 - Tags are recognized in notes
 - Autocomplete works
 - Tag filtering works correctly
@@ -1129,6 +1206,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Implement inter-note link syntax: `[[title]]`
   - Theme-dependent color (different from tags, complementary to blue)
   - Store as note IDs internally
@@ -1149,6 +1227,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Links stored as IDs, so no actual update needed in content
 
 **Acceptance Criteria:**
+
 - Can create inter-note links
 - Autocomplete works
 - Links navigate correctly
@@ -1161,6 +1240,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Enhance search with advanced dialog
   - Full text search (already working)
   - Filter by: date range, folder, SD, tags, has-todos, etc.
@@ -1171,6 +1251,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Highlight in editor when opened from search
 
 **Acceptance Criteria:**
+
 - Advanced search dialog works
 - Can save searches
 - Results are accurate
@@ -1182,6 +1263,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Implement note export
   - Right-click menu: Export as Markdown
   - File menu: Export
@@ -1202,6 +1284,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Ensure filenames are valid on all platforms
 
 **Acceptance Criteria:**
+
 - Can export notes, folders, SDs
 - Markdown is correct
 - Links are converted correctly
@@ -1214,6 +1297,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Implement tri-state checkbox in TipTap
   - Markdown: `- [ ]` (todo), `- [x]` (done), `- [N]` (NOPE)
   - Visual: empty checkbox, checked checkbox, red checkbox with "N"
@@ -1223,6 +1307,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Index todos in SQLite for querying
 
 **Acceptance Criteria:**
+
 - Checkboxes render correctly
 - Can cycle through states
 - State syncs across instances
@@ -1234,6 +1319,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Add TipTap extensions:
   - TextStyle
   - Color (text color)
@@ -1241,6 +1327,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Add toolbar controls for color selection
 
 **Acceptance Criteria:**
+
 - Can change text color
 - Can highlight text
 - Colors persist in CRDT
@@ -1252,6 +1339,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Add TipTap extensions (verify Yjs compatibility):
   - Table
   - Image (with alignment)
@@ -1263,6 +1351,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Add to toolbar
 
 **Acceptance Criteria:**
+
 - All extensions work
 - Compatible with Yjs
 
@@ -1273,6 +1362,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Design IPC API protocol
   - Commands: query notes, get note content, search, list folders
   - Response format: JSON
@@ -1288,6 +1378,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Document API
 
 **Acceptance Criteria:**
+
 - API is accessible via IPC
 - CLI tool works
 - Can query notes programmatically
@@ -1299,6 +1390,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Implement due date syntax: `@due(2025-12-31)`
   - Parse and extract due dates
   - Store in SQLite
@@ -1309,6 +1401,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Add due date filtering/querying
 
 **Acceptance Criteria:**
+
 - Can add due dates to tasks
 - Can assign tasks with @mentions
 - Can query tasks by due date
@@ -1320,6 +1413,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Implement Intents framework on iOS
   - Intent: Create Note
   - Intent: Add to Note
@@ -1330,6 +1424,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Document automation capabilities
 
 **Acceptance Criteria:**
+
 - Shortcuts can create/search notes
 - AppleScript works on macOS
 
@@ -1340,6 +1435,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Post-MVP)
 
 **Tasks:**
+
 - [ ] 🟥 Extend IPC API to support writes
   - Commands: create note, update note, delete note, move note
   - Ensure proper CRDT update generation
@@ -1349,6 +1445,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Add safety checks (confirmation prompts, dry-run mode)
 
 **Acceptance Criteria:**
+
 - Can create/update/delete notes via API
 - Changes appear in UI immediately
 - CRDT state remains consistent
@@ -1362,6 +1459,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Set up Vite + React project in `/packages/website`
 - [ ] 🟥 Configure for GitHub Pages deployment
 - [ ] 🟥 Design landing page
@@ -1377,6 +1475,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Deploy to GitHub Pages
 
 **Acceptance Criteria:**
+
 - Landing page is live
 - Looks professional
 - Links work
@@ -1388,6 +1487,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Incremental)
 
 **Tasks:**
+
 - [ ] 🟥 Write installation instructions
   - macOS, Windows, Linux
   - iOS (TestFlight / direct install via Xcode)
@@ -1404,6 +1504,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Update incrementally as features are completed
 
 **Acceptance Criteria:**
+
 - User guide covers all features
 - Screenshots are current
 - Easy to follow
@@ -1415,6 +1516,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Incremental)
 
 **Tasks:**
+
 - [ ] 🟥 Write architecture overview
   - CRDT design
   - File structure
@@ -1432,6 +1534,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Link to design docs in `/docs/`
 
 **Acceptance Criteria:**
+
 - Developer docs are comprehensive
 - API is fully documented
 - Easy for contributors to understand codebase
@@ -1443,6 +1546,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do
 
 **Tasks:**
+
 - [ ] 🟥 Enhance GitHub Actions workflow (based on Phase 1.2 local CI script)
   - Run tests, linting, builds on every push/PR
   - Test on: macOS, Windows, Linux
@@ -1462,6 +1566,7 @@ Before diving into implementation, here's how iOS differs from desktop:
   - Future: Mac App Store, iOS App Store
 
 **Acceptance Criteria:**
+
 - CI runs on every push
 - Can build release artifacts locally
 - Code signing and distribution requirements documented
@@ -1473,6 +1578,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 **Status:** To Do (Ongoing)
 
 **Tasks:**
+
 - [ ] 🟥 Refine animations and transitions
 - [ ] 🟥 Improve error messages and user feedback
 - [ ] 🟥 Add loading states and progress indicators
@@ -1483,6 +1589,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - [ ] 🟥 Icon and asset cleanup
 
 **Acceptance Criteria:**
+
 - UI feels polished and responsive
 - Interactions are smooth
 - Error messages are helpful
@@ -1492,6 +1599,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 ## Testing Strategy
 
 ### Test Coverage Targets
+
 - **Overall:** 70% minimum
 - **CRDT/Sync Logic:** ~100%
 - **File System Operations:** ~100%
@@ -1499,6 +1607,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - **UI Components:** 70%
 
 ### Test Types
+
 1. **Unit Tests (Jest)**
    - CRDT operations
    - File system operations
@@ -1525,6 +1634,7 @@ Before diving into implementation, here's how iOS differs from desktop:
    - Accessibility with screen readers
 
 ### Test Scenarios (Critical)
+
 - **Multi-instance sync:** Two desktop instances editing same note simultaneously
 - **Cross-platform sync:** Desktop and iOS editing same note
 - **Offline mode:** Edit notes offline, sync when online
@@ -1538,12 +1648,14 @@ Before diving into implementation, here's how iOS differs from desktop:
 ## Development Workflow
 
 ### Branch Strategy
+
 - `main` branch: stable, tested code
 - Feature branches: `feature/<name>` for each major task
 - Merge to `main` only after review and `pnpm ci-local` passes
 - Each phase gets a feature branch (e.g., `feature/phase-1-core`)
 
 ### Code Review Process
+
 - After implementing each phase, perform self-review
 - Run `pnpm ci-local` (full test suite, linting, coverage)
 - Check code coverage meets thresholds
@@ -1551,6 +1663,7 @@ Before diving into implementation, here's how iOS differs from desktop:
 - Get user approval before merging to `main`
 
 ### Bug Fixes
+
 - Any bug report gets a test first (TDD)
 - Fix the bug
 - Verify test passes

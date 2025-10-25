@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm --filter @notecove/shared build:*)",
+      "Bash(pnpm format:check:*)",
+      "Bash(pnpm format:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm test:coverage:*)",
+      "Bash(chmod:*)",
+      "Bash(pnpm ci-local:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -12,6 +12,7 @@ Excellent catches! You've identified several issues with the plan ordering and s
 
 **Proposed Fix:**
 Reorder Phase 1 tasks:
+
 - 1.1 Project Setup & Repository Structure
 - **1.2 Testing Framework Setup** (moved from 1.5)
 - 1.3 CRDT Core Implementation (was 1.2)
@@ -30,6 +31,7 @@ This way, Jest, Playwright, and XCTest are ready before we start implementing CR
 **You're right - this is misleading.** With Yjs, there's no explicit "save" operation. Changes are automatically captured as CRDT updates and written to disk by the sync mechanism.
 
 **What the IPC actually needs:**
+
 - `loadNote(noteId)` - Load a note's Yjs document into main process memory, start watching its files
 - `unloadNote(noteId)` - Unload from memory when no windows have it open
 - `createNote(sdId, folderId, initialContent)` - Create new note (generates UUID, creates CRDT files)
@@ -40,6 +42,7 @@ This way, Jest, Playwright, and XCTest are ready before we start implementing CR
 
 **Clarification:**
 The renderer process never directly writes to CRDT files. Instead:
+
 1. User types in TipTap editor (renderer)
 2. TipTap generates Yjs updates (in-memory, in renderer)
 3. Updates are sent to main process via IPC
@@ -49,6 +52,7 @@ The renderer process never directly writes to CRDT files. Instead:
 
 **Proposed Fix:**
 Update section 2.1 to clarify:
+
 - Remove `saveNote` (misleading)
 - Add proper IPC commands as listed above
 - Add note about the flow: renderer → main process → disk → other renderers
@@ -62,6 +66,7 @@ Update section 2.1 to clarify:
 **You're absolutely right - this is a chicken-and-egg problem.**
 
 **Current situation:**
+
 - Notes list (2.5) needs to show note titles
 - Note titles come from first line of note content
 - Note content is in Yjs documents (Y.XmlFragment for TipTap)
@@ -73,6 +78,7 @@ Update section 2.1 to clarify:
 Move 2.6 (Note Editor) to before 2.3-2.5. Build editor early so we can create and view notes, then build the organizational UI around it.
 
 **New order:**
+
 - 2.1 Electron App Structure
 - 2.2 Three-Panel Layout
 - **2.3 Note Editor (Basic TipTap)** ← moved earlier
@@ -88,6 +94,7 @@ Build the UI with mock/fixture data first, then integrate real CRDT content when
 Implement a lightweight "title extraction" utility that can parse Yjs Y.XmlFragment without full TipTap setup. This feels over-engineered.
 
 **My Recommendation: Option A** - Build editor first (at least basic version). This gives us:
+
 1. Ability to create real notes
 2. Ability to extract real titles
 3. Something tangible to work with while building organizational UI
@@ -96,6 +103,7 @@ Implement a lightweight "title extraction" utility that can parse Yjs Y.XmlFragm
 It also aligns better with your TDD approach - we can write tests for the editor and CRDT integration, then build the UI that consumes it.
 
 > Agree with option A
+
 ---
 
 ## Issue 4: iOS and Yjs - Recreating vs Porting vs WASM?
@@ -105,6 +113,7 @@ It also aligns better with your TDD approach - we can write tests for the editor
 **This is a critical architectural question I didn't fully address in the plan.**
 
 **Background:**
+
 - Yjs is JavaScript/TypeScript library
 - iOS native app is Swift/SwiftUI
 - Our CRDT files on disk are Yjs binary format (.yjson)
@@ -112,7 +121,9 @@ It also aligns better with your TDD approach - we can write tests for the editor
 **Options:**
 
 ### Option 1: Port Yjs to Swift (or use existing port)
+
 **Approach:** Reimplement Yjs CRDT algorithms in Swift
+
 - **Pros:** Native performance, no JS runtime
 - **Cons:**
   - Huge effort to reimplement Yjs correctly
@@ -121,7 +132,9 @@ It also aligns better with your TDD approach - we can write tests for the editor
 - **Reality check:** There doesn't appear to be a mature Swift Yjs port
 
 ### Option 2: Use JavaScriptCore (iOS's built-in JS engine)
+
 **Approach:** Bundle Yjs library, run it in JavaScriptCore on iOS
+
 - **Pros:**
   - Uses official Yjs library (guaranteed compatibility)
   - Our shared TypeScript code could potentially run on iOS
@@ -132,7 +145,9 @@ It also aligns better with your TDD approach - we can write tests for the editor
 - **Feasibility:** Doable, but awkward
 
 ### Option 3: WASM
+
 **Approach:** Compile Yjs (or our layer) to WebAssembly, run on iOS
+
 - **Pros:**
   - Better performance than JavaScriptCore
   - Could share code between platforms
@@ -144,7 +159,9 @@ It also aligns better with your TDD approach - we can write tests for the editor
 - **Reality check:** Yjs has dependencies that may not work in WASM
 
 ### Option 4: WebView with Full Web App
+
 **Approach:** iOS app is just a WebView running the Electron renderer code
+
 - **Pros:**
   - Maximum code sharing
   - TipTap works natively (it's a web component)
@@ -155,7 +172,9 @@ It also aligns better with your TDD approach - we can write tests for the editor
 - **Feasibility:** This is basically like Cordova/Capacitor approach
 
 ### Option 5: Hybrid - Native UI + JS Core for CRDT
+
 **Approach:** Native SwiftUI for all UI, JavaScriptCore only for CRDT operations
+
 - **Pros:**
   - Native UI/UX
   - Shared CRDT logic (guaranteed compatibility)
@@ -166,7 +185,9 @@ It also aligns better with your TDD approach - we can write tests for the editor
   - For editor: either WebView for TipTap, or native iOS rich text (incompatible)
 
 ### Option 6: React Native
+
 **Approach:** Use React Native instead of Electron for desktop, share more code with iOS
+
 - **Pros:**
   - Maximum code sharing across platforms
   - React on both platforms
@@ -181,6 +202,7 @@ It also aligns better with your TDD approach - we can write tests for the editor
 
 **The Editor Problem is Key:**
 The core issue is TipTap + Yjs integration. TipTap is a web-based editor (runs in DOM). On iOS we have these choices:
+
 1. **WebView with TipTap** (web content in iOS app)
 2. **Native iOS rich text editor** (UITextView/TextKit) with custom Yjs binding
 3. **Different editor library** that works on both platforms
@@ -188,12 +210,14 @@ The core issue is TipTap + Yjs integration. TipTap is a web-based editor (runs i
 **Recommended Approach: Hybrid with WebView Editor**
 
 For **iOS Architecture:**
+
 - **UI Layer:** Native SwiftUI for navigation, lists, folders, settings
 - **Editor:** WKWebView running TipTap with Yjs (same as desktop)
 - **CRDT Layer:** JavaScriptCore running official Yjs library + our shared TypeScript CRDT logic
 - **Storage:** Native Swift code for file I/O, SQLite
 
 **Why this works:**
+
 1. **Editor compatibility:** TipTap works identically on desktop and iOS (it's in a WebView on both)
 2. **CRDT compatibility:** Using official Yjs library (via JavaScriptCore) guarantees perfect compatibility
 3. **Code sharing:** Our TypeScript CRDT logic (`packages/shared`) can run on both platforms
@@ -201,6 +225,7 @@ For **iOS Architecture:**
 5. **Proven approach:** Many apps use this pattern (native UI + WebView for rich content)
 
 **What "porting our layer" means:**
+
 - **File I/O:** Rewrite in Swift (reading/writing .yjson files)
 - **SQLite:** Rewrite in Swift (using GRDB or similar)
 - **File watching:** Rewrite in Swift (using FileManager)
@@ -210,6 +235,7 @@ For **iOS Architecture:**
 
 **WASM Consideration:**
 While interesting, WASM is not practical here because:
+
 1. Yjs has Node.js dependencies (not WASM-compatible)
 2. No mature WASM ↔ Swift bridge for this use case
 3. Adds complexity without clear benefits over JavaScriptCore (which is built into iOS)
@@ -219,6 +245,7 @@ While interesting, WASM is not practical here because:
 ## Proposed Plan Updates
 
 **1. Reorder Phase 1:**
+
 ```
 1.1 Project Setup & Repository Structure
 1.2 Testing Framework Setup ← moved earlier
@@ -232,6 +259,7 @@ While interesting, WASM is not practical here because:
 Remove `saveNote`, clarify CRDT automatic persistence, list correct IPC commands
 
 **3. Reorder Phase 2 (Editor Earlier):**
+
 ```
 2.1 Electron App Structure
 2.2 Three-Panel Layout
@@ -244,6 +272,7 @@ Remove `saveNote`, clarify CRDT automatic persistence, list correct IPC commands
 
 **4. Add iOS Architecture Section to Plan:**
 Before Phase 3, add detailed architecture explanation:
+
 - Native SwiftUI for UI
 - WKWebView for TipTap editor
 - JavaScriptCore for Yjs + shared CRDT logic
@@ -252,6 +281,7 @@ Before Phase 3, add detailed architecture explanation:
 
 **5. Update Phase 3 Tasks:**
 Clarify that:
+
 - Swift code handles file I/O, SQLite, file watching (rewrite from TypeScript)
 - JavaScriptCore bridge handles CRDT operations (runs our TypeScript shared code)
 - TipTap editor embedded in WKWebView

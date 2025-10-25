@@ -11,6 +11,7 @@ Final clarification on iOS deployment
 **Requirements:**
 
 **Option A: Development Build (Simplest for MVP)**
+
 - Free Apple Developer account (no cost)
 - Register your iPhone's UDID in your Apple Developer account
 - Use Xcode to build and install directly via USB or wirelessly
@@ -19,6 +20,7 @@ Final clarification on iOS deployment
 - No app store submission
 
 **Option B: TestFlight (Better for longer testing)**
+
 - Paid Apple Developer account ($99/year)
 - Code signing certificate
 - Upload build to App Store Connect
@@ -28,6 +30,7 @@ Final clarification on iOS deployment
 - No public app store submission needed
 
 **Option C: Ad-Hoc Distribution**
+
 - Paid Apple Developer account ($99/year)
 - Code signing certificate
 - Register device UDID
@@ -39,6 +42,7 @@ Final clarification on iOS deployment
 Start with **Option A** (free account, direct Xcode installation) for initial development and testing. The 7-day expiration is annoying but acceptable for active development. Once you want longer-term testing, upgrade to **Option B** (TestFlight with paid account).
 
 **For the plan, I'll include:**
+
 - Setup instructions for free Apple Developer account
 - Xcode project configuration for development builds
 - Scripts/commands to build and install to device
@@ -47,6 +51,7 @@ Start with **Option A** (free account, direct Xcode installation) for initial de
 Does this work for you, or do you want to start with paid account + TestFlight from the beginning?
 
 > that works for me.
+
 ---
 
 ## 2. IPC API Scope
@@ -56,12 +61,14 @@ Does this work for you, or do you want to start with paid account + TestFlight f
 For MVP scope, should the IPC API support:
 
 **Read Operations:**
+
 - Query notes by various criteria (title pattern, tags, todos, etc.)
 - Get note content by ID
 - List folders
 - Search full text
 
 **Write Operations:**
+
 - Create new note
 - Update note content
 - Delete note
@@ -71,6 +78,7 @@ For MVP scope, should the IPC API support:
 **Or should MVP IPC API be read-only, with write operations added post-MVP?**
 
 The concern with write operations in MVP is ensuring they properly:
+
 - Generate CRDT updates
 - Update SQLite cache
 - Trigger UI updates
@@ -79,7 +87,9 @@ The concern with write operations in MVP is ensuring they properly:
 Read-only is simpler and safer for MVP. Write operations can be added once the core is stable.
 
 Your preference?
+
 > read only for MVP, write operations after
+
 ---
 
 ## 3. MVP Definition Final Confirmation
@@ -87,6 +97,7 @@ Your preference?
 **Q3.1:** You said Phase 4 vs Phase 1-3 is "a better delineation" for MVP.
 
 Just to be crystal clear, MVP means:
+
 - **Phase 1**: Core Foundation ✓
 - **Phase 2**: Desktop UI (basic) ✓
 - **Phase 3**: iOS App (basic) ✓
@@ -97,6 +108,7 @@ So MVP = working desktop + iOS app with basic note editing, folders, syncing, an
 **Phase 5** (Documentation & Polish) happens alongside/after as features are built.
 
 Is this correct?
+
 > correct
 
 ---
@@ -104,11 +116,13 @@ Is this correct?
 ## 4. Color Scheme Clarification
 
 **Q4.1:** You mentioned:
+
 - Brown as main accent color
 - Blue for dark mode (since brown might not work well)
 - Clean, not garish
 
 Should the plan include:
+
 - Light theme: Brown accent (#795548 or similar earth tone)
 - Dark theme: Blue accent (#2196F3 or similar)
 - Otherwise follow Material Design color principles
@@ -119,6 +133,7 @@ Or should I research/suggest specific color palettes for your approval?
 > lets just go blue and skip brown altogether
 > allow for customization later
 > in general, allow for the ability to change my mind
+
 ---
 
 ## Notes
