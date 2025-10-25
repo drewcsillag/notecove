@@ -28,4 +28,4 @@ Build tooling as you see fit to help debug.
 Suggest tooling that might be applicable where I've not considered it
 
 # overall
-If I ask you to do something, and you start doing it, NEVER start rolling back the change without asking me and explaining in detail what the problem is.
+If I ask you to make a change, and you start doing it, NEVER start rolling back the change without asking me and explaining in detail what the problem is.
