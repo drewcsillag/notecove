@@ -10,3 +10,4 @@ export * from './types';
 export * from './crdt';
 export * from './storage';
 export * from './database';
+export * from './logging';
