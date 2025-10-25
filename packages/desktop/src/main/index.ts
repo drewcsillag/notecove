@@ -35,13 +35,13 @@ function createWindow(): void {
   });
 
   mainWindow.on('closed', () => {
-    const index = allWindows.indexOf(mainWindow as BrowserWindow);
-    if (index > -1) {
-      allWindows.splice(index, 1);
+    if (mainWindow) {
+      const index = allWindows.indexOf(mainWindow);
+      if (index > -1) {
+        allWindows.splice(index, 1);
+      }
     }
-    if (mainWindow === mainWindow) {
-      mainWindow = null;
-    }
+    mainWindow = null;
   });
 
   // Track window
@@ -89,7 +89,9 @@ function createMenu(): void {
         {
           label: 'New Window',
           accelerator: 'CmdOrCtrl+N',
-          click: () => createWindow(),
+          click: () => {
+            createWindow();
+          },
         },
         { type: 'separator' },
         { role: 'quit' },
@@ -138,8 +140,8 @@ function createMenu(): void {
         { type: 'separator' },
         {
           label: 'Learn More',
-          click: async () => {
-            await shell.openExternal('https://github.com/anthropics/notecove');
+          click: () => {
+            void shell.openExternal('https://github.com/anthropics/notecove');
           },
         },
       ],

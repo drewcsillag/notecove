@@ -694,6 +694,7 @@ New files to create:
 **Implementation Summary:**
 
 Phase 2.3 successfully implemented the core TipTap editor with:
+
 - ✅ TipTap React component with Yjs Collaboration extension
 - ✅ Full formatting toolbar with Material-UI buttons
 - ✅ All basic extensions (Bold, Italic, Underline, Strike, Code, Headings, Lists, Blockquote, CodeBlock, HorizontalRule)
@@ -703,6 +704,7 @@ Phase 2.3 successfully implemented the core TipTap editor with:
 - ✅ Documentation complete
 
 **Files Added:**
+
 - `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx` - Main editor component
 - `packages/desktop/src/renderer/src/components/EditorPanel/EditorToolbar.tsx` - Formatting toolbar
 - `packages/shared/src/crdt/title-extractor.ts` - Title extraction utility
@@ -710,6 +712,7 @@ Phase 2.3 successfully implemented the core TipTap editor with:
 - `docs/tiptap-yjs-compatibility.md` - TipTap+Yjs compatibility research
 
 **Dependencies Added:**
+
 - `@tiptap/react@^2.26.4`
 - `@tiptap/starter-kit@^2.26.4`
 - `@tiptap/extension-collaboration@^2.26.4`
@@ -717,11 +720,13 @@ Phase 2.3 successfully implemented the core TipTap editor with:
 - `@tiptap/pm@^2.26.4`
 
 **Next Steps:**
+
 - IPC integration to sync editor changes with main process Y.Doc
 - Note loading/unloading via IPC
 - Collaborative cursors (requires awareness support)
 
 **Demo Hack (Temporary):**
+
 - ✅ Added BroadcastChannel-based collaboration demo (see `/docs/DEMO-COLLABORATION.md`)
 - 🔄 **TODO**: Remove BroadcastChannel demo code when implementing proper IPC integration (Phase 2.6+)
   - Remove demo code from `TipTapEditor.tsx` (lines 63-97)
@@ -729,6 +734,38 @@ Phase 2.3 successfully implemented the core TipTap editor with:
   - Replace with IPC-based Y.Doc sync from main process
   - Keep the menu items for opening multiple windows (useful for testing)
   - Location: `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx`
+
+**⚠️ Important Architectural Finding:**
+
+The BroadcastChannel demo revealed a critical synchronization issue that **must be addressed** in the proper IPC implementation:
+
+**Problem:** The current demo only broadcasts incremental Yjs updates without implementing the Yjs synchronization protocol. This causes:
+
+- ✅ Main window → New window: Works (new window receives updates after opening)
+- ❌ New window → Main window: **Fails** (main window ignores updates from new window)
+
+**Root Cause:** Each window creates an independent Y.Doc with different internal state (vector clocks, update history). Yjs updates are context-dependent - they require both peers to have synchronized state first.
+
+**Solution for Phase 2.6+ (IPC-based Collaboration):**
+
+The proper implementation MUST use the **Yjs Synchronization Protocol**, which includes:
+
+1. **State Vector Exchange**: When a renderer opens a note, it requests the state vector from main process
+2. **Missing Update Sync**: Main process sends all updates the renderer is missing to reach current state
+3. **Ongoing Updates**: Only after initial sync, incremental updates work reliably
+
+**Architecture:**
+
+- Main process holds authoritative Y.Doc for each open note
+- Renderers sync with main process (not directly with each other)
+- Use Yjs sync protocol over IPC (similar to y-websocket but over Electron IPC)
+- Main process broadcasts updates to all renderers viewing the same note
+
+**References:**
+
+- Yjs sync protocol: https://github.com/yjs/yjs#Yjs-CRDT-Algorithm
+- Example implementations: y-websocket, y-webrtc, y-indexeddb
+- The core sync logic is ~200 lines and well-documented in Yjs ecosystem
 
 ---
 

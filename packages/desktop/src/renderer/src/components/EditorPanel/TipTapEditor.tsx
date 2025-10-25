@@ -21,7 +21,7 @@ export interface TipTapEditorProps {
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChange }) => {
   const [yDoc] = useState(() => new Y.Doc());
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const isInitialLoadRef = React.useRef(true);
 
   const editor = useEditor({
     extensions: [
@@ -74,7 +74,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
     // Send updates to other windows (but not during initial load)
     const updateHandler = (update: Uint8Array) => {
       // Skip broadcasting during initial content load to prevent duplication
-      if (isInitialLoad) return;
+      if (isInitialLoadRef.current) return;
 
       // Convert Uint8Array to regular array for structured clone
       channel.postMessage({
@@ -86,7 +86,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
     yDoc.on('update', updateHandler);
 
     // Receive updates from other windows
-    channel.onmessage = (event: MessageEvent) => {
+    channel.onmessage = (event: MessageEvent<{ type: string; update: number[] }>) => {
       if (event.data.type === 'yjs-update') {
         // Convert back to Uint8Array
         const update = new Uint8Array(event.data.update);
@@ -98,28 +98,32 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
       yDoc.off('update', updateHandler);
       channel.close();
     };
-  }, [editor, yDoc, noteId, isInitialLoad]);
+  }, [editor, yDoc, noteId]);
 
   // Handle note loading/unloading
   useEffect(() => {
     if (!noteId) {
       // No note selected - show welcome message
-      setIsInitialLoad(true);
+      isInitialLoadRef.current = true;
       editor?.commands.setContent(
         '<h1>Welcome to NoteCove!</h1><p>Open multiple windows to see real-time collaboration in action.</p><p>Try typing here and watch it appear in other windows! 🎉</p>'
       );
       // Wait for content to be applied before enabling sync
-      setTimeout(() => setIsInitialLoad(false), 100);
+      setTimeout(() => {
+        isInitialLoadRef.current = false;
+      }, 100);
       return;
     }
 
     // Load note with placeholder content
-    setIsInitialLoad(true);
+    isInitialLoadRef.current = true;
     editor?.commands.setContent(
       `<h1>Note ${noteId}</h1><p>Start typing to test collaboration between windows...</p>`
     );
     // Wait for content to be applied before enabling sync
-    setTimeout(() => setIsInitialLoad(false), 100);
+    setTimeout(() => {
+      isInitialLoadRef.current = false;
+    }, 100);
 
     // TODO: Set up IPC listeners for incoming updates
     // window.electron.ipc.on('note:updated', handleUpdate)
