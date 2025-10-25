@@ -47,7 +47,13 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
   }
 
   const instanceId = parts[0];
-  const timestamp = parseInt(parts[parts.length - 1], 10);
+  const lastPart = parts[parts.length - 1];
+
+  if (!instanceId || !lastPart) {
+    return null;
+  }
+
+  const timestamp = parseInt(lastPart, 10);
 
   if (isNaN(timestamp)) {
     return null;

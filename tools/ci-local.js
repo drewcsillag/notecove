@@ -15,6 +15,7 @@ const checks = [
   { name: 'Build', cmd: 'pnpm build' },
   { name: 'Unit Tests', cmd: 'pnpm test' },
   { name: 'Coverage', cmd: 'pnpm test:coverage' },
+  { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
 ];
 
 console.log('🚀 Running local CI checks...\n');

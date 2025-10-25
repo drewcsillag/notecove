@@ -10,7 +10,16 @@
       "Bash(pnpm test:*)",
       "Bash(pnpm test:coverage:*)",
       "Bash(chmod:*)",
-      "Bash(pnpm ci-local:*)"
+      "Bash(pnpm ci-local:*)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(pnpm rebuild:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm build:*)",
+      "Bash(timeout 10 pnpm dev:*)",
+      "Bash(pnpm add:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(pnpm test:e2e:*)"
     ],
     "deny": [],
     "ask": []

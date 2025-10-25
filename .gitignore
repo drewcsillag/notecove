@@ -7,6 +7,8 @@ node_modules/
 coverage/
 *.lcov
 .nyc_output
+test-results/
+playwright-report/
 
 # Production builds
 dist/
@@ -57,6 +59,7 @@ Thumbs.db
 # Electron
 packages/desktop/.vite/
 packages/desktop/.electron-vite/
+packages/desktop/dist-electron/
 
 # iOS
 packages/ios/build/
