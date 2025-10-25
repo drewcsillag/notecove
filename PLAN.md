@@ -607,14 +607,17 @@ Documentation:
 **Implementation Notes:**
 
 Files already created in Phase 1.5 (schema and interfaces):
+
 - `packages/shared/src/database/schema.ts` - SQL schema with all tables
 - `packages/shared/src/database/types.ts` - Database abstractions and interfaces
 
 New files to create:
+
 - `packages/desktop/src/main/database/adapter.ts` - better-sqlite3 implementation
 - `packages/desktop/src/main/database/__tests__/adapter.test.ts` - Database tests
 
 **Deferred from Phase 1.5:**
+
 - Database adapter implementation (better-sqlite3 on desktop, GRDB on iOS)
 - Indexing logic (initial SD indexing, incremental updates)
 - Cache invalidation strategy

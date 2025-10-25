@@ -16,7 +16,8 @@
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "rebuild": "electron-rebuild"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
@@ -28,7 +29,7 @@
     "@tiptap/extension-collaboration": "^2.1.16",
     "@tiptap/react": "^2.1.16",
     "@tiptap/starter-kit": "^2.1.16",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^12.4.1",
     "chokidar": "^3.5.3",
     "i18next": "^23.7.0",
     "react": "^18.2.0",
@@ -38,6 +39,7 @@
     "yjs": "^13.6.10"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
@@ -48,7 +50,7 @@
     "@typescript-eslint/eslint-plugin": "^6.18.0",
     "@typescript-eslint/parser": "^6.18.0",
     "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^28.3.3",
+    "electron": "^38.4.0",
     "electron-vite": "^2.0.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",

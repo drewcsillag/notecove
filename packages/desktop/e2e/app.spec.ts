@@ -6,24 +6,34 @@
 
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 let electronApp: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
-  // Launch Electron app
+  // Use absolute path to ensure correct resolution
+  const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+  console.log('[E2E] Launching Electron with main process at:', mainPath);
+
+  // Launch Electron app with extended timeout
   electronApp = await electron.launch({
-    args: [join(__dirname, '../dist-electron/main/index.js')],
+    args: [mainPath],
     env: {
       ...process.env,
       NODE_ENV: 'test',
     },
+    timeout: 60000, // Increase timeout to 60 seconds for database initialization
+  });
+
+  // Log console output from the app
+  electronApp.on('console', (msg) => {
+    console.log('[Electron Console]:', msg.text());
   });
 
   // Get the first window
   page = await electronApp.firstWindow();
-});
+}, 60000); // Also increase beforeAll timeout
 
 test.afterAll(async () => {
   await electronApp.close();

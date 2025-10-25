@@ -9,10 +9,13 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
-import { appStateStorage } from '../storage/app-state';
+import type { Database } from '@notecove/shared';
 
 export class IPCHandlers {
-  constructor(private crdtManager: CRDTManager) {
+  constructor(
+    private crdtManager: CRDTManager,
+    private database: Database
+  ) {
     this.registerHandlers();
   }
 
@@ -99,7 +102,7 @@ export class IPCHandlers {
   }
 
   private async handleGetAppState(_event: IpcMainInvokeEvent, key: string): Promise<string | null> {
-    return await appStateStorage.get(key);
+    return await this.database.getState(key);
   }
 
   private async handleSetAppState(
@@ -107,7 +110,7 @@ export class IPCHandlers {
     key: string,
     value: string
   ): Promise<void> {
-    await appStateStorage.set(key, value);
+    await this.database.setState(key, value);
   }
 
   /**
