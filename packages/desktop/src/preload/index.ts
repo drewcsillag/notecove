@@ -77,4 +77,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
   },
+
+  // App state operations
+  appState: {
+    get: (key: string): Promise<string | null> =>
+      ipcRenderer.invoke('appState:get', key) as Promise<string | null>,
+    set: (key: string, value: string): Promise<void> =>
+      ipcRenderer.invoke('appState:set', key, value) as Promise<void>,
+  },
 });

@@ -20,6 +20,10 @@ export interface IPCCommands {
   // Folder operations
   'folder:create': (sdId: string, parentId: string, name: string) => Promise<string>;
   'folder:delete': (folderId: string) => Promise<void>;
+
+  // App state operations
+  'appState:get': (key: string) => Promise<string | null>;
+  'appState:set': (key: string, value: string) => Promise<void>;
 }
 
 /**

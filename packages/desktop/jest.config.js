@@ -18,5 +18,6 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@shared/(.*)$': '<rootDir>/../shared/src/$1',
+    '^@notecove/shared$': '<rootDir>/../shared/src/index.ts',
   },
 };

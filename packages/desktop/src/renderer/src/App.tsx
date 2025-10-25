@@ -2,29 +2,61 @@
  * Main App Component
  */
 
-import React from 'react';
-import { CssBaseline, ThemeProvider, Box, Typography } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import React, { useEffect, useState } from 'react';
+import { CssBaseline, ThemeProvider } from '@mui/material';
 import { theme } from './theme';
 import './i18n';
+import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
+import { FolderPanel } from './components/FolderPanel/FolderPanel';
+import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
+import { EditorPanel } from './components/EditorPanel/EditorPanel';
+import { AppStateKey } from '@notecove/shared';
+
+const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
 
 function App(): React.ReactElement {
-  const { t } = useTranslation();
+  const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
+
+  // Load saved panel sizes on mount
+  useEffect(() => {
+    const loadPanelSizes = async (): Promise<void> => {
+      try {
+        const saved = await window.electronAPI.appState.get(PANEL_SIZES_KEY);
+        if (saved) {
+          const sizes = JSON.parse(saved) as number[];
+          setInitialPanelSizes(sizes);
+        }
+      } catch (error) {
+        console.error('Failed to load panel sizes:', error);
+      }
+    };
+
+    void loadPanelSizes();
+  }, []);
+
+  const handleLayoutChange = (sizes: number[]): void => {
+    // Persist panel sizes to app state
+    const savePanelSizes = async (): Promise<void> => {
+      try {
+        await window.electronAPI.appState.set(PANEL_SIZES_KEY, JSON.stringify(sizes));
+      } catch (error) {
+        console.error('Failed to save panel sizes:', error);
+      }
+    };
+
+    void savePanelSizes();
+  };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ padding: 3 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          {t('app.title')}
-        </Typography>
-        <Typography variant="subtitle1" gutterBottom>
-          {t('app.tagline')}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Platform: {window.electronAPI.platform}
-        </Typography>
-      </Box>
+      <ThreePanelLayout
+        leftPanel={<FolderPanel />}
+        middlePanel={<NotesListPanel />}
+        rightPanel={<EditorPanel />}
+        onLayoutChange={handleLayoutChange}
+        initialSizes={initialPanelSizes}
+      />
     </ThemeProvider>
   );
 }

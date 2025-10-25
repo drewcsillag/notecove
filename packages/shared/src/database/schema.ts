@@ -83,6 +83,7 @@ export enum AppStateKey {
   LastOpenedNote = 'lastOpenedNote',
   LeftPanelWidth = 'leftPanelWidth',
   RightPanelWidth = 'rightPanelWidth',
+  PanelSizes = 'panelSizes', // Array of panel sizes: [left%, middle%, right%]
   FolderCollapseState = 'folderCollapseState',
   TagFilters = 'tagFilters',
   SearchText = 'searchText',

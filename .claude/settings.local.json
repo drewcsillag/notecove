@@ -19,7 +19,8 @@
       "Bash(pnpm add:*)",
       "Bash(cat:*)",
       "Bash(node:*)",
-      "Bash(pnpm test:e2e:*)"
+      "Bash(pnpm test:e2e:*)",
+      "Bash(pnpm run:*)"
     ],
     "deny": [],
     "ask": []

@@ -9,6 +9,7 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
+import { appStateStorage } from '../storage/app-state';
 
 export class IPCHandlers {
   constructor(private crdtManager: CRDTManager) {
@@ -28,6 +29,10 @@ export class IPCHandlers {
     // Folder operations
     ipcMain.handle('folder:create', this.handleCreateFolder.bind(this));
     ipcMain.handle('folder:delete', this.handleDeleteFolder.bind(this));
+
+    // App state operations
+    ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
+    ipcMain.handle('appState:set', this.handleSetAppState.bind(this));
   }
 
   private async handleLoadNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
@@ -93,6 +98,18 @@ export class IPCHandlers {
     throw new Error('Not implemented');
   }
 
+  private async handleGetAppState(_event: IpcMainInvokeEvent, key: string): Promise<string | null> {
+    return await appStateStorage.get(key);
+  }
+
+  private async handleSetAppState(
+    _event: IpcMainInvokeEvent,
+    key: string,
+    value: string
+  ): Promise<void> {
+    await appStateStorage.set(key, value);
+  }
+
   /**
    * Clean up all handlers
    */
@@ -106,5 +123,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:getMetadata');
     ipcMain.removeHandler('folder:create');
     ipcMain.removeHandler('folder:delete');
+    ipcMain.removeHandler('appState:get');
+    ipcMain.removeHandler('appState:set');
   }
 }

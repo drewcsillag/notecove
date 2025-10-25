@@ -35,29 +35,25 @@ test.describe('NoteCove Desktop App', () => {
     expect(await page.isVisible('body')).toBe(true);
   });
 
-  test('should display the app title', async () => {
-    // Wait for content to load
-    await page.waitForSelector('h1');
+  test('should display the folder panel', async () => {
+    // Wait for folder panel content to load
+    await page.waitForSelector('text=Folders');
 
-    // Check for "NoteCove" title (actual translation in E2E)
-    const title = await page.textContent('h1');
-    expect(title).toBe('NoteCove');
+    // Check for folder panel title
+    const title = await page.locator('text=Folders').first();
+    await expect(title).toBeVisible();
   });
 
-  test('should display the tagline', async () => {
-    // Check for the actual translated tagline
-    const tagline = await page.locator('text=Your offline-first note-taking app').first();
-    await expect(tagline).toBeVisible();
+  test('should display the notes list panel', async () => {
+    // Check for notes panel title
+    const title = await page.locator('text=Notes').first();
+    await expect(title).toBeVisible();
   });
 
-  test('should display platform information', async () => {
-    // Check for platform display
-    const platformText = await page.locator('text=/Platform:/').first();
-    await expect(platformText).toBeVisible();
-
-    // Verify it shows a valid platform
-    const text = await platformText.textContent();
-    expect(text).toMatch(/Platform: (darwin|win32|linux)/);
+  test('should display the editor panel', async () => {
+    // Check for editor panel title
+    const title = await page.locator('text=Editor').first();
+    await expect(title).toBeVisible();
   });
 
   test('should have Material-UI theme applied', async () => {

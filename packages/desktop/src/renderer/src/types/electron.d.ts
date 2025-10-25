@@ -30,6 +30,11 @@ declare global {
       sync: {
         onProgress: (callback: (sdId: string, progress: SyncProgress) => void) => () => void;
       };
+
+      appState: {
+        get: (key: string) => Promise<string | null>;
+        set: (key: string, value: string) => Promise<void>;
+      };
     };
   }
 }

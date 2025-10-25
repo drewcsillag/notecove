@@ -23,3 +23,15 @@ jest.mock('react-i18next', () => ({
     init: jest.fn(),
   },
 }));
+
+// Mock react-resizable-panels
+jest.mock('react-resizable-panels', () => {
+  const React = require('react');
+  return {
+    Panel: ({ children }) => React.createElement('div', { 'data-testid': 'panel' }, children),
+    PanelGroup: ({ children }) =>
+      React.createElement('div', { 'data-testid': 'panel-group' }, children),
+    PanelResizeHandle: ({ children }) =>
+      React.createElement('div', { 'data-testid': 'resize-handle' }, children),
+  };
+});

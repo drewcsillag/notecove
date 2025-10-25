@@ -16,5 +16,17 @@
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close"
+  },
+  "folders": {
+    "title": "Folders",
+    "placeholder": "Folder tree will appear here"
+  },
+  "notes": {
+    "title": "Notes",
+    "placeholder": "Notes list will appear here"
+  },
+  "editor": {
+    "title": "Editor",
+    "placeholder": "Note editor will appear here"
   }
 }

@@ -31,6 +31,10 @@ const mockElectronAPI = {
   sync: {
     onProgress: jest.fn(),
   },
+  appState: {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+  },
 };
 
 Object.defineProperty(window, 'electronAPI', {
@@ -39,19 +43,33 @@ Object.defineProperty(window, 'electronAPI', {
 });
 
 describe('App', () => {
-  it('should render the app title', () => {
-    render(<App />);
-    expect(screen.getByText('app.title')).toBeInTheDocument();
+  it('should render the three-panel layout', () => {
+    const { container } = render(<App />);
+    // Check that the panel group is rendered
+    const panelGroup = container.querySelector('[data-testid="panel-group"]');
+    expect(panelGroup).toBeInTheDocument();
   });
 
-  it('should render the tagline', () => {
-    render(<App />);
-    expect(screen.getByText('app.tagline')).toBeInTheDocument();
+  it('should render all three panels', () => {
+    const { container } = render(<App />);
+    // Check that all three panels are rendered
+    const panels = container.querySelectorAll('[data-testid="panel"]');
+    expect(panels).toHaveLength(3);
   });
 
-  it('should display platform information', () => {
+  it('should render folder panel content', () => {
     render(<App />);
-    expect(screen.getByText(/Platform: darwin/i)).toBeInTheDocument();
+    expect(screen.getByText('folders.title')).toBeInTheDocument();
+  });
+
+  it('should render notes list panel content', () => {
+    render(<App />);
+    expect(screen.getByText('notes.title')).toBeInTheDocument();
+  });
+
+  it('should render editor panel content', () => {
+    render(<App />);
+    expect(screen.getByText('editor.title')).toBeInTheDocument();
   });
 
   it('should use Material-UI theme', () => {
