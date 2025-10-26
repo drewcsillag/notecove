@@ -47,7 +47,9 @@ declare global {
         rename: (sdId: string, folderId: string, newName: string) => Promise<void>;
         delete: (sdId: string, folderId: string) => Promise<void>;
         move: (sdId: string, folderId: string, newParentId: string | null) => Promise<void>;
-        onUpdated: (callback: (folderId: string) => void) => () => void;
+        onUpdated: (
+          callback: (data: { sdId: string; operation: string; folderId: string }) => void
+        ) => () => void;
       };
 
       sync: {

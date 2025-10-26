@@ -120,7 +120,7 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
-   * Load folder tree for an SD
+   * Load folder tree for an SD (synchronous, but loads from disk asynchronously in background)
    */
   loadFolderTree(sdId: string): FolderTreeDoc {
     const existing = this.folderTrees.get(sdId);
@@ -131,14 +131,70 @@ export class CRDTManagerImpl implements CRDTManager {
     // Create new FolderTreeDoc
     const folderTree = new FolderTreeDoc(sdId);
 
-    // TODO: Load updates from disk (Phase 2.4.2)
-    // For now, create some demo folders for testing
-    if (sdId === 'default') {
-      this.createDemoFolders(folderTree);
-    }
+    // Set up update listener to write changes to disk
+    folderTree.doc.on('update', (update: Uint8Array, origin: unknown) => {
+      this.handleFolderUpdate(sdId, update, origin).catch((error: Error) => {
+        console.error(`Failed to handle folder update for ${sdId}:`, error);
+      });
+    });
 
     this.folderTrees.set(sdId, folderTree);
+
+    // Load updates from disk (this will trigger the update listener, but we need
+    // to temporarily disable it to avoid saving the loaded updates back to disk)
+    this.loadFolderTreeUpdatesSync(sdId, folderTree);
+
     return folderTree;
+  }
+
+  /**
+   * Synchronously load folder tree updates from disk
+   */
+  private loadFolderTreeUpdatesSync(sdId: string, folderTree: FolderTreeDoc): void {
+    // Use setImmediate to load updates asynchronously but immediately
+    setImmediate(() => {
+      this.loadFolderTreeUpdates(sdId, folderTree).catch((err) => {
+        console.error(`Failed to load folder tree updates for ${sdId}:`, err);
+      });
+    });
+  }
+
+  /**
+   * Load folder tree updates from disk
+   */
+  private async loadFolderTreeUpdates(sdId: string, folderTree: FolderTreeDoc): Promise<void> {
+    try {
+      const updates = await this.updateManager.readFolderUpdates();
+
+      // Apply all updates with 'load' origin to prevent triggering persistence
+      for (const update of updates) {
+        Y.applyUpdate(folderTree.doc, update, 'load');
+      }
+
+      // If no updates were found (new installation), create demo folders
+      if (updates.length === 0 && sdId === 'default') {
+        this.createDemoFolders(folderTree);
+      }
+    } catch (error) {
+      console.error(`Failed to load folder tree updates for ${sdId}:`, error);
+      // On error, create demo folders for default SD
+      if (sdId === 'default') {
+        this.createDemoFolders(folderTree);
+      }
+    }
+  }
+
+  /**
+   * Handle folder tree update by writing to disk
+   */
+  private async handleFolderUpdate(sdId: string, update: Uint8Array, origin: unknown): Promise<void> {
+    // Don't persist updates that originated from loading (would create duplicate files)
+    if (origin === 'load') {
+      return;
+    }
+
+    // Write update to disk
+    await this.updateManager.writeFolderUpdate(sdId, update);
   }
 
   /**

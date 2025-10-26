@@ -7,12 +7,17 @@ import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
 import type { Database } from '@notecove/shared';
+import { UpdateManager, SyncDirectoryStructure } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl } from './crdt/crdt-manager';
+import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
+import { NodeFileWatcher } from './storage/node-file-watcher';
+import { randomUUID } from 'crypto';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
 let ipcHandlers: IPCHandlers | null = null;
+let fileWatcher: NodeFileWatcher | null = null;
 const allWindows: BrowserWindow[] = [];
 
 function createWindow(): void {
@@ -165,48 +170,62 @@ void app.whenReady().then(async () => {
       console.log('[TEST MODE] Database ready, initializing CRDT manager...');
     }
 
-    // Initialize CRDT manager
-    // TODO: Implement proper UpdateManager with file system operations
-    // For now, use a placeholder that throws errors
-    const placeholderUpdateManager = {
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async readNoteUpdates() {
-        return [];
-      },
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async writeNoteUpdate() {
-        throw new Error('UpdateManager not implemented yet');
-      },
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async listNoteUpdates() {
-        return [];
-      },
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async deleteNoteUpdate() {
-        throw new Error('UpdateManager not implemented yet');
-      },
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async readFolderUpdates() {
-        return [];
-      },
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async writeFolderUpdate() {
-        throw new Error('UpdateManager not implemented yet');
-      },
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async listFolderUpdates() {
-        return [];
-      },
-      // eslint-disable-next-line @typescript-eslint/require-await
-      async deleteFolderUpdate() {
-        throw new Error('UpdateManager not implemented yet');
-      },
+    // Initialize file system adapter
+    const fsAdapter = new NodeFileSystemAdapter();
+
+    // Determine storage directory (shared across instances for sync)
+    const storageDir = process.env['TEST_STORAGE_DIR'] || join(app.getPath('userData'), 'storage');
+
+    // Initialize SD structure with config
+    const sdConfig = {
+      id: 'default',
+      path: storageDir,
+      label: 'Default Storage',
     };
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    const crdtManager = new CRDTManagerImpl(placeholderUpdateManager as any);
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, sdConfig);
+
+    // Initialize SD directory structure
+    await sdStructure.initialize();
+
+    // Initialize UpdateManager with instance ID
+    const instanceId = process.env['INSTANCE_ID'] || randomUUID();
+    const updateManager = new UpdateManager(fsAdapter, sdStructure, instanceId);
+
+    // Initialize CRDT manager
+    const crdtManager = new CRDTManagerImpl(updateManager);
 
     // Initialize IPC handlers
     ipcHandlers = new IPCHandlers(crdtManager, database);
+
+    // Set up file watcher for cross-instance folder sync
+    fileWatcher = new NodeFileWatcher();
+    const folderUpdatesPath = join(storageDir, 'folders', 'updates');
+    await fileWatcher.watch(folderUpdatesPath, (event) => {
+      console.log('[FileWatcher] Detected folder update file change:', event.filename);
+
+      // Reload folder tree from disk
+      const folderTree = crdtManager.getFolderTree('default');
+      if (folderTree) {
+        // Load all updates from disk (this will merge with existing state)
+        updateManager.readFolderUpdates().then((updates) => {
+          for (const update of updates) {
+            folderTree.applyUpdate(update);
+          }
+
+          // Broadcast update to all windows
+          const windows = BrowserWindow.getAllWindows();
+          for (const window of windows) {
+            window.webContents.send('folder:updated', {
+              sdId: 'default',
+              operation: 'external-sync',
+              folderId: 'unknown',
+            });
+          }
+        }).catch((err) => {
+          console.error('[FileWatcher] Failed to reload folder updates:', err);
+        });
+      }
+    });
 
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] IPC handlers ready, creating window...');
@@ -251,6 +270,9 @@ app.on('before-quit', () => {
   try {
     if (ipcHandlers) {
       ipcHandlers.destroy();
+    }
+    if (fileWatcher) {
+      void fileWatcher.unwatch();
     }
     // Note: Database cleanup is async, but we can't await here
     // The database will be closed when the process exits

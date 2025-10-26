@@ -5,7 +5,7 @@
  * Phase 2.4.1: Read-only display with selection and expand/collapse.
  */
 
-import { type FC, forwardRef, useEffect, useState, type MouseEvent } from 'react';
+import { type FC, forwardRef, useEffect, useState, type MouseEvent, type DragEvent } from 'react';
 import {
   Box,
   Typography,
@@ -112,22 +112,106 @@ function buildTreeItems(folders: FolderData[]): TreeViewBaseItem[] {
 }
 
 /**
- * Custom TreeItem component with context menu support
+ * Custom TreeItem component with context menu and drag & drop support
  */
 interface CustomTreeItemProps extends TreeItemProps {
   onItemContextMenu?: (event: MouseEvent<HTMLElement>, itemId: string) => void;
+  onItemDragStart?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
+  onItemDragOver?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
+  onItemDragLeave?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
+  onItemDrop?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
+  onItemDragEnd?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
+  draggedOverFolderId?: string | null;
 }
 
 const CustomTreeItem = forwardRef<HTMLLIElement, CustomTreeItemProps>((props, ref) => {
-  const { onItemContextMenu, itemId, ...other } = props;
+  const {
+    onItemContextMenu,
+    onItemDragStart,
+    onItemDragOver,
+    onItemDragLeave,
+    onItemDrop,
+    onItemDragEnd,
+    draggedOverFolderId,
+    itemId,
+    ...other
+  } = props;
+
+  // Compute derived values
+  const isDraggedOver = draggedOverFolderId === itemId;
+  const isDraggable = itemId !== 'all-notes' && itemId !== 'recently-deleted';
 
   const handleContextMenu = (event: MouseEvent<HTMLLIElement>) => {
     if (onItemContextMenu && itemId) {
+      event.stopPropagation(); // Prevent event bubbling to parent items
       onItemContextMenu(event, itemId);
     }
   };
 
-  return <TreeItem ref={ref} itemId={itemId} onContextMenu={handleContextMenu} {...other} />;
+  const handleDragStart = (event: DragEvent<HTMLLIElement>) => {
+    if (onItemDragStart && itemId) {
+      event.stopPropagation(); // Prevent event bubbling to parent items
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', itemId);
+      onItemDragStart(event, itemId);
+    }
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLLIElement>) => {
+    if (onItemDragOver && itemId) {
+      event.preventDefault(); // Allow drop
+      event.stopPropagation(); // Prevent event bubbling to parent items
+      event.dataTransfer.dropEffect = 'move';
+      onItemDragOver(event, itemId);
+    }
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLLIElement>) => {
+    if (onItemDragLeave && itemId) {
+      event.stopPropagation(); // Prevent event bubbling to parent items
+      onItemDragLeave(event, itemId);
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLLIElement>) => {
+    if (onItemDrop && itemId) {
+      event.preventDefault();
+      event.stopPropagation(); // Prevent event bubbling to parent items
+      onItemDrop(event, itemId);
+    }
+  };
+
+  const handleDragEnd = (event: DragEvent<HTMLLIElement>) => {
+    if (onItemDragEnd && itemId) {
+      onItemDragEnd(event, itemId);
+    }
+  };
+
+  return (
+    <TreeItem
+      ref={ref}
+      itemId={itemId}
+      onContextMenu={handleContextMenu}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onDragEnd={handleDragEnd}
+      slotProps={{
+        root: {
+          draggable: isDraggable,
+        },
+      }}
+      sx={{
+        ...(isDraggedOver && {
+          backgroundColor: 'action.hover',
+          borderLeft: 3,
+          borderColor: 'primary.main',
+        }),
+      }}
+      {...other}
+    />
+  );
 });
 
 CustomTreeItem.displayName = 'CustomTreeItem';
@@ -176,6 +260,10 @@ export const FolderTree: FC<FolderTreeProps> = ({
     folderId: '',
     folderName: '',
   });
+
+  // Drag & drop state
+  const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
+  const [draggedOverFolderId, setDraggedOverFolderId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadFolders = async (): Promise<void> => {
@@ -310,6 +398,96 @@ export const FolderTree: FC<FolderTreeProps> = ({
     }
   };
 
+  // Drag & drop handlers
+  const isDescendant = (ancestorId: string, descendantId: string): boolean => {
+    let current = folders.find((f) => f.id === descendantId);
+    while (current) {
+      if (current.id === ancestorId) {
+        return true;
+      }
+      if (current.parentId === null) {
+        break;
+      }
+      current = folders.find((f) => f.id === current?.parentId);
+    }
+    return false;
+  };
+
+  const isValidDropTarget = (targetId: string, sourceId: string): boolean => {
+    // Cannot drop on special items
+    if (targetId === 'all-notes' || targetId === 'recently-deleted') {
+      return targetId === 'all-notes'; // Can drop on "All Notes" to move to root
+    }
+    // Cannot drop on itself
+    if (targetId === sourceId) {
+      return false;
+    }
+    // Cannot drop on descendant (would create circular reference)
+    if (isDescendant(sourceId, targetId)) {
+      return false;
+    }
+    return true;
+  };
+
+  const handleDragStart = (_event: DragEvent<HTMLLIElement>, itemId: string): void => {
+    // Don't allow dragging special items
+    if (itemId === 'all-notes' || itemId === 'recently-deleted') {
+      return;
+    }
+    setDraggedFolderId(itemId);
+  };
+
+  const handleDragOver = (_event: DragEvent<HTMLLIElement>, itemId: string): void => {
+    if (!draggedFolderId) return;
+    if (isValidDropTarget(itemId, draggedFolderId)) {
+      setDraggedOverFolderId(itemId);
+    }
+  };
+
+  const handleDragLeave = (_event: DragEvent<HTMLLIElement>, _itemId: string): void => {
+    setDraggedOverFolderId(null);
+  };
+
+  const handleDrop = async (_event: DragEvent<HTMLLIElement>, itemId: string): Promise<void> => {
+    if (!draggedFolderId) return;
+
+    // Validate drop
+    if (!isValidDropTarget(itemId, draggedFolderId)) {
+      setDraggedFolderId(null);
+      setDraggedOverFolderId(null);
+      return;
+    }
+
+    try {
+      // Determine new parent ID
+      let newParentId: string | null = null;
+      if (itemId === 'all-notes') {
+        // Move to root
+        newParentId = null;
+      } else if (itemId !== 'recently-deleted') {
+        // Move to target folder
+        newParentId = itemId;
+      }
+
+      // Call folder:move handler
+      await window.electronAPI.folder.move(sdId, draggedFolderId, newParentId);
+
+      // Refresh the tree
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to move folder:', err);
+    } finally {
+      setDraggedFolderId(null);
+      setDraggedOverFolderId(null);
+    }
+  };
+
+  const handleDragEnd = (_event: DragEvent<HTMLLIElement>, _itemId: string): void => {
+    // Always reset drag state when drag ends (successful drop, ESC key, or cancelled)
+    setDraggedFolderId(null);
+    setDraggedOverFolderId(null);
+  };
+
   const treeItems = buildTreeItems(folders);
 
   // Handler for tree item context menu
@@ -337,6 +515,14 @@ export const FolderTree: FC<FolderTreeProps> = ({
         slotProps={{
           item: {
             onItemContextMenu: handleItemContextMenu,
+            onItemDragStart: handleDragStart,
+            onItemDragOver: handleDragOver,
+            onItemDragLeave: handleDragLeave,
+            onItemDrop: (event, itemId) => {
+              void handleDrop(event, itemId);
+            },
+            onItemDragEnd: handleDragEnd,
+            draggedOverFolderId: draggedOverFolderId,
           } as CustomTreeItemProps,
         }}
       />

@@ -35,6 +35,19 @@ export const FolderPanel: React.FC = () => {
     void loadState();
   }, []);
 
+  // Listen for folder updates from other windows or file system changes
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.folder.onUpdated((data) => {
+      console.log('[FolderPanel] Received folder:updated event:', data);
+      // Refresh the folder tree
+      setRefreshTrigger((prev) => prev + 1);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   const loadState = async (): Promise<void> => {
     try {
       // Load selected folder

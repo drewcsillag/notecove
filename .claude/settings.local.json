@@ -55,7 +55,9 @@
       "Bash(echo:*)",
       "WebFetch(domain:codesandbox.io)",
       "Bash(pnpm --filter @notecove/desktop rebuild:*)",
-      "Bash(npx --yes node-gyp rebuild:*)"
+      "Bash(npx --yes node-gyp rebuild:*)",
+      "Bash(pnpm --filter @notecove/desktop add:*)",
+      "Bash(pnpm --filter @notecove/desktop remove:*)"
     ],
     "deny": [],
     "ask": []

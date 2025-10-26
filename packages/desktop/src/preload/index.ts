@@ -101,10 +101,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('folder:move', sdId, folderId, newParentId) as Promise<void>,
 
     // Event listeners
-    onUpdated: (callback: (folderId: string) => void): (() => void) => {
-      ipcRenderer.on('folder:updated', (_event, folderId: string) => {
-        callback(folderId);
-      });
+    onUpdated: (
+      callback: (data: { sdId: string; operation: string; folderId: string }) => void
+    ): (() => void) => {
+      ipcRenderer.on(
+        'folder:updated',
+        (_event, data: { sdId: string; operation: string; folderId: string }) => {
+          callback(data);
+        }
+      );
       return () => {
         ipcRenderer.removeAllListeners('folder:updated');
       };

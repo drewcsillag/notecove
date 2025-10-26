@@ -6,7 +6,7 @@
 
 /* eslint-disable @typescript-eslint/require-await */
 
-import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
 import type { Database } from '@notecove/shared';
@@ -17,6 +17,16 @@ export class IPCHandlers {
     private database: Database
   ) {
     this.registerHandlers();
+  }
+
+  /**
+   * Broadcast an event to all renderer windows
+   */
+  private broadcastToAll(channel: string, ...args: unknown[]): void {
+    const windows = BrowserWindow.getAllWindows();
+    for (const window of windows) {
+      window.webContents.send(channel, ...args);
+    }
   }
 
   private registerHandlers(): void {
@@ -161,6 +171,9 @@ export class IPCHandlers {
       deleted: false,
     });
 
+    // Broadcast folder update to all windows
+    this.broadcastToAll('folder:updated', { sdId, operation: 'create', folderId });
+
     return folderId;
   }
 
@@ -205,6 +218,9 @@ export class IPCHandlers {
       ...folder,
       name: trimmedName,
     });
+
+    // Broadcast folder update to all windows
+    this.broadcastToAll('folder:updated', { sdId, operation: 'rename', folderId });
   }
 
   private async handleDeleteFolder(
@@ -227,6 +243,9 @@ export class IPCHandlers {
       ...folder,
       deleted: true,
     });
+
+    // Broadcast folder update to all windows
+    this.broadcastToAll('folder:updated', { sdId, operation: 'delete', folderId });
   }
 
   private async handleMoveFolder(
@@ -279,6 +298,9 @@ export class IPCHandlers {
       parentId: newParentId,
       order: newOrder,
     });
+
+    // Broadcast folder update to all windows
+    this.broadcastToAll('folder:updated', { sdId, operation: 'move', folderId });
   }
 
   private async handleGetAppState(_event: IpcMainInvokeEvent, key: string): Promise<string | null> {

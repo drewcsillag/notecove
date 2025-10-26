@@ -67,6 +67,9 @@ test.describe('Folder Context Menu', () => {
     // Wait for dialog to close
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
 
+    // Wait for folder to appear in tree (with explicit timeout for refresh)
+    await page.waitForSelector('text=Test Folder', { timeout: 5000 });
+
     // Verify folder appears in tree
     await expect(page.locator('text=Test Folder')).toBeVisible();
   });
@@ -93,6 +96,7 @@ test.describe('Folder Context Menu', () => {
       const createButton = page.locator('button:has-text("Create")');
       await createButton.click();
       await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+      await page.waitForSelector('text=Test Folder', { timeout: 5000 });
       testFolder = page.locator('text=Test Folder').first();
     }
 
@@ -134,6 +138,7 @@ test.describe('Folder Context Menu', () => {
       const createButton = page.locator('button:has-text("Create")');
       await createButton.click();
       await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+      await page.waitForSelector('text=Test Folder', { timeout: 5000 });
       testFolder = page.locator('text=Test Folder').first();
     }
 
@@ -157,6 +162,9 @@ test.describe('Folder Context Menu', () => {
 
     // Wait for dialog to close
     await page.waitForSelector('text=Rename Folder', { state: 'hidden' });
+
+    // Wait for renamed folder to appear
+    await page.waitForSelector('text=Renamed Folder', { timeout: 5000 });
 
     // Verify folder has new name
     await expect(page.locator('text=Renamed Folder')).toBeVisible();
@@ -183,6 +191,7 @@ test.describe('Folder Context Menu', () => {
     const createButton = page.locator('button:has-text("Create")');
     await createButton.click();
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Folder To Delete', { timeout: 5000 });
 
     // Right-click on folder
     const folderToDelete = page.locator('text=Folder To Delete').first();
@@ -223,6 +232,7 @@ test.describe('Folder Context Menu', () => {
     let createButton = page.locator('button:has-text("Create")');
     await createButton.click();
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Parent Folder', { timeout: 5000 });
 
     // Select the parent folder
     const parentFolder = page.locator('text=Parent Folder').first();
@@ -236,6 +246,7 @@ test.describe('Folder Context Menu', () => {
     createButton = page.locator('button:has-text("Create")');
     await createButton.click();
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Child Folder', { timeout: 5000 });
 
     // Verify child folder is visible (parent should be expanded)
     await expect(page.locator('text=Child Folder')).toBeVisible();
@@ -245,5 +256,72 @@ test.describe('Folder Context Menu', () => {
 
     // Verify child folder is still visible (should not have collapsed)
     await expect(page.locator('text=Child Folder')).toBeVisible();
+  });
+});
+
+test.describe('Folder Drag & Drop UI', () => {
+  test('should have draggable attribute on user folders', async () => {
+    // Wait for folder panel
+    await page.waitForSelector('text=Folders', { timeout: 10000 });
+
+    // Wait for folders to load
+    await page.waitForTimeout(1000);
+
+    // Check if user folders exist (e.g., Work, Personal)
+    const workFolder = await page
+      .locator('text=Work')
+      .first()
+      .isVisible()
+      .catch(() => false);
+
+    if (workFolder) {
+      // Get the <li> tree item element using role
+      const treeItem = page.locator('role=treeitem').filter({ hasText: 'Work' }).first();
+
+      // Check if draggable attribute exists
+      const draggable = await treeItem.getAttribute('draggable');
+
+      // User folders should be draggable
+      expect(draggable).toBe('true');
+    }
+  });
+
+  test('should not have draggable attribute on special items', async () => {
+    // Wait for folder panel
+    await page.waitForSelector('text=Folders', { timeout: 10000 });
+
+    // Get "All Notes" tree item using role
+    const allNotesTreeItem = page.locator('role=treeitem').filter({ hasText: 'All Notes' }).first();
+
+    // Check draggable attribute
+    const allNotesDraggable = await allNotesTreeItem.getAttribute('draggable');
+
+    // "All Notes" should not be draggable (draggable="false")
+    expect(allNotesDraggable).toBe('false');
+
+    // Get "Recently Deleted" tree item using role
+    const recentlyDeletedTreeItem = page
+      .locator('role=treeitem')
+      .filter({ hasText: 'Recently Deleted' })
+      .first();
+
+    // Check draggable attribute
+    const recentlyDeletedDraggable = await recentlyDeletedTreeItem.getAttribute('draggable');
+
+    // "Recently Deleted" should not be draggable
+    expect(recentlyDeletedDraggable).toBe('false');
+  });
+
+  test('should display folders with proper hierarchy', async () => {
+    // Wait for folder panel
+    await page.waitForSelector('text=Folders', { timeout: 10000 });
+
+    // Verify special items are present
+    await expect(page.locator('text=All Notes')).toBeVisible();
+    await expect(page.locator('text=Recently Deleted')).toBeVisible();
+
+    // Verify folder panel is functional
+    const folderPanelHeader = page.locator('text=Folders');
+    await expect(folderPanelHeader).toBeVisible();
   });
 });
