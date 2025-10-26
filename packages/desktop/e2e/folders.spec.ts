@@ -49,6 +49,9 @@ test.describe('Folder Context Menu', () => {
     await page.locator('text=All Notes').click();
     await page.waitForTimeout(500); // Give React time to update state
 
+    // Use unique folder name
+    const folderName = `Test Folder ${Date.now()}`;
+
     // Click the plus button to create a folder
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
@@ -58,7 +61,7 @@ test.describe('Folder Context Menu', () => {
 
     // Type folder name
     const folderNameInput = page.locator('input[type="text"]').first();
-    await folderNameInput.fill('Test Folder');
+    await folderNameInput.fill(folderName);
 
     // Click create button
     const createButton = page.locator('button:has-text("Create")');
@@ -68,10 +71,10 @@ test.describe('Folder Context Menu', () => {
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
 
     // Wait for folder to appear in tree (with explicit timeout for refresh)
-    await page.waitForSelector('text=Test Folder', { timeout: 5000 });
+    await page.waitForSelector(`text=${folderName}`, { timeout: 5000 });
 
     // Verify folder appears in tree
-    await expect(page.locator('text=Test Folder')).toBeVisible();
+    await expect(page.locator(`text=${folderName}`)).toBeVisible();
   });
 
   test('should open context menu on right-click', async () => {
@@ -92,7 +95,7 @@ test.describe('Folder Context Menu', () => {
       await plusButton.click();
       await page.waitForSelector('text=Create New Folder');
       const folderNameInput = page.locator('input[type="text"]').first();
-      await folderNameInput.fill('Test Folder');
+      await folderNameInput.fill(`Test Folder ${Date.now()}`);
       const createButton = page.locator('button:has-text("Create")');
       await createButton.click();
       await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
@@ -124,28 +127,27 @@ test.describe('Folder Context Menu', () => {
     await page.locator('text=All Notes').click();
     await page.waitForTimeout(500);
 
-    // Ensure Test Folder exists
-    let testFolder = page.locator('text=Test Folder').first();
-    const isVisible = await testFolder.isVisible().catch(() => false);
+    // Create unique folder names to avoid conflicts
+    const timestamp = Date.now();
+    const testFolderName = `Test Folder ${timestamp}`;
+    const renamedFolderName = `Renamed Folder ${timestamp}`;
 
-    if (!isVisible) {
-      // Create test folder
-      const plusButton = page.locator('button[title="Create folder"]');
-      await plusButton.click();
-      await page.waitForSelector('text=Create New Folder');
-      const folderNameInput = page.locator('input[type="text"]').first();
-      await folderNameInput.fill('Test Folder');
-      const createButton = page.locator('button:has-text("Create")');
-      await createButton.click();
-      await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
-      await page.waitForSelector('text=Test Folder', { timeout: 5000 });
-      testFolder = page.locator('text=Test Folder').first();
-    }
+    // Create test folder
+    const plusButton = page.locator('button[title="Create folder"]');
+    await plusButton.click();
+    await page.waitForSelector('text=Create New Folder');
+    const folderNameInput = page.locator('input[type="text"]').first();
+    await folderNameInput.fill(testFolderName);
+    const createButton = page.locator('button:has-text("Create")');
+    await createButton.click();
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector(`text=${testFolderName}`, { timeout: 5000 });
 
     // Right-click on folder
+    const testFolder = page.locator(`text=${testFolderName}`).first();
     await testFolder.click({ button: 'right' });
 
-    // Click Rename in context menu (use role=menuitem to avoid matching "Renamed Folder")
+    // Click Rename in context menu (use role=menuitem to avoid matching folder name)
     const renameMenuItem = page.getByRole('menuitem', { name: 'Rename' });
     await renameMenuItem.click();
 
@@ -154,7 +156,7 @@ test.describe('Folder Context Menu', () => {
 
     // Change the name
     const nameInput = page.locator('input[type="text"]').first();
-    await nameInput.fill('Renamed Folder');
+    await nameInput.fill(renamedFolderName);
 
     // Click Rename button
     const renameButton = page.locator('button:has-text("Rename")');
@@ -164,10 +166,10 @@ test.describe('Folder Context Menu', () => {
     await page.waitForSelector('text=Rename Folder', { state: 'hidden' });
 
     // Wait for renamed folder to appear
-    await page.waitForSelector('text=Renamed Folder', { timeout: 5000 });
+    await page.waitForSelector(`text=${renamedFolderName}`, { timeout: 5000 });
 
     // Verify folder has new name
-    await expect(page.locator('text=Renamed Folder')).toBeVisible();
+    await expect(page.locator(`text=${renamedFolderName}`)).toBeVisible();
   });
 
   test('should delete folder via context menu', async () => {
@@ -187,7 +189,7 @@ test.describe('Folder Context Menu', () => {
     await plusButton.click();
     await page.waitForSelector('text=Create New Folder');
     const folderNameInput = page.locator('input[type="text"]').first();
-    await folderNameInput.fill('Folder To Delete');
+    await folderNameInput.fill(`Folder To Delete ${Date.now()}`);
     const createButton = page.locator('button:has-text("Create")');
     await createButton.click();
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
@@ -223,39 +225,44 @@ test.describe('Folder Context Menu', () => {
     await page.locator('text=All Notes').click();
     await page.waitForTimeout(500);
 
+    // Create unique folder names to avoid conflicts
+    const timestamp = Date.now();
+    const parentFolderName = `Parent Folder ${timestamp}`;
+    const childFolderName = `Child Folder ${timestamp}`;
+
     // Create a parent folder
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
     await page.waitForSelector('text=Create New Folder');
     let folderNameInput = page.locator('input[type="text"]').first();
-    await folderNameInput.fill('Parent Folder');
+    await folderNameInput.fill(parentFolderName);
     let createButton = page.locator('button:has-text("Create")');
     await createButton.click();
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
-    await page.waitForSelector('text=Parent Folder', { timeout: 5000 });
+    await page.waitForSelector(`text=${parentFolderName}`, { timeout: 5000 });
 
     // Select the parent folder
-    const parentFolder = page.locator('text=Parent Folder').first();
+    const parentFolder = page.locator(`text=${parentFolderName}`).first();
     await parentFolder.click();
 
     // Create a child folder
     await plusButton.click();
     await page.waitForSelector('text=Create New Folder');
     folderNameInput = page.locator('input[type="text"]').first();
-    await folderNameInput.fill('Child Folder');
+    await folderNameInput.fill(childFolderName);
     createButton = page.locator('button:has-text("Create")');
     await createButton.click();
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
-    await page.waitForSelector('text=Child Folder', { timeout: 5000 });
+    await page.waitForSelector(`text=${childFolderName}`, { timeout: 5000 });
 
     // Verify child folder is visible (parent should be expanded)
-    await expect(page.locator('text=Child Folder')).toBeVisible();
+    await expect(page.locator(`text=${childFolderName}`)).toBeVisible();
 
     // Click on the parent folder name (not the caret)
     await parentFolder.click();
 
     // Verify child folder is still visible (should not have collapsed)
-    await expect(page.locator('text=Child Folder')).toBeVisible();
+    await expect(page.locator(`text=${childFolderName}`)).toBeVisible();
   });
 });
 
