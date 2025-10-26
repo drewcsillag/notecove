@@ -58,7 +58,9 @@
       "Bash(npx --yes node-gyp rebuild:*)",
       "Bash(pnpm --filter @notecove/desktop add:*)",
       "Bash(pnpm --filter @notecove/desktop remove:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:minop1205.github.io)"
     ],
     "deny": [],
     "ask": []

@@ -1,11 +1,11 @@
 /**
  * FolderTree Component
  *
- * Displays the hierarchical folder structure using MUI RichTreeView.
- * Phase 2.4.1: Read-only display with selection and expand/collapse.
+ * Displays the hierarchical folder structure using @minoru/react-dnd-treeview.
+ * Phase 2.4.4: Drag-and-drop reordering using battle-tested react-dnd library.
  */
 
-import { type FC, forwardRef, useEffect, useState, useRef, type MouseEvent, type DragEvent } from 'react';
+import { type FC, useEffect, useState, type MouseEvent } from 'react';
 import {
   Box,
   Typography,
@@ -17,10 +17,19 @@ import {
   DialogActions,
   TextField,
   Button,
+  ListItemButton,
+  ListItemText,
 } from '@mui/material';
-import { RichTreeView } from '@mui/x-tree-view/RichTreeView';
-import { TreeViewBaseItem } from '@mui/x-tree-view/models';
-import { TreeItem, TreeItemProps } from '@mui/x-tree-view/TreeItem';
+import { Tree, type NodeModel, type DropOptions } from '@minoru/react-dnd-treeview';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FolderIcon from '@mui/icons-material/Folder';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
+import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
+import { IconButton, Tooltip } from '@mui/material';
 
 interface FolderData {
   id: string;
@@ -37,184 +46,51 @@ export interface FolderTreeProps {
   expandedFolderIds?: string[];
   onFolderSelect?: (folderId: string | null) => void;
   onExpandedChange?: (expandedIds: string[]) => void;
-  refreshTrigger?: number; // Change this number to force reload
-  onRefresh?: () => void; // Callback to trigger refresh
+  refreshTrigger?: number;
+  onRefresh?: () => void;
 }
 
 /**
- * Transform flat folder list into tree structure for MUI TreeView
+ * Transform flat folder list into react-dnd-treeview NodeModel format
  */
-function buildTreeItems(folders: FolderData[]): TreeViewBaseItem[] {
-  // Create special UI-only items
-  const allNotesItem: TreeViewBaseItem = {
+function buildTreeNodes(folders: FolderData[]): NodeModel[] {
+  const nodes: NodeModel[] = [];
+
+  // Add special UI-only items
+  nodes.push({
     id: 'all-notes',
-    label: 'All Notes',
-  };
+    parent: 0,
+    text: 'All Notes',
+    droppable: true, // Droppable to allow moving folders to root level (like Apple Notes)
+    data: { isSpecial: true, noExpand: true }, // But don't show expand/collapse button
+  });
 
-  const recentlyDeletedItem: TreeViewBaseItem = {
-    id: 'recently-deleted',
-    label: 'Recently Deleted',
-  };
-
-  // Build tree from user folders
-  const folderMap = new Map<string, TreeViewBaseItem>();
-  const rootFolders: TreeViewBaseItem[] = [];
-
-  // First pass: create all folder items
+  // Add user folders - root folders (parentId === null) go at top level, not under "All Notes"
   for (const folder of folders) {
-    folderMap.set(folder.id, {
+    nodes.push({
       id: folder.id,
-      label: folder.name,
-      children: [],
+      parent: folder.parentId || 0, // Root folders go at top level (parent: 0)
+      text: folder.name,
+      droppable: true,
+      data: {
+        order: folder.order,
+        sdId: folder.sdId,
+        isSpecial: false,
+      },
     });
   }
 
-  // Second pass: build hierarchy
-  for (const folder of folders) {
-    const item = folderMap.get(folder.id);
-    if (!item) continue;
+  // Add "Recently Deleted" at the end
+  nodes.push({
+    id: 'recently-deleted',
+    parent: 0,
+    text: 'Recently Deleted',
+    droppable: false,
+    data: { isSpecial: true },
+  });
 
-    if (folder.parentId === null) {
-      // Root level folder
-      rootFolders.push(item);
-    } else {
-      // Child folder - add to parent's children
-      const parent = folderMap.get(folder.parentId);
-      if (parent) {
-        if (!parent.children) {
-          parent.children = [];
-        }
-        parent.children.push(item);
-      }
-    }
-  }
-
-  // Sort folders by order (within each level)
-  const sortByOrder = (items: TreeViewBaseItem[]): void => {
-    items.sort((a, b) => {
-      const folderA = folders.find((f) => f.id === a.id);
-      const folderB = folders.find((f) => f.id === b.id);
-      return (folderA?.order ?? 0) - (folderB?.order ?? 0);
-    });
-
-    // Recursively sort children
-    for (const item of items) {
-      if (item.children && item.children.length > 0) {
-        sortByOrder(item.children);
-      }
-    }
-  };
-
-  sortByOrder(rootFolders);
-
-  // Combine: All Notes, user folders, Recently Deleted
-  return [allNotesItem, ...rootFolders, recentlyDeletedItem];
+  return nodes;
 }
-
-/**
- * Custom TreeItem component with context menu and drag & drop support
- */
-interface CustomTreeItemProps extends TreeItemProps {
-  onItemContextMenu?: (event: MouseEvent<HTMLElement>, itemId: string) => void;
-  onItemDragStart?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
-  onItemDragOver?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
-  onItemDragLeave?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
-  onItemDrop?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
-  onItemDragEnd?: (event: DragEvent<HTMLLIElement>, itemId: string) => void;
-  draggedOverFolderId?: string | null;
-}
-
-const CustomTreeItem = forwardRef<HTMLLIElement, CustomTreeItemProps>((props, ref) => {
-  const {
-    onItemContextMenu,
-    onItemDragStart,
-    onItemDragOver,
-    onItemDragLeave,
-    onItemDrop,
-    onItemDragEnd,
-    draggedOverFolderId,
-    itemId,
-    ...other
-  } = props;
-
-  // Compute derived values
-  const isDraggedOver = draggedOverFolderId === itemId;
-  const isDraggable = itemId !== 'all-notes' && itemId !== 'recently-deleted';
-
-  const handleContextMenu = (event: MouseEvent<HTMLLIElement>) => {
-    if (onItemContextMenu && itemId) {
-      event.stopPropagation(); // Prevent event bubbling to parent items
-      onItemContextMenu(event, itemId);
-    }
-  };
-
-  const handleDragStart = (event: DragEvent<HTMLLIElement>) => {
-    if (onItemDragStart && itemId) {
-      event.stopPropagation(); // Prevent event bubbling to parent items
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', itemId);
-      onItemDragStart(event, itemId);
-    }
-  };
-
-  const handleDragOver = (event: DragEvent<HTMLLIElement>) => {
-    if (onItemDragOver && itemId) {
-      event.preventDefault(); // Allow drop
-      event.stopPropagation(); // Prevent event bubbling to parent items
-      event.dataTransfer.dropEffect = 'move';
-      onItemDragOver(event, itemId);
-    }
-  };
-
-  const handleDragLeave = (event: DragEvent<HTMLLIElement>) => {
-    if (onItemDragLeave && itemId) {
-      event.stopPropagation(); // Prevent event bubbling to parent items
-      onItemDragLeave(event, itemId);
-    }
-  };
-
-  const handleDrop = (event: DragEvent<HTMLLIElement>) => {
-    if (onItemDrop && itemId) {
-      event.preventDefault();
-      event.stopPropagation(); // Prevent event bubbling to parent items
-      onItemDrop(event, itemId);
-    }
-  };
-
-  const handleDragEnd = (event: DragEvent<HTMLLIElement>) => {
-    if (onItemDragEnd && itemId) {
-      onItemDragEnd(event, itemId);
-    }
-  };
-
-  return (
-    <TreeItem
-      ref={ref}
-      itemId={itemId}
-      onContextMenu={handleContextMenu}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      onDragEnd={handleDragEnd}
-      slotProps={{
-        root: {
-          draggable: isDraggable,
-        },
-      }}
-      sx={{
-        ...(isDraggedOver && {
-          backgroundColor: 'action.hover',
-          borderLeft: 3,
-          borderColor: 'primary.main',
-        }),
-      }}
-      {...other}
-    />
-  );
-});
-
-CustomTreeItem.displayName = 'CustomTreeItem';
 
 export const FolderTree: FC<FolderTreeProps> = ({
   sdId,
@@ -228,6 +104,10 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [treeData, setTreeData] = useState<NodeModel[]>([]);
+  const [allFolderIds, setAllFolderIds] = useState<string[]>([]); // For initial expansion
+  const [remountCounter, setRemountCounter] = useState(0); // Force remount for expand/collapse all
+  const [isCollapsedAll, setIsCollapsedAll] = useState(false); // Track if user clicked collapse all
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -261,11 +141,6 @@ export const FolderTree: FC<FolderTreeProps> = ({
     folderName: '',
   });
 
-  // Drag & drop state
-  const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
-  const [draggedOverFolderId, setDraggedOverFolderId] = useState<string | null>(null);
-  const dropHandledRef = useRef(false); // Synchronous flag for drop handling
-
   useEffect(() => {
     const loadFolders = async (): Promise<void> => {
       try {
@@ -273,6 +148,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
         setError(null);
         const folderList = await window.electronAPI.folder.list(sdId);
         setFolders(folderList);
+        setTreeData(buildTreeNodes(folderList));
+
+        // Set all folder IDs for initial expansion (start fully expanded)
+        const folderIds = folderList.map((f) => f.id);
+        setAllFolderIds(folderIds);
       } catch (err) {
         console.error('Failed to load folders:', err);
         setError(err instanceof Error ? err.message : 'Failed to load folders');
@@ -307,7 +187,6 @@ export const FolderTree: FC<FolderTreeProps> = ({
   // Context menu handlers
   const handleContextMenu = (event: MouseEvent<HTMLElement>, folderId: string): void => {
     event.preventDefault();
-    // Don't show context menu for special items
     if (folderId === 'all-notes' || folderId === 'recently-deleted') {
       return;
     }
@@ -399,144 +278,233 @@ export const FolderTree: FC<FolderTreeProps> = ({
     }
   };
 
-  // Drag & drop handlers
-  const isDescendant = (ancestorId: string, descendantId: string): boolean => {
-    let current = folders.find((f) => f.id === descendantId);
-    while (current) {
-      if (current.id === ancestorId) {
-        return true;
-      }
-      if (current.parentId === null) {
-        break;
-      }
-      current = folders.find((f) => f.id === current?.parentId);
-    }
-    return false;
-  };
+  // Drag-and-drop handler
+  const handleDrop = async (
+    newTree: NodeModel[],
+    options: DropOptions<unknown>
+  ): Promise<void> => {
+    const { dragSourceId, dropTargetId } = options;
 
-  const isValidDropTarget = (targetId: string, sourceId: string): boolean => {
-    // Cannot drop on special items
-    if (targetId === 'all-notes' || targetId === 'recently-deleted') {
-      return targetId === 'all-notes'; // Can drop on "All Notes" to move to root
-    }
-    // Cannot drop on itself
-    if (targetId === sourceId) {
-      return false;
-    }
-    // Cannot drop on descendant (would create circular reference)
-    if (isDescendant(sourceId, targetId)) {
-      return false;
-    }
-    return true;
-  };
-
-  const handleDragStart = (_event: DragEvent<HTMLLIElement>, itemId: string): void => {
     // Don't allow dragging special items
-    if (itemId === 'all-notes' || itemId === 'recently-deleted') {
+    if (dragSourceId === 'all-notes' || dragSourceId === 'recently-deleted') {
       return;
     }
-    setDraggedFolderId(itemId);
-    dropHandledRef.current = false; // Reset drop handled flag for new drag
-  };
 
-  const handleDragOver = (_event: DragEvent<HTMLLIElement>, itemId: string): void => {
-    if (!draggedFolderId) return;
-    if (isValidDropTarget(itemId, draggedFolderId)) {
-      setDraggedOverFolderId(itemId);
-    }
-  };
-
-  const handleDragLeave = (_event: DragEvent<HTMLLIElement>, _itemId: string): void => {
-    setDraggedOverFolderId(null);
-  };
-
-  const handleDrop = async (_event: DragEvent<HTMLLIElement>, itemId: string): Promise<void> => {
-    if (!draggedFolderId) return;
-
-    // CRITICAL FIX: Only handle drop ONCE per drag operation
-    // The event bubbles up from child items, but we only want the first (deepest) handler to run
-    // Use a ref instead of state for synchronous checking
-    if (dropHandledRef.current) {
+    // Don't allow dropping on "Recently Deleted"
+    if (dropTargetId === 'recently-deleted') {
       return;
     }
-    dropHandledRef.current = true; // Mark this drop as handled
 
-    // Validate drop
-    if (!isValidDropTarget(itemId, draggedFolderId)) {
-      setDraggedFolderId(null);
-      setDraggedOverFolderId(null);
-      return;
+    // Determine the new parent ID
+    // Dropping on "All Notes" or root (0) means move to root level (parentId = null)
+    let newParentId: string | null = null;
+    if (dropTargetId !== 'all-notes' && dropTargetId !== 0) {
+      newParentId = String(dropTargetId);
     }
 
     try {
-      // Determine new parent ID
-      let newParentId: string | null = null;
-      if (itemId === 'all-notes') {
-        // Move to root
-        newParentId = null;
-      } else if (itemId !== 'recently-deleted') {
-        // Move to target folder
-        newParentId = itemId;
-      }
+      console.log(`[FolderTree] Moving folder ${dragSourceId} to parent ${newParentId}`);
+      await window.electronAPI.folder.move(sdId, String(dragSourceId), newParentId);
 
-      // Call folder:move handler
-      await window.electronAPI.folder.move(sdId, draggedFolderId, newParentId);
+      // Update tree data locally for immediate feedback
+      setTreeData(newTree);
 
-      // Refresh the tree
+      // Trigger refresh to get updated data from backend
       onRefresh?.();
     } catch (err) {
       console.error('Failed to move folder:', err);
-    } finally {
-      setDraggedFolderId(null);
-      setDraggedOverFolderId(null);
+      // Revert to original tree data on error
+      setTreeData(buildTreeNodes(folders));
     }
   };
 
-  const handleDragEnd = (_event: DragEvent<HTMLLIElement>, _itemId: string): void => {
-    // Always reset drag state when drag ends (successful drop, ESC key, or cancelled)
-    setDraggedFolderId(null);
-    setDraggedOverFolderId(null);
-    dropHandledRef.current = false; // Reset for next drag operation
+  // Control which nodes can be dragged
+  const canDrag = (node: NodeModel | undefined): boolean => {
+    if (!node) return false;
+    return !(node.data as { isSpecial?: boolean })?.isSpecial;
   };
 
-  const treeItems = buildTreeItems(folders);
+  // Control where nodes can be dropped
+  const canDrop = (_tree: NodeModel[], options: DropOptions<unknown>): boolean => {
+    const { dragSourceId, dropTargetId } = options;
 
-  // Handler for tree item context menu
-  const handleItemContextMenu = (event: MouseEvent<HTMLElement>, itemId: string): void => {
-    if (itemId !== 'all-notes' && itemId !== 'recently-deleted') {
-      handleContextMenu(event, itemId);
+    // Can't drag special items
+    if (dragSourceId === 'all-notes' || dragSourceId === 'recently-deleted') {
+      return false;
     }
+
+    // Can't drop on "Recently Deleted"
+    if (dropTargetId === 'recently-deleted') {
+      return false;
+    }
+
+    // Allow dropping on "All Notes" (root level) and regular folders
+    return true;
   };
+
+  // Handle tree item selection
+  const handleSelect = (node: NodeModel): void => {
+    onFolderSelect?.(String(node.id));
+  };
+
+  // Handle expand/collapse
+  const handleToggle = (nodeId: string | number, isOpen: boolean): void => {
+    const id = String(nodeId);
+    let newExpanded: string[];
+
+    if (isOpen) {
+      newExpanded = [...expandedFolderIds, id];
+    } else {
+      newExpanded = expandedFolderIds.filter((fid) => fid !== id);
+    }
+
+    onExpandedChange?.(newExpanded);
+  };
+
+  // Expand all folders
+  const handleExpandAll = (): void => {
+    setRemountCounter(prev => prev + 1); // Force remount
+    setIsCollapsedAll(false);
+    onExpandedChange?.(allFolderIds);
+  };
+
+  // Collapse all folders
+  const handleCollapseAll = (): void => {
+    setRemountCounter(prev => prev + 1); // Force remount
+    setIsCollapsedAll(true);
+    onExpandedChange?.([]);
+  };
+
+  // Determine if all folders are expanded (but not if user explicitly collapsed all)
+  const allExpanded = !isCollapsedAll && (expandedFolderIds.length === 0 || expandedFolderIds.length === allFolderIds.length);
 
   return (
-    <Box sx={{ height: '100%', overflow: 'auto' }}>
-      <RichTreeView
-        items={treeItems}
-        selectedItems={selectedFolderId ?? null}
-        expandedItems={expandedFolderIds}
-        onSelectedItemsChange={(_event, itemId) => {
-          onFolderSelect?.(itemId);
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Expand/Collapse All Button */}
+      <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
+        <Tooltip title={allExpanded ? 'Collapse All' : 'Expand All'}>
+          <IconButton
+            size="small"
+            onClick={allExpanded ? handleCollapseAll : handleExpandAll}
+            sx={{ ml: 1 }}
+          >
+            {allExpanded ? <UnfoldLessIcon fontSize="small" /> : <UnfoldMoreIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* Tree Container */}
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          '& ul': {
+            listStyleType: 'none',
+            paddingLeft: 0,
+            margin: 0,
+          },
+          '& li': {
+            listStyleType: 'none',
+          },
         }}
-        onExpandedItemsChange={(_event, itemIds) => {
-          onExpandedChange?.(itemIds);
-        }}
-        slots={{
-          item: CustomTreeItem,
-        }}
-        slotProps={{
-          item: {
-            onItemContextMenu: handleItemContextMenu,
-            onItemDragStart: handleDragStart,
-            onItemDragOver: handleDragOver,
-            onItemDragLeave: handleDragLeave,
-            onItemDrop: (event, itemId) => {
-              void handleDrop(event, itemId);
-            },
-            onItemDragEnd: handleDragEnd,
-            draggedOverFolderId: draggedOverFolderId,
-          } as CustomTreeItemProps,
-        }}
-      />
+      >
+        <DndProvider backend={HTML5Backend}>
+          <Tree
+          key={`tree-${remountCounter}`} // Force remount when expand/collapse all is clicked
+          tree={treeData}
+          rootId={0}
+          onDrop={handleDrop}
+          canDrag={canDrag}
+          canDrop={canDrop}
+          initialOpen={isCollapsedAll ? [] : expandedFolderIds.length > 0 ? expandedFolderIds : allFolderIds}
+          onChangeOpen={(newOpenIds) => {
+            // Sync library's internal state with our parent component (but don't trigger remount)
+            onExpandedChange?.(newOpenIds.map(String));
+          }}
+          dragPreviewRender={(monitorProps) => {
+            // Custom drag preview to show ONLY the dragged folder, not the entire tree
+            return (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px 8px',
+                  backgroundColor: 'primary.light',
+                  borderRadius: 1,
+                  opacity: 0.8,
+                }}
+              >
+                <FolderIcon fontSize="small" sx={{ mr: 1 }} />
+                <Typography variant="body2">{monitorProps.item.text}</Typography>
+              </Box>
+            );
+          }}
+          render={(node, { depth, onToggle, isDropTarget }) => {
+            const isSelected = String(node.id) === selectedFolderId;
+            const isExpanded = expandedFolderIds.includes(String(node.id));
+            const noExpand = (node.data as { noExpand?: boolean })?.noExpand;
+
+            // Check if this node has children
+            const hasChildren = treeData.some((n) => n.parent === node.id);
+
+            return (
+              <ListItemButton
+                sx={{
+                  pl: depth * 2,
+                  backgroundColor: isDropTarget
+                    ? 'primary.light'
+                    : isSelected
+                      ? 'action.selected'
+                      : 'transparent',
+                  borderLeft: isDropTarget ? 3 : 0,
+                  borderColor: isDropTarget ? 'primary.main' : 'transparent',
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+                onClick={() => {
+                  handleSelect(node);
+                }}
+                onContextMenu={(e) => {
+                  handleContextMenu(e, String(node.id));
+                }}
+              >
+                {node.droppable && !noExpand && hasChildren && (
+                  <Box
+                    component="span"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggle();
+                      handleToggle(node.id, !isExpanded);
+                    }}
+                    sx={{ mr: 0.5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                  </Box>
+                )}
+                {(!node.droppable || noExpand || !hasChildren) && <Box sx={{ width: 24, mr: 0.5 }} />}
+                <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+                  {node.droppable ? (
+                    isExpanded ? (
+                      <FolderOpenIcon fontSize="small" />
+                    ) : (
+                      <FolderIcon fontSize="small" />
+                    )
+                  ) : null}
+                </Box>
+                <ListItemText primary={node.text} />
+              </ListItemButton>
+            );
+          }}
+        />
+      </DndProvider>
+      </Box>
 
       {/* Context Menu */}
       <Menu
