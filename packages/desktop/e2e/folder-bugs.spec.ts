@@ -144,8 +144,12 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     // Wait for tree to update
     await page.waitForTimeout(2000);
 
-    // Click on Work to expand it if needed
+    // Click on Work to expand it and see if Recipes moved there
     await page.locator('text=Work').first().click();
+    await page.waitForTimeout(500);
+
+    // Re-expand Personal to verify Ideas is still there
+    await page.locator('text=Personal').first().click();
     await page.waitForTimeout(500);
 
     // Verify ONLY "Recipes" moved under "Work"

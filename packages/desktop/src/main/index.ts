@@ -187,6 +187,11 @@ void app.whenReady().then(async () => {
     // Initialize SD directory structure
     await sdStructure.initialize();
 
+    // Ensure updates directory exists BEFORE creating CRDT manager
+    // This prevents ENOENT errors when demo folders are created
+    const folderUpdatesPath = join(storageDir, 'folders', 'updates');
+    await fsAdapter.mkdir(folderUpdatesPath);
+
     // Initialize UpdateManager with instance ID
     const instanceId = process.env['INSTANCE_ID'] || randomUUID();
     const updateManager = new UpdateManager(fsAdapter, sdStructure, instanceId);
@@ -194,12 +199,15 @@ void app.whenReady().then(async () => {
     // Initialize CRDT manager
     const crdtManager = new CRDTManagerImpl(updateManager);
 
+    // Eagerly load folder tree to trigger demo folder creation
+    // This ensures demo folders are created while we know the updates directory exists
+    crdtManager.loadFolderTree('default');
+
     // Initialize IPC handlers
     ipcHandlers = new IPCHandlers(crdtManager, database);
 
     // Set up file watcher for cross-instance folder sync
     fileWatcher = new NodeFileWatcher();
-    const folderUpdatesPath = join(storageDir, 'folders', 'updates');
     await fileWatcher.watch(folderUpdatesPath, (event) => {
       console.log('[FileWatcher] Detected folder update file change:', event.filename);
 
