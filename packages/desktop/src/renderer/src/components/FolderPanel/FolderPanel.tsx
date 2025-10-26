@@ -169,6 +169,9 @@ export const FolderPanel: React.FC = () => {
           onFolderSelect={handleFolderSelect}
           onExpandedChange={handleExpandedChange}
           refreshTrigger={refreshTrigger}
+          onRefresh={() => {
+            setRefreshTrigger((prev) => prev + 1);
+          }}
         />
       </Box>
 

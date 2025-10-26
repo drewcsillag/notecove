@@ -35,3 +35,49 @@ jest.mock('react-resizable-panels', () => {
       React.createElement('div', { 'data-testid': 'resize-handle' }, children),
   };
 });
+
+// Mock MUI TreeView components
+jest.mock('@mui/x-tree-view/RichTreeView', () => {
+  const React = require('react');
+  return {
+    RichTreeView: ({ items, slots, slotProps, ...props }) => {
+      const TreeItem = slots?.item || require('@mui/x-tree-view/TreeItem').TreeItem;
+      const renderTree = (nodes) => {
+        return nodes.map((node) => {
+          const itemProps =
+            typeof slotProps?.item === 'function' ? slotProps.item({}) : slotProps?.item || {};
+          return React.createElement(
+            'div',
+            { key: node.id, 'data-testid': `tree-item-${node.id}` },
+            [
+              React.createElement('div', { key: `label-${node.id}` }, node.label),
+              node.children && node.children.length > 0 ? renderTree(node.children) : null,
+            ]
+          );
+        });
+      };
+      return React.createElement(
+        'div',
+        { 'data-testid': 'rich-tree-view' },
+        renderTree(items || [])
+      );
+    },
+  };
+});
+
+jest.mock('@mui/x-tree-view/TreeItem', () => {
+  const React = require('react');
+  return {
+    TreeItem: React.forwardRef(({ itemId, children, ...props }, ref) => {
+      return React.createElement(
+        'div',
+        { ref, 'data-testid': `tree-item-${itemId}`, ...props },
+        children
+      );
+    }),
+  };
+});
+
+jest.mock('@mui/x-tree-view/models', () => ({
+  // Export types as empty objects for Jest
+}));

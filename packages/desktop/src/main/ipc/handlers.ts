@@ -35,6 +35,7 @@ export class IPCHandlers {
     ipcMain.handle('folder:create', this.handleCreateFolder.bind(this));
     ipcMain.handle('folder:rename', this.handleRenameFolder.bind(this));
     ipcMain.handle('folder:delete', this.handleDeleteFolder.bind(this));
+    ipcMain.handle('folder:move', this.handleMoveFolder.bind(this));
 
     // App state operations
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
@@ -228,6 +229,58 @@ export class IPCHandlers {
     });
   }
 
+  private async handleMoveFolder(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string,
+    newParentId: string | null
+  ): Promise<void> {
+    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folder = folderTree.getFolder(folderId);
+
+    if (!folder) {
+      throw new Error(`Folder ${folderId} not found`);
+    }
+
+    // Prevent moving folder to be its own descendant (circular reference)
+    if (newParentId !== null) {
+      const isDescendant = (ancestorId: string, descendantId: string): boolean => {
+        let current = folderTree.getFolder(descendantId);
+        while (current) {
+          if (current.id === ancestorId) {
+            return true;
+          }
+          if (current.parentId === null) {
+            break;
+          }
+          current = folderTree.getFolder(current.parentId);
+        }
+        return false;
+      };
+
+      if (isDescendant(folderId, newParentId)) {
+        throw new Error('Cannot move folder to be its own descendant');
+      }
+    }
+
+    // Calculate new order (append to end of siblings)
+    const siblings =
+      newParentId === null ? folderTree.getRootFolders() : folderTree.getChildFolders(newParentId);
+
+    const maxOrder = siblings.reduce((max, f) => Math.max(max, f.order), -1);
+    const newOrder = maxOrder + 1;
+
+    // Update CRDT
+    folderTree.updateFolder(folderId, { parentId: newParentId, order: newOrder });
+
+    // Update SQLite cache
+    await this.database.upsertFolder({
+      ...folder,
+      parentId: newParentId,
+      order: newOrder,
+    });
+  }
+
   private async handleGetAppState(_event: IpcMainInvokeEvent, key: string): Promise<string | null> {
     return await this.database.getState(key);
   }
@@ -256,6 +309,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('folder:create');
     ipcMain.removeHandler('folder:rename');
     ipcMain.removeHandler('folder:delete');
+    ipcMain.removeHandler('folder:move');
     ipcMain.removeHandler('appState:get');
     ipcMain.removeHandler('appState:set');
   }

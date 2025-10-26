@@ -52,7 +52,10 @@
       "Bash(pnpm why:*)",
       "Bash(node_modules/.bin/electron:*)",
       "Bash(readlink:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebFetch(domain:codesandbox.io)",
+      "Bash(pnpm --filter @notecove/desktop rebuild:*)",
+      "Bash(npx --yes node-gyp rebuild:*)"
     ],
     "deny": [],
     "ask": []

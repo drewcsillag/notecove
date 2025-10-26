@@ -97,6 +97,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('folder:rename', sdId, folderId, newName) as Promise<void>,
     delete: (sdId: string, folderId: string): Promise<void> =>
       ipcRenderer.invoke('folder:delete', sdId, folderId) as Promise<void>,
+    move: (sdId: string, folderId: string, newParentId: string | null): Promise<void> =>
+      ipcRenderer.invoke('folder:move', sdId, folderId, newParentId) as Promise<void>,
 
     // Event listeners
     onUpdated: (callback: (folderId: string) => void): (() => void) => {

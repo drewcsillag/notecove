@@ -1,8 +1,8 @@
 # NoteCove Implementation Plan
 
-**Overall Progress:** `8/21 phases (38%)` + Phase 2.4.1/4 sub-phases complete
+**Overall Progress:** `8/21 phases (38%)` + Phase 2.4: 3/5 sub-phases complete
 
-**Last Updated:** 2025-10-25 (Completed Phase 2.4.1: Basic Folder Tree Display)
+**Last Updated:** 2025-10-26 (Completed Phase 2.4.3: Folder Context Menus)
 
 ---
 
@@ -771,9 +771,9 @@ The proper implementation MUST use the **Yjs Synchronization Protocol**, which i
 
 ### 2.4 Folder Tree Panel 🟡
 
-**Status:** In Progress (1/4 sub-phases complete)
+**Status:** In Progress (3/5 sub-phases complete)
 
-This phase is split into 4 sub-phases for better manageability:
+This phase is split into 5 sub-phases for better manageability:
 
 ---
 
@@ -823,9 +823,9 @@ This phase is split into 4 sub-phases for better manageability:
 **Deferred to Later Sub-Phases:**
 
 - Folder creation, rename, delete (→ 2.4.2)
-- Drag & drop (→ 2.4.3)
 - Context menus (→ 2.4.3)
-- Multi-SD support (→ 2.4.4)
+- Drag & drop (→ 2.4.4)
+- Multi-SD support (→ 2.4.5)
 
 ---
 
@@ -887,57 +887,118 @@ This phase is split into 4 sub-phases for better manageability:
 - [x] ✅ Backend can delete folders (soft delete)
 - [x] ✅ Create folder UI functional with validation
 - [x] ✅ Changes persist to CRDT and SQLite
-- [ ] ⏭️ Rename/delete UI (deferred to 2.4.3)
+- [x] ✅ Rename/delete UI (completed in 2.4.3)
 - [ ] ⏭️ Folder changes sync to all open windows (requires IPC events in 2.6)
 
 ---
 
-#### 2.4.3 Drag & Drop and Context Menus 🟥
+#### 2.4.3 Folder Context Menus ✅
+
+**Status:** Complete (2025-10-26)
+
+**Completed Tasks:**
+
+- [x] ✅ **Implement folder context menu** (includes deferred UI from 2.4.2)
+  - Right-click folder for menu using custom TreeItem component
+  - Options: Rename, Move to Top Level, Delete
+  - "Rename" → dialog with Enter key support (uses existing `folder:rename` handler from 2.4.2)
+  - "Move to Top Level" → set parentId to null (uses new `folder:move` handler)
+  - "Delete" → confirmation dialog (uses existing `folder:delete` handler from 2.4.2)
+  - Context menu hidden for special items ("All Notes", "Recently Deleted")
+- [x] ✅ **Backend folder move handler**
+  - IPC handler: `folder:move` - updates parentId and order
+  - Circular reference detection (prevents moving folder to its own descendant)
+  - Updates FolderTreeDoc CRDT (parentId, order)
+  - Updates SQLite cache
+  - Order calculation (appends to end of siblings)
+- [x] ✅ **Custom TreeItem component**
+  - Extends MUI TreeItem with onContextMenu support
+  - Uses React.forwardRef for proper MUI integration
+  - Passes context menu events to parent component
+- [x] ✅ **Add comprehensive tests**
+  - Unit tests: 6 tests for folder:move handler (basic move, move to root, order calculation, error cases, circular references)
+  - E2E tests: 5 tests for context menu UI (create, open menu, rename, delete, collapse behavior)
+  - All tests passing (13 E2E + 87 unit = 100 total)
+  - Tests use role-based selectors for reliability
+  - Tests handle modal backdrop cleanup with Escape key
+
+**Files Added:**
+
+- `packages/desktop/e2e/folders.spec.ts` - E2E tests for folder context menus (5 tests, 249 lines)
+
+**Files Modified:**
+
+- `packages/desktop/src/main/ipc/handlers.ts` - Added handleMoveFolder with circular reference detection
+- `packages/desktop/src/main/ipc/__tests__/handlers.test.ts` - Added 6 tests for folder:move (224 lines)
+- `packages/desktop/src/preload/index.ts` - Exposed folder.move method
+- `packages/desktop/src/renderer/src/types/electron.d.ts` - Added move method type definition
+- `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx` - Added CustomTreeItem, context menu, rename/delete dialogs (200+ lines)
+- `packages/desktop/src/renderer/src/components/FolderPanel/FolderPanel.tsx` - Added onRefresh callback
+- `packages/desktop/jest.setup.js` - Added MUI TreeView mocks for Jest
+
+**Technical Decisions:**
+
+- Used custom TreeItem component because MUI RichTreeView doesn't support onContextMenu through slotProps
+- Changed React imports from namespace to destructured (fixes Jest compatibility)
+- Used `anchorEl` for Menu positioning (correct MUI pattern)
+- Used role-based selectors in E2E tests to avoid ambiguity
+- Added Escape key press to close lingering modals in tests
+
+**Acceptance Criteria:**
+
+- [x] ✅ Context menu appears on right-click
+- [x] ✅ Can rename folder via context menu
+- [x] ✅ Can delete folder via context menu (with confirmation)
+- [x] ✅ Can move folder to top level via context menu
+- [x] ✅ Context menu hidden for special items
+- [x] ✅ All context menu actions work correctly
+- [x] ✅ Circular reference prevention works
+- [x] ✅ All tests passing
+
+---
+
+#### 2.4.4 Folder Drag & Drop 🟥
 
 **Status:** To Do
 
 **Tasks:**
 
-- [ ] 🟥 **Implement folder context menu** (includes deferred UI from 2.4.2)
-  - Right-click folder for menu
-  - Options: Rename, Move to Top Level, Delete
-  - "Rename" → inline editing or dialog (uses existing `folder:rename` handler from 2.4.2)
-  - "Move to Top Level" → set parentId to null
-  - "Delete" → confirmation dialog (uses existing `folder:delete` handler from 2.4.2)
-  - **Note:** Backend handlers for rename/delete already complete in 2.4.2
-- [ ] 🟥 **Implement folder drag & drop**
-  - Drag folder to another folder (nesting)
+- [ ] 🟥 **Implement folder drag & drop UI**
+  - Make folders draggable using MUI TreeView drag API or HTML5 drag events
+  - Drag folder to another folder (nesting) - updates parentId
   - Drag folder to "All Notes" (move to root - set parentId to null)
-  - Cannot drag folder to be its own descendant (validate)
-  - Cannot drag across SDs (single SD only in 2.4.3)
-  - Visual feedback during drag (cursor, drop zones)
-  - IPC handler: `folder:move` - updates parentId and order
-  - Update FolderTreeDoc CRDT (parentId, order)
-  - Update SQLite cache
-- [ ] 🟥 **Add tests for context menu**
-  - Test menu opening
-  - Test rename action (UI only - handler tested in 2.4.2)
-  - Test delete action with confirmation (UI only - handler tested in 2.4.2)
-  - Test move to top level action
+  - Visual feedback during drag:
+    - Drag cursor indicator
+    - Drop zone highlighting
+    - Invalid drop indicator (e.g., when hovering over descendant)
+  - Cannot drag folder to be its own descendant (validate client-side)
+  - Cannot drag across SDs (single SD only in 2.4.4)
+  - Cannot drag special items ("All Notes", "Recently Deleted")
+- [ ] 🟥 **Reuse existing folder:move handler**
+  - `folder:move` handler already implemented in 2.4.3
+  - Already has circular reference detection
+  - Already updates CRDT and SQLite
+  - Only need to call from drag & drop UI
 - [ ] 🟥 **Add tests for drag & drop**
+  - E2E tests for drag interactions
   - Test folder moving (parent change)
-  - Test circular reference prevention
-  - Test visual feedback
+  - Test circular reference prevention UI
+  - Test visual feedback (drop zones, cursor)
+  - Test dragging to root level
+  - Test invalid drag attempts
 
 **Acceptance Criteria:**
 
-- ✅ Context menu appears on right-click
-- ✅ Can rename folder via context menu
-- ✅ Can delete folder via context menu (with confirmation)
-- ✅ Can move folder to top level via context menu
 - ✅ Can drag folders to nest/unnest
-- ✅ Cannot create circular references
+- ✅ Cannot create circular references (UI prevents)
 - ✅ Visual feedback during drag is clear
-- ✅ All context menu actions work correctly
+- ✅ Drag to "All Notes" moves to root
+- ✅ Cannot drag special items
+- ✅ All drag & drop tests passing
 
 ---
 
-#### 2.4.4 Multi-SD Support 🟥
+#### 2.4.5 Multi-SD Support 🟥
 
 **Status:** To Do
 

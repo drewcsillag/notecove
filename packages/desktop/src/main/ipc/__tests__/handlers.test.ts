@@ -516,4 +516,228 @@ describe('IPCHandlers - Folder CRUD', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('folder:move', () => {
+    it('should move folder to new parent', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+      const folderId = 'folder-1';
+      const newParentId = 'parent-2';
+      const folder: FolderData = {
+        id: folderId,
+        name: 'Folder 1',
+        parentId: 'parent-1',
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      const newParent: FolderData = {
+        id: newParentId,
+        name: 'Parent 2',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      // Mock getFolder to return different folders based on ID
+      mockFolderTree.getFolder.mockImplementation((id: string) => {
+        if (id === folderId) return folder;
+        if (id === newParentId) return newParent;
+        return null;
+      });
+      mockFolderTree.getChildFolders.mockReturnValue([]);
+
+      await (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId);
+
+      // Should get the folder
+      expect(mockFolderTree.getFolder).toHaveBeenCalledWith(folderId);
+
+      // Should get siblings in new location
+      expect(mockFolderTree.getChildFolders).toHaveBeenCalledWith(newParentId);
+
+      // Should update CRDT with new parent and order
+      expect(mockFolderTree.updateFolder).toHaveBeenCalledWith(folderId, {
+        parentId: newParentId,
+        order: 0,
+      });
+
+      // Should update database
+      expect(mockDatabase.upsertFolder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: folderId,
+          parentId: newParentId,
+          order: 0,
+        })
+      );
+    });
+
+    it('should move folder to root level (null parent)', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+      const folderId = 'folder-1';
+      const folder: FolderData = {
+        id: folderId,
+        name: 'Folder 1',
+        parentId: 'parent-1',
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      mockFolderTree.getFolder.mockReturnValue(folder);
+      mockFolderTree.getRootFolders.mockReturnValue([
+        { id: 'root-1', name: 'Root 1', order: 0 } as FolderData,
+      ]);
+
+      await (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, null);
+
+      // Should get root folders
+      expect(mockFolderTree.getRootFolders).toHaveBeenCalled();
+
+      // Should update with null parent and order after existing root
+      expect(mockFolderTree.updateFolder).toHaveBeenCalledWith(folderId, {
+        parentId: null,
+        order: 1,
+      });
+    });
+
+    it('should calculate correct order when moving to folder with children', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+      const folderId = 'folder-1';
+      const newParentId = 'parent-2';
+      const folder: FolderData = {
+        id: folderId,
+        name: 'Folder 1',
+        parentId: 'parent-1',
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      const newParent: FolderData = {
+        id: newParentId,
+        name: 'Parent 2',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      // Mock getFolder to return different folders based on ID
+      mockFolderTree.getFolder.mockImplementation((id: string) => {
+        if (id === folderId) return folder;
+        if (id === newParentId) return newParent;
+        return null;
+      });
+      mockFolderTree.getChildFolders.mockReturnValue([
+        { id: 'sibling-1', name: 'Sibling 1', order: 0 } as FolderData,
+        { id: 'sibling-2', name: 'Sibling 2', order: 1 } as FolderData,
+      ]);
+
+      await (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId);
+
+      // Should append to end (order 2)
+      expect(mockFolderTree.updateFolder).toHaveBeenCalledWith(folderId, {
+        parentId: newParentId,
+        order: 2,
+      });
+    });
+
+    it('should reject move if folder not found', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+      const folderId = 'nonexistent';
+      const newParentId = 'parent-2';
+
+      mockFolderTree.getFolder.mockReturnValue(null);
+
+      await expect(
+        (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId)
+      ).rejects.toThrow('Folder nonexistent not found');
+    });
+
+    it('should reject circular reference (folder to its own child)', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+      const folderId = 'folder-1';
+      const newParentId = 'folder-1-child';
+
+      const folder1: FolderData = {
+        id: folderId,
+        name: 'Folder 1',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      const folder1Child: FolderData = {
+        id: 'folder-1-child',
+        name: 'Child of Folder 1',
+        parentId: folderId,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      // Mock getFolder to return different folders based on ID
+      mockFolderTree.getFolder.mockImplementation((id: string) => {
+        if (id === folderId) return folder1;
+        if (id === 'folder-1-child') return folder1Child;
+        return null;
+      });
+
+      await expect(
+        (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId)
+      ).rejects.toThrow('Cannot move folder to be its own descendant');
+    });
+
+    it('should reject circular reference (folder to its own grandchild)', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+      const folderId = 'folder-1';
+      const newParentId = 'folder-1-grandchild';
+
+      const folder1: FolderData = {
+        id: folderId,
+        name: 'Folder 1',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      const folder1Child: FolderData = {
+        id: 'folder-1-child',
+        name: 'Child',
+        parentId: folderId,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      const folder1Grandchild: FolderData = {
+        id: 'folder-1-grandchild',
+        name: 'Grandchild',
+        parentId: 'folder-1-child',
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+
+      mockFolderTree.getFolder.mockImplementation((id: string) => {
+        if (id === folderId) return folder1;
+        if (id === 'folder-1-child') return folder1Child;
+        if (id === 'folder-1-grandchild') return folder1Grandchild;
+        return null;
+      });
+
+      await expect(
+        (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId)
+      ).rejects.toThrow('Cannot move folder to be its own descendant');
+    });
+  });
 });
