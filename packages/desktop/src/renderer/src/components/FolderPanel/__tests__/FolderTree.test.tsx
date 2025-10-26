@@ -8,15 +8,21 @@ import { FolderTree } from '../FolderTree';
 
 // Mock electron API
 const mockFolderList = jest.fn();
+const mockFolderOnUpdated = jest.fn();
 global.window.electronAPI = {
   folder: {
     list: mockFolderList,
+    onUpdated: mockFolderOnUpdated,
   } as Partial<typeof window.electronAPI.folder>,
 } as Partial<typeof window.electronAPI> as typeof window.electronAPI;
 
 describe('FolderTree', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Make onUpdated return an unsubscribe function
+    mockFolderOnUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
   });
 
   it('should render loading state initially', () => {

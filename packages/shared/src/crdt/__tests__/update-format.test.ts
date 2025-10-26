@@ -73,7 +73,8 @@ describe('update-format', () => {
     it('should generate note update filename', () => {
       const filename = generateUpdateFilename(UpdateType.Note, 'inst-123', 'note-456', 1234567890);
 
-      expect(filename).toBe('inst-123_note-456_1234567890.yjson');
+      // Should match format: inst-123_note-456_1234567890-XXXX.yjson (where XXXX is random 4 digits)
+      expect(filename).toMatch(/^inst-123_note-456_1234567890-\d{4}\.yjson$/);
     });
 
     it('should generate folder-tree update filename', () => {
@@ -84,7 +85,8 @@ describe('update-format', () => {
         1234567890
       );
 
-      expect(filename).toBe('inst-123_folder-tree_sd-789_1234567890.yjson');
+      // Should match format: inst-123_folder-tree_sd-789_1234567890-XXXX.yjson (where XXXX is random 4 digits)
+      expect(filename).toMatch(/^inst-123_folder-tree_sd-789_1234567890-\d{4}\.yjson$/);
     });
 
     it('should use current timestamp when not provided', () => {
@@ -105,7 +107,8 @@ describe('update-format', () => {
         1234567890
       );
 
-      expect(filename).toBe('inst-123_note_with_underscores_1234567890.yjson');
+      // Should match format with random suffix
+      expect(filename).toMatch(/^inst-123_note_with_underscores_1234567890-\d{4}\.yjson$/);
 
       // Should be parseable
       const metadata = parseUpdateFilename(filename);

@@ -119,7 +119,7 @@ describe('UpdateManager', () => {
       const update = noteDoc.encodeStateAsUpdate();
       const filename = await updateManager.writeNoteUpdate(noteId, update);
 
-      expect(filename).toMatch(/^test-instance-123_note-123_\d+\.yjson$/);
+      expect(filename).toMatch(/^test-instance-123_note-123_\d+-\d{4}\.yjson$/);
       expect(fs.hasFile(`/test/sd/notes/note-123/updates/${filename}`)).toBe(true);
 
       noteDoc.destroy();
@@ -143,7 +143,7 @@ describe('UpdateManager', () => {
       const update = new Uint8Array([1, 2, 3]);
       const filename = await updateManager.writeFolderUpdate('sd-test', update);
 
-      expect(filename).toMatch(/^test-instance-123_folder-tree_sd-test_\d+\.yjson$/);
+      expect(filename).toMatch(/^test-instance-123_folder-tree_sd-test_\d+-\d{4}\.yjson$/);
       expect(fs.hasFile(`/test/sd/folders/updates/${filename}`)).toBe(true);
     });
   });

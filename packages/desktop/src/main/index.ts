@@ -7,7 +7,13 @@ import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
 import type { Database } from '@notecove/shared';
-import { UpdateManager, SyncDirectoryStructure } from '@notecove/shared';
+import {
+  UpdateManager,
+  SyncDirectoryStructure,
+  ActivityLogger,
+  ActivitySync,
+  type ActivitySyncCallbacks,
+} from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl } from './crdt/crdt-manager';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
@@ -18,6 +24,8 @@ let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
 let ipcHandlers: IPCHandlers | null = null;
 let fileWatcher: NodeFileWatcher | null = null;
+let activityWatcher: NodeFileWatcher | null = null;
+let compactionInterval: NodeJS.Timeout | null = null;
 const allWindows: BrowserWindow[] = [];
 
 function createWindow(): void {
@@ -201,6 +209,36 @@ void app.whenReady().then(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     const crdtManager = new CRDTManagerImpl(updateManager as any);
 
+    // Initialize activity logger for note sync
+    const activityDir = join(storageDir, '.activity');
+    await fsAdapter.mkdir(activityDir);
+
+    const activityLogger = new ActivityLogger(fsAdapter, activityDir);
+    activityLogger.setInstanceId(instanceId);
+    await activityLogger.initialize();
+
+    // Set activity logger on CRDT manager
+    // Type assertion needed due to TypeScript module resolution quirk between dist and src
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    crdtManager.setActivityLogger(activityLogger as any);
+
+    // Initialize activity sync with callbacks
+    const activitySyncCallbacks: ActivitySyncCallbacks = {
+      reloadNote: async (noteId: string) => {
+        await crdtManager.reloadNote(noteId);
+      },
+      getLoadedNotes: () => crdtManager.getLoadedNotes(),
+    };
+    const activitySync = new ActivitySync(
+      fsAdapter,
+      instanceId,
+      activityDir,
+      activitySyncCallbacks
+    );
+
+    // Clean up orphaned activity logs on startup
+    await activitySync.cleanupOrphanedLogs();
+
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
     crdtManager.loadFolderTree('default');
@@ -250,6 +288,52 @@ void app.whenReady().then(async () => {
       }
     });
 
+    // Set up file watcher for cross-instance note sync
+    activityWatcher = new NodeFileWatcher();
+    await activityWatcher.watch(activityDir, (event) => {
+      console.log('[ActivityWatcher] Detected activity log change:', event.filename);
+
+      // Ignore directory creation events and our own log file
+      if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
+        return;
+      }
+
+      // Only process .log files
+      if (!event.filename.endsWith('.log')) {
+        return;
+      }
+
+      // Sync from other instances (wrapped in void to handle async in sync callback)
+      void (async () => {
+        try {
+          const affectedNotes = await activitySync.syncFromOtherInstances();
+
+          if (affectedNotes.size > 0) {
+            // Broadcast update to all windows
+            const windows = BrowserWindow.getAllWindows();
+            for (const window of windows) {
+              window.webContents.send('note:external-update', {
+                operation: 'external-sync',
+                noteIds: Array.from(affectedNotes),
+              });
+            }
+          }
+        } catch (error) {
+          console.error('[ActivityWatcher] Failed to sync from other instances:', error);
+        }
+      })();
+    });
+
+    // Periodic compaction of activity log (every 5 minutes)
+    compactionInterval = setInterval(
+      () => {
+        activityLogger.compact().catch((err) => {
+          console.error('[ActivityLogger] Failed to compact log:', err);
+        });
+      },
+      5 * 60 * 1000
+    );
+
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] IPC handlers ready, creating window...');
     }
@@ -296,6 +380,12 @@ app.on('before-quit', () => {
     }
     if (fileWatcher) {
       void fileWatcher.unwatch();
+    }
+    if (activityWatcher) {
+      void activityWatcher.unwatch();
+    }
+    if (compactionInterval) {
+      clearInterval(compactionInterval);
     }
     // Note: Database cleanup is async, but we can't await here
     // The database will be closed when the process exits

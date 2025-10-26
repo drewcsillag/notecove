@@ -5,3 +5,5 @@
 export * from './types';
 export { SyncDirectoryStructure } from './sd-structure';
 export { UpdateManager } from './update-manager';
+export { ActivityLogger } from './activity-logger';
+export { ActivitySync, type ActivitySyncCallbacks } from './activity-sync';

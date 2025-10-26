@@ -52,6 +52,19 @@ Object.defineProperty(window, 'electronAPI', {
 describe('App', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Make onUpdated return an unsubscribe function
+    mockElectronAPI.folder.onUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onDeleted.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.sync.onProgress.mockReturnValue(() => {
+      /* unsubscribe */
+    });
   });
   it('should render the three-panel layout', async () => {
     const { container } = render(<App />);

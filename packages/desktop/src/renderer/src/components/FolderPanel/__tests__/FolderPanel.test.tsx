@@ -14,17 +14,37 @@ jest.mock('../FolderTree', () => ({
 // Mock electron API
 const mockAppStateGet = jest.fn();
 const mockAppStateSet = jest.fn();
+const mockFolderOnUpdated = jest.fn();
+const mockFolderList = jest.fn();
+const mockFolderGet = jest.fn();
+const mockFolderCreate = jest.fn();
+const mockFolderRename = jest.fn();
+const mockFolderMove = jest.fn();
+const mockFolderDelete = jest.fn();
 
 global.window.electronAPI = {
   appState: {
     get: mockAppStateGet,
     set: mockAppStateSet,
   },
+  folder: {
+    list: mockFolderList,
+    get: mockFolderGet,
+    create: mockFolderCreate,
+    rename: mockFolderRename,
+    move: mockFolderMove,
+    delete: mockFolderDelete,
+    onUpdated: mockFolderOnUpdated,
+  },
 } as Partial<typeof window.electronAPI> as typeof window.electronAPI;
 
 describe('FolderPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Make onUpdated return an unsubscribe function
+    mockFolderOnUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
   });
 
   it('should render the folder panel with header', async () => {

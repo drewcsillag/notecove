@@ -62,7 +62,9 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:minop1205.github.io)",
       "Bash(git stash:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(pnpm --filter @notecove/shared test)",
+      "Bash(pnpm --filter @notecove/desktop typecheck:*)"
     ],
     "deny": [],
     "ask": []

@@ -58,4 +58,16 @@ export interface CRDTManager {
    * @returns The FolderTreeDoc instance or undefined
    */
   getFolderTree(sdId: string): import('@notecove/shared').FolderTreeDoc | undefined;
+
+  /**
+   * Reload a note from disk (re-apply all updates)
+   * @param noteId Note ID
+   */
+  reloadNote(noteId: string): Promise<void>;
+
+  /**
+   * Get all loaded note IDs
+   * @returns Array of note IDs
+   */
+  getLoadedNotes(): string[];
 }

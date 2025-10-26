@@ -14,6 +14,7 @@ import type { UUID, FolderData } from '@shared/types';
 export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
   private folderTrees = new Map<string, FolderTreeDoc>();
+  private activityLogger: import('@shared/storage').ActivityLogger | null = null;
 
   constructor(private updateManager: UpdateManager) {}
 
@@ -110,6 +111,11 @@ export class CRDTManagerImpl implements CRDTManager {
     await this.updateManager.writeNoteUpdate(noteId, update);
 
     state.lastModified = Date.now();
+
+    // Record activity for cross-instance sync
+    if (this.activityLogger) {
+      await this.activityLogger.recordNoteActivity(noteId, state.refCount);
+    }
   }
 
   /**
@@ -117,6 +123,43 @@ export class CRDTManagerImpl implements CRDTManager {
    */
   getLoadedNotes(): string[] {
     return Array.from(this.documents.keys());
+  }
+
+  /**
+   * Reload a note from disk
+   *
+   * Re-reads all updates from disk and applies them to the in-memory document.
+   * This is used for cross-instance synchronization.
+   */
+  async reloadNote(noteId: string): Promise<void> {
+    const state = this.documents.get(noteId);
+    if (!state) {
+      // Note not loaded, nothing to do
+      return;
+    }
+
+    try {
+      // Re-read all updates from disk
+      const updates = await this.updateManager.readNoteUpdates(noteId);
+
+      // Apply all updates (Yjs will automatically merge and deduplicate)
+      for (const update of updates) {
+        Y.applyUpdate(state.doc, update, 'reload');
+      }
+
+      state.lastModified = Date.now();
+    } catch (error) {
+      console.error(`Failed to reload note ${noteId}:`, error);
+    }
+  }
+
+  /**
+   * Set the activity logger instance
+   *
+   * This is called by the main process after initialization.
+   */
+  setActivityLogger(logger: import('@shared/storage').ActivityLogger): void {
+    this.activityLogger = logger;
   }
 
   /**
