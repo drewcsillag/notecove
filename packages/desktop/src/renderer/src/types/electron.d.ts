@@ -43,8 +43,9 @@ declare global {
           order: number;
           deleted: boolean;
         } | null>;
-        create: (sdId: string, parentId: string, name: string) => Promise<string>;
-        delete: (folderId: string) => Promise<void>;
+        create: (sdId: string, parentId: string | null, name: string) => Promise<string>;
+        rename: (sdId: string, folderId: string, newName: string) => Promise<void>;
+        delete: (sdId: string, folderId: string) => Promise<void>;
         onUpdated: (callback: (folderId: string) => void) => () => void;
       };
 

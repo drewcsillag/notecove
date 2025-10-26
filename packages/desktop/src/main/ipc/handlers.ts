@@ -33,6 +33,7 @@ export class IPCHandlers {
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
     ipcMain.handle('folder:get', this.handleGetFolder.bind(this));
     ipcMain.handle('folder:create', this.handleCreateFolder.bind(this));
+    ipcMain.handle('folder:rename', this.handleRenameFolder.bind(this));
     ipcMain.handle('folder:delete', this.handleDeleteFolder.bind(this));
 
     // App state operations
@@ -107,17 +108,124 @@ export class IPCHandlers {
 
   private async handleCreateFolder(
     _event: IpcMainInvokeEvent,
-    _sdId: string,
-    _parentId: string,
-    _name: string
+    sdId: string,
+    parentId: string | null,
+    name: string
   ): Promise<string> {
-    // TODO: Implement folder creation (Phase 2.4.2)
-    throw new Error('Not implemented');
+    // Validate name
+    if (!name || name.trim().length === 0) {
+      throw new Error('Folder name cannot be empty');
+    }
+
+    const trimmedName = name.trim();
+
+    // Check for name conflicts with siblings
+    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const siblings =
+      parentId === null ? folderTree.getRootFolders() : folderTree.getChildFolders(parentId);
+
+    const nameConflict = siblings.some((f) => f.name.toLowerCase() === trimmedName.toLowerCase());
+
+    if (nameConflict) {
+      throw new Error(`A folder named "${trimmedName}" already exists in this location`);
+    }
+
+    // Generate new folder ID
+    const folderId = crypto.randomUUID();
+
+    // Determine order (last in the list)
+    const maxOrder = siblings.reduce((max, f) => Math.max(max, f.order), -1);
+    const order = maxOrder + 1;
+
+    // Create folder data
+    const folderData: import('@notecove/shared').FolderData = {
+      id: folderId,
+      name: trimmedName,
+      parentId,
+      sdId,
+      order,
+      deleted: false,
+    };
+
+    // Update CRDT
+    folderTree.createFolder(folderData);
+
+    // Update SQLite cache
+    await this.database.upsertFolder({
+      id: folderId,
+      name: trimmedName,
+      parentId,
+      sdId,
+      order,
+      deleted: false,
+    });
+
+    return folderId;
   }
 
-  private async handleDeleteFolder(_event: IpcMainInvokeEvent, _folderId: string): Promise<void> {
-    // TODO: Implement folder deletion (Phase 2.4.2)
-    throw new Error('Not implemented');
+  private async handleRenameFolder(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string,
+    newName: string
+  ): Promise<void> {
+    // Validate name
+    if (!newName || newName.trim().length === 0) {
+      throw new Error('Folder name cannot be empty');
+    }
+
+    const trimmedName = newName.trim();
+    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folder = folderTree.getFolder(folderId);
+
+    if (!folder) {
+      throw new Error(`Folder ${folderId} not found`);
+    }
+
+    // Check for name conflicts with siblings
+    const siblings =
+      folder.parentId === null
+        ? folderTree.getRootFolders()
+        : folderTree.getChildFolders(folder.parentId);
+
+    const nameConflict = siblings.some(
+      (f) => f.id !== folderId && f.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (nameConflict) {
+      throw new Error(`A folder named "${trimmedName}" already exists in this location`);
+    }
+
+    // Update CRDT
+    folderTree.updateFolder(folderId, { name: trimmedName });
+
+    // Update SQLite cache
+    await this.database.upsertFolder({
+      ...folder,
+      name: trimmedName,
+    });
+  }
+
+  private async handleDeleteFolder(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string
+  ): Promise<void> {
+    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folder = folderTree.getFolder(folderId);
+
+    if (!folder) {
+      throw new Error(`Folder ${folderId} not found`);
+    }
+
+    // Soft delete in CRDT
+    folderTree.deleteFolder(folderId);
+
+    // Update SQLite cache
+    await this.database.upsertFolder({
+      ...folder,
+      deleted: true,
+    });
   }
 
   private async handleGetAppState(_event: IpcMainInvokeEvent, key: string): Promise<string | null> {
@@ -146,6 +254,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('folder:list');
     ipcMain.removeHandler('folder:get');
     ipcMain.removeHandler('folder:create');
+    ipcMain.removeHandler('folder:rename');
     ipcMain.removeHandler('folder:delete');
     ipcMain.removeHandler('appState:get');
     ipcMain.removeHandler('appState:set');

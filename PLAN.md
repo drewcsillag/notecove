@@ -829,47 +829,66 @@ This phase is split into 4 sub-phases for better manageability:
 
 ---
 
-#### 2.4.2 Folder CRUD Operations 🟥
+#### 2.4.2 Folder CRUD Operations ✅
 
-**Status:** To Do
+**Status:** Complete
 
-**Tasks:**
+**Completed Tasks:**
 
-- [ ] 🟥 Implement folder creation
-  - Add plus icon to header
-  - Click plus icon: create folder in active SD
-  - Dialog: prompt for folder name
-  - IPC handler: `folder:create`
-  - Update FolderTreeDoc CRDT
-  - Update SQLite cache
+- [x] ✅ **Backend CRUD Operations**
+  - IPC handler: `folder:create` - creates folders with UUID generation, order calculation (max + 1)
+  - IPC handler: `folder:rename` - renames folders with validation
+  - IPC handler: `folder:delete` - soft deletes folders (sets deleted flag)
+  - All handlers update both FolderTreeDoc CRDT and SQLite cache
+  - Name conflict validation (case-insensitive, sibling-only)
+  - Empty name validation and trimming
+- [x] ✅ **Create Folder UI**
+  - Plus icon button in FolderPanel header
+  - MUI Dialog for folder name input with Enter key support
+  - Auto-expand parent folder after creation
+  - Auto-select newly created folder
+  - Error display in dialog for validation failures
   - Default location: root level if "All Notes" selected, subfolder if folder selected
-- [ ] 🟥 Implement folder rename
-  - Double-click folder name to edit
-  - Or: Rename option in future context menu (2.4.3)
-  - IPC handler: `folder:rename`
-  - Update FolderTreeDoc CRDT
-  - Update SQLite cache
-- [ ] 🟥 Implement folder delete
-  - IPC handler: `folder:delete`
-  - Set deleted flag in FolderTreeDoc CRDT
-  - Update SQLite cache
-  - Confirmation dialog (simple for now, before context menu)
-- [ ] 🟥 Handle folder name conflicts
-  - Prevent rename/create if sibling has same name
-  - Alert user with friendly message
-- [ ] 🟥 Add tests for folder operations
-  - Test folder creation
-  - Test folder rename
+- [x] ✅ **Type Definitions**
+  - Updated preload script with folder.create, folder.rename, folder.delete methods
+  - Updated electron.d.ts with proper type signatures
+  - Full type safety for all folder operations
+- [x] ✅ **Comprehensive Tests** (17 new tests, all passing)
+  - Test folder creation (root and subfolders)
+  - Test folder rename with conflict prevention
   - Test folder deletion
-  - Test name conflict validation
+  - Test name conflict validation (case-insensitive)
+  - Test empty name rejection
+  - Test name trimming
+  - Test order calculation
+  - Test folder list/get operations
+
+**Files Added:**
+
+- `packages/desktop/src/main/ipc/__tests__/handlers.test.ts` - CRUD operation tests (17 tests)
+
+**Files Modified:**
+
+- `packages/desktop/src/main/ipc/handlers.ts` - Added create/rename/delete handlers
+- `packages/desktop/src/preload/index.ts` - Exposed folder CRUD methods
+- `packages/desktop/src/renderer/src/types/electron.d.ts` - Updated type definitions
+- `packages/desktop/src/renderer/src/components/FolderPanel/FolderPanel.tsx` - Added create dialog
+- `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx` - Added refreshTrigger prop
+
+**Deferred to Phase 2.4.3:**
+
+- Rename folder UI (will use context menu for better UX)
+- Delete folder UI (will use context menu with confirmation)
 
 **Acceptance Criteria:**
 
-- ✅ Can create folders with unique names
-- ✅ Can rename folders (with conflict prevention)
-- ✅ Can delete folders (with confirmation)
-- ✅ Folder changes sync to all open windows
-- ✅ Changes persist to CRDT and SQLite
+- [x] ✅ Backend can create folders with unique names
+- [x] ✅ Backend can rename folders (with conflict prevention)
+- [x] ✅ Backend can delete folders (soft delete)
+- [x] ✅ Create folder UI functional with validation
+- [x] ✅ Changes persist to CRDT and SQLite
+- [ ] ⏭️ Rename/delete UI (deferred to 2.4.3)
+- [ ] ⏭️ Folder changes sync to all open windows (requires IPC events in 2.6)
 
 ---
 
@@ -879,35 +898,41 @@ This phase is split into 4 sub-phases for better manageability:
 
 **Tasks:**
 
-- [ ] 🟥 Implement folder drag & drop
+- [ ] 🟥 **Implement folder context menu** (includes deferred UI from 2.4.2)
+  - Right-click folder for menu
+  - Options: Rename, Move to Top Level, Delete
+  - "Rename" → inline editing or dialog (uses existing `folder:rename` handler from 2.4.2)
+  - "Move to Top Level" → set parentId to null
+  - "Delete" → confirmation dialog (uses existing `folder:delete` handler from 2.4.2)
+  - **Note:** Backend handlers for rename/delete already complete in 2.4.2
+- [ ] 🟥 **Implement folder drag & drop**
   - Drag folder to another folder (nesting)
   - Drag folder to "All Notes" (move to root - set parentId to null)
   - Cannot drag folder to be its own descendant (validate)
   - Cannot drag across SDs (single SD only in 2.4.3)
   - Visual feedback during drag (cursor, drop zones)
-  - IPC handler: `folder:move`
+  - IPC handler: `folder:move` - updates parentId and order
   - Update FolderTreeDoc CRDT (parentId, order)
   - Update SQLite cache
-- [ ] 🟥 Implement folder context menu
-  - Right-click folder for menu
-  - Options: Rename, Move to Top Level, Delete
-  - "Rename" → inline editing
-  - "Move to Top Level" → set parentId to null
-  - "Delete" → confirmation dialog, recursive delete (set deleted flag)
-- [ ] 🟥 Add tests for drag & drop
+- [ ] 🟥 **Add tests for context menu**
+  - Test menu opening
+  - Test rename action (UI only - handler tested in 2.4.2)
+  - Test delete action with confirmation (UI only - handler tested in 2.4.2)
+  - Test move to top level action
+- [ ] 🟥 **Add tests for drag & drop**
   - Test folder moving (parent change)
   - Test circular reference prevention
   - Test visual feedback
-- [ ] 🟥 Add tests for context menu
-  - Test menu opening
-  - Test each menu action
 
 **Acceptance Criteria:**
 
+- ✅ Context menu appears on right-click
+- ✅ Can rename folder via context menu
+- ✅ Can delete folder via context menu (with confirmation)
+- ✅ Can move folder to top level via context menu
 - ✅ Can drag folders to nest/unnest
 - ✅ Cannot create circular references
 - ✅ Visual feedback during drag is clear
-- ✅ Context menu appears on right-click
 - ✅ All context menu actions work correctly
 
 ---

@@ -91,10 +91,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         order: number;
         deleted: boolean;
       } | null>,
-    create: (sdId: string, parentId: string, name: string): Promise<string> =>
+    create: (sdId: string, parentId: string | null, name: string): Promise<string> =>
       ipcRenderer.invoke('folder:create', sdId, parentId, name) as Promise<string>,
-    delete: (folderId: string): Promise<void> =>
-      ipcRenderer.invoke('folder:delete', folderId) as Promise<void>,
+    rename: (sdId: string, folderId: string, newName: string): Promise<void> =>
+      ipcRenderer.invoke('folder:rename', sdId, folderId, newName) as Promise<void>,
+    delete: (sdId: string, folderId: string): Promise<void> =>
+      ipcRenderer.invoke('folder:delete', sdId, folderId) as Promise<void>,
 
     // Event listeners
     onUpdated: (callback: (folderId: string) => void): (() => void) => {

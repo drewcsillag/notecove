@@ -25,6 +25,7 @@ export interface FolderTreeProps {
   expandedFolderIds?: string[];
   onFolderSelect?: (folderId: string | null) => void;
   onExpandedChange?: (expandedIds: string[]) => void;
+  refreshTrigger?: number; // Change this number to force reload
 }
 
 /**
@@ -103,6 +104,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   expandedFolderIds = [],
   onFolderSelect,
   onExpandedChange,
+  refreshTrigger = 0,
 }) => {
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +126,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
     };
 
     void loadFolders();
-  }, [sdId]);
+  }, [sdId, refreshTrigger]);
 
   if (loading) {
     return (
