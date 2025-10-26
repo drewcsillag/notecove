@@ -14,10 +14,11 @@
     "lint": "eslint src --ext .ts,.tsx",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "pretest:e2e": "npx @electron/rebuild -f -w better-sqlite3",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "rebuild": "electron-rebuild"
+    "rebuild": "npx @electron/rebuild"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",

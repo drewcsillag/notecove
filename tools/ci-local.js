@@ -17,7 +17,7 @@ const checks = [
   { name: 'Coverage', cmd: 'pnpm test:coverage' },
   {
     name: 'Rebuild for Electron',
-    cmd: 'cd packages/desktop && npx @electron/rebuild > /dev/null 2>&1',
+    cmd: 'cd packages/desktop && npx @electron/rebuild -f -w better-sqlite3',
   },
   { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
 ];
