@@ -14,7 +14,8 @@ import type { Database } from '@notecove/shared';
 export class IPCHandlers {
   constructor(
     private crdtManager: CRDTManager,
-    private database: Database
+    private database: Database,
+    private createWindowFn?: () => void
   ) {
     this.registerHandlers();
   }
@@ -50,6 +51,11 @@ export class IPCHandlers {
     // App state operations
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
     ipcMain.handle('appState:set', this.handleSetAppState.bind(this));
+
+    // Testing operations (only register if createWindowFn provided)
+    if (this.createWindowFn) {
+      ipcMain.handle('testing:createWindow', this.handleCreateWindow.bind(this));
+    }
   }
 
   private async handleLoadNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
@@ -316,6 +322,15 @@ export class IPCHandlers {
   }
 
   /**
+   * Testing: Create a new window
+   */
+  private async handleCreateWindow(_event: IpcMainInvokeEvent): Promise<void> {
+    if (this.createWindowFn) {
+      this.createWindowFn();
+    }
+  }
+
+  /**
    * Clean up all handlers
    */
   destroy(): void {
@@ -334,5 +349,9 @@ export class IPCHandlers {
     ipcMain.removeHandler('folder:move');
     ipcMain.removeHandler('appState:get');
     ipcMain.removeHandler('appState:set');
+
+    if (this.createWindowFn) {
+      ipcMain.removeHandler('testing:createWindow');
+    }
   }
 }

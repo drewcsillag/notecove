@@ -135,4 +135,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     set: (key: string, value: string): Promise<void> =>
       ipcRenderer.invoke('appState:set', key, value) as Promise<void>,
   },
+
+  // Testing operations (only available if main process registered handler)
+  testing: {
+    createWindow: (): Promise<void> =>
+      ipcRenderer.invoke('testing:createWindow') as Promise<void>,
+  },
 });

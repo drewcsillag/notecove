@@ -203,8 +203,8 @@ void app.whenReady().then(async () => {
     // This ensures demo folders are created while we know the updates directory exists
     crdtManager.loadFolderTree('default');
 
-    // Initialize IPC handlers
-    ipcHandlers = new IPCHandlers(crdtManager, database);
+    // Initialize IPC handlers (pass createWindow for testing support)
+    ipcHandlers = new IPCHandlers(crdtManager, database, createWindow);
 
     // Set up file watcher for cross-instance folder sync
     fileWatcher = new NodeFileWatcher();

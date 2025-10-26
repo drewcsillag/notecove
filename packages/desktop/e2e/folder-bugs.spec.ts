@@ -350,36 +350,11 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Create a second window programmatically by getting the first window's path
-    const firstWindowUrl = await page.evaluate(() => window.location.href);
-    console.log('[TEST] First window URL:', firstWindowUrl);
+    // Create a second window using the testing IPC method
+    await page.evaluate(() => window.electronAPI.testing.createWindow());
 
-    // Create second window via Electron evaluate with hardcoded paths
-    await electronApp.evaluate(async ({ BrowserWindow }) => {
-      const newWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        show: false,
-        autoHideMenuBar: false,
-        webPreferences: {
-          preload: __dirname + '/../preload/index.js',
-          sandbox: false,
-          contextIsolation: true,
-          nodeIntegration: false,
-        },
-      });
-
-      newWindow.on('ready-to-show', () => {
-        newWindow.show();
-      });
-
-      // Load the renderer
-      await newWindow.loadFile(__dirname + '/../renderer/index.html');
-
-      console.log('[TEST] Created second window. Total windows:', BrowserWindow.getAllWindows().length);
-    });
-
-    await page.waitForTimeout(2000);
+    // Wait for window to be created
+    await page.waitForTimeout(1000);
 
     // Get all windows
     const allPages = await electronApp.windows();
@@ -433,25 +408,10 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Create second window programmatically
-    await electronApp.evaluate(async ({ BrowserWindow }) => {
-      const newWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        show: false,
-        autoHideMenuBar: false,
-        webPreferences: {
-          preload: __dirname + '/../preload/index.js',
-          sandbox: false,
-          contextIsolation: true,
-          nodeIntegration: false,
-        },
-      });
-      newWindow.on('ready-to-show', () => { newWindow.show(); });
-      await newWindow.loadFile(__dirname + '/../renderer/index.html');
-    });
+    // Create second window using testing IPC method
+    await page.evaluate(() => window.electronAPI.testing.createWindow());
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
 
     const allPages = await electronApp.windows();
 
@@ -502,25 +462,10 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Create second window programmatically
-    await electronApp.evaluate(async ({ BrowserWindow }) => {
-      const newWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        show: false,
-        autoHideMenuBar: false,
-        webPreferences: {
-          preload: __dirname + '/../preload/index.js',
-          sandbox: false,
-          contextIsolation: true,
-          nodeIntegration: false,
-        },
-      });
-      newWindow.on('ready-to-show', () => { newWindow.show(); });
-      await newWindow.loadFile(__dirname + '/../renderer/index.html');
-    });
+    // Create second window using testing IPC method
+    await page.evaluate(() => window.electronAPI.testing.createWindow());
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
 
     const allPages = await electronApp.windows();
 
