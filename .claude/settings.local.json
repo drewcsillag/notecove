@@ -57,7 +57,8 @@
       "Bash(pnpm --filter @notecove/desktop rebuild:*)",
       "Bash(npx --yes node-gyp rebuild:*)",
       "Bash(pnpm --filter @notecove/desktop add:*)",
-      "Bash(pnpm --filter @notecove/desktop remove:*)"
+      "Bash(pnpm --filter @notecove/desktop remove:*)",
+      "Bash(tee:*)"
     ],
     "deny": [],
     "ask": []

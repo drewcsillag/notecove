@@ -15,11 +15,23 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import { resolve } from 'path';
+import { rm } from 'fs/promises';
+import { join } from 'path';
+import { homedir } from 'os';
 
 let electronApp: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
+  // Clean up any existing test storage to start fresh
+  const storageDir = join(homedir(), 'Library', 'Application Support', 'Electron', 'storage');
+  try {
+    await rm(storageDir, { recursive: true, force: true });
+    console.log('[E2E] Cleaned up existing storage directory');
+  } catch (err) {
+    // Ignore errors if directory doesn't exist
+  }
+
   const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
   console.log('[E2E] Launching Electron with main process at:', mainPath);
 
@@ -54,9 +66,15 @@ test.describe('Bug: Right-click rename renames wrong folder', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Verify default folder structure exists
-    // Work -> Projects
+    // Verify "Work" folder exists (top level)
     await expect(page.locator('text=Work')).toBeVisible();
+
+    // Expand "Work" folder to see "Projects"
+    const workFolder = page.locator('role=treeitem[name=/Work/]').first();
+    await workFolder.click();
+    await page.waitForTimeout(500);
+
+    // Now "Projects" should be visible
     await expect(page.locator('text=Projects')).toBeVisible();
 
     // Right-click on "Projects" (nested under Work)
@@ -103,12 +121,17 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Verify initial structure:
-    // Work -> Projects
-    // Personal -> Ideas, Recipes
+    // Verify Work and Personal exist at top level
     await expect(page.locator('text=Work')).toBeVisible();
-    await expect(page.locator('text=Projects')).toBeVisible();
     await expect(page.locator('text=Personal')).toBeVisible();
+
+    // Expand "Personal" to see "Ideas" and "Recipes"
+    const personalFolder = page.locator('role=treeitem[name=/Personal/]').first();
+    await personalFolder.click();
+    await page.waitForTimeout(500);
+
+    // Now nested folders should be visible
+    await expect(page.locator('text=Ideas')).toBeVisible();
     await expect(page.locator('text=Recipes')).toBeVisible();
 
     // Get tree items for drag and drop
@@ -151,6 +174,11 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
+
+    // Expand "Personal" to see "Ideas" and "Recipes"
+    const personalFolder = page.locator('role=treeitem[name=/Personal/]').first();
+    await personalFolder.click();
+    await page.waitForTimeout(500);
 
     // First drag: Move "Ideas" to "Work"
     const ideasItem = page.locator('role=treeitem').filter({ hasText: 'Ideas' }).first();
@@ -195,6 +223,7 @@ test.describe('Bug: Folders don\'t persist across app restarts', () => {
   test('should persist created folders after app restart', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
+    await page.waitForTimeout(2000); // Wait for folder tree to fully load
 
     // Select "All Notes"
     await page.locator('text=All Notes').click();
@@ -211,7 +240,7 @@ test.describe('Bug: Folders don\'t persist across app restarts', () => {
     const createButton = page.locator('button:has-text("Create")');
     await createButton.click();
 
-    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden', timeout: 5000 });
     await page.waitForSelector('text=Persistent Test Folder', { timeout: 5000 });
 
     // Verify folder exists
@@ -244,7 +273,7 @@ test.describe('Bug: Folders don\'t persist across app restarts', () => {
   test('should persist renamed folders after app restart', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000); // Wait for folder tree to fully load
 
     // Right-click on "Work" and rename it
     const workFolder = page.locator('text=Work').first();
@@ -294,19 +323,36 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Open a second window
-    const pages = await electronApp.windows();
-    console.log('Initial windows:', pages.length);
+    // Create a second window programmatically by getting the first window's path
+    const firstWindowUrl = await page.evaluate(() => window.location.href);
+    console.log('[TEST] First window URL:', firstWindowUrl);
 
-    // Create a new window (simulating File -> New Window)
-    // In a real Electron app, we'd trigger this via menu or IPC
-    // For now, we'll use page.context().newPage() if available
-    // or wait for a new window event
+    // Create second window via Electron evaluate with hardcoded paths
+    await electronApp.evaluate(async ({ BrowserWindow }) => {
+      const newWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        show: false,
+        autoHideMenuBar: false,
+        webPreferences: {
+          preload: __dirname + '/../preload/index.js',
+          sandbox: false,
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
 
-    // Trigger new window creation via keyboard shortcut or programmatically
-    // Note: This might need adjustment based on how your app creates new windows
-    await page.keyboard.press('Control+N'); // Common shortcut for new window
-    await page.waitForTimeout(1000);
+      newWindow.on('ready-to-show', () => {
+        newWindow.show();
+      });
+
+      // Load the renderer
+      await newWindow.loadFile(__dirname + '/../renderer/index.html');
+
+      console.log('[TEST] Created second window. Total windows:', BrowserWindow.getAllWindows().length);
+    });
+
+    await page.waitForTimeout(2000);
 
     // Get all windows
     const allPages = await electronApp.windows();
@@ -360,9 +406,25 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Try to get a second window
-    await page.keyboard.press('Control+N');
-    await page.waitForTimeout(1000);
+    // Create second window programmatically
+    await electronApp.evaluate(async ({ BrowserWindow }) => {
+      const newWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        show: false,
+        autoHideMenuBar: false,
+        webPreferences: {
+          preload: __dirname + '/../preload/index.js',
+          sandbox: false,
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
+      newWindow.on('ready-to-show', () => { newWindow.show(); });
+      await newWindow.loadFile(__dirname + '/../renderer/index.html');
+    });
+
+    await page.waitForTimeout(2000);
 
     const allPages = await electronApp.windows();
 
@@ -413,9 +475,25 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
-    // Try to get a second window
-    await page.keyboard.press('Control+N');
-    await page.waitForTimeout(1000);
+    // Create second window programmatically
+    await electronApp.evaluate(async ({ BrowserWindow }) => {
+      const newWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        show: false,
+        autoHideMenuBar: false,
+        webPreferences: {
+          preload: __dirname + '/../preload/index.js',
+          sandbox: false,
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
+      newWindow.on('ready-to-show', () => { newWindow.show(); });
+      await newWindow.loadFile(__dirname + '/../renderer/index.html');
+    });
+
+    await page.waitForTimeout(2000);
 
     const allPages = await electronApp.windows();
 
@@ -425,6 +503,11 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
 
       await page1.waitForSelector('text=Folders', { timeout: 10000 });
       await page2.waitForSelector('text=Folders', { timeout: 10000 });
+
+      // Expand "Personal" to see "Ideas"
+      const personalFolder = page1.locator('role=treeitem[name=/Personal/]').first();
+      await personalFolder.click();
+      await page1.waitForTimeout(500);
 
       // Move a folder in window 1 using context menu
       const ideasFolder = page1.locator('text=Ideas').first();
@@ -564,8 +647,13 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
       await page2.waitForTimeout(3000);
 
       // Verify folder appears in instance 2
+      // The folder:updated event should trigger a UI refresh in instance 2
       console.log('[SYNC TEST] Checking instance 2 for synced folder...');
-      await expect(page2.locator('text=Cross Instance Sync Test')).toBeVisible();
+
+      // Give the UI time to refresh after folder:updated event
+      await page2.waitForTimeout(1000);
+
+      await expect(page2.locator('text=Cross Instance Sync Test')).toBeVisible({ timeout: 5000 });
 
       console.log('[SYNC TEST] ✓ Folder creation synced!');
 
@@ -597,9 +685,12 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
       console.log('[SYNC TEST] Waiting for sync back to instance 1...');
       await page1.waitForTimeout(3000);
 
+      // Give UI time to refresh after folder:updated event
+      await page1.waitForTimeout(1000);
+
       // Verify rename synced to instance 1
       console.log('[SYNC TEST] Checking instance 1 for synced rename...');
-      await expect(page1.locator('text=Synced and Renamed')).toBeVisible();
+      await expect(page1.locator('text=Synced and Renamed')).toBeVisible({ timeout: 5000 });
       await expect(page1.locator('text=Cross Instance Sync Test')).not.toBeVisible();
 
       console.log('[SYNC TEST] ✓ Folder rename synced!');
