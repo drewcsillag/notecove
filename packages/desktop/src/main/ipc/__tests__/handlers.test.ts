@@ -16,6 +16,9 @@ jest.mock('electron', () => ({
     handle: jest.fn(),
     removeHandler: jest.fn(),
   },
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
+  },
 }));
 
 // Mock crypto.randomUUID for Node <19

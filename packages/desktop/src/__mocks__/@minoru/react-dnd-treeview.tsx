@@ -1,7 +1,7 @@
 /**
  * Mock for @minoru/react-dnd-treeview
  */
-import React from 'react';
+import * as React from 'react';
 
 export interface NodeModel<T = unknown> {
   id: string | number;
@@ -20,12 +20,27 @@ export interface DropOptions<T = unknown> {
   relativeIndex?: number;
 }
 
-export const Tree = ({ treeData }: { treeData?: NodeModel[] }): JSX.Element => {
-  if (!treeData) return React.createElement('div', { 'data-testid': 'tree-mock' }, 'Loading...');
+export const Tree = ({
+  tree,
+  treeData,
+}: {
+  tree?: NodeModel[];
+  treeData?: NodeModel[];
+}): React.ReactElement => {
+  // Support both 'tree' and 'treeData' props
+  const nodes = tree ?? treeData;
+
+  if (!nodes) {
+    return React.createElement('div', { 'data-testid': 'tree-mock' }, 'Loading...');
+  }
+
+  // Render each node as a div with its text so tests can find them
   return React.createElement(
     'div',
     { 'data-testid': 'tree-mock' },
-    treeData.map((node) => node.text).join(', ')
+    nodes.map((node, index) =>
+      React.createElement('div', { key: index }, node.text ?? String(node.id))
+    )
   );
 };
 

@@ -1,10 +1,10 @@
 /**
  * Mock for react-dnd
  */
-import React from 'react';
+import * as React from 'react';
 
-export const DndProvider = ({ children }: { children: React.ReactNode }) => {
-  return <div data-testid="dnd-provider">{children}</div>;
+export const DndProvider = ({ children }: { children: React.ReactNode }): React.ReactElement => {
+  return React.createElement('div', { 'data-testid': 'dnd-provider' }, children);
 };
 
 export const useDrag = () => [{}, () => null];
