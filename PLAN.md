@@ -1,8 +1,8 @@
 # NoteCove Implementation Plan
 
-**Overall Progress:** `8/21 phases (38%)`
+**Overall Progress:** `8/21 phases (38%)` + Phase 2.4.1/4 sub-phases complete
 
-**Last Updated:** 2025-10-25 (Completed Phase 2.2: Three-Panel Layout)
+**Last Updated:** 2025-10-25 (Completed Phase 2.4.1: Basic Folder Tree Display)
 
 ---
 
@@ -769,45 +769,48 @@ The proper implementation MUST use the **Yjs Synchronization Protocol**, which i
 
 ---
 
-### 2.4 Folder Tree Panel 🟥
+### 2.4 Folder Tree Panel 🟡
 
-**Status:** To Do (Split into Sub-Phases)
+**Status:** In Progress (1/4 sub-phases complete)
 
 This phase is split into 4 sub-phases for better manageability:
 
 ---
 
-#### 2.4.1 Basic Folder Tree Display (Read-Only, Single SD) 🟥
+#### 2.4.1 Basic Folder Tree Display (Read-Only, Single SD) ✅
 
-**Status:** To Do
+**Status:** Complete
 
 **Tasks:**
 
-- [ ] 🟥 Set up MUI TreeView component
-  - Install @mui/x-tree-view package
-  - Create basic FolderTree component
-  - Header: "FOLDERS" (no plus icon yet)
-- [ ] 🟥 Implement IPC handlers for folder data
+- [x] ✅ Set up MUI TreeView component
+  - Installed @mui/x-tree-view ^8.15.0
+  - Created FolderTree component using RichTreeView
+  - Header: "Folders" in FolderPanel
+- [x] ✅ Implement IPC handlers for folder data
   - `folder:list` - Get all folders for default SD
   - `folder:get` - Get single folder by ID
   - Load from FolderTreeDoc CRDT and return folder list
-- [ ] 🟥 Display folder tree structure
+  - Extended CRDTManager with loadFolderTree() and createDemoFolders()
+- [x] ✅ Display folder tree structure
   - Show "All Notes" at top (UI-only, not in CRDT)
   - Show user folders from CRDT (sorted by order)
   - Show "Recently Deleted" at bottom (UI-only, not in CRDT)
-  - Display folder names with proper nesting
-  - Show note count badges (placeholder counts for now)
-- [ ] 🟥 Implement folder selection
+  - Display folder names with proper nesting via buildTreeItems()
+  - Note count badges deferred to Phase 2.6 (Notes List Panel)
+- [x] ✅ Implement folder selection
   - Click folder to select
   - Visual feedback for selected folder
-  - Persist selection in app_state
-- [ ] 🟥 Implement expand/collapse
+  - Persist selection in app_state (key: 'selectedFolderId')
+  - Defaults to "all-notes" on first load
+- [x] ✅ Implement expand/collapse
   - Click folder to expand/collapse children
-  - Persist expansion state in app_state
-- [ ] 🟥 Add basic tests
-  - Test folder tree rendering
-  - Test folder selection
-  - Test expand/collapse
+  - Persist expansion state in app_state (key: 'expandedFolderIds')
+  - State stored as JSON array
+- [x] ✅ Add basic tests
+  - FolderTree.test.tsx: 8 tests (loading, error, rendering, selection, expansion)
+  - FolderPanel.test.tsx: 5 tests (rendering, state persistence, error handling)
+  - All tests passing (13/13)
 
 **Acceptance Criteria:**
 
@@ -815,7 +818,7 @@ This phase is split into 4 sub-phases for better manageability:
 - ✅ "All Notes" and "Recently Deleted" appear at correct positions
 - ✅ Can select folders (persists across restarts)
 - ✅ Can expand/collapse folders (persists across restarts)
-- ✅ Note count badges appear (even if placeholder)
+- ⏭️ Note count badges deferred to Phase 2.6
 
 **Deferred to Later Sub-Phases:**
 
