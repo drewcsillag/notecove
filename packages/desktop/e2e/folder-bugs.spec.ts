@@ -22,8 +22,8 @@ import { homedir } from 'os';
 let electronApp: ElectronApplication;
 let page: Page;
 
-test.beforeAll(async () => {
-  // Clean up any existing test storage to start fresh
+test.beforeEach(async () => {
+  // Clean up any existing test storage to start fresh for EACH test
   const storageDir = join(homedir(), 'Library', 'Application Support', 'Electron', 'storage');
   try {
     await rm(storageDir, { recursive: true, force: true });
@@ -56,8 +56,15 @@ test.beforeAll(async () => {
   });
 }, 60000);
 
-test.afterAll(async () => {
-  await electronApp.close();
+test.afterEach(async () => {
+  if (electronApp) {
+    try {
+      await electronApp.close();
+    } catch (err) {
+      // App may already be closed by test (e.g., restart tests)
+      console.log('[E2E] App already closed or failed to close:', err);
+    }
+  }
 });
 
 test.describe('Bug: Right-click rename renames wrong folder', () => {
@@ -149,21 +156,19 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     // Wait for tree to update and folder:updated event to propagate
     await page.waitForTimeout(3000);
 
+    // Force reload the tree by clicking "All Notes" to trigger fresh data load
+    await page.locator('text=All Notes').click();
+    await page.waitForTimeout(500);
+
     // Expand Work folder to see Recipes (which should have moved there)
     const workFolderItem = page.getByRole('treeitem', { name: /^Work/ });
-    const isWorkExpanded = await workFolderItem.getAttribute('aria-expanded');
-    if (isWorkExpanded !== 'true') {
-      await workFolderItem.click();
-      await page.waitForTimeout(1000);
-    }
+    await workFolderItem.click(); // Always click to ensure expansion
+    await page.waitForTimeout(1000);
 
-    // Personal should still be expanded from before, but verify
+    // Expand Personal to see Ideas
     const personalFolderItem = page.getByRole('treeitem', { name: /^Personal/ });
-    const isPersonalExpanded = await personalFolderItem.getAttribute('aria-expanded');
-    if (isPersonalExpanded !== 'true') {
-      await personalFolderItem.click();
-      await page.waitForTimeout(1000);
-    }
+    await personalFolderItem.click(); // Always click to ensure expansion
+    await page.waitForTimeout(1000);
 
     // Verify ONLY "Recipes" moved under "Work"
     // The entire "Personal" folder should NOT have moved
@@ -203,16 +208,15 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
 
     await ideasItem.dragTo(workItem);
 
-    // Wait longer for folder:updated event to propagate and UI to refresh
-    await page.waitForTimeout(3000);
+    // Wait for folder:updated event and force tree refresh
+    await page.waitForTimeout(2000);
+    await page.locator('text=All Notes').click();
+    await page.waitForTimeout(500);
 
-    // Expand Work to verify Ideas moved (check aria-expanded first)
+    // Expand Work to verify Ideas moved
     const workFolderItem = page.getByRole('treeitem', { name: /^Work/ });
-    const isWorkExpanded = await workFolderItem.getAttribute('aria-expanded');
-    if (isWorkExpanded !== 'true') {
-      await workFolderItem.click();
-      await page.waitForTimeout(1000);
-    }
+    await workFolderItem.click();
+    await page.waitForTimeout(1000);
 
     // Verify "Ideas" is now visible (should be under Work)
     await expect(page.locator('text=Ideas')).toBeVisible();
@@ -221,9 +225,18 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
     const recipesItem = page.getByRole('treeitem', { name: 'Recipes', exact: true });
 
     await recipesItem.dragTo(workItem);
-    await page.waitForTimeout(3000);
 
-    // Verify "Recipes" is now also under Work (Work should still be expanded)
+    // Wait for folder:updated event and force tree refresh
+    await page.waitForTimeout(2000);
+    await page.locator('text=All Notes').click();
+    await page.waitForTimeout(500);
+
+    // Re-expand Work to see both Ideas and Recipes
+    const workFolderItem2 = page.getByRole('treeitem', { name: /^Work/ });
+    await workFolderItem2.click();
+    await page.waitForTimeout(1000);
+
+    // Verify "Recipes" is now also under Work
     await expect(page.locator('text=Recipes')).toBeVisible();
 
     // Third drag: Move "Ideas" back to "Personal" - use exact selectors
@@ -231,15 +244,16 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
     const personalItem = page.getByRole('treeitem', { name: /^Personal/, exact: false });
 
     await ideasItem2.dragTo(personalItem);
-    await page.waitForTimeout(3000);
 
-    // Expand Personal to verify Ideas moved back (check aria-expanded first)
+    // Wait for folder:updated event and force tree refresh
+    await page.waitForTimeout(2000);
+    await page.locator('text=All Notes').click();
+    await page.waitForTimeout(500);
+
+    // Expand Personal to verify Ideas moved back
     const personalFolderItem = page.getByRole('treeitem', { name: /^Personal/ });
-    const isPersonalExpanded = await personalFolderItem.getAttribute('aria-expanded');
-    if (isPersonalExpanded !== 'true') {
-      await personalFolderItem.click();
-      await page.waitForTimeout(500);
-    }
+    await personalFolderItem.click();
+    await page.waitForTimeout(1000);
 
     // Verify "Ideas" is back under Personal
     await expect(page.locator('text=Ideas')).toBeVisible();

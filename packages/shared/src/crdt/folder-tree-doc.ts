@@ -40,6 +40,16 @@ export class FolderTreeDoc {
       throw new Error(`Folder ${folderId} not found`);
     }
 
+    console.log(`[FolderTreeDoc] updateFolder ${folderId}:`, {
+      before: {
+        name: folder.get('name'),
+        parentId: folder.get('parentId'),
+        order: folder.get('order'),
+        deleted: folder.get('deleted'),
+      },
+      updates,
+    });
+
     this.doc.transact(() => {
       if (updates.name !== undefined) {
         folder.set('name', updates.name);
@@ -53,6 +63,13 @@ export class FolderTreeDoc {
       if (updates.deleted !== undefined) {
         folder.set('deleted', updates.deleted);
       }
+    });
+
+    console.log(`[FolderTreeDoc] updateFolder ${folderId} after:`, {
+      name: folder.get('name'),
+      parentId: folder.get('parentId'),
+      order: folder.get('order'),
+      deleted: folder.get('deleted'),
     });
   }
 
@@ -80,16 +97,20 @@ export class FolderTreeDoc {
    */
   getAllFolders(): FolderData[] {
     const result: FolderData[] = [];
-    this.folders.forEach((folderMap) => {
-      result.push({
+    console.log(`[FolderTreeDoc] getAllFolders: folders.size = ${this.folders.size}`);
+    this.folders.forEach((folderMap, key) => {
+      const folderData = {
         id: folderMap.get('id') as UUID,
         name: folderMap.get('name') as string,
         parentId: (folderMap.get('parentId') as UUID | null) ?? null,
         sdId: folderMap.get('sdId') as string,
         order: folderMap.get('order') as number,
         deleted: folderMap.get('deleted') as boolean,
-      });
+      };
+      console.log(`[FolderTreeDoc]   folder ${key}:`, folderData);
+      result.push(folderData);
     });
+    console.log(`[FolderTreeDoc] getAllFolders returning ${result.length} folders`);
     return result;
   }
 

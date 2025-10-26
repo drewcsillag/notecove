@@ -5,7 +5,7 @@
  * Phase 2.4.1: Read-only display with selection and expand/collapse.
  */
 
-import { type FC, forwardRef, useEffect, useState, type MouseEvent, type DragEvent } from 'react';
+import { type FC, forwardRef, useEffect, useState, useRef, type MouseEvent, type DragEvent } from 'react';
 import {
   Box,
   Typography,
@@ -264,6 +264,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   // Drag & drop state
   const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
   const [draggedOverFolderId, setDraggedOverFolderId] = useState<string | null>(null);
+  const dropHandledRef = useRef(false); // Synchronous flag for drop handling
 
   useEffect(() => {
     const loadFolders = async (): Promise<void> => {
@@ -435,6 +436,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
       return;
     }
     setDraggedFolderId(itemId);
+    dropHandledRef.current = false; // Reset drop handled flag for new drag
   };
 
   const handleDragOver = (_event: DragEvent<HTMLLIElement>, itemId: string): void => {
@@ -450,6 +452,14 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   const handleDrop = async (_event: DragEvent<HTMLLIElement>, itemId: string): Promise<void> => {
     if (!draggedFolderId) return;
+
+    // CRITICAL FIX: Only handle drop ONCE per drag operation
+    // The event bubbles up from child items, but we only want the first (deepest) handler to run
+    // Use a ref instead of state for synchronous checking
+    if (dropHandledRef.current) {
+      return;
+    }
+    dropHandledRef.current = true; // Mark this drop as handled
 
     // Validate drop
     if (!isValidDropTarget(itemId, draggedFolderId)) {
@@ -486,6 +496,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
     // Always reset drag state when drag ends (successful drop, ESC key, or cancelled)
     setDraggedFolderId(null);
     setDraggedOverFolderId(null);
+    dropHandledRef.current = false; // Reset for next drag operation
   };
 
   const treeItems = buildTreeItems(folders);
