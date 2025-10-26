@@ -260,7 +260,7 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
   });
 });
 
-test.describe('Bug: Folders don\'t persist across app restarts', () => {
+test.describe("Bug: Folders don't persist across app restarts", () => {
   test('should persist created folders after app restart', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
@@ -358,7 +358,7 @@ test.describe('Bug: Folders don\'t persist across app restarts', () => {
   });
 });
 
-test.describe('Bug: Folder changes don\'t sync across windows', () => {
+test.describe("Bug: Folder changes don't sync across windows", () => {
   test('should sync folder creation across multiple windows in same instance', async () => {
     // Wait for first window to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
@@ -412,7 +412,7 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
       // If we can't create a second window, mark this as a limitation
       console.log('Could not create second window for sync test');
       throw new Error(
-        'Sync test requires multiple windows - this test needs app support for window creation',
+        'Sync test requires multiple windows - this test needs app support for window creation'
       );
     }
   });
@@ -466,7 +466,7 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
       await expect(page2.locator('text=Work')).not.toBeVisible();
     } else {
       throw new Error(
-        'Sync test requires multiple windows - this test needs app support for window creation',
+        'Sync test requires multiple windows - this test needs app support for window creation'
       );
     }
   });
@@ -521,7 +521,7 @@ test.describe('Bug: Folder changes don\'t sync across windows', () => {
       expect(bodyText2).toContain('Ideas');
     } else {
       throw new Error(
-        'Sync test requires multiple windows - this test needs app support for window creation',
+        'Sync test requires multiple windows - this test needs app support for window creation'
       );
     }
   });
@@ -706,9 +706,12 @@ test.describe('Bug: Expand/collapse all button does not work', () => {
 
     // Find the expand/collapse all button by its SVG icon (UnfoldMore or UnfoldLess)
     // Look for the button in the border-divided section at top of folder panel
-    const expandCollapseButton = page.locator('button').filter({
-      has: page.locator('svg[data-testid="UnfoldMoreIcon"], svg[data-testid="UnfoldLessIcon"]'),
-    }).first();
+    const expandCollapseButton = page
+      .locator('button')
+      .filter({
+        has: page.locator('svg[data-testid="UnfoldMoreIcon"], svg[data-testid="UnfoldLessIcon"]'),
+      })
+      .first();
 
     // Click to collapse all
     await expandCollapseButton.click();
@@ -746,7 +749,9 @@ test.describe('Bug: Folders without children show expand icon', () => {
     // Check if Ideas has a chevron icon (ChevronRight or ExpandMore)
     // The chevron should NOT exist for childless folders
     const ideasRow = ideasButton.locator('..');
-    const chevronInIdeas = ideasRow.locator('svg[data-testid="ChevronRightIcon"], svg[data-testid="ExpandMoreIcon"]');
+    const chevronInIdeas = ideasRow.locator(
+      'svg[data-testid="ChevronRightIcon"], svg[data-testid="ExpandMoreIcon"]'
+    );
 
     // This should fail initially (bug exists) - childless folder has chevron
     await expect(chevronInIdeas).not.toBeVisible();
@@ -756,14 +761,18 @@ test.describe('Bug: Folders without children show expand icon', () => {
     await expect(recipesButton).toBeVisible();
 
     const recipesRow = recipesButton.locator('..');
-    const chevronInRecipes = recipesRow.locator('svg[data-testid="ChevronRightIcon"], svg[data-testid="ExpandMoreIcon"]');
+    const chevronInRecipes = recipesRow.locator(
+      'svg[data-testid="ChevronRightIcon"], svg[data-testid="ExpandMoreIcon"]'
+    );
 
     await expect(chevronInRecipes).not.toBeVisible();
 
     // "Work" has a child ("Projects"), so it SHOULD have a chevron
     const workButton = page.getByRole('button', { name: /^Work/ }).first();
     const workRow = workButton.locator('..');
-    const chevronInWork = workRow.locator('svg[data-testid="ChevronRightIcon"], svg[data-testid="ExpandMoreIcon"]');
+    const chevronInWork = workRow.locator(
+      'svg[data-testid="ChevronRightIcon"], svg[data-testid="ExpandMoreIcon"]'
+    );
 
     await expect(chevronInWork).toBeVisible();
   });
@@ -796,7 +805,9 @@ test.describe('Bug: Drag shadow shows multiple items', () => {
     const workItem = page.getByRole('button', { name: /^Work/ });
     const workBox = await workItem.boundingBox();
     if (workBox) {
-      await page.mouse.move(workBox.x + workBox.width / 2, workBox.y + workBox.height / 2, { steps: 10 });
+      await page.mouse.move(workBox.x + workBox.width / 2, workBox.y + workBox.height / 2, {
+        steps: 10,
+      });
     }
     await page.waitForTimeout(200);
 

@@ -174,7 +174,7 @@ void app.whenReady().then(async () => {
     const fsAdapter = new NodeFileSystemAdapter();
 
     // Determine storage directory (shared across instances for sync)
-    const storageDir = process.env['TEST_STORAGE_DIR'] || join(app.getPath('userData'), 'storage');
+    const storageDir = process.env['TEST_STORAGE_DIR'] ?? join(app.getPath('userData'), 'storage');
 
     // Initialize SD structure with config
     const sdConfig = {
@@ -193,11 +193,13 @@ void app.whenReady().then(async () => {
     await fsAdapter.mkdir(folderUpdatesPath);
 
     // Initialize UpdateManager with instance ID
-    const instanceId = process.env['INSTANCE_ID'] || randomUUID();
+    const instanceId = process.env['INSTANCE_ID'] ?? randomUUID();
     const updateManager = new UpdateManager(fsAdapter, sdStructure, instanceId);
 
     // Initialize CRDT manager
-    const crdtManager = new CRDTManagerImpl(updateManager);
+    // Type assertion needed due to TypeScript module resolution quirk between dist and src
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    const crdtManager = new CRDTManagerImpl(updateManager as any);
 
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
@@ -225,23 +227,26 @@ void app.whenReady().then(async () => {
       const folderTree = crdtManager.getFolderTree('default');
       if (folderTree) {
         // Load all updates from disk (this will merge with existing state)
-        updateManager.readFolderUpdates().then((updates) => {
-          for (const update of updates) {
-            folderTree.applyUpdate(update);
-          }
+        updateManager
+          .readFolderUpdates()
+          .then((updates) => {
+            for (const update of updates) {
+              folderTree.applyUpdate(update);
+            }
 
-          // Broadcast update to all windows
-          const windows = BrowserWindow.getAllWindows();
-          for (const window of windows) {
-            window.webContents.send('folder:updated', {
-              sdId: 'default',
-              operation: 'external-sync',
-              folderId: 'unknown',
-            });
-          }
-        }).catch((err) => {
-          console.error('[FileWatcher] Failed to reload folder updates:', err);
-        });
+            // Broadcast update to all windows
+            const windows = BrowserWindow.getAllWindows();
+            for (const window of windows) {
+              window.webContents.send('folder:updated', {
+                sdId: 'default',
+                operation: 'external-sync',
+                folderId: 'unknown',
+              });
+            }
+          })
+          .catch((err) => {
+            console.error('[FileWatcher] Failed to reload folder updates:', err);
+          });
       }
     });
 

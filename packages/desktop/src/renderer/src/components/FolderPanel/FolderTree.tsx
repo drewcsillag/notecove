@@ -69,7 +69,7 @@ function buildTreeNodes(folders: FolderData[]): NodeModel[] {
   for (const folder of folders) {
     nodes.push({
       id: folder.id,
-      parent: folder.parentId || 0, // Root folders go at top level (parent: 0)
+      parent: folder.parentId ?? 0, // Root folders go at top level (parent: 0)
       text: folder.name,
       droppable: true,
       data: {
@@ -279,10 +279,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   };
 
   // Drag-and-drop handler
-  const handleDrop = async (
-    newTree: NodeModel[],
-    options: DropOptions<unknown>
-  ): Promise<void> => {
+  const handleDrop = async (newTree: NodeModel[], options: DropOptions): Promise<void> => {
     const { dragSourceId, dropTargetId } = options;
 
     // Don't allow dragging special items
@@ -321,11 +318,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
   // Control which nodes can be dragged
   const canDrag = (node: NodeModel | undefined): boolean => {
     if (!node) return false;
-    return !(node.data as { isSpecial?: boolean })?.isSpecial;
+    return !(node.data as { isSpecial?: boolean }).isSpecial;
   };
 
   // Control where nodes can be dropped
-  const canDrop = (_tree: NodeModel[], options: DropOptions<unknown>): boolean => {
+  const canDrop = (_tree: NodeModel[], options: DropOptions): boolean => {
     const { dragSourceId, dropTargetId } = options;
 
     // Can't drag special items
@@ -363,20 +360,22 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   // Expand all folders
   const handleExpandAll = (): void => {
-    setRemountCounter(prev => prev + 1); // Force remount
+    setRemountCounter((prev) => prev + 1); // Force remount
     setIsCollapsedAll(false);
     onExpandedChange?.(allFolderIds);
   };
 
   // Collapse all folders
   const handleCollapseAll = (): void => {
-    setRemountCounter(prev => prev + 1); // Force remount
+    setRemountCounter((prev) => prev + 1); // Force remount
     setIsCollapsedAll(true);
     onExpandedChange?.([]);
   };
 
   // Determine if all folders are expanded (but not if user explicitly collapsed all)
-  const allExpanded = !isCollapsedAll && (expandedFolderIds.length === 0 || expandedFolderIds.length === allFolderIds.length);
+  const allExpanded =
+    !isCollapsedAll &&
+    (expandedFolderIds.length === 0 || expandedFolderIds.length === allFolderIds.length);
 
   return (
     <Box
@@ -394,7 +393,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
             onClick={allExpanded ? handleCollapseAll : handleExpandAll}
             sx={{ ml: 1 }}
           >
-            {allExpanded ? <UnfoldLessIcon fontSize="small" /> : <UnfoldMoreIcon fontSize="small" />}
+            {allExpanded ? (
+              <UnfoldLessIcon fontSize="small" />
+            ) : (
+              <UnfoldMoreIcon fontSize="small" />
+            )}
           </IconButton>
         </Tooltip>
       </Box>
@@ -416,94 +419,98 @@ export const FolderTree: FC<FolderTreeProps> = ({
       >
         <DndProvider backend={HTML5Backend}>
           <Tree
-          key={`tree-${remountCounter}`} // Force remount when expand/collapse all is clicked
-          tree={treeData}
-          rootId={0}
-          onDrop={handleDrop}
-          canDrag={canDrag}
-          canDrop={canDrop}
-          initialOpen={isCollapsedAll ? [] : expandedFolderIds.length > 0 ? expandedFolderIds : allFolderIds}
-          onChangeOpen={(newOpenIds) => {
-            // Sync library's internal state with our parent component (but don't trigger remount)
-            onExpandedChange?.(newOpenIds.map(String));
-          }}
-          dragPreviewRender={(monitorProps) => {
-            // Custom drag preview to show ONLY the dragged folder, not the entire tree
-            return (
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '4px 8px',
-                  backgroundColor: 'primary.light',
-                  borderRadius: 1,
-                  opacity: 0.8,
-                }}
-              >
-                <FolderIcon fontSize="small" sx={{ mr: 1 }} />
-                <Typography variant="body2">{monitorProps.item.text}</Typography>
-              </Box>
-            );
-          }}
-          render={(node, { depth, onToggle, isDropTarget }) => {
-            const isSelected = String(node.id) === selectedFolderId;
-            const isExpanded = expandedFolderIds.includes(String(node.id));
-            const noExpand = (node.data as { noExpand?: boolean })?.noExpand;
-
-            // Check if this node has children
-            const hasChildren = treeData.some((n) => n.parent === node.id);
-
-            return (
-              <ListItemButton
-                sx={{
-                  pl: depth * 2,
-                  backgroundColor: isDropTarget
-                    ? 'primary.light'
-                    : isSelected
-                      ? 'action.selected'
-                      : 'transparent',
-                  borderLeft: isDropTarget ? 3 : 0,
-                  borderColor: isDropTarget ? 'primary.main' : 'transparent',
-                  '&:hover': {
-                    backgroundColor: 'action.hover',
-                  },
-                }}
-                onClick={() => {
-                  handleSelect(node);
-                }}
-                onContextMenu={(e) => {
-                  handleContextMenu(e, String(node.id));
-                }}
-              >
-                {node.droppable && !noExpand && hasChildren && (
-                  <Box
-                    component="span"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggle();
-                      handleToggle(node.id, !isExpanded);
-                    }}
-                    sx={{ mr: 0.5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  >
-                    {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-                  </Box>
-                )}
-                {(!node.droppable || noExpand || !hasChildren) && <Box sx={{ width: 24, mr: 0.5 }} />}
-                <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
-                  {node.droppable ? (
-                    isExpanded ? (
-                      <FolderOpenIcon fontSize="small" />
-                    ) : (
-                      <FolderIcon fontSize="small" />
-                    )
-                  ) : null}
+            key={`tree-${remountCounter}`} // Force remount when expand/collapse all is clicked
+            tree={treeData}
+            rootId={0}
+            onDrop={(tree, options) => void handleDrop(tree, options)}
+            canDrag={canDrag}
+            canDrop={canDrop}
+            initialOpen={
+              isCollapsedAll ? [] : expandedFolderIds.length > 0 ? expandedFolderIds : allFolderIds
+            }
+            onChangeOpen={(newOpenIds) => {
+              // Sync library's internal state with our parent component (but don't trigger remount)
+              onExpandedChange?.(newOpenIds.map(String));
+            }}
+            dragPreviewRender={(monitorProps) => {
+              // Custom drag preview to show ONLY the dragged folder, not the entire tree
+              return (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px 8px',
+                    backgroundColor: 'primary.light',
+                    borderRadius: 1,
+                    opacity: 0.8,
+                  }}
+                >
+                  <FolderIcon fontSize="small" sx={{ mr: 1 }} />
+                  <Typography variant="body2">{monitorProps.item.text}</Typography>
                 </Box>
-                <ListItemText primary={node.text} />
-              </ListItemButton>
-            );
-          }}
-        />
-      </DndProvider>
+              );
+            }}
+            render={(node, { depth, onToggle, isDropTarget }) => {
+              const isSelected = String(node.id) === selectedFolderId;
+              const isExpanded = expandedFolderIds.includes(String(node.id));
+              const noExpand = (node.data as { noExpand?: boolean }).noExpand ?? false;
+
+              // Check if this node has children
+              const hasChildren = treeData.some((n) => n.parent === node.id);
+
+              return (
+                <ListItemButton
+                  sx={{
+                    pl: depth * 2,
+                    backgroundColor: isDropTarget
+                      ? 'primary.light'
+                      : isSelected
+                        ? 'action.selected'
+                        : 'transparent',
+                    borderLeft: isDropTarget ? 3 : 0,
+                    borderColor: isDropTarget ? 'primary.main' : 'transparent',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                  onClick={() => {
+                    handleSelect(node);
+                  }}
+                  onContextMenu={(e) => {
+                    handleContextMenu(e, String(node.id));
+                  }}
+                >
+                  {node.droppable && !noExpand && hasChildren && (
+                    <Box
+                      component="span"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggle();
+                        handleToggle(node.id, !isExpanded);
+                      }}
+                      sx={{ mr: 0.5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                    </Box>
+                  )}
+                  {(!node.droppable || noExpand || !hasChildren) && (
+                    <Box sx={{ width: 24, mr: 0.5 }} />
+                  )}
+                  <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+                    {node.droppable ? (
+                      isExpanded ? (
+                        <FolderOpenIcon fontSize="small" />
+                      ) : (
+                        <FolderIcon fontSize="small" />
+                      )
+                    ) : null}
+                  </Box>
+                  <ListItemText primary={node.text} />
+                </ListItemButton>
+              );
+            }}
+          />
+        </DndProvider>
       </Box>
 
       {/* Context Menu */}

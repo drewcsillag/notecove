@@ -96,7 +96,9 @@ export function generateUpdateFilename(
   timestamp: number = Date.now()
 ): string {
   // Add 4-digit random suffix to prevent filename collisions
-  const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const randomSuffix = Math.floor(Math.random() * 10000)
+    .toString()
+    .padStart(4, '0');
   const uniqueTimestamp = `${timestamp}-${randomSuffix}`;
 
   if (type === UpdateType.FolderTree) {

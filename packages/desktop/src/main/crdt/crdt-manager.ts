@@ -187,7 +187,11 @@ export class CRDTManagerImpl implements CRDTManager {
   /**
    * Handle folder tree update by writing to disk
    */
-  private async handleFolderUpdate(sdId: string, update: Uint8Array, origin: unknown): Promise<void> {
+  private async handleFolderUpdate(
+    sdId: string,
+    update: Uint8Array,
+    origin: unknown
+  ): Promise<void> {
     // Don't persist updates that originated from loading (would create duplicate files)
     if (origin === 'load') {
       return;

@@ -60,7 +60,9 @@
       "Bash(pnpm --filter @notecove/desktop remove:*)",
       "Bash(tee:*)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:minop1205.github.io)"
+      "WebFetch(domain:minop1205.github.io)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

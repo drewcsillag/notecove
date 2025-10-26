@@ -5,20 +5,16 @@
  */
 
 import { watch, type FSWatcher } from 'fs';
-import { basename } from 'path';
 import type { FileWatcher, FileWatchEvent, FileWatchEventType } from '@notecove/shared';
 
 export class NodeFileWatcher implements FileWatcher {
   private watcher: FSWatcher | null = null;
-  private watchPath: string | null = null;
 
   async watch(path: string, callback: (event: FileWatchEvent) => void): Promise<void> {
     // Clean up existing watcher if any
     if (this.watcher) {
       await this.unwatch();
     }
-
-    this.watchPath = path;
 
     // Watch for file changes
     this.watcher = watch(
@@ -58,6 +54,6 @@ export class NodeFileWatcher implements FileWatcher {
       this.watcher.close();
       this.watcher = null;
     }
-    this.watchPath = null;
+    return Promise.resolve();
   }
 }

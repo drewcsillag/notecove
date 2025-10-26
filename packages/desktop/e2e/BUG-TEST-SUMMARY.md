@@ -11,6 +11,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test:** `should rename the clicked nested folder, not its parent`
 
 **What it tests:**
+
 - Right-click on "Projects" (nested under "Work")
 - Open rename dialog
 - Verify dialog shows "Projects" (NOT "Work")
@@ -28,6 +29,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test:** `should move only the dragged folder, not its parent`
 
 **What it tests:**
+
 - Drag "Recipes" (child of "Personal") to "Work"
 - Verify ONLY "Recipes" moved (not entire "Personal" folder)
 - Verify "Personal" still exists at root level
@@ -44,6 +46,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test:** `should continue to work for multiple drag operations`
 
 **What it tests:**
+
 - First drag: Move "Ideas" to "Work"
 - Second drag: Move "Recipes" to "Work"
 - Third drag: Move "Ideas" back to "Personal"
@@ -60,6 +63,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test 4a:** `should persist created folders after app restart`
 
 **What it tests:**
+
 - Create a new folder "Persistent Test Folder"
 - Close the app
 - Relaunch the app
@@ -72,6 +76,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test 4b:** `should persist renamed folders after app restart`
 
 **What it tests:**
+
 - Rename "Work" to "Career"
 - Close the app
 - Relaunch the app
@@ -88,6 +93,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test 5a:** `should sync folder creation across multiple windows in same instance`
 
 **What it tests:**
+
 - Open two windows in same Electron instance
 - Create folder "Sync Test Folder" in window 1
 - Verify folder appears in window 2 (via folder:updated event)
@@ -99,6 +105,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test 5b:** `should sync folder rename across multiple windows in same instance`
 
 **What it tests:**
+
 - Open two windows
 - Rename "Work" to "Office" in window 1
 - Verify rename syncs to window 2
@@ -110,6 +117,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test 5c:** `should sync folder move across multiple windows in same instance`
 
 **What it tests:**
+
 - Open two windows
 - Move "Ideas" to top level in window 1
 - Verify move syncs to window 2
@@ -121,6 +129,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Test 5d:** `should sync folder changes across separate Electron instances`
 
 **What it tests:**
+
 - Launch TWO separate Electron processes (not just windows)
 - Each instance has:
   - Different instance ID
@@ -134,6 +143,7 @@ All tests are **expected to FAIL** initially and should **PASS** after implement
 **Current behavior:** Changes don't sync across instances
 
 **Expected behavior:** Changes should sync via:
+
 1. Instance 1 writes folder update to shared CRDT file
 2. File watcher in instance 2 detects the change
 3. Instance 2 loads update and broadcasts folder:updated event

@@ -3,20 +3,23 @@
 ## Test Results: 4/9 Passing (was 0/9)
 
 ### ✅ CONSISTENTLY PASSING Tests:
+
 1. **Test 1**: Right-click rename - Event bubbling fix working
-4. **Test 4**: Folder persistence (create) - Persistence implementation working
-5. **Test 5**: Folder persistence (rename) - Persistence implementation working
-9. **Test 9**: Cross-instance sync - File watcher + persistence working perfectly!
+2. **Test 4**: Folder persistence (create) - Persistence implementation working
+3. **Test 5**: Folder persistence (rename) - Persistence implementation working
+4. **Test 9**: Cross-instance sync - File watcher + persistence working perfectly!
 
 ### ❌ FLAKY/FAILING Tests:
 
 **Tests 2-3** (Drag-drop):
+
 - Status: Flaky - Test 2 passes when run alone, fails in suite
 - Issue: UI refresh timing after folder:updated events
 - Root cause: Folder tree not consistently showing moved folders after refreshTrigger increments
 - Note: The CRDT operations ARE working (logs show correct moves), but UI doesn't always update
 
 **Tests 6-8** (Multi-window):
+
 - Status: Blocked - cannot create second window in tests
 - Error: `__dirname not defined` in electronApp.evaluate()
 - Solution needed: Add IPC method `window.electronAPI.testing.createWindow()`
@@ -24,7 +27,9 @@
 ## Critical Bugs Fixed
 
 ### 1. ENOENT Filename Collision Bug (CRITICAL)
+
 **Files**:
+
 - `packages/shared/src/crdt/update-format.ts:90-105`
 - `packages/shared/src/crdt/update-format.ts:36-86`
 
@@ -33,9 +38,12 @@
 **Root Cause**: `Date.now()` only has millisecond precision. Creating 5 demo folders triggered 5 update events in <1ms, all with same timestamp.
 
 **Fix**:
+
 ```typescript
 // Added 4-digit random suffix to prevent collisions
-const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+const randomSuffix = Math.floor(Math.random() * 10000)
+  .toString()
+  .padStart(4, '0');
 const uniqueTimestamp = `${timestamp}-${randomSuffix}`;
 // Result: "instanceId_folder-tree_sdId_1234567890-1234.yjson"
 ```
@@ -45,14 +53,17 @@ const uniqueTimestamp = `${timestamp}-${randomSuffix}`;
 **Impact**: Eliminated ALL ENOENT errors during demo folder creation and rapid updates.
 
 ### 2. File Watcher Processing Bug
+
 **File**: `packages/desktop/src/main/index.ts:211-246`
 
 **Problem**: File watcher triggered on:
+
 - Directory creation events ("updates")
 - Temporary `.tmp` files during atomic writes
-This caused unnecessary reload attempts and potential race conditions.
+  This caused unnecessary reload attempts and potential race conditions.
 
 **Fix**:
+
 ```typescript
 // Ignore directory creation events and temporary files
 if (event.filename === 'updates' || event.filename.endsWith('.tmp')) {
@@ -68,6 +79,7 @@ if (!event.filename.endsWith('.yjson')) {
 **Impact**: Reduced noise in file watcher, only processes actual completed updates.
 
 ### 3. Event Bubbling Bug (Previously Fixed in 2.4.4-CHECKPOINT)
+
 **File**: `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx:142-189`
 
 **Fix**: Added `event.stopPropagation()` to prevent events bubbling to parent folders.
@@ -75,6 +87,7 @@ if (!event.filename.endsWith('.yjson')) {
 **Status**: Still working correctly.
 
 ### 4. Drag State Reset Bug (Previously Fixed)
+
 **File**: `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx:485-489`
 
 **Fix**: Added `onDragEnd` handler to always reset drag state.
@@ -86,27 +99,32 @@ if (!event.filename.endsWith('.yjson')) {
 ### Issue 1: UI Refresh After folder:updated Events (Tests 2 & 3)
 
 **Files**:
+
 - `packages/desktop/src/renderer/src/components/FolderPanel/FolderPanel.tsx:38-49`
 - `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx:268-284`
 
 **Symptoms**:
+
 - folder:updated events fire correctly
 - refreshTrigger increments
 - But UI doesn't always show updated folder structure
 - Flaky behavior - sometimes works, sometimes doesn't
 
 **Current Investigation**:
+
 - FolderTree has `refreshTrigger` in useEffect dependency array
 - Should trigger `loadFolders()` when refreshTrigger changes
 - But folders aren't consistently reloading/displaying
 
 **Possible Causes**:
+
 1. Race condition between folder:updated firing and tree re-render
 2. MUI TreeView not preserving expansion state after data reload
 3. Need to wait for actual DOM changes instead of arbitrary timeouts
 4. State pollution between tests
 
 **Next Steps**:
+
 - Add console.log to FolderTree useEffect to verify it's being called
 - Check if folder.list() IPC returns correct data after updates
 - Consider using `page.waitForFunction()` to wait for specific DOM conditions
@@ -119,35 +137,41 @@ if (!event.filename.endsWith('.yjson')) {
 **Problem**: Cannot create second window via `electronApp.evaluate()` because `__dirname` is not available in evaluate context.
 
 **Current Code**:
+
 ```typescript
 await electronApp.evaluate(async ({ BrowserWindow }) => {
   const newWindow = new BrowserWindow({
     webPreferences: {
-      preload: __dirname + '/../preload/index.js',  // __dirname not defined!
+      preload: __dirname + '/../preload/index.js', // __dirname not defined!
     },
   });
 });
 ```
 
 **Options**:
+
 1. **Recommended**: Add IPC method `window.electronAPI.testing.createWindow()` in main process
 2. Use app.getPath() and construct paths differently in evaluate context
 3. Expose window creation via programmatic menu item
 
 **Implementation Plan**:
+
 1. Add to `packages/desktop/src/main/ipc/handlers.ts`:
+
 ```typescript
 createWindow: async (): Promise<void> => {
   createWindow(); // Call existing window creation function
-}
+};
 ```
 
 2. Add to `packages/desktop/src/preload/index.ts`:
+
 ```typescript
-createWindow: (): Promise<void> => ipcRenderer.invoke('testing:createWindow')
+createWindow: (): Promise<void> => ipcRenderer.invoke('testing:createWindow');
 ```
 
 3. Update tests to use:
+
 ```typescript
 await page.evaluate(() => window.electronAPI.testing.createWindow());
 ```
@@ -155,11 +179,13 @@ await page.evaluate(() => window.electronAPI.testing.createWindow());
 ## File Changes Summary
 
 ### Modified:
+
 - `packages/shared/src/crdt/update-format.ts` - Added random suffix to filenames, updated parser
 - `packages/desktop/src/main/index.ts` - Added file watcher filtering for .tmp and directory events
 - `e2e/folder-bugs.spec.ts` - Improved selectors (getByRole with exact matching), added aria-expanded checks
 
 ### Status Files Created:
+
 - `PHASE-2.4.4-CHECKPOINT.md` - Initial checkpoint after implementations
 - `PHASE-2.4.4-STATUS.md` - Detailed status before context compaction
 - `PHASE-2.4.4-PROGRESS.md` - This file
@@ -198,6 +224,7 @@ await page.evaluate(() => window.electronAPI.testing.createWindow());
 **Test Progress**: 0/9 → 4/9 passing (44% → significant improvement!)
 
 **Key Working Features**:
+
 - ✅ Folder persistence to disk
 - ✅ Cross-instance sync via file watcher
 - ✅ Multi-window sync events (implementation works, tests blocked)
@@ -205,6 +232,7 @@ await page.evaluate(() => window.electronAPI.testing.createWindow());
 - ✅ Drag state management
 
 **Remaining Challenges**:
+
 - UI refresh after folder:updated events is flaky
 - Multi-window test creation needs IPC support
 - Test timing needs improvement
