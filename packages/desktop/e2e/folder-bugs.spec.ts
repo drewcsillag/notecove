@@ -134,23 +134,27 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     await expect(page.locator('text=Ideas')).toBeVisible();
     await expect(page.locator('text=Recipes')).toBeVisible();
 
-    // Get tree items for drag and drop
-    const recipesItem = page.locator('role=treeitem').filter({ hasText: 'Recipes' }).first();
-    const workItem = page.locator('role=treeitem').filter({ hasText: 'Work' }).first();
+    // Get tree items for drag and drop - be very specific to avoid selecting parent
+    // Use getByRole with exact name to ensure we get the right element
+    const recipesItem = page.getByRole('treeitem', { name: 'Recipes', exact: true });
+    const workItem = page.getByRole('treeitem', { name: /^Work/, exact: false });
+
+    // Verify we found the right elements
+    await expect(recipesItem).toBeVisible();
+    await expect(workItem).toBeVisible();
 
     // Use Playwright's native drag and drop
     await recipesItem.dragTo(workItem);
 
-    // Wait for tree to update
-    await page.waitForTimeout(2000);
+    // Wait for tree to update and folder:updated event to propagate
+    await page.waitForTimeout(3000);
 
-    // Click on Work to expand it and see if Recipes moved there
+    // Expand both Work and Personal to verify folder locations
     await page.locator('text=Work').first().click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
-    // Re-expand Personal to verify Ideas is still there
     await page.locator('text=Personal').first().click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     // Verify ONLY "Recipes" moved under "Work"
     // The entire "Personal" folder should NOT have moved
