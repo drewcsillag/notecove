@@ -211,6 +211,16 @@ void app.whenReady().then(async () => {
     await fileWatcher.watch(folderUpdatesPath, (event) => {
       console.log('[FileWatcher] Detected folder update file change:', event.filename);
 
+      // Ignore directory creation events and temporary files
+      if (event.filename === 'updates' || event.filename.endsWith('.tmp')) {
+        return;
+      }
+
+      // Only process .yjson files
+      if (!event.filename.endsWith('.yjson')) {
+        return;
+      }
+
       // Reload folder tree from disk
       const folderTree = crdtManager.getFolderTree('default');
       if (folderTree) {

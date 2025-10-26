@@ -31,7 +31,7 @@ export interface UpdateFileMetadata {
 
 /**
  * Parse update filename to extract metadata
- * @param filename - e.g., "inst-123_note-456_1234567890.yjson"
+ * @param filename - e.g., "inst-123_note-456_1234567890-1234.yjson" or "inst-123_note-456_1234567890.yjson" (legacy)
  */
 export function parseUpdateFilename(filename: string): UpdateFileMetadata | null {
   // Remove .yjson extension
@@ -53,7 +53,9 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
     return null;
   }
 
-  const timestamp = parseInt(lastPart, 10);
+  // Extract timestamp (handle both "timestamp-random" and legacy "timestamp" formats)
+  const timestampStr = lastPart.includes('-') ? lastPart.split('-')[0] : lastPart;
+  const timestamp = parseInt(timestampStr ?? '', 10);
 
   if (isNaN(timestamp)) {
     return null;
@@ -61,7 +63,7 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
 
   // Determine type and document ID
   if (parts[1] === 'folder-tree') {
-    // Format: <instance-id>_folder-tree_<sd-id>_<timestamp>
+    // Format: <instance-id>_folder-tree_<sd-id>_<timestamp>[-random]
     const sdId = parts.slice(2, -1).join('_');
     return {
       type: UpdateType.FolderTree,
@@ -71,7 +73,7 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
       version: UPDATE_FORMAT_VERSION,
     };
   } else {
-    // Format: <instance-id>_<note-id>_<timestamp>
+    // Format: <instance-id>_<note-id>_<timestamp>[-random]
     const noteId = parts.slice(1, -1).join('_');
     return {
       type: UpdateType.Note,
@@ -85,6 +87,7 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
 
 /**
  * Generate update filename
+ * Includes random suffix to prevent collisions when multiple updates happen in same millisecond
  */
 export function generateUpdateFilename(
   type: UpdateType,
@@ -92,10 +95,14 @@ export function generateUpdateFilename(
   documentId: string,
   timestamp: number = Date.now()
 ): string {
+  // Add 4-digit random suffix to prevent filename collisions
+  const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const uniqueTimestamp = `${timestamp}-${randomSuffix}`;
+
   if (type === UpdateType.FolderTree) {
-    return `${instanceId}_folder-tree_${documentId}_${timestamp}.yjson`;
+    return `${instanceId}_folder-tree_${documentId}_${uniqueTimestamp}.yjson`;
   } else {
-    return `${instanceId}_${documentId}_${timestamp}.yjson`;
+    return `${instanceId}_${documentId}_${uniqueTimestamp}.yjson`;
   }
 }
 

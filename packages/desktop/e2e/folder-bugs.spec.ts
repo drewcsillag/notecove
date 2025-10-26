@@ -149,12 +149,21 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     // Wait for tree to update and folder:updated event to propagate
     await page.waitForTimeout(3000);
 
-    // Expand both Work and Personal to verify folder locations
-    await page.locator('text=Work').first().click();
-    await page.waitForTimeout(1000);
+    // Expand Work folder to see Recipes (which should have moved there)
+    const workFolderItem = page.getByRole('treeitem', { name: /^Work/ });
+    const isWorkExpanded = await workFolderItem.getAttribute('aria-expanded');
+    if (isWorkExpanded !== 'true') {
+      await workFolderItem.click();
+      await page.waitForTimeout(1000);
+    }
 
-    await page.locator('text=Personal').first().click();
-    await page.waitForTimeout(1000);
+    // Personal should still be expanded from before, but verify
+    const personalFolderItem = page.getByRole('treeitem', { name: /^Personal/ });
+    const isPersonalExpanded = await personalFolderItem.getAttribute('aria-expanded');
+    if (isPersonalExpanded !== 'true') {
+      await personalFolderItem.click();
+      await page.waitForTimeout(1000);
+    }
 
     // Verify ONLY "Recipes" moved under "Work"
     // The entire "Personal" folder should NOT have moved
@@ -188,39 +197,49 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
     await personalFolder.click();
     await page.waitForTimeout(500);
 
-    // First drag: Move "Ideas" to "Work"
-    const ideasItem = page.locator('role=treeitem').filter({ hasText: 'Ideas' }).first();
-    const workItem = page.locator('role=treeitem').filter({ hasText: 'Work' }).first();
+    // First drag: Move "Ideas" to "Work" - use exact selectors
+    const ideasItem = page.getByRole('treeitem', { name: 'Ideas', exact: true });
+    const workItem = page.getByRole('treeitem', { name: /^Work/, exact: false });
 
     await ideasItem.dragTo(workItem);
-    await page.waitForTimeout(2000);
 
-    // Expand Work to verify Ideas moved
-    await page.locator('text=Work').first().click();
-    await page.waitForTimeout(500);
+    // Wait longer for folder:updated event to propagate and UI to refresh
+    await page.waitForTimeout(3000);
+
+    // Expand Work to verify Ideas moved (check aria-expanded first)
+    const workFolderItem = page.getByRole('treeitem', { name: /^Work/ });
+    const isWorkExpanded = await workFolderItem.getAttribute('aria-expanded');
+    if (isWorkExpanded !== 'true') {
+      await workFolderItem.click();
+      await page.waitForTimeout(1000);
+    }
 
     // Verify "Ideas" is now visible (should be under Work)
     await expect(page.locator('text=Ideas')).toBeVisible();
 
-    // Second drag: Move "Recipes" to "Work"
-    const recipesItem = page.locator('role=treeitem').filter({ hasText: 'Recipes' }).first();
+    // Second drag: Move "Recipes" to "Work" - use exact selector
+    const recipesItem = page.getByRole('treeitem', { name: 'Recipes', exact: true });
 
     await recipesItem.dragTo(workItem);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
-    // Verify "Recipes" is now also under Work
+    // Verify "Recipes" is now also under Work (Work should still be expanded)
     await expect(page.locator('text=Recipes')).toBeVisible();
 
-    // Third drag: Move "Ideas" back to "Personal"
-    const ideasItem2 = page.locator('role=treeitem').filter({ hasText: 'Ideas' }).first();
-    const personalItem = page.locator('role=treeitem').filter({ hasText: 'Personal' }).first();
+    // Third drag: Move "Ideas" back to "Personal" - use exact selectors
+    const ideasItem2 = page.getByRole('treeitem', { name: 'Ideas', exact: true });
+    const personalItem = page.getByRole('treeitem', { name: /^Personal/, exact: false });
 
     await ideasItem2.dragTo(personalItem);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
-    // Expand Personal to verify Ideas moved back
-    await page.locator('text=Personal').first().click();
-    await page.waitForTimeout(500);
+    // Expand Personal to verify Ideas moved back (check aria-expanded first)
+    const personalFolderItem = page.getByRole('treeitem', { name: /^Personal/ });
+    const isPersonalExpanded = await personalFolderItem.getAttribute('aria-expanded');
+    if (isPersonalExpanded !== 'true') {
+      await personalFolderItem.click();
+      await page.waitForTimeout(500);
+    }
 
     // Verify "Ideas" is back under Personal
     await expect(page.locator('text=Ideas')).toBeVisible();
