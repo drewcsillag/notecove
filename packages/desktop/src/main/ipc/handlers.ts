@@ -30,6 +30,8 @@ export class IPCHandlers {
     ipcMain.handle('note:getMetadata', this.handleGetMetadata.bind(this));
 
     // Folder operations
+    ipcMain.handle('folder:list', this.handleListFolders.bind(this));
+    ipcMain.handle('folder:get', this.handleGetFolder.bind(this));
     ipcMain.handle('folder:create', this.handleCreateFolder.bind(this));
     ipcMain.handle('folder:delete', this.handleDeleteFolder.bind(this));
 
@@ -86,18 +88,35 @@ export class IPCHandlers {
     throw new Error('Not implemented');
   }
 
+  private async handleListFolders(
+    _event: IpcMainInvokeEvent,
+    sdId: string
+  ): Promise<import('@notecove/shared').FolderData[]> {
+    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    return folderTree.getActiveFolders();
+  }
+
+  private async handleGetFolder(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string
+  ): Promise<import('@notecove/shared').FolderData | null> {
+    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    return folderTree.getFolder(folderId);
+  }
+
   private async handleCreateFolder(
     _event: IpcMainInvokeEvent,
     _sdId: string,
     _parentId: string,
     _name: string
   ): Promise<string> {
-    // TODO: Implement folder creation
+    // TODO: Implement folder creation (Phase 2.4.2)
     throw new Error('Not implemented');
   }
 
   private async handleDeleteFolder(_event: IpcMainInvokeEvent, _folderId: string): Promise<void> {
-    // TODO: Implement folder deletion
+    // TODO: Implement folder deletion (Phase 2.4.2)
     throw new Error('Not implemented');
   }
 
@@ -124,6 +143,8 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:delete');
     ipcMain.removeHandler('note:move');
     ipcMain.removeHandler('note:getMetadata');
+    ipcMain.removeHandler('folder:list');
+    ipcMain.removeHandler('folder:get');
     ipcMain.removeHandler('folder:create');
     ipcMain.removeHandler('folder:delete');
     ipcMain.removeHandler('appState:get');

@@ -44,7 +44,15 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm --filter @notecove/shared test title-extractor)",
       "Bash(/dev/null)",
-      "Bash(npx playwright test:*)"
+      "Bash(npx playwright test:*)",
+      "WebFetch(domain:mui.com)",
+      "Bash(pnpm --filter @notecove/desktop install --force better-sqlite3)",
+      "Bash(pnpm config:*)",
+      "Bash(npm run install:*)",
+      "Bash(pnpm why:*)",
+      "Bash(node_modules/.bin/electron:*)",
+      "Bash(readlink:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []

@@ -10,7 +10,7 @@ jest.mock('../components/EditorPanel/TipTapEditor', () => ({
   TipTapEditor: () => <div data-testid="tiptap-editor">TipTap Editor</div>,
 }));
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import App from '../App';
 
@@ -29,6 +29,8 @@ const mockElectronAPI = {
     onDeleted: jest.fn(),
   },
   folder: {
+    list: jest.fn().mockResolvedValue([]),
+    get: jest.fn().mockResolvedValue(null),
     create: jest.fn(),
     delete: jest.fn(),
     onUpdated: jest.fn(),
@@ -48,38 +50,71 @@ Object.defineProperty(window, 'electronAPI', {
 });
 
 describe('App', () => {
-  it('should render the three-panel layout', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  it('should render the three-panel layout', async () => {
     const { container } = render(<App />);
     // Check that the panel group is rendered
     const panelGroup = container.querySelector('[data-testid="panel-group"]');
     expect(panelGroup).toBeInTheDocument();
+
+    // Wait for appState to be called
+    await waitFor(() => {
+      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+    });
   });
 
-  it('should render all three panels', () => {
+  it('should render all three panels', async () => {
     const { container } = render(<App />);
     // Check that all three panels are rendered
     const panels = container.querySelectorAll('[data-testid="panel"]');
     expect(panels).toHaveLength(3);
+
+    // Wait for appState to be called
+    await waitFor(() => {
+      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+    });
   });
 
-  it('should render folder panel content', () => {
+  it('should render folder panel content', async () => {
     render(<App />);
-    expect(screen.getByText('folders.title')).toBeInTheDocument();
+    expect(screen.getByText('Folders')).toBeInTheDocument();
+
+    // Wait for appState to be called
+    await waitFor(() => {
+      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+    });
   });
 
-  it('should render notes list panel content', () => {
+  it('should render notes list panel content', async () => {
     render(<App />);
     expect(screen.getByText('notes.title')).toBeInTheDocument();
+
+    // Wait for appState to be called
+    await waitFor(() => {
+      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+    });
   });
 
-  it('should render editor panel content', () => {
+  it('should render editor panel content', async () => {
     render(<App />);
     expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument();
+
+    // Wait for appState to be called
+    await waitFor(() => {
+      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+    });
   });
 
-  it('should use Material-UI theme', () => {
+  it('should use Material-UI theme', async () => {
     const { container } = render(<App />);
     // Check that MUI CssBaseline is applied
     expect(container.firstChild).toBeTruthy();
+
+    // Wait for appState to be called
+    await waitFor(() => {
+      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+    });
   });
 });

@@ -7,11 +7,13 @@
 
 import * as Y from 'yjs';
 import type { CRDTManager, DocumentState } from './types';
-import { NoteDoc } from '@shared/crdt';
+import { NoteDoc, FolderTreeDoc } from '@shared/crdt';
 import type { UpdateManager } from '@shared/storage';
+import type { UUID, FolderData } from '@shared/types';
 
 export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
+  private folderTrees = new Map<string, FolderTreeDoc>();
 
   constructor(private updateManager: UpdateManager) {}
 
@@ -118,6 +120,88 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Load folder tree for an SD
+   */
+  loadFolderTree(sdId: string): FolderTreeDoc {
+    const existing = this.folderTrees.get(sdId);
+    if (existing) {
+      return existing;
+    }
+
+    // Create new FolderTreeDoc
+    const folderTree = new FolderTreeDoc(sdId);
+
+    // TODO: Load updates from disk (Phase 2.4.2)
+    // For now, create some demo folders for testing
+    if (sdId === 'default') {
+      this.createDemoFolders(folderTree);
+    }
+
+    this.folderTrees.set(sdId, folderTree);
+    return folderTree;
+  }
+
+  /**
+   * Get loaded folder tree
+   */
+  getFolderTree(sdId: string): FolderTreeDoc | undefined {
+    return this.folderTrees.get(sdId);
+  }
+
+  /**
+   * Create demo folders for testing (Phase 2.4.1 only)
+   * TODO: Remove in Phase 2.4.2 when we have real folder creation
+   */
+  private createDemoFolders(folderTree: FolderTreeDoc): void {
+    const folders: FolderData[] = [
+      {
+        id: 'folder-1' as UUID,
+        name: 'Work',
+        parentId: null,
+        sdId: 'default',
+        order: 0,
+        deleted: false,
+      },
+      {
+        id: 'folder-2' as UUID,
+        name: 'Projects',
+        parentId: 'folder-1' as UUID,
+        sdId: 'default',
+        order: 0,
+        deleted: false,
+      },
+      {
+        id: 'folder-3' as UUID,
+        name: 'Personal',
+        parentId: null,
+        sdId: 'default',
+        order: 1,
+        deleted: false,
+      },
+      {
+        id: 'folder-4' as UUID,
+        name: 'Ideas',
+        parentId: 'folder-3' as UUID,
+        sdId: 'default',
+        order: 0,
+        deleted: false,
+      },
+      {
+        id: 'folder-5' as UUID,
+        name: 'Recipes',
+        parentId: 'folder-3' as UUID,
+        sdId: 'default',
+        order: 1,
+        deleted: false,
+      },
+    ];
+
+    for (const folder of folders) {
+      folderTree.createFolder(folder);
+    }
+  }
+
+  /**
    * Clean up all documents
    */
   destroy(): void {
@@ -125,5 +209,10 @@ export class CRDTManagerImpl implements CRDTManager {
       state.doc.destroy();
     }
     this.documents.clear();
+
+    for (const folderTree of this.folderTrees.values()) {
+      folderTree.destroy();
+    }
+    this.folderTrees.clear();
   }
 }

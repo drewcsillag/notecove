@@ -22,6 +22,27 @@ declare global {
       };
 
       folder: {
+        list: (sdId: string) => Promise<
+          {
+            id: string;
+            name: string;
+            parentId: string | null;
+            sdId: string;
+            order: number;
+            deleted: boolean;
+          }[]
+        >;
+        get: (
+          sdId: string,
+          folderId: string
+        ) => Promise<{
+          id: string;
+          name: string;
+          parentId: string | null;
+          sdId: string;
+          order: number;
+          deleted: boolean;
+        } | null>;
         create: (sdId: string, parentId: string, name: string) => Promise<string>;
         delete: (folderId: string) => Promise<void>;
         onUpdated: (callback: (folderId: string) => void) => () => void;

@@ -50,6 +50,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Folder operations
   folder: {
+    list: (
+      sdId: string
+    ): Promise<
+      {
+        id: string;
+        name: string;
+        parentId: string | null;
+        sdId: string;
+        order: number;
+        deleted: boolean;
+      }[]
+    > =>
+      ipcRenderer.invoke('folder:list', sdId) as Promise<
+        {
+          id: string;
+          name: string;
+          parentId: string | null;
+          sdId: string;
+          order: number;
+          deleted: boolean;
+        }[]
+      >,
+    get: (
+      sdId: string,
+      folderId: string
+    ): Promise<{
+      id: string;
+      name: string;
+      parentId: string | null;
+      sdId: string;
+      order: number;
+      deleted: boolean;
+    } | null> =>
+      ipcRenderer.invoke('folder:get', sdId, folderId) as Promise<{
+        id: string;
+        name: string;
+        parentId: string | null;
+        sdId: string;
+        order: number;
+        deleted: boolean;
+      } | null>,
     create: (sdId: string, parentId: string, name: string): Promise<string> =>
       ipcRenderer.invoke('folder:create', sdId, parentId, name) as Promise<string>,
     delete: (folderId: string): Promise<void> =>

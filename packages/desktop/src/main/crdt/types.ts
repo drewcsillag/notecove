@@ -44,4 +44,18 @@ export interface CRDTManager {
    * @returns The Yjs document or undefined
    */
   getDocument(noteId: string): Y.Doc | undefined;
+
+  /**
+   * Load a folder tree document for an SD
+   * @param sdId Sync Directory ID
+   * @returns The FolderTreeDoc instance
+   */
+  loadFolderTree(sdId: string): import('@notecove/shared').FolderTreeDoc;
+
+  /**
+   * Get the loaded folder tree for an SD
+   * @param sdId Sync Directory ID
+   * @returns The FolderTreeDoc instance or undefined
+   */
+  getFolderTree(sdId: string): import('@notecove/shared').FolderTreeDoc | undefined;
 }

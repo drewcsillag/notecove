@@ -771,48 +771,184 @@ The proper implementation MUST use the **Yjs Synchronization Protocol**, which i
 
 ### 2.4 Folder Tree Panel 🟥
 
+**Status:** To Do (Split into Sub-Phases)
+
+This phase is split into 4 sub-phases for better manageability:
+
+---
+
+#### 2.4.1 Basic Folder Tree Display (Read-Only, Single SD) 🟥
+
 **Status:** To Do
 
 **Tasks:**
 
-- [ ] 🟥 Implement folder tree component (MUI TreeView)
-  - Header: "FOLDERS" + plus icon
-  - Tree per SD (labeled with SD name)
-  - Each SD has "All Notes" (top) and "Recently Deleted" (bottom) - UI-only, not in CRDT
-  - User folders in between (from CRDT)
-  - Folder expand/collapse (persist state in app_state table)
-  - Note count badges on folders (from SQLite cache)
+- [ ] 🟥 Set up MUI TreeView component
+  - Install @mui/x-tree-view package
+  - Create basic FolderTree component
+  - Header: "FOLDERS" (no plus icon yet)
+- [ ] 🟥 Implement IPC handlers for folder data
+  - `folder:list` - Get all folders for default SD
+  - `folder:get` - Get single folder by ID
+  - Load from FolderTreeDoc CRDT and return folder list
+- [ ] 🟥 Display folder tree structure
+  - Show "All Notes" at top (UI-only, not in CRDT)
+  - Show user folders from CRDT (sorted by order)
+  - Show "Recently Deleted" at bottom (UI-only, not in CRDT)
+  - Display folder names with proper nesting
+  - Show note count badges (placeholder counts for now)
+- [ ] 🟥 Implement folder selection
+  - Click folder to select
+  - Visual feedback for selected folder
+  - Persist selection in app_state
+- [ ] 🟥 Implement expand/collapse
+  - Click folder to expand/collapse children
+  - Persist expansion state in app_state
+- [ ] 🟥 Add basic tests
+  - Test folder tree rendering
+  - Test folder selection
+  - Test expand/collapse
+
+**Acceptance Criteria:**
+
+- ✅ Folder tree displays with proper hierarchy
+- ✅ "All Notes" and "Recently Deleted" appear at correct positions
+- ✅ Can select folders (persists across restarts)
+- ✅ Can expand/collapse folders (persists across restarts)
+- ✅ Note count badges appear (even if placeholder)
+
+**Deferred to Later Sub-Phases:**
+
+- Folder creation, rename, delete (→ 2.4.2)
+- Drag & drop (→ 2.4.3)
+- Context menus (→ 2.4.3)
+- Multi-SD support (→ 2.4.4)
+
+---
+
+#### 2.4.2 Folder CRUD Operations 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
 - [ ] 🟥 Implement folder creation
+  - Add plus icon to header
   - Click plus icon: create folder in active SD
-  - Context menu: New Folder
-  - Default location: root level if "All Notes" selected, subfolder otherwise
+  - Dialog: prompt for folder name
+  - IPC handler: `folder:create`
+  - Update FolderTreeDoc CRDT
+  - Update SQLite cache
+  - Default location: root level if "All Notes" selected, subfolder if folder selected
+- [ ] 🟥 Implement folder rename
+  - Double-click folder name to edit
+  - Or: Rename option in future context menu (2.4.3)
+  - IPC handler: `folder:rename`
+  - Update FolderTreeDoc CRDT
+  - Update SQLite cache
+- [ ] 🟥 Implement folder delete
+  - IPC handler: `folder:delete`
+  - Set deleted flag in FolderTreeDoc CRDT
+  - Update SQLite cache
+  - Confirmation dialog (simple for now, before context menu)
+- [ ] 🟥 Handle folder name conflicts
+  - Prevent rename/create if sibling has same name
+  - Alert user with friendly message
+- [ ] 🟥 Add tests for folder operations
+  - Test folder creation
+  - Test folder rename
+  - Test folder deletion
+  - Test name conflict validation
+
+**Acceptance Criteria:**
+
+- ✅ Can create folders with unique names
+- ✅ Can rename folders (with conflict prevention)
+- ✅ Can delete folders (with confirmation)
+- ✅ Folder changes sync to all open windows
+- ✅ Changes persist to CRDT and SQLite
+
+---
+
+#### 2.4.3 Drag & Drop and Context Menus 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
 - [ ] 🟥 Implement folder drag & drop
   - Drag folder to another folder (nesting)
   - Drag folder to "All Notes" (move to root - set parentId to null)
   - Cannot drag folder to be its own descendant (validate)
-  - Cannot drag across SDs
-  - Visual feedback during drag
+  - Cannot drag across SDs (single SD only in 2.4.3)
+  - Visual feedback during drag (cursor, drop zones)
+  - IPC handler: `folder:move`
+  - Update FolderTreeDoc CRDT (parentId, order)
+  - Update SQLite cache
 - [ ] 🟥 Implement folder context menu
-  - Rename Folder
-  - Move to Top Level (set parentId to null)
-  - Delete (confirmation dialog, recursive delete to Recently Deleted - set deleted flag)
-- [ ] 🟥 Implement folder selection
-  - Click folder to select
-  - Selection persists across restarts (app_state table)
-  - Active SD concept (SD of currently selected folder)
-- [ ] 🟥 Handle folder name conflicts
-  - Prevent rename/move if sibling has same name
-  - Alert user
+  - Right-click folder for menu
+  - Options: Rename, Move to Top Level, Delete
+  - "Rename" → inline editing
+  - "Move to Top Level" → set parentId to null
+  - "Delete" → confirmation dialog, recursive delete (set deleted flag)
+- [ ] 🟥 Add tests for drag & drop
+  - Test folder moving (parent change)
+  - Test circular reference prevention
+  - Test visual feedback
+- [ ] 🟥 Add tests for context menu
+  - Test menu opening
+  - Test each menu action
 
 **Acceptance Criteria:**
 
-- Folder tree displays correctly for all SDs
-- Can create, rename, move, delete folders
-- Drag & drop works correctly
-- Folder collapse state persists
-- Note counts are accurate
-- "All Notes" always at top, "Recently Deleted" always at bottom
-- No circular parent references
+- ✅ Can drag folders to nest/unnest
+- ✅ Cannot create circular references
+- ✅ Visual feedback during drag is clear
+- ✅ Context menu appears on right-click
+- ✅ All context menu actions work correctly
+
+---
+
+#### 2.4.4 Multi-SD Support 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 Implement SD management
+  - IPC handler: `sd:list` - Get all configured SDs
+  - IPC handler: `sd:create` - Create new SD
+  - IPC handler: `sd:setActive` - Set active SD
+  - Store SD list in SQLite (or app_state)
+- [ ] 🟥 Update folder tree to show multiple SDs
+  - Each SD as a top-level tree section
+  - SD name as label (editable?)
+  - Each SD has its own "All Notes" and "Recently Deleted"
+  - User folders between them
+- [ ] 🟥 Update IPC handlers for multi-SD
+  - All folder operations need sdId parameter
+  - Load correct FolderTreeDoc per SD
+  - Update all existing handlers
+- [ ] 🟥 Implement active SD concept
+  - SD of currently selected folder
+  - New notes/folders created in active SD
+  - Visual indicator for active SD
+- [ ] 🟥 Prevent cross-SD operations
+  - Cannot drag folders across SDs
+  - Error messages for invalid operations
+- [ ] 🟥 Add tests for multi-SD
+  - Test SD listing
+  - Test SD creation
+  - Test switching between SDs
+  - Test cross-SD prevention
+
+**Acceptance Criteria:**
+
+- ✅ Can have multiple SDs configured
+- ✅ Each SD shows its own folder tree
+- ✅ Can create/manage folders in each SD
+- ✅ Cannot perform cross-SD operations
+- ✅ Active SD concept works correctly
 
 ---
 
