@@ -1041,39 +1041,7 @@ This phase is split into 5 sub-phases for better manageability:
 
 ---
 
-### 2.5 Tags Panel 🟥
-
-**Status:** To Do
-
-**Tasks:**
-
-- [ ] 🟥 Implement tags panel below folder tree
-  - Header: "TAGS" + search box
-  - Draggable splitter between folder tree and tags panel
-  - List of tag buttons (all known tags from SQLite)
-  - Tri-state buttons: off (default) / positive (blue) / negative (red)
-  - Fuzzy search for tag filtering
-- [ ] 🟥 Implement tag filtering logic
-  - Multiple positive tags: AND logic (note must have all)
-  - Negative tags: exclude even if positive match
-  - Update notes list when tag filters change
-  - Persist tag filter state across restarts (app_state table)
-- [ ] 🟥 Extract tags from note content
-  - Parse `#tagname` from notes (case-insensitive)
-  - No spaces in tag names (stop at whitespace or punctuation)
-  - Update tag index in SQLite (tags, note_tags tables)
-
-**Acceptance Criteria:**
-
-- Tags panel displays all tags
-- Can toggle tag states (off/positive/negative)
-- Tag search filters tag list (fuzzy)
-- Tag filtering updates notes list correctly
-- Tag state persists across restarts
-
----
-
-### 2.6 Notes List Panel 🟥
+### 2.5 Notes List Panel 🟥
 
 **Status:** To Do
 
@@ -1142,6 +1110,38 @@ This phase is split into 5 sub-phases for better manageability:
 - Note counts and times are accurate
 - Virtual scrolling performs well with many notes
 - Orphan notes (folderId = null) work correctly
+
+---
+
+### 2.6 Tags Panel 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 Implement tags panel below folder tree
+  - Header: "TAGS" + search box
+  - Draggable splitter between folder tree and tags panel
+  - List of tag buttons (all known tags from SQLite)
+  - Tri-state buttons: off (default) / positive (blue) / negative (red)
+  - Fuzzy search for tag filtering
+- [ ] 🟥 Implement tag filtering logic
+  - Multiple positive tags: AND logic (note must have all)
+  - Negative tags: exclude even if positive match
+  - Update notes list when tag filters change
+  - Persist tag filter state across restarts (app_state table)
+- [ ] 🟥 Extract tags from note content
+  - Parse `#tagname` from notes (case-insensitive)
+  - No spaces in tag names (stop at whitespace or punctuation)
+  - Update tag index in SQLite (tags, note_tags tables)
+
+**Acceptance Criteria:**
+
+- Tags panel displays all tags
+- Can toggle tag states (off/positive/negative)
+- Tag search filters tag list (fuzzy)
+- Tag filtering updates notes list correctly
+- Tag state persists across restarts
 
 ---
 
