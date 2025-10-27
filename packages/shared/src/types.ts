@@ -46,3 +46,34 @@ export interface InstanceInfo {
   instanceId: UUID;
   username: string;
 }
+
+/**
+ * Storage Directory metadata
+ *
+ * A Storage Directory (SD) represents a sync directory containing notes and folders.
+ * Multiple SDs allow users to have separate collections (e.g., work vs personal).
+ */
+export interface StorageDir {
+  /** Unique identifier for the storage directory */
+  id: UUID;
+
+  /** User-visible name for the storage directory */
+  name: string;
+
+  /** File system path to the sync directory */
+  path: string;
+
+  /** Timestamp when this SD was created */
+  created: number;
+}
+
+/**
+ * Storage Directory creation parameters
+ */
+export interface CreateStorageDirParams {
+  /** User-visible name for the storage directory */
+  name: string;
+
+  /** File system path to the sync directory */
+  path: string;
+}

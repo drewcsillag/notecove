@@ -109,12 +109,21 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const [remountCounter, setRemountCounter] = useState(0); // Force remount for expand/collapse all
   const [isCollapsedAll, setIsCollapsedAll] = useState(false); // Track if user clicked collapse all
   const isProgrammaticChange = useRef(false); // Track if change is from expand/collapse all buttons
+  const previousExpandedLength = useRef(0); // Track previous length to detect initial expansion
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     anchorEl: HTMLElement;
     folderId: string;
   } | null>(null);
+
+  // Force remount when expandedFolderIds changes from empty to populated (initial load)
+  useEffect(() => {
+    if (previousExpandedLength.current === 0 && expandedFolderIds.length > 0) {
+      setRemountCounter((prev) => prev + 1);
+    }
+    previousExpandedLength.current = expandedFolderIds.length;
+  }, [expandedFolderIds]);
 
   // Rename dialog state
   const [renameDialog, setRenameDialog] = useState<{

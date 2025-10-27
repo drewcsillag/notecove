@@ -4,7 +4,7 @@
  * Defines the communication protocol between main and renderer processes.
  */
 
-import type { NoteCache } from '@notecove/shared';
+import type { NoteCache, StorageDir } from '@notecove/shared';
 
 /**
  * Commands (renderer → main)
@@ -23,6 +23,12 @@ export interface IPCCommands {
   // Folder operations
   'folder:create': (sdId: string, parentId: string, name: string) => Promise<string>;
   'folder:delete': (folderId: string) => Promise<void>;
+
+  // Storage Directory operations
+  'sd:list': () => Promise<StorageDir[]>;
+  'sd:create': (name: string, path: string) => Promise<string>;
+  'sd:setActive': (sdId: string) => Promise<void>;
+  'sd:getActive': () => Promise<string | null>;
 
   // App state operations
   'appState:get': (key: string) => Promise<string | null>;

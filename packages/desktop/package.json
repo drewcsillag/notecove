@@ -12,13 +12,16 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
+    "pretest": "pnpm rebuild:node",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "pretest:e2e": "npx @electron/rebuild -f -w better-sqlite3",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "rebuild": "npx @electron/rebuild"
+    "rebuild": "npx @electron/rebuild",
+    "rebuild:node": "cd ../../node_modules/.pnpm/better-sqlite3@12.4.1/node_modules/better-sqlite3 && npm run build-release",
+    "rebuild:electron": "npx @electron/rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",

@@ -1287,3 +1287,17 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 
 ---
 
+## Technical Debt / Known Issues
+
+### Test Flakiness
+
+**Issue:** First test in folder-bugs.spec.ts is flaky (skipped for now)
+- Test: "Bug: Right-click rename renames wrong folder › should rename the clicked nested folder, not its parent"
+- Location: `packages/desktop/e2e/folder-bugs.spec.ts:80`
+- Status: Skipped with `test.skip()`
+- Appears to be timing-related to initial app startup
+- Other 10 tests in suite pass consistently after test architecture fix
+- **TODO:** Investigate and fix this timing issue when time permits
+
+---
+

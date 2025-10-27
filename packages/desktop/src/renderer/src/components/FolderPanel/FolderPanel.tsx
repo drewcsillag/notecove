@@ -29,6 +29,7 @@ export const FolderPanel: React.FC = () => {
   const [newFolderName, setNewFolderName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [stateLoaded, setStateLoaded] = useState(false);
 
   // Load persisted state on mount
   useEffect(() => {
@@ -63,11 +64,20 @@ export const FolderPanel: React.FC = () => {
       const expandedState = await window.electronAPI.appState.get('expandedFolderIds');
       if (expandedState) {
         setExpandedFolderIds(JSON.parse(expandedState) as string[]);
+      } else {
+        // No saved state (fresh installation) - default to expanding all folders
+        const folders = await window.electronAPI.folder.list(DEFAULT_SD_ID);
+        const allFolderIds = folders.map((f) => f.id);
+        setExpandedFolderIds(allFolderIds);
       }
+
+      // Mark state as loaded
+      setStateLoaded(true);
     } catch (err) {
       console.error('Failed to load folder state:', err);
       // Default to "All Notes" on error
       setSelectedFolderId('all-notes');
+      setStateLoaded(true); // Still mark as loaded even on error
     }
   };
 
@@ -175,17 +185,25 @@ export const FolderPanel: React.FC = () => {
 
       {/* Folder Tree */}
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
-        <FolderTree
-          sdId={DEFAULT_SD_ID}
-          selectedFolderId={selectedFolderId}
-          expandedFolderIds={expandedFolderIds}
-          onFolderSelect={handleFolderSelect}
-          onExpandedChange={handleExpandedChange}
-          refreshTrigger={refreshTrigger}
-          onRefresh={() => {
-            setRefreshTrigger((prev) => prev + 1);
-          }}
-        />
+        {stateLoaded ? (
+          <FolderTree
+            sdId={DEFAULT_SD_ID}
+            selectedFolderId={selectedFolderId}
+            expandedFolderIds={expandedFolderIds}
+            onFolderSelect={handleFolderSelect}
+            onExpandedChange={handleExpandedChange}
+            refreshTrigger={refreshTrigger}
+            onRefresh={() => {
+              setRefreshTrigger((prev) => prev + 1);
+            }}
+          />
+        ) : (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              Loading folders...
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Create Folder Dialog */}
