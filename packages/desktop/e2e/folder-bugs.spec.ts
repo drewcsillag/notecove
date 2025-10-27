@@ -23,6 +23,9 @@ let electronApp: ElectronApplication;
 let page: Page;
 
 test.beforeEach(async () => {
+  // Wait briefly to ensure previous test's app is fully closed
+  await new Promise(resolve => setTimeout(resolve, 500));
+
   // Clean up any existing test storage to start fresh for EACH test
   const storageDir = join(homedir(), 'Library', 'Application Support', 'Electron', 'storage');
   try {
@@ -60,6 +63,8 @@ test.afterEach(async () => {
   if (electronApp) {
     try {
       await electronApp.close();
+      // Wait for app to fully close and release file handles before next test
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (err) {
       // App may already be closed by test (e.g., restart tests)
       console.log('[E2E] App already closed or failed to close:', err);
@@ -73,7 +78,8 @@ test.describe('Bug: Right-click rename renames wrong folder', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Wait for folders to fully load and render (demo folders are created async)
-    await page.waitForTimeout(2000);
+    // Longer wait after many sequential tests to ensure stable rendering
+    await page.waitForTimeout(3000);
 
     // Verify "Work" folder exists (top level)
     await expect(page.locator('text=Work')).toBeVisible();
@@ -130,7 +136,8 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Wait for folders to fully load and render (demo folders are created async)
-    await page.waitForTimeout(2000);
+    // Longer wait after many sequential tests to ensure stable rendering
+    await page.waitForTimeout(3000);
 
     // Verify Work and Personal exist at top level
     await expect(page.locator('text=Work')).toBeVisible();
@@ -201,7 +208,8 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Wait for folders to fully load and render (demo folders are created async)
-    await page.waitForTimeout(2000);
+    // Longer wait after many sequential tests to ensure stable rendering
+    await page.waitForTimeout(3000);
 
     // Wait for Ideas to be visible (tree should start fully expanded)
     const ideasItem = page.getByRole('button', { name: 'Ideas', exact: true });
@@ -497,21 +505,21 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       // Wait for folders to fully load and render (demo folders are created async)
       await page1.waitForTimeout(2000);
 
-      // Try to find Ideas - should be visible if tree is fully expanded
-      let ideasFolder = page1.locator('text=Ideas').first();
+      // Always explicitly expand Personal folder to ensure Ideas is visible
+      const personalFolder = page1.getByRole('button', { name: /Personal/ }).first();
 
-      // If not visible after short wait, manually expand Personal folder
-      try {
-        await expect(ideasFolder).toBeVisible({ timeout: 1000 });
-      } catch {
-        console.log('Ideas not visible, expanding Personal folder');
-        const personalFolder = page1.getByRole('button', { name: /Personal/ }).first();
-        const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+      // Check if it has a chevron (if collapsed)
+      const personalChevron = personalFolder.locator('svg').first();
+      const chevronCount = await personalChevron.count();
+
+      if (chevronCount > 0) {
+        // Has chevron, click it to expand
         await personalChevron.click();
         await page1.waitForTimeout(500);
       }
 
       // Now Ideas should be visible
+      const ideasFolder = page1.locator('text=Ideas').first();
       await expect(ideasFolder).toBeVisible({ timeout: 5000 });
 
       // Move a folder in window 1 using context menu
@@ -754,23 +762,24 @@ test.describe('Bug: Folders without children show expand icon', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Wait for folders to fully load and render (demo folders are created async)
-    await page.waitForTimeout(2000);
+    // Longer wait after many sequential tests to ensure stable rendering
+    await page.waitForTimeout(3000);
 
-    // Try to find Ideas - should be visible if tree is fully expanded
-    let ideasButton = page.getByRole('button', { name: 'Ideas', exact: true });
+    // Always explicitly expand Personal folder to ensure Ideas is visible
+    const personalFolder = page.getByRole('button', { name: /^Personal/ }).first();
 
-    // If not visible after short wait, manually expand Personal folder
-    try {
-      await expect(ideasButton).toBeVisible({ timeout: 1000 });
-    } catch {
-      console.log('Ideas not visible, expanding Personal folder');
-      const personalFolder = page.getByRole('button', { name: /^Personal/ }).first();
-      const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+    // Check if it has a chevron (if collapsed)
+    const personalChevron = personalFolder.locator('svg').first();
+    const chevronCount = await personalChevron.count();
+
+    if (chevronCount > 0) {
+      // Has chevron, click it to expand
       await personalChevron.click();
       await page.waitForTimeout(500);
     }
 
     // Now Ideas should be visible
+    const ideasButton = page.getByRole('button', { name: 'Ideas', exact: true });
     await expect(ideasButton).toBeVisible({ timeout: 5000 });
 
     // Check if Ideas has a chevron icon (ChevronRight or ExpandMore)
@@ -811,7 +820,8 @@ test.describe('Bug: Drag shadow shows multiple items', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Wait for folders to fully load and render (demo folders are created async)
-    await page.waitForTimeout(2000);
+    // Longer wait after many sequential tests to ensure stable rendering
+    await page.waitForTimeout(3000);
 
     // Expand "Personal" to see "Ideas" and "Recipes" by clicking the chevron icon
     const personalFolder = page.getByRole('button', { name: /^Personal/ }).first();
