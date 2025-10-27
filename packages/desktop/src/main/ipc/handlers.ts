@@ -151,8 +151,14 @@ export class IPCHandlers {
 
   private async handleListNotes(
     _event: IpcMainInvokeEvent,
-    sdId: string
+    sdId: string,
+    folderId?: string | null
   ): Promise<import('@notecove/shared').NoteCache[]> {
+    // If folderId is provided, filter by folder (including null for root folder)
+    if (folderId !== undefined) {
+      return await this.database.getNotesByFolder(folderId);
+    }
+    // Otherwise, return all notes for the SD (backward compatibility)
     return await this.database.getNotesBySd(sdId);
   }
 

@@ -31,7 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getMetadata: (noteId: string): Promise<NoteMetadata> =>
       ipcRenderer.invoke('note:getMetadata', noteId) as Promise<NoteMetadata>,
     list: (
-      sdId: string
+      sdId: string,
+      folderId?: string | null
     ): Promise<
       {
         id: string;
@@ -45,7 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         contentText: string;
       }[]
     > =>
-      ipcRenderer.invoke('note:list', sdId) as Promise<
+      ipcRenderer.invoke('note:list', sdId, folderId) as Promise<
         {
           id: string;
           title: string;

@@ -25,8 +25,11 @@ const mockElectronAPI = {
     delete: jest.fn(),
     move: jest.fn(),
     getMetadata: jest.fn(),
+    list: jest.fn().mockResolvedValue([]),
     onUpdated: jest.fn(),
     onDeleted: jest.fn(),
+    onCreated: jest.fn(),
+    onExternalUpdate: jest.fn(),
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),
@@ -60,6 +63,12 @@ describe('App', () => {
       /* unsubscribe */
     });
     mockElectronAPI.note.onDeleted.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onCreated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onExternalUpdate.mockReturnValue(() => {
       /* unsubscribe */
     });
     mockElectronAPI.sync.onProgress.mockReturnValue(() => {
@@ -102,11 +111,13 @@ describe('App', () => {
 
   it('should render notes list panel content', async () => {
     render(<App />);
-    expect(screen.getByText('notes.title')).toBeInTheDocument();
 
-    // Wait for appState to be called
+    // Should show loading initially
+    expect(screen.getByText('Loading notes...')).toBeInTheDocument();
+
+    // Wait for notes to load and show empty state
     await waitFor(() => {
-      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+      expect(screen.getByText('No notes in this folder')).toBeInTheDocument();
     });
   });
 

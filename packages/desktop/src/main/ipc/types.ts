@@ -4,6 +4,8 @@
  * Defines the communication protocol between main and renderer processes.
  */
 
+import type { NoteCache } from '@notecove/shared';
+
 /**
  * Commands (renderer → main)
  */
@@ -16,6 +18,7 @@ export interface IPCCommands {
   'note:delete': (noteId: string) => Promise<void>;
   'note:move': (noteId: string, newFolderId: string) => Promise<void>;
   'note:getMetadata': (noteId: string) => Promise<NoteMetadata>;
+  'note:list': (sdId: string, folderId?: string | null) => Promise<NoteCache[]>;
 
   // Folder operations
   'folder:create': (sdId: string, parentId: string, name: string) => Promise<string>;
