@@ -126,4 +126,120 @@ test.describe('Note Multi-Instance Sync', () => {
 
     console.log('[E2E] Note editing completed, activity log infrastructure is active');
   });
+
+  test('should sync multiple consecutive edits between separate instances', async () => {
+    // Create a shared storage directory for both instances
+    const sharedStorageDir = await mkdtemp(join(tmpdir(), 'notecove-cross-instance-'));
+    console.log('[E2E Cross-Instance] Shared storage directory:', sharedStorageDir);
+
+    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Launch first instance
+    const instance1 = await electron.launch({
+      args: [mainPath],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sharedStorageDir,
+        INSTANCE_ID: 'instance-1',
+      },
+      timeout: 60000,
+    });
+
+    instance1.on('console', (msg) => {
+      console.log('[Instance1 Console]:', msg.text());
+    });
+
+    const page1 = await instance1.firstWindow();
+    page1.on('console', (msg) => {
+      console.log('[Instance1 Renderer]:', msg.text());
+    });
+
+    // Wait for instance 1 to be ready
+    await page1.waitForSelector('text=Folders', { timeout: 10000 });
+    const editor1 = page1.locator('[contenteditable="true"]').first();
+    await editor1.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Launch second instance with same storage directory
+    const instance2 = await electron.launch({
+      args: [mainPath],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sharedStorageDir,
+        INSTANCE_ID: 'instance-2',
+      },
+      timeout: 60000,
+    });
+
+    instance2.on('console', (msg) => {
+      console.log('[Instance2 Console]:', msg.text());
+    });
+
+    const page2 = await instance2.firstWindow();
+    page2.on('console', (msg) => {
+      console.log('[Instance2 Renderer]:', msg.text());
+    });
+
+    // Wait for instance 2 to be ready
+    await page2.waitForSelector('text=Folders', { timeout: 10000 });
+    const editor2 = page2.locator('[contenteditable="true"]').first();
+    await editor2.waitFor({ state: 'visible', timeout: 10000 });
+
+    try {
+      // First edit in instance 1
+      console.log('[E2E Cross-Instance] Making first edit in instance 1...');
+      const firstEdit = `First edit ${Date.now()}`;
+      await editor1.click();
+      await editor1.fill(firstEdit);
+
+      // Wait for activity log to be written and file watcher to trigger
+      await page1.waitForTimeout(3000);
+
+      // Verify first edit appears in instance 2
+      console.log('[E2E Cross-Instance] Checking first edit in instance 2...');
+      await expect(editor2).toContainText(firstEdit, { timeout: 5000 });
+      console.log('[E2E Cross-Instance] ✅ First edit synced successfully');
+
+      // Second edit in instance 1 (this is where the bug manifests)
+      console.log('[E2E Cross-Instance] Making second edit in instance 1...');
+      const secondEdit = `${firstEdit} + Second edit ${Date.now()}`;
+      await editor1.click();
+      await editor1.fill(secondEdit);
+
+      // Wait for activity log to be written and file watcher to trigger
+      await page1.waitForTimeout(3000);
+
+      // Verify second edit appears in instance 2
+      // This assertion should FAIL due to the bug
+      console.log('[E2E Cross-Instance] Checking second edit in instance 2...');
+      await expect(editor2).toContainText('Second edit', { timeout: 5000 });
+      console.log('[E2E Cross-Instance] ✅ Second edit synced successfully');
+
+      // Third edit to be thorough
+      console.log('[E2E Cross-Instance] Making third edit in instance 1...');
+      const thirdEdit = `${secondEdit} + Third edit ${Date.now()}`;
+      await editor1.click();
+      await editor1.fill(thirdEdit);
+
+      // Wait for activity log to be written and file watcher to trigger
+      await page1.waitForTimeout(3000);
+
+      // Verify third edit appears in instance 2
+      console.log('[E2E Cross-Instance] Checking third edit in instance 2...');
+      await expect(editor2).toContainText('Third edit', { timeout: 5000 });
+      console.log('[E2E Cross-Instance] ✅ Third edit synced successfully');
+    } finally {
+      // Clean up both instances
+      await instance1.close();
+      await instance2.close();
+
+      // Clean up shared storage directory
+      try {
+        await rm(sharedStorageDir, { recursive: true, force: true });
+      } catch (error) {
+        console.error('[E2E Cross-Instance] Failed to clean up shared storage:', error);
+      }
+    }
+  });
 });

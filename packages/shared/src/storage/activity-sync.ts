@@ -67,7 +67,11 @@ export class ActivitySync {
             console.warn(
               `[ActivitySync] Gap detected for ${instanceId} (oldest: ${oldestTimestamp}, last seen: ${lastSeen}), performing full scan`
             );
-            await this.fullScanAllNotes();
+            const reloadedNotes = await this.fullScanAllNotes();
+            // Add all reloaded notes to affected set
+            for (const noteId of reloadedNotes) {
+              affectedNotes.add(noteId);
+            }
             this.updateWatermark(instanceId, lines);
             continue;
           }
@@ -123,17 +127,23 @@ export class ActivitySync {
    * 1. Only reloads notes that are already in memory
    * 2. Typically only 1-5 notes are loaded at once
    * 3. CRDT merge is idempotent
+   *
+   * @returns Set of note IDs that were reloaded
    */
-  private async fullScanAllNotes(): Promise<void> {
+  private async fullScanAllNotes(): Promise<Set<string>> {
     const loadedNotes = this.callbacks.getLoadedNotes();
+    const reloadedNotes = new Set<string>();
 
     for (const noteId of loadedNotes) {
       try {
         await this.callbacks.reloadNote(noteId);
+        reloadedNotes.add(noteId);
       } catch (error) {
         console.error(`[ActivitySync] Failed to reload note ${noteId}:`, error);
       }
     }
+
+    return reloadedNotes;
   }
 
   /**
