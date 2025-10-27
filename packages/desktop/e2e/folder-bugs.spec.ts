@@ -823,12 +823,20 @@ test.describe('Bug: Drag shadow shows multiple items', () => {
     // Longer wait after many sequential tests to ensure stable rendering
     await page.waitForTimeout(3000);
 
-    // Expand "Personal" to see "Ideas" and "Recipes" by clicking the chevron icon
+    // Always explicitly expand Personal folder to ensure Ideas is visible
     const personalFolder = page.getByRole('button', { name: /^Personal/ }).first();
-    const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
-    await personalChevron.click();
 
-    // Wait for Ideas to be visible after expansion
+    // Check if it has a chevron (if collapsed)
+    const personalChevron = personalFolder.locator('svg').first();
+    const chevronCount = await personalChevron.count();
+
+    if (chevronCount > 0) {
+      // Has chevron, click it to expand
+      await personalChevron.click();
+      await page.waitForTimeout(500);
+    }
+
+    // Wait for Ideas to be visible
     const ideasItem = page.getByRole('button', { name: 'Ideas', exact: true });
     await expect(ideasItem).toBeVisible({ timeout: 5000 });
 
