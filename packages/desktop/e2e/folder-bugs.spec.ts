@@ -497,13 +497,21 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       // Wait for folders to fully load and render (demo folders are created async)
       await page1.waitForTimeout(2000);
 
-      // Expand "Personal" to see "Ideas" by clicking the chevron icon
-      const personalFolder = page1.getByRole('button', { name: /Personal/ }).first();
-      const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
-      await personalChevron.click();
+      // Try to find Ideas - should be visible if tree is fully expanded
+      let ideasFolder = page1.locator('text=Ideas').first();
 
-      // Wait for Ideas to be visible after expansion
-      const ideasFolder = page1.locator('text=Ideas').first();
+      // If not visible after short wait, manually expand Personal folder
+      try {
+        await expect(ideasFolder).toBeVisible({ timeout: 1000 });
+      } catch {
+        console.log('Ideas not visible, expanding Personal folder');
+        const personalFolder = page1.getByRole('button', { name: /Personal/ }).first();
+        const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+        await personalChevron.click();
+        await page1.waitForTimeout(500);
+      }
+
+      // Now Ideas should be visible
       await expect(ideasFolder).toBeVisible({ timeout: 5000 });
 
       // Move a folder in window 1 using context menu
@@ -748,9 +756,22 @@ test.describe('Bug: Folders without children show expand icon', () => {
     // Wait for folders to fully load and render (demo folders are created async)
     await page.waitForTimeout(2000);
 
-    // Wait for "Ideas" and "Recipes" (leaf nodes) to be visible (tree should start fully expanded)
-    const ideasButton = page.getByRole('button', { name: 'Ideas', exact: true });
-    await expect(ideasButton).toBeVisible({ timeout: 10000 });
+    // Try to find Ideas - should be visible if tree is fully expanded
+    let ideasButton = page.getByRole('button', { name: 'Ideas', exact: true });
+
+    // If not visible after short wait, manually expand Personal folder
+    try {
+      await expect(ideasButton).toBeVisible({ timeout: 1000 });
+    } catch {
+      console.log('Ideas not visible, expanding Personal folder');
+      const personalFolder = page.getByRole('button', { name: /^Personal/ }).first();
+      const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+      await personalChevron.click();
+      await page.waitForTimeout(500);
+    }
+
+    // Now Ideas should be visible
+    await expect(ideasButton).toBeVisible({ timeout: 5000 });
 
     // Check if Ideas has a chevron icon (ChevronRight or ExpandMore)
     // The chevron should NOT exist for childless folders
