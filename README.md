@@ -71,6 +71,31 @@ pnpm ci-local
 
 Apache License 2.0 - See [LICENSE](./LICENSE) for details.
 
-## Status
+## Current Status
 
-🚧 **Currently in development** - See [PLAN.md](./PLAN.md) for implementation plan and progress.
+🚧 **In Active Development** - Core features are being implemented incrementally.
+
+### What's Working
+
+✅ **Multi-Window Sync** - Real-time collaboration between multiple windows in the same app instance
+✅ **Note Persistence** - Notes persist across app restarts and windows
+✅ **CRDT Synchronization** - Yjs-based conflict-free note editing
+✅ **Rich Text Editing** - TipTap editor with formatting toolbar
+✅ **Folder Management** - Create, rename, delete, and organize folders
+✅ **SQLite Caching** - Fast note metadata lookup with FTS5 search
+✅ **Activity Logging** - Infrastructure for cross-instance sync
+
+### In Progress
+
+🔄 **Cross-Instance Sync** - Currently only first change replicates between separate app instances
+🔄 **Note Selection** - UI for selecting and switching between notes
+🔄 **Search** - Full-text search across note content
+
+### Next Up
+
+📋 Fix cross-instance synchronization (activity sync mechanism)
+📋 Note list panel with search and filtering
+📋 Tags and inter-note links
+📋 iOS app implementation
+
+See [PLAN.md](./PLAN.md) for detailed implementation plan and progress tracking.
