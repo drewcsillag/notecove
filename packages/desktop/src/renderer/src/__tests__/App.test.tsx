@@ -112,12 +112,14 @@ describe('App', () => {
 
   it('should render editor panel content', async () => {
     render(<App />);
-    expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument();
 
-    // Wait for appState to be called
+    // Wait for editor to finish loading
     await waitFor(() => {
-      expect(mockElectronAPI.appState.get).toHaveBeenCalled();
+      expect(screen.getByTestId('tiptap-editor')).toBeInTheDocument();
     });
+
+    // Verify appState was called
+    expect(mockElectronAPI.appState.get).toHaveBeenCalled();
   });
 
   it('should use Material-UI theme', async () => {

@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/require-await */
 
 import { ipcMain, type IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import * as Y from 'yjs';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
 import type { Database } from '@notecove/shared';
@@ -34,11 +35,13 @@ export class IPCHandlers {
     // Note operations
     ipcMain.handle('note:load', this.handleLoadNote.bind(this));
     ipcMain.handle('note:unload', this.handleUnloadNote.bind(this));
+    ipcMain.handle('note:getState', this.handleGetState.bind(this));
     ipcMain.handle('note:applyUpdate', this.handleApplyUpdate.bind(this));
     ipcMain.handle('note:create', this.handleCreateNote.bind(this));
     ipcMain.handle('note:delete', this.handleDeleteNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
     ipcMain.handle('note:getMetadata', this.handleGetMetadata.bind(this));
+    ipcMain.handle('note:list', this.handleListNotes.bind(this));
 
     // Folder operations
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
@@ -66,22 +69,62 @@ export class IPCHandlers {
     await this.crdtManager.unloadNote(noteId);
   }
 
+  private async handleGetState(_event: IpcMainInvokeEvent, noteId: string): Promise<Uint8Array> {
+    const doc = this.crdtManager.getDocument(noteId);
+    if (!doc) {
+      throw new Error(`Note ${noteId} not loaded`);
+    }
+    // Encode the entire document state as an update
+    return Y.encodeStateAsUpdate(doc);
+  }
+
   private async handleApplyUpdate(
     _event: IpcMainInvokeEvent,
     noteId: string,
     update: Uint8Array
   ): Promise<void> {
     await this.crdtManager.applyUpdate(noteId, update);
+
+    // Broadcast update to all other windows
+    this.broadcastToAll('note:updated', noteId, update);
   }
 
   private async handleCreateNote(
     _event: IpcMainInvokeEvent,
-    _sdId: string,
-    _folderId: string,
-    _initialContent: string
+    sdId: string,
+    folderId: string | null,
+    initialContent?: string
   ): Promise<string> {
-    // TODO: Implement note creation
-    throw new Error('Not implemented');
+    // Generate new note ID
+    const noteId = crypto.randomUUID();
+
+    // Load the note (creates empty CRDT document)
+    await this.crdtManager.loadNote(noteId);
+
+    // If initial content provided, apply it to the CRDT
+    if (initialContent) {
+      // TODO: Convert initialContent to ProseMirror structure and insert
+      // For now, just create empty document
+      console.log('[Note] Initial content not yet implemented:', initialContent);
+    }
+
+    // Create note cache entry in SQLite
+    await this.database.upsertNote({
+      id: noteId,
+      title: 'Untitled',
+      sdId,
+      folderId,
+      created: Date.now(),
+      modified: Date.now(),
+      deleted: false,
+      contentPreview: '',
+      contentText: '',
+    });
+
+    // Broadcast note creation to all windows
+    this.broadcastToAll('note:created', { sdId, noteId, folderId });
+
+    return noteId;
   }
 
   private async handleDeleteNote(_event: IpcMainInvokeEvent, _noteId: string): Promise<void> {
@@ -104,6 +147,13 @@ export class IPCHandlers {
   ): Promise<NoteMetadata> {
     // TODO: Implement metadata retrieval from SQLite
     throw new Error('Not implemented');
+  }
+
+  private async handleListNotes(
+    _event: IpcMainInvokeEvent,
+    sdId: string
+  ): Promise<import('@notecove/shared').NoteCache[]> {
+    return await this.database.getNotesBySd(sdId);
   }
 
   private async handleListFolders(
@@ -336,11 +386,13 @@ export class IPCHandlers {
   destroy(): void {
     ipcMain.removeHandler('note:load');
     ipcMain.removeHandler('note:unload');
+    ipcMain.removeHandler('note:getState');
     ipcMain.removeHandler('note:applyUpdate');
     ipcMain.removeHandler('note:create');
     ipcMain.removeHandler('note:delete');
     ipcMain.removeHandler('note:move');
     ipcMain.removeHandler('note:getMetadata');
+    ipcMain.removeHandler('note:list');
     ipcMain.removeHandler('folder:list');
     ipcMain.removeHandler('folder:get');
     ipcMain.removeHandler('folder:create');

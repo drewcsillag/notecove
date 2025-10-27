@@ -12,13 +12,33 @@ declare global {
       note: {
         load: (noteId: string) => Promise<void>;
         unload: (noteId: string) => Promise<void>;
+        getState: (noteId: string) => Promise<Uint8Array>;
         applyUpdate: (noteId: string, update: Uint8Array) => Promise<void>;
         create: (sdId: string, folderId: string, initialContent: string) => Promise<string>;
         delete: (noteId: string) => Promise<void>;
         move: (noteId: string, newFolderId: string) => Promise<void>;
         getMetadata: (noteId: string) => Promise<NoteMetadata>;
+        list: (sdId: string) => Promise<
+          {
+            id: string;
+            title: string;
+            sdId: string;
+            folderId: string | null;
+            created: number;
+            modified: number;
+            deleted: boolean;
+            contentPreview: string;
+            contentText: string;
+          }[]
+        >;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
+        onCreated: (
+          callback: (data: { sdId: string; noteId: string; folderId: string | null }) => void
+        ) => () => void;
+        onExternalUpdate: (
+          callback: (data: { operation: string; noteIds: string[] }) => void
+        ) => () => void;
       };
 
       folder: {

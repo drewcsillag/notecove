@@ -15,10 +15,11 @@ import {
   type ActivitySyncCallbacks,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
-import { CRDTManagerImpl } from './crdt/crdt-manager';
+import { CRDTManagerImpl, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import { NodeFileWatcher } from './storage/node-file-watcher';
 import { randomUUID } from 'crypto';
+import * as Y from 'yjs';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
@@ -90,6 +91,97 @@ async function initializeDatabase(): Promise<Database> {
   }
 
   return db;
+}
+
+/**
+ * Ensure a default note exists for the user
+ */
+async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<void> {
+  const DEFAULT_NOTE_ID = 'default-note';
+  const DEFAULT_SD_ID = 'default';
+
+  // Check if the default note exists
+  const existingNotes = await db.getNotesBySd(DEFAULT_SD_ID);
+  const defaultNote = existingNotes.find((note) => note.id === DEFAULT_NOTE_ID);
+
+  if (defaultNote) {
+    // Default note exists, check if it has content
+    console.log('[ensureDefaultNote] Found default note, checking content');
+    await crdtMgr.loadNote(DEFAULT_NOTE_ID);
+    const doc = crdtMgr.getDocument(DEFAULT_NOTE_ID);
+    if (doc) {
+      const content = doc.getXmlFragment('content');
+      if (content.length === 0) {
+        // No content, add the welcome message
+        console.log('[ensureDefaultNote] Default note is empty, adding content');
+        const paragraph = new Y.XmlElement('paragraph');
+        const text = new Y.XmlText();
+        text.insert(
+          0,
+          'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
+        );
+        paragraph.insert(0, [text]);
+        content.insert(0, [paragraph]);
+      }
+    }
+    await db.setState('selectedNoteId', DEFAULT_NOTE_ID);
+    return;
+  }
+
+  // Check if any other notes exist
+  if (existingNotes.length > 0) {
+    // Other notes exist, select the first one
+    const firstNote = existingNotes[0];
+    if (firstNote) {
+      console.log(
+        '[ensureDefaultNote] Found existing note:',
+        firstNote.id,
+        'title:',
+        firstNote.title
+      );
+      await db.setState('selectedNoteId', firstNote.id);
+    }
+    return;
+  }
+
+  console.log('[ensureDefaultNote] No existing notes, creating default note');
+
+  // No notes exist, create the default note
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  await crdtMgr.loadNote(DEFAULT_NOTE_ID);
+
+  // Get the document to insert initial content
+  const doc = crdtMgr.getDocument(DEFAULT_NOTE_ID);
+  if (doc) {
+    // Insert initial content into the Y.XmlFragment
+    // ProseMirror structure: paragraph containing text
+    const content = doc.getXmlFragment('content');
+    const paragraph = new Y.XmlElement('paragraph');
+    const text = new Y.XmlText();
+    text.insert(
+      0,
+      'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
+    );
+    paragraph.insert(0, [text]);
+    content.insert(0, [paragraph]);
+  }
+
+  // Create note cache entry in SQLite
+  await db.upsertNote({
+    id: DEFAULT_NOTE_ID,
+    title: 'Welcome to NoteCove',
+    sdId: DEFAULT_SD_ID,
+    folderId: null,
+    created: Date.now(),
+    modified: Date.now(),
+    deleted: false,
+    contentPreview: 'Welcome to NoteCove!',
+    contentText:
+      'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.',
+  });
+
+  // Set as selected note
+  await db.setState('selectedNoteId', DEFAULT_NOTE_ID);
 }
 
 // App lifecycle
@@ -245,6 +337,9 @@ void app.whenReady().then(async () => {
 
     // Initialize IPC handlers (pass createWindow for testing support)
     ipcHandlers = new IPCHandlers(crdtManager, database, createWindow);
+
+    // Create default note if none exists
+    await ensureDefaultNote(database, crdtManager);
 
     // Set up file watcher for cross-instance folder sync
     fileWatcher = new NodeFileWatcher();

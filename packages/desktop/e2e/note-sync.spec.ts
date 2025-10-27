@@ -70,10 +70,10 @@ test.describe('Note Multi-Window Sync', () => {
     await editor.click();
     await editor.fill(testContent);
 
-    // Wait a bit for the note to be saved
-    await page.waitForTimeout(1000);
+    // Wait a bit for the note to be saved to database
+    await page.waitForTimeout(2000);
 
-    // Verify the content appears
+    // Verify the content appears in window 1
     await expect(editor).toContainText(testContent);
 
     // Open a second window using the testing IPC method
@@ -90,14 +90,19 @@ test.describe('Note Multi-Window Sync', () => {
     // Wait for folder panel in second window
     await secondWindow.waitForSelector('text=Folders', { timeout: 10000 });
 
-    // In the second window, the note should be visible in the list
-    // This is a basic smoke test - a full test would open the same note and verify content
-    console.log('[E2E] Successfully opened second window, note sync infrastructure is active');
+    // Wait for the editor in the second window
+    const secondEditor = secondWindow.locator('[contenteditable="true"]').first();
+    await secondEditor.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Verify the same content appears in window 2 (synced from database)
+    await expect(secondEditor).toContainText(testContent);
+
+    console.log('[E2E] Note content synced across both windows via shared database');
   });
 });
 
 test.describe('Note Multi-Instance Sync', () => {
-  test('should create activity log file when editing note', async () => {
+  test('should record note activity when editing', async () => {
     // Wait for app to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
@@ -106,16 +111,19 @@ test.describe('Note Multi-Instance Sync', () => {
     await editor.waitFor({ state: 'visible', timeout: 10000 });
 
     // Type content in the existing note
+    const testContent = 'Test content for activity log';
     await editor.click();
-    await editor.fill('Test content for activity log');
+    await editor.fill(testContent);
 
-    // Wait for activity log to be written
+    // Wait for activity log to be written (activity logger debounces)
     await page.waitForTimeout(2000);
 
-    // Verify activity log directory exists (we can't directly check files from here,
-    // but we can verify the app didn't crash and is still responsive)
+    // Verify the content was saved
+    await expect(editor).toContainText(testContent);
+
+    // Verify the app is still responsive (basic smoke test that nothing crashed)
     await expect(editor).toBeVisible();
 
-    console.log('[E2E] Note editing completed, activity log should be created');
+    console.log('[E2E] Note editing completed, activity log infrastructure is active');
   });
 });

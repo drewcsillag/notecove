@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:load', noteId) as Promise<void>,
     unload: (noteId: string): Promise<void> =>
       ipcRenderer.invoke('note:unload', noteId) as Promise<void>,
+    getState: (noteId: string): Promise<Uint8Array> =>
+      ipcRenderer.invoke('note:getState', noteId) as Promise<Uint8Array>,
     applyUpdate: (noteId: string, update: Uint8Array): Promise<void> =>
       ipcRenderer.invoke('note:applyUpdate', noteId, update) as Promise<void>,
     create: (sdId: string, folderId: string, initialContent: string): Promise<string> =>
@@ -28,6 +30,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:move', noteId, newFolderId) as Promise<void>,
     getMetadata: (noteId: string): Promise<NoteMetadata> =>
       ipcRenderer.invoke('note:getMetadata', noteId) as Promise<NoteMetadata>,
+    list: (
+      sdId: string
+    ): Promise<
+      {
+        id: string;
+        title: string;
+        sdId: string;
+        folderId: string | null;
+        created: number;
+        modified: number;
+        deleted: boolean;
+        contentPreview: string;
+        contentText: string;
+      }[]
+    > =>
+      ipcRenderer.invoke('note:list', sdId) as Promise<
+        {
+          id: string;
+          title: string;
+          sdId: string;
+          folderId: string | null;
+          created: number;
+          modified: number;
+          deleted: boolean;
+          contentPreview: string;
+          contentText: string;
+        }[]
+      >,
 
     // Event listeners
     onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
@@ -44,6 +74,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
       });
       return () => {
         ipcRenderer.removeAllListeners('note:deleted');
+      };
+    },
+    onCreated: (
+      callback: (data: { sdId: string; noteId: string; folderId: string | null }) => void
+    ): (() => void) => {
+      ipcRenderer.on(
+        'note:created',
+        (_event, data: { sdId: string; noteId: string; folderId: string | null }) => {
+          callback(data);
+        }
+      );
+      return () => {
+        ipcRenderer.removeAllListeners('note:created');
+      };
+    },
+    onExternalUpdate: (
+      callback: (data: { operation: string; noteIds: string[] }) => void
+    ): (() => void) => {
+      ipcRenderer.on(
+        'note:external-update',
+        (_event, data: { operation: string; noteIds: string[] }) => {
+          callback(data);
+        }
+      );
+      return () => {
+        ipcRenderer.removeAllListeners('note:external-update');
       };
     },
   },

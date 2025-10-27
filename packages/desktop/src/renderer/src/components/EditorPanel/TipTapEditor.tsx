@@ -21,7 +21,6 @@ export interface TipTapEditorProps {
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChange }) => {
   const [yDoc] = useState(() => new Y.Doc());
-  const isInitialLoadRef = React.useRef(true);
 
   const editor = useEditor({
     extensions: [
@@ -32,8 +31,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
       // Add Underline extension (not in StarterKit)
       Underline,
       // Collaboration extension binds TipTap to Yjs
+      // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
         document: yDoc,
+        fragment: yDoc.getXmlFragment('content'),
       }),
     ],
     content: '<p>Start typing...</p>',
@@ -61,78 +62,92 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
     };
   }, [editor, yDoc]);
 
-  // DEMO HACK: Sync between windows using BroadcastChannel
-  // This is a temporary demo to show collaboration working
-  // Will be replaced with proper IPC integration in Phase 3.x
+  // Send Yjs updates to main process for persistence and cross-window sync
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !noteId) return;
 
-    // Create broadcast channel for this note (or default channel)
-    const channelName = noteId ? `notecove-note-${noteId}` : 'notecove-demo';
-    const channel = new BroadcastChannel(channelName);
+    // Send updates to main process (but not updates from network/load)
+    const updateHandler = (update: Uint8Array, origin: unknown) => {
+      // Skip updates that we applied from external sources (origin will be set)
+      if (origin === 'remote' || origin === 'load') return;
 
-    // Send updates to other windows (but not during initial load)
-    const updateHandler = (update: Uint8Array) => {
-      // Skip broadcasting during initial content load to prevent duplication
-      if (isInitialLoadRef.current) return;
-
-      // Convert Uint8Array to regular array for structured clone
-      channel.postMessage({
-        type: 'yjs-update',
-        update: Array.from(update),
+      // Send update to main process for persistence and distribution to other windows
+      window.electronAPI.note.applyUpdate(noteId, update).catch((error: Error) => {
+        console.error(`Failed to apply update for note ${noteId}:`, error);
       });
     };
 
     yDoc.on('update', updateHandler);
 
-    // Receive updates from other windows
-    channel.onmessage = (event: MessageEvent<{ type: string; update: number[] }>) => {
-      if (event.data.type === 'yjs-update') {
-        // Convert back to Uint8Array
-        const update = new Uint8Array(event.data.update);
-        Y.applyUpdate(yDoc, update);
-      }
-    };
-
     return () => {
       yDoc.off('update', updateHandler);
-      channel.close();
     };
   }, [editor, yDoc, noteId]);
 
-  // Handle note loading/unloading
+  // Handle note loading/unloading with IPC
   useEffect(() => {
-    if (!noteId) {
-      // No note selected - show welcome message
-      isInitialLoadRef.current = true;
-      editor?.commands.setContent(
-        '<h1>Welcome to NoteCove!</h1><p>Open multiple windows to see real-time collaboration in action.</p><p>Try typing here and watch it appear in other windows! 🎉</p>'
-      );
-      // Wait for content to be applied before enabling sync
-      setTimeout(() => {
-        isInitialLoadRef.current = false;
-      }, 100);
+    if (!noteId || !editor) {
       return;
     }
 
-    // Load note with placeholder content
-    isInitialLoadRef.current = true;
-    editor?.commands.setContent(
-      `<h1>Note ${noteId}</h1><p>Start typing to test collaboration between windows...</p>`
-    );
-    // Wait for content to be applied before enabling sync
-    setTimeout(() => {
-      isInitialLoadRef.current = false;
-    }, 100);
+    let isActive = true;
 
-    // TODO: Set up IPC listeners for incoming updates
-    // window.electron.ipc.on('note:updated', handleUpdate)
+    // Load note from main process
+    const loadNote = async () => {
+      try {
+        // Tell main process to load this note
+        await window.electronAPI.note.load(noteId);
+
+        // Get the current state from main process
+        const state = await window.electronAPI.note.getState(noteId);
+
+        if (!isActive) return;
+
+        // Apply the state to our local Yjs document with 'load' origin
+        Y.applyUpdate(yDoc, state, 'load');
+      } catch (error) {
+        console.error(`Failed to load note ${noteId}:`, error);
+      }
+    };
+
+    void loadNote();
+
+    // Set up listener for updates from other windows in same process
+    const handleNoteUpdate = (updatedNoteId: string, update: Uint8Array) => {
+      if (updatedNoteId === noteId) {
+        // Apply update from other window to our local Y.Doc with 'remote' origin
+        // This will automatically update the editor via the Collaboration extension
+        Y.applyUpdate(yDoc, update, 'remote');
+      }
+    };
+
+    const cleanupNoteUpdate = window.electronAPI.note.onUpdated(handleNoteUpdate);
+
+    // Set up listener for updates from other instances (via activity sync)
+    const handleExternalUpdate = (data: { operation: string; noteIds: string[] }) => {
+      if (data.noteIds.includes(noteId)) {
+        // Reload note state from main process
+        void (async () => {
+          try {
+            const state = await window.electronAPI.note.getState(noteId);
+            Y.applyUpdate(yDoc, state, 'remote');
+          } catch (error) {
+            console.error(`Failed to reload note ${noteId}:`, error);
+          }
+        })();
+      }
+    };
+
+    const cleanupExternalUpdate = window.electronAPI.note.onExternalUpdate(handleExternalUpdate);
 
     return () => {
-      // TODO: Clean up IPC listeners
-      // window.electron.ipc.removeListener('note:updated', handleUpdate)
+      isActive = false;
+      cleanupNoteUpdate();
+      cleanupExternalUpdate();
+      // Tell main process we're done with this note
+      void window.electronAPI.note.unload(noteId);
     };
-  }, [noteId, editor]);
+  }, [noteId, editor, yDoc]);
 
   return (
     <Box
