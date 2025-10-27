@@ -1041,75 +1041,260 @@ This phase is split into 5 sub-phases for better manageability:
 
 ---
 
-### 2.5 Notes List Panel 🟥
+### 2.5 Notes List Panel 🟡
+
+**Status:** In Progress
+
+This phase is split into 6 sub-phases for better manageability:
+
+---
+
+#### 2.5.1 Basic Notes List Display (Read-Only) 🟥
 
 **Status:** To Do
 
 **Tasks:**
 
-- [ ] 🟥 Implement notes list component
-  - Header: search box
-  - Sub-header: "NOTES" + note count + plus button
-  - List of note items (virtual scrolling for >1000 notes)
-  - Each note shows: title (extracted from editor), last modified time (relative, with tooltip)
-  - Sort: pinned notes first, then by most recently edited
-  - Multi-select support (platform-standard: Ctrl/Cmd+Click, Shift+Click)
-  - Multi-select badge (floating near selection) showing count
-- [ ] 🟥 Implement search functionality
-  - Live/incremental search (debounced 250-300ms)
-  - Search full note content + tags (using SQLite FTS5)
-  - Case-sensitive toggle (icon/button next to search box)
-  - Regex toggle
-  - Whole word toggle
-  - Advanced search dialog (additional options)
-  - Search scope selector (icon/button that cycles): Current SD / All SDs / Current Folder
-    - Also accessible via advanced search dialog
-  - Persist search text across restarts (app_state table)
-- [ ] 🟥 Implement note creation
-  - Click plus button: create note in active folder
-  - If "All Notes" selected: create orphan note (folderId = null)
-  - Context menu: New Note
-  - Auto-focus editor on new note
-  - New note appears at top of list (most recently edited)
-- [ ] 🟥 Implement note selection
-  - Click note to open in editor
-  - Selection persists across restarts (app_state table)
-- [ ] 🟥 Implement note drag & drop
-  - Drag note to folder (move - update folderId in CRDT)
-  - Drag multiple selected notes
-  - Cross-SD move: show warning dialog ("copying note to new SD, deleting from old SD")
-    - "Don't show again" checkbox (global setting in app_state)
-  - Drag to "Recently Deleted" = delete (set deleted flag)
-  - Visual feedback during drag
-- [ ] 🟥 Implement note context menu
-  - New Note
-  - Pin / Unpin (toggle based on state)
-  - Open in New Window
-  - Move to... (submenu of folders)
-  - Duplicate to... (submenu of folders, can cross SDs - copy CRDT history)
-  - Delete
-- [ ] 🟥 Implement pinned notes
-  - Visual indicator (pin icon)
-  - Show at top of list
-  - Sort among themselves by edit time
-  - Stored in note metadata (pinned: boolean in CRDT or SQLite)
-- [ ] 🟥 Handle note title extraction
-  - Use title extraction utility from editor (2.3)
-  - First line with text = title
-  - If only whitespace: "Untitled"
-  - Long titles: truncate with ellipsis in UI (widget handles truncation)
-  - Update title in real-time as user types (via CRDT updates)
+- [ ] 🟥 **Implement basic notes list component**
+  - Header: search box (placeholder)
+  - Sub-header: "NOTES" + note count
+  - List of note items from SQLite cache
+  - Each note shows: title (extracted), last modified time (relative, with tooltip)
+  - Sort: by most recently edited
+  - Filter by selected folder (use folderId from note cache)
+  - Handle "All Notes" (folderId = null or any)
+  - Handle "Recently Deleted" (deleted = true)
+- [ ] 🟥 **Implement IPC handlers for note queries**
+  - `note:list` - Get notes for folder/SD
+  - Filter by folderId, sdId, deleted flag
+  - Return note cache entries (id, title, modified, folderId, deleted)
+- [ ] 🟥 **Implement virtual scrolling**
+  - Use react-window or react-virtuoso for performance
+  - Handle >1000 notes efficiently
+- [ ] 🟥 **Add basic tests**
+  - Test note list rendering
+  - Test folder filtering
+  - Test "All Notes" and "Recently Deleted"
+  - Test virtual scrolling
 
 **Acceptance Criteria:**
 
-- Notes list displays correctly
-- Search works (live, with options, scoped)
-- Can create, select, pin, delete notes
-- Drag & drop works correctly
-- Multi-select works
-- Note counts and times are accurate
-- Virtual scrolling performs well with many notes
-- Orphan notes (folderId = null) work correctly
+- ✅ Notes list displays with titles and modified times
+- ✅ Filters by selected folder
+- ✅ "All Notes" shows all non-deleted notes
+- ✅ "Recently Deleted" shows deleted notes
+- ✅ Virtual scrolling works with many notes
+- ⏭️ Selection, creation, search deferred to later sub-phases
+
+**Deferred to Later Sub-Phases:**
+
+- Note selection (→ 2.5.2)
+- Note creation (→ 2.5.2)
+- Search functionality (→ 2.5.3)
+- Context menu (→ 2.5.4)
+- Pinned notes (→ 2.5.5)
+- Drag & drop (→ 2.5.6)
+
+---
+
+#### 2.5.2 Note Selection & Creation 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 **Implement note selection**
+  - Click note to select
+  - Visual feedback for selected note
+  - Persist selection in app_state (key: 'selectedNoteId')
+  - Load note in editor when selected
+- [ ] 🟥 **Implement note creation**
+  - Plus button in sub-header
+  - Click plus button: create note in active folder
+  - If "All Notes" selected: create orphan note (folderId = null)
+  - Auto-focus editor on new note
+  - New note appears at top of list (most recently edited)
+- [ ] 🟥 **Implement IPC handlers for note CRUD**
+  - `note:create` - Create new note with metadata
+  - `note:getState` - Get Yjs state for note (already exists from Phase 2.3)
+  - Initialize empty NoteDoc in CRDT manager
+  - Create note cache entry in SQLite
+- [ ] 🟥 **Connect editor to selected note**
+  - Pass selectedNoteId to EditorPanel
+  - Editor loads note via existing IPC handlers
+  - Title extraction updates note cache
+- [ ] 🟥 **Add tests**
+  - Test note selection
+  - Test note creation
+  - Test editor integration
+  - Test orphan note creation
+
+**Acceptance Criteria:**
+
+- ✅ Can select notes by clicking
+- ✅ Selection persists across restarts
+- ✅ Can create notes via plus button
+- ✅ New notes open in editor automatically
+- ✅ Orphan notes work correctly
+- ⏭️ Context menu creation deferred to 2.5.4
+
+---
+
+#### 2.5.3 Basic Search Functionality 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 **Implement search box in header**
+  - Text input for search query
+  - Debounced onChange (250-300ms)
+  - Clear button (X icon)
+  - Persist search text in app_state
+- [ ] 🟥 **Implement basic FTS5 search**
+  - `note:search` IPC handler
+  - Use SQLite FTS5 notes_fts table
+  - Search full note content
+  - Return matching note IDs with snippets
+- [ ] 🟥 **Filter notes list by search**
+  - Show only matching notes when search is active
+  - Clear filter when search is empty
+  - Maintain folder filter (search within folder)
+- [ ] 🟥 **Add tests**
+  - Test search query handling
+  - Test FTS5 search results
+  - Test search + folder filter combination
+  - Test search persistence
+
+**Acceptance Criteria:**
+
+- ✅ Search box filters notes list
+- ✅ Live/incremental search works (debounced)
+- ✅ Search uses FTS5 full-text index
+- ✅ Search persists across restarts
+- ⏭️ Advanced options (case-sensitive, regex, scope) deferred to 2.5.5
+
+---
+
+#### 2.5.4 Note Context Menu & Deletion 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 **Implement note context menu**
+  - Right-click note for menu
+  - Options: New Note, Delete
+  - More options deferred to later sub-phases
+- [ ] 🟥 **Implement note deletion**
+  - Delete option in context menu
+  - Confirmation dialog ("Move to Recently Deleted?")
+  - Set deleted flag in CRDT (soft delete)
+  - Update SQLite cache
+  - Note moves to "Recently Deleted"
+- [ ] 🟥 **Implement IPC handlers**
+  - `note:delete` - Soft delete note
+  - `note:create` context menu variant (if different from plus button)
+- [ ] 🟥 **Add tests**
+  - Test context menu display
+  - Test note deletion
+  - Test "Recently Deleted" appearance
+  - Test deletion persistence
+
+**Acceptance Criteria:**
+
+- ✅ Context menu appears on right-click
+- ✅ Can delete notes (soft delete)
+- ✅ Deleted notes appear in "Recently Deleted"
+- ✅ Deleted notes hidden from other views
+- ⏭️ Pin/Unpin, Open in New Window, Move to..., Duplicate deferred to 2.5.5
+
+---
+
+#### 2.5.5 Pinned Notes & Advanced Search 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 **Implement pinned notes**
+  - Add pinned flag to note metadata (SQLite note_cache table)
+  - Visual indicator (pin icon) next to pinned notes
+  - Sort pinned notes at top of list
+  - Among pinned notes, sort by edit time
+  - Pin/Unpin in context menu
+- [ ] 🟥 **Implement IPC handlers**
+  - `note:pin` - Toggle pinned status
+  - Update note cache with pinned flag
+- [ ] 🟥 **Implement advanced search options**
+  - Case-sensitive toggle (icon/button next to search box)
+  - Regex toggle
+  - Whole word toggle
+  - Search scope selector (icon/button that cycles): Current Folder / Current SD / All SDs
+  - Advanced search dialog (consolidates all options)
+- [ ] 🟥 **Extend context menu**
+  - Pin / Unpin (toggle based on state)
+  - Open in New Window (deferred - requires window management from Phase 2.10)
+  - Move to... (submenu of folders)
+  - Duplicate to... (deferred - complex CRDT copying)
+- [ ] 🟥 **Add tests**
+  - Test pinned notes sorting
+  - Test pin/unpin toggle
+  - Test advanced search options
+  - Test search scope selector
+  - Test "Move to..." functionality
+
+**Acceptance Criteria:**
+
+- ✅ Can pin/unpin notes
+- ✅ Pinned notes show at top with indicator
+- ✅ Advanced search options work
+- ✅ Search scope selector works
+- ✅ Can move notes to different folders
+- ⏭️ "Open in New Window" and "Duplicate" deferred to later phases
+
+---
+
+#### 2.5.6 Drag & Drop 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 **Implement multi-select support**
+  - Ctrl/Cmd+Click to toggle selection
+  - Shift+Click for range selection
+  - Multi-select badge (floating near selection) showing count
+  - Visual indication of selected notes
+- [ ] 🟥 **Implement note drag & drop**
+  - Drag note to folder (move - update folderId in CRDT)
+  - Drag multiple selected notes
+  - Visual feedback during drag (drag preview, drop zones)
+  - Drag to "Recently Deleted" = delete (set deleted flag)
+- [ ] 🟥 **Implement cross-SD move handling**
+  - Detect cross-SD move (different sdId)
+  - Show warning dialog ("copying note to new SD, deleting from old SD")
+  - "Don't show again" checkbox (global setting in app_state)
+  - Copy CRDT history to new SD
+  - Delete from old SD
+- [ ] 🟥 **Implement IPC handlers**
+  - `note:move` - Update folderId in CRDT and cache
+  - Handle cross-SD moves (if implemented)
+- [ ] 🟥 **Add tests**
+  - Test multi-select (Ctrl/Cmd+Click, Shift+Click)
+  - Test drag & drop to folders
+  - Test multi-note drag
+  - Test drag to "Recently Deleted"
+  - Test cross-SD move (if implemented)
+
+**Acceptance Criteria:**
+
+- ✅ Multi-select works (Ctrl/Cmd+Click, Shift+Click)
+- ✅ Can drag notes to folders
+- ✅ Can drag multiple selected notes
+- ✅ Drag to "Recently Deleted" deletes notes
+- ✅ Visual feedback during drag is clear
+- ⏭️ Cross-SD move may be simplified or deferred based on complexity
 
 ---
 
