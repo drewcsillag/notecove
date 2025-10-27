@@ -61,29 +61,27 @@ test.describe('Note Multi-Window Sync', () => {
     // Wait for app to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
-    // Create a new note
-    const createNoteButton = page.locator('button[aria-label="Create a new note"]');
-    await createNoteButton.click();
-
-    // Wait for note editor to appear
+    // Wait for the default note to appear (we don't create new notes, we use the existing one)
     const editor = page.locator('[contenteditable="true"]').first();
-    await editor.waitFor({ state: 'visible' });
+    await editor.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Type some content
+    // Type some content in the existing note
     const testContent = `Test note content ${Date.now()}`;
+    await editor.click();
     await editor.fill(testContent);
 
     // Wait a bit for the note to be saved
     await page.waitForTimeout(1000);
 
-    // Get the note ID from the URL or  state (you may need to adjust this)
-    // For now, we'll just verify the content appears
+    // Verify the content appears
     await expect(editor).toContainText(testContent);
 
-    // Open a second window
-    await page.keyboard.press('Meta+Shift+N'); // Or use menu
+    // Open a second window using the testing IPC method
+    await page.evaluate(() => window.electronAPI.testing.createWindow());
 
-    // Wait for second window
+    // Wait for second window to be created
+    await page.waitForTimeout(1000);
+
     const windows = await electronApp.windows();
     expect(windows.length).toBe(2);
 
@@ -103,15 +101,12 @@ test.describe('Note Multi-Instance Sync', () => {
     // Wait for app to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
-    // Create a new note
-    const createNoteButton = page.locator('button[aria-label="Create a new note"]');
-    await createNoteButton.click();
-
-    // Wait for note editor
+    // Wait for the default note to appear (we don't create new notes, we use the existing one)
     const editor = page.locator('[contenteditable="true"]').first();
-    await editor.waitFor({ state: 'visible' });
+    await editor.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Type content
+    // Type content in the existing note
+    await editor.click();
     await editor.fill('Test content for activity log');
 
     // Wait for activity log to be written

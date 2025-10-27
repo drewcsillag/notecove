@@ -5,7 +5,7 @@
  * Phase 2.4.4: Drag-and-drop reordering using battle-tested react-dnd library.
  */
 
-import { type FC, useEffect, useState, type MouseEvent } from 'react';
+import { type FC, useEffect, useState, useRef, type MouseEvent } from 'react';
 import {
   Box,
   Typography,
@@ -108,6 +108,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const [allFolderIds, setAllFolderIds] = useState<string[]>([]); // For initial expansion
   const [remountCounter, setRemountCounter] = useState(0); // Force remount for expand/collapse all
   const [isCollapsedAll, setIsCollapsedAll] = useState(false); // Track if user clicked collapse all
+  const isProgrammaticChange = useRef(false); // Track if change is from expand/collapse all buttons
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -360,6 +361,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   // Expand all folders
   const handleExpandAll = (): void => {
+    isProgrammaticChange.current = true;
     setRemountCounter((prev) => prev + 1); // Force remount
     setIsCollapsedAll(false);
     onExpandedChange?.(allFolderIds);
@@ -367,6 +369,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   // Collapse all folders
   const handleCollapseAll = (): void => {
+    isProgrammaticChange.current = true;
     setRemountCounter((prev) => prev + 1); // Force remount
     setIsCollapsedAll(true);
     onExpandedChange?.([]);
@@ -429,6 +432,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
               isCollapsedAll ? [] : expandedFolderIds.length > 0 ? expandedFolderIds : allFolderIds
             }
             onChangeOpen={(newOpenIds) => {
+              // Skip callback if this is a programmatic change (expand/collapse all)
+              if (isProgrammaticChange.current) {
+                isProgrammaticChange.current = false; // Reset flag
+                return;
+              }
               // Sync library's internal state with our parent component (but don't trigger remount)
               onExpandedChange?.(newOpenIds.map(String));
             }}

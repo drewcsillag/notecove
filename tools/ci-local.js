@@ -13,6 +13,10 @@ const checks = [
   { name: 'Lint', cmd: 'pnpm lint' },
   { name: 'Type Check', cmd: 'pnpm typecheck' },
   { name: 'Build', cmd: 'pnpm build' },
+  {
+    name: 'Rebuild for Node.js',
+    cmd: 'cd packages/desktop && pnpm rebuild better-sqlite3',
+  },
   { name: 'Unit Tests', cmd: 'pnpm test' },
   { name: 'Coverage', cmd: 'pnpm test:coverage' },
   {
