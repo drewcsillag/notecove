@@ -41,6 +41,7 @@ export class IPCHandlers {
     ipcMain.handle('note:delete', this.handleDeleteNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
     ipcMain.handle('note:getMetadata', this.handleGetMetadata.bind(this));
+    ipcMain.handle('note:updateTitle', this.handleUpdateTitle.bind(this));
     ipcMain.handle('note:list', this.handleListNotes.bind(this));
 
     // Folder operations
@@ -147,6 +148,35 @@ export class IPCHandlers {
   ): Promise<NoteMetadata> {
     // TODO: Implement metadata retrieval from SQLite
     throw new Error('Not implemented');
+  }
+
+  private async handleUpdateTitle(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    title: string
+  ): Promise<void> {
+    console.log(`[IPC] handleUpdateTitle called - noteId: ${noteId}, title: "${title}"`);
+
+    // Get existing note from database
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      console.error(`[IPC] Note ${noteId} not found in database`);
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    console.log(`[IPC] Found note in database, current title: "${note.title}"`);
+
+    // Update title and modified timestamp
+    await this.database.upsertNote({
+      ...note,
+      title,
+      modified: Date.now(),
+    });
+
+    console.log(`[IPC] Title updated successfully in database`);
+
+    // Broadcast title update to all windows so they can refresh their notes list
+    this.broadcastToAll('note:titleUpdated', { noteId, title });
   }
 
   private async handleListNotes(
@@ -398,6 +428,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:delete');
     ipcMain.removeHandler('note:move');
     ipcMain.removeHandler('note:getMetadata');
+    ipcMain.removeHandler('note:updateTitle');
     ipcMain.removeHandler('note:list');
     ipcMain.removeHandler('folder:list');
     ipcMain.removeHandler('folder:get');

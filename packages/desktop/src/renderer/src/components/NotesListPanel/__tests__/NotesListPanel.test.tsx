@@ -13,12 +13,14 @@ jest.mock('../../../i18n', () => ({}));
 const mockElectronAPI = {
   note: {
     list: jest.fn().mockResolvedValue([]),
+    create: jest.fn().mockResolvedValue('new-note-id'),
     onCreated: jest.fn().mockReturnValue(() => {}),
     onDeleted: jest.fn().mockReturnValue(() => {}),
     onExternalUpdate: jest.fn().mockReturnValue(() => {}),
   },
   appState: {
     get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
   },
 };
 
@@ -140,5 +142,81 @@ describe('NotesListPanel', () => {
     await waitFor(() => {
       expect(mockElectronAPI.note.list).toHaveBeenCalledWith('default');
     });
+  });
+
+  it('should select a note when clicked', async () => {
+    // Use real timers for this test to avoid async issues
+    jest.useRealTimers();
+
+    const mockNotes = [
+      {
+        id: 'note1',
+        title: 'Test Note',
+        sdId: 'default',
+        folderId: null,
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        contentPreview: 'Preview text',
+        contentText: 'Content text',
+      },
+    ];
+
+    mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+    mockElectronAPI.appState.get.mockImplementation((key) => {
+      if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+      if (key === 'selectedNoteId') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+
+    const { getByText, unmount } = render(<NotesListPanel />);
+
+    await waitFor(() => {
+      expect(getByText('Test Note')).toBeInTheDocument();
+    });
+
+    // Click the note - MUI ListItemButton is a div with role="button"
+    const noteButton = getByText('Test Note').closest('[role="button"]');
+    if (noteButton) {
+      (noteButton as HTMLElement).click();
+    }
+
+    await waitFor(() => {
+      expect(mockElectronAPI.appState.set).toHaveBeenCalledWith('selectedNoteId', 'note1');
+    });
+
+    // Clean up - unmount to stop polling interval
+    unmount();
+  });
+
+  it('should create a note when plus button is clicked', async () => {
+    // Use real timers for this test to avoid async issues
+    jest.useRealTimers();
+
+    mockElectronAPI.appState.get.mockImplementation((key) => {
+      if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+      if (key === 'selectedNoteId') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+    mockElectronAPI.note.list.mockResolvedValue([]);
+    mockElectronAPI.note.create.mockResolvedValue('new-note-id');
+
+    const { getByTitle, unmount } = render(<NotesListPanel />);
+
+    await waitFor(() => {
+      expect(getByTitle('Create note')).toBeInTheDocument();
+    });
+
+    // Click the create button
+    const createButton = getByTitle('Create note');
+    createButton.click();
+
+    await waitFor(() => {
+      expect(mockElectronAPI.note.create).toHaveBeenCalledWith('default', '', '');
+      expect(mockElectronAPI.appState.set).toHaveBeenCalledWith('selectedNoteId', 'new-note-id');
+    });
+
+    // Clean up - unmount to stop polling interval
+    unmount();
   });
 });

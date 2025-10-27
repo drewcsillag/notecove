@@ -4,42 +4,38 @@
  * Displays the TipTap note editor with formatting toolbar.
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Box } from '@mui/material';
 import { TipTapEditor } from './TipTapEditor';
 
-export const EditorPanel: React.FC = () => {
-  const [currentNoteId, setCurrentNoteId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+interface EditorPanelProps {
+  selectedNoteId: string | null;
+}
 
-  // Load the selected note from app state on mount
-  useEffect(() => {
-    const loadSelectedNote = async () => {
-      const selectedNoteId = await window.electronAPI.appState.get('selectedNoteId');
-      setCurrentNoteId(selectedNoteId);
-      setIsLoading(false);
-    };
+export const EditorPanel: React.FC<EditorPanelProps> = ({ selectedNoteId }) => {
 
-    void loadSelectedNote();
-  }, []);
+  const handleTitleChange = React.useCallback(
+    async (title: string) => {
+      if (!selectedNoteId) {
+        console.log('[EditorPanel] Skipping title update - no note selected');
+        return;
+      }
 
-  const handleTitleChange = (title: string) => {
-    // TODO: Update note title in main process via IPC
-    console.log('Note title changed:', title);
-  };
-
-  // Don't render editor until we've loaded the note ID
-  if (isLoading) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        Loading...
-      </Box>
-    );
-  }
+      console.log(`[EditorPanel] Updating title for note ${selectedNoteId}: "${title}"`);
+      try {
+        await window.electronAPI.note.updateTitle(selectedNoteId, title);
+        console.log(`[EditorPanel] Title updated successfully`);
+      } catch (err) {
+        console.error('Failed to update note title:', err);
+      }
+    },
+    [selectedNoteId]
+  );
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <TipTapEditor noteId={currentNoteId} onTitleChange={handleTitleChange} />
+      {/* Use key to force recreation of editor when switching notes */}
+      <TipTapEditor key={selectedNoteId} noteId={selectedNoteId} onTitleChange={handleTitleChange} />
     </Box>
   );
 };

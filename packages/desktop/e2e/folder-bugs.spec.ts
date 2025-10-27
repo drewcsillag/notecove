@@ -71,18 +71,20 @@ test.describe('Bug: Right-click rename renames wrong folder', () => {
   test('should rename the clicked nested folder, not its parent', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
-    await page.waitForTimeout(1000);
+
+    // Wait for folders to fully load and render (demo folders are created async)
+    await page.waitForTimeout(2000);
 
     // Verify "Work" folder exists (top level)
     await expect(page.locator('text=Work')).toBeVisible();
 
-    // Expand "Work" folder to see "Projects"
+    // Expand "Work" folder to see "Projects" by clicking the chevron icon
     const workFolder = page.getByRole('button', { name: /Work/ }).first();
-    await workFolder.click();
-    await page.waitForTimeout(500);
+    const workChevron = workFolder.locator('svg').first();  // ChevronRight icon
+    await workChevron.click();
 
-    // Now "Projects" should be visible
-    await expect(page.locator('text=Projects')).toBeVisible();
+    // Wait for "Projects" to be visible after expansion
+    await expect(page.locator('text=Projects')).toBeVisible({ timeout: 5000 });
 
     // Right-click on "Projects" (nested under Work)
     const projectsFolder = page.locator('text=Projects').first();
@@ -126,20 +128,22 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
   test('should move only the dragged folder, not its parent', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
-    await page.waitForTimeout(1000);
+
+    // Wait for folders to fully load and render (demo folders are created async)
+    await page.waitForTimeout(2000);
 
     // Verify Work and Personal exist at top level
     await expect(page.locator('text=Work')).toBeVisible();
     await expect(page.locator('text=Personal')).toBeVisible();
 
-    // Expand "Personal" to see "Ideas" and "Recipes"
+    // Expand "Personal" to see "Ideas" and "Recipes" by clicking the chevron icon
     const personalFolder = page.getByRole('button', { name: /Personal/ }).first();
-    await personalFolder.click();
-    await page.waitForTimeout(500);
+    const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+    await personalChevron.click();
 
-    // Now nested folders should be visible
-    await expect(page.locator('text=Ideas')).toBeVisible();
-    await expect(page.locator('text=Recipes')).toBeVisible();
+    // Wait for nested folders to be visible after expansion
+    await expect(page.locator('text=Ideas')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Recipes')).toBeVisible({ timeout: 5000 });
 
     // Get tree items for drag and drop - be very specific to avoid selecting parent
     // Use getByRole with exact name to ensure we get the right element
@@ -195,17 +199,17 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
   test('should continue to work for multiple drag operations', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
-    await page.waitForTimeout(1000);
 
-    // Expand "Personal" to see "Ideas" and "Recipes"
-    const personalFolder = page.getByRole('button', { name: /Personal/ }).first();
-    await personalFolder.click();
-    await page.waitForTimeout(500);
+    // Wait for folders to fully load and render (demo folders are created async)
+    await page.waitForTimeout(2000);
 
-    // First drag: Move "Ideas" to "Work" - use exact selectors
+    // Wait for Ideas to be visible (tree should start fully expanded)
     const ideasItem = page.getByRole('button', { name: 'Ideas', exact: true });
+    await expect(ideasItem).toBeVisible({ timeout: 10000 });
+
     const workItem = page.getByRole('button', { name: /^Work/, exact: false });
 
+    // First drag: Move "Ideas" to "Work"
     await ideasItem.dragTo(workItem);
 
     // Wait for folder:updated event and force tree refresh
@@ -490,13 +494,19 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       await page1.waitForSelector('text=Folders', { timeout: 10000 });
       await page2.waitForSelector('text=Folders', { timeout: 10000 });
 
-      // Expand "Personal" to see "Ideas"
+      // Wait for folders to fully load and render (demo folders are created async)
+      await page1.waitForTimeout(2000);
+
+      // Expand "Personal" to see "Ideas" by clicking the chevron icon
       const personalFolder = page1.getByRole('button', { name: /Personal/ }).first();
-      await personalFolder.click();
-      await page1.waitForTimeout(500);
+      const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+      await personalChevron.click();
+
+      // Wait for Ideas to be visible after expansion
+      const ideasFolder = page1.locator('text=Ideas').first();
+      await expect(ideasFolder).toBeVisible({ timeout: 5000 });
 
       // Move a folder in window 1 using context menu
-      const ideasFolder = page1.locator('text=Ideas').first();
       await ideasFolder.click({ button: 'right' });
 
       await page1.waitForSelector('text=Rename');
@@ -734,17 +744,13 @@ test.describe('Bug: Folders without children show expand icon', () => {
   test('should NOT show expand/collapse chevron for childless folders', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
-    await page.waitForTimeout(1000);
 
-    // Expand "Personal" to see its children
-    const personalFolder = page.getByRole('button', { name: /^Personal/ }).first();
-    await personalFolder.click();
-    await page.waitForTimeout(500);
+    // Wait for folders to fully load and render (demo folders are created async)
+    await page.waitForTimeout(2000);
 
-    // "Ideas" and "Recipes" are leaf nodes (no children)
-    // Find the "Ideas" row
+    // Wait for "Ideas" and "Recipes" (leaf nodes) to be visible (tree should start fully expanded)
     const ideasButton = page.getByRole('button', { name: 'Ideas', exact: true });
-    await expect(ideasButton).toBeVisible();
+    await expect(ideasButton).toBeVisible({ timeout: 10000 });
 
     // Check if Ideas has a chevron icon (ChevronRight or ExpandMore)
     // The chevron should NOT exist for childless folders
@@ -782,16 +788,18 @@ test.describe('Bug: Drag shadow shows multiple items', () => {
   test('should only show the dragged folder in drag preview, not other folders', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
-    await page.waitForTimeout(1000);
 
-    // Expand "Personal" to see "Ideas" and "Recipes"
+    // Wait for folders to fully load and render (demo folders are created async)
+    await page.waitForTimeout(2000);
+
+    // Expand "Personal" to see "Ideas" and "Recipes" by clicking the chevron icon
     const personalFolder = page.getByRole('button', { name: /^Personal/ }).first();
-    await personalFolder.click();
-    await page.waitForTimeout(500);
+    const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+    await personalChevron.click();
 
-    // Get the "Ideas" folder to drag
+    // Wait for Ideas to be visible after expansion
     const ideasItem = page.getByRole('button', { name: 'Ideas', exact: true });
-    await expect(ideasItem).toBeVisible();
+    await expect(ideasItem).toBeVisible({ timeout: 5000 });
 
     // Take a screenshot before drag to understand the structure
     await page.screenshot({ path: '/tmp/before-drag.png' });

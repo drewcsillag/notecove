@@ -16,6 +16,7 @@ const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
 
 function App(): React.ReactElement {
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
   // Load saved panel sizes on mount
   useEffect(() => {
@@ -32,6 +33,24 @@ function App(): React.ReactElement {
     };
 
     void loadPanelSizes();
+  }, []);
+
+  // Auto-select default note on first load
+  useEffect(() => {
+    const loadDefaultNote = async (): Promise<void> => {
+      try {
+        // Check if default note exists
+        const notes = await window.electronAPI.note.list('default');
+        const defaultNote = notes.find((note) => note.id === 'default-note');
+        if (defaultNote) {
+          setSelectedNoteId('default-note');
+        }
+      } catch (error) {
+        console.error('Failed to load default note:', error);
+      }
+    };
+
+    void loadDefaultNote();
   }, []);
 
   const handleLayoutChange = (sizes: number[]): void => {
@@ -52,8 +71,8 @@ function App(): React.ReactElement {
       <CssBaseline />
       <ThreePanelLayout
         leftPanel={<FolderPanel />}
-        middlePanel={<NotesListPanel />}
-        rightPanel={<EditorPanel />}
+        middlePanel={<NotesListPanel selectedNoteId={selectedNoteId} onNoteSelect={setSelectedNoteId} />}
+        rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
         onLayoutChange={handleLayoutChange}
         initialSizes={initialPanelSizes}
       />

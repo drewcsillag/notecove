@@ -13,7 +13,9 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  IconButton,
 } from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -29,11 +31,17 @@ interface Note {
   contentText: string;
 }
 
-export const NotesListPanel: React.FC = () => {
+interface NotesListPanelProps {
+  selectedNoteId: string | null;
+  onNoteSelect: (noteId: string) => void;
+}
+
+export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, onNoteSelect }) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   // Load selected folder from app state
   const loadSelectedFolder = useCallback(async () => {
@@ -45,6 +53,8 @@ export const NotesListPanel: React.FC = () => {
       setSelectedFolderId('all-notes');
     }
   }, []);
+
+  // Note: selectedNoteId is now window-local state, not persisted globally
 
   // Fetch notes for the selected folder
   const fetchNotes = useCallback(async (folderId: string | null) => {
@@ -75,6 +85,38 @@ export const NotesListPanel: React.FC = () => {
     }
   }, []);
 
+  // Handle note selection - delegate to parent
+  const handleNoteSelect = useCallback((noteId: string) => {
+    onNoteSelect(noteId);
+  }, [onNoteSelect]);
+
+  // Handle note creation
+  const handleCreateNote = useCallback(async () => {
+    if (creating) return; // Prevent double-clicks
+
+    setCreating(true);
+    try {
+      // Determine folder for new note
+      const folderId = selectedFolderId === 'all-notes' ? null : selectedFolderId;
+
+      // Create note via IPC
+      const noteId = await window.electronAPI.note.create(DEFAULT_SD_ID, folderId || '', '');
+
+      // Select the newly created note
+      await handleNoteSelect(noteId);
+
+      // Refresh notes list to show the new note
+      if (selectedFolderId !== null) {
+        await fetchNotes(selectedFolderId);
+      }
+    } catch (err) {
+      console.error('Failed to create note:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create note');
+    } finally {
+      setCreating(false);
+    }
+  }, [creating, selectedFolderId, handleNoteSelect, fetchNotes]);
+
   // Load selected folder on mount
   useEffect(() => {
     void loadSelectedFolder();
@@ -104,6 +146,7 @@ export const NotesListPanel: React.FC = () => {
       if (selectedFolderId === 'all-notes' || selectedFolderId === data.folderId) {
         void fetchNotes(selectedFolderId);
       }
+      // Don't auto-select here - let the creating window handle selection
     });
 
     const unsubscribeDeleted = window.electronAPI.note.onDeleted((noteId) => {
@@ -120,12 +163,21 @@ export const NotesListPanel: React.FC = () => {
       }
     });
 
+    const unsubscribeTitleUpdated = window.electronAPI.note.onTitleUpdated((data) => {
+      console.log('[NotesListPanel] Title updated:', data);
+      // Refresh notes list to show updated title
+      if (selectedFolderId !== null) {
+        void fetchNotes(selectedFolderId);
+      }
+    });
+
     return () => {
       unsubscribeCreated();
       unsubscribeDeleted();
       unsubscribeExternal();
+      unsubscribeTitleUpdated();
     };
-  }, [selectedFolderId, fetchNotes]);
+  }, [selectedFolderId, fetchNotes, handleNoteSelect]);
 
   // Format date for display
   const formatDate = (timestamp: number): string => {
@@ -155,92 +207,102 @@ export const NotesListPanel: React.FC = () => {
     return text.substring(0, maxLength) + '...';
   };
 
-  if (loading && notes.length === 0) {
-    return (
-      <Box sx={{ padding: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          Loading notes...
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ padding: 2 }}>
-        <Typography variant="body2" color="error">
-          Error: {error}
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (notes.length === 0) {
-    return (
-      <Box sx={{ padding: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          No notes in this folder
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <Box sx={{ padding: 2, borderBottom: 1, borderColor: 'divider' }}>
+      <Box
+        sx={{
+          padding: 2,
+          borderBottom: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <Typography variant="h6">Notes ({notes.length})</Typography>
+        <IconButton
+          size="small"
+          onClick={handleCreateNote}
+          disabled={creating}
+          title="Create note"
+          sx={{ marginLeft: 1 }}
+        >
+          <AddIcon />
+        </IconButton>
       </Box>
 
-      {/* Notes List */}
+      {/* Notes List or Status */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-        <List disablePadding>
-          {notes.map((note) => (
-            <ListItem key={note.id} disablePadding>
-              <ListItemButton
-                sx={{
-                  paddingY: 1.5,
-                  paddingX: 2,
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                }}
-              >
-                <ListItemText
-                  primary={
-                    <Typography variant="subtitle1" noWrap>
-                      {note.title || 'Untitled Note'}
-                    </Typography>
-                  }
-                  secondary={
-                    <>
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          display: 'block',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {truncatePreview(note.contentPreview)}
+        {loading && notes.length === 0 ? (
+          <Box sx={{ padding: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Loading notes...
+            </Typography>
+          </Box>
+        ) : error ? (
+          <Box sx={{ padding: 2 }}>
+            <Typography variant="body2" color="error">
+              Error: {error}
+            </Typography>
+          </Box>
+        ) : notes.length === 0 ? (
+          <Box sx={{ padding: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              No notes in this folder
+            </Typography>
+          </Box>
+        ) : (
+          <List disablePadding>
+            {notes.map((note) => (
+              <ListItem key={note.id} disablePadding>
+                <ListItemButton
+                  selected={selectedNoteId === note.id}
+                  onClick={() => handleNoteSelect(note.id)}
+                  sx={{
+                    paddingY: 1.5,
+                    paddingX: 2,
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                  }}
+                >
+                  <ListItemText
+                    primary={
+                      <Typography variant="subtitle1" noWrap>
+                        {note.title || 'Untitled Note'}
                       </Typography>
-                      <Typography
-                        component="span"
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: 'block', marginTop: 0.5 }}
-                      >
-                        {formatDate(note.modified)}
-                      </Typography>
-                    </>
-                  }
-                />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
+                    }
+                    secondary={
+                      <>
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {truncatePreview(note.contentPreview)}
+                        </Typography>
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: 'block', marginTop: 0.5 }}
+                        >
+                          {formatDate(note.modified)}
+                        </Typography>
+                      </>
+                    }
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        )}
       </Box>
     </Box>
   );

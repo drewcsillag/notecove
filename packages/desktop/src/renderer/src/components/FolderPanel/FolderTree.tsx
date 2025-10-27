@@ -468,6 +468,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
               return (
                 <ListItemButton
+                  aria-label={String(node.text)}
                   sx={{
                     pl: depth * 2,
                     backgroundColor: isDropTarget

@@ -21,6 +21,10 @@ export interface TipTapEditorProps {
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChange }) => {
   const [yDoc] = useState(() => new Y.Doc());
+  const isLoadingNoteRef = React.useRef(false);
+  const currentNoteIdRef = React.useRef<string | null>(null);
+  const titleUpdateTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const updateHandlerRef = React.useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -45,11 +49,28 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
     },
     // Track content changes for title extraction
     onUpdate: ({ editor }) => {
-      // Extract title from first line
+      // Don't extract title while loading a note
+      if (isLoadingNoteRef.current) {
+        console.log('[TipTapEditor] Skipping title extraction - still loading');
+        return;
+      }
+
+      // Extract title from first line and debounce the update
       const firstLine = editor.state.doc.firstChild;
       if (firstLine && onTitleChange) {
         const titleText = firstLine.textContent.trim();
-        onTitleChange(titleText || 'Untitled');
+        console.log(`[TipTapEditor] Extracted title: "${titleText}"`);
+
+        // Clear existing timer
+        if (titleUpdateTimerRef.current) {
+          clearTimeout(titleUpdateTimerRef.current);
+        }
+
+        // Debounce title update by 300ms for snappy updates
+        titleUpdateTimerRef.current = setTimeout(() => {
+          console.log(`[TipTapEditor] Calling onTitleChange with: "${titleText || 'Untitled'}"`);
+          onTitleChange(titleText || 'Untitled');
+        }, 300);
       }
     },
   });
@@ -57,6 +78,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (titleUpdateTimerRef.current) {
+        clearTimeout(titleUpdateTimerRef.current);
+      }
       editor?.destroy();
       yDoc.destroy();
     };
@@ -69,18 +93,26 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
     // Send updates to main process (but not updates from network/load)
     const updateHandler = (update: Uint8Array, origin: unknown) => {
       // Skip updates that we applied from external sources (origin will be set)
-      if (origin === 'remote' || origin === 'load') return;
+      if (origin === 'remote' || origin === 'load') {
+        console.log(`[TipTapEditor] Skipping update with origin: ${origin}`);
+        return;
+      }
 
+      console.log(`[TipTapEditor] Sending update to main process for note ${noteId}, size: ${update.length} bytes`);
       // Send update to main process for persistence and distribution to other windows
       window.electronAPI.note.applyUpdate(noteId, update).catch((error: Error) => {
         console.error(`Failed to apply update for note ${noteId}:`, error);
       });
     };
 
+    // Store reference to handler so we can temporarily disable it during loading
+    updateHandlerRef.current = updateHandler;
+
     yDoc.on('update', updateHandler);
 
     return () => {
       yDoc.off('update', updateHandler);
+      updateHandlerRef.current = null;
     };
   }, [editor, yDoc, noteId]);
 
@@ -95,18 +127,29 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
     // Load note from main process
     const loadNote = async () => {
       try {
+        isLoadingNoteRef.current = true;
+        console.log(`[TipTapEditor] Loading note ${noteId}`);
+
         // Tell main process to load this note
         await window.electronAPI.note.load(noteId);
 
         // Get the current state from main process
         const state = await window.electronAPI.note.getState(noteId);
+        console.log(`[TipTapEditor] Got state from main process, size: ${state.length} bytes`);
 
         if (!isActive) return;
 
         // Apply the state to our local Yjs document with 'load' origin
+        // Since this editor instance is created fresh for each note (via key prop),
+        // the yDoc is empty and we don't need to clear it first
         Y.applyUpdate(yDoc, state, 'load');
+        console.log(`[TipTapEditor] Applied state to yDoc`);
+
+        currentNoteIdRef.current = noteId;
+        isLoadingNoteRef.current = false;
       } catch (error) {
         console.error(`Failed to load note ${noteId}:`, error);
+        isLoadingNoteRef.current = false;
       }
     };
 

@@ -34,8 +34,10 @@ export class CRDTManagerImpl implements CRDTManager {
     // Load all updates from disk
     try {
       const updates = await this.updateManager.readNoteUpdates(noteId);
+      console.log(`[CRDT Manager] Loading note ${noteId}, found ${updates.length} updates from disk`);
 
       for (const update of updates) {
+        console.log(`[CRDT Manager] Applying update of size ${update.length} bytes`);
         Y.applyUpdate(doc, update);
       }
     } catch (error) {
@@ -79,18 +81,22 @@ export class CRDTManagerImpl implements CRDTManager {
     return Promise.resolve();
   }
 
-  applyUpdate(noteId: string, update: Uint8Array): Promise<void> {
+  async applyUpdate(noteId: string, update: Uint8Array): Promise<void> {
     const state = this.documents.get(noteId);
 
     if (!state) {
       throw new Error(`Note ${noteId} not loaded`);
     }
 
+    console.log(`[CRDT Manager] Applying update to note ${noteId}, size: ${update.length} bytes`);
+
     // Apply update to in-memory document
     Y.applyUpdate(state.doc, update);
     state.lastModified = Date.now();
 
-    return Promise.resolve();
+    // Write update to disk (Y.applyUpdate doesn't trigger the 'update' event)
+    await this.handleUpdate(noteId, update);
+    console.log(`[CRDT Manager] Update written to disk for note ${noteId}`);
   }
 
   getDocument(noteId: string): Y.Doc | undefined {
@@ -114,7 +120,12 @@ export class CRDTManagerImpl implements CRDTManager {
 
     // Record activity for cross-instance sync
     if (this.activityLogger) {
-      await this.activityLogger.recordNoteActivity(noteId, state.refCount);
+      try {
+        await this.activityLogger.recordNoteActivity(noteId, state.refCount);
+      } catch (error) {
+        // Don't let activity logging errors break the update
+        console.error(`[CRDT Manager] Failed to record activity for note ${noteId}:`, error);
+      }
     }
   }
 

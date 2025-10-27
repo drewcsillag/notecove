@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:move', noteId, newFolderId) as Promise<void>,
     getMetadata: (noteId: string): Promise<NoteMetadata> =>
       ipcRenderer.invoke('note:getMetadata', noteId) as Promise<NoteMetadata>,
+    updateTitle: (noteId: string, title: string): Promise<void> =>
+      ipcRenderer.invoke('note:updateTitle', noteId, title) as Promise<void>,
     list: (
       sdId: string,
       folderId?: string | null
@@ -101,6 +103,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       );
       return () => {
         ipcRenderer.removeAllListeners('note:external-update');
+      };
+    },
+    onTitleUpdated: (
+      callback: (data: { noteId: string; title: string }) => void
+    ): (() => void) => {
+      ipcRenderer.on(
+        'note:titleUpdated',
+        (_event, data: { noteId: string; title: string }) => {
+          callback(data);
+        }
+      );
+      return () => {
+        ipcRenderer.removeAllListeners('note:titleUpdated');
       };
     },
   },

@@ -13,6 +13,7 @@ import {
   ActivityLogger,
   ActivitySync,
   type ActivitySyncCallbacks,
+  extractTitleFromDoc,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
@@ -28,6 +29,22 @@ let fileWatcher: NodeFileWatcher | null = null;
 let activityWatcher: NodeFileWatcher | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
 const allWindows: BrowserWindow[] = [];
+
+/**
+ * Extract all text content from an XmlElement recursively
+ * Used for generating content previews from CRDT documents
+ */
+function extractTextFromXmlElement(element: Y.XmlElement): string {
+  let text = '';
+  element.forEach((child) => {
+    if (child instanceof Y.XmlText) {
+      text += child.toString();
+    } else if (child instanceof Y.XmlElement) {
+      text += extractTextFromXmlElement(child);
+    }
+  });
+  return text;
+}
 
 function createWindow(): void {
   // Create the browser window
@@ -144,26 +161,33 @@ async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<vo
     return;
   }
 
-  console.log('[ensureDefaultNote] No existing notes, creating default note');
+  console.log('[ensureDefaultNote] No existing notes in database, loading from CRDT');
 
-  // No notes exist, create the default note
+  // No notes exist in database, but CRDT files might exist
+  // Load the note to check if it already has content from sync directory
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   await crdtMgr.loadNote(DEFAULT_NOTE_ID);
 
-  // Get the document to insert initial content
+  // Get the document to check/insert initial content
   const doc = crdtMgr.getDocument(DEFAULT_NOTE_ID);
   if (doc) {
-    // Insert initial content into the Y.XmlFragment
-    // ProseMirror structure: paragraph containing text
+    // Check if content already exists (from sync directory)
     const content = doc.getXmlFragment('content');
-    const paragraph = new Y.XmlElement('paragraph');
-    const text = new Y.XmlText();
-    text.insert(
-      0,
-      'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
-    );
-    paragraph.insert(0, [text]);
-    content.insert(0, [paragraph]);
+    if (content.length === 0) {
+      // Only add welcome content if CRDT is truly empty
+      console.log('[ensureDefaultNote] CRDT is empty, adding welcome content');
+      // ProseMirror structure: paragraph containing text
+      const paragraph = new Y.XmlElement('paragraph');
+      const text = new Y.XmlText();
+      text.insert(
+        0,
+        'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
+      );
+      paragraph.insert(0, [text]);
+      content.insert(0, [paragraph]);
+    } else {
+      console.log('[ensureDefaultNote] CRDT already has content from sync directory, skipping welcome content');
+    }
   }
 
   // Create note cache entry in SQLite
@@ -317,7 +341,75 @@ void app.whenReady().then(async () => {
     // Initialize activity sync with callbacks
     const activitySyncCallbacks: ActivitySyncCallbacks = {
       reloadNote: async (noteId: string) => {
-        await crdtManager.reloadNote(noteId);
+        try {
+          // Check if note exists in database cache
+          const existingNote = await database.getNote(noteId);
+
+          if (!existingNote) {
+            // Note doesn't exist in our database - it was created in another instance
+            try {
+            // Load note from CRDT files in sync directory
+            await crdtManager.loadNote(noteId);
+            const doc = crdtManager.getDocument(noteId);
+
+            if (!doc) {
+              console.error(`[ActivitySync] Failed to load document for note ${noteId}`);
+              return;
+            }
+
+            // Extract metadata from CRDT
+            const fragment = doc.getXmlFragment('content');
+            const title = extractTitleFromDoc(doc, 'content');
+
+            // Extract text content for preview
+            let contentText = '';
+            for (let i = 0; i < fragment.length; i++) {
+              const node = fragment.get(i);
+              if (node instanceof Y.XmlElement) {
+                contentText += extractTextFromXmlElement(node) + ' ';
+              } else if (node instanceof Y.XmlText) {
+                contentText += node.toString() + ' ';
+              }
+            }
+            contentText = contentText.trim();
+
+            // Create database entry
+            // TODO: Extract actual sdId and folderId from note metadata when implemented
+            const sdId = 'default';
+            const folderId = null; // For now, default to root
+
+            await database.upsertNote({
+              id: noteId,
+              title,
+              sdId,
+              folderId,
+              created: Date.now(), // We don't have the original creation time, use now
+              modified: Date.now(),
+              deleted: false,
+              contentPreview: contentText.substring(0, 200), // First 200 chars
+              contentText,
+            });
+
+            console.log(`[ActivitySync] Created database entry for note ${noteId} with title "${title}"`);
+
+            // Unload the note since we just needed metadata
+            await crdtManager.unloadNote(noteId);
+
+            // Broadcast note creation to all windows so they update their lists
+            const windows = BrowserWindow.getAllWindows();
+            for (const window of windows) {
+              window.webContents.send('note:created', { sdId, noteId, folderId });
+            }
+            } catch (error) {
+              console.error(`[ActivitySync] Failed to process new note ${noteId}:`, error);
+            }
+          } else {
+            // Note exists in database, just reload it if it's currently loaded
+            await crdtManager.reloadNote(noteId);
+          }
+        } catch (error) {
+          console.error(`[ActivitySync] Error in reloadNote callback for ${noteId}:`, error);
+        }
       },
       getLoadedNotes: () => crdtManager.getLoadedNotes(),
     };

@@ -18,6 +18,7 @@ declare global {
         delete: (noteId: string) => Promise<void>;
         move: (noteId: string, newFolderId: string) => Promise<void>;
         getMetadata: (noteId: string) => Promise<NoteMetadata>;
+        updateTitle: (noteId: string, title: string) => Promise<void>;
         list: (sdId: string, folderId?: string | null) => Promise<
           {
             id: string;
@@ -39,6 +40,7 @@ declare global {
         onExternalUpdate: (
           callback: (data: { operation: string; noteIds: string[] }) => void
         ) => () => void;
+        onTitleUpdated: (callback: (data: { noteId: string; title: string }) => void) => () => void;
       };
 
       folder: {
