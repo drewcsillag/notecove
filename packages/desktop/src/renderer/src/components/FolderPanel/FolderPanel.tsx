@@ -17,12 +17,14 @@ import {
   TextField,
   Button,
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Settings as SettingsIcon } from '@mui/icons-material';
 import { FolderTree } from './FolderTree';
 
-const DEFAULT_SD_ID = 'default'; // Phase 2.4.1: Single SD only
+export interface FolderPanelProps {
+  onOpenSettings?: () => void;
+}
 
-export const FolderPanel: React.FC = () => {
+export const FolderPanel: React.FC<FolderPanelProps> = ({ onOpenSettings }) => {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -30,6 +32,7 @@ export const FolderPanel: React.FC = () => {
   const [createError, setCreateError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stateLoaded, setStateLoaded] = useState(false);
+  const [activeSdId, setActiveSdId] = useState<string | undefined>();
 
   // Load persisted state on mount
   useEffect(() => {
@@ -51,13 +54,21 @@ export const FolderPanel: React.FC = () => {
 
   const loadState = async (): Promise<void> => {
     try {
+      // Load active SD
+      const activeSdId = await window.electronAPI.sd.getActive();
+      if (activeSdId) {
+        setActiveSdId(activeSdId);
+      }
+
       // Load selected folder
       const selectedState = await window.electronAPI.appState.get('selectedFolderId');
       if (selectedState) {
         setSelectedFolderId(selectedState);
       } else {
-        // Default to "All Notes"
-        setSelectedFolderId('all-notes');
+        // Default to "All Notes" for the active SD
+        if (activeSdId) {
+          setSelectedFolderId(`all-notes:${activeSdId}`);
+        }
       }
 
       // Load expanded folders
@@ -65,10 +76,8 @@ export const FolderPanel: React.FC = () => {
       if (expandedState) {
         setExpandedFolderIds(JSON.parse(expandedState) as string[]);
       } else {
-        // No saved state (fresh installation) - default to expanding all folders
-        const folders = await window.electronAPI.folder.list(DEFAULT_SD_ID);
-        const allFolderIds = folders.map((f) => f.id);
-        setExpandedFolderIds(allFolderIds);
+        // No saved state - in multi-SD mode, the tree will handle default expansion
+        setExpandedFolderIds([]);
       }
 
       // Mark state as loaded
@@ -103,6 +112,21 @@ export const FolderPanel: React.FC = () => {
       });
   };
 
+  const handleActiveSdChange = async (sdId: string): Promise<void> => {
+    try {
+      // Update local state
+      setActiveSdId(sdId);
+
+      // Set as active in backend
+      await window.electronAPI.sd.setActive(sdId);
+
+      // Persist in app state
+      await window.electronAPI.appState.set('activeSdId', sdId);
+    } catch (err) {
+      console.error('Failed to change active SD:', err);
+    }
+  };
+
   const handleCreateClick = (): void => {
     setCreateDialogOpen(true);
     setNewFolderName('');
@@ -119,19 +143,32 @@ export const FolderPanel: React.FC = () => {
     try {
       setCreateError(null);
 
+      // Must have an active SD to create a folder
+      if (!activeSdId) {
+        setCreateError('No active storage directory');
+        return;
+      }
+
       // Determine parent folder
       let parentId: string | null = null;
-      if (
-        selectedFolderId &&
-        selectedFolderId !== 'all-notes' &&
-        selectedFolderId !== 'recently-deleted'
-      ) {
-        parentId = selectedFolderId;
+      if (selectedFolderId) {
+        // Handle multi-SD special nodes
+        if (
+          selectedFolderId.startsWith('all-notes:') ||
+          selectedFolderId.startsWith('recently-deleted:') ||
+          selectedFolderId.startsWith('sd:')
+        ) {
+          // Creating at root level of the SD
+          parentId = null;
+        } else {
+          // Creating as a subfolder
+          parentId = selectedFolderId;
+        }
       }
 
       // Create folder via IPC
       const newFolderId = await window.electronAPI.folder.create(
-        DEFAULT_SD_ID,
+        activeSdId,
         parentId,
         newFolderName
       );
@@ -178,16 +215,22 @@ export const FolderPanel: React.FC = () => {
         }}
       >
         <Typography variant="h6">Folders</Typography>
-        <IconButton size="small" onClick={handleCreateClick} title="Create folder">
-          <AddIcon />
-        </IconButton>
+        <Box display="flex" gap={0.5}>
+          <IconButton size="small" onClick={handleCreateClick} title="Create folder">
+            <AddIcon />
+          </IconButton>
+          {onOpenSettings && (
+            <IconButton size="small" onClick={onOpenSettings} title="Settings">
+              <SettingsIcon />
+            </IconButton>
+          )}
+        </Box>
       </Box>
 
       {/* Folder Tree */}
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
         {stateLoaded ? (
           <FolderTree
-            sdId={DEFAULT_SD_ID}
             selectedFolderId={selectedFolderId}
             expandedFolderIds={expandedFolderIds}
             onFolderSelect={handleFolderSelect}
@@ -196,6 +239,8 @@ export const FolderPanel: React.FC = () => {
             onRefresh={() => {
               setRefreshTrigger((prev) => prev + 1);
             }}
+            {...(activeSdId && { activeSdId })}
+            onActiveSdChange={(sdId) => void handleActiveSdChange(sdId)}
           />
         ) : (
           <Box sx={{ p: 2, textAlign: 'center' }}>

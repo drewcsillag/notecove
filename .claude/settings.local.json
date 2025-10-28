@@ -65,7 +65,12 @@
       "Bash(git checkout:*)",
       "Bash(pnpm --filter @notecove/shared test)",
       "Bash(pnpm --filter @notecove/desktop typecheck:*)",
-      "Bash(npx @electron/rebuild:*)"
+      "Bash(npx @electron/rebuild:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(pnpm --filter @notecove/desktop lint:*)",
+      "Bash(awk:*)",
+      "Bash(pnpm --filter @notecove/desktop format:check:*)"
     ],
     "deny": [],
     "ask": []

@@ -47,7 +47,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
   const loadSelectedFolder = useCallback(async () => {
     try {
       const selected = await window.electronAPI.appState.get('selectedFolderId');
-      setSelectedFolderId(selected || 'all-notes');
+      setSelectedFolderId(selected ?? 'all-notes');
     } catch (err) {
       console.error('Failed to load selected folder:', err);
       setSelectedFolderId('all-notes');
@@ -86,9 +86,12 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
   }, []);
 
   // Handle note selection - delegate to parent
-  const handleNoteSelect = useCallback((noteId: string) => {
-    onNoteSelect(noteId);
-  }, [onNoteSelect]);
+  const handleNoteSelect = useCallback(
+    (noteId: string) => {
+      onNoteSelect(noteId);
+    },
+    [onNoteSelect]
+  );
 
   // Handle note creation
   const handleCreateNote = useCallback(async () => {
@@ -100,10 +103,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
       const folderId = selectedFolderId === 'all-notes' ? null : selectedFolderId;
 
       // Create note via IPC
-      const noteId = await window.electronAPI.note.create(DEFAULT_SD_ID, folderId || '', '');
+      const noteId = await window.electronAPI.note.create(DEFAULT_SD_ID, folderId ?? '', '');
 
       // Select the newly created note
-      await handleNoteSelect(noteId);
+      handleNoteSelect(noteId);
 
       // Refresh notes list to show the new note
       if (selectedFolderId !== null) {
@@ -135,7 +138,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
       void loadSelectedFolder();
     }, 500); // Check every 500ms
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [loadSelectedFolder]);
 
   // Listen for note updates from other windows
@@ -223,7 +228,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
         <Typography variant="h6">Notes ({notes.length})</Typography>
         <IconButton
           size="small"
-          onClick={handleCreateNote}
+          onClick={() => void handleCreateNote()}
           disabled={creating}
           title="Create note"
           sx={{ marginLeft: 1 }}
@@ -258,7 +263,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
               <ListItem key={note.id} disablePadding>
                 <ListItemButton
                   selected={selectedNoteId === note.id}
-                  onClick={() => handleNoteSelect(note.id)}
+                  onClick={() => {
+                    handleNoteSelect(note.id);
+                  }}
                   sx={{
                     paddingY: 1.5,
                     paddingX: 2,

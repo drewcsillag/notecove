@@ -58,7 +58,7 @@ test.afterEach(async () => {
     try {
       await electronApp.close();
       // Wait for app to fully close and release file handles
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     } catch (err) {
       // App may already be closed by test (e.g., restart tests)
       console.log('[E2E] App already closed or failed to close:', err);
@@ -143,7 +143,7 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
 
     // Expand "Personal" to see "Ideas" and "Recipes" by clicking the chevron icon
     const personalFolder = page.getByRole('button', { name: /Personal/ }).first();
-    const personalChevron = personalFolder.locator('svg').first();  // ChevronRight icon
+    const personalChevron = personalFolder.locator('svg').first(); // ChevronRight icon
     await personalChevron.click();
 
     // Wait for nested folders to be visible after expansion

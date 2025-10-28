@@ -30,6 +30,8 @@ const mockElectronAPI = {
     onDeleted: jest.fn(),
     onCreated: jest.fn(),
     onExternalUpdate: jest.fn(),
+    onTitleUpdated: jest.fn(),
+    updateTitle: jest.fn(),
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),
@@ -69,6 +71,9 @@ describe('App', () => {
       /* unsubscribe */
     });
     mockElectronAPI.note.onExternalUpdate.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onTitleUpdated.mockReturnValue(() => {
       /* unsubscribe */
     });
     mockElectronAPI.sync.onProgress.mockReturnValue(() => {

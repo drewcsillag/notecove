@@ -5,7 +5,7 @@
  * Syncs with main process CRDT via IPC.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
@@ -21,10 +21,10 @@ export interface TipTapEditorProps {
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChange }) => {
   const [yDoc] = useState(() => new Y.Doc());
-  const isLoadingNoteRef = React.useRef(false);
-  const currentNoteIdRef = React.useRef<string | null>(null);
-  const titleUpdateTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const updateHandlerRef = React.useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
+  const isLoadingNoteRef = useRef(false);
+  const currentNoteIdRef = useRef<string | null>(null);
+  const titleUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -98,7 +98,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
         return;
       }
 
-      console.log(`[TipTapEditor] Sending update to main process for note ${noteId}, size: ${update.length} bytes`);
+      console.log(
+        `[TipTapEditor] Sending update to main process for note ${noteId}, size: ${update.length} bytes`
+      );
       // Send update to main process for persistence and distribution to other windows
       window.electronAPI.note.applyUpdate(noteId, update).catch((error: Error) => {
         console.error(`Failed to apply update for note ${noteId}:`, error);

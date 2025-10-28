@@ -9,6 +9,7 @@ import { NotesListPanel } from '../NotesListPanel';
 // Mock i18n
 jest.mock('../../../i18n', () => ({}));
 
+/* eslint-disable @typescript-eslint/no-empty-function */
 // Mock window.electronAPI
 const mockElectronAPI = {
   note: {
@@ -17,6 +18,7 @@ const mockElectronAPI = {
     onCreated: jest.fn().mockReturnValue(() => {}),
     onDeleted: jest.fn().mockReturnValue(() => {}),
     onExternalUpdate: jest.fn().mockReturnValue(() => {}),
+    onTitleUpdated: jest.fn().mockReturnValue(() => {}),
   },
   appState: {
     get: jest.fn().mockResolvedValue(null),
@@ -41,7 +43,8 @@ describe('NotesListPanel', () => {
   });
 
   it('should show loading state initially', () => {
-    render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
     expect(screen.getByText('Loading notes...')).toBeInTheDocument();
   });
 
@@ -49,7 +52,8 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.list.mockResolvedValue([]);
     mockElectronAPI.appState.get.mockResolvedValue('all-notes');
 
-    render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
 
     await waitFor(() => {
       expect(screen.getByText('No notes in this folder')).toBeInTheDocument();
@@ -85,7 +89,8 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.list.mockResolvedValue(mockNotes);
     mockElectronAPI.appState.get.mockResolvedValue('all-notes');
 
-    render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
 
     await waitFor(() => {
       expect(screen.getByText('Notes (2)')).toBeInTheDocument();
@@ -114,7 +119,8 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.list.mockResolvedValue(mockNotes);
     mockElectronAPI.appState.get.mockResolvedValue('all-notes');
 
-    render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
 
     await waitFor(() => {
       expect(screen.getByText('Untitled Note')).toBeInTheDocument();
@@ -126,7 +132,8 @@ describe('NotesListPanel', () => {
     mockElectronAPI.appState.get.mockResolvedValue(folderId);
     mockElectronAPI.note.list.mockResolvedValue([]);
 
-    render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
 
     await waitFor(() => {
       expect(mockElectronAPI.note.list).toHaveBeenCalledWith('default', folderId);
@@ -137,7 +144,8 @@ describe('NotesListPanel', () => {
     mockElectronAPI.appState.get.mockResolvedValue('all-notes');
     mockElectronAPI.note.list.mockResolvedValue([]);
 
-    render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
 
     await waitFor(() => {
       expect(mockElectronAPI.note.list).toHaveBeenCalledWith('default');
@@ -169,7 +177,10 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const { getByText, unmount } = render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    const { getByText, unmount } = render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />
+    );
 
     await waitFor(() => {
       expect(getByText('Test Note')).toBeInTheDocument();
@@ -182,7 +193,7 @@ describe('NotesListPanel', () => {
     }
 
     await waitFor(() => {
-      expect(mockElectronAPI.appState.set).toHaveBeenCalledWith('selectedNoteId', 'note1');
+      expect(onNoteSelect).toHaveBeenCalledWith('note1');
     });
 
     // Clean up - unmount to stop polling interval
@@ -201,7 +212,10 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.list.mockResolvedValue([]);
     mockElectronAPI.note.create.mockResolvedValue('new-note-id');
 
-    const { getByTitle, unmount } = render(<NotesListPanel />);
+    const onNoteSelect = jest.fn();
+    const { getByTitle, unmount } = render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />
+    );
 
     await waitFor(() => {
       expect(getByTitle('Create note')).toBeInTheDocument();
@@ -213,7 +227,7 @@ describe('NotesListPanel', () => {
 
     await waitFor(() => {
       expect(mockElectronAPI.note.create).toHaveBeenCalledWith('default', '', '');
-      expect(mockElectronAPI.appState.set).toHaveBeenCalledWith('selectedNoteId', 'new-note-id');
+      expect(onNoteSelect).toHaveBeenCalledWith('new-note-id');
     });
 
     // Clean up - unmount to stop polling interval

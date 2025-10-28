@@ -19,7 +19,10 @@ declare global {
         move: (noteId: string, newFolderId: string) => Promise<void>;
         getMetadata: (noteId: string) => Promise<NoteMetadata>;
         updateTitle: (noteId: string, title: string) => Promise<void>;
-        list: (sdId: string, folderId?: string | null) => Promise<
+        list: (
+          sdId: string,
+          folderId?: string | null
+        ) => Promise<
           {
             id: string;
             title: string;
@@ -72,6 +75,21 @@ declare global {
         onUpdated: (
           callback: (data: { sdId: string; operation: string; folderId: string }) => void
         ) => () => void;
+      };
+
+      sd: {
+        list: () => Promise<
+          {
+            id: string;
+            name: string;
+            path: string;
+            created: number;
+            isActive: boolean;
+          }[]
+        >;
+        create: (name: string, path: string) => Promise<string>;
+        setActive: (sdId: string) => Promise<void>;
+        getActive: () => Promise<string | null>;
       };
 
       sync: {

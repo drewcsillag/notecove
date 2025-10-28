@@ -29,7 +29,9 @@ import FolderIcon from '@mui/icons-material/Folder';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
-import { IconButton, Tooltip } from '@mui/material';
+import StorageIcon from '@mui/icons-material/Storage';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { IconButton, Tooltip, Chip } from '@mui/material';
 
 interface FolderData {
   id: string;
@@ -40,18 +42,28 @@ interface FolderData {
   deleted: boolean;
 }
 
+interface StorageDirectory {
+  id: string;
+  name: string;
+  path: string;
+  created: number;
+  isActive: boolean;
+}
+
 export interface FolderTreeProps {
-  sdId: string;
+  sdId?: string; // Optional - if not provided, shows all SDs
   selectedFolderId?: string | null;
   expandedFolderIds?: string[];
   onFolderSelect?: (folderId: string | null) => void;
   onExpandedChange?: (expandedIds: string[]) => void;
   refreshTrigger?: number;
   onRefresh?: () => void;
+  activeSdId?: string; // For multi-SD mode, which SD is currently active
+  onActiveSdChange?: (sdId: string) => void; // Callback when active SD changes
 }
 
 /**
- * Transform flat folder list into react-dnd-treeview NodeModel format
+ * Transform flat folder list into react-dnd-treeview NodeModel format (Single SD mode)
  */
 function buildTreeNodes(folders: FolderData[]): NodeModel[] {
   const nodes: NodeModel[] = [];
@@ -92,6 +104,85 @@ function buildTreeNodes(folders: FolderData[]): NodeModel[] {
   return nodes;
 }
 
+/**
+ * Build tree nodes for multi-SD mode
+ * Structure:
+ * - SD 1 (collapsible)
+ *   - All Notes
+ *   - User folders
+ *   - Recently Deleted
+ * - SD 2 (collapsible)
+ *   - All Notes
+ *   - User folders
+ *   - Recently Deleted
+ */
+function buildMultiSDTreeNodes(
+  sds: StorageDirectory[],
+  foldersBySd: Map<string, FolderData[]>,
+  activeSdId?: string
+): NodeModel[] {
+  const nodes: NodeModel[] = [];
+
+  for (const sd of sds) {
+    // Add SD as top-level node
+    nodes.push({
+      id: `sd:${sd.id}`,
+      parent: 0,
+      text: sd.name,
+      droppable: false, // Cannot drop folders onto SD header
+      data: {
+        isSD: true,
+        sdId: sd.id,
+        isActive: sd.id === activeSdId,
+        path: sd.path,
+      },
+    });
+
+    // Add "All Notes" under this SD
+    nodes.push({
+      id: `all-notes:${sd.id}`,
+      parent: `sd:${sd.id}`,
+      text: 'All Notes',
+      droppable: true,
+      data: {
+        isSpecial: true,
+        noExpand: true,
+        sdId: sd.id,
+      },
+    });
+
+    // Add user folders under this SD
+    const folders = foldersBySd.get(sd.id) ?? [];
+    for (const folder of folders) {
+      nodes.push({
+        id: folder.id,
+        parent: folder.parentId ?? `sd:${sd.id}`, // Root folders go under SD
+        text: folder.name,
+        droppable: true,
+        data: {
+          order: folder.order,
+          sdId: sd.id,
+          isSpecial: false,
+        },
+      });
+    }
+
+    // Add "Recently Deleted" under this SD
+    nodes.push({
+      id: `recently-deleted:${sd.id}`,
+      parent: `sd:${sd.id}`,
+      text: 'Recently Deleted',
+      droppable: false,
+      data: {
+        isSpecial: true,
+        sdId: sd.id,
+      },
+    });
+  }
+
+  return nodes;
+}
+
 export const FolderTree: FC<FolderTreeProps> = ({
   sdId,
   selectedFolderId,
@@ -100,6 +191,8 @@ export const FolderTree: FC<FolderTreeProps> = ({
   onExpandedChange,
   refreshTrigger = 0,
   onRefresh,
+  activeSdId,
+  onActiveSdChange,
 }) => {
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,6 +203,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const [isCollapsedAll, setIsCollapsedAll] = useState(false); // Track if user clicked collapse all
   const isProgrammaticChange = useRef(false); // Track if change is from expand/collapse all buttons
   const previousExpandedLength = useRef(0); // Track previous length to detect initial expansion
+
+  // Multi-SD mode state
+  const [sds, setSds] = useState<StorageDirectory[]>([]);
+  const [foldersBySd, setFoldersBySd] = useState<Map<string, FolderData[]>>(new Map());
+  const isMultiSDMode = sdId === undefined;
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -152,27 +250,56 @@ export const FolderTree: FC<FolderTreeProps> = ({
   });
 
   useEffect(() => {
-    const loadFolders = async (): Promise<void> => {
+    const loadData = async (): Promise<void> => {
       try {
         setLoading(true);
         setError(null);
-        const folderList = await window.electronAPI.folder.list(sdId);
-        setFolders(folderList);
-        setTreeData(buildTreeNodes(folderList));
 
-        // Set all folder IDs for initial expansion (start fully expanded)
-        const folderIds = folderList.map((f) => f.id);
-        setAllFolderIds(folderIds);
+        if (isMultiSDMode) {
+          // Multi-SD mode: load all SDs and folders for each SD
+          const sdList = await window.electronAPI.sd.list();
+          setSds(sdList);
+
+          // Load folders for each SD
+          const folderMap = new Map<string, FolderData[]>();
+          await Promise.all(
+            sdList.map(async (sd) => {
+              const folderList = await window.electronAPI.folder.list(sd.id);
+              folderMap.set(sd.id, folderList);
+            })
+          );
+          setFoldersBySd(folderMap);
+
+          // Build tree with SD sections
+          const nodes = buildMultiSDTreeNodes(sdList, folderMap, activeSdId);
+          setTreeData(nodes);
+
+          // Set all folder IDs + SD IDs for initial expansion
+          const allFolderIds = Array.from(folderMap.values())
+            .flat()
+            .map((f) => f.id);
+          const allIds = [...sdList.map((s) => `sd:${s.id}`), ...allFolderIds];
+          setAllFolderIds(allIds);
+        } else {
+          // Single SD mode: original behavior
+          const folderList = await window.electronAPI.folder.list(sdId);
+          setFolders(folderList);
+          setTreeData(buildTreeNodes(folderList));
+
+          // Set all folder IDs for initial expansion (start fully expanded)
+          const folderIds = folderList.map((f) => f.id);
+          setAllFolderIds(folderIds);
+        }
       } catch (err) {
-        console.error('Failed to load folders:', err);
+        console.error('Failed to load data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load folders');
       } finally {
         setLoading(false);
       }
     };
 
-    void loadFolders();
-  }, [sdId, refreshTrigger]);
+    void loadData();
+  }, [sdId, refreshTrigger, isMultiSDMode, activeSdId]);
 
   if (loading) {
     return (
@@ -227,7 +354,17 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   const handleRenameConfirm = async (): Promise<void> => {
     try {
-      await window.electronAPI.folder.rename(sdId, renameDialog.folderId, renameDialog.newName);
+      // Find the folder to get its SD ID
+      const folder = folders.find((f) => f.id === renameDialog.folderId);
+      if (!folder) {
+        throw new Error('Folder not found');
+      }
+
+      await window.electronAPI.folder.rename(
+        folder.sdId,
+        renameDialog.folderId,
+        renameDialog.newName
+      );
       setRenameDialog({ ...renameDialog, open: false });
       onRefresh?.();
     } catch (err) {
@@ -263,7 +400,13 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   const handleDeleteConfirm = async (): Promise<void> => {
     try {
-      await window.electronAPI.folder.delete(sdId, deleteDialog.folderId);
+      // Find the folder to get its SD ID
+      const folder = folders.find((f) => f.id === deleteDialog.folderId);
+      if (!folder) {
+        throw new Error('Folder not found');
+      }
+
+      await window.electronAPI.folder.delete(folder.sdId, deleteDialog.folderId);
       setDeleteDialog({ open: false, folderId: '', folderName: '' });
       onRefresh?.();
     } catch (err) {
@@ -279,7 +422,13 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const handleMoveToTopLevel = async (): Promise<void> => {
     if (!contextMenu) return;
     try {
-      await window.electronAPI.folder.move(sdId, contextMenu.folderId, null);
+      // Find the folder to get its SD ID
+      const folder = folders.find((f) => f.id === contextMenu.folderId);
+      if (!folder) {
+        throw new Error('Folder not found');
+      }
+
+      await window.electronAPI.folder.move(folder.sdId, contextMenu.folderId, null);
       handleCloseContextMenu();
       onRefresh?.();
     } catch (err) {
@@ -292,26 +441,78 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const handleDrop = async (newTree: NodeModel[], options: DropOptions): Promise<void> => {
     const { dragSourceId, dropTargetId } = options;
 
-    // Don't allow dragging special items
-    if (dragSourceId === 'all-notes' || dragSourceId === 'recently-deleted') {
+    // Don't allow dragging special items (handle both single and multi-SD formats)
+    if (
+      String(dragSourceId).includes('all-notes') ||
+      String(dragSourceId).includes('recently-deleted') ||
+      String(dragSourceId).startsWith('sd:')
+    ) {
       return;
     }
 
-    // Don't allow dropping on "Recently Deleted"
-    if (dropTargetId === 'recently-deleted') {
+    // Don't allow dropping on "Recently Deleted" or SD headers
+    if (
+      String(dropTargetId).includes('recently-deleted') ||
+      String(dropTargetId).startsWith('sd:')
+    ) {
       return;
+    }
+
+    // In multi-SD mode, prevent cross-SD drag operations
+    if (isMultiSDMode) {
+      const dragNode = newTree.find((n) => n.id === dragSourceId);
+      const dropNode = newTree.find((n) => n.id === dropTargetId);
+
+      if (dragNode && dropNode) {
+        const dragSdId = (dragNode.data as { sdId?: string }).sdId;
+        const dropSdId = (dropNode.data as { sdId?: string }).sdId;
+
+        if (dragSdId && dropSdId && dragSdId !== dropSdId) {
+          console.warn('[FolderTree] Cannot drag folders across different SDs');
+          return;
+        }
+      }
     }
 
     // Determine the new parent ID
-    // Dropping on "All Notes" or root (0) means move to root level (parentId = null)
+    // In multi-SD mode, dropping on "All Notes" for a specific SD means move to root of that SD
     let newParentId: string | null = null;
-    if (dropTargetId !== 'all-notes' && dropTargetId !== 0) {
-      newParentId = String(dropTargetId);
+    const dropTargetStr = String(dropTargetId);
+
+    if (isMultiSDMode) {
+      // Handle multi-SD special cases
+      if (dropTargetStr.startsWith('all-notes:')) {
+        // Dropping on "All Notes" for a specific SD - root level within that SD
+        newParentId = null;
+      } else if (dropTargetStr.startsWith('sd:')) {
+        // Dropping on SD header - shouldn't happen, but treat as root
+        newParentId = null;
+      } else if (dropTargetId !== 0) {
+        // Dropping on a regular folder
+        newParentId = dropTargetStr;
+      }
+    } else {
+      // Single SD mode: original logic
+      if (dropTargetId !== 'all-notes' && dropTargetId !== 0) {
+        newParentId = dropTargetStr;
+      }
+    }
+
+    // Determine which SD this operation is for
+    const targetSdId = isMultiSDMode
+      ? ((newTree.find((n) => n.id === dragSourceId)?.data as { sdId?: string }).sdId ?? sdId)
+      : sdId;
+
+    if (!targetSdId) {
+      console.error('[FolderTree] Cannot determine SD for folder move');
+      return;
     }
 
     try {
-      console.log(`[FolderTree] Moving folder ${dragSourceId} to parent ${newParentId}`);
-      await window.electronAPI.folder.move(sdId, String(dragSourceId), newParentId);
+      console.log(
+        `[FolderTree] Moving folder ${dragSourceId} to parent ${newParentId} in SD ${targetSdId}`
+      );
+      await window.electronAPI.folder.move(targetSdId, String(dragSourceId), newParentId);
 
       // Update tree data locally for immediate feedback
       setTreeData(newTree);
@@ -321,28 +522,63 @@ export const FolderTree: FC<FolderTreeProps> = ({
     } catch (err) {
       console.error('Failed to move folder:', err);
       // Revert to original tree data on error
-      setTreeData(buildTreeNodes(folders));
+      if (isMultiSDMode) {
+        const nodes = buildMultiSDTreeNodes(sds, foldersBySd, activeSdId);
+        setTreeData(nodes);
+      } else {
+        setTreeData(buildTreeNodes(folders));
+      }
     }
   };
 
   // Control which nodes can be dragged
   const canDrag = (node: NodeModel | undefined): boolean => {
     if (!node) return false;
-    return !(node.data as { isSpecial?: boolean }).isSpecial;
+    const nodeData = node.data as { isSpecial?: boolean; isSD?: boolean };
+    return !nodeData.isSpecial && !nodeData.isSD;
   };
 
   // Control where nodes can be dropped
-  const canDrop = (_tree: NodeModel[], options: DropOptions): boolean => {
+  const canDrop = (tree: NodeModel[], options: DropOptions): boolean => {
     const { dragSourceId, dropTargetId } = options;
 
-    // Can't drag special items
-    if (dragSourceId === 'all-notes' || dragSourceId === 'recently-deleted') {
+    // Can't drag special items or SD headers (handle both formats)
+    if (
+      String(dragSourceId).includes('all-notes') ||
+      String(dragSourceId).includes('recently-deleted') ||
+      String(dragSourceId).startsWith('sd:')
+    ) {
       return false;
     }
 
-    // Can't drop on "Recently Deleted"
-    if (dropTargetId === 'recently-deleted') {
+    // Can't drop on "Recently Deleted" or SD headers
+    if (
+      String(dropTargetId).includes('recently-deleted') ||
+      String(dropTargetId).startsWith('sd:')
+    ) {
       return false;
+    }
+
+    // In multi-SD mode, prevent cross-SD drops
+    if (isMultiSDMode) {
+      const dragNode = tree.find((n) => n.id === dragSourceId);
+      const dropNode = tree.find((n) => n.id === dropTargetId);
+
+      if (dragNode && dropNode) {
+        const dragSdId = (dragNode.data as { sdId?: string }).sdId;
+        // For drop target, handle special cases like "all-notes:sd-id"
+        let dropSdId = (dropNode.data as { sdId?: string }).sdId;
+
+        // Extract SD ID from special node IDs
+        if (!dropSdId && String(dropTargetId).includes(':')) {
+          const parts = String(dropTargetId).split(':');
+          dropSdId = parts[1];
+        }
+
+        if (dragSdId && dropSdId && dragSdId !== dropSdId) {
+          return false; // Cannot drop across SDs
+        }
+      }
     }
 
     // Allow dropping on "All Notes" (root level) and regular folders
@@ -351,7 +587,35 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   // Handle tree item selection
   const handleSelect = (node: NodeModel): void => {
-    onFolderSelect?.(String(node.id));
+    const nodeId = String(node.id);
+    const nodeData = node.data as { isSD?: boolean; sdId?: string; isSpecial?: boolean };
+
+    // If clicking an SD header, don't select it as a folder
+    if (nodeData.isSD) {
+      // Could expand/collapse the SD section, but we handle that with the chevron
+      return;
+    }
+
+    // In multi-SD mode, track which SD this folder belongs to and update active SD
+    if (isMultiSDMode && onActiveSdChange) {
+      // Extract SD ID from the folder or special node
+      let newActiveSdId: string | undefined;
+
+      if (nodeId.includes(':')) {
+        // Special nodes like "all-notes:sd-id" or "recently-deleted:sd-id"
+        const parts = nodeId.split(':');
+        newActiveSdId = parts[1];
+      } else if (nodeData.sdId) {
+        // Regular folder with sdId in data
+        newActiveSdId = nodeData.sdId;
+      }
+
+      if (newActiveSdId && newActiveSdId !== activeSdId) {
+        onActiveSdChange(newActiveSdId);
+      }
+    }
+
+    onFolderSelect?.(nodeId);
   };
 
   // Handle expand/collapse
@@ -471,6 +735,9 @@ export const FolderTree: FC<FolderTreeProps> = ({
               const isSelected = String(node.id) === selectedFolderId;
               const isExpanded = expandedFolderIds.includes(String(node.id));
               const noExpand = (node.data as { noExpand?: boolean }).noExpand ?? false;
+              const nodeData = node.data as { isSD?: boolean; isActive?: boolean; path?: string };
+              const isSDNode = nodeData.isSD ?? false;
+              const isActiveSD = nodeData.isActive ?? false;
 
               // Check if this node has children
               const hasChildren = treeData.some((n) => n.parent === node.id);
@@ -484,21 +751,31 @@ export const FolderTree: FC<FolderTreeProps> = ({
                       ? 'primary.light'
                       : isSelected
                         ? 'action.selected'
+                        : isSDNode && isActiveSD
+                          ? 'action.hover'
+                          : 'transparent',
+                    borderLeft: isDropTarget ? 3 : isActiveSD && isSDNode ? 3 : 0,
+                    borderColor: isDropTarget
+                      ? 'primary.main'
+                      : isActiveSD && isSDNode
+                        ? 'primary.main'
                         : 'transparent',
-                    borderLeft: isDropTarget ? 3 : 0,
-                    borderColor: isDropTarget ? 'primary.main' : 'transparent',
                     '&:hover': {
                       backgroundColor: 'action.hover',
                     },
+                    fontWeight: isSDNode ? 600 : 400,
                   }}
                   onClick={() => {
                     handleSelect(node);
                   }}
                   onContextMenu={(e) => {
-                    handleContextMenu(e, String(node.id));
+                    if (!isSDNode) {
+                      handleContextMenu(e, String(node.id));
+                    }
                   }}
                 >
-                  {node.droppable && !noExpand && hasChildren && (
+                  {/* Expand/collapse chevron */}
+                  {(node.droppable ?? isSDNode) && !noExpand && hasChildren && (
                     <Box
                       component="span"
                       onClick={(e) => {
@@ -511,11 +788,15 @@ export const FolderTree: FC<FolderTreeProps> = ({
                       {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
                     </Box>
                   )}
-                  {(!node.droppable || noExpand || !hasChildren) && (
+                  {((!node.droppable && !isSDNode) || noExpand || !hasChildren) && (
                     <Box sx={{ width: 24, mr: 0.5 }} />
                   )}
+
+                  {/* Icon */}
                   <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
-                    {node.droppable ? (
+                    {isSDNode ? (
+                      <StorageIcon fontSize="small" color={isActiveSD ? 'primary' : 'action'} />
+                    ) : node.droppable ? (
                       isExpanded ? (
                         <FolderOpenIcon fontSize="small" />
                       ) : (
@@ -523,7 +804,18 @@ export const FolderTree: FC<FolderTreeProps> = ({
                       )
                     ) : null}
                   </Box>
+
+                  {/* Text and active indicator */}
                   <ListItemText primary={node.text} />
+                  {isSDNode && isActiveSD && (
+                    <Chip
+                      label="Active"
+                      size="small"
+                      color="primary"
+                      icon={<CheckCircleIcon />}
+                      sx={{ ml: 1, height: 20 }}
+                    />
+                  )}
                 </ListItemButton>
               );
             }}

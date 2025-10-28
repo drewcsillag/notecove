@@ -12,6 +12,7 @@ import type {
   AppState,
   SearchResult,
   SchemaVersionRecord,
+  StorageDirCache,
 } from './schema';
 import type { UUID } from '../types';
 
@@ -237,6 +238,41 @@ export interface UserOperations {
 }
 
 /**
+ * Storage Directory operations
+ */
+export interface StorageDirOperations {
+  /**
+   * Create a new storage directory
+   */
+  createStorageDir(id: string, name: string, path: string): Promise<StorageDirCache>;
+
+  /**
+   * Get a storage directory by ID
+   */
+  getStorageDir(id: string): Promise<StorageDirCache | null>;
+
+  /**
+   * Get all storage directories
+   */
+  getAllStorageDirs(): Promise<StorageDirCache[]>;
+
+  /**
+   * Get the active storage directory
+   */
+  getActiveStorageDir(): Promise<StorageDirCache | null>;
+
+  /**
+   * Set the active storage directory (only one can be active)
+   */
+  setActiveStorageDir(id: string): Promise<void>;
+
+  /**
+   * Delete a storage directory
+   */
+  deleteStorageDir(id: string): Promise<void>;
+}
+
+/**
  * Schema version operations
  */
 export interface SchemaVersionOperations {
@@ -279,6 +315,7 @@ export interface Database
     TagOperations,
     AppStateOperations,
     UserOperations,
+    StorageDirOperations,
     SchemaVersionOperations {
   /**
    * Get the underlying adapter

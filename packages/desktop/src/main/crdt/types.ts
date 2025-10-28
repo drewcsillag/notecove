@@ -9,6 +9,7 @@ import type * as Y from 'yjs';
  */
 export interface DocumentState {
   doc: Y.Doc;
+  noteDoc: import('@notecove/shared').NoteDoc; // NoteDoc wrapper with metadata methods
   noteId: string;
   refCount: number; // Number of renderer windows using this document
   lastModified: number;
@@ -44,6 +45,13 @@ export interface CRDTManager {
    * @returns The Yjs document or undefined
    */
   getDocument(noteId: string): Y.Doc | undefined;
+
+  /**
+   * Get a note's NoteDoc wrapper (if loaded)
+   * @param noteId Note ID
+   * @returns The NoteDoc instance or undefined
+   */
+  getNoteDoc(noteId: string): import('@notecove/shared').NoteDoc | undefined;
 
   /**
    * Load a folder tree document for an SD

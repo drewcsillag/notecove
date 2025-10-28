@@ -8,6 +8,7 @@
 
 import { ipcMain, type IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import * as Y from 'yjs';
+import * as crypto from 'crypto';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
 import type { Database } from '@notecove/shared';
@@ -52,6 +53,12 @@ export class IPCHandlers {
     ipcMain.handle('folder:delete', this.handleDeleteFolder.bind(this));
     ipcMain.handle('folder:move', this.handleMoveFolder.bind(this));
 
+    // Storage Directory operations
+    ipcMain.handle('sd:list', this.handleListStorageDirs.bind(this));
+    ipcMain.handle('sd:create', this.handleCreateStorageDir.bind(this));
+    ipcMain.handle('sd:setActive', this.handleSetActiveStorageDir.bind(this));
+    ipcMain.handle('sd:getActive', this.handleGetActiveStorageDir.bind(this));
+
     // App state operations
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
     ipcMain.handle('appState:set', this.handleSetAppState.bind(this));
@@ -64,6 +71,24 @@ export class IPCHandlers {
 
   private async handleLoadNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
     await this.crdtManager.loadNote(noteId);
+
+    // Sync CRDT metadata to SQLite cache
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (noteDoc) {
+      const crdtMetadata = noteDoc.getMetadata();
+      const note = await this.database.getNote(noteId);
+
+      // Only update if note exists in cache and CRDT has initialized metadata
+      if (note && crdtMetadata.id) {
+        await this.database.upsertNote({
+          ...note,
+          folderId: crdtMetadata.folderId,
+          created: crdtMetadata.created,
+          modified: crdtMetadata.modified,
+          deleted: crdtMetadata.deleted,
+        });
+      }
+    }
   }
 
   private async handleUnloadNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
@@ -102,6 +127,21 @@ export class IPCHandlers {
     // Load the note (creates empty CRDT document)
     await this.crdtManager.loadNote(noteId);
 
+    // Initialize CRDT metadata with folder association
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (noteDoc) {
+      const now = Date.now();
+      noteDoc.initializeNote({
+        id: noteId,
+        created: now,
+        modified: now,
+        folderId: folderId,
+        deleted: false,
+      });
+    } else {
+      console.error(`[Note] Failed to get NoteDoc for ${noteId} after loading`);
+    }
+
     // If initial content provided, apply it to the CRDT
     if (initialContent) {
       // TODO: Convert initialContent to ProseMirror structure and insert
@@ -135,19 +175,80 @@ export class IPCHandlers {
 
   private async handleMoveNote(
     _event: IpcMainInvokeEvent,
-    _noteId: string,
-    _newFolderId: string
+    noteId: string,
+    newFolderId: string | null
   ): Promise<void> {
-    // TODO: Implement note moving
-    throw new Error('Not implemented');
+    // Get the note from cache to find its current location
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    // Update CRDT metadata with new folder
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (noteDoc) {
+      noteDoc.updateMetadata({
+        folderId: newFolderId,
+        modified: Date.now(),
+      });
+    } else {
+      // Note not loaded in memory, load it first
+      await this.crdtManager.loadNote(noteId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (loadedNoteDoc) {
+        loadedNoteDoc.updateMetadata({
+          folderId: newFolderId,
+          modified: Date.now(),
+        });
+      } else {
+        console.error(`[Note] Failed to load NoteDoc for ${noteId}`);
+      }
+    }
+
+    // Update SQLite cache
+    await this.database.upsertNote({
+      ...note,
+      folderId: newFolderId,
+      modified: Date.now(),
+    });
+
+    // Broadcast move event
+    this.broadcastToAll('note:moved', { noteId, oldFolderId: note.folderId, newFolderId });
   }
 
   private async handleGetMetadata(
     _event: IpcMainInvokeEvent,
-    _noteId: string
+    noteId: string
   ): Promise<NoteMetadata> {
-    // TODO: Implement metadata retrieval from SQLite
-    throw new Error('Not implemented');
+    // Get note from SQLite cache for title
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    // Try to get metadata from CRDT if loaded
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    let crdtMetadata: import('@notecove/shared').NoteMetadata | null = null;
+
+    if (noteDoc) {
+      crdtMetadata = noteDoc.getMetadata();
+    } else {
+      // Load note to get CRDT metadata
+      await this.crdtManager.loadNote(noteId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (loadedNoteDoc) {
+        crdtMetadata = loadedNoteDoc.getMetadata();
+      }
+    }
+
+    // Return metadata, preferring CRDT metadata for folderId
+    return {
+      noteId: noteId,
+      title: note.title,
+      folderId: crdtMetadata?.folderId ?? note.folderId ?? '',
+      createdAt: crdtMetadata?.created ?? note.created,
+      modifiedAt: crdtMetadata?.modified ?? note.modified,
+    };
   }
 
   private async handleUpdateTitle(
@@ -407,6 +508,35 @@ export class IPCHandlers {
     await this.database.setState(key, value);
   }
 
+  // ============================================================================
+  // Storage Directory Handlers
+  // ============================================================================
+
+  private async handleListStorageDirs(
+    _event: IpcMainInvokeEvent
+  ): Promise<{ id: string; name: string; path: string; created: number; isActive: boolean }[]> {
+    return await this.database.getAllStorageDirs();
+  }
+
+  private async handleCreateStorageDir(
+    _event: IpcMainInvokeEvent,
+    name: string,
+    path: string
+  ): Promise<string> {
+    const id = crypto.randomUUID();
+    await this.database.createStorageDir(id, name, path);
+    return id;
+  }
+
+  private async handleSetActiveStorageDir(_event: IpcMainInvokeEvent, sdId: string): Promise<void> {
+    await this.database.setActiveStorageDir(sdId);
+  }
+
+  private async handleGetActiveStorageDir(_event: IpcMainInvokeEvent): Promise<string | null> {
+    const activeSD = await this.database.getActiveStorageDir();
+    return activeSD ? activeSD.id : null;
+  }
+
   /**
    * Testing: Create a new window
    */
@@ -436,6 +566,10 @@ export class IPCHandlers {
     ipcMain.removeHandler('folder:rename');
     ipcMain.removeHandler('folder:delete');
     ipcMain.removeHandler('folder:move');
+    ipcMain.removeHandler('sd:list');
+    ipcMain.removeHandler('sd:create');
+    ipcMain.removeHandler('sd:setActive');
+    ipcMain.removeHandler('sd:getActive');
     ipcMain.removeHandler('appState:get');
     ipcMain.removeHandler('appState:set');
 

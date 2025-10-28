@@ -93,8 +93,9 @@ export class UpdateManager {
 
   /**
    * Read all updates for folder tree
+   * @param sdId Optional SD ID to filter updates for a specific SD
    */
-  async readFolderUpdates(): Promise<Uint8Array[]> {
+  async readFolderUpdates(sdId?: string): Promise<Uint8Array[]> {
     const folderPaths = this.sdStructure.getFolderPaths();
 
     const folderExists = await this.fs.exists(folderPaths.updates);
@@ -108,6 +109,18 @@ export class UpdateManager {
     for (const filename of files) {
       if (!filename.endsWith('.yjson')) {
         continue;
+      }
+
+      // Filter by SD ID if provided
+      // Filename format: {instanceId}_folder-tree_{sdId}_{timestamp}.yjson
+      if (sdId) {
+        const parts = filename.split('_');
+        if (parts.length >= 3) {
+          const fileSdId = parts[2]; // Extract SD ID from filename
+          if (fileSdId !== sdId) {
+            continue; // Skip files that don't match the requested SD
+          }
+        }
       }
 
       const filePath = this.fs.joinPath(folderPaths.updates, filename);

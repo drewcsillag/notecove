@@ -21,39 +21,25 @@ jest.mock('electron', () => ({
   },
 }));
 
-// Mock crypto.randomUUID for Node <19
+// Mock Node.js crypto module
 let uuidCounter = 0;
-// eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition
-const originalRandomUUID = globalThis.crypto?.randomUUID;
-
-// Install mock before tests
-beforeAll(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!globalThis.crypto) {
-    (globalThis as any).crypto = {};
-  }
-  globalThis.crypto.randomUUID = (): `${string}-${string}-${string}-${string}-${string}` => {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  randomUUID: jest.fn((): string => {
     uuidCounter++;
-    const uuid = `test-uuid-${uuidCounter.toString().padStart(8, '0')}-0000-0000-0000-000000000000`;
-    return uuid as `${string}-${string}-${string}-${string}-${string}`;
-  };
-});
+    return `test-uuid-${uuidCounter.toString().padStart(8, '0')}-0000-0000-0000-000000000000`;
+  }),
+}));
 
-// Restore original after tests
-afterAll(() => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (originalRandomUUID) {
-    globalThis.crypto.randomUUID = originalRandomUUID;
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  } else if (globalThis.crypto) {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    delete (globalThis.crypto as any).randomUUID;
-  }
-});
-
+// Mock crypto.randomUUID for Node <19 (for compatibility)
+// let uuidCounter = 0;
 // Reset counter before each test
 beforeEach(() => {
   uuidCounter = 0;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const crypto = require('crypto');
+  (crypto.randomUUID as jest.Mock).mockClear();
 });
 
 import { IPCHandlers } from '../handlers';
@@ -83,6 +69,10 @@ interface MockDatabase {
   upsertFolder: jest.Mock;
   getState: jest.Mock;
   setState: jest.Mock;
+  createStorageDir: jest.Mock;
+  getAllStorageDirs: jest.Mock;
+  getActiveStorageDir: jest.Mock;
+  setActiveStorageDir: jest.Mock;
 }
 
 describe('IPCHandlers - Folder CRUD', () => {
@@ -116,6 +106,10 @@ describe('IPCHandlers - Folder CRUD', () => {
       upsertFolder: jest.fn().mockResolvedValue(undefined),
       getState: jest.fn(),
       setState: jest.fn().mockResolvedValue(undefined),
+      createStorageDir: jest.fn(),
+      getAllStorageDirs: jest.fn(),
+      getActiveStorageDir: jest.fn(),
+      setActiveStorageDir: jest.fn(),
     };
 
     // Create handlers
@@ -741,6 +735,163 @@ describe('IPCHandlers - Folder CRUD', () => {
       await expect(
         (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId)
       ).rejects.toThrow('Cannot move folder to be its own descendant');
+    });
+  });
+});
+
+describe('IPCHandlers - SD Management', () => {
+  let handlers: IPCHandlers;
+  let mockCRDTManager: MockCRDTManager;
+  let mockDatabase: MockDatabase;
+  let mockFolderTree: MockFolderTreeDoc;
+
+  beforeEach(() => {
+    // Create mock folder tree
+    mockFolderTree = {
+      getActiveFolders: jest.fn(),
+      getFolder: jest.fn(),
+      getRootFolders: jest.fn(),
+      getChildFolders: jest.fn(),
+      createFolder: jest.fn(),
+      updateFolder: jest.fn(),
+      deleteFolder: jest.fn(),
+    };
+
+    // Create mock CRDT manager
+    mockCRDTManager = {
+      loadNote: jest.fn(),
+      unloadNote: jest.fn(),
+      applyUpdate: jest.fn(),
+      loadFolderTree: jest.fn().mockReturnValue(mockFolderTree),
+    };
+
+    // Create mock database
+    mockDatabase = {
+      upsertFolder: jest.fn(),
+      getState: jest.fn(),
+      setState: jest.fn(),
+      createStorageDir: jest.fn(),
+      getAllStorageDirs: jest.fn(),
+      getActiveStorageDir: jest.fn(),
+      setActiveStorageDir: jest.fn(),
+    };
+
+    // Create handlers
+    handlers = new IPCHandlers(
+      mockCRDTManager as unknown as CRDTManager,
+      mockDatabase as unknown as Database
+    );
+  });
+
+  describe('sd:list', () => {
+    it('should return all storage directories', async () => {
+      const mockEvent = {} as any;
+      const sds = [
+        { id: 'sd1', name: 'Work', path: '/path/work', created: 1000, isActive: true },
+        { id: 'sd2', name: 'Personal', path: '/path/personal', created: 2000, isActive: false },
+      ];
+
+      mockDatabase.getAllStorageDirs.mockResolvedValue(sds);
+
+      const result = await (handlers as any).handleListStorageDirs(mockEvent);
+
+      expect(mockDatabase.getAllStorageDirs).toHaveBeenCalled();
+      expect(result).toEqual(sds);
+    });
+
+    it('should return empty array when no SDs exist', async () => {
+      const mockEvent = {} as any;
+      mockDatabase.getAllStorageDirs.mockResolvedValue([]);
+
+      const result = await (handlers as any).handleListStorageDirs(mockEvent);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('sd:create', () => {
+    it('should create a new storage directory', async () => {
+      const mockEvent = {} as any;
+      const name = 'Work';
+      const path = '/path/to/work';
+      const createdSD = {
+        id: 'test-uuid-00000001-0000-0000-0000-000000000000',
+        name,
+        path,
+        created: Date.now(),
+        isActive: false,
+      };
+
+      mockDatabase.createStorageDir.mockResolvedValue(createdSD);
+
+      const result = await (handlers as any).handleCreateStorageDir(mockEvent, name, path);
+
+      expect(mockDatabase.createStorageDir).toHaveBeenCalledWith(
+        'test-uuid-00000001-0000-0000-0000-000000000000',
+        name,
+        path
+      );
+      expect(result).toEqual('test-uuid-00000001-0000-0000-0000-000000000000');
+    });
+
+    it('should create first SD as active', async () => {
+      const mockEvent = {} as any;
+      const name = 'Work';
+      const path = '/path/to/work';
+      const createdSD = {
+        id: 'test-uuid-00000001-0000-0000-0000-000000000000',
+        name,
+        path,
+        created: Date.now(),
+        isActive: true,
+      };
+
+      mockDatabase.createStorageDir.mockResolvedValue(createdSD);
+
+      await (handlers as any).handleCreateStorageDir(mockEvent, name, path);
+
+      expect(mockDatabase.createStorageDir).toHaveBeenCalled();
+      // Database layer handles setting isActive for first SD
+    });
+  });
+
+  describe('sd:setActive', () => {
+    it('should set the active storage directory', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'sd2';
+
+      await (handlers as any).handleSetActiveStorageDir(mockEvent, sdId);
+
+      expect(mockDatabase.setActiveStorageDir).toHaveBeenCalledWith(sdId);
+    });
+  });
+
+  describe('sd:getActive', () => {
+    it('should return the active storage directory ID', async () => {
+      const mockEvent = {} as any;
+      const activeSd = {
+        id: 'sd1',
+        name: 'Work',
+        path: '/path/work',
+        created: 1000,
+        isActive: true,
+      };
+
+      mockDatabase.getActiveStorageDir.mockResolvedValue(activeSd);
+
+      const result = await (handlers as any).handleGetActiveStorageDir(mockEvent);
+
+      expect(mockDatabase.getActiveStorageDir).toHaveBeenCalled();
+      expect(result).toEqual('sd1');
+    });
+
+    it('should return null when no active SD exists', async () => {
+      const mockEvent = {} as any;
+      mockDatabase.getActiveStorageDir.mockResolvedValue(null);
+
+      const result = await (handlers as any).handleGetActiveStorageDir(mockEvent);
+
+      expect(result).toBeNull();
     });
   });
 });

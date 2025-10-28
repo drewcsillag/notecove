@@ -21,6 +21,9 @@ const mockFolderCreate = jest.fn();
 const mockFolderRename = jest.fn();
 const mockFolderMove = jest.fn();
 const mockFolderDelete = jest.fn();
+const mockSdGetActive = jest.fn();
+const mockSdList = jest.fn();
+const mockSdSetActive = jest.fn();
 
 global.window.electronAPI = {
   appState: {
@@ -36,7 +39,12 @@ global.window.electronAPI = {
     delete: mockFolderDelete,
     onUpdated: mockFolderOnUpdated,
   },
-} as Partial<typeof window.electronAPI> as typeof window.electronAPI;
+  sd: {
+    getActive: mockSdGetActive,
+    list: mockSdList,
+    setActive: mockSdSetActive,
+  },
+} as unknown as typeof window.electronAPI;
 
 describe('FolderPanel', () => {
   beforeEach(() => {
@@ -45,6 +53,8 @@ describe('FolderPanel', () => {
     mockFolderOnUpdated.mockReturnValue(() => {
       /* unsubscribe */
     });
+    // Mock sd.getActive to return a default SD ID
+    mockSdGetActive.mockResolvedValue('default');
   });
 
   it('should render the folder panel with header', async () => {
@@ -62,14 +72,13 @@ describe('FolderPanel', () => {
 
   it('should render FolderTree component', async () => {
     mockAppStateGet.mockResolvedValue(null);
+    mockFolderList.mockResolvedValue([]);
 
     render(<FolderPanel />);
 
-    expect(screen.getByTestId('folder-tree')).toBeInTheDocument();
-
-    // Wait for state to settle
+    // Wait for state to load and FolderTree to render
     await waitFor(() => {
-      expect(mockAppStateGet).toHaveBeenCalled();
+      expect(screen.getByTestId('folder-tree')).toBeInTheDocument();
     });
   });
 

@@ -10,6 +10,7 @@ import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
 import { FolderPanel } from './components/FolderPanel/FolderPanel';
 import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
 import { EditorPanel } from './components/EditorPanel/EditorPanel';
+import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
@@ -17,6 +18,7 @@ const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
 function App(): React.ReactElement {
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Load saved panel sizes on mount
   useEffect(() => {
@@ -70,11 +72,25 @@ function App(): React.ReactElement {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <ThreePanelLayout
-        leftPanel={<FolderPanel />}
-        middlePanel={<NotesListPanel selectedNoteId={selectedNoteId} onNoteSelect={setSelectedNoteId} />}
+        leftPanel={
+          <FolderPanel
+            onOpenSettings={() => {
+              setSettingsOpen(true);
+            }}
+          />
+        }
+        middlePanel={
+          <NotesListPanel selectedNoteId={selectedNoteId} onNoteSelect={setSelectedNoteId} />
+        }
         rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
         onLayoutChange={handleLayoutChange}
         initialSizes={initialPanelSizes}
+      />
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => {
+          setSettingsOpen(false);
+        }}
       />
     </ThemeProvider>
   );

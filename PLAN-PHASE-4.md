@@ -279,4 +279,3 @@
 - CRDT state remains consistent
 
 ---
-

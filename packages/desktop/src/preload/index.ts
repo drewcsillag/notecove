@@ -105,15 +105,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeAllListeners('note:external-update');
       };
     },
-    onTitleUpdated: (
-      callback: (data: { noteId: string; title: string }) => void
-    ): (() => void) => {
-      ipcRenderer.on(
-        'note:titleUpdated',
-        (_event, data: { noteId: string; title: string }) => {
-          callback(data);
-        }
-      );
+    onTitleUpdated: (callback: (data: { noteId: string; title: string }) => void): (() => void) => {
+      ipcRenderer.on('note:titleUpdated', (_event, data: { noteId: string; title: string }) => {
+        callback(data);
+      });
       return () => {
         ipcRenderer.removeAllListeners('note:titleUpdated');
       };
@@ -186,6 +181,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeAllListeners('folder:updated');
       };
     },
+  },
+
+  // Storage Directory operations
+  sd: {
+    list: (): Promise<
+      {
+        id: string;
+        name: string;
+        path: string;
+        created: number;
+        isActive: boolean;
+      }[]
+    > =>
+      ipcRenderer.invoke('sd:list') as Promise<
+        {
+          id: string;
+          name: string;
+          path: string;
+          created: number;
+          isActive: boolean;
+        }[]
+      >,
+    create: (name: string, path: string): Promise<string> =>
+      ipcRenderer.invoke('sd:create', name, path) as Promise<string>,
+    setActive: (sdId: string): Promise<void> =>
+      ipcRenderer.invoke('sd:setActive', sdId) as Promise<void>,
+    getActive: (): Promise<string | null> =>
+      ipcRenderer.invoke('sd:getActive') as Promise<string | null>,
   },
 
   // Sync operations

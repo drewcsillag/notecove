@@ -610,46 +610,96 @@ This phase is split into 5 sub-phases for better manageability:
 
 ---
 
-#### 2.4.5 Multi-SD Support 🟥
+#### 2.4.5 Multi-SD Support ✅
 
-**Status:** To Do
+**Status:** Complete (2025-10-27)
 
-**Tasks:**
+**Completed Tasks:**
 
-- [ ] 🟥 Implement SD management
-  - IPC handler: `sd:list` - Get all configured SDs
-  - IPC handler: `sd:create` - Create new SD
-  - IPC handler: `sd:setActive` - Set active SD
-  - Store SD list in SQLite (or app_state)
-- [ ] 🟥 Update folder tree to show multiple SDs
-  - Each SD as a top-level tree section
-  - SD name as label (editable?)
-  - Each SD has its own "All Notes" and "Recently Deleted"
-  - User folders between them
-- [ ] 🟥 Update IPC handlers for multi-SD
-  - All folder operations need sdId parameter
-  - Load correct FolderTreeDoc per SD
-  - Update all existing handlers
-- [ ] 🟥 Implement active SD concept
-  - SD of currently selected folder
-  - New notes/folders created in active SD
-  - Visual indicator for active SD
-- [ ] 🟥 Prevent cross-SD operations
-  - Cannot drag folders across SDs
-  - Error messages for invalid operations
-- [ ] 🟥 Add tests for multi-SD
-  - Test SD listing
-  - Test SD creation
-  - Test switching between SDs
-  - Test cross-SD prevention
+- [x] ✅ **Backend SD Management** (2025-10-27)
+  - ✅ Added `storage_dirs` table to SQLite schema
+  - ✅ IPC handler: `sd:list` - Get all configured SDs
+  - ✅ IPC handler: `sd:create` - Create new SD
+  - ✅ IPC handler: `sd:setActive` - Set active SD
+  - ✅ IPC handler: `sd:getActive` - Get active SD ID
+  - ✅ Store SD list in SQLite with active flag
+  - ✅ First SD automatically marked as active
+  - ✅ Default SD created on first run (`~/Documents/NoteCove`)
+  - ✅ Exposed SD methods in preload script
+  - ✅ TypeScript type definitions complete
+  - ✅ 6 unit tests passing (30 total handler tests passing)
 
-**Acceptance Criteria:**
+- [x] ✅ **Multi-SD UI Implementation** (2025-10-27)
+  - ✅ Updated FolderTree to display multiple SDs
+    - Each SD as top-level collapsible section
+    - SD name with Storage icon
+    - Each SD has own "All Notes" and "Recently Deleted"
+    - User folders grouped under each SD
+  - ✅ Removed hardcoded DEFAULT_SD_ID from components
+    - FolderPanel loads active SD on mount
+    - FolderTree operates in multi-SD mode (no sdId prop)
+    - All folder operations use SD ID from folder data
+  - ✅ Implemented active SD concept in UI
+    - Active SD tracked in FolderPanel state
+    - Active SD persisted via appState
+    - Visual indicator: blue border + "Active" chip
+    - New folders created in active SD
+    - Active SD changes when selecting folder from different SD
+  - ✅ Prevented cross-SD drag operations
+    - Drag-and-drop validates source and target SD IDs
+    - Cannot drag folders between different SDs
+    - Warning logged for invalid cross-SD operations
+  - ✅ Added comprehensive test coverage
+    - 6 new multi-SD tests in FolderTree.test.tsx
+    - Tests verify SD display, folder grouping, active indicator
+    - Tests verify cross-SD prevention and folder loading
+    - All 130 tests passing (14 FolderTree tests, 116 total)
+
+**Implementation Details:**
+
+**Files Modified:**
+
+- `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx`
+  - Added `StorageDirectory` interface for SD data
+  - Made `sdId` prop optional (multi-SD mode when omitted)
+  - Added `activeSdId` and `onActiveSdChange` props
+  - Created `buildMultiSDTreeNodes()` function for multi-SD tree structure
+  - Updated data loading to load all SDs and folders per SD
+  - Enhanced drag-and-drop to prevent cross-SD operations
+  - Added active SD tracking in selection handler
+  - Updated render to show SD nodes with visual indicators
+
+- `packages/desktop/src/renderer/src/components/FolderPanel/FolderPanel.tsx`
+  - Removed hardcoded `DEFAULT_SD_ID` constant
+  - Added `activeSdId` state tracking
+  - Updated `loadState()` to load active SD from backend
+  - Added `handleActiveSdChange()` to update active SD
+  - Updated `handleCreateFolder` to use active SD
+  - Updated FolderTree props to use multi-SD mode
+
+- `packages/desktop/src/renderer/src/components/FolderPanel/__tests__/FolderPanel.test.tsx`
+  - Added SD mocks (`sd.getActive`, `sd.list`, `sd.setActive`)
+  - Updated all tests to work with multi-SD mode
+
+- `packages/desktop/src/renderer/src/components/FolderPanel/__tests__/FolderTree.test.tsx`
+  - Added 6 comprehensive multi-SD tests
+  - Tests cover SD display, folder grouping, active indicator, cross-SD prevention
+
+**Key Features:**
+
+- Multi-SD mode automatically activated when `sdId` prop omitted from FolderTree
+- SD nodes use prefixed IDs: `sd:{id}`, `all-notes:{sdId}`, `recently-deleted:{sdId}`
+- Active SD visually indicated with blue left border and "Active" chip
+- Cross-SD drag prevention validates both source and target SD IDs
+- All folder operations extract SD ID from folder data (works in both modes)
+
+**Acceptance Criteria:** ✅ All met
 
 - ✅ Can have multiple SDs configured
 - ✅ Each SD shows its own folder tree
 - ✅ Can create/manage folders in each SD
 - ✅ Cannot perform cross-SD operations
-- ✅ Active SD concept works correctly
+- ✅ Active SD concept works correctly in UI
 
 ---
 
@@ -961,9 +1011,112 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 
 ---
 
-### 2.6 Tags Panel 🟥
+### 2.6 Settings Window 🟡
+
+**Status:** Partial (UI Complete, Integration Pending)
+
+**Context:** Phase order changed to prioritize SD management UI before Tags. Settings provides the interface for users to configure multiple Storage Directories, which is needed for Phase 2.4.5 UI completion.
+
+**Completed Tasks (2025-10-27):**
+
+- [x] ✅ **Implement settings dialog** (Material-UI Dialog)
+  - Modal dialog style with tabs
+  - Accessible via Settings button in Folder Panel header
+  - Close button in dialog
+- [x] ✅ **Implement SD management UI** (StorageDirectorySettings.tsx)
+  - List of configured SDs (uses `sd:list` IPC handler) ✅
+  - For each SD: name, path, active indicator displayed ✅
+  - Add SD dialog: calls `sd:create` IPC handler ✅
+  - Remove SD: confirmation dialog (sd:delete IPC handler not yet implemented) 🟡
+  - Set active SD: calls `sd:setActive` IPC handler ✅
+  - Prevent duplicate SD names (enforced by SQLite UNIQUE constraint) ✅
+  - Cannot remove last SD (button disabled) ✅
+- [x] ✅ **Implement user settings tab** (UserSettings.tsx)
+  - Username input field (persistence not yet implemented) 🟡
+  - Mention handle input field (persistence not yet implemented) 🟡
+- [x] ✅ **Implement appearance settings tab** (AppearanceSettings.tsx)
+  - Dark mode toggle (theme switching not yet implemented) 🟡
+- [x] ✅ Settings integrated into App component
+- [x] ✅ Settings button added to Folder Panel header
+
+**Pending Tasks:**
+
+**High Priority:**
+
+- [ ] 🟥 Add SD deletion IPC handler (`sd:delete`)
+- [ ] 🟥 Implement native file picker for SD path selection
+- [ ] 🟥 Persist user settings (username, handle) to app_state
+
+**Medium Priority:**
+
+- [ ] 🟥 Implement dark mode theme switching
+- [ ] 🟥 Keyboard shortcut (Cmd/Ctrl+,) to open settings
+- [ ] 🟥 Auto-detect common cloud storage paths (Google Drive, OneDrive, iCloud, Dropbox)
+
+**Low Priority:**
+
+- [ ] 🟥 Add Settings to application menu
+- [ ] 🟥 Write E2E tests for Settings dialog
+
+**Completed:**
+
+- [x] ✅ Write unit tests for Settings components (2025-10-27)
+  - 16 tests for Settings dialog and StorageDirectorySettings
+  - All Settings tests passing
+  - Fixed 15 pre-existing test failures in other components
+
+**Backend Already Complete:**
+
+- ✅ SD IPC handlers implemented (`sd:list`, `sd:create`, `sd:setActive`, `sd:getActive`)
+- ✅ SQLite `storage_dirs` table with UNIQUE constraints
+- ✅ TypeScript types in preload and electron.d.ts
+- ✅ Default SD creation on first run
+
+**Components Created:**
+
+- `src/renderer/src/components/Settings/SettingsDialog.tsx` - Main settings dialog with tabs
+- `src/renderer/src/components/Settings/StorageDirectorySettings.tsx` - SD management UI
+- `src/renderer/src/components/Settings/UserSettings.tsx` - User settings
+- `src/renderer/src/components/Settings/AppearanceSettings.tsx` - Appearance settings
+
+**Temporary Tools:**
+CLI tools in `/tools/` still available for advanced SD management:
+
+- `./tools/sd-list.js`
+- `./tools/sd-create.js`
+- `./tools/sd-activate.js`
+
+**Acceptance Criteria:**
+
+- ✅ Settings dialog opens (via button)
+- ✅ Can list SDs via UI
+- ✅ Can add SDs via UI
+- ✅ Can set active SD via UI
+- 🟡 Can remove SDs via UI (button exists, IPC handler pending)
+- 🟡 Settings persist across restarts (partial - SDs persist, user settings don't yet)
+- 🟥 Auto-detection finds cloud storage folders (pending)
+- 🟡 User can set username (UI exists, persistence pending)
+- ✅ Active SD clearly indicated
+
+**Test Coverage:**
+
+- 16 Settings tests (100% passing)
+  - 6 tests for SettingsDialog (tab navigation, reset behavior)
+  - 10 tests for StorageDirectorySettings (SD CRUD operations)
+- **Total test suite: 116/116 tests passing (100%)**
+  - Fixed all pre-existing test failures across codebase
+  - Fixed React hook import issues in EditorPanel, TipTapEditor, and Settings components
+  - Fixed component prop issues in NotesListPanel and App tests
+
+**Note:** Core SD management UI is functional. Remaining work is polish and additional features.
+
+---
+
+### 2.7 Tags Panel 🟥
 
 **Status:** To Do
+
+**Note:** Moved after Settings Window (was 2.6) to prioritize SD management UI.
 
 **Tasks:**
 
@@ -993,49 +1146,11 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 
 ---
 
-### 2.7 Settings Window 🟥
-
-**Status:** To Do
-
-**Tasks:**
-
-- [ ] 🟥 Implement settings window (separate Electron window)
-  - Modal dialog style
-  - Accessible via: Cmd/Ctrl+, or menu (Preferences/Settings)
-  - Gear icon in main UI
-- [ ] 🟥 Implement SD management UI
-  - List of configured SDs
-  - For each SD: name, path, enabled/disabled toggle
-  - Add SD: auto-detect common cloud storage paths (Google Drive, OneDrive, iCloud, Dropbox)
-  - File picker for custom path
-  - If SD doesn't exist: confirmation dialog, create if yes
-  - Remove SD: confirmation dialog
-  - Reorder SDs (affects display order in folder tree)
-  - Prevent duplicate SD names
-- [ ] 🟥 Implement default SD creation
-  - On first run: create default SD at `~/Documents/NoteCove`
-  - Or show welcome wizard
-- [ ] 🟥 Implement user settings
-  - Username (auto-detect system username as default, allow override)
-  - Mention handle (for @mentions)
-- [ ] 🟥 Implement appearance settings
-  - Dark mode toggle
-  - (Future: color customization)
-- [ ] 🟥 Store settings in Electron store (local, per-instance)
-
-**Acceptance Criteria:**
-
-- Settings window opens
-- Can add/remove/enable/disable/configure SDs
-- Settings persist across restarts
-- Auto-detection finds cloud storage folders
-- User can override username
-
----
-
 ### 2.8 Application Menu 🟥
 
 **Status:** To Do
+
+**Note:** Phase numbering maintained (was 2.8, still 2.8 after swap of 2.6/2.7)
 
 **Tasks:**
 
@@ -1082,6 +1197,8 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 
 **Status:** To Do
 
+**Note:** Phase numbering maintained (was 2.9, still 2.9 after swap of 2.6/2.7)
+
 **Tasks:**
 
 - [ ] 🟥 Implement global keyboard shortcuts
@@ -1116,6 +1233,8 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 ### 2.10 Window Management 🟥
 
 **Status:** To Do
+
+**Note:** Phase numbering maintained (was 2.10, still 2.10 after swap of 2.6/2.7)
 
 **Tasks:**
 
@@ -1292,6 +1411,7 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 ### Test Flakiness
 
 **Issue:** First test in folder-bugs.spec.ts is flaky (skipped for now)
+
 - Test: "Bug: Right-click rename renames wrong folder › should rename the clicked nested folder, not its parent"
 - Location: `packages/desktop/e2e/folder-bugs.spec.ts:80`
 - Status: Skipped with `test.skip()`
@@ -1300,4 +1420,3 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 - **TODO:** Investigate and fix this timing issue when time permits
 
 ---
-

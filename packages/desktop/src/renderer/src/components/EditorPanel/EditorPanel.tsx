@@ -4,7 +4,7 @@
  * Displays the TipTap note editor with formatting toolbar.
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Box } from '@mui/material';
 import { TipTapEditor } from './TipTapEditor';
 
@@ -13,8 +13,7 @@ interface EditorPanelProps {
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ selectedNoteId }) => {
-
-  const handleTitleChange = React.useCallback(
+  const handleTitleChange = useCallback(
     async (title: string) => {
       if (!selectedNoteId) {
         console.log('[EditorPanel] Skipping title update - no note selected');
@@ -35,7 +34,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ selectedNoteId }) => {
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Use key to force recreation of editor when switching notes */}
-      <TipTapEditor key={selectedNoteId} noteId={selectedNoteId} onTitleChange={handleTitleChange} />
+      <TipTapEditor
+        key={selectedNoteId}
+        noteId={selectedNoteId}
+        onTitleChange={(title: string) => void handleTitleChange(title)}
+      />
     </Box>
   );
 };

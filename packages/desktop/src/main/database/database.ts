@@ -6,6 +6,8 @@
  */
 
 import { randomUUID } from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import type {
   Database,
   DatabaseAdapter,
@@ -16,6 +18,7 @@ import type {
   AppState,
   SearchResult,
   SchemaVersionRecord,
+  StorageDirCache,
 } from '@notecove/shared';
 import { SCHEMA_SQL, SCHEMA_VERSION } from '@notecove/shared';
 import type { UUID } from '@notecove/shared';
@@ -55,6 +58,7 @@ export class SqliteDatabase implements Database {
   private async createSchema(): Promise<void> {
     // Create tables in order (respecting foreign keys)
     await this.adapter.exec(SCHEMA_SQL.version);
+    await this.adapter.exec(SCHEMA_SQL.storageDirs);
     await this.adapter.exec(SCHEMA_SQL.notes);
 
     // Create FTS5 table without external content for simplicity
@@ -540,6 +544,100 @@ export class SqliteDatabase implements Database {
       username: row.username,
       lastSeen: row.last_seen,
     }));
+  }
+
+  // ============================================================================
+  // Storage Directory Operations
+  // ============================================================================
+
+  async createStorageDir(id: string, name: string, sdPath: string): Promise<StorageDirCache> {
+    const created = Date.now();
+
+    // Check if this is the first SD - if so, make it active
+    const existing = await this.getAllStorageDirs();
+    const isActive = existing.length === 0;
+
+    // Create the directory on disk if it doesn't exist
+    if (!fs.existsSync(sdPath)) {
+      fs.mkdirSync(sdPath, { recursive: true });
+    }
+
+    // Create required subdirectories
+    const notesDir = path.join(sdPath, 'notes');
+    if (!fs.existsSync(notesDir)) {
+      fs.mkdirSync(notesDir, { recursive: true });
+    }
+
+    await this.adapter.exec(
+      'INSERT INTO storage_dirs (id, name, path, created, is_active) VALUES (?, ?, ?, ?, ?)',
+      [id, name, sdPath, created, isActive ? 1 : 0]
+    );
+
+    return { id, name, path: sdPath, created, isActive };
+  }
+
+  async getStorageDir(id: string): Promise<StorageDirCache | null> {
+    const row = await this.adapter.get<{
+      id: string;
+      name: string;
+      path: string;
+      created: number;
+      is_active: number;
+    }>('SELECT * FROM storage_dirs WHERE id = ?', [id]);
+
+    return row ? this.mapStorageDirRow(row) : null;
+  }
+
+  async getAllStorageDirs(): Promise<StorageDirCache[]> {
+    const rows = await this.adapter.all<{
+      id: string;
+      name: string;
+      path: string;
+      created: number;
+      is_active: number;
+    }>('SELECT * FROM storage_dirs ORDER BY created ASC');
+
+    return rows.map((row) => this.mapStorageDirRow(row));
+  }
+
+  async getActiveStorageDir(): Promise<StorageDirCache | null> {
+    const row = await this.adapter.get<{
+      id: string;
+      name: string;
+      path: string;
+      created: number;
+      is_active: number;
+    }>('SELECT * FROM storage_dirs WHERE is_active = 1 LIMIT 1');
+
+    return row ? this.mapStorageDirRow(row) : null;
+  }
+
+  async setActiveStorageDir(id: string): Promise<void> {
+    // First, deactivate all SDs
+    await this.adapter.exec('UPDATE storage_dirs SET is_active = 0');
+
+    // Then activate the specified SD
+    await this.adapter.exec('UPDATE storage_dirs SET is_active = 1 WHERE id = ?', [id]);
+  }
+
+  async deleteStorageDir(id: string): Promise<void> {
+    await this.adapter.exec('DELETE FROM storage_dirs WHERE id = ?', [id]);
+  }
+
+  private mapStorageDirRow(row: {
+    id: string;
+    name: string;
+    path: string;
+    created: number;
+    is_active: number;
+  }): StorageDirCache {
+    return {
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      created: row.created,
+      isActive: row.is_active === 1,
+    };
   }
 
   // ============================================================================

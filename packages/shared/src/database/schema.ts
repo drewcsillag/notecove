@@ -60,6 +60,17 @@ export interface User {
 }
 
 /**
+ * Storage Directory (SD) entry
+ */
+export interface StorageDirCache {
+  id: string;
+  name: string;
+  path: string;
+  created: number;
+  isActive: boolean; // Only one SD can be active at a time
+}
+
+/**
  * App state key-value pairs
  */
 export interface AppState {
@@ -222,6 +233,21 @@ export const SCHEMA_SQL = {
       username TEXT NOT NULL,
       last_seen INTEGER NOT NULL
     );
+  `,
+
+  /**
+   * Storage Directories table
+   */
+  storageDirs: `
+    CREATE TABLE IF NOT EXISTS storage_dirs (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      path TEXT NOT NULL UNIQUE,
+      created INTEGER NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_storage_dirs_is_active ON storage_dirs(is_active);
   `,
 
   /**

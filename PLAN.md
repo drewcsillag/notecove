@@ -82,6 +82,7 @@ This plan is organized into 5 phases. Each phase has been split into separate fi
 Project setup, monorepo structure, TypeScript configuration, shared CRDT logic, and file-based storage system.
 
 **Sub-phases:**
+
 - 1.1 Project Setup & Repository Structure ✅
 - 1.2 Shared Package (CRDT & Storage) ✅
 - 1.3 Database Schema & SQLite Integration ✅
@@ -95,6 +96,7 @@ Project setup, monorepo structure, TypeScript configuration, shared CRDT logic, 
 Desktop Electron application with basic UI, note editing, folder management, and multi-window sync.
 
 **Sub-phases:**
+
 - 2.1 Desktop App Basic Structure ✅
 - 2.2 Desktop Note Editing & CRDT Integration ✅
 - 2.3 Desktop Multi-Window Sync ✅
@@ -111,6 +113,7 @@ Desktop Electron application with basic UI, note editing, folder management, and
 iOS native application with basic UI, note editing via WKWebView, and folder management.
 
 **Sub-phases:**
+
 - 3.1 iOS Project Setup
 - 3.2 iOS File Storage & JavaScriptCore Bridge
 - 3.3 iOS Note Editing (WKWebView + TipTap)
@@ -126,6 +129,7 @@ iOS native application with basic UI, note editing via WKWebView, and folder man
 Advanced features for both platforms including tags, inter-note links, advanced search, and export functionality.
 
 **Sub-phases:**
+
 - 4.1 Tags Implementation
 - 4.2 Inter-Note Links
 - 4.3 Advanced Search (FTS5)
@@ -140,6 +144,7 @@ Advanced features for both platforms including tags, inter-note links, advanced 
 Documentation website, user guides, and final polish for both platforms.
 
 **Sub-phases:**
+
 - 5.1 Documentation Website
 - 5.2 User Documentation
 - 5.3 Developer Documentation
@@ -153,6 +158,7 @@ Documentation website, user guides, and final polish for both platforms.
 **Completed Phases:** 1 (Core Foundation)
 
 **In Progress:** Phase 2 (Desktop UI)
+
 - ✅ 2.1 Desktop App Basic Structure
 - ✅ 2.2 Desktop Note Editing & CRDT Integration
 - ✅ 2.3 Desktop Multi-Window Sync
@@ -184,12 +190,14 @@ Documentation website, user guides, and final polish for both platforms.
 ## Recent Updates
 
 **2025-10-26:**
+
 - Split PLAN.md into separate phase files for better manageability
 - Completed Phase 2.4.3: Folder Context Menus
 - Swapped Phase 2.5 (Notes List Panel) with 2.6 (Tags Panel) - implementing Notes List next
 - Fixed cross-instance sync bug (gap detection not returning affected notes)
 
 **2025-10-25:**
+
 - Completed Phase 2.3: Desktop Multi-Window Sync
 - Implemented activity logging and file watching for cross-instance sync
 - Enhanced E2E test coverage for multi-window and cross-instance scenarios

@@ -115,7 +115,22 @@ async function initializeDatabase(): Promise<Database> {
  */
 async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<void> {
   const DEFAULT_NOTE_ID = 'default-note';
-  const DEFAULT_SD_ID = 'default';
+
+  // Ensure default SD exists
+  let DEFAULT_SD_ID: string;
+  const existingSDs = await db.getAllStorageDirs();
+  if (existingSDs.length === 0) {
+    // Create default SD
+    const defaultPath = join(app.getPath('documents'), 'NoteCove');
+    DEFAULT_SD_ID = 'default';
+    await db.createStorageDir(DEFAULT_SD_ID, 'Default', defaultPath);
+    console.log('[Main] Created default SD at:', defaultPath);
+  } else {
+    // Use the active SD or the first one
+    const activeSD = await db.getActiveStorageDir();
+    DEFAULT_SD_ID = activeSD ? activeSD.id : (existingSDs[0]?.id ?? 'default');
+    console.log('[Main] Using existing SD:', DEFAULT_SD_ID);
+  }
 
   // Check if the default note exists
   const existingNotes = await db.getNotesBySd(DEFAULT_SD_ID);
@@ -186,7 +201,9 @@ async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<vo
       paragraph.insert(0, [text]);
       content.insert(0, [paragraph]);
     } else {
-      console.log('[ensureDefaultNote] CRDT already has content from sync directory, skipping welcome content');
+      console.log(
+        '[ensureDefaultNote] CRDT already has content from sync directory, skipping welcome content'
+      );
     }
   }
 
@@ -342,64 +359,74 @@ void app.whenReady().then(async () => {
     const activitySyncCallbacks: ActivitySyncCallbacks = {
       reloadNote: async (noteId: string) => {
         try {
+          if (!database) {
+            console.error('[ActivitySync] Database not initialized');
+            return;
+          }
+
           // Check if note exists in database cache
           const existingNote = await database.getNote(noteId);
 
           if (!existingNote) {
             // Note doesn't exist in our database - it was created in another instance
             try {
-            // Load note from CRDT files in sync directory
-            await crdtManager.loadNote(noteId);
-            const doc = crdtManager.getDocument(noteId);
+              // Load note from CRDT files in sync directory
+              await crdtManager.loadNote(noteId);
+              const doc = crdtManager.getDocument(noteId);
 
-            if (!doc) {
-              console.error(`[ActivitySync] Failed to load document for note ${noteId}`);
-              return;
-            }
-
-            // Extract metadata from CRDT
-            const fragment = doc.getXmlFragment('content');
-            const title = extractTitleFromDoc(doc, 'content');
-
-            // Extract text content for preview
-            let contentText = '';
-            for (let i = 0; i < fragment.length; i++) {
-              const node = fragment.get(i);
-              if (node instanceof Y.XmlElement) {
-                contentText += extractTextFromXmlElement(node) + ' ';
-              } else if (node instanceof Y.XmlText) {
-                contentText += node.toString() + ' ';
+              if (!doc) {
+                console.error(`[ActivitySync] Failed to load document for note ${noteId}`);
+                return;
               }
-            }
-            contentText = contentText.trim();
 
-            // Create database entry
-            // TODO: Extract actual sdId and folderId from note metadata when implemented
-            const sdId = 'default';
-            const folderId = null; // For now, default to root
+              // Extract metadata from CRDT
+              const fragment = doc.getXmlFragment('content');
+              const title = extractTitleFromDoc(doc, 'content');
 
-            await database.upsertNote({
-              id: noteId,
-              title,
-              sdId,
-              folderId,
-              created: Date.now(), // We don't have the original creation time, use now
-              modified: Date.now(),
-              deleted: false,
-              contentPreview: contentText.substring(0, 200), // First 200 chars
-              contentText,
-            });
+              // Extract text content for preview
+              let contentText = '';
+              for (let i = 0; i < fragment.length; i++) {
+                const node = fragment.get(i);
+                if (node instanceof Y.XmlElement) {
+                  contentText += extractTextFromXmlElement(node) + ' ';
+                } else if (node instanceof Y.XmlText) {
+                  contentText += node.toString() + ' ';
+                }
+              }
+              contentText = contentText.trim();
 
-            console.log(`[ActivitySync] Created database entry for note ${noteId} with title "${title}"`);
+              // Create database entry
+              // TODO: Extract actual sdId and folderId from note metadata when implemented
+              const sdId = 'default';
+              const folderId = null; // For now, default to root
 
-            // Unload the note since we just needed metadata
-            await crdtManager.unloadNote(noteId);
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+              if (database) {
+                await database.upsertNote({
+                  id: noteId,
+                  title,
+                  sdId,
+                  folderId,
+                  created: Date.now(), // We don't have the original creation time, use now
+                  modified: Date.now(),
+                  deleted: false,
+                  contentPreview: contentText.substring(0, 200), // First 200 chars
+                  contentText,
+                });
+              }
 
-            // Broadcast note creation to all windows so they update their lists
-            const windows = BrowserWindow.getAllWindows();
-            for (const window of windows) {
-              window.webContents.send('note:created', { sdId, noteId, folderId });
-            }
+              console.log(
+                `[ActivitySync] Created database entry for note ${noteId} with title "${title}"`
+              );
+
+              // Unload the note since we just needed metadata
+              await crdtManager.unloadNote(noteId);
+
+              // Broadcast note creation to all windows so they update their lists
+              const windows = BrowserWindow.getAllWindows();
+              for (const window of windows) {
+                window.webContents.send('note:created', { sdId, noteId, folderId });
+              }
             } catch (error) {
               console.error(`[ActivitySync] Failed to process new note ${noteId}:`, error);
             }
@@ -451,9 +478,9 @@ void app.whenReady().then(async () => {
       // Reload folder tree from disk
       const folderTree = crdtManager.getFolderTree('default');
       if (folderTree) {
-        // Load all updates from disk (this will merge with existing state)
+        // Load all updates from disk for 'default' SD (this will merge with existing state)
         updateManager
-          .readFolderUpdates()
+          .readFolderUpdates('default')
           .then((updates) => {
             for (const update of updates) {
               folderTree.applyUpdate(update);

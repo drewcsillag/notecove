@@ -34,7 +34,9 @@ export class CRDTManagerImpl implements CRDTManager {
     // Load all updates from disk
     try {
       const updates = await this.updateManager.readNoteUpdates(noteId);
-      console.log(`[CRDT Manager] Loading note ${noteId}, found ${updates.length} updates from disk`);
+      console.log(
+        `[CRDT Manager] Loading note ${noteId}, found ${updates.length} updates from disk`
+      );
 
       for (const update of updates) {
         console.log(`[CRDT Manager] Applying update of size ${update.length} bytes`);
@@ -48,6 +50,7 @@ export class CRDTManagerImpl implements CRDTManager {
     // Store document state
     this.documents.set(noteId, {
       doc,
+      noteDoc,
       noteId,
       refCount: 1,
       lastModified: Date.now(),
@@ -101,6 +104,10 @@ export class CRDTManagerImpl implements CRDTManager {
 
   getDocument(noteId: string): Y.Doc | undefined {
     return this.documents.get(noteId)?.doc;
+  }
+
+  getNoteDoc(noteId: string): NoteDoc | undefined {
+    return this.documents.get(noteId)?.noteDoc;
   }
 
   /**
@@ -218,7 +225,8 @@ export class CRDTManagerImpl implements CRDTManager {
    */
   private async loadFolderTreeUpdates(sdId: string, folderTree: FolderTreeDoc): Promise<void> {
     try {
-      const updates = await this.updateManager.readFolderUpdates();
+      // Read updates for this specific SD only
+      const updates = await this.updateManager.readFolderUpdates(sdId);
 
       // Apply all updates with 'load' origin to prevent triggering persistence
       for (const update of updates) {

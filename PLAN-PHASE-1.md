@@ -344,4 +344,3 @@ Logging system is implemented as platform-agnostic abstractions in shared packag
 - 🟡 "Show Logs" UI - Deferred to desktop package
 
 ---
-

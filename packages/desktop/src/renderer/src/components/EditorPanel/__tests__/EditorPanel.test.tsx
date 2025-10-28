@@ -10,8 +10,8 @@ import { EditorPanel } from '../EditorPanel';
 Object.defineProperty(window, 'electronAPI', {
   writable: true,
   value: {
-    appState: {
-      get: jest.fn().mockResolvedValue('test-note-id'),
+    note: {
+      updateTitle: jest.fn().mockResolvedValue(undefined),
     },
   },
 });
@@ -37,21 +37,22 @@ jest.mock('../TipTapEditor', () => ({
 
 describe('EditorPanel', () => {
   it('should render without crashing', async () => {
-    const { container } = render(<EditorPanel />);
+    const { container } = render(<EditorPanel selectedNoteId={null} />);
     await waitFor(() => {
       expect(container).toBeInTheDocument();
     });
   });
 
-  it('should render TipTapEditor component after loading', async () => {
-    const { getByTestId } = render(<EditorPanel />);
+  it('should render TipTapEditor component with null noteId', async () => {
+    const { getByTestId } = render(<EditorPanel selectedNoteId={null} />);
     await waitFor(() => {
       expect(getByTestId('tiptap-editor')).toBeInTheDocument();
+      expect(getByTestId('tiptap-editor')).toHaveTextContent('noteId: none');
     });
   });
 
-  it('should pass loaded noteId to TipTapEditor', async () => {
-    const { getByText } = render(<EditorPanel />);
+  it('should pass selectedNoteId prop to TipTapEditor', async () => {
+    const { getByText } = render(<EditorPanel selectedNoteId="test-note-id" />);
     await waitFor(() => {
       expect(getByText(/noteId: test-note-id/)).toBeInTheDocument();
     });
