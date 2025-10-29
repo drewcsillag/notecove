@@ -764,6 +764,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
               return (
                 <ListItemButton
+                  data-testid={`folder-tree-node-${node.id}`}
                   aria-label={String(node.text)}
                   sx={{
                     pl: depth * 2,

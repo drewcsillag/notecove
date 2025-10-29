@@ -46,7 +46,7 @@ test.describe('Folder Context Menu', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Select "All Notes" first to ensure we create a root-level folder
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500); // Give React time to update state
 
     // Use unique folder name
@@ -82,7 +82,7 @@ test.describe('Folder Context Menu', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Select "All Notes" first to ensure we create a root-level folder
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Find the Test Folder we created (or create one if not exists)
@@ -124,7 +124,7 @@ test.describe('Folder Context Menu', () => {
     await page.waitForTimeout(200);
 
     // Select "All Notes" first
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Create unique folder names to avoid conflicts
@@ -181,7 +181,7 @@ test.describe('Folder Context Menu', () => {
     await page.waitForTimeout(200);
 
     // Select "All Notes" first
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Create a folder to delete
@@ -222,7 +222,7 @@ test.describe('Folder Context Menu', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Select "All Notes" first
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Create unique folder names to avoid conflicts
@@ -304,14 +304,14 @@ test.describe('Folder Drag & Drop UI', () => {
     // The library prevents dragging special items via canDrag() callback
     // We verify this behavior in folder-bugs.spec.ts drag tests
 
-    // Get "All Notes" button
-    const allNotesButton = page.getByRole('button', { name: /^All Notes/ }).first();
+    // Get "All Notes" button using test ID
+    const allNotesButton = page.getByTestId('folder-tree-node-all-notes:default');
 
     // Verify it's visible but drag protection is handled by canDrag callback
     await expect(allNotesButton).toBeVisible();
 
-    // Get "Recently Deleted" button
-    const recentlyDeletedButton = page.getByRole('button', { name: /^Recently Deleted/ }).first();
+    // Get "Recently Deleted" button using test ID
+    const recentlyDeletedButton = page.getByTestId('folder-tree-node-recently-deleted:default');
 
     // Verify it's visible but drag protection is handled by canDrag callback
     await expect(recentlyDeletedButton).toBeVisible();
@@ -325,8 +325,8 @@ test.describe('Folder Drag & Drop UI', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Verify special items are present
-    await expect(page.locator('text=All Notes')).toBeVisible();
-    await expect(page.locator('text=Recently Deleted')).toBeVisible();
+    await expect(page.getByTestId('folder-tree-node-all-notes:default')).toBeVisible();
+    await expect(page.getByTestId('folder-tree-node-recently-deleted:default')).toBeVisible();
 
     // Verify folder panel is functional
     const folderPanelHeader = page.locator('text=Folders');

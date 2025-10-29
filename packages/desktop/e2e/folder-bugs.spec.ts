@@ -166,7 +166,7 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     await page.waitForTimeout(3000);
 
     // Force reload the tree by clicking "All Notes" to trigger fresh data load
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Expand Work folder to see Recipes (which should have moved there)
@@ -220,7 +220,7 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
 
     // Wait for folder:updated event and force tree refresh
     await page.waitForTimeout(2000);
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Expand Work to verify Ideas moved
@@ -238,7 +238,7 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
 
     // Wait for folder:updated event and force tree refresh
     await page.waitForTimeout(2000);
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Re-expand Work to see both Ideas and Recipes
@@ -257,7 +257,7 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
 
     // Wait for folder:updated event and force tree refresh
     await page.waitForTimeout(2000);
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Expand Personal to verify Ideas moved back
@@ -277,7 +277,7 @@ test.describe("Bug: Folders don't persist across app restarts", () => {
     await page.waitForTimeout(2000); // Wait for folder tree to fully load
 
     // Select "All Notes"
-    await page.locator('text=All Notes').click();
+    await page.getByTestId('folder-tree-node-all-notes:default').click();
     await page.waitForTimeout(500);
 
     // Create a new folder
@@ -396,7 +396,7 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       await page2.waitForSelector('text=Folders', { timeout: 10000 });
 
       // Create a folder in window 1
-      await page1.locator('text=All Notes').click();
+      await page1.getByTestId('folder-tree-node-all-notes:default').click();
       await page1.waitForTimeout(500);
 
       const plusButton = page1.locator('button[title="Create folder"]');
@@ -620,7 +620,7 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
     try {
       // TEST 1: Create a folder in instance 1
       console.log('[SYNC TEST] Creating folder in instance 1...');
-      await page1.locator('text=All Notes').click();
+      await page1.getByTestId('folder-tree-node-all-notes:default').click();
       await page1.waitForTimeout(500);
 
       const plusButton1 = page1.locator('button[title="Create folder"]');
