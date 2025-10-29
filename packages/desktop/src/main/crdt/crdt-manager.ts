@@ -15,7 +15,7 @@ import type { Database } from '@notecove/shared';
 export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
   private folderTrees = new Map<string, FolderTreeDoc>();
-  private activityLogger: import('@shared/storage').ActivityLogger | null = null;
+  private activityLoggers = new Map<string, import('@shared/storage').ActivityLogger>();
 
   constructor(
     private updateManager: UpdateManager,
@@ -136,14 +136,19 @@ export class CRDTManagerImpl implements CRDTManager {
 
     state.lastModified = Date.now();
 
-    // Record activity for cross-instance sync
-    if (this.activityLogger) {
+    // Record activity for cross-instance sync using the correct SD's activity logger
+    const activityLogger = this.activityLoggers.get(state.sdId);
+    if (activityLogger) {
       try {
-        await this.activityLogger.recordNoteActivity(noteId, state.refCount);
+        console.log(`[CRDT Manager] Recording activity for note ${noteId} in SD ${state.sdId}`);
+        await activityLogger.recordNoteActivity(noteId, state.refCount);
       } catch (error) {
         // Don't let activity logging errors break the update
         console.error(`[CRDT Manager] Failed to record activity for note ${noteId}:`, error);
       }
+    } else {
+      console.warn(`[CRDT Manager] No activity logger found for SD ${state.sdId} when updating note ${noteId}`);
+      console.warn(`[CRDT Manager] Available loggers:`, Array.from(this.activityLoggers.keys()));
     }
   }
 
@@ -183,12 +188,14 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
-   * Set the activity logger instance
+   * Set the activity logger for a specific SD
    *
-   * This is called by the main process after initialization.
+   * This is called by the main process after initialization of each SD.
    */
-  setActivityLogger(logger: import('@shared/storage').ActivityLogger): void {
-    this.activityLogger = logger;
+  setActivityLogger(sdId: string, logger: import('@shared/storage').ActivityLogger): void {
+    console.log(`[CRDT Manager] Registering activity logger for SD: ${sdId}`);
+    this.activityLoggers.set(sdId, logger);
+    console.log(`[CRDT Manager] Total activity loggers registered:`, this.activityLoggers.size);
   }
 
   /**

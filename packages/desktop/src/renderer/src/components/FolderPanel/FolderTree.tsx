@@ -270,14 +270,16 @@ export const FolderTree: FC<FolderTreeProps> = ({
           );
           setFoldersBySd(folderMap);
 
+          // Flatten all folders into single array for context menu operations
+          const allFolders = Array.from(folderMap.values()).flat();
+          setFolders(allFolders);
+
           // Build tree with SD sections
           const nodes = buildMultiSDTreeNodes(sdList, folderMap, activeSdId);
           setTreeData(nodes);
 
           // Set all folder IDs + SD IDs for initial expansion
-          const allFolderIds = Array.from(folderMap.values())
-            .flat()
-            .map((f) => f.id);
+          const allFolderIds = allFolders.map((f) => f.id);
           const allIds = [...sdList.map((s) => `sd:${s.id}`), ...allFolderIds];
           setAllFolderIds(allIds);
         } else {
@@ -590,9 +592,27 @@ export const FolderTree: FC<FolderTreeProps> = ({
     const nodeId = String(node.id);
     const nodeData = node.data as { isSD?: boolean; sdId?: string; isSpecial?: boolean };
 
-    // If clicking an SD header, don't select it as a folder
+    console.log('[FolderTree] handleSelect called:', {
+      nodeId,
+      isSD: nodeData.isSD,
+      sdId: nodeData.sdId,
+      isMultiSDMode,
+      hasOnActiveSdChange: !!onActiveSdChange,
+    });
+
+    // If clicking an SD header, update active SD
     if (nodeData.isSD) {
-      // Could expand/collapse the SD section, but we handle that with the chevron
+      console.log('[FolderTree] SD header clicked');
+      if (isMultiSDMode && onActiveSdChange && nodeData.sdId) {
+        console.log('[FolderTree] Calling onActiveSdChange with:', nodeData.sdId);
+        onActiveSdChange(nodeData.sdId);
+      } else {
+        console.log('[FolderTree] NOT calling onActiveSdChange -', {
+          isMultiSDMode,
+          hasCallback: !!onActiveSdChange,
+          hasSdId: !!nodeData.sdId,
+        });
+      }
       return;
     }
 

@@ -19,6 +19,12 @@ function App(): React.ReactElement {
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeSdId, setActiveSdId] = useState<string>('default');
+
+  // Debug: Log when activeSdId changes
+  useEffect(() => {
+    console.log('[App] activeSdId changed to:', activeSdId);
+  }, [activeSdId]);
 
   // Load saved panel sizes on mount
   useEffect(() => {
@@ -71,21 +77,29 @@ function App(): React.ReactElement {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <div data-testid="app-root" data-active-sd-id={activeSdId}>
       <ThreePanelLayout
         leftPanel={
           <FolderPanel
             onOpenSettings={() => {
               setSettingsOpen(true);
             }}
+            activeSdId={activeSdId}
+            onActiveSdChange={setActiveSdId}
           />
         }
         middlePanel={
-          <NotesListPanel selectedNoteId={selectedNoteId} onNoteSelect={setSelectedNoteId} />
+          <NotesListPanel
+            selectedNoteId={selectedNoteId}
+            onNoteSelect={setSelectedNoteId}
+            activeSdId={activeSdId}
+          />
         }
         rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
         onLayoutChange={handleLayoutChange}
         initialSizes={initialPanelSizes}
       />
+      </div>
       <SettingsDialog
         open={settingsOpen}
         onClose={() => {

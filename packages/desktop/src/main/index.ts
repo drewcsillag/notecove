@@ -32,6 +32,7 @@ const allWindows: BrowserWindow[] = [];
 const sdFileWatchers = new Map<string, NodeFileWatcher>();
 const sdActivityWatchers = new Map<string, NodeFileWatcher>();
 const sdActivitySyncs = new Map<string, ActivitySync>();
+const sdActivityLoggers = new Map<string, ActivityLogger>();
 
 
 function createWindow(): void {
@@ -230,6 +231,19 @@ async function setupSDWatchers(
 
   const folderUpdatesPath = join(sdPath, 'folders', 'updates');
   const activityDir = join(sdPath, '.activity');
+
+  // Create and initialize ActivityLogger for this SD
+  const activityLogger = new ActivityLogger(fsAdapter, activityDir);
+  activityLogger.setInstanceId(instanceId);
+  await activityLogger.initialize();
+
+  // Register the activity logger with CRDT Manager
+  // Type assertion needed due to TypeScript module resolution quirk between dist and src
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  crdtManager.setActivityLogger(sdId, activityLogger as any);
+
+  // Store logger for periodic compaction
+  sdActivityLoggers.set(sdId, activityLogger);
 
   // Create ActivitySync for this SD
   const activitySyncCallbacks: ActivitySyncCallbacks = {
@@ -508,46 +522,48 @@ void app.whenReady().then(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     const crdtManager = new CRDTManagerImpl(updateManager as any, database);
 
-    // Initialize activity logger for note sync
-    const activityDir = join(storageDir, '.activity');
-    await fsAdapter.mkdir(activityDir);
-
-    const activityLogger = new ActivityLogger(fsAdapter, activityDir);
-    activityLogger.setInstanceId(instanceId);
-    await activityLogger.initialize();
-
-    // Set activity logger on CRDT manager
-    // Type assertion needed due to TypeScript module resolution quirk between dist and src
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    crdtManager.setActivityLogger(activityLogger as any);
-
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
     crdtManager.loadFolderTree('default');
 
     // Handler for when new SD is created (for IPC)
     const handleNewStorageDir = async (sdId: string, sdPath: string): Promise<void> => {
-      console.log(`[Init] Initializing new SD: ${sdId} at ${sdPath}`);
+      try {
+        console.log(`[Init] ===== Initializing new SD: ${sdId} at ${sdPath} =====`);
 
-      // 1. Create SD config and initialize structure
-      const sdConfig = { id: sdId, path: sdPath, label: '' };
-      const newSdStructure = new SyncDirectoryStructure(fsAdapter, sdConfig);
-      await newSdStructure.initialize();
+        // 1. Create SD config and initialize structure
+        console.log(`[Init] Step 1: Creating SD structure`);
+        const sdConfig = { id: sdId, path: sdPath, label: '' };
+        const newSdStructure = new SyncDirectoryStructure(fsAdapter, sdConfig);
+        await newSdStructure.initialize();
+        console.log(`[Init] Step 1: SD structure created successfully`);
 
-      // 2. Ensure activity directory exists (required for watchers)
-      const activityDir = join(sdPath, '.activity');
-      await fsAdapter.mkdir(activityDir);
+        // 2. Ensure activity directory exists (required for watchers)
+        const activityDir = join(sdPath, '.activity');
+        console.log(`[Init] Step 2: Creating activity directory at ${activityDir}`);
+        await fsAdapter.mkdir(activityDir);
+        console.log(`[Init] Step 2: Activity directory created successfully`);
 
-      // 3. Register with UpdateManager
-      updateManager.registerSD(sdId, sdPath);
+        // 3. Register with UpdateManager
+        console.log(`[Init] Step 3: Registering with UpdateManager`);
+        updateManager.registerSD(sdId, sdPath);
+        console.log(`[Init] Step 3: Registered with UpdateManager`);
 
-      // 4. Load folder tree for this SD
-      crdtManager.loadFolderTree(sdId);
+        // 4. Load folder tree for this SD
+        console.log(`[Init] Step 4: Loading folder tree`);
+        crdtManager.loadFolderTree(sdId);
+        console.log(`[Init] Step 4: Folder tree loaded`);
 
-      // 5. Set up watchers for this SD
-      await setupSDWatchers(sdId, sdPath, fsAdapter, instanceId, updateManager, crdtManager);
+        // 5. Set up watchers for this SD
+        console.log(`[Init] Step 5: Setting up watchers`);
+        await setupSDWatchers(sdId, sdPath, fsAdapter, instanceId, updateManager, crdtManager);
+        console.log(`[Init] Step 5: Watchers set up successfully`);
 
-      console.log(`[Init] Successfully initialized new SD: ${sdId}`);
+        console.log(`[Init] ===== Successfully initialized new SD: ${sdId} =====`);
+      } catch (error) {
+        console.error(`[Init] ERROR initializing new SD ${sdId}:`, error);
+        throw error;
+      }
     };
 
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)
@@ -566,12 +582,14 @@ void app.whenReady().then(async () => {
       }
     }
 
-    // Periodic compaction of activity log (every 5 minutes)
+    // Periodic compaction of activity logs for all SDs (every 5 minutes)
     compactionInterval = setInterval(
       () => {
-        activityLogger.compact().catch((err) => {
-          console.error('[ActivityLogger] Failed to compact log:', err);
-        });
+        for (const [sdId, logger] of sdActivityLoggers) {
+          logger.compact().catch((err) => {
+            console.error(`[ActivityLogger] Failed to compact log for SD ${sdId}:`, err);
+          });
+        }
       },
       5 * 60 * 1000
     );

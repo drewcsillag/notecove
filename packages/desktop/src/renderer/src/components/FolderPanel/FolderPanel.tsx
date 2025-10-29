@@ -22,9 +22,15 @@ import { FolderTree } from './FolderTree';
 
 export interface FolderPanelProps {
   onOpenSettings?: () => void;
+  activeSdId?: string;
+  onActiveSdChange?: (sdId: string) => void;
 }
 
-export const FolderPanel: React.FC<FolderPanelProps> = ({ onOpenSettings }) => {
+export const FolderPanel: React.FC<FolderPanelProps> = ({
+  onOpenSettings,
+  activeSdId,
+  onActiveSdChange,
+}) => {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -32,7 +38,6 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({ onOpenSettings }) => {
   const [createError, setCreateError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stateLoaded, setStateLoaded] = useState(false);
-  const [activeSdId, setActiveSdId] = useState<string | undefined>();
 
   // Load persisted state on mount
   useEffect(() => {
@@ -45,6 +50,24 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({ onOpenSettings }) => {
       console.log('[FolderPanel] Received folder:updated event:', data);
       // Refresh the folder tree
       setRefreshTrigger((prev) => prev + 1);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Listen for SD updates (create, setActive)
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.sd.onUpdated((data) => {
+      console.log('[FolderPanel] Received sd:updated event:', data);
+      // Refresh the folder tree to show new SD or active SD change
+      setRefreshTrigger((prev) => prev + 1);
+
+      // If SD was set active, update local state
+      if (data.operation === 'setActive') {
+        setActiveSdId(data.sdId);
+      }
     });
 
     return () => {
@@ -114,8 +137,8 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({ onOpenSettings }) => {
 
   const handleActiveSdChange = async (sdId: string): Promise<void> => {
     try {
-      // Update local state
-      setActiveSdId(sdId);
+      // Update parent state
+      onActiveSdChange?.(sdId);
 
       // Set as active in backend
       await window.electronAPI.sd.setActive(sdId);
@@ -239,7 +262,7 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({ onOpenSettings }) => {
             onRefresh={() => {
               setRefreshTrigger((prev) => prev + 1);
             }}
-            {...(activeSdId && { activeSdId })}
+            activeSdId={activeSdId}
             onActiveSdChange={(sdId) => void handleActiveSdChange(sdId)}
           />
         ) : (

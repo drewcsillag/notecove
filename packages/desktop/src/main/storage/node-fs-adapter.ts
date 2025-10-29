@@ -29,8 +29,17 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
 
   async writeFile(path: string, data: Uint8Array): Promise<void> {
     // Ensure parent directory exists
+    // Using recursive:true makes this safe for concurrent calls
     const dir = dirname(path);
-    await this.mkdir(dir);
+    try {
+      await fs.mkdir(dir, { recursive: true });
+    } catch (error) {
+      // Ignore EEXIST errors (directory already exists)
+      // This can happen when multiple processes create simultaneously
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw error;
+      }
+    }
 
     // Atomic write: write to temp file, then rename
     const tempPath = `${path}.tmp`;

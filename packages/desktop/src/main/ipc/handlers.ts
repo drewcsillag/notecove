@@ -528,7 +528,28 @@ export class IPCHandlers {
     name: string,
     path: string
   ): Promise<string> {
-    const id = crypto.randomUUID();
+    // Check if SD already has an ID file (for cross-instance consistency)
+    const { promises: fs } = await import('fs');
+    const { join } = await import('path');
+    const idFilePath = join(path, '.sd-id');
+
+    let id: string;
+    try {
+      const idContent = await fs.readFile(idFilePath, 'utf-8');
+      id = idContent.trim();
+      console.log(`[SD] Found existing SD ID in ${path}: ${id}`);
+    } catch {
+      // File doesn't exist, create new ID
+      id = crypto.randomUUID();
+      try {
+        await fs.writeFile(idFilePath, id, 'utf-8');
+        console.log(`[SD] Created new SD ID file in ${path}: ${id}`);
+      } catch (error) {
+        console.error(`[SD] Failed to write SD ID file:`, error);
+        // Continue anyway, we'll use the generated ID
+      }
+    }
+
     await this.database.createStorageDir(id, name, path);
 
     // Initialize the new SD (register with UpdateManager, set up watchers, etc.)

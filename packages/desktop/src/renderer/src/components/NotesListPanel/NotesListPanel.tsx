@@ -34,9 +34,14 @@ interface Note {
 interface NotesListPanelProps {
   selectedNoteId: string | null;
   onNoteSelect: (noteId: string) => void;
+  activeSdId?: string;
 }
 
-export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, onNoteSelect }) => {
+export const NotesListPanel: React.FC<NotesListPanelProps> = ({
+  selectedNoteId,
+  onNoteSelect,
+  activeSdId,
+}) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,13 +68,14 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
 
     try {
       let notesList: Note[];
+      const sdId = activeSdId ?? DEFAULT_SD_ID;
 
       if (folderId === 'all-notes' || folderId === null) {
         // Fetch all notes for the SD
-        notesList = await window.electronAPI.note.list(DEFAULT_SD_ID);
+        notesList = await window.electronAPI.note.list(sdId);
       } else {
         // Fetch notes for specific folder
-        notesList = await window.electronAPI.note.list(DEFAULT_SD_ID, folderId);
+        notesList = await window.electronAPI.note.list(sdId, folderId);
       }
 
       // Sort by modified date (newest first)
@@ -83,7 +89,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeSdId]);
 
   // Handle note selection - delegate to parent
   const handleNoteSelect = useCallback(
@@ -102,8 +108,13 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
       // Determine folder for new note
       const folderId = selectedFolderId === 'all-notes' ? null : selectedFolderId;
 
-      // Create note via IPC
-      const noteId = await window.electronAPI.note.create(DEFAULT_SD_ID, folderId ?? '', '');
+      // Create note via IPC - use the currently active SD
+      console.log('[NotesListPanel] Creating note with activeSdId:', activeSdId);
+      const noteId = await window.electronAPI.note.create(
+        activeSdId ?? DEFAULT_SD_ID,
+        folderId ?? '',
+        ''
+      );
 
       // Select the newly created note
       handleNoteSelect(noteId);
@@ -118,12 +129,17 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
     } finally {
       setCreating(false);
     }
-  }, [creating, selectedFolderId, handleNoteSelect, fetchNotes]);
+  }, [creating, selectedFolderId, handleNoteSelect, fetchNotes, activeSdId]);
 
   // Load selected folder on mount
   useEffect(() => {
     void loadSelectedFolder();
   }, [loadSelectedFolder]);
+
+  // Reset to "all-notes" when active SD changes
+  useEffect(() => {
+    setSelectedFolderId('all-notes');
+  }, [activeSdId]);
 
   // Fetch notes when selected folder changes
   useEffect(() => {
@@ -258,7 +274,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({ selectedNoteId, 
             </Typography>
           </Box>
         ) : (
-          <List disablePadding>
+          <List disablePadding data-testid="notes-list">
             {notes.map((note) => (
               <ListItem key={note.id} disablePadding>
                 <ListItemButton

@@ -73,8 +73,8 @@ export class ActivitySync {
             for (const noteId of reloadedNotes) {
               affectedNotes.add(noteId);
             }
-            this.updateWatermark(instanceId, lines);
-            continue;
+            // Don't continue - still process new entries below
+            // We need to process the current activity log to discover new notes
           }
 
           // Process new entries (those with timestamp > lastSeen)
