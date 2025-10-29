@@ -147,7 +147,9 @@ export class CRDTManagerImpl implements CRDTManager {
         console.error(`[CRDT Manager] Failed to record activity for note ${noteId}:`, error);
       }
     } else {
-      console.warn(`[CRDT Manager] No activity logger found for SD ${state.sdId} when updating note ${noteId}`);
+      console.warn(
+        `[CRDT Manager] No activity logger found for SD ${state.sdId} when updating note ${noteId}`
+      );
       console.warn(`[CRDT Manager] Available loggers:`, Array.from(this.activityLoggers.keys()));
     }
   }

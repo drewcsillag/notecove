@@ -24,6 +24,7 @@ export class NoteDoc {
       this.metadata.set('id', meta.id);
       this.metadata.set('created', meta.created);
       this.metadata.set('modified', meta.modified);
+      this.metadata.set('sdId', meta.sdId);
       this.metadata.set('folderId', meta.folderId);
       this.metadata.set('deleted', meta.deleted);
     });
@@ -37,6 +38,7 @@ export class NoteDoc {
       id: this.metadata.get('id') as UUID,
       created: this.metadata.get('created') as number,
       modified: this.metadata.get('modified') as number,
+      sdId: this.metadata.get('sdId') as UUID,
       folderId: (this.metadata.get('folderId') as UUID | null) ?? null,
       deleted: this.metadata.get('deleted') as boolean,
     };
@@ -49,6 +51,9 @@ export class NoteDoc {
     this.doc.transact(() => {
       if (updates.modified !== undefined) {
         this.metadata.set('modified', updates.modified);
+      }
+      if (updates.sdId !== undefined) {
+        this.metadata.set('sdId', updates.sdId);
       }
       if (updates.folderId !== undefined) {
         this.metadata.set('folderId', updates.folderId);

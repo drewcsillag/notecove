@@ -21,19 +21,22 @@ describe('UpdateManager - Multi-SD Support', () => {
       readFile: async (path: string) => {
         const data = files.get(path);
         if (!data) throw new Error(`File not found: ${path}`);
-        return data;
+        return await Promise.resolve(data);
       },
       writeFile: async (path: string, data: Uint8Array) => {
         files.set(path, data);
+        await Promise.resolve();
       },
       deleteFile: async (path: string) => {
         files.delete(path);
+        await Promise.resolve();
       },
       exists: async (path: string) => {
-        return files.has(path) || dirs.has(path);
+        return await Promise.resolve(files.has(path) || dirs.has(path));
       },
       mkdir: async (path: string) => {
         dirs.add(path);
+        await Promise.resolve();
       },
       listFiles: async (path: string) => {
         const results: string[] = [];
@@ -46,7 +49,7 @@ describe('UpdateManager - Multi-SD Support', () => {
             }
           }
         }
-        return results;
+        return await Promise.resolve(results);
       },
       joinPath: (...parts: string[]) => parts.join('/'),
     };
@@ -186,9 +189,9 @@ describe('UpdateManager - Multi-SD Support', () => {
     });
 
     it('should throw error for unregistered SD', async () => {
-      await expect(
-        updateManager.readNoteUpdates('unregistered', 'note-1')
-      ).rejects.toThrow('Storage Directory not registered: unregistered');
+      await expect(updateManager.readNoteUpdates('unregistered', 'note-1')).rejects.toThrow(
+        'Storage Directory not registered: unregistered'
+      );
     });
   });
 

@@ -34,7 +34,6 @@ const sdActivityWatchers = new Map<string, NodeFileWatcher>();
 const sdActivitySyncs = new Map<string, ActivitySync>();
 const sdActivityLoggers = new Map<string, ActivityLogger>();
 
-
 function createWindow(): void {
   // Create the browser window
   mainWindow = new BrowserWindow({
@@ -239,7 +238,7 @@ async function setupSDWatchers(
 
   // Register the activity logger with CRDT Manager
   // Type assertion needed due to TypeScript module resolution quirk between dist and src
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call
   crdtManager.setActivityLogger(sdId, activityLogger as any);
 
   // Store logger for periodic compaction
@@ -288,8 +287,36 @@ async function setupSDWatchers(
             window.webContents.send('note:created', { sdId: sdIdFromSync, noteId, folderId });
           }
         } else {
-          // Note exists, just reload if currently loaded
+          // Note exists, reload and update metadata
           await crdtManager.reloadNote(noteId);
+
+          // Extract updated title and metadata from the reloaded document
+          const noteDoc = crdtManager.getNoteDoc(noteId);
+          const doc = crdtManager.getDocument(noteId);
+          if (doc) {
+            const crdtMetadata = noteDoc?.getMetadata();
+            const newTitle = extractTitleFromDoc(doc, 'content');
+
+            await database.upsertNote({
+              id: noteId,
+              title: newTitle,
+              sdId: existingNote.sdId,
+              folderId: crdtMetadata?.folderId ?? existingNote.folderId,
+              created: existingNote.created,
+              modified: crdtMetadata?.modified ?? Date.now(),
+              deleted: crdtMetadata?.deleted ?? false,
+              contentPreview: existingNote.contentPreview,
+              contentText: existingNote.contentText,
+            });
+
+            // Broadcast title update to all windows
+            for (const window of BrowserWindow.getAllWindows()) {
+              window.webContents.send('note:title-updated', {
+                noteId,
+                title: newTitle,
+              });
+            }
+          }
         }
       } catch (error) {
         console.error(`[ActivitySync] Error in reloadNote callback:`, error);
@@ -377,10 +404,12 @@ async function setupSDWatchers(
 
         // Broadcast updates to all windows for affected notes
         if (affectedNotes.size > 0) {
+          const noteIds = Array.from(affectedNotes);
           for (const window of BrowserWindow.getAllWindows()) {
-            for (const noteId of affectedNotes) {
-              window.webContents.send('note:externalUpdate', { noteId });
-            }
+            window.webContents.send('note:external-update', {
+              operation: 'sync',
+              noteIds,
+            });
           }
         }
       } catch (error) {
@@ -390,6 +419,29 @@ async function setupSDWatchers(
   });
 
   sdActivityWatchers.set(sdId, activityWatcher);
+
+  // Perform initial sync from other instances on startup
+  console.log(`[Init] Performing initial sync from other instances for SD: ${sdId}`);
+  try {
+    const affectedNotes = await activitySync.syncFromOtherInstances();
+    console.log(
+      `[Init] Initial sync complete for SD: ${sdId}, affected notes:`,
+      affectedNotes.size
+    );
+
+    // Broadcast updates to all windows for affected notes
+    if (affectedNotes.size > 0) {
+      const noteIds = Array.from(affectedNotes);
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('note:external-update', {
+          operation: 'sync',
+          noteIds,
+        });
+      }
+    }
+  } catch (error) {
+    console.error(`[Init] Failed to perform initial sync for SD: ${sdId}:`, error);
+  }
 
   console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
 }
@@ -508,7 +560,7 @@ void app.whenReady().then(async () => {
     updateManager.registerSD('default', storageDir);
 
     // Load all Storage Directories from database and register them
-    const allSDs = database ? await database.getAllStorageDirs() : [];
+    const allSDs = await database.getAllStorageDirs();
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
         // Default is already registered above
@@ -559,6 +611,59 @@ void app.whenReady().then(async () => {
         await setupSDWatchers(sdId, sdPath, fsAdapter, instanceId, updateManager, crdtManager);
         console.log(`[Init] Step 5: Watchers set up successfully`);
 
+        // 6. Scan for existing notes on disk and load them into database
+        console.log(`[Init] Step 6: Scanning for existing notes`);
+        try {
+          const notesDir = join(sdPath, 'notes');
+          const noteDirectories = await fsAdapter.listFiles(notesDir);
+          let loadedCount = 0;
+
+          for (const noteId of noteDirectories) {
+            // Skip special files (like .DS_Store)
+            if (noteId.startsWith('.') || !noteId || noteId === 'undefined') {
+              continue;
+            }
+
+            // Check if note is already in database
+            const existingNote = await database?.getNote(noteId);
+            if (existingNote) continue;
+
+            try {
+              // Load note from disk
+              await crdtManager.loadNote(noteId, sdId);
+
+              // Extract metadata and insert into database
+              const noteDoc = crdtManager.getNoteDoc(noteId);
+              const doc = crdtManager.getDocument(noteId);
+              if (doc) {
+                const crdtMetadata = noteDoc?.getMetadata();
+                const folderId = crdtMetadata?.folderId ?? null;
+                const title = extractTitleFromDoc(doc, 'content');
+
+                await database?.upsertNote({
+                  id: noteId,
+                  title,
+                  sdId,
+                  folderId,
+                  created: crdtMetadata?.created ?? Date.now(),
+                  modified: crdtMetadata?.modified ?? Date.now(),
+                  deleted: crdtMetadata?.deleted ?? false,
+                  contentPreview: '',
+                  contentText: '',
+                });
+
+                loadedCount++;
+              }
+            } catch (error) {
+              console.error(`[Init] Failed to load note ${noteId}:`, error);
+            }
+          }
+
+          console.log(`[Init] Step 6: Loaded ${loadedCount} existing notes from disk`);
+        } catch (error) {
+          console.error(`[Init] Failed to scan for existing notes:`, error);
+        }
+
         console.log(`[Init] ===== Successfully initialized new SD: ${sdId} =====`);
       } catch (error) {
         console.error(`[Init] ERROR initializing new SD ${sdId}:`, error);
@@ -575,10 +680,20 @@ void app.whenReady().then(async () => {
     // Set up watchers for default SD
     await setupSDWatchers('default', storageDir, fsAdapter, instanceId, updateManager, crdtManager);
 
-    // Set up watchers for all other registered SDs
+    // Set up watchers for all other registered SDs (only if fully initialized)
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
-        await setupSDWatchers(sd.id, sd.path, fsAdapter, instanceId, updateManager, crdtManager);
+        // Check if SD is fully initialized by checking for required subdirectories
+        const folderUpdatesPath = join(sd.path, 'folders', 'updates');
+        const isInitialized = await fsAdapter.exists(folderUpdatesPath);
+        if (isInitialized) {
+          console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
+          await setupSDWatchers(sd.id, sd.path, fsAdapter, instanceId, updateManager, crdtManager);
+        } else {
+          console.log(
+            `[Init] Skipping watchers for SD: ${sd.id} (not fully initialized: ${sd.path})`
+          );
+        }
       }
     }
 

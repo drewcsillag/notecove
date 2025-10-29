@@ -43,7 +43,9 @@ describe('StorageDirectoryRegistry', () => {
     });
 
     it('should handle unregistering non-existent SD', () => {
-      expect(() => registry.unregister('non-existent')).not.toThrow();
+      expect(() => {
+        registry.unregister('non-existent');
+      }).not.toThrow();
       expect(registry.size).toBe(0);
     });
   });

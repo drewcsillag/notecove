@@ -65,8 +65,8 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
       setRefreshTrigger((prev) => prev + 1);
 
       // If SD was set active, update local state
-      if (data.operation === 'setActive') {
-        setActiveSdId(data.sdId);
+      if (data.operation === 'setActive' && onActiveSdChange) {
+        onActiveSdChange(data.sdId);
       }
     });
 
@@ -78,9 +78,9 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
   const loadState = async (): Promise<void> => {
     try {
       // Load active SD
-      const activeSdId = await window.electronAPI.sd.getActive();
-      if (activeSdId) {
-        setActiveSdId(activeSdId);
+      const loadedActiveSdId = await window.electronAPI.sd.getActive();
+      if (loadedActiveSdId && onActiveSdChange) {
+        onActiveSdChange(loadedActiveSdId);
       }
 
       // Load selected folder
@@ -89,8 +89,8 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
         setSelectedFolderId(selectedState);
       } else {
         // Default to "All Notes" for the active SD
-        if (activeSdId) {
-          setSelectedFolderId(`all-notes:${activeSdId}`);
+        if (loadedActiveSdId) {
+          setSelectedFolderId(`all-notes:${loadedActiveSdId}`);
         }
       }
 
@@ -262,8 +262,10 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
             onRefresh={() => {
               setRefreshTrigger((prev) => prev + 1);
             }}
-            activeSdId={activeSdId}
-            onActiveSdChange={(sdId) => void handleActiveSdChange(sdId)}
+            {...(activeSdId && { activeSdId })}
+            onActiveSdChange={(sdId) => {
+              void handleActiveSdChange(sdId);
+            }}
           />
         ) : (
           <Box sx={{ p: 2, textAlign: 'center' }}>

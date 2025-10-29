@@ -24,6 +24,7 @@ const mockFolderDelete = jest.fn();
 const mockSdGetActive = jest.fn();
 const mockSdList = jest.fn();
 const mockSdSetActive = jest.fn();
+const mockSdOnUpdated = jest.fn();
 
 global.window.electronAPI = {
   appState: {
@@ -43,6 +44,7 @@ global.window.electronAPI = {
     getActive: mockSdGetActive,
     list: mockSdList,
     setActive: mockSdSetActive,
+    onUpdated: mockSdOnUpdated,
   },
 } as unknown as typeof window.electronAPI;
 
@@ -51,6 +53,9 @@ describe('FolderPanel', () => {
     jest.clearAllMocks();
     // Make onUpdated return an unsubscribe function
     mockFolderOnUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockSdOnUpdated.mockReturnValue(() => {
       /* unsubscribe */
     });
     // Mock sd.getActive to return a default SD ID

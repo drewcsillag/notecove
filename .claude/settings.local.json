@@ -70,7 +70,8 @@
       "Bash(git commit:*)",
       "Bash(pnpm --filter @notecove/desktop lint:*)",
       "Bash(awk:*)",
-      "Bash(pnpm --filter @notecove/desktop format:check:*)"
+      "Bash(pnpm --filter @notecove/desktop format:check:*)",
+      "Bash(npx prettier:*)"
     ],
     "deny": [],
     "ask": []

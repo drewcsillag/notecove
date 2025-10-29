@@ -106,11 +106,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
     onTitleUpdated: (callback: (data: { noteId: string; title: string }) => void): (() => void) => {
-      ipcRenderer.on('note:titleUpdated', (_event, data: { noteId: string; title: string }) => {
+      ipcRenderer.on('note:title-updated', (_event, data: { noteId: string; title: string }) => {
         callback(data);
       });
       return () => {
-        ipcRenderer.removeAllListeners('note:titleUpdated');
+        ipcRenderer.removeAllListeners('note:title-updated');
+      };
+    },
+    onMoved: (
+      callback: (data: { noteId: string; oldFolderId: string | null; newFolderId: string }) => void
+    ): (() => void) => {
+      ipcRenderer.on(
+        'note:moved',
+        (_event, data: { noteId: string; oldFolderId: string | null; newFolderId: string }) => {
+          callback(data);
+        }
+      );
+      return () => {
+        ipcRenderer.removeAllListeners('note:moved');
       };
     },
   },
@@ -209,6 +222,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('sd:setActive', sdId) as Promise<void>,
     getActive: (): Promise<string | null> =>
       ipcRenderer.invoke('sd:getActive') as Promise<string | null>,
+
+    // Event listeners
+    onUpdated: (callback: (data: { operation: string; sdId: string }) => void): (() => void) => {
+      ipcRenderer.on('sd:updated', (_event, data: { operation: string; sdId: string }) => {
+        callback(data);
+      });
+      return () => {
+        ipcRenderer.removeAllListeners('sd:updated');
+      };
+    },
   },
 
   // Sync operations

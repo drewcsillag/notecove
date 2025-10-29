@@ -62,34 +62,38 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   // Note: selectedNoteId is now window-local state, not persisted globally
 
   // Fetch notes for the selected folder
-  const fetchNotes = useCallback(async (folderId: string | null) => {
-    setLoading(true);
-    setError(null);
+  const fetchNotes = useCallback(
+    async (folderId: string | null) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      let notesList: Note[];
-      const sdId = activeSdId ?? DEFAULT_SD_ID;
+      try {
+        let notesList: Note[];
+        const sdId = activeSdId ?? DEFAULT_SD_ID;
 
-      if (folderId === 'all-notes' || folderId === null) {
-        // Fetch all notes for the SD
-        notesList = await window.electronAPI.note.list(sdId);
-      } else {
-        // Fetch notes for specific folder
-        notesList = await window.electronAPI.note.list(sdId, folderId);
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        if (folderId === 'all-notes' || folderId?.startsWith('all-notes:') || folderId === null) {
+          // Fetch all notes for the SD
+          notesList = await window.electronAPI.note.list(sdId);
+        } else {
+          // Fetch notes for specific folder
+          notesList = await window.electronAPI.note.list(sdId, folderId);
+        }
+
+        // Sort by modified date (newest first)
+        notesList.sort((a, b) => b.modified - a.modified);
+
+        setNotes(notesList);
+      } catch (err) {
+        console.error('Failed to fetch notes:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load notes');
+        setNotes([]);
+      } finally {
+        setLoading(false);
       }
-
-      // Sort by modified date (newest first)
-      notesList.sort((a, b) => b.modified - a.modified);
-
-      setNotes(notesList);
-    } catch (err) {
-      console.error('Failed to fetch notes:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load notes');
-      setNotes([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeSdId]);
+    },
+    [activeSdId]
+  );
 
   // Handle note selection - delegate to parent
   const handleNoteSelect = useCallback(
@@ -141,12 +145,13 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     setSelectedFolderId('all-notes');
   }, [activeSdId]);
 
-  // Fetch notes when selected folder changes
+  // Fetch notes when selected folder or active SD changes
   useEffect(() => {
     if (selectedFolderId !== null) {
       void fetchNotes(selectedFolderId);
     }
-  }, [selectedFolderId, fetchNotes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFolderId, activeSdId]);
 
   // Poll for selected folder changes (since we don't have cross-component events yet)
   useEffect(() => {

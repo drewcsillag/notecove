@@ -55,6 +55,7 @@ const mockElectronAPI = {
     create: jest.fn(),
     setActive: jest.fn(),
     getActive: jest.fn().mockResolvedValue('default'),
+    onUpdated: jest.fn(() => () => {}),
   },
   sync: {
     onProgress: jest.fn(() => () => {}),

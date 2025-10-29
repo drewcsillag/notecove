@@ -373,4 +373,601 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     // UI refresh timing may vary, so we rely on the backend sync verification from logs.
     console.log('[Test] ✅ Folder synced to instance 2 (verified via CRDT logs)!');
   }, 180000);
+
+  test('Bug 4: Note title should sync in default SD between instances', async () => {
+    console.log('[Test] Testing note title sync in default SD...');
+
+    // In instance 1, create a note in the default SD
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    // Type a title
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('My Test Note Title');
+    await window1.waitForTimeout(2000);
+
+    // Wait for sync
+    await window2.waitForTimeout(3000);
+
+    // In instance 2, check if the note appears in the notes list with the title
+    const notesList2 = window2.locator('[data-testid="notes-list"] > li');
+    const noteCount = await notesList2.count();
+
+    console.log('[Test] Note count in instance 2:', noteCount);
+    expect(noteCount).toBeGreaterThan(0);
+
+    // Verify the title appears in the list (should be "My Test Note Title", not "Untitled")
+    const noteWithTitle = window2
+      .locator('[data-testid="notes-list"]')
+      .getByText(/My Test Note Title/);
+    await expect(noteWithTitle).toBeVisible({ timeout: 5000 });
+
+    console.log('[Test] ✅ Note title synced correctly in default SD!');
+  }, 180000);
+
+  test('Bug 5: Note should appear when second instance adds existing SD with notes', async () => {
+    console.log('[Test] Testing note visibility after SD addition...');
+
+    // In instance 1, add a new SD
+    console.log('[Test] Creating new SD in instance 1...');
+    const settingsButton1 = window1.locator('[title="Settings"]');
+    await settingsButton1.click();
+    await window1.waitForTimeout(500);
+
+    const addDirButton = window1.locator('button:has-text("Add Directory")');
+    await addDirButton.click();
+    await window1.waitForTimeout(300);
+
+    const sdName = `NewSD ${testId}`;
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
+    await nameInput.fill(sdName);
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
+    await pathInput.fill(testStorageDir2);
+
+    const dialogAddButton = window1.locator('button:has-text("Add")').last();
+    await dialogAddButton.click();
+    await window1.waitForTimeout(1000);
+
+    await window1.keyboard.press('Escape');
+    await window1.waitForTimeout(500);
+
+    // Select the new SD in instance 1
+    console.log('[Test] Selecting', sdName, 'in instance 1...');
+    const newSdButton1 = window1.getByRole('button', { name: new RegExp(sdName) });
+    await newSdButton1.click();
+    await window1.waitForTimeout(1000);
+
+    // Create a note in the new SD
+    console.log('[Test] Creating note in new SD...');
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('Note in New SD');
+    await window1.waitForTimeout(2000);
+
+    // Wait for the note to be persisted to disk
+    await window1.waitForTimeout(2000);
+
+    // In instance 2, add the same SD
+    console.log('[Test] Adding same SD in instance 2...');
+    const settingsButton2 = window2.locator('[title="Settings"]');
+    await settingsButton2.click();
+    await window2.waitForTimeout(500);
+
+    const addDirButton2 = window2.locator('button:has-text("Add Directory")');
+    await addDirButton2.click();
+    await window2.waitForTimeout(300);
+
+    const nameInput2 = window2.locator('input[value=""][type="text"]').first();
+    await nameInput2.fill(sdName);
+    const pathInput2 = window2.locator('input[value=""][type="text"]').last();
+    await pathInput2.fill(testStorageDir2);
+
+    const dialogAddButton2 = window2.locator('button:has-text("Add")').last();
+    await dialogAddButton2.click();
+    await window2.waitForTimeout(1000);
+
+    await window2.keyboard.press('Escape');
+    await window2.waitForTimeout(500);
+
+    // Select the new SD in instance 2
+    console.log('[Test] Selecting', sdName, 'in instance 2...');
+    const newSdButton2 = window2.getByRole('button', { name: new RegExp(sdName) });
+    await newSdButton2.click();
+    await window2.waitForTimeout(2000);
+
+    // Check if the note appears in instance 2
+    const notesList2 = window2.locator('[data-testid="notes-list"] > li');
+    const noteCount = await notesList2.count();
+
+    console.log('[Test] Note count in instance 2:', noteCount);
+
+    // BUG: Note doesn't appear even though it exists on disk
+    expect(noteCount).toBeGreaterThan(0);
+
+    console.log('[Test] ✅ Note appeared when SD was added to instance 2!');
+  }, 180000);
+
+  test('Bug 6: Note title should update in notes list when creating note in new SD', async () => {
+    console.log('[Test] Testing note title update in new SD...');
+
+    // In instance 1, add a new SD
+    console.log('[Test] Creating new SD in instance 1...');
+    const settingsButton1 = window1.locator('[title="Settings"]');
+    await settingsButton1.click();
+    await window1.waitForTimeout(500);
+
+    const addDirButton = window1.locator('button:has-text("Add Directory")');
+    await addDirButton.click();
+    await window1.waitForTimeout(300);
+
+    const sdName = `TestSD ${testId}`;
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
+    await nameInput.fill(sdName);
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
+    await pathInput.fill(testStorageDir2);
+
+    const dialogAddButton = window1.locator('button:has-text("Add")').last();
+    await dialogAddButton.click();
+    await window1.waitForTimeout(1000);
+
+    await window1.keyboard.press('Escape');
+    await window1.waitForTimeout(500);
+
+    // Select the new SD in instance 1
+    console.log('[Test] Selecting', sdName, 'in instance 1...');
+    const newSdButton1 = window1.getByRole('button', { name: new RegExp(sdName) });
+    await newSdButton1.click();
+    await window1.waitForTimeout(1000);
+
+    // Create a note in the new SD
+    console.log('[Test] Creating note in new SD...');
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    // Type the title
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('New SD Note Title');
+    await window1.waitForTimeout(2000);
+
+    // Check if the title appears in the notes list
+    console.log('[Test] Checking if title appears in notes list...');
+    const noteWithTitle = window1
+      .locator('[data-testid="notes-list"]')
+      .getByText(/New SD Note Title/);
+    await expect(noteWithTitle).toBeVisible({ timeout: 5000 });
+
+    console.log('[Test] ✅ Note title updated correctly in new SD!');
+  }, 180000);
+
+  test('Bug 7: Notes list should not empty when switching between SDs', async () => {
+    console.log('[Test] Testing notes list stability when switching SDs...');
+
+    // In instance 1, add a new SD
+    console.log('[Test] Creating new SD in instance 1...');
+    const settingsButton1 = window1.locator('[title="Settings"]');
+    await settingsButton1.click();
+    await window1.waitForTimeout(500);
+
+    const addDirButton = window1.locator('button:has-text("Add Directory")');
+    await addDirButton.click();
+    await window1.waitForTimeout(300);
+
+    const sdName = `SwitchSD ${testId}`;
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
+    await nameInput.fill(sdName);
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
+    await pathInput.fill(testStorageDir2);
+
+    const dialogAddButton = window1.locator('button:has-text("Add")').last();
+    await dialogAddButton.click();
+    await window1.waitForTimeout(1000);
+
+    await window1.keyboard.press('Escape');
+    await window1.waitForTimeout(500);
+
+    // Select the new SD and create a note
+    console.log('[Test] Selecting new SD and creating note...');
+    const newSdButton1 = window1.getByRole('button', { name: new RegExp(sdName) });
+    await newSdButton1.click();
+    await window1.waitForTimeout(1000);
+
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('Note in Switch SD');
+    await window1.waitForTimeout(2000);
+
+    // Switch to Default SD
+    console.log('[Test] Switching to Default SD...');
+    const defaultSdButton = window1.getByRole('button', { name: /Default/ });
+    await defaultSdButton.click();
+    await window1.waitForTimeout(1000);
+
+    // Check that notes list is not empty
+    const notesList1 = window1.locator('[data-testid="notes-list"] > li');
+    const noteCount1 = await notesList1.count();
+    console.log('[Test] Note count in Default SD:', noteCount1);
+    expect(noteCount1).toBeGreaterThan(0);
+
+    // Switch back to new SD
+    console.log('[Test] Switching back to new SD...');
+    await newSdButton1.click();
+    await window1.waitForTimeout(1000);
+
+    // Check that notes list still has the note
+    const notesList2 = window1.locator('[data-testid="notes-list"] > li');
+    const noteCount2 = await notesList2.count();
+    console.log('[Test] Note count in new SD after switch:', noteCount2);
+    expect(noteCount2).toBeGreaterThan(0);
+
+    // Verify the note with the title is still visible
+    const noteWithTitle = window1
+      .locator('[data-testid="notes-list"]')
+      .getByText(/Note in Switch SD/);
+    await expect(noteWithTitle).toBeVisible({ timeout: 2000 });
+
+    console.log('[Test] ✅ Notes list remained stable during SD switches!');
+  }, 180000);
+
+  test('Bug 8: Notes list should not empty in second instance when switching to All Notes', async () => {
+    console.log('[Test] Testing notes list stability in second instance...');
+
+    // In instance 1, add a new SD and create a note
+    console.log('[Test] Creating new SD in instance 1...');
+    const settingsButton1 = window1.locator('[title="Settings"]');
+    await settingsButton1.click();
+    await window1.waitForTimeout(500);
+
+    const addDirButton = window1.locator('button:has-text("Add Directory")');
+    await addDirButton.click();
+    await window1.waitForTimeout(300);
+
+    const sdName = `SharedSD ${testId}`;
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
+    await nameInput.fill(sdName);
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
+    await pathInput.fill(testStorageDir2);
+
+    const dialogAddButton = window1.locator('button:has-text("Add")').last();
+    await dialogAddButton.click();
+    await window1.waitForTimeout(1000);
+
+    await window1.keyboard.press('Escape');
+    await window1.waitForTimeout(500);
+
+    // Select the new SD and create a note
+    console.log('[Test] Creating note in new SD...');
+    const newSdButton1 = window1.getByRole('button', { name: new RegExp(sdName) });
+    await newSdButton1.click();
+    await window1.waitForTimeout(1000);
+
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('Shared Note Title');
+    await window1.waitForTimeout(2000);
+
+    // Wait for file to be written
+    await window1.waitForTimeout(1000);
+
+    // In instance 2, add the same SD
+    console.log('[Test] Adding same SD in instance 2...');
+    const settingsButton2 = window2.locator('[title="Settings"]');
+    await settingsButton2.click();
+    await window2.waitForTimeout(500);
+
+    const addDirButton2 = window2.locator('button:has-text("Add Directory")');
+    await addDirButton2.click();
+    await window2.waitForTimeout(300);
+
+    const nameInput2 = window2.locator('input[value=""][type="text"]').first();
+    await nameInput2.fill(sdName);
+    const pathInput2 = window2.locator('input[value=""][type="text"]').last();
+    await pathInput2.fill(testStorageDir2);
+
+    const dialogAddButton2 = window2.locator('button:has-text("Add")').last();
+    await dialogAddButton2.click();
+    await window2.waitForTimeout(1000);
+
+    await window2.keyboard.press('Escape');
+    await window2.waitForTimeout(500);
+
+    // Select the new SD in instance 2
+    console.log('[Test] Selecting new SD in instance 2...');
+    const newSdButton2 = window2.getByRole('button', { name: new RegExp(sdName) });
+    await newSdButton2.click();
+    await window2.waitForTimeout(2000);
+
+    // Check that the note appears
+    const notesList1 = window2.locator('[data-testid="notes-list"] > li');
+    const noteCount1 = await notesList1.count();
+    console.log('[Test] Initial note count in instance 2:', noteCount1);
+    expect(noteCount1).toBeGreaterThan(0);
+
+    // Switch to Default SD and back
+    console.log('[Test] Switching to Default SD in instance 2...');
+    const defaultSdButton2 = window2.getByRole('button', { name: /Default/ });
+    await defaultSdButton2.click();
+    await window2.waitForTimeout(1000);
+
+    console.log('[Test] Switching back to new SD in instance 2...');
+    await newSdButton2.click();
+    await window2.waitForTimeout(1000);
+
+    // Check that notes list is still populated
+    const notesList2 = window2.locator('[data-testid="notes-list"] > li');
+    const noteCount2 = await notesList2.count();
+    console.log('[Test] Note count after switch in instance 2:', noteCount2);
+    expect(noteCount2).toBeGreaterThan(0);
+
+    // Verify the note with the title is still visible
+    const noteWithTitle = window2
+      .locator('[data-testid="notes-list"]')
+      .getByText(/Shared Note Title/);
+    await expect(noteWithTitle).toBeVisible({ timeout: 2000 });
+
+    console.log('[Test] ✅ Notes list remained stable in second instance!');
+  }, 180000);
+
+  test('Bug 9: Notes should remain visible when switching back to All Notes', async () => {
+    console.log('[Test] Testing notes visibility when returning to All Notes...');
+
+    // Get initial note count in All Notes
+    console.log('[Test] Checking initial notes in All Notes...');
+    await window1.waitForTimeout(1000);
+    const allNotesButton1 = window1.getByRole('button', { name: /All Notes/i });
+    await allNotesButton1.click();
+    await window1.waitForTimeout(1000);
+
+    const notesList1 = window1.locator('[data-testid="notes-list"] > li');
+    const initialNoteItems = await notesList1.count();
+    console.log('[Test] Initial note count in All Notes:', initialNoteItems);
+
+    // Create a new note
+    console.log('[Test] Creating a new note...');
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    // Type a title for the note
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('Test Note For Bug 9');
+    await window1.waitForTimeout(2000);
+
+    // Verify the note appears in the list
+    console.log('[Test] Verifying note appears in All Notes...');
+    const newNote = window1.locator('[data-testid="notes-list"]').getByText(/Test Note For Bug 9/);
+    await expect(newNote).toBeVisible({ timeout: 3000 });
+    const noteCountAfterCreate = await notesList1.count();
+    console.log('[Test] Note count after creating note:', noteCountAfterCreate);
+
+    // Switch to a different folder (Work folder)
+    console.log('[Test] Switching to Work folder...');
+    const workFolder = window1.getByRole('button', { name: /Work/i }).first();
+    await workFolder.click();
+    await window1.waitForTimeout(1000);
+
+    // Switch back to All Notes
+    console.log('[Test] Switching back to All Notes...');
+    await allNotesButton1.click();
+    await window1.waitForTimeout(1000);
+
+    // Verify all notes are still visible
+    console.log('[Test] Verifying notes are visible after switching back...');
+    const finalNoteCount = await notesList1.count();
+    console.log('[Test] Final note count in All Notes:', finalNoteCount);
+
+    // Check that the new note is still visible
+    const noteAfterSwitch = window1
+      .locator('[data-testid="notes-list"]')
+      .getByText(/Test Note For Bug 9/);
+    await expect(noteAfterSwitch).toBeVisible({ timeout: 3000 });
+
+    // Verify the count matches what we had after creation
+    expect(finalNoteCount).toBe(noteCountAfterCreate);
+
+    console.log('[Test] ✅ Notes remained visible when switching back to All Notes!');
+  }, 180000);
+
+  test('Bug 10: Second instance should show notes from first instance on startup', async () => {
+    console.log('[Test] Testing cross-instance note visibility on startup...');
+
+    // Close instance 2 first (we'll launch it after creating note A)
+    console.log('[Test] Closing instance 2 to simulate fresh start...');
+    await window2.close();
+    await instance2.close();
+
+    // In instance 1, create note "A"
+    console.log('[Test] Creating note A in instance 1...');
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    // Type title for note "A"
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('Note A Title');
+    await window1.waitForTimeout(2000);
+
+    // Verify note A appears in instance 1's notes list
+    console.log('[Test] Verifying note A appears in instance 1...');
+    const noteA1 = window1.locator('[data-testid="notes-list"]').getByText(/Note A Title/);
+    await expect(noteA1).toBeVisible({ timeout: 3000 });
+
+    const notesList1 = window1.locator('[data-testid="notes-list"] > li');
+    const count1 = await notesList1.count();
+    console.log('[Test] Note count in instance 1:', count1);
+    expect(count1).toBeGreaterThanOrEqual(2); // Welcome note + Note A
+
+    // Wait a bit for activity sync to write
+    await window1.waitForTimeout(2000);
+
+    // NOW launch instance 2 (after note A was created)
+    console.log('[Test] Launching instance 2 (after note A created)...');
+    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: testStorageDir1,
+        INSTANCE_ID: 'instance-2',
+      },
+      timeout: 60000,
+    });
+
+    instance2.on('console', (msg) => {
+      console.log('[Instance2]:', msg.text());
+    });
+
+    window2 = await instance2.firstWindow();
+    await window2.waitForSelector('.ProseMirror', { timeout: 10000 });
+    await window2.waitForTimeout(2000);
+
+    // In instance 2, verify note A shows in the notes list
+    console.log('[Test] Checking if note A appears in instance 2...');
+    await window2.waitForTimeout(2000); // Give time for sync
+
+    const notesList2Before = window2.locator('[data-testid="notes-list"] > li');
+    const count2Before = await notesList2Before.count();
+    console.log('[Test] Note count in instance 2 before edit:', count2Before);
+
+    // Check if note A is visible
+    const noteA2Before = window2.locator('[data-testid="notes-list"]').getByText(/Note A Title/);
+    const isNoteAVisibleBefore = await noteA2Before.isVisible().catch(() => false);
+    console.log('[Test] Note A visible in instance 2 before edit:', isNoteAVisibleBefore);
+
+    if (!isNoteAVisibleBefore) {
+      console.log('[Test] ❌ BUG REPRODUCED: Note A not visible in instance 2!');
+    }
+
+    // Create note "B" in instance 2
+    console.log('[Test] Creating note B in instance 2...');
+    const createNoteButton2 = window2.locator('[title="Create note"]');
+    await createNoteButton2.click();
+    await window2.waitForTimeout(500);
+
+    // Type one character into note "B"
+    const editor2 = window2.locator('.ProseMirror');
+    await editor2.click();
+    await editor2.type('B');
+    await window2.waitForTimeout(2000);
+
+    // Now check if note A appears
+    console.log('[Test] Checking if note A appears after editing note B...');
+    const notesList2After = window2.locator('[data-testid="notes-list"] > li');
+    const count2After = await notesList2After.count();
+    console.log('[Test] Note count in instance 2 after edit:', count2After);
+
+    // Verify note A is now visible
+    const noteA2After = window2.locator('[data-testid="notes-list"]').getByText(/Note A Title/);
+    await expect(noteA2After).toBeVisible({ timeout: 3000 });
+
+    // The count should be: Welcome note + Note A + Note B = 3
+    expect(count2After).toBe(3);
+
+    // The bug is: Note A should have been visible BEFORE we edited note B
+    // So we assert that it should have been visible before
+    expect(isNoteAVisibleBefore).toBe(true);
+
+    console.log('[Test] ✅ Note A was visible in instance 2 on startup!');
+  }, 180000);
+
+  test('Bug 11: Editor should show edits from other instance without reloading note', async () => {
+    console.log('[Test] Testing cross-instance editor synchronization...');
+
+    // In instance 1, create note "A" and keep it selected
+    console.log('[Test] Creating note A in instance 1...');
+    const createNoteButton1 = window1.locator('[title="Create note"]');
+    await createNoteButton1.click();
+    await window1.waitForTimeout(500);
+
+    // Type initial content in note "A"
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await editor1.type('Initial content from instance 1');
+    await window1.waitForTimeout(2000);
+
+    // Get the initial content
+    const initialContent1 = await editor1.textContent();
+    console.log('[Test] Initial content in instance 1:', initialContent1);
+
+    // Wait for sync
+    await window1.waitForTimeout(2000);
+
+    // In instance 2, find and select note "A"
+    console.log('[Test] Selecting note A in instance 2...');
+    const noteA2 = window2.locator('[data-testid="notes-list"]').getByText(/Initial content/);
+    await expect(noteA2).toBeVisible({ timeout: 5000 });
+    await noteA2.click();
+    await window2.waitForTimeout(1000);
+
+    // Edit note "A" in instance 2
+    console.log('[Test] Editing note A in instance 2...');
+    const editor2 = window2.locator('.ProseMirror');
+    await editor2.click();
+
+    // Clear and type new content
+    await window2.keyboard.press('Meta+A'); // Select all
+    await editor2.type('Edited content from instance 2');
+    await window2.waitForTimeout(2000);
+
+    const editedContent2 = await editor2.textContent();
+    console.log('[Test] Edited content in instance 2:', editedContent2);
+
+    // Wait for sync to propagate
+    await window2.waitForTimeout(2000);
+
+    // Check if instance 1's editor shows the edited content (WITHOUT clicking away and back)
+    console.log('[Test] Checking if instance 1 editor shows edits...');
+    const contentInInstance1 = await editor1.textContent();
+    console.log('[Test] Content in instance 1 after edit:', contentInInstance1);
+
+    // The editor in instance 1 should show the edited content
+    const hasEditedContent = contentInInstance1?.includes('Edited content from instance 2');
+    console.log('[Test] Instance 1 editor has edited content:', hasEditedContent);
+
+    if (!hasEditedContent) {
+      console.log('[Test] ❌ BUG REPRODUCED: Instance 1 editor does not show edits!');
+
+      // Try the workaround: click another note and back
+      console.log('[Test] Testing workaround: creating new note and clicking back...');
+      const createNoteButton1Again = window1.locator('[title="Create note"]');
+      await createNoteButton1Again.click();
+      await window1.waitForTimeout(1000);
+
+      // Click back to note A
+      const noteA1 = window1.locator('[data-testid="notes-list"]').getByText(/Edited content/);
+      await noteA1.click();
+      await window1.waitForTimeout(1000);
+
+      const contentAfterReload = await editor1.textContent();
+      console.log('[Test] Content in instance 1 after reload:', contentAfterReload);
+
+      const hasEditedContentAfterReload = contentAfterReload?.includes(
+        'Edited content from instance 2'
+      );
+      console.log('[Test] After reload, has edited content:', hasEditedContentAfterReload);
+    }
+
+    // Assert that the edited content should be visible WITHOUT needing to reload
+    expect(hasEditedContent).toBe(true);
+
+    console.log('[Test] ✅ Instance 1 editor showed edits without reloading!');
+  }, 180000);
 });

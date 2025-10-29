@@ -40,6 +40,13 @@ const mockElectronAPI = {
     delete: jest.fn(),
     onUpdated: jest.fn(),
   },
+  sd: {
+    list: jest.fn().mockResolvedValue([]),
+    create: jest.fn(),
+    setActive: jest.fn(),
+    getActive: jest.fn().mockResolvedValue(null),
+    onUpdated: jest.fn(),
+  },
   sync: {
     onProgress: jest.fn(),
   },
@@ -74,6 +81,9 @@ describe('App', () => {
       /* unsubscribe */
     });
     mockElectronAPI.note.onTitleUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.sd.onUpdated.mockReturnValue(() => {
       /* unsubscribe */
     });
     mockElectronAPI.sync.onProgress.mockReturnValue(() => {

@@ -44,6 +44,13 @@ declare global {
           callback: (data: { operation: string; noteIds: string[] }) => void
         ) => () => void;
         onTitleUpdated: (callback: (data: { noteId: string; title: string }) => void) => () => void;
+        onMoved: (
+          callback: (data: {
+            noteId: string;
+            oldFolderId: string | null;
+            newFolderId: string;
+          }) => void
+        ) => () => void;
       };
 
       folder: {
@@ -90,6 +97,7 @@ declare global {
         create: (name: string, path: string) => Promise<string>;
         setActive: (sdId: string) => Promise<void>;
         getActive: () => Promise<string | null>;
+        onUpdated: (callback: (data: { operation: string; sdId: string }) => void) => () => void;
       };
 
       sync: {

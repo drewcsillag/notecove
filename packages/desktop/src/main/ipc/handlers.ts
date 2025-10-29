@@ -282,7 +282,7 @@ export class IPCHandlers {
     console.log(`[IPC] Title updated successfully in database`);
 
     // Broadcast title update to all windows so they can refresh their notes list
-    this.broadcastToAll('note:titleUpdated', { noteId, title });
+    this.broadcastToAll('note:title-updated', { noteId, title });
   }
 
   private async handleListNotes(
@@ -530,8 +530,8 @@ export class IPCHandlers {
   ): Promise<string> {
     // Check if SD already has an ID file (for cross-instance consistency)
     const { promises: fs } = await import('fs');
-    const { join } = await import('path');
-    const idFilePath = join(path, '.sd-id');
+    const pathModule = await import('path');
+    const idFilePath = pathModule.join(path, '.sd-id');
 
     let id: string;
     try {

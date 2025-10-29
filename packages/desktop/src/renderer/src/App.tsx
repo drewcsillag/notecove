@@ -78,27 +78,27 @@ function App(): React.ReactElement {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <div data-testid="app-root" data-active-sd-id={activeSdId}>
-      <ThreePanelLayout
-        leftPanel={
-          <FolderPanel
-            onOpenSettings={() => {
-              setSettingsOpen(true);
-            }}
-            activeSdId={activeSdId}
-            onActiveSdChange={setActiveSdId}
-          />
-        }
-        middlePanel={
-          <NotesListPanel
-            selectedNoteId={selectedNoteId}
-            onNoteSelect={setSelectedNoteId}
-            activeSdId={activeSdId}
-          />
-        }
-        rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
-        onLayoutChange={handleLayoutChange}
-        initialSizes={initialPanelSizes}
-      />
+        <ThreePanelLayout
+          leftPanel={
+            <FolderPanel
+              onOpenSettings={() => {
+                setSettingsOpen(true);
+              }}
+              activeSdId={activeSdId}
+              onActiveSdChange={setActiveSdId}
+            />
+          }
+          middlePanel={
+            <NotesListPanel
+              selectedNoteId={selectedNoteId}
+              onNoteSelect={setSelectedNoteId}
+              activeSdId={activeSdId}
+            />
+          }
+          rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
+          onLayoutChange={handleLayoutChange}
+          initialSizes={initialPanelSizes}
+        />
       </div>
       <SettingsDialog
         open={settingsOpen}

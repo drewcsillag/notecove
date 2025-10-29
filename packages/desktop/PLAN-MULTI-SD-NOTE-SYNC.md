@@ -1,6 +1,7 @@
 # Implementation Plan: Multi-SD Note Sync
 
 ## Overview
+
 Fix note synchronization across instances for non-default Storage Directories by making the note storage architecture SD-aware.
 
 ## Current Architecture Problem
@@ -60,6 +61,7 @@ Fix note synchronization across instances for non-default Storage Directories by
 ## Implementation Phases
 
 ### Phase 1: Data Layer (UpdateManager/Storage) ⚠️ BREAKING CHANGES
+
 **Goal**: Make UpdateManager support multiple SDs
 
 **Changes Required**:
@@ -74,13 +76,14 @@ Fix note synchronization across instances for non-default Storage Directories by
 
 2. **Create SD Registry**
    - New file: `packages/desktop/src/main/storage/sd-registry.ts`
+
    ```typescript
    export class StorageDirectoryRegistry {
      private sdPaths = new Map<string, string>();
 
-     register(sdId: string, path: string): void
-     get(sdId: string): string | undefined
-     getAll(): Map<string, string>
+     register(sdId: string, path: string): void;
+     get(sdId: string): string | undefined;
+     getAll(): Map<string, string>;
    }
    ```
 
@@ -91,6 +94,7 @@ Fix note synchronization across instances for non-default Storage Directories by
    - Listen for SD creation events and register new SDs
 
 **Testing**:
+
 - Unit tests for SD Registry
 - Unit tests for UpdateManager with multiple SDs
 - Integration test: Write note to SD1, verify file in SD1 path
@@ -101,6 +105,7 @@ Fix note synchronization across instances for non-default Storage Directories by
 ---
 
 ### Phase 2: CRDT Layer ⚠️ API CHANGES
+
 **Goal**: Make CRDT Manager track SD for each note
 
 **Changes Required**:
@@ -117,6 +122,7 @@ Fix note synchronization across instances for non-default Storage Directories by
    - Use sdId when calling UpdateManager methods
 
 3. **Add helper method**
+
    ```typescript
    private async getNoteSdId(noteId: string): Promise<string> {
      // Try to get from loaded document
@@ -138,6 +144,7 @@ Fix note synchronization across instances for non-default Storage Directories by
    ```
 
 **Testing**:
+
 - Unit test: Load note with sdId, verify tracked correctly
 - Unit test: Load note without sdId, verify extraction from metadata
 - Integration test: Note operations use correct SD
@@ -147,6 +154,7 @@ Fix note synchronization across instances for non-default Storage Directories by
 ---
 
 ### Phase 3: IPC Layer
+
 **Goal**: Pass SD information through the stack
 
 **Changes Required**:
@@ -164,6 +172,7 @@ Fix note synchronization across instances for non-default Storage Directories by
    ```
 
 **Testing**:
+
 - E2E test: Create note in SD2, verify written to SD2 path
 - E2E test: Load note from SD2, verify read from SD2 path
 
@@ -172,6 +181,7 @@ Fix note synchronization across instances for non-default Storage Directories by
 ---
 
 ### Phase 4: File Watching
+
 **Goal**: Monitor all SDs for cross-instance changes
 
 **Changes Required**:
@@ -184,6 +194,7 @@ Fix note synchronization across instances for non-default Storage Directories by
    - Call when new SD created
 
 2. **Watch SD note directories**
+
    ```typescript
    async function setupSDNoteWatcher(sdId: string, sdPath: string) {
      const activityDir = join(sdPath, '.activity');
@@ -205,6 +216,7 @@ Fix note synchronization across instances for non-default Storage Directories by
    - If not provided, sync all SDs (backward compatible)
 
 **Testing**:
+
 - Integration test: Create SD, verify watcher created
 - E2E test: Create note in SD2 instance1, verify appears in instance2
 - E2E test: Update note in SD2 instance1, verify syncs to instance2
@@ -214,6 +226,7 @@ Fix note synchronization across instances for non-default Storage Directories by
 ---
 
 ### Phase 5: Activity Logging
+
 **Goal**: Track activity per SD
 
 **Changes Required**:
@@ -234,6 +247,7 @@ Fix note synchronization across instances for non-default Storage Directories by
    - Route updates to correct SD
 
 **Testing**:
+
 - Unit test: Activity logged with correct sdId
 - Unit test: Activity read filters by sdId correctly
 - Integration test: Multi-SD activity logging
@@ -247,11 +261,13 @@ Fix note synchronization across instances for non-default Storage Directories by
 ### Backward Compatibility
 
 **For existing notes in default SD:**
+
 - Notes without explicit sdId in filename → assume 'default'
 - Activity logs without sdId → assume 'default'
 - No data migration required
 
 **For existing multi-SD setups:**
+
 - Notes in wrong location stay there (orphaned)
 - New notes go to correct location
 - Users can manually move orphaned notes if needed
@@ -273,23 +289,27 @@ Fix note synchronization across instances for non-default Storage Directories by
 ## Testing Strategy
 
 ### Unit Tests
+
 - UpdateManager SD routing
 - CRDT Manager sdId tracking
 - SD Registry operations
 - Activity logging with sdId
 
 ### Integration Tests
+
 - Write/read notes from multiple SDs
 - File watchers for multiple SDs
 - Activity sync across SDs
 
 ### E2E Tests
+
 - ✅ Already exist: `e2e/multi-sd-cross-instance.spec.ts`
 - Should PASS after implementation
 - Add: Note content sync test
 - Add: Multiple simultaneous SD operations
 
 ### Regression Tests
+
 - Default SD still works
 - Single-SD usage unaffected
 - Folder sync still works
@@ -297,25 +317,28 @@ Fix note synchronization across instances for non-default Storage Directories by
 
 ## Risk Assessment
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Break existing default SD | Medium | High | Extensive testing, feature flag |
-| Performance degradation | Low | Medium | Profile before/after, optimize watchers |
-| Data loss | Low | Critical | Backup recommendation, read-only testing phase |
-| Incomplete migration | Medium | Medium | Clear documentation, migration tools |
+| Risk                      | Probability | Impact   | Mitigation                                     |
+| ------------------------- | ----------- | -------- | ---------------------------------------------- |
+| Break existing default SD | Medium      | High     | Extensive testing, feature flag                |
+| Performance degradation   | Low         | Medium   | Profile before/after, optimize watchers        |
+| Data loss                 | Low         | Critical | Backup recommendation, read-only testing phase |
+| Incomplete migration      | Medium      | Medium   | Clear documentation, migration tools           |
 
 ## Success Criteria
 
 ✅ **Phase 1-2 Complete When:**
+
 - Unit tests pass for UpdateManager with multiple SDs
 - Integration tests show notes written to correct SD paths
 
 ✅ **Phase 3-4 Complete When:**
+
 - E2E test "Bug 1: Note title sync" PASSES
 - E2E test "Bug 2: Note creation sync" PASSES
 - E2E test "Bug 3: Folder sync" still PASSES (no regression)
 
 ✅ **Project Complete When:**
+
 - All E2E tests pass
 - No regressions in default SD behavior
 - Documentation updated

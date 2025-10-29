@@ -27,7 +27,7 @@ describe('ActivitySync', () => {
       getLoadedNotes: jest.fn().mockReturnValue([]),
     };
 
-    sync = new ActivitySync(mockFs, instanceId, activityDir, mockCallbacks);
+    sync = new ActivitySync(mockFs, instanceId, activityDir, 'test-sd', mockCallbacks);
   });
 
   describe('syncFromOtherInstances', () => {
@@ -63,9 +63,9 @@ describe('ActivitySync', () => {
 
       expect(affectedNotes).toEqual(new Set(['note-1', 'note-2', 'note-3']));
       expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(3);
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1');
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2');
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-3');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2', 'test-sd');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-3', 'test-sd');
     });
 
     it('should only reload notes newer than last seen timestamp', async () => {
@@ -88,7 +88,7 @@ describe('ActivitySync', () => {
       // Should only reload note-4 (timestamp 4000 > last seen 3000)
       expect(affectedNotes).toEqual(new Set(['note-4']));
       expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(1);
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-4');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-4', 'test-sd');
     });
 
     it('should detect gaps and trigger full scan', async () => {
@@ -108,12 +108,14 @@ describe('ActivitySync', () => {
 
       await sync.syncFromOtherInstances();
 
-      // Should trigger full scan of all loaded notes
-      // Note: affectedNotes doesn't include notes from full scan, only from normal sync
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(3);
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1');
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2');
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-3');
+      // Should trigger full scan of all loaded notes PLUS process new entries
+      // After gap detection, we still process the current log to discover new notes
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(5); // 3 from full scan + 2 new entries
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2', 'test-sd');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-3', 'test-sd');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-5', 'test-sd');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-6', 'test-sd');
     });
 
     it('should handle empty log files', async () => {
@@ -137,6 +139,8 @@ describe('ActivitySync', () => {
       // Should process valid entries only
       expect(affectedNotes).toEqual(new Set(['note-1', 'note-2']));
       expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(2);
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2', 'test-sd');
     });
   });
 

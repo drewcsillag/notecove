@@ -70,6 +70,13 @@ export interface CRDTManager {
   getFolderTree(sdId: string): import('@notecove/shared').FolderTreeDoc | undefined;
 
   /**
+   * Set the activity logger for a specific SD
+   * @param sdId Storage Directory ID
+   * @param logger Activity logger instance
+   */
+  setActivityLogger(sdId: string, logger: import('@shared/storage').ActivityLogger): void;
+
+  /**
    * Reload a note from disk (re-apply all updates)
    * @param noteId Note ID
    */
