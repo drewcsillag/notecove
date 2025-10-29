@@ -7,16 +7,23 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import { resolve } from 'path';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 let electronApp: ElectronApplication;
 let page: Page;
+let testUserDataDir: string;
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
-  console.log('[E2E] Launching Electron with main process at:', mainPath);
+
+  // Create a unique temporary directory for this test's userData
+  testUserDataDir = mkdtempSync(join(tmpdir(), 'notecove-e2e-'));
+  console.log('[E2E] Launching fresh Electron instance with userData at:', testUserDataDir);
 
   electronApp = await electron.launch({
-    args: [mainPath],
+    args: [mainPath, `--user-data-dir=${testUserDataDir}`],
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -36,17 +43,71 @@ test.beforeAll(async () => {
   });
 }, 60000);
 
-test.afterAll(async () => {
+test.afterEach(async () => {
   await electronApp.close();
+
+  // Clean up the temporary user data directory
+  try {
+    rmSync(testUserDataDir, { recursive: true, force: true });
+    console.log('[E2E] Cleaned up test userData directory:', testUserDataDir);
+  } catch (err) {
+    console.error('[E2E] Failed to clean up test userData directory:', err);
+  }
 });
+
+/**
+ * Helper function to ensure an SD node is in the desired expansion state
+ * @param sdNode - The SD node locator
+ * @param shouldBeExpanded - Whether the SD should be expanded (true) or collapsed (false)
+ */
+async function ensureSDExpansionState(
+  sdNode: ReturnType<typeof page.locator>,
+  shouldBeExpanded: boolean
+): Promise<void> {
+  // Check if "All Notes" (child of SD) is visible to determine current expansion state
+  const sdId = (await sdNode.getAttribute('data-testid'))?.split('folder-tree-node-')[1];
+  if (!sdId) {
+    throw new Error('Could not determine SD ID from node');
+  }
+
+  // Look for "All Notes" under this SD
+  const allNotesNode = page.locator(`[data-testid="folder-tree-node-all-notes:${sdId}"]`);
+  const isCurrentlyExpanded = await allNotesNode.isVisible().catch(() => false);
+
+  console.log(
+    `[E2E] SD ${sdId} is currently ${isCurrentlyExpanded ? 'expanded' : 'collapsed'}, want ${shouldBeExpanded ? 'expanded' : 'collapsed'}`
+  );
+
+  // If current state doesn't match desired state, click to toggle
+  if (isCurrentlyExpanded !== shouldBeExpanded) {
+    console.log(`[E2E] Clicking SD node to ${shouldBeExpanded ? 'expand' : 'collapse'} it`);
+    await sdNode.click();
+    await page.waitForTimeout(500); // Wait for expansion/collapse animation
+  }
+
+  // Verify the state changed
+  const isNowExpanded = await allNotesNode.isVisible().catch(() => false);
+  if (isNowExpanded !== shouldBeExpanded) {
+    throw new Error(
+      `Failed to set SD expansion state: wanted ${shouldBeExpanded}, got ${isNowExpanded}`
+    );
+  }
+}
 
 test.describe('Folder Context Menu', () => {
   test('should create a folder using the plus button', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
-    // Select "All Notes" first to ensure we create a root-level folder
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    // Wait for tree to load
+    await page.waitForTimeout(1000);
+
+    // Explicitly ensure the first SD node is expanded
+    const firstSDNode = page.locator('[data-testid^="folder-tree-node-sd:"]').first();
+    await ensureSDExpansionState(firstSDNode, true);
+
+    // Now find and click "All Notes" (should be visible after expanding SD)
+    await page.locator('text=All Notes').first().click();
     await page.waitForTimeout(500); // Give React time to update state
 
     // Use unique folder name
@@ -81,8 +142,15 @@ test.describe('Folder Context Menu', () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
+    // Wait for tree to load
+    await page.waitForTimeout(1000);
+
+    // Explicitly ensure the first SD node is expanded
+    const firstSDNode = page.locator('[data-testid^="folder-tree-node-sd:"]').first();
+    await ensureSDExpansionState(firstSDNode, true);
+
     // Select "All Notes" first to ensure we create a root-level folder
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.locator('text=All Notes').first().click();
     await page.waitForTimeout(500);
 
     // Find the Test Folder we created (or create one if not exists)
@@ -123,8 +191,15 @@ test.describe('Folder Context Menu', () => {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
 
+    // Wait for tree to load
+    await page.waitForTimeout(1000);
+
+    // Explicitly ensure the first SD node is expanded
+    const firstSDNode = page.locator('[data-testid^="folder-tree-node-sd:"]').first();
+    await ensureSDExpansionState(firstSDNode, true);
+
     // Select "All Notes" first
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.locator('text=All Notes').first().click();
     await page.waitForTimeout(500);
 
     // Create unique folder names to avoid conflicts
@@ -180,8 +255,15 @@ test.describe('Folder Context Menu', () => {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
 
+    // Wait for tree to load
+    await page.waitForTimeout(1000);
+
+    // Explicitly ensure the first SD node is expanded
+    const firstSDNode = page.locator('[data-testid^="folder-tree-node-sd:"]').first();
+    await ensureSDExpansionState(firstSDNode, true);
+
     // Select "All Notes" first
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.locator('text=All Notes').first().click();
     await page.waitForTimeout(500);
 
     // Create a folder to delete
@@ -221,8 +303,15 @@ test.describe('Folder Context Menu', () => {
     // Wait for folder panel
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
+    // Wait for tree to load
+    await page.waitForTimeout(1000);
+
+    // Explicitly ensure the first SD node is expanded
+    const firstSDNode = page.locator('[data-testid^="folder-tree-node-sd:"]').first();
+    await ensureSDExpansionState(firstSDNode, true);
+
     // Select "All Notes" first
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.locator('text=All Notes').first().click();
     await page.waitForTimeout(500);
 
     // Create unique folder names to avoid conflicts
@@ -300,18 +389,25 @@ test.describe('Folder Drag & Drop UI', () => {
     // Wait for folder panel
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
+    // Wait for tree to load
+    await page.waitForTimeout(1000);
+
+    // Explicitly ensure the first SD node is expanded
+    const firstSDNode = page.locator('[data-testid^="folder-tree-node-sd:"]').first();
+    await ensureSDExpansionState(firstSDNode, true);
+
     // Note: react-dnd-treeview uses role="button" for tree items, not role="treeitem"
     // The library prevents dragging special items via canDrag() callback
     // We verify this behavior in folder-bugs.spec.ts drag tests
 
-    // Get "All Notes" button using test ID
-    const allNotesButton = page.getByTestId('folder-tree-node-all-notes:default');
+    // Get "All Notes" button - now visible after expanding SD
+    const allNotesButton = page.locator('text=All Notes').first();
 
     // Verify it's visible but drag protection is handled by canDrag callback
     await expect(allNotesButton).toBeVisible();
 
-    // Get "Recently Deleted" button using test ID
-    const recentlyDeletedButton = page.getByTestId('folder-tree-node-recently-deleted:default');
+    // Get "Recently Deleted" button
+    const recentlyDeletedButton = page.locator('text=Recently Deleted').first();
 
     // Verify it's visible but drag protection is handled by canDrag callback
     await expect(recentlyDeletedButton).toBeVisible();
@@ -324,9 +420,16 @@ test.describe('Folder Drag & Drop UI', () => {
     // Wait for folder panel
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
-    // Verify special items are present
-    await expect(page.getByTestId('folder-tree-node-all-notes:default')).toBeVisible();
-    await expect(page.getByTestId('folder-tree-node-recently-deleted:default')).toBeVisible();
+    // Wait for tree to load
+    await page.waitForTimeout(1000);
+
+    // Explicitly ensure the first SD node is expanded
+    const firstSDNode = page.locator('[data-testid^="folder-tree-node-sd:"]').first();
+    await ensureSDExpansionState(firstSDNode, true);
+
+    // Verify special items are present (using text instead of test ID since SD ID is dynamic)
+    await expect(page.locator('text=All Notes').first()).toBeVisible();
+    await expect(page.locator('text=Recently Deleted').first()).toBeVisible();
 
     // Verify folder panel is functional
     const folderPanelHeader = page.locator('text=Folders');

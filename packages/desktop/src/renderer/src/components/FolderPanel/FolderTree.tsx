@@ -203,6 +203,8 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const [isCollapsedAll, setIsCollapsedAll] = useState(false); // Track if user clicked collapse all
   const isProgrammaticChange = useRef(false); // Track if change is from expand/collapse all buttons
   const previousExpandedLength = useRef(0); // Track previous length to detect initial expansion
+  const scrollContainerRef = useRef<HTMLDivElement>(null); // Ref to scroll container
+  const savedScrollPosition = useRef<number>(0); // Save scroll position before remount
 
   // Multi-SD mode state
   const [sds, setSds] = useState<StorageDirectory[]>([]);
@@ -222,6 +224,20 @@ export const FolderTree: FC<FolderTreeProps> = ({
     }
     previousExpandedLength.current = expandedFolderIds.length;
   }, [expandedFolderIds]);
+
+  // Save scroll position before remount
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      savedScrollPosition.current = scrollContainerRef.current.scrollTop;
+    }
+  }, [remountCounter]);
+
+  // Restore scroll position after remount
+  useEffect(() => {
+    if (scrollContainerRef.current && savedScrollPosition.current > 0) {
+      scrollContainerRef.current.scrollTop = savedScrollPosition.current;
+    }
+  }, [remountCounter, treeData]);
 
   // Rename dialog state
   const [renameDialog, setRenameDialog] = useState<{
@@ -278,10 +294,18 @@ export const FolderTree: FC<FolderTreeProps> = ({
           const nodes = buildMultiSDTreeNodes(sdList, folderMap, activeSdId);
           setTreeData(nodes);
 
-          // Set all folder IDs + SD IDs for initial expansion
+          // Set all folder IDs + SD IDs for expand all functionality
           const allFolderIds = allFolders.map((f) => f.id);
           const allIds = [...sdList.map((s) => `sd:${s.id}`), ...allFolderIds];
           setAllFolderIds(allIds);
+
+          // For default expansion: only expand SD nodes (top level), not all folders
+          // This gives users a clean view without deep nesting
+          const sdIds = sdList.map((s) => `sd:${s.id}`);
+          if (expandedFolderIds.length === 0) {
+            // Only set default expansion if no saved state
+            onExpandedChange?.(sdIds);
+          }
         } else {
           // Single SD mode: original behavior
           const folderList = await window.electronAPI.folder.list(sdId);
@@ -600,19 +624,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
       hasOnActiveSdChange: !!onActiveSdChange,
     });
 
-    // If clicking an SD header, update active SD
+    // If clicking an SD header, toggle its expansion (don't activate it or change notes pane)
     if (nodeData.isSD) {
-      console.log('[FolderTree] SD header clicked');
-      if (isMultiSDMode && onActiveSdChange && nodeData.sdId) {
-        console.log('[FolderTree] Calling onActiveSdChange with:', nodeData.sdId);
-        onActiveSdChange(nodeData.sdId);
-      } else {
-        console.log('[FolderTree] NOT calling onActiveSdChange -', {
-          isMultiSDMode,
-          hasCallback: !!onActiveSdChange,
-          hasSdId: !!nodeData.sdId,
-        });
-      }
+      console.log('[FolderTree] SD header clicked - toggling expansion');
+      const isExpanded = expandedFolderIds.includes(nodeId);
+      handleToggle(nodeId, !isExpanded);
       return;
     }
 
@@ -645,6 +661,8 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
     if (isOpen) {
       newExpanded = [...expandedFolderIds, id];
+      // If user is expanding a node, exit "collapsed all" mode
+      setIsCollapsedAll(false);
     } else {
       newExpanded = expandedFolderIds.filter((fid) => fid !== id);
     }
@@ -700,6 +718,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
       {/* Tree Container */}
       <Box
+        ref={scrollContainerRef}
         sx={{
           flex: 1,
           overflow: 'auto',
@@ -762,9 +781,24 @@ export const FolderTree: FC<FolderTreeProps> = ({
               // Check if this node has children
               const hasChildren = treeData.some((n) => n.parent === node.id);
 
+              // Determine if this node belongs to the active SD (for test selectors)
+              const nodeDataWithSdId = node.data as {
+                sdId?: string;
+                isSD?: boolean;
+                isActive?: boolean;
+                path?: string;
+              };
+              const belongsToActiveSD =
+                isMultiSDMode &&
+                activeSdId &&
+                ((isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
+                  (!isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
+                  (String(node.id).includes(':') && String(node.id).split(':')[1] === activeSdId));
+
               return (
                 <ListItemButton
                   data-testid={`folder-tree-node-${node.id}`}
+                  data-active-sd={belongsToActiveSD ? 'true' : undefined}
                   aria-label={String(node.text)}
                   sx={{
                     pl: depth * 2,
