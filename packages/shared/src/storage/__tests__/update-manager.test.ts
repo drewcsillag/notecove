@@ -92,16 +92,18 @@ describe('UpdateManager', () => {
   let sdStructure: SyncDirectoryStructure;
   let updateManager: UpdateManager;
   const instanceId = 'test-instance-123';
+  const sdId = 'sd-test';
 
   beforeEach(() => {
     fs = new MockFileSystemAdapter();
     config = {
-      id: 'sd-test',
+      id: sdId,
       path: '/test/sd',
       label: 'Test SD',
     };
     sdStructure = new SyncDirectoryStructure(fs, config);
-    updateManager = new UpdateManager(fs, sdStructure, instanceId);
+    updateManager = new UpdateManager(fs, instanceId);
+    updateManager.registerSD(sdId, config.path);
   });
 
   describe('writeNoteUpdate', () => {
@@ -117,7 +119,7 @@ describe('UpdateManager', () => {
       });
 
       const update = noteDoc.encodeStateAsUpdate();
-      const filename = await updateManager.writeNoteUpdate(noteId, update);
+      const filename = await updateManager.writeNoteUpdate(sdId, noteId, update);
 
       expect(filename).toMatch(/^test-instance-123_note-123_\d+-\d{4}\.yjson$/);
       expect(fs.hasFile(`/test/sd/notes/note-123/updates/${filename}`)).toBe(true);
@@ -129,7 +131,7 @@ describe('UpdateManager', () => {
       const noteId = 'note-456' as UUID;
       const update = new Uint8Array([1, 2, 3]);
 
-      await updateManager.writeNoteUpdate(noteId, update);
+      await updateManager.writeNoteUpdate(sdId, noteId, update);
 
       expect(await fs.exists('/test/sd/notes/note-456')).toBe(true);
       expect(await fs.exists('/test/sd/notes/note-456/updates')).toBe(true);
@@ -151,14 +153,14 @@ describe('UpdateManager', () => {
   describe('readNoteUpdates', () => {
     it('should return empty array when no updates exist', async () => {
       const noteId = 'note-123' as UUID;
-      const updates = await updateManager.readNoteUpdates(noteId);
+      const updates = await updateManager.readNoteUpdates(sdId, noteId);
 
       expect(updates).toEqual([]);
     });
 
     it('should return empty array when note directory does not exist', async () => {
       const noteId = 'note-999' as UUID;
-      const updates = await updateManager.readNoteUpdates(noteId);
+      const updates = await updateManager.readNoteUpdates(sdId, noteId);
 
       expect(updates).toEqual([]);
     });
@@ -171,14 +173,14 @@ describe('UpdateManager', () => {
       const update2 = new Uint8Array([4, 5, 6]);
       const update3 = new Uint8Array([7, 8, 9]);
 
-      await updateManager.writeNoteUpdate(noteId, update1);
+      await updateManager.writeNoteUpdate(sdId, noteId, update1);
       await new Promise((resolve) => setTimeout(resolve, 2));
-      await updateManager.writeNoteUpdate(noteId, update2);
+      await updateManager.writeNoteUpdate(sdId, noteId, update2);
       await new Promise((resolve) => setTimeout(resolve, 2));
-      await updateManager.writeNoteUpdate(noteId, update3);
+      await updateManager.writeNoteUpdate(sdId, noteId, update3);
 
       // Read all updates
-      const updates = await updateManager.readNoteUpdates(noteId);
+      const updates = await updateManager.readNoteUpdates(sdId, noteId);
 
       expect(updates).toHaveLength(3);
     });
@@ -188,19 +190,19 @@ describe('UpdateManager', () => {
       await sdStructure.initializeNote(noteId);
 
       // Write valid update
-      await updateManager.writeNoteUpdate(noteId, new Uint8Array([1, 2, 3]));
+      await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([1, 2, 3]));
 
       // Write invalid file
       await fs.writeFile('/test/sd/notes/note-123/updates/invalid.txt', new Uint8Array([9, 9, 9]));
 
-      const updates = await updateManager.readNoteUpdates(noteId);
+      const updates = await updateManager.readNoteUpdates(sdId, noteId);
       expect(updates).toHaveLength(1);
     });
   });
 
   describe('readFolderUpdates', () => {
     it('should return empty array when no updates exist', async () => {
-      const updates = await updateManager.readFolderUpdates();
+      const updates = await updateManager.readFolderUpdates(sdId);
       expect(updates).toEqual([]);
     });
 
@@ -214,7 +216,7 @@ describe('UpdateManager', () => {
       await new Promise((resolve) => setTimeout(resolve, 2));
       await updateManager.writeFolderUpdate('sd-test', update2);
 
-      const updates = await updateManager.readFolderUpdates();
+      const updates = await updateManager.readFolderUpdates(sdId);
       expect(updates).toHaveLength(2);
     });
   });
@@ -222,7 +224,7 @@ describe('UpdateManager', () => {
   describe('listNoteUpdateFiles', () => {
     it('should return empty array when no updates exist', async () => {
       const noteId = 'note-123' as UUID;
-      const files = await updateManager.listNoteUpdateFiles(noteId);
+      const files = await updateManager.listNoteUpdateFiles(sdId, noteId);
 
       expect(files).toEqual([]);
     });
@@ -231,13 +233,13 @@ describe('UpdateManager', () => {
       const noteId = 'note-123' as UUID;
 
       // Use setTimeout to ensure different timestamps
-      await updateManager.writeNoteUpdate(noteId, new Uint8Array([1]));
+      await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([1]));
       await new Promise((resolve) => setTimeout(resolve, 10));
-      await updateManager.writeNoteUpdate(noteId, new Uint8Array([2]));
+      await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([2]));
       await new Promise((resolve) => setTimeout(resolve, 10));
-      await updateManager.writeNoteUpdate(noteId, new Uint8Array([3]));
+      await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([3]));
 
-      const files = await updateManager.listNoteUpdateFiles(noteId);
+      const files = await updateManager.listNoteUpdateFiles(sdId, noteId);
 
       expect(files).toHaveLength(3);
       expect(files[0]?.instanceId).toBe(instanceId);
@@ -254,17 +256,17 @@ describe('UpdateManager', () => {
       const noteId = 'note-123' as UUID;
       await sdStructure.initializeNote(noteId);
 
-      await updateManager.writeNoteUpdate(noteId, new Uint8Array([1]));
+      await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([1]));
       await fs.writeFile('/test/sd/notes/note-123/updates/invalid-name.yjson', new Uint8Array([2]));
 
-      const files = await updateManager.listNoteUpdateFiles(noteId);
+      const files = await updateManager.listNoteUpdateFiles(sdId, noteId);
       expect(files).toHaveLength(1);
     });
   });
 
   describe('listFolderUpdateFiles', () => {
     it('should return empty array when no updates exist', async () => {
-      const files = await updateManager.listFolderUpdateFiles();
+      const files = await updateManager.listFolderUpdateFiles(sdId);
       expect(files).toEqual([]);
     });
 
@@ -275,7 +277,7 @@ describe('UpdateManager', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       await updateManager.writeFolderUpdate('sd-test', new Uint8Array([2]));
 
-      const files = await updateManager.listFolderUpdateFiles();
+      const files = await updateManager.listFolderUpdateFiles(sdId);
 
       expect(files).toHaveLength(2);
       expect(files[0]?.instanceId).toBe(instanceId);
@@ -290,9 +292,9 @@ describe('UpdateManager', () => {
     it('should delete specified files', async () => {
       const noteId = 'note-123' as UUID;
 
-      const filename1 = await updateManager.writeNoteUpdate(noteId, new Uint8Array([1]));
+      const filename1 = await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([1]));
       await new Promise((resolve) => setTimeout(resolve, 2));
-      const filename2 = await updateManager.writeNoteUpdate(noteId, new Uint8Array([2]));
+      const filename2 = await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([2]));
 
       const path1 = `/test/sd/notes/note-123/updates/${filename1}`;
       const path2 = `/test/sd/notes/note-123/updates/${filename2}`;
@@ -328,10 +330,10 @@ describe('UpdateManager', () => {
 
       // Write update
       const update = noteDoc1.encodeStateAsUpdate();
-      await updateManager.writeNoteUpdate(noteId, update);
+      await updateManager.writeNoteUpdate(sdId, noteId, update);
 
       // Read updates
-      const updates = await updateManager.readNoteUpdates(noteId);
+      const updates = await updateManager.readNoteUpdates(sdId, noteId);
       expect(updates).toHaveLength(1);
 
       // Apply to new document

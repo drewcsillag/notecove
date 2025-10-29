@@ -10,15 +10,19 @@ import type { CRDTManager, DocumentState } from './types';
 import { NoteDoc, FolderTreeDoc } from '@shared/crdt';
 import type { UpdateManager } from '@shared/storage';
 import type { UUID, FolderData } from '@shared/types';
+import type { Database } from '@notecove/shared';
 
 export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
   private folderTrees = new Map<string, FolderTreeDoc>();
   private activityLogger: import('@shared/storage').ActivityLogger | null = null;
 
-  constructor(private updateManager: UpdateManager) {}
+  constructor(
+    private updateManager: UpdateManager,
+    private database?: Database
+  ) {}
 
-  async loadNote(noteId: string): Promise<Y.Doc> {
+  async loadNote(noteId: string, sdId?: string): Promise<Y.Doc> {
     const existing = this.documents.get(noteId);
 
     if (existing) {
@@ -27,15 +31,21 @@ export class CRDTManagerImpl implements CRDTManager {
       return existing.doc;
     }
 
+    // If sdId not provided, try to determine it from existing updates
+    let noteSdId = sdId;
+    if (!noteSdId) {
+      noteSdId = await this.getNoteSdId(noteId);
+    }
+
     // Create new Yjs document
     const noteDoc = new NoteDoc(noteId);
     const doc = noteDoc.doc;
 
     // Load all updates from disk
     try {
-      const updates = await this.updateManager.readNoteUpdates(noteId);
+      const updates = await this.updateManager.readNoteUpdates(noteSdId, noteId);
       console.log(
-        `[CRDT Manager] Loading note ${noteId}, found ${updates.length} updates from disk`
+        `[CRDT Manager] Loading note ${noteId} from SD ${noteSdId}, found ${updates.length} updates from disk`
       );
 
       for (const update of updates) {
@@ -52,6 +62,7 @@ export class CRDTManagerImpl implements CRDTManager {
       doc,
       noteDoc,
       noteId,
+      sdId: noteSdId,
       refCount: 1,
       lastModified: Date.now(),
     });
@@ -120,8 +131,8 @@ export class CRDTManagerImpl implements CRDTManager {
       return;
     }
 
-    // Write update to disk
-    await this.updateManager.writeNoteUpdate(noteId, update);
+    // Write update to disk using the note's SD ID
+    await this.updateManager.writeNoteUpdate(state.sdId, noteId, update);
 
     state.lastModified = Date.now();
 
@@ -157,8 +168,8 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     try {
-      // Re-read all updates from disk
-      const updates = await this.updateManager.readNoteUpdates(noteId);
+      // Re-read all updates from disk using the note's SD ID
+      const updates = await this.updateManager.readNoteUpdates(state.sdId, noteId);
 
       // Apply all updates (Yjs will automatically merge and deduplicate)
       for (const update of updates) {
@@ -321,6 +332,35 @@ export class CRDTManagerImpl implements CRDTManager {
     for (const folder of folders) {
       folderTree.createFolder(folder);
     }
+  }
+
+  /**
+   * Get the SD ID for a note by querying the database
+   * @param noteId Note ID
+   * @returns SD ID or 'default' as fallback
+   */
+  private async getNoteSdId(noteId: string): Promise<string> {
+    // Try to get from loaded document first (optimization)
+    const state = this.documents.get(noteId);
+    if (state?.sdId) {
+      return state.sdId;
+    }
+
+    // Query database for the note's SD ID
+    if (this.database) {
+      try {
+        const note = await this.database.getNote(noteId);
+        if (note?.sdId) {
+          return note.sdId;
+        }
+      } catch (error) {
+        console.error(`[CRDT Manager] Failed to query database for note ${noteId}:`, error);
+      }
+    }
+
+    // Fallback to default SD
+    console.log(`[CRDT Manager] No sdId found for note ${noteId}, using 'default'`);
+    return 'default';
   }
 
   /**

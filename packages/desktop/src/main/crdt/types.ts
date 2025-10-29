@@ -11,6 +11,7 @@ export interface DocumentState {
   doc: Y.Doc;
   noteDoc: import('@notecove/shared').NoteDoc; // NoteDoc wrapper with metadata methods
   noteId: string;
+  sdId: string; // Storage Directory ID for this note
   refCount: number; // Number of renderer windows using this document
   lastModified: number;
 }
@@ -22,9 +23,10 @@ export interface CRDTManager {
   /**
    * Load a note's CRDT document into memory
    * @param noteId Note ID
+   * @param sdId Storage Directory ID (optional, will be extracted from metadata if not provided)
    * @returns The Yjs document
    */
-  loadNote(noteId: string): Promise<Y.Doc>;
+  loadNote(noteId: string, sdId?: string): Promise<Y.Doc>;
 
   /**
    * Unload a note from memory (decrements ref count)

@@ -11,7 +11,7 @@ export interface ActivitySyncCallbacks {
   /**
    * Reload a note from disk if it's currently loaded
    */
-  reloadNote: (noteId: string) => Promise<void>;
+  reloadNote: (noteId: string, sdId: string) => Promise<void>;
 
   /**
    * Get list of currently loaded note IDs
@@ -26,6 +26,7 @@ export class ActivitySync {
     private fs: FileSystemAdapter,
     private instanceId: string,
     private activityDir: string,
+    private sdId: string,
     private callbacks: ActivitySyncCallbacks
   ) {}
 
@@ -88,7 +89,7 @@ export class ActivitySync {
             const ts = parseInt(timestamp);
 
             if (ts > lastSeen) {
-              await this.callbacks.reloadNote(noteId);
+              await this.callbacks.reloadNote(noteId, this.sdId);
               affectedNotes.add(noteId);
             }
           }
@@ -136,7 +137,7 @@ export class ActivitySync {
 
     for (const noteId of loadedNotes) {
       try {
-        await this.callbacks.reloadNote(noteId);
+        await this.callbacks.reloadNote(noteId, this.sdId);
         reloadedNotes.add(noteId);
       } catch (error) {
         console.error(`[ActivitySync] Failed to reload note ${noteId}:`, error);

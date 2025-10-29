@@ -16,25 +16,61 @@ import { SyncDirectoryStructure } from './sd-structure';
 
 /**
  * Manages reading and writing update files
+ * Supports multiple Storage Directories
  */
 export class UpdateManager {
+  private sdStructures = new Map<UUID, SyncDirectoryStructure>();
+
   constructor(
     private readonly fs: FileSystemAdapter,
-    private readonly sdStructure: SyncDirectoryStructure,
     private readonly instanceId: string
   ) {}
 
   /**
+   * Register a Storage Directory
+   */
+  registerSD(sdId: UUID, sdPath: string): void {
+    const config = {
+      id: sdId,
+      path: sdPath,
+      label: '', // Not needed for UpdateManager operations
+    };
+    const structure = new SyncDirectoryStructure(this.fs, config);
+    this.sdStructures.set(sdId, structure);
+  }
+
+  /**
+   * Unregister a Storage Directory
+   */
+  unregisterSD(sdId: UUID): void {
+    this.sdStructures.delete(sdId);
+  }
+
+  /**
+   * Get SD structure for a given SD ID
+   * @throws Error if SD is not registered
+   */
+  private getSDStructure(sdId: UUID): SyncDirectoryStructure {
+    const structure = this.sdStructures.get(sdId);
+    if (!structure) {
+      throw new Error(`Storage Directory not registered: ${sdId}`);
+    }
+    return structure;
+  }
+
+  /**
    * Write a note update to disk
    */
-  async writeNoteUpdate(noteId: UUID, update: Uint8Array): Promise<string> {
+  async writeNoteUpdate(sdId: UUID, noteId: UUID, update: Uint8Array): Promise<string> {
+    const sdStructure = this.getSDStructure(sdId);
+
     // Ensure note directory exists
-    await this.sdStructure.initializeNote(noteId);
+    await sdStructure.initializeNote(noteId);
 
     const filename = generateUpdateFilename(UpdateType.Note, this.instanceId, noteId, Date.now());
 
     const encoded = encodeUpdateFile(update);
-    const filePath = this.sdStructure.getNoteUpdateFilePath(noteId, filename);
+    const filePath = sdStructure.getNoteUpdateFilePath(noteId, filename);
 
     await this.fs.writeFile(filePath, encoded);
     return filename;
@@ -43,7 +79,9 @@ export class UpdateManager {
   /**
    * Write a folder tree update to disk
    */
-  async writeFolderUpdate(sdId: string, update: Uint8Array): Promise<string> {
+  async writeFolderUpdate(sdId: UUID, update: Uint8Array): Promise<string> {
+    const sdStructure = this.getSDStructure(sdId);
+
     const filename = generateUpdateFilename(
       UpdateType.FolderTree,
       this.instanceId,
@@ -52,7 +90,7 @@ export class UpdateManager {
     );
 
     const encoded = encodeUpdateFile(update);
-    const filePath = this.sdStructure.getFolderUpdateFilePath(filename);
+    const filePath = sdStructure.getFolderUpdateFilePath(filename);
 
     await this.fs.writeFile(filePath, encoded);
     return filename;
@@ -61,8 +99,9 @@ export class UpdateManager {
   /**
    * Read all updates for a note
    */
-  async readNoteUpdates(noteId: UUID): Promise<Uint8Array[]> {
-    const notePaths = this.sdStructure.getNotePaths(noteId);
+  async readNoteUpdates(sdId: UUID, noteId: UUID): Promise<Uint8Array[]> {
+    const sdStructure = this.getSDStructure(sdId);
+    const notePaths = sdStructure.getNotePaths(noteId);
 
     const noteExists = await this.fs.exists(notePaths.updates);
     if (!noteExists) {
@@ -93,10 +132,10 @@ export class UpdateManager {
 
   /**
    * Read all updates for folder tree
-   * @param sdId Optional SD ID to filter updates for a specific SD
    */
-  async readFolderUpdates(sdId?: string): Promise<Uint8Array[]> {
-    const folderPaths = this.sdStructure.getFolderPaths();
+  async readFolderUpdates(sdId: UUID): Promise<Uint8Array[]> {
+    const sdStructure = this.getSDStructure(sdId);
+    const folderPaths = sdStructure.getFolderPaths();
 
     const folderExists = await this.fs.exists(folderPaths.updates);
     if (!folderExists) {
@@ -109,18 +148,6 @@ export class UpdateManager {
     for (const filename of files) {
       if (!filename.endsWith('.yjson')) {
         continue;
-      }
-
-      // Filter by SD ID if provided
-      // Filename format: {instanceId}_folder-tree_{sdId}_{timestamp}.yjson
-      if (sdId) {
-        const parts = filename.split('_');
-        if (parts.length >= 3) {
-          const fileSdId = parts[2]; // Extract SD ID from filename
-          if (fileSdId !== sdId) {
-            continue; // Skip files that don't match the requested SD
-          }
-        }
       }
 
       const filePath = this.fs.joinPath(folderPaths.updates, filename);
@@ -139,8 +166,9 @@ export class UpdateManager {
   /**
    * List all update files for a note
    */
-  async listNoteUpdateFiles(noteId: UUID): Promise<UpdateFile[]> {
-    const notePaths = this.sdStructure.getNotePaths(noteId);
+  async listNoteUpdateFiles(sdId: UUID, noteId: UUID): Promise<UpdateFile[]> {
+    const sdStructure = this.getSDStructure(sdId);
+    const notePaths = sdStructure.getNotePaths(noteId);
 
     const noteExists = await this.fs.exists(notePaths.updates);
     if (!noteExists) {
@@ -173,8 +201,9 @@ export class UpdateManager {
   /**
    * List all update files for folder tree
    */
-  async listFolderUpdateFiles(): Promise<UpdateFile[]> {
-    const folderPaths = this.sdStructure.getFolderPaths();
+  async listFolderUpdateFiles(sdId: UUID): Promise<UpdateFile[]> {
+    const sdStructure = this.getSDStructure(sdId);
+    const folderPaths = sdStructure.getFolderPaths();
 
     const folderExists = await this.fs.exists(folderPaths.updates);
     if (!folderExists) {

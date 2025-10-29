@@ -17,7 +17,8 @@ export class IPCHandlers {
   constructor(
     private crdtManager: CRDTManager,
     private database: Database,
-    private createWindowFn?: () => void
+    private createWindowFn?: () => void,
+    private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
   ) {
     this.registerHandlers();
   }
@@ -70,13 +71,16 @@ export class IPCHandlers {
   }
 
   private async handleLoadNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
-    await this.crdtManager.loadNote(noteId);
+    // Get note from database to find its sdId
+    const note = await this.database.getNote(noteId);
+    const sdId = note?.sdId ?? 'default';
+
+    await this.crdtManager.loadNote(noteId, sdId);
 
     // Sync CRDT metadata to SQLite cache
     const noteDoc = this.crdtManager.getNoteDoc(noteId);
     if (noteDoc) {
       const crdtMetadata = noteDoc.getMetadata();
-      const note = await this.database.getNote(noteId);
 
       // Only update if note exists in cache and CRDT has initialized metadata
       if (note && crdtMetadata.id) {
@@ -124,10 +128,10 @@ export class IPCHandlers {
     // Generate new note ID
     const noteId = crypto.randomUUID();
 
-    // Load the note (creates empty CRDT document)
-    await this.crdtManager.loadNote(noteId);
+    // Load the note (creates empty CRDT document) with explicit sdId
+    await this.crdtManager.loadNote(noteId, sdId);
 
-    // Initialize CRDT metadata with folder association
+    // Initialize CRDT metadata with SD and folder association
     const noteDoc = this.crdtManager.getNoteDoc(noteId);
     if (noteDoc) {
       const now = Date.now();
@@ -135,6 +139,7 @@ export class IPCHandlers {
         id: noteId,
         created: now,
         modified: now,
+        sdId: sdId,
         folderId: folderId,
         deleted: false,
       });
@@ -192,8 +197,8 @@ export class IPCHandlers {
         modified: Date.now(),
       });
     } else {
-      // Note not loaded in memory, load it first
-      await this.crdtManager.loadNote(noteId);
+      // Note not loaded in memory, load it first with its sdId
+      await this.crdtManager.loadNote(noteId, note.sdId);
       const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
       if (loadedNoteDoc) {
         loadedNoteDoc.updateMetadata({
@@ -233,8 +238,8 @@ export class IPCHandlers {
     if (noteDoc) {
       crdtMetadata = noteDoc.getMetadata();
     } else {
-      // Load note to get CRDT metadata
-      await this.crdtManager.loadNote(noteId);
+      // Load note to get CRDT metadata with its sdId
+      await this.crdtManager.loadNote(noteId, note.sdId);
       const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
       if (loadedNoteDoc) {
         crdtMetadata = loadedNoteDoc.getMetadata();
@@ -525,11 +530,23 @@ export class IPCHandlers {
   ): Promise<string> {
     const id = crypto.randomUUID();
     await this.database.createStorageDir(id, name, path);
+
+    // Initialize the new SD (register with UpdateManager, set up watchers, etc.)
+    if (this.onStorageDirCreated) {
+      await this.onStorageDirCreated(id, path);
+    }
+
+    // Broadcast SD update to all windows
+    this.broadcastToAll('sd:updated', { operation: 'create', sdId: id });
+
     return id;
   }
 
   private async handleSetActiveStorageDir(_event: IpcMainInvokeEvent, sdId: string): Promise<void> {
     await this.database.setActiveStorageDir(sdId);
+
+    // Broadcast SD update to all windows
+    this.broadcastToAll('sd:updated', { operation: 'setActive', sdId });
   }
 
   private async handleGetActiveStorageDir(_event: IpcMainInvokeEvent): Promise<string | null> {

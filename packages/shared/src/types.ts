@@ -14,6 +14,7 @@ export interface NoteMetadata {
   id: UUID;
   created: number; // timestamp
   modified: number; // timestamp
+  sdId: UUID; // Storage Directory ID
   folderId: UUID | null; // null for orphan notes
   deleted: boolean;
 }

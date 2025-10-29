@@ -25,26 +25,14 @@ import * as Y from 'yjs';
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
 let ipcHandlers: IPCHandlers | null = null;
-let fileWatcher: NodeFileWatcher | null = null;
-let activityWatcher: NodeFileWatcher | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
 const allWindows: BrowserWindow[] = [];
 
-/**
- * Extract all text content from an XmlElement recursively
- * Used for generating content previews from CRDT documents
- */
-function extractTextFromXmlElement(element: Y.XmlElement): string {
-  let text = '';
-  element.forEach((child) => {
-    if (child instanceof Y.XmlText) {
-      text += child.toString();
-    } else if (child instanceof Y.XmlElement) {
-      text += extractTextFromXmlElement(child);
-    }
-  });
-  return text;
-}
+// Multi-SD support: Store watchers and activity syncs per SD
+const sdFileWatchers = new Map<string, NodeFileWatcher>();
+const sdActivityWatchers = new Map<string, NodeFileWatcher>();
+const sdActivitySyncs = new Map<string, ActivitySync>();
+
 
 function createWindow(): void {
   // Create the browser window
@@ -139,7 +127,7 @@ async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<vo
   if (defaultNote) {
     // Default note exists, check if it has content
     console.log('[ensureDefaultNote] Found default note, checking content');
-    await crdtMgr.loadNote(DEFAULT_NOTE_ID);
+    await crdtMgr.loadNote(DEFAULT_NOTE_ID, DEFAULT_SD_ID);
     const doc = crdtMgr.getDocument(DEFAULT_NOTE_ID);
     if (doc) {
       const content = doc.getXmlFragment('content');
@@ -181,7 +169,7 @@ async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<vo
   // No notes exist in database, but CRDT files might exist
   // Load the note to check if it already has content from sync directory
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  await crdtMgr.loadNote(DEFAULT_NOTE_ID);
+  await crdtMgr.loadNote(DEFAULT_NOTE_ID, DEFAULT_SD_ID);
 
   // Get the document to check/insert initial content
   const doc = crdtMgr.getDocument(DEFAULT_NOTE_ID);
@@ -227,6 +215,171 @@ async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<vo
 
 // App lifecycle
 // Create application menu
+/**
+ * Set up file watchers and activity sync for a Storage Directory
+ */
+async function setupSDWatchers(
+  sdId: string,
+  sdPath: string,
+  fsAdapter: NodeFileSystemAdapter,
+  instanceId: string,
+  updateManager: UpdateManager,
+  crdtManager: CRDTManager
+): Promise<void> {
+  console.log(`[Init] Setting up watchers for SD: ${sdId} at ${sdPath}`);
+
+  const folderUpdatesPath = join(sdPath, 'folders', 'updates');
+  const activityDir = join(sdPath, '.activity');
+
+  // Create ActivitySync for this SD
+  const activitySyncCallbacks: ActivitySyncCallbacks = {
+    reloadNote: async (noteId: string, sdIdFromSync: string) => {
+      try {
+        if (!database) {
+          console.error('[ActivitySync] Database not initialized');
+          return;
+        }
+
+        const existingNote = await database.getNote(noteId);
+
+        if (!existingNote) {
+          // Note created in another instance
+          await crdtManager.loadNote(noteId, sdIdFromSync);
+
+          // Extract metadata and insert into database
+          const noteDoc = crdtManager.getNoteDoc(noteId);
+          const doc = crdtManager.getDocument(noteId);
+          if (!doc) {
+            console.error(`[ActivitySync] Failed to get document for note ${noteId}`);
+            return;
+          }
+
+          const crdtMetadata = noteDoc?.getMetadata();
+          const folderId = crdtMetadata?.folderId ?? null;
+
+          await database.upsertNote({
+            id: noteId,
+            title: extractTitleFromDoc(doc, 'content'),
+            sdId: sdIdFromSync,
+            folderId,
+            created: crdtMetadata?.created ?? Date.now(),
+            modified: crdtMetadata?.modified ?? Date.now(),
+            deleted: crdtMetadata?.deleted ?? false,
+            contentPreview: '',
+            contentText: '',
+          });
+
+          // Broadcast to all windows
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('note:created', { sdId: sdIdFromSync, noteId, folderId });
+          }
+        } else {
+          // Note exists, just reload if currently loaded
+          await crdtManager.reloadNote(noteId);
+        }
+      } catch (error) {
+        console.error(`[ActivitySync] Error in reloadNote callback:`, error);
+      }
+    },
+    getLoadedNotes: () => crdtManager.getLoadedNotes(),
+  };
+
+  const activitySync = new ActivitySync(
+    fsAdapter,
+    instanceId,
+    activityDir,
+    sdId,
+    activitySyncCallbacks
+  );
+
+  // Clean up orphaned activity logs on startup
+  await activitySync.cleanupOrphanedLogs();
+
+  // Store the ActivitySync instance
+  sdActivitySyncs.set(sdId, activitySync);
+
+  // Set up folder updates watcher
+  const folderWatcher = new NodeFileWatcher();
+  await folderWatcher.watch(folderUpdatesPath, (event) => {
+    console.log(`[FileWatcher ${sdId}] Detected folder update file change:`, event.filename);
+
+    // Ignore directory creation events and temporary files
+    if (event.filename === 'updates' || event.filename.endsWith('.tmp')) {
+      return;
+    }
+
+    // Only process .yjson files
+    if (!event.filename.endsWith('.yjson')) {
+      return;
+    }
+
+    // Reload folder tree from disk
+    const folderTree = crdtManager.getFolderTree(sdId);
+    if (folderTree) {
+      updateManager
+        .readFolderUpdates(sdId)
+        .then((updates) => {
+          for (const update of updates) {
+            folderTree.applyUpdate(update);
+          }
+
+          // Broadcast update to all windows
+          const windows = BrowserWindow.getAllWindows();
+          for (const window of windows) {
+            window.webContents.send('folder:updated', {
+              sdId,
+              operation: 'external-sync',
+              folderId: 'unknown',
+            });
+          }
+        })
+        .catch((err) => {
+          console.error(`[FileWatcher ${sdId}] Failed to reload folder updates:`, err);
+        });
+    }
+  });
+
+  sdFileWatchers.set(sdId, folderWatcher);
+
+  // Set up activity watcher
+  const activityWatcher = new NodeFileWatcher();
+  await activityWatcher.watch(activityDir, (event) => {
+    console.log(`[ActivityWatcher ${sdId}] Detected activity log change:`, event.filename);
+
+    // Ignore directory creation events and our own log file
+    if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
+      return;
+    }
+
+    // Only process .log files
+    if (!event.filename.endsWith('.log')) {
+      return;
+    }
+
+    // Sync from other instances
+    void (async () => {
+      try {
+        const affectedNotes = await activitySync.syncFromOtherInstances();
+
+        // Broadcast updates to all windows for affected notes
+        if (affectedNotes.size > 0) {
+          for (const window of BrowserWindow.getAllWindows()) {
+            for (const noteId of affectedNotes) {
+              window.webContents.send('note:externalUpdate', { noteId });
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[ActivityWatcher ${sdId}] Failed to sync from other instances:`, error);
+      }
+    })();
+  });
+
+  sdActivityWatchers.set(sdId, activityWatcher);
+
+  console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
+}
+
 function createMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -333,14 +486,27 @@ void app.whenReady().then(async () => {
     const folderUpdatesPath = join(storageDir, 'folders', 'updates');
     await fsAdapter.mkdir(folderUpdatesPath);
 
-    // Initialize UpdateManager with instance ID
+    // Initialize UpdateManager with instance ID (multi-SD aware)
     const instanceId = process.env['INSTANCE_ID'] ?? randomUUID();
-    const updateManager = new UpdateManager(fsAdapter, sdStructure, instanceId);
+    const updateManager = new UpdateManager(fsAdapter, instanceId);
 
-    // Initialize CRDT manager
+    // Register the default SD
+    updateManager.registerSD('default', storageDir);
+
+    // Load all Storage Directories from database and register them
+    const allSDs = database ? await database.getAllStorageDirs() : [];
+    for (const sd of allSDs) {
+      if (sd.id !== 'default') {
+        // Default is already registered above
+        updateManager.registerSD(sd.id, sd.path);
+        console.log(`[Init] Registered SD: ${sd.name} at ${sd.path}`);
+      }
+    }
+
+    // Initialize CRDT manager with database reference
     // Type assertion needed due to TypeScript module resolution quirk between dist and src
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    const crdtManager = new CRDTManagerImpl(updateManager as any);
+    const crdtManager = new CRDTManagerImpl(updateManager as any, database);
 
     // Initialize activity logger for note sync
     const activityDir = join(storageDir, '.activity');
@@ -355,188 +521,50 @@ void app.whenReady().then(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     crdtManager.setActivityLogger(activityLogger as any);
 
-    // Initialize activity sync with callbacks
-    const activitySyncCallbacks: ActivitySyncCallbacks = {
-      reloadNote: async (noteId: string) => {
-        try {
-          if (!database) {
-            console.error('[ActivitySync] Database not initialized');
-            return;
-          }
-
-          // Check if note exists in database cache
-          const existingNote = await database.getNote(noteId);
-
-          if (!existingNote) {
-            // Note doesn't exist in our database - it was created in another instance
-            try {
-              // Load note from CRDT files in sync directory
-              await crdtManager.loadNote(noteId);
-              const doc = crdtManager.getDocument(noteId);
-
-              if (!doc) {
-                console.error(`[ActivitySync] Failed to load document for note ${noteId}`);
-                return;
-              }
-
-              // Extract metadata from CRDT
-              const fragment = doc.getXmlFragment('content');
-              const title = extractTitleFromDoc(doc, 'content');
-
-              // Extract text content for preview
-              let contentText = '';
-              for (let i = 0; i < fragment.length; i++) {
-                const node = fragment.get(i);
-                if (node instanceof Y.XmlElement) {
-                  contentText += extractTextFromXmlElement(node) + ' ';
-                } else if (node instanceof Y.XmlText) {
-                  contentText += node.toString() + ' ';
-                }
-              }
-              contentText = contentText.trim();
-
-              // Create database entry
-              // TODO: Extract actual sdId and folderId from note metadata when implemented
-              const sdId = 'default';
-              const folderId = null; // For now, default to root
-
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-              if (database) {
-                await database.upsertNote({
-                  id: noteId,
-                  title,
-                  sdId,
-                  folderId,
-                  created: Date.now(), // We don't have the original creation time, use now
-                  modified: Date.now(),
-                  deleted: false,
-                  contentPreview: contentText.substring(0, 200), // First 200 chars
-                  contentText,
-                });
-              }
-
-              console.log(
-                `[ActivitySync] Created database entry for note ${noteId} with title "${title}"`
-              );
-
-              // Unload the note since we just needed metadata
-              await crdtManager.unloadNote(noteId);
-
-              // Broadcast note creation to all windows so they update their lists
-              const windows = BrowserWindow.getAllWindows();
-              for (const window of windows) {
-                window.webContents.send('note:created', { sdId, noteId, folderId });
-              }
-            } catch (error) {
-              console.error(`[ActivitySync] Failed to process new note ${noteId}:`, error);
-            }
-          } else {
-            // Note exists in database, just reload it if it's currently loaded
-            await crdtManager.reloadNote(noteId);
-          }
-        } catch (error) {
-          console.error(`[ActivitySync] Error in reloadNote callback for ${noteId}:`, error);
-        }
-      },
-      getLoadedNotes: () => crdtManager.getLoadedNotes(),
-    };
-    const activitySync = new ActivitySync(
-      fsAdapter,
-      instanceId,
-      activityDir,
-      activitySyncCallbacks
-    );
-
-    // Clean up orphaned activity logs on startup
-    await activitySync.cleanupOrphanedLogs();
-
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
     crdtManager.loadFolderTree('default');
 
-    // Initialize IPC handlers (pass createWindow for testing support)
-    ipcHandlers = new IPCHandlers(crdtManager, database, createWindow);
+    // Handler for when new SD is created (for IPC)
+    const handleNewStorageDir = async (sdId: string, sdPath: string): Promise<void> => {
+      console.log(`[Init] Initializing new SD: ${sdId} at ${sdPath}`);
+
+      // 1. Create SD config and initialize structure
+      const sdConfig = { id: sdId, path: sdPath, label: '' };
+      const newSdStructure = new SyncDirectoryStructure(fsAdapter, sdConfig);
+      await newSdStructure.initialize();
+
+      // 2. Ensure activity directory exists (required for watchers)
+      const activityDir = join(sdPath, '.activity');
+      await fsAdapter.mkdir(activityDir);
+
+      // 3. Register with UpdateManager
+      updateManager.registerSD(sdId, sdPath);
+
+      // 4. Load folder tree for this SD
+      crdtManager.loadFolderTree(sdId);
+
+      // 5. Set up watchers for this SD
+      await setupSDWatchers(sdId, sdPath, fsAdapter, instanceId, updateManager, crdtManager);
+
+      console.log(`[Init] Successfully initialized new SD: ${sdId}`);
+    };
+
+    // Initialize IPC handlers (pass createWindow for testing support and SD callback)
+    ipcHandlers = new IPCHandlers(crdtManager, database, createWindow, handleNewStorageDir);
 
     // Create default note if none exists
     await ensureDefaultNote(database, crdtManager);
 
-    // Set up file watcher for cross-instance folder sync
-    fileWatcher = new NodeFileWatcher();
-    await fileWatcher.watch(folderUpdatesPath, (event) => {
-      console.log('[FileWatcher] Detected folder update file change:', event.filename);
+    // Set up watchers for default SD
+    await setupSDWatchers('default', storageDir, fsAdapter, instanceId, updateManager, crdtManager);
 
-      // Ignore directory creation events and temporary files
-      if (event.filename === 'updates' || event.filename.endsWith('.tmp')) {
-        return;
+    // Set up watchers for all other registered SDs
+    for (const sd of allSDs) {
+      if (sd.id !== 'default') {
+        await setupSDWatchers(sd.id, sd.path, fsAdapter, instanceId, updateManager, crdtManager);
       }
-
-      // Only process .yjson files
-      if (!event.filename.endsWith('.yjson')) {
-        return;
-      }
-
-      // Reload folder tree from disk
-      const folderTree = crdtManager.getFolderTree('default');
-      if (folderTree) {
-        // Load all updates from disk for 'default' SD (this will merge with existing state)
-        updateManager
-          .readFolderUpdates('default')
-          .then((updates) => {
-            for (const update of updates) {
-              folderTree.applyUpdate(update);
-            }
-
-            // Broadcast update to all windows
-            const windows = BrowserWindow.getAllWindows();
-            for (const window of windows) {
-              window.webContents.send('folder:updated', {
-                sdId: 'default',
-                operation: 'external-sync',
-                folderId: 'unknown',
-              });
-            }
-          })
-          .catch((err) => {
-            console.error('[FileWatcher] Failed to reload folder updates:', err);
-          });
-      }
-    });
-
-    // Set up file watcher for cross-instance note sync
-    activityWatcher = new NodeFileWatcher();
-    await activityWatcher.watch(activityDir, (event) => {
-      console.log('[ActivityWatcher] Detected activity log change:', event.filename);
-
-      // Ignore directory creation events and our own log file
-      if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
-        return;
-      }
-
-      // Only process .log files
-      if (!event.filename.endsWith('.log')) {
-        return;
-      }
-
-      // Sync from other instances (wrapped in void to handle async in sync callback)
-      void (async () => {
-        try {
-          const affectedNotes = await activitySync.syncFromOtherInstances();
-
-          if (affectedNotes.size > 0) {
-            // Broadcast update to all windows
-            const windows = BrowserWindow.getAllWindows();
-            for (const window of windows) {
-              window.webContents.send('note:external-update', {
-                operation: 'external-sync',
-                noteIds: Array.from(affectedNotes),
-              });
-            }
-          }
-        } catch (error) {
-          console.error('[ActivityWatcher] Failed to sync from other instances:', error);
-        }
-      })();
-    });
+    }
 
     // Periodic compaction of activity log (every 5 minutes)
     compactionInterval = setInterval(
@@ -592,12 +620,17 @@ app.on('before-quit', () => {
     if (ipcHandlers) {
       ipcHandlers.destroy();
     }
-    if (fileWatcher) {
-      void fileWatcher.unwatch();
+    // Clean up all SD file watchers
+    for (const watcher of sdFileWatchers.values()) {
+      void watcher.unwatch();
     }
-    if (activityWatcher) {
-      void activityWatcher.unwatch();
+    sdFileWatchers.clear();
+    // Clean up all SD activity watchers
+    for (const watcher of sdActivityWatchers.values()) {
+      void watcher.unwatch();
     }
+    sdActivityWatchers.clear();
+    sdActivitySyncs.clear();
     if (compactionInterval) {
       clearInterval(compactionInterval);
     }
