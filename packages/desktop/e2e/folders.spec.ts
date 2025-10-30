@@ -65,13 +65,24 @@ async function ensureSDExpansionState(
   shouldBeExpanded: boolean
 ): Promise<void> {
   // Check if "All Notes" (child of SD) is visible to determine current expansion state
-  const sdId = (await sdNode.getAttribute('data-testid'))?.split('folder-tree-node-')[1];
-  if (!sdId) {
-    throw new Error('Could not determine SD ID from node');
+  const testId = await sdNode.getAttribute('data-testid');
+  if (!testId) {
+    throw new Error('Could not determine SD test ID from node');
   }
+
+  // Extract SD ID from test ID (e.g., "folder-tree-node-sd:abc123" -> "abc123")
+  const sdIdMatch = testId.match(/folder-tree-node-sd:(.+)/);
+  if (!sdIdMatch) {
+    throw new Error(`Invalid SD test ID format: ${testId}`);
+  }
+  const sdId = sdIdMatch[1];
 
   // Look for "All Notes" under this SD
   const allNotesNode = page.locator(`[data-testid="folder-tree-node-all-notes:${sdId}"]`);
+
+  // Wait for the tree to stabilize (default expansion might still be happening)
+  await page.waitForTimeout(500);
+
   const isCurrentlyExpanded = await allNotesNode.isVisible().catch(() => false);
 
   console.log(
@@ -82,10 +93,18 @@ async function ensureSDExpansionState(
   if (isCurrentlyExpanded !== shouldBeExpanded) {
     console.log(`[E2E] Clicking SD node to ${shouldBeExpanded ? 'expand' : 'collapse'} it`);
     await sdNode.click();
-    await page.waitForTimeout(500); // Wait for expansion/collapse animation
+
+    // Wait for the expansion/collapse animation and state change
+    if (shouldBeExpanded) {
+      // If we want it expanded, wait for All Notes to become visible
+      await expect(allNotesNode).toBeVisible({ timeout: 2000 });
+    } else {
+      // If we want it collapsed, wait for All Notes to be hidden
+      await expect(allNotesNode).not.toBeVisible({ timeout: 2000 });
+    }
   }
 
-  // Verify the state changed
+  // Final verification
   const isNowExpanded = await allNotesNode.isVisible().catch(() => false);
   if (isNowExpanded !== shouldBeExpanded) {
     throw new Error(
@@ -342,10 +361,12 @@ test.describe('Folder Context Menu', () => {
     createButton = page.locator('button:has-text("Create")');
     await createButton.click();
     await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
-    await page.waitForSelector(`text=${childFolderName}`, { timeout: 5000 });
 
-    // Verify child folder is visible (parent should be expanded)
-    await expect(page.locator(`text=${childFolderName}`)).toBeVisible();
+    // Wait a bit longer for the folder tree to update and auto-expand the parent
+    await page.waitForTimeout(1000);
+
+    // The child folder should now be visible (parent should be auto-expanded)
+    await expect(page.locator(`text=${childFolderName}`)).toBeVisible({ timeout: 5000 });
 
     // Click on the parent folder name (not the caret)
     await parentFolder.click();
