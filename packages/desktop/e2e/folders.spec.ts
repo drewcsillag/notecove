@@ -139,8 +139,9 @@ test.describe('Folder Context Menu', () => {
     // Wait for create dialog
     await page.waitForSelector('text=Create New Folder');
 
-    // Type folder name
-    const folderNameInput = page.locator('input[type="text"]').first();
+    // Type folder name - scope to dialog to avoid search box
+    const dialog = page.locator('div[role="dialog"]');
+    const folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill(folderName);
 
     // Click create button
@@ -181,7 +182,8 @@ test.describe('Folder Context Menu', () => {
       const plusButton = page.locator('button[title="Create folder"]');
       await plusButton.click();
       await page.waitForSelector('text=Create New Folder');
-      const folderNameInput = page.locator('input[type="text"]').first();
+      const dialog = page.locator('div[role="dialog"]');
+      const folderNameInput = dialog.locator('input[type="text"]');
       await folderNameInput.fill(`Test Folder ${Date.now()}`);
       const createButton = page.locator('button:has-text("Create")');
       await createButton.click();
@@ -230,7 +232,8 @@ test.describe('Folder Context Menu', () => {
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
     await page.waitForSelector('text=Create New Folder');
-    const folderNameInput = page.locator('input[type="text"]').first();
+    const dialog = page.locator('div[role="dialog"]');
+    const folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill(testFolderName);
     const createButton = page.locator('button:has-text("Create")');
     await createButton.click();
@@ -248,8 +251,9 @@ test.describe('Folder Context Menu', () => {
     // Wait for rename dialog
     await page.waitForSelector('text=Rename Folder');
 
-    // Change the name
-    const nameInput = page.locator('input[type="text"]').first();
+    // Change the name - scope to dialog to avoid search box
+    const renameDialog = page.locator('div[role="dialog"]');
+    const nameInput = renameDialog.locator('input[type="text"]');
     await nameInput.fill(renamedFolderName);
 
     // Click Rename button
@@ -289,7 +293,8 @@ test.describe('Folder Context Menu', () => {
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
     await page.waitForSelector('text=Create New Folder');
-    const folderNameInput = page.locator('input[type="text"]').first();
+    const dialog = page.locator('div[role="dialog"]');
+    const folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill(`Folder To Delete ${Date.now()}`);
     const createButton = page.locator('button:has-text("Create")');
     await createButton.click();
@@ -342,7 +347,8 @@ test.describe('Folder Context Menu', () => {
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
     await page.waitForSelector('text=Create New Folder');
-    let folderNameInput = page.locator('input[type="text"]').first();
+    let dialog = page.locator('div[role="dialog"]');
+    let folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill(parentFolderName);
     let createButton = page.locator('button:has-text("Create")');
     await createButton.click();
@@ -356,7 +362,8 @@ test.describe('Folder Context Menu', () => {
     // Create a child folder
     await plusButton.click();
     await page.waitForSelector('text=Create New Folder');
-    folderNameInput = page.locator('input[type="text"]').first();
+    dialog = page.locator('div[role="dialog"]');
+    folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill(childFolderName);
     createButton = page.locator('button:has-text("Create")');
     await createButton.click();

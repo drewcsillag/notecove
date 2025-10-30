@@ -260,7 +260,8 @@ export class IPCHandlers {
   private async handleUpdateTitle(
     _event: IpcMainInvokeEvent,
     noteId: string,
-    title: string
+    title: string,
+    contentText?: string
   ): Promise<void> {
     console.log(`[IPC] handleUpdateTitle called - noteId: ${noteId}, title: "${title}"`);
 
@@ -273,14 +274,27 @@ export class IPCHandlers {
 
     console.log(`[IPC] Found note in database, current title: "${note.title}"`);
 
-    // Update title and modified timestamp
-    await this.database.upsertNote({
+    // Update title, content (if provided), and modified timestamp
+    const updates: Partial<typeof note> = {
       ...note,
       title,
       modified: Date.now(),
-    });
+    };
 
-    console.log(`[IPC] Title updated successfully in database`);
+    if (contentText !== undefined) {
+      updates.contentText = contentText;
+      // Extract preview from content after first line (which is the title)
+      // This prevents the title from appearing twice in the notes list
+      const lines = contentText.split('\n');
+      const contentAfterTitle = lines.slice(1).join('\n').trim();
+      updates.contentPreview = contentAfterTitle.substring(0, 200);
+    }
+
+    await this.database.upsertNote(updates as typeof note);
+
+    console.log(
+      `[IPC] Title${contentText !== undefined ? ' and content' : ''} updated successfully in database`
+    );
 
     // Broadcast title update to all windows so they can refresh their notes list
     this.broadcastToAll('note:title-updated', { noteId, title });

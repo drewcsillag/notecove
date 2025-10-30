@@ -18,7 +18,7 @@ declare global {
         delete: (noteId: string) => Promise<void>;
         move: (noteId: string, newFolderId: string) => Promise<void>;
         getMetadata: (noteId: string) => Promise<NoteMetadata>;
-        updateTitle: (noteId: string, title: string) => Promise<void>;
+        updateTitle: (noteId: string, title: string, contentText?: string) => Promise<void>;
         list: (
           sdId: string,
           folderId?: string | null

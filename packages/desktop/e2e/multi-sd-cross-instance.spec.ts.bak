@@ -119,10 +119,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
 
     // Fill in SD details with unique name
     const sdName = `Work SD ${testId}`;
-    const dialog = window1.locator('div[role=\"dialog\"]');
-    const nameInput = dialog.locator('input[type=\"text\"]').first();
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
     await nameInput.fill(sdName);
-    const pathInput = dialog.locator('input[type=\"text\"]').last();
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
     await pathInput.fill(testStorageDir2);
 
     // Click Add button in dialog
@@ -144,10 +143,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await addDirButton2.click();
     await window2.waitForTimeout(300);
 
-    const dialog2 = window2.locator('div[role=\"dialog\"]');
-    const nameInput2 = dialog2.locator('input[type=\"text\"]').first();
+    const nameInput2 = window2.locator('input[value=""][type="text"]').first();
     await nameInput2.fill(sdName);
-    const pathInput2 = dialog2.locator('input[type=\"text\"]').last();
+    const pathInput2 = window2.locator('input[value=""][type="text"]').last();
     await pathInput2.fill(testStorageDir2);
 
     const dialogAddButton2 = window2.locator('button:has-text("Add")').last();
@@ -208,10 +206,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(300);
 
     const sdName = `Personal SD ${testId}`;
-    const dialog = window1.locator('div[role=\"dialog\"]');
-    const nameInput = dialog.locator('input[type=\"text\"]').first();
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
     await nameInput.fill(sdName);
-    const pathInput = dialog.locator('input[type=\"text\"]').last();
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
     await pathInput.fill(testStorageDir2);
 
     const dialogAddButton = window1.locator('button:has-text("Add")').last();
@@ -232,10 +229,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await addDirButton2.click();
     await window2.waitForTimeout(300);
 
-    const dialog2 = window2.locator('div[role=\"dialog\"]');
-    const nameInput2 = dialog2.locator('input[type=\"text\"]').first();
+    const nameInput2 = window2.locator('input[value=""][type="text"]').first();
     await nameInput2.fill(sdName);
-    const pathInput2 = dialog2.locator('input[type=\"text\"]').last();
+    const pathInput2 = window2.locator('input[value=""][type="text"]').last();
     await pathInput2.fill(testStorageDir2);
 
     const dialogAddButton2 = window2.locator('button:has-text("Add")').last();
@@ -306,10 +302,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(300);
 
     const sdName = `Projects SD ${testId}`;
-    const dialog = window1.locator('div[role=\"dialog\"]');
-    const nameInput = dialog.locator('input[type=\"text\"]').first();
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
     await nameInput.fill(sdName);
-    const pathInput = dialog.locator('input[type=\"text\"]').last();
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
     await pathInput.fill(testStorageDir2);
 
     const dialogAddButton = window1.locator('button:has-text("Add")').last();
@@ -330,10 +325,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await addDirButton2.click();
     await window2.waitForTimeout(300);
 
-    const dialog2 = window2.locator('div[role=\"dialog\"]');
-    const nameInput2 = dialog2.locator('input[type=\"text\"]').first();
+    const nameInput2 = window2.locator('input[value=""][type="text"]').first();
     await nameInput2.fill(sdName);
-    const pathInput2 = dialog2.locator('input[type=\"text\"]').last();
+    const pathInput2 = window2.locator('input[value=""][type="text"]').last();
     await pathInput2.fill(testStorageDir2);
 
     const dialogAddButton2 = window2.locator('button:has-text("Add")').last();
@@ -357,8 +351,8 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(300);
 
     // Fill in folder name - scope to dialog to avoid search box
-    const folderDialog = window1.locator('div[role="dialog"]');
-    const folderNameInput = folderDialog.locator('input[type="text"]');
+    const dialog = window1.locator('div[role="dialog"]');
+    const folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill('Client Projects');
 
     // Click Create button
@@ -428,10 +422,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(300);
 
     const sdName = `NewSD ${testId}`;
-    const dialog = window1.locator('div[role=\"dialog\"]');
-    const nameInput = dialog.locator('input[type=\"text\"]').first();
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
     await nameInput.fill(sdName);
-    const pathInput = dialog.locator('input[type=\"text\"]').last();
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
     await pathInput.fill(testStorageDir2);
 
     const dialogAddButton = window1.locator('button:has-text("Add")').last();
@@ -471,10 +464,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await addDirButton2.click();
     await window2.waitForTimeout(300);
 
-    const dialog2 = window2.locator('div[role=\"dialog\"]');
-    const nameInput2 = dialog2.locator('input[type=\"text\"]').first();
+    const nameInput2 = window2.locator('input[value=""][type="text"]').first();
     await nameInput2.fill(sdName);
-    const pathInput2 = dialog2.locator('input[type=\"text\"]').last();
+    const pathInput2 = window2.locator('input[value=""][type="text"]').last();
     await pathInput2.fill(testStorageDir2);
 
     const dialogAddButton2 = window2.locator('button:has-text("Add")').last();
@@ -516,10 +508,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(300);
 
     const sdName = `TestSD ${testId}`;
-    const dialog = window1.locator('div[role=\"dialog\"]');
-    const nameInput = dialog.locator('input[type=\"text\"]').first();
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
     await nameInput.fill(sdName);
-    const pathInput = dialog.locator('input[type=\"text\"]').last();
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
     await pathInput.fill(testStorageDir2);
 
     const dialogAddButton = window1.locator('button:has-text("Add")').last();
@@ -571,10 +562,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(300);
 
     const sdName = `SwitchSD ${testId}`;
-    const dialog = window1.locator('div[role=\"dialog\"]');
-    const nameInput = dialog.locator('input[type=\"text\"]').first();
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
     await nameInput.fill(sdName);
-    const pathInput = dialog.locator('input[type=\"text\"]').last();
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
     await pathInput.fill(testStorageDir2);
 
     const dialogAddButton = window1.locator('button:has-text("Add")').last();
@@ -645,10 +635,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(300);
 
     const sdName = `SharedSD ${testId}`;
-    const dialog = window1.locator('div[role=\"dialog\"]');
-    const nameInput = dialog.locator('input[type=\"text\"]').first();
+    const nameInput = window1.locator('input[value=""][type="text"]').first();
     await nameInput.fill(sdName);
-    const pathInput = dialog.locator('input[type=\"text\"]').last();
+    const pathInput = window1.locator('input[value=""][type="text"]').last();
     await pathInput.fill(testStorageDir2);
 
     const dialogAddButton = window1.locator('button:has-text("Add")').last();
@@ -686,10 +675,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await addDirButton2.click();
     await window2.waitForTimeout(300);
 
-    const dialog2 = window2.locator('div[role=\"dialog\"]');
-    const nameInput2 = dialog2.locator('input[type=\"text\"]').first();
+    const nameInput2 = window2.locator('input[value=""][type="text"]').first();
     await nameInput2.fill(sdName);
-    const pathInput2 = dialog2.locator('input[type=\"text\"]').last();
+    const pathInput2 = window2.locator('input[value=""][type="text"]').last();
     await pathInput2.fill(testStorageDir2);
 
     const dialogAddButton2 = window2.locator('button:has-text("Add")').last();

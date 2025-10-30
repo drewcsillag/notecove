@@ -5,7 +5,7 @@
  * Phase 2.5.1: Basic read-only display.
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -14,8 +14,10 @@ import {
   ListItemButton,
   ListItemText,
   IconButton,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Clear as ClearIcon } from '@mui/icons-material';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -47,6 +49,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load selected folder from app state
   const loadSelectedFolder = useCallback(async () => {
@@ -59,6 +64,62 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     }
   }, []);
 
+  // Load search query from app state
+  const loadSearchQuery = useCallback(async () => {
+    try {
+      const savedQuery = await window.electronAPI.appState.get('searchQuery');
+      if (savedQuery) {
+        setSearchQuery(savedQuery);
+      }
+    } catch (err) {
+      console.error('Failed to load search query:', err);
+    }
+  }, []);
+
+  // Save search query to app state
+  const saveSearchQuery = useCallback(async (query: string) => {
+    try {
+      await window.electronAPI.appState.set('searchQuery', query);
+    } catch (err) {
+      console.error('Failed to save search query:', err);
+    }
+  }, []);
+
+  // Perform search
+  const performSearch = useCallback(
+    async (query: string) => {
+      setLoading(true);
+      setError(null);
+      setIsSearching(true);
+
+      try {
+        const searchResults = await window.electronAPI.note.search(query, 50);
+
+        // Convert search results to Note format
+        const notesList: Note[] = searchResults.map((result) => ({
+          id: result.noteId,
+          title: result.title,
+          sdId: activeSdId ?? DEFAULT_SD_ID,
+          folderId: null, // Search results don't have folder info
+          created: 0,
+          modified: 0,
+          deleted: false,
+          contentPreview: result.snippet,
+          contentText: result.snippet,
+        }));
+
+        setNotes(notesList);
+      } catch (err) {
+        console.error('Failed to search notes:', err);
+        setError(err instanceof Error ? err.message : 'Failed to search notes');
+        setNotes([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeSdId]
+  );
+
   // Note: selectedNoteId is now window-local state, not persisted globally
 
   // Fetch notes for the selected folder
@@ -66,6 +127,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     async (folderId: string | null) => {
       setLoading(true);
       setError(null);
+      setIsSearching(false);
 
       try {
         let notesList: Note[];
@@ -103,6 +165,46 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     [onNoteSelect]
   );
 
+  // Handle search input change
+  const handleSearchChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const query = event.target.value;
+      setSearchQuery(query);
+
+      // Clear existing timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      // Save query to app state
+      void saveSearchQuery(query);
+
+      // Debounce search with 300ms delay
+      if (query.trim()) {
+        searchTimeoutRef.current = setTimeout(() => {
+          void performSearch(query.trim());
+        }, 300);
+      } else {
+        // Clear search, show folder contents
+        setIsSearching(false);
+        if (selectedFolderId !== null) {
+          void fetchNotes(selectedFolderId);
+        }
+      }
+    },
+    [saveSearchQuery, performSearch, selectedFolderId, fetchNotes]
+  );
+
+  // Handle clear search
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    void saveSearchQuery('');
+    setIsSearching(false);
+    if (selectedFolderId !== null) {
+      void fetchNotes(selectedFolderId);
+    }
+  }, [saveSearchQuery, selectedFolderId, fetchNotes]);
+
   // Handle note creation
   const handleCreateNote = useCallback(async () => {
     if (creating) return; // Prevent double-clicks
@@ -135,23 +237,36 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     }
   }, [creating, selectedFolderId, handleNoteSelect, fetchNotes, activeSdId]);
 
-  // Load selected folder on mount
+  // Load selected folder and search query on mount
   useEffect(() => {
     void loadSelectedFolder();
-  }, [loadSelectedFolder]);
+    void loadSearchQuery();
+  }, [loadSelectedFolder, loadSearchQuery]);
 
   // Reset to "all-notes" when active SD changes
   useEffect(() => {
     setSelectedFolderId('all-notes');
   }, [activeSdId]);
 
-  // Fetch notes when selected folder or active SD changes
+  // Fetch notes when selected folder or active SD changes (only if not searching)
   useEffect(() => {
-    if (selectedFolderId !== null) {
+    if (selectedFolderId !== null && !searchQuery.trim()) {
       void fetchNotes(selectedFolderId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFolderId, activeSdId]);
+
+  // Trigger search when searchQuery changes (loaded from app state)
+  useEffect(() => {
+    // Skip if no query or folder not loaded yet
+    if (!searchQuery.trim() || selectedFolderId === null) return;
+
+    // Skip initial empty state
+    if (notes.length === 0 && !loading) {
+      void performSearch(searchQuery.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedFolderId]);
 
   // Poll for selected folder changes (since we don't have cross-component events yet)
   useEffect(() => {
@@ -241,21 +356,50 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           padding: 2,
           borderBottom: 1,
           borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
         }}
       >
-        <Typography variant="h6">Notes ({notes.length})</Typography>
-        <IconButton
-          size="small"
-          onClick={() => void handleCreateNote()}
-          disabled={creating}
-          title="Create note"
-          sx={{ marginLeft: 1 }}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 1.5,
+          }}
         >
-          <AddIcon />
-        </IconButton>
+          <Typography variant="h6">Notes ({notes.length})</Typography>
+          <IconButton
+            size="small"
+            onClick={() => void handleCreateNote()}
+            disabled={creating}
+            title="Create note"
+            sx={{ marginLeft: 1 }}
+          >
+            <AddIcon />
+          </IconButton>
+        </Box>
+
+        {/* Search Box */}
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search notes..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+          InputProps={{
+            endAdornment: searchQuery && (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={handleClearSearch}
+                  edge="end"
+                  aria-label="clear search"
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
       </Box>
 
       {/* Notes List or Status */}
@@ -275,7 +419,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         ) : notes.length === 0 ? (
           <Box sx={{ padding: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              No notes in this folder
+              {isSearching ? 'No results found' : 'No notes in this folder'}
             </Typography>
           </Box>
         ) : (

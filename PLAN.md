@@ -211,6 +211,7 @@ For detailed design decisions, answered questions, and implementation context, s
 - **[POST-PLAN-2.md](./POST-PLAN-2.md)** - Folder tree CRDT architecture, local CI script requirements
 
 **Key Topics by Document:**
+
 - Search behavior: QUESTIONS-1.md (Q6.1-6.3)
 - Tag filtering logic: QUESTIONS-1.md (Q3.1-3.4)
 - Inter-note links: QUESTIONS-1.md (Q4.1-4.3)

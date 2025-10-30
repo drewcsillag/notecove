@@ -74,7 +74,11 @@
       "Bash(npx prettier:*)",
       "Read(//private/tmp/**)",
       "Bash(git restore:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(for f in /Users/drew/devel/nc2/QUESTIONS-*.md)",
+      "Bash(head:*)",
+      "Bash(done)",
+      "Bash(pnpm -w run ci-local:*)"
     ],
     "deny": [],
     "ask": []

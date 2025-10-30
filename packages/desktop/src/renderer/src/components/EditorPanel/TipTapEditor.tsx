@@ -16,7 +16,7 @@ import { EditorToolbar } from './EditorToolbar';
 
 export interface TipTapEditorProps {
   noteId: string | null;
-  onTitleChange?: (title: string) => void;
+  onTitleChange?: (title: string, contentText: string) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChange }) => {
@@ -68,8 +68,23 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
 
         // Debounce title update by 300ms for snappy updates
         titleUpdateTimerRef.current = setTimeout(() => {
-          console.log(`[TipTapEditor] Calling onTitleChange with: "${titleText || 'Untitled'}"`);
-          onTitleChange(titleText || 'Untitled');
+          // Extract full text content for FTS5 indexing
+          // Manually extract with block separators to preserve word boundaries
+          let text = '';
+          editor.state.doc.descendants((node) => {
+            if (node.isText) {
+              text += node.text;
+            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
+              // Add space between blocks to preserve word boundaries
+              text += ' ';
+            }
+            return true;
+          });
+
+          console.log(
+            `[TipTapEditor] Calling onTitleChange with: "${titleText || 'Untitled'}" and ${text.length} chars of content`
+          );
+          onTitleChange(titleText || 'Untitled', text.trim());
         }, 300);
       }
     },

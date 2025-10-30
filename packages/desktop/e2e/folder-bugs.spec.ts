@@ -119,8 +119,9 @@ test.describe('Bug: Right-click rename renames wrong folder', () => {
     // Wait for rename dialog
     await page.waitForSelector('text=Rename Folder');
 
-    // Verify the current name shown is "Projects" (NOT "Work")
-    const nameInput = page.locator('input[type="text"]').first();
+    // Verify the current name shown is "Projects" (NOT "Work") - scope to dialog
+    const dialog = page.locator('div[role="dialog"]');
+    const nameInput = dialog.locator('input[type="text"]');
     const currentValue = await nameInput.inputValue();
     expect(currentValue).toBe('Projects');
 
@@ -296,7 +297,8 @@ test.describe("Bug: Folders don't persist across app restarts", () => {
     await plusButton.click();
 
     await page.waitForSelector('text=Create New Folder');
-    const folderNameInput = page.locator('input[type="text"]').first();
+    const dialog = page.locator('div[role="dialog"]');
+    const folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill('Persistent Test Folder');
 
     const createButton = page.locator('button:has-text("Create")');
@@ -347,7 +349,8 @@ test.describe("Bug: Folders don't persist across app restarts", () => {
     await renameMenuItem.click();
 
     await page.waitForSelector('text=Rename Folder');
-    const nameInput = page.locator('input[type="text"]').first();
+    const renameDialog = page.locator('div[role="dialog"]');
+    const nameInput = renameDialog.locator('input[type="text"]');
     await nameInput.fill('Career');
 
     const renameButton = page.locator('button:has-text("Rename")');
@@ -414,7 +417,8 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       await plusButton.click();
 
       await page1.waitForSelector('text=Create New Folder');
-      const folderNameInput = page1.locator('input[type="text"]').first();
+      const dialog = page1.locator('div[role="dialog"]');
+      const folderNameInput = dialog.locator('input[type="text"]');
       await folderNameInput.fill('Sync Test Folder');
 
       const createButton = page1.locator('button:has-text("Create")');
@@ -468,7 +472,8 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       await renameMenuItem.click();
 
       await page1.waitForSelector('text=Rename Folder');
-      const nameInput = page1.locator('input[type="text"]').first();
+      const renameDialog1 = page1.locator('div[role="dialog"]');
+      const nameInput = renameDialog1.locator('input[type="text"]');
       await nameInput.fill('Office');
 
       const renameButton = page1.locator('button:has-text("Rename")');
@@ -638,7 +643,8 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       await plusButton1.click();
 
       await page1.waitForSelector('text=Create New Folder');
-      const folderNameInput1 = page1.locator('input[type="text"]').first();
+      const folderDialog1 = page1.locator('div[role="dialog"]');
+      const folderNameInput1 = folderDialog1.locator('input[type="text"]');
       await folderNameInput1.fill('Cross Instance Sync Test');
 
       const createButton1 = page1.locator('button:has-text("Create")');
@@ -677,7 +683,8 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       await renameMenuItem2.click();
 
       await page2.waitForSelector('text=Rename Folder');
-      const nameInput2 = page2.locator('input[type="text"]').first();
+      const renameDialog2 = page2.locator('div[role="dialog"]');
+      const nameInput2 = renameDialog2.locator('input[type="text"]');
       await nameInput2.fill('Synced and Renamed');
 
       const renameButton2 = page2.locator('button:has-text("Rename")');

@@ -30,8 +30,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:move', noteId, newFolderId) as Promise<void>,
     getMetadata: (noteId: string): Promise<NoteMetadata> =>
       ipcRenderer.invoke('note:getMetadata', noteId) as Promise<NoteMetadata>,
-    updateTitle: (noteId: string, title: string): Promise<void> =>
-      ipcRenderer.invoke('note:updateTitle', noteId, title) as Promise<void>,
+    updateTitle: (noteId: string, title: string, contentText?: string): Promise<void> =>
+      ipcRenderer.invoke('note:updateTitle', noteId, title, contentText) as Promise<void>,
     list: (
       sdId: string,
       folderId?: string | null

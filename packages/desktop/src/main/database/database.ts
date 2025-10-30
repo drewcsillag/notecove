@@ -236,6 +236,26 @@ export class SqliteDatabase implements Database {
   }
 
   async searchNotes(query: string, limit = 50): Promise<SearchResult[]> {
+    // Transform query to support prefix matching
+    // For each word >=3 chars, add wildcard for prefix search
+    const fts5Query = query
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0)
+      .map((word) => {
+        // If it's already a quoted phrase, keep it as is
+        if (word.startsWith('"') && word.endsWith('"')) {
+          return word;
+        }
+        // For words >= 3 chars, add prefix wildcard
+        if (word.length >= 3) {
+          return `${word}*`;
+        }
+        // Shorter words: exact match only
+        return word;
+      })
+      .join(' ');
+
     const rows = await this.adapter.all<{
       note_id: string;
       title: string;
@@ -245,13 +265,13 @@ export class SqliteDatabase implements Database {
       `SELECT
         note_id,
         title,
-        snippet(notes_fts, 2, '<mark>', '</mark>', '...', 32) as content,
+        snippet(notes_fts, 2, '', '', '...', 32) as content,
         rank
       FROM notes_fts
       WHERE notes_fts MATCH ?
       ORDER BY rank
       LIMIT ?`,
-      [query, limit]
+      [fts5Query, limit]
     );
 
     return rows.map((row) => ({
