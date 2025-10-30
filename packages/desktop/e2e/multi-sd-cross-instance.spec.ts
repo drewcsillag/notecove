@@ -930,8 +930,8 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     const editedContent2 = await editor2.textContent();
     console.log('[Test] Edited content in instance 2:', editedContent2);
 
-    // Wait for sync to propagate
-    await window2.waitForTimeout(2000);
+    // Wait for sync to propagate (longer wait for file watcher + CRDT sync)
+    await window2.waitForTimeout(4000);
 
     // Check if instance 1's editor shows the edited content (WITHOUT clicking away and back)
     console.log('[Test] Checking if instance 1 editor shows edits...');
