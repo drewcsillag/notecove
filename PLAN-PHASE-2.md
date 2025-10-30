@@ -857,6 +857,8 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 
 **Status:** To Do
 
+**Context:** See [QUESTIONS-1.md](../QUESTIONS-1.md) Q6.1-6.3 for search behavior requirements (full content + tags search, case-sensitive option, Monaco-style find)
+
 **Tasks:**
 
 - [ ] 🟥 **Implement search box in header**

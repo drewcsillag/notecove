@@ -35,6 +35,17 @@ declare global {
             contentText: string;
           }[]
         >;
+        search: (
+          query: string,
+          limit?: number
+        ) => Promise<
+          {
+            noteId: string;
+            title: string;
+            snippet: string;
+            rank: number;
+          }[]
+        >;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
         onCreated: (

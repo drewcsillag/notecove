@@ -73,6 +73,7 @@ interface MockDatabase {
   getAllStorageDirs: jest.Mock;
   getActiveStorageDir: jest.Mock;
   setActiveStorageDir: jest.Mock;
+  searchNotes: jest.Mock;
 }
 
 describe('IPCHandlers - Folder CRUD', () => {
@@ -110,6 +111,7 @@ describe('IPCHandlers - Folder CRUD', () => {
       getAllStorageDirs: jest.fn(),
       getActiveStorageDir: jest.fn(),
       setActiveStorageDir: jest.fn(),
+      searchNotes: jest.fn().mockResolvedValue([]),
     };
 
     // Create handlers
@@ -774,6 +776,7 @@ describe('IPCHandlers - SD Management', () => {
       getAllStorageDirs: jest.fn(),
       getActiveStorageDir: jest.fn(),
       setActiveStorageDir: jest.fn(),
+      searchNotes: jest.fn().mockResolvedValue([]),
     };
 
     // Create handlers
@@ -892,6 +895,66 @@ describe('IPCHandlers - SD Management', () => {
       const result = await (handlers as any).handleGetActiveStorageDir(mockEvent);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('note:search', () => {
+    it('should search notes and return results', async () => {
+      const mockEvent = {} as any;
+      const query = 'test query';
+      const searchResults = [
+        {
+          noteId: 'note-1',
+          title: 'Test Note',
+          snippet: 'This is a test query result',
+          rank: 0.5,
+        },
+        {
+          noteId: 'note-2',
+          title: 'Another Test',
+          snippet: 'Another test query match',
+          rank: 0.3,
+        },
+      ];
+
+      mockDatabase.searchNotes.mockResolvedValue(searchResults);
+
+      const result = await (handlers as any).handleSearchNotes(mockEvent, query);
+
+      expect(mockDatabase.searchNotes).toHaveBeenCalledWith(query, undefined);
+      expect(result).toEqual(searchResults);
+    });
+
+    it('should support limiting search results', async () => {
+      const mockEvent = {} as any;
+      const query = 'test';
+      const limit = 10;
+      const searchResults = [
+        {
+          noteId: 'note-1',
+          title: 'Test Note',
+          snippet: 'Test content',
+          rank: 0.5,
+        },
+      ];
+
+      mockDatabase.searchNotes.mockResolvedValue(searchResults);
+
+      const result = await (handlers as any).handleSearchNotes(mockEvent, query, limit);
+
+      expect(mockDatabase.searchNotes).toHaveBeenCalledWith(query, limit);
+      expect(result).toEqual(searchResults);
+    });
+
+    it('should return empty array when no results found', async () => {
+      const mockEvent = {} as any;
+      const query = 'nonexistent';
+
+      mockDatabase.searchNotes.mockResolvedValue([]);
+
+      const result = await (handlers as any).handleSearchNotes(mockEvent, query);
+
+      expect(result).toEqual([]);
     });
   });
 });

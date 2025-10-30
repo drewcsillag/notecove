@@ -45,6 +45,7 @@ export class IPCHandlers {
     ipcMain.handle('note:getMetadata', this.handleGetMetadata.bind(this));
     ipcMain.handle('note:updateTitle', this.handleUpdateTitle.bind(this));
     ipcMain.handle('note:list', this.handleListNotes.bind(this));
+    ipcMain.handle('note:search', this.handleSearchNotes.bind(this));
 
     // Folder operations
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
@@ -296,6 +297,14 @@ export class IPCHandlers {
     }
     // Otherwise, return all notes for the SD (backward compatibility)
     return await this.database.getNotesBySd(sdId);
+  }
+
+  private async handleSearchNotes(
+    _event: IpcMainInvokeEvent,
+    query: string,
+    limit?: number
+  ): Promise<import('@notecove/shared').SearchResult[]> {
+    return await this.database.searchNotes(query, limit);
   }
 
   private async handleListFolders(

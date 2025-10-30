@@ -195,6 +195,32 @@ Documentation website, user guides, and final polish for both platforms.
 
 ---
 
+## Context Documents
+
+For detailed design decisions, answered questions, and implementation context, see:
+
+- **[QUESTIONS-1.md](./QUESTIONS-1.md)** - Initial requirements clarification (CRDT architecture, folder organization, tags, links, etc.)
+- **[QUESTIONS-2.md](./QUESTIONS-2.md)** - Follow-up questions on CRDT structure, username handling, etc.
+- **[QUESTIONS-3.md](./QUESTIONS-3.md)** - Database/cache technology decisions (SQLite vs alternatives)
+- **[QUESTIONS-4.md](./QUESTIONS-4.md)** - User tracking in CRDT updates, metadata handling
+- **[QUESTIONS-5.md](./QUESTIONS-5.md)** - Keyboard shortcuts and additional UI patterns
+- **[QUESTIONS-6.md](./QUESTIONS-6.md)** - Note history UI design
+- **[QUESTIONS-7.md](./QUESTIONS-7.md)** - iOS deployment strategy and IPC API scope
+- **[POST-PLAN-0.md](./POST-PLAN-0.md)** - Initial plan review and feedback
+- **[POST-PLAN-1.md](./POST-PLAN-1.md)** - Plan structure reorganization decisions
+- **[POST-PLAN-2.md](./POST-PLAN-2.md)** - Folder tree CRDT architecture, local CI script requirements
+
+**Key Topics by Document:**
+- Search behavior: QUESTIONS-1.md (Q6.1-6.3)
+- Tag filtering logic: QUESTIONS-1.md (Q3.1-3.4)
+- Inter-note links: QUESTIONS-1.md (Q4.1-4.3)
+- Multi-window behavior: QUESTIONS-1.md (Q5.1-5.3)
+- Folder structure CRDT: POST-PLAN-2.md
+- Storage Directory management: QUESTIONS-1.md (Q7.1-7.4)
+- iOS architecture: POST-PLAN-2.md (iOS Architecture Overview)
+
+---
+
 ## Recent Updates
 
 **2025-10-29:**

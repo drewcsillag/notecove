@@ -62,6 +62,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }[]
       >,
 
+    search: (
+      query: string,
+      limit?: number
+    ): Promise<
+      {
+        noteId: string;
+        title: string;
+        snippet: string;
+        rank: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('note:search', query, limit) as Promise<
+        {
+          noteId: string;
+          title: string;
+          snippet: string;
+          rank: number;
+        }[]
+      >,
+
     // Event listeners
     onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
       ipcRenderer.on('note:updated', (_event, noteId: string, update: Uint8Array) => {
