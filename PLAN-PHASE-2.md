@@ -868,7 +868,7 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
   - Persist search text in app_state
 - [x] ✅ **Implement basic FTS5 search**
   - `note:search` IPC handler implemented
-  - SQLite FTS5 notes_fts table with prefix matching (*)
+  - SQLite FTS5 notes_fts table with prefix matching (\*)
   - Searches full note content (contentText field)
   - Returns matching note IDs with snippets (empty for now, XML tags removed)
 - [x] ✅ **Filter notes list by search**
@@ -884,12 +884,14 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 **Implementation Details:**
 
 **Backend Changes:**
+
 - Modified `database.ts` to add FTS5 virtual table `notes_fts`
 - Implemented `searchNotes()` method with prefix matching support
 - Modified `handleUpdateTitle()` to extract contentPreview from content after title (prevents duplicate title display)
 - Enhanced title extraction in TipTapEditor with proper word boundary preservation between blocks
 
 **Frontend Changes:**
+
 - Added search UI to NotesListPanel with debounced input (300ms)
 - Implemented search query persistence using appState
 - Added clear button that resets search
@@ -897,6 +899,7 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 - Search respects current folder filter
 
 **Test Fixes:**
+
 - Fixed folder creation dialog selectors (9 tests)
 - Fixed folder rename dialog selectors (4 tests)
 - Fixed SD dialog input selectors (7 tests)
@@ -904,6 +907,7 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 - All selectors now properly scoped to `div[role="dialog"]` to avoid search box conflict
 
 **Files Modified:**
+
 - `packages/desktop/src/main/database/database.ts` - FTS5 table and search
 - `packages/desktop/src/main/ipc/handlers.ts` - search handler + contentPreview fix
 - `packages/desktop/src/preload/index.ts` - search IPC exposure
@@ -924,6 +928,7 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 - ⏭️ Advanced options (case-sensitive, regex, scope) deferred to 2.5.5
 
 **Test Coverage:**
+
 - 7 new E2E tests for search functionality (all passing)
 - All 55 E2E tests passing
 - 149 unit tests passing (1 skipped)

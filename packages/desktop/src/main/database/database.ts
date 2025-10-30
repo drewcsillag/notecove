@@ -215,7 +215,7 @@ export class SqliteDatabase implements Database {
     return rows.map((row) => this.mapNoteRow(row));
   }
 
-  async getDeletedNotes(): Promise<NoteCache[]> {
+  async getDeletedNotes(sdId?: string): Promise<NoteCache[]> {
     const rows = await this.adapter.all<{
       id: string;
       title: string;
@@ -226,7 +226,12 @@ export class SqliteDatabase implements Database {
       deleted: number;
       content_preview: string;
       content_text: string;
-    }>('SELECT * FROM notes WHERE deleted = 1 ORDER BY modified DESC');
+    }>(
+      sdId
+        ? 'SELECT * FROM notes WHERE deleted = 1 AND sd_id = ? ORDER BY modified DESC'
+        : 'SELECT * FROM notes WHERE deleted = 1 ORDER BY modified DESC',
+      sdId ? [sdId] : []
+    );
 
     return rows.map((row) => this.mapNoteRow(row));
   }
@@ -263,13 +268,14 @@ export class SqliteDatabase implements Database {
       rank: number;
     }>(
       `SELECT
-        note_id,
-        title,
+        notes_fts.note_id,
+        notes_fts.title,
         snippet(notes_fts, 2, '', '', '...', 32) as content,
-        rank
+        notes_fts.rank
       FROM notes_fts
-      WHERE notes_fts MATCH ?
-      ORDER BY rank
+      INNER JOIN notes ON notes_fts.note_id = notes.id
+      WHERE notes_fts MATCH ? AND notes.deleted = 0
+      ORDER BY notes_fts.rank
       LIMIT ?`,
       [fts5Query, limit]
     );

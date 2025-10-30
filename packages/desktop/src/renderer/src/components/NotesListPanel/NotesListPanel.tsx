@@ -16,6 +16,14 @@ import {
   IconButton,
   TextField,
   InputAdornment,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import { Add as AddIcon, Clear as ClearIcon } from '@mui/icons-material';
 
@@ -52,6 +60,17 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    noteId: string;
+  } | null>(null);
+
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
 
   // Load selected folder from app state
   const loadSelectedFolder = useCallback(async () => {
@@ -292,8 +311,19 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
     const unsubscribeDeleted = window.electronAPI.note.onDeleted((noteId) => {
       console.log('[NotesListPanel] Note deleted:', noteId);
-      // Remove from list
-      setNotes((prev) => prev.filter((note) => note.id !== noteId));
+      // If we're viewing a regular folder (including "All Notes"), remove the note from the list
+      // If we're viewing "Recently Deleted", we need to refetch to show the newly deleted note
+      if (
+        selectedFolderId &&
+        (selectedFolderId === 'recently-deleted' ||
+          selectedFolderId.startsWith('recently-deleted:'))
+      ) {
+        // Refresh the Recently Deleted view to show the new note
+        void fetchNotes(selectedFolderId);
+      } else {
+        // Remove from the current view
+        setNotes((prev) => prev.filter((note) => note.id !== noteId));
+      }
     });
 
     const unsubscribeExternal = window.electronAPI.note.onExternalUpdate((data) => {
@@ -319,6 +349,67 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       unsubscribeTitleUpdated();
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
+
+  // Handle context menu open
+  const handleContextMenu = useCallback((event: React.MouseEvent, noteId: string) => {
+    event.preventDefault();
+    setContextMenu({
+      mouseX: event.clientX - 2,
+      mouseY: event.clientY - 4,
+      noteId,
+    });
+  }, []);
+
+  // Handle context menu close
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Handle "New Note" from context menu
+  const handleNewNoteFromMenu = useCallback(() => {
+    handleContextMenuClose();
+    void handleCreateNote();
+  }, [handleContextMenuClose, handleCreateNote]);
+
+  // Handle "Delete" from context menu
+  const handleDeleteFromMenu = useCallback(() => {
+    if (contextMenu) {
+      setNoteToDelete(contextMenu.noteId);
+      setDeleteDialogOpen(true);
+      handleContextMenuClose();
+    }
+  }, [contextMenu, handleContextMenuClose]);
+
+  // Handle delete confirmation
+  const handleConfirmDelete = useCallback(async () => {
+    if (!noteToDelete) return;
+
+    try {
+      // Call IPC to delete note (soft delete)
+      await window.electronAPI.note.delete(noteToDelete);
+
+      // Close dialog
+      setDeleteDialogOpen(false);
+      setNoteToDelete(null);
+
+      // If we just deleted the selected note, clear selection
+      if (selectedNoteId === noteToDelete) {
+        onNoteSelect('');
+      }
+
+      // Note: The notes list will be updated automatically via the onDeleted event handler
+      // which removes the note from the current view
+    } catch (err) {
+      console.error('Failed to delete note:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete note');
+    }
+  }, [noteToDelete, selectedNoteId, onNoteSelect]);
+
+  // Handle delete cancellation
+  const handleCancelDelete = useCallback(() => {
+    setDeleteDialogOpen(false);
+    setNoteToDelete(null);
+  }, []);
 
   // Format date for display
   const formatDate = (timestamp: number): string => {
@@ -431,6 +522,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
                   onClick={() => {
                     handleNoteSelect(note.id);
                   }}
+                  onContextMenu={(e) => {
+                    handleContextMenu(e, note.id);
+                  }}
                   sx={{
                     paddingY: 1.5,
                     paddingX: 2,
@@ -476,6 +570,36 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           </List>
         )}
       </Box>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <Menu
+          open={true}
+          onClose={handleContextMenuClose}
+          anchorReference="anchorPosition"
+          anchorPosition={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
+        >
+          <MenuItem onClick={handleNewNoteFromMenu}>New Note</MenuItem>
+          <MenuItem onClick={handleDeleteFromMenu}>Delete</MenuItem>
+        </Menu>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
+        <DialogTitle>Delete Note?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This note will be moved to Recently Deleted. You can restore it later or permanently
+            delete it from there.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete}>Cancel</Button>
+          <Button onClick={() => void handleConfirmDelete()} color="error" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

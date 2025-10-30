@@ -94,7 +94,7 @@ export interface NoteCacheOperations {
   /**
    * Get all deleted notes (for "Recently Deleted")
    */
-  getDeletedNotes(): Promise<NoteCache[]>;
+  getDeletedNotes(sdId?: string): Promise<NoteCache[]>;
 
   /**
    * Delete a note from the cache

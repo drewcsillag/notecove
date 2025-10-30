@@ -78,7 +78,9 @@
       "Bash(for f in /Users/drew/devel/nc2/QUESTIONS-*.md)",
       "Bash(head:*)",
       "Bash(done)",
-      "Bash(pnpm -w run ci-local:*)"
+      "Bash(pnpm -w run ci-local:*)",
+      "Bash(timeout 120 pnpm test:e2e:*)",
+      "Bash(pnpm -w format:*)"
     ],
     "deny": [],
     "ask": []

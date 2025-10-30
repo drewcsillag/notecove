@@ -174,9 +174,37 @@ export class IPCHandlers {
     return noteId;
   }
 
-  private async handleDeleteNote(_event: IpcMainInvokeEvent, _noteId: string): Promise<void> {
-    // TODO: Implement note deletion
-    throw new Error('Not implemented');
+  private async handleDeleteNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
+    // Get the note from cache
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    // Update CRDT metadata to mark as deleted (soft delete)
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (noteDoc) {
+      noteDoc.markDeleted();
+    } else {
+      // Note not loaded in memory, load it first with its sdId
+      await this.crdtManager.loadNote(noteId, note.sdId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (loadedNoteDoc) {
+        loadedNoteDoc.markDeleted();
+      } else {
+        console.error(`[Note] Failed to load NoteDoc for ${noteId}`);
+      }
+    }
+
+    // Update SQLite cache
+    await this.database.upsertNote({
+      ...note,
+      deleted: true,
+      modified: Date.now(),
+    });
+
+    // Broadcast delete event to all windows
+    this.broadcastToAll('note:deleted', noteId);
   }
 
   private async handleMoveNote(
@@ -305,6 +333,10 @@ export class IPCHandlers {
     sdId: string,
     folderId?: string | null
   ): Promise<import('@notecove/shared').NoteCache[]> {
+    // Handle "Recently Deleted" special folder
+    if (folderId && (folderId === 'recently-deleted' || folderId.startsWith('recently-deleted:'))) {
+      return await this.database.getDeletedNotes(sdId);
+    }
     // If folderId is provided, filter by folder (including null for root folder)
     if (folderId !== undefined) {
       return await this.database.getNotesByFolder(folderId);
