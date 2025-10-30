@@ -25,7 +25,7 @@ import {
   DialogActions,
   Button,
 } from '@mui/material';
-import { Add as AddIcon, Clear as ClearIcon } from '@mui/icons-material';
+import { Add as AddIcon, Clear as ClearIcon, PushPin as PushPinIcon } from '@mui/icons-material';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -37,6 +37,7 @@ interface Note {
   created: number;
   modified: number;
   deleted: boolean;
+  pinned: boolean;
   contentPreview: string;
   contentText: string;
 }
@@ -123,6 +124,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           created: 0,
           modified: 0,
           deleted: false,
+          pinned: false, // Search results don't include pin status
           contentPreview: result.snippet,
           contentText: result.snippet,
         }));
@@ -161,8 +163,13 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           notesList = await window.electronAPI.note.list(sdId, folderId);
         }
 
-        // Sort by modified date (newest first)
-        notesList.sort((a, b) => b.modified - a.modified);
+        // Sort by pinned status first, then by modified date (newest first)
+        notesList.sort((a, b) => {
+          if (a.pinned !== b.pinned) {
+            return a.pinned ? -1 : 1; // Pinned notes come first
+          }
+          return b.modified - a.modified; // Within each group, sort by modified date
+        });
 
         setNotes(notesList);
       } catch (err) {
@@ -387,12 +394,31 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       });
     });
 
+    const unsubscribePinned = window.electronAPI.note.onPinned((data) => {
+      console.log('[NotesListPanel] Note pin toggled:', data);
+      // Update pinned status in notes list and re-sort
+      setNotes((prevNotes) => {
+        const updated = prevNotes.map((note) =>
+          note.id === data.noteId ? { ...note, pinned: data.pinned } : note
+        );
+        // Re-sort with pinned notes first, then by modified date
+        updated.sort((a, b) => {
+          if (a.pinned !== b.pinned) {
+            return a.pinned ? -1 : 1;
+          }
+          return b.modified - a.modified;
+        });
+        return updated;
+      });
+    });
+
     return () => {
       unsubscribeCreated();
       unsubscribeDeleted();
       unsubscribeRestored();
       unsubscribeExternal();
       unsubscribeTitleUpdated();
+      unsubscribePinned();
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
 
@@ -480,6 +506,25 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         setError(err instanceof Error ? err.message : 'Failed to restore note');
       });
   }, [contextMenu, handleContextMenuClose, selectedNoteId, onNoteSelect]);
+
+  const handleTogglePinFromMenu = useCallback(() => {
+    if (!contextMenu) return;
+
+    const { noteId } = contextMenu;
+    handleContextMenuClose();
+
+    // Call IPC to toggle pin status
+    window.electronAPI.note
+      .togglePin(noteId)
+      .then(() => {
+        console.log('[NotesListPanel] Note pin toggled:', noteId);
+        // Note: The notes list will be updated automatically via onPinned event
+      })
+      .catch((err) => {
+        console.error('Failed to toggle pin:', err);
+        setError(err instanceof Error ? err.message : 'Failed to toggle pin');
+      });
+  }, [contextMenu, handleContextMenuClose]);
 
   // Format date for display
   const formatDate = (timestamp: number): string => {
@@ -604,9 +649,19 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
                 >
                   <ListItemText
                     primary={
-                      <Typography variant="subtitle1" noWrap>
-                        {note.title || 'Untitled Note'}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {note.pinned && (
+                          <PushPinIcon
+                            sx={{
+                              fontSize: '1rem',
+                              color: 'primary.main',
+                            }}
+                          />
+                        )}
+                        <Typography variant="subtitle1" noWrap sx={{ flex: 1 }}>
+                          {note.title || 'Untitled Note'}
+                        </Typography>
+                      </Box>
                     }
                     secondary={
                       <>
@@ -658,6 +713,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           ) : (
             <>
               <MenuItem onClick={handleNewNoteFromMenu}>New Note</MenuItem>
+              <MenuItem onClick={handleTogglePinFromMenu}>
+                {notes.find((n) => n.id === contextMenu.noteId)?.pinned ? 'Unpin' : 'Pin'}
+              </MenuItem>
               <MenuItem onClick={handleDeleteFromMenu}>Delete</MenuItem>
             </>
           )}

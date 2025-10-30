@@ -62,6 +62,7 @@ describe('SqliteDatabase', () => {
       created: Date.now(),
       modified: Date.now(),
       deleted: false,
+      pinned: false,
       contentPreview: 'This is a test note',
       contentText: 'This is a test note with full content',
     };
@@ -225,6 +226,7 @@ describe('SqliteDatabase', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'test',
         contentText: 'test',
       };
@@ -248,6 +250,7 @@ describe('SqliteDatabase', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'test',
         contentText: 'test',
       };
@@ -271,6 +274,7 @@ describe('SqliteDatabase', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'test',
         contentText: 'test',
       };
@@ -362,6 +366,7 @@ describe('SqliteDatabase', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'Learn JavaScript basics',
         contentText: 'Learn JavaScript basics including variables, functions, and objects',
       });
@@ -374,6 +379,7 @@ describe('SqliteDatabase', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'TypeScript is a superset',
         contentText: 'TypeScript is a superset of JavaScript with static typing',
       });
@@ -386,6 +392,7 @@ describe('SqliteDatabase', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'Python programming language',
         contentText: 'Python is a high-level programming language',
       });

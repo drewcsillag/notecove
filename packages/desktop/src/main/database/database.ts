@@ -121,8 +121,8 @@ export class SqliteDatabase implements Database {
 
   async upsertNote(note: NoteCache): Promise<void> {
     await this.adapter.exec(
-      `INSERT INTO notes (id, title, sd_id, folder_id, created, modified, deleted, content_preview, content_text)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO notes (id, title, sd_id, folder_id, created, modified, deleted, pinned, content_preview, content_text)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          title = excluded.title,
          sd_id = excluded.sd_id,
@@ -130,6 +130,7 @@ export class SqliteDatabase implements Database {
          created = excluded.created,
          modified = excluded.modified,
          deleted = excluded.deleted,
+         pinned = excluded.pinned,
          content_preview = excluded.content_preview,
          content_text = excluded.content_text`,
       [
@@ -140,6 +141,7 @@ export class SqliteDatabase implements Database {
         note.created,
         note.modified,
         note.deleted ? 1 : 0,
+        note.pinned ? 1 : 0,
         note.contentPreview,
         note.contentText,
       ]
@@ -155,6 +157,7 @@ export class SqliteDatabase implements Database {
       created: number;
       modified: number;
       deleted: number;
+      pinned: number;
       content_preview: string;
       content_text: string;
     }>('SELECT * FROM notes WHERE id = ?', [noteId]);
@@ -171,6 +174,7 @@ export class SqliteDatabase implements Database {
       created: number;
       modified: number;
       deleted: number;
+      pinned: number;
       content_preview: string;
       content_text: string;
     }>(
@@ -192,6 +196,7 @@ export class SqliteDatabase implements Database {
       created: number;
       modified: number;
       deleted: number;
+      pinned: number;
       content_preview: string;
       content_text: string;
     }>('SELECT * FROM notes WHERE sd_id = ? AND deleted = 0 ORDER BY modified DESC', [sdId]);
@@ -208,6 +213,7 @@ export class SqliteDatabase implements Database {
       created: number;
       modified: number;
       deleted: number;
+      pinned: number;
       content_preview: string;
       content_text: string;
     }>('SELECT * FROM notes WHERE deleted = 0 ORDER BY modified DESC');
@@ -224,6 +230,7 @@ export class SqliteDatabase implements Database {
       created: number;
       modified: number;
       deleted: number;
+      pinned: number;
       content_preview: string;
       content_text: string;
     }>(
@@ -296,6 +303,7 @@ export class SqliteDatabase implements Database {
     created: number;
     modified: number;
     deleted: number;
+    pinned: number;
     content_preview: string;
     content_text: string;
   }): NoteCache {
@@ -307,6 +315,7 @@ export class SqliteDatabase implements Database {
       created: row.created,
       modified: row.modified,
       deleted: row.deleted === 1,
+      pinned: row.pinned === 1,
       contentPreview: row.content_preview,
       contentText: row.content_text,
     };
@@ -486,6 +495,7 @@ export class SqliteDatabase implements Database {
       created: number;
       modified: number;
       deleted: number;
+      pinned: number;
       content_preview: string;
       content_text: string;
     }>(

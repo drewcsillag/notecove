@@ -16,7 +16,7 @@ import type { UUID } from '../../types';
 describe('Database Schema', () => {
   describe('SCHEMA_VERSION', () => {
     it('should be defined', () => {
-      expect(SCHEMA_VERSION).toBe(1);
+      expect(SCHEMA_VERSION).toBe(2);
     });
   });
 
@@ -84,6 +84,7 @@ describe('Database Schema', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'This is a preview...',
         contentText: 'Full content text for search',
       };
@@ -102,6 +103,7 @@ describe('Database Schema', () => {
         created: Date.now(),
         modified: Date.now(),
         deleted: false,
+        pinned: false,
         contentPreview: 'Preview',
         contentText: 'Content',
       };

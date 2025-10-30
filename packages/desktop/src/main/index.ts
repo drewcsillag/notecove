@@ -204,6 +204,7 @@ async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<vo
     created: Date.now(),
     modified: Date.now(),
     deleted: false,
+    pinned: false,
     contentPreview: 'Welcome to NoteCove!',
     contentText:
       'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.',
@@ -278,6 +279,7 @@ async function setupSDWatchers(
             created: crdtMetadata?.created ?? Date.now(),
             modified: crdtMetadata?.modified ?? Date.now(),
             deleted: crdtMetadata?.deleted ?? false,
+            pinned: false,
             contentPreview: '',
             contentText: '',
           });
@@ -305,6 +307,7 @@ async function setupSDWatchers(
               created: existingNote.created,
               modified: crdtMetadata?.modified ?? Date.now(),
               deleted: crdtMetadata?.deleted ?? false,
+              pinned: false,
               contentPreview: existingNote.contentPreview,
               contentText: existingNote.contentText,
             });
@@ -648,6 +651,7 @@ void app.whenReady().then(async () => {
                   created: crdtMetadata?.created ?? Date.now(),
                   modified: crdtMetadata?.modified ?? Date.now(),
                   deleted: crdtMetadata?.deleted ?? false,
+                  pinned: false,
                   contentPreview: '',
                   contentText: '',
                 });

@@ -18,6 +18,7 @@ export interface NoteCache {
   created: number;
   modified: number;
   deleted: boolean;
+  pinned: boolean; // Whether note is pinned to top of list
   contentPreview: string; // First ~200 chars of note content
   contentText: string; // Full plain text for FTS5 search
 }
@@ -117,12 +118,13 @@ export interface SearchResult {
  *
  * Version history:
  * - v1: Initial schema
+ * - v2: Added pinned field to notes table
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
  * - User data tables (tags, note_tags, app_state): Migrate with version-specific logic
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * SQL schema definitions
@@ -140,6 +142,7 @@ export const SCHEMA_SQL = {
       created INTEGER NOT NULL,
       modified INTEGER NOT NULL,
       deleted INTEGER NOT NULL DEFAULT 0,
+      pinned INTEGER NOT NULL DEFAULT 0,
       content_preview TEXT NOT NULL,
       content_text TEXT NOT NULL
     );
@@ -148,6 +151,7 @@ export const SCHEMA_SQL = {
     CREATE INDEX IF NOT EXISTS idx_notes_folder_id ON notes(folder_id);
     CREATE INDEX IF NOT EXISTS idx_notes_deleted ON notes(deleted);
     CREATE INDEX IF NOT EXISTS idx_notes_modified ON notes(modified);
+    CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned);
   `,
 
   /**

@@ -42,6 +42,7 @@ export class IPCHandlers {
     ipcMain.handle('note:create', this.handleCreateNote.bind(this));
     ipcMain.handle('note:delete', this.handleDeleteNote.bind(this));
     ipcMain.handle('note:restore', this.handleRestoreNote.bind(this));
+    ipcMain.handle('note:togglePin', this.handleTogglePinNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
     ipcMain.handle('note:getMetadata', this.handleGetMetadata.bind(this));
     ipcMain.handle('note:updateTitle', this.handleUpdateTitle.bind(this));
@@ -165,6 +166,7 @@ export class IPCHandlers {
       created: Date.now(),
       modified: Date.now(),
       deleted: false,
+      pinned: false,
       contentPreview: '',
       contentText: '',
     });
@@ -239,6 +241,24 @@ export class IPCHandlers {
 
     // Broadcast restore event to all windows
     this.broadcastToAll('note:restored', noteId);
+  }
+
+  private async handleTogglePinNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
+    // Get the note from cache
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    // Toggle pinned status in SQLite cache only (not in CRDT)
+    await this.database.upsertNote({
+      ...note,
+      pinned: !note.pinned,
+      modified: Date.now(),
+    });
+
+    // Broadcast pin event to all windows
+    this.broadcastToAll('note:pinned', { noteId, pinned: !note.pinned });
   }
 
   private async handleMoveNote(
