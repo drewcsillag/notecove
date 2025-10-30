@@ -131,16 +131,10 @@ test.describe('Collaboration Demo', () => {
     expect(welcomeCount2).toBe(1);
   });
 
-  // NOTE: BroadcastChannel sync testing is skipped because Playwright's window
+  // NOTE: BroadcastChannel sync testing is not included here because Playwright's window
   // isolation prevents BroadcastChannel from working across test-controlled windows.
   // The collaboration feature works correctly when manually testing with real windows.
+  // Cross-instance sync is thoroughly tested in note-sync.spec.ts using file-based sync.
   // This is a temporary demo feature that will be replaced with proper IPC-based
   // collaboration in Phase 2.6+.
-  test.skip('should sync edits between windows', async () => {
-    // This test is skipped - see note above
-    // Manual testing confirms that:
-    // 1. Typing in one window appears in other windows
-    // 2. Formatting (bold, italic, etc.) syncs correctly
-    // 3. Concurrent edits are merged by Yjs CRDT
-  });
 });

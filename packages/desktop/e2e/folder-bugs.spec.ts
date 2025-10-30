@@ -92,7 +92,7 @@ test.afterEach(async () => {
 });
 
 test.describe('Bug: Right-click rename renames wrong folder', () => {
-  test.skip('should rename the clicked nested folder, not its parent', async () => {
+  test('should rename the clicked nested folder, not its parent', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
 
@@ -715,7 +715,7 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
 });
 
 test.describe('Bug: Expand/collapse all button does not work', () => {
-  test.skip('should actually expand and collapse tree nodes when button is clicked', async () => {
+  test('should actually expand and collapse tree nodes when button is clicked', async () => {
     // Wait for folder panel to load
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
