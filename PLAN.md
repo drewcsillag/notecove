@@ -224,6 +224,12 @@ For detailed design decisions, answered questions, and implementation context, s
 
 ## Recent Updates
 
+**2025-10-30:**
+
+- Fixed welcome note appearing in wrong folders bug (Phase 2.5.2)
+- Added E2E test for welcome note bug (welcome-note-deletion-bug.spec.ts)
+- Documented 3 failing folder sync tests in PLAN-PHASE-2.md (should be fixed in Phase 2.3)
+
 **2025-10-29:**
 
 - Reviewed and confirmed completion status of all phases

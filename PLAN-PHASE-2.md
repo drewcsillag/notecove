@@ -599,6 +599,16 @@ This phase is split into 5 sub-phases for better manageability:
 - All tests pass when run individually
 - Issue tracked for future improvement
 
+**Failing Tests (As of 2025-10-30):**
+
+The following 3 E2E tests in folder-bugs.spec.ts are currently failing and represent known bugs that need to be fixed:
+
+1. **"should persist renamed folders after app restart"** - Folder renames not persisting to disk
+2. **"should sync folder rename across multiple windows in same instance"** - Folder changes not syncing between windows in the same Electron instance
+3. **"should sync folder changes across separate Electron instances"** - Folder changes not syncing across different Electron instances
+
+These tests are documented in `e2e/BUG-TEST-SUMMARY.md` as expected failures. They should be fixed in **Phase 2.3 (Desktop Multi-Window Sync)** when enhancing the CRDT file persistence and IPC event broadcasting for folder operations.
+
 **Acceptance Criteria:** ✅ All met
 
 - ✅ Can drag folders to nest/unnest
@@ -803,9 +813,15 @@ This phase is split into 6 sub-phases for better manageability:
   - Fixed welcome note duplication - check CRDT content first
   - Fixed title update speed - reduced debounce from 1000ms to 300ms
   - Fixed cross-instance notes list sync - activity sync hydrates database from CRDT
+- [x] ✅ **Fix welcome note appearing in wrong folders bug (2025-10-30)**
+  - Added useEffect hook to clear selectedNoteId when note doesn't exist in current folder
+  - Updated NotesListPanelProps to allow onNoteSelect(null)
+  - Fixed bug where welcome note remained visible in editor when switching to empty folders
+  - E2E test: welcome-note-deletion-bug.spec.ts verifies fix
 - [x] ✅ **Add comprehensive tests**
   - Unit tests for NotesListPanel, App, EditorPanel, TipTapEditor
   - E2E tests in cross-instance-bugs.spec.ts (3/3 passing)
+  - E2E test in welcome-note-deletion-bug.spec.ts (1/1 passing)
   - Tests for title updates, content persistence, cross-instance sync
 
 **Files Added:**
