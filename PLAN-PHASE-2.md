@@ -936,42 +936,89 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 
 ---
 
-#### 2.5.4 Note Context Menu & Deletion 🟥
+#### 2.5.4 Note Context Menu & Deletion ✅
 
-**Status:** To Do
+**Status:** Complete (2025-10-30) - Partial implementation, "Recently Deleted" UI deferred to 2.5.5
 
-**Tasks:**
+**Completed Tasks:**
 
-- [ ] 🟥 **Implement note context menu**
-  - Right-click note for menu
+- [x] ✅ **Implement note context menu**
+  - Right-click note shows context menu
   - Options: New Note, Delete
-  - More options deferred to later sub-phases
-- [ ] 🟥 **Implement note deletion**
-  - Delete option in context menu
-  - Confirmation dialog ("Move to Recently Deleted?")
-  - Set deleted flag in CRDT (soft delete)
-  - Update SQLite cache
-  - Note moves to "Recently Deleted"
-- [ ] 🟥 **Implement IPC handlers**
-  - `note:delete` - Soft delete note
-  - `note:create` context menu variant (if different from plus button)
-- [ ] 🟥 **Add tests**
-  - Test context menu display
-  - Test note deletion
-  - Test "Recently Deleted" appearance
-  - Test deletion persistence
+  - Clean MUI Menu component with proper positioning
+- [x] ✅ **Implement note deletion backend**
+  - `note:delete` IPC handler implemented with soft delete
+  - Updates CRDT (markDeleted()) and SQLite cache (deleted=true)
+  - Broadcasts 'note:deleted' event to all windows
+- [x] ✅ **Implement deletion UI**
+  - Delete confirmation dialog with clear messaging
+  - Cancel and Delete buttons
+  - Removes note from current view after deletion
+- [x] ✅ **Implement database support for deleted notes**
+  - Added getDeletedNotes(sdId?) method
+  - Updated searchNotes() to exclude deleted notes (JOIN with notes table)
+  - Updated handleListNotes() to support "recently-deleted" folder ID
+- [x] ✅ **Add comprehensive tests**
+  - Created note-context-menu.spec.ts with 10 E2E tests
+  - Tests for context menu UI (4 passing)
+  - Tests for deletion flow (3 passing)
+  - Tests for cancel behavior (passing)
+  - 3 tests skipped pending "Recently Deleted" folder UI (Phase 2.5.5)
+
+**Files Modified:**
+
+- packages/desktop/src/main/ipc/handlers.ts - handleDeleteNote, handleListNotes
+- packages/desktop/src/main/database/database.ts - getDeletedNotes, searchNotes filtering
+- packages/desktop/src/renderer/src/components/NotesListPanel/NotesListPanel.tsx - context menu, dialog
+- packages/shared/src/database/types.ts - getDeletedNotes type definition
+- packages/desktop/e2e/note-context-menu.spec.ts (NEW)
 
 **Acceptance Criteria:**
 
 - ✅ Context menu appears on right-click
 - ✅ Can delete notes (soft delete)
-- ✅ Deleted notes appear in "Recently Deleted"
-- ✅ Deleted notes hidden from other views
-- ⏭️ Pin/Unpin, Open in New Window, Move to..., Duplicate deferred to 2.5.5
+- ✅ Deleted notes hidden from search results
+- ✅ Deleted notes hidden from folder views
+- ⏭️ Deleted notes appear in "Recently Deleted" → Deferred to 2.5.5
+- ⏭️ Pin/Unpin, Open in New Window, Move to..., Duplicate → Deferred to 2.5.6+
 
 ---
 
-#### 2.5.5 Pinned Notes & Advanced Search 🟥
+#### 2.5.5 "Recently Deleted" Virtual Folder 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 **Implement "Recently Deleted" virtual folder**
+  - Add to FolderTree as special folder (like "All Notes")
+  - Position at bottom of folder list
+  - Handle selection and display deleted notes
+  - Update tests (re-enable 3 skipped tests from 2.5.4)
+- [ ] 🟥 **Implement restore functionality**
+  - Context menu option "Restore" on deleted notes
+  - Removes deleted flag from CRDT and SQLite
+  - Note returns to original folder
+- [ ] 🟥 **Implement permanent delete**
+  - Context menu option "Delete Permanently"
+  - Confirmation dialog ("Cannot be undone")
+  - Actually removes note from CRDT and disk
+- [ ] 🟥 **Add auto-cleanup**
+  - Notes in "Recently Deleted" for >30 days auto-deleted
+  - Background task checks on app startup
+  - Configuration option for cleanup period
+
+**Acceptance Criteria:**
+
+- ✅ "Recently Deleted" folder shows deleted notes
+- ✅ Can restore notes from "Recently Deleted"
+- ✅ Can permanently delete notes
+- ✅ Old deleted notes auto-cleanup after 30 days
+- ✅ All 10 E2E tests from 2.5.4 passing
+
+---
+
+#### 2.5.6 Pinned Notes & Advanced Search 🟥
 
 **Status:** To Do
 
