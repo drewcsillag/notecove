@@ -14,21 +14,14 @@ interface EditorPanelProps {
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ selectedNoteId }) => {
   const handleTitleChange = useCallback(
-    async (title: string, contentText: string) => {
-      if (!selectedNoteId) {
-        console.log('[EditorPanel] Skipping title update - no note selected');
-        return;
-      }
-
-      console.log(`[EditorPanel] Updating title for note ${selectedNoteId}: "${title}"`);
+    async (noteId: string, title: string, contentText: string) => {
       try {
-        await window.electronAPI.note.updateTitle(selectedNoteId, title, contentText);
-        console.log(`[EditorPanel] Title updated successfully`);
+        await window.electronAPI.note.updateTitle(noteId, title, contentText);
       } catch (err) {
         console.error('Failed to update note title:', err);
       }
     },
-    [selectedNoteId]
+    []
   );
 
   return (
@@ -37,9 +30,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ selectedNoteId }) => {
       <TipTapEditor
         key={selectedNoteId}
         noteId={selectedNoteId}
-        onTitleChange={(title: string, contentText: string) =>
-          void handleTitleChange(title, contentText)
-        }
+        onTitleChange={(noteId: string, title: string, contentText: string) => {
+          void handleTitleChange(noteId, title, contentText);
+        }}
       />
     </Box>
   );

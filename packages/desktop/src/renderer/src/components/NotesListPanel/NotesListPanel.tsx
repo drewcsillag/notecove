@@ -299,6 +299,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   }, [loadSelectedFolder]);
 
   // Clear selected note if it's not in the current notes list
+  // This runs when folder changes or when notes are loaded/updated
   useEffect(() => {
     if (selectedNoteId && notes.length > 0) {
       const noteExists = notes.some((note) => note.id === selectedNoteId);
@@ -309,7 +310,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       // If folder is empty, clear selection
       onNoteSelect(null);
     }
-  }, [notes, selectedNoteId, onNoteSelect, loading]);
+    // Now depends on notes array too, but title updates don't refetch the whole array anymore
+    // so this won't trigger on every keystroke
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFolderId, notes, onNoteSelect]);
 
   // Listen for note updates from other windows
   useEffect(() => {
@@ -367,11 +371,20 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     });
 
     const unsubscribeTitleUpdated = window.electronAPI.note.onTitleUpdated((data) => {
-      console.log('[NotesListPanel] Title updated:', data);
-      // Refresh notes list to show updated title
-      if (selectedFolderId !== null) {
-        void fetchNotes(selectedFolderId);
-      }
+      // Update title in notes list without refetching (more efficient and prevents selection clearing)
+      setNotes((prevNotes) => {
+        const noteIndex = prevNotes.findIndex((note) => note.id === data.noteId);
+        if (noteIndex !== -1) {
+          const updatedNotes = [...prevNotes];
+          updatedNotes[noteIndex] = {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            ...updatedNotes[noteIndex]!,
+            title: data.title,
+          };
+          return updatedNotes;
+        }
+        return prevNotes;
+      });
     });
 
     return () => {

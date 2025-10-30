@@ -16,15 +16,50 @@ import { EditorToolbar } from './EditorToolbar';
 
 export interface TipTapEditorProps {
   noteId: string | null;
-  onTitleChange?: (title: string, contentText: string) => void;
+  onTitleChange?: (noteId: string, title: string, contentText: string) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChange }) => {
   const [yDoc] = useState(() => new Y.Doc());
   const isLoadingNoteRef = useRef(false);
-  const currentNoteIdRef = useRef<string | null>(null);
+  const noteIdRef = useRef<string | null>(noteId);
   const titleUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
+
+  // Keep noteIdRef in sync with noteId prop and handle note deselection
+  useEffect(() => {
+    const previousNoteId = noteIdRef.current;
+
+    if (previousNoteId !== noteId) {
+      // If we're deselecting a note (changing from a valid ID to null or different ID),
+      // immediately save the current editor content
+      if (previousNoteId && editor && onTitleChange) {
+        // Clear any pending debounced update
+        if (titleUpdateTimerRef.current) {
+          clearTimeout(titleUpdateTimerRef.current);
+          titleUpdateTimerRef.current = null;
+        }
+
+        // Extract and save title immediately
+        const firstLine = editor.state.doc.firstChild;
+        if (firstLine) {
+          const titleText = firstLine.textContent.trim();
+          let text = '';
+          editor.state.doc.descendants((node) => {
+            if (node.isText) {
+              text += node.text;
+            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
+              text += ' ';
+            }
+            return true;
+          });
+          onTitleChange(previousNoteId, titleText || 'Untitled', text.trim());
+        }
+      }
+
+      noteIdRef.current = noteId;
+    }
+  }, [noteId]); // Only depend on noteId changes, not editor/onTitleChange
 
   const editor = useEditor({
     extensions: [
@@ -51,7 +86,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
     onUpdate: ({ editor }) => {
       // Don't extract title while loading a note
       if (isLoadingNoteRef.current) {
-        console.log('[TipTapEditor] Skipping title extraction - still loading');
+        return;
+      }
+
+      // Don't extract title if no note is selected
+      if (!noteIdRef.current) {
         return;
       }
 
@@ -59,12 +98,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
       const firstLine = editor.state.doc.firstChild;
       if (firstLine && onTitleChange) {
         const titleText = firstLine.textContent.trim();
-        console.log(`[TipTapEditor] Extracted title: "${titleText}"`);
 
         // Clear existing timer
         if (titleUpdateTimerRef.current) {
           clearTimeout(titleUpdateTimerRef.current);
         }
+
+        // Capture the noteId NOW, before debounce delay
+        const capturedNoteId = noteIdRef.current;
 
         // Debounce title update by 300ms for snappy updates
         titleUpdateTimerRef.current = setTimeout(() => {
@@ -81,25 +122,41 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
             return true;
           });
 
-          console.log(
-            `[TipTapEditor] Calling onTitleChange with: "${titleText || 'Untitled'}" and ${text.length} chars of content`
-          );
-          onTitleChange(titleText || 'Untitled', text.trim());
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          onTitleChange?.(capturedNoteId, titleText || 'Untitled', text.trim());
         }, 300);
       }
     },
   });
 
-  // Cleanup on unmount
+  // Cleanup on unmount - save any pending changes before destroying editor
   useEffect(() => {
     return () => {
+      // Save current editor content before unmounting
+      if (noteId && editor && onTitleChange) {
+        const firstLine = editor.state.doc.firstChild;
+        if (firstLine) {
+          const titleText = firstLine.textContent.trim();
+          let text = '';
+          editor.state.doc.descendants((node) => {
+            if (node.isText) {
+              text += node.text;
+            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
+              text += ' ';
+            }
+            return true;
+          });
+          onTitleChange(noteId, titleText || 'Untitled', text.trim());
+        }
+      }
+
       if (titleUpdateTimerRef.current) {
         clearTimeout(titleUpdateTimerRef.current);
       }
       editor?.destroy();
       yDoc.destroy();
     };
-  }, [editor, yDoc]);
+  }, [editor, yDoc, noteId, onTitleChange]);
 
   // Send Yjs updates to main process for persistence and cross-window sync
   useEffect(() => {
@@ -154,7 +211,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
         const state = await window.electronAPI.note.getState(noteId);
         console.log(`[TipTapEditor] Got state from main process, size: ${state.length} bytes`);
 
-        if (!isActive) return;
+        if (!isActive) {
+          return;
+        }
 
         // Apply the state to our local Yjs document with 'load' origin
         // Since this editor instance is created fresh for each note (via key prop),
@@ -162,7 +221,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
         Y.applyUpdate(yDoc, state, 'load');
         console.log(`[TipTapEditor] Applied state to yDoc`);
 
-        currentNoteIdRef.current = noteId;
         isLoadingNoteRef.current = false;
       } catch (error) {
         console.error(`Failed to load note ${noteId}:`, error);

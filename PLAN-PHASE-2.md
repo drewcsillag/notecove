@@ -818,11 +818,25 @@ This phase is split into 6 sub-phases for better manageability:
   - Updated NotesListPanelProps to allow onNoteSelect(null)
   - Fixed bug where welcome note remained visible in editor when switching to empty folders
   - E2E test: welcome-note-deletion-bug.spec.ts verifies fix
+- [x] ✅ **Fix critical title extraction bug causing all E2E test failures (2025-10-30)**
+  - **Root Cause**: `onTitleUpdated` handler was calling `fetchNotes()`, which replaced the entire notes array, triggering a useEffect that cleared selectedNoteId on every keystroke
+  - **Impact**: 9 failing E2E tests across search.spec.ts, cross-instance-bugs.spec.ts, multi-sd-cross-instance.spec.ts, note-context-menu.spec.ts
+  - **Solution**: Changed NotesListPanel to update note titles in-place using functional setState instead of refetching all notes
+  - **Result**: All 67 E2E tests now passing, full CI passing
+  - **Files Modified**:
+    - NotesListPanel.tsx (lines 373-388): In-place title updates with functional setState
+    - TipTapEditor.tsx: Removed verbose debug logging added during investigation
+    - EditorPanel.tsx: Removed debug logging
+  - **Investigation**: See TEST-FAILURE-INVESTIGATION-REPORT.md for detailed 8-attempt investigation process
 - [x] ✅ **Add comprehensive tests**
   - Unit tests for NotesListPanel, App, EditorPanel, TipTapEditor
   - E2E tests in cross-instance-bugs.spec.ts (3/3 passing)
   - E2E test in welcome-note-deletion-bug.spec.ts (1/1 passing)
+  - E2E tests in search.spec.ts (7/7 passing - all fixed after title bug resolution)
+  - E2E tests in note-context-menu.spec.ts (7/7 passing - all fixed after title bug resolution)
+  - E2E tests in multi-sd-cross-instance.spec.ts (3/3 passing - all fixed after title bug resolution)
   - Tests for title updates, content persistence, cross-instance sync
+  - **Total: 67/67 E2E tests passing, full CI passing**
 
 **Files Added:**
 

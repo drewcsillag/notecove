@@ -104,10 +104,11 @@ test.describe('Note Search Functionality', () => {
 
     const editor = page.locator('.ProseMirror');
     await editor.click();
+    await page.waitForTimeout(1000); // Wait for note to be fully selected and editor initialized
     const testContent =
       'Searchable Test Note\nThis note contains unique search terms like xyzabc123';
-    await editor.fill(testContent);
-    await page.waitForTimeout(4000); // Wait for debounce (300ms) + save + FTS indexing
+    await editor.type(testContent);
+    await page.waitForTimeout(1500); // Wait for debounce (300ms) + save + FTS indexing
 
     // Now search for the unique term
     const middlePanel = page.locator('#middle-panel');
