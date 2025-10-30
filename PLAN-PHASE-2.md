@@ -356,9 +356,9 @@ The proper implementation MUST use the **Yjs Synchronization Protocol**, which i
 
 ---
 
-### 2.4 Folder Tree Panel 🟡
+### 2.4 Folder Tree Panel ✅
 
-**Status:** In Progress (3/5 sub-phases complete)
+**Status:** Complete (5/5 sub-phases complete)
 
 This phase is split into 5 sub-phases for better manageability:
 
@@ -705,7 +705,7 @@ This phase is split into 5 sub-phases for better manageability:
 
 ### 2.5 Notes List Panel 🟡
 
-**Status:** In Progress
+**Status:** In Progress (2/6 sub-phases complete)
 
 This phase is split into 6 sub-phases for better manageability:
 
