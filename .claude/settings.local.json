@@ -71,7 +71,9 @@
       "Bash(pnpm --filter @notecove/desktop lint:*)",
       "Bash(awk:*)",
       "Bash(pnpm --filter @notecove/desktop format:check:*)",
-      "Bash(npx prettier:*)"
+      "Bash(npx prettier:*)",
+      "Read(//private/tmp/**)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

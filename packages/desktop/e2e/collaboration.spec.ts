@@ -12,18 +12,26 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { resolve } from 'path';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 let electronApp: ElectronApplication;
 let window1: Page;
 let window2: Page;
+let testUserDataDir: string;
 
 test.describe('Collaboration Demo', () => {
-  test.beforeAll(async () => {
+  test.beforeEach(async () => {
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Create a unique temporary directory for this test's userData
+    testUserDataDir = mkdtempSync(join(tmpdir(), 'notecove-e2e-'));
     console.log('[Collaboration E2E] Launching Electron with main process at:', mainPath);
+    console.log('[Collaboration E2E] Launching fresh Electron instance with userData at:', testUserDataDir);
 
     electronApp = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${testUserDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -77,8 +85,16 @@ test.describe('Collaboration Demo', () => {
     await window1.waitForTimeout(300);
   }, 60000);
 
-  test.afterAll(async () => {
+  test.afterEach(async () => {
     await electronApp.close();
+
+    // Clean up the temporary user data directory
+    try {
+      rmSync(testUserDataDir, { recursive: true, force: true });
+      console.log('[Collaboration E2E] Cleaned up test userData directory:', testUserDataDir);
+    } catch (err) {
+      console.error('[Collaboration E2E] Failed to clean up test userData directory:', err);
+    }
   });
 
   test('should open multiple windows without duplication', async () => {

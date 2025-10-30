@@ -7,28 +7,27 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import { resolve } from 'path';
-import { mkdtemp, rm } from 'fs/promises';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 let electronApp: ElectronApplication;
 let page: Page;
-let testStorageDir: string;
+let testUserDataDir: string;
 
-test.beforeAll(async () => {
-  // Create a temporary storage directory for this test session
-  testStorageDir = await mkdtemp(join(tmpdir(), 'notecove-test-'));
-
+test.beforeEach(async () => {
   const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+  // Create a unique temporary directory for this test's userData
+  testUserDataDir = mkdtempSync(join(tmpdir(), 'notecove-e2e-'));
   console.log('[E2E] Launching Electron with main process at:', mainPath);
-  console.log('[E2E] Test storage directory:', testStorageDir);
+  console.log('[E2E] Launching fresh Electron instance with userData at:', testUserDataDir);
 
   electronApp = await electron.launch({
-    args: [mainPath],
+    args: [mainPath, `--user-data-dir=${testUserDataDir}`],
     env: {
       ...process.env,
       NODE_ENV: 'test',
-      TEST_STORAGE_DIR: testStorageDir,
     },
     timeout: 60000,
   });
@@ -45,14 +44,15 @@ test.beforeAll(async () => {
   });
 }, 60000);
 
-test.afterAll(async () => {
+test.afterEach(async () => {
   await electronApp.close();
 
-  // Clean up test storage directory
+  // Clean up the temporary user data directory
   try {
-    await rm(testStorageDir, { recursive: true, force: true });
-  } catch (error) {
-    console.error('[E2E] Failed to clean up test storage:', error);
+    rmSync(testUserDataDir, { recursive: true, force: true });
+    console.log('[E2E] Cleaned up test userData directory:', testUserDataDir);
+  } catch (err) {
+    console.error('[E2E] Failed to clean up test userData directory:', err);
   }
 });
 
@@ -129,14 +129,18 @@ test.describe('Note Multi-Instance Sync', () => {
 
   test('should sync multiple consecutive edits between separate instances', async () => {
     // Create a shared storage directory for both instances
-    const sharedStorageDir = await mkdtemp(join(tmpdir(), 'notecove-cross-instance-'));
+    const sharedStorageDir = mkdtempSync(join(tmpdir(), 'notecove-cross-instance-'));
     console.log('[E2E Cross-Instance] Shared storage directory:', sharedStorageDir);
 
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
 
+    // Create separate user data directories for each instance
+    const userData1 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance1-'));
+    const userData2 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance2-'));
+
     // Launch first instance
     const instance1 = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${userData1}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -160,9 +164,9 @@ test.describe('Note Multi-Instance Sync', () => {
     const editor1 = page1.locator('[contenteditable="true"]').first();
     await editor1.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Launch second instance with same storage directory
+    // Launch second instance with same storage directory but different userData
     const instance2 = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${userData2}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -234,11 +238,13 @@ test.describe('Note Multi-Instance Sync', () => {
       await instance1.close();
       await instance2.close();
 
-      // Clean up shared storage directory
+      // Clean up all temporary directories
       try {
-        await rm(sharedStorageDir, { recursive: true, force: true });
+        rmSync(sharedStorageDir, { recursive: true, force: true });
+        rmSync(userData1, { recursive: true, force: true });
+        rmSync(userData2, { recursive: true, force: true });
       } catch (error) {
-        console.error('[E2E Cross-Instance] Failed to clean up shared storage:', error);
+        console.error('[E2E Cross-Instance] Failed to clean up temporary directories:', error);
       }
     }
   });

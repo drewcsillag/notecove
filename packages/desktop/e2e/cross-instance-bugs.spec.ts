@@ -10,44 +10,33 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import { resolve } from 'path';
-import { mkdtemp, rm } from 'fs/promises';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-
-let testStorageDir: string;
 
 test.describe('Cross-Instance Bugs', () => {
   let instance1: ElectronApplication;
   let instance2: ElectronApplication;
   let window1: Page;
   let window2: Page;
-  let userData1: string;
-  let userData2: string;
-
-  test.beforeAll(async () => {
-    // Create a shared temporary storage directory for both instances
-    testStorageDir = await mkdtemp(join(tmpdir(), 'notecove-cross-instance-'));
-    console.log('[Cross-Instance] Shared storage directory:', testStorageDir);
-  }, 60000);
-
-  test.afterAll(async () => {
-    // Clean up test storage directory
-    try {
-      await rm(testStorageDir, { recursive: true, force: true });
-      console.log('[Cross-Instance] Cleaned up test storage');
-    } catch (error) {
-      console.error('[Cross-Instance] Failed to clean up test storage:', error);
-    }
-  });
+  let testStorageDir: string;
 
   test('should not duplicate welcome note content when opening two instances with same storage', async () => {
     console.log('[Test] Testing welcome note duplication bug...');
 
+    // Create a shared temporary storage directory for both instances
+    testStorageDir = mkdtempSync(join(tmpdir(), 'notecove-cross-instance-'));
+    console.log('[Cross-Instance] Shared storage directory:', testStorageDir);
+
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Create separate user data directories for each instance
+    const userData1 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance1-'));
+    const userData2 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance2-'));
 
     // Launch first instance
     instance1 = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${userData1}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -78,10 +67,10 @@ test.describe('Cross-Instance Bugs', () => {
     const welcomeCount1 = (content1Initial?.match(/Welcome to NoteCove!/g) || []).length;
     expect(welcomeCount1).toBe(1);
 
-    // Launch second instance with SAME storage directory
+    // Launch second instance with SAME storage directory but DIFFERENT userData
     console.log('[Test] Launching second instance with same storage...');
     instance2 = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${userData2}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -120,16 +109,30 @@ test.describe('Cross-Instance Bugs', () => {
     // Cleanup
     await instance1.close();
     await instance2.close();
+
+    // Clean up temporary directories
+    try {
+      rmSync(testStorageDir, { recursive: true, force: true });
+      rmSync(userData1, { recursive: true, force: true });
+      rmSync(userData2, { recursive: true, force: true });
+      console.log('[Cross-Instance] Cleaned up test directories');
+    } catch (error) {
+      console.error('[Cross-Instance] Failed to clean up test directories:', error);
+    }
   }, 120000);
 
   test('should sync notes list when creating note in one instance', async () => {
     console.log('[Test] Testing cross-instance notes list sync...');
 
+    // Create a shared temporary storage directory for both instances
+    testStorageDir = mkdtempSync(join(tmpdir(), 'notecove-cross-instance-'));
+    console.log('[Cross-Instance] Shared storage directory:', testStorageDir);
+
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
 
     // Create separate user data directories for each instance
-    userData1 = await mkdtemp(join(tmpdir(), 'notecove-userdata-1-'));
-    userData2 = await mkdtemp(join(tmpdir(), 'notecove-userdata-2-'));
+    const userData1 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance1-'));
+    const userData2 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance2-'));
 
     console.log('[Test] Instance 1 userData:', userData1);
     console.log('[Test] Instance 2 userData:', userData2);
@@ -224,19 +227,32 @@ test.describe('Cross-Instance Bugs', () => {
     await instance1.close();
     await instance2.close();
 
-    // Clean up userData directories
-    await rm(userData1, { recursive: true, force: true });
-    await rm(userData2, { recursive: true, force: true });
+    // Clean up temporary directories
+    try {
+      rmSync(testStorageDir, { recursive: true, force: true });
+      rmSync(userData1, { recursive: true, force: true });
+      rmSync(userData2, { recursive: true, force: true });
+      console.log('[Cross-Instance] Cleaned up test directories');
+    } catch (error) {
+      console.error('[Cross-Instance] Failed to clean up test directories:', error);
+    }
   }, 120000);
 
   test('should consistently update note title when editing', async () => {
     console.log('[Test] Testing title update consistency...');
 
+    // Create a temporary storage directory for this test
+    testStorageDir = mkdtempSync(join(tmpdir(), 'notecove-cross-instance-'));
+    console.log('[Cross-Instance] Shared storage directory:', testStorageDir);
+
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Create a user data directory for this instance
+    const userData1 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance1-'));
 
     // Launch instance
     instance1 = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${userData1}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -303,5 +319,14 @@ test.describe('Cross-Instance Bugs', () => {
 
     // Cleanup
     await instance1.close();
+
+    // Clean up temporary directories
+    try {
+      rmSync(testStorageDir, { recursive: true, force: true });
+      rmSync(userData1, { recursive: true, force: true });
+      console.log('[Cross-Instance] Cleaned up test directories');
+    } catch (error) {
+      console.error('[Cross-Instance] Failed to clean up test directories:', error);
+    }
   }, 180000);
 });

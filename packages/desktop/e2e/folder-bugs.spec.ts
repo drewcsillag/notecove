@@ -22,17 +22,22 @@ import { tmpdir } from 'os';
 let electronApp: ElectronApplication;
 let page: Page;
 let testStorageDir: string;
+let testUserDataDir: string;
 
 test.beforeEach(async () => {
   // Create a unique temp directory for THIS test's storage
   testStorageDir = await mkdtemp(join(tmpdir(), 'notecove-folder-test-'));
   console.log('[E2E] Test storage directory:', testStorageDir);
 
+  // Create a unique temporary directory for this test's userData (database)
+  testUserDataDir = await mkdtemp(join(tmpdir(), 'notecove-e2e-'));
+  console.log('[E2E] Test userData directory:', testUserDataDir);
+
   const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
   console.log('[E2E] Launching Electron with main process at:', mainPath);
 
   electronApp = await electron.launch({
-    args: [mainPath],
+    args: [mainPath, `--user-data-dir=${testUserDataDir}`],
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -72,6 +77,16 @@ test.afterEach(async () => {
       console.log('[E2E] Cleaned up test storage:', testStorageDir);
     } catch (error) {
       console.error('[E2E] Failed to clean up test storage:', error);
+    }
+  }
+
+  // Clean up test userData directory
+  if (testUserDataDir) {
+    try {
+      await rm(testUserDataDir, { recursive: true, force: true });
+      console.log('[E2E] Cleaned up test userData:', testUserDataDir);
+    } catch (error) {
+      console.error('[E2E] Failed to clean up test userData:', error);
     }
   }
 });
