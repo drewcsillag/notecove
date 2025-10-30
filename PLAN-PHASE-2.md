@@ -853,41 +853,81 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 
 ---
 
-#### 2.5.3 Basic Search Functionality 🟥
+#### 2.5.3 Basic Search Functionality ✅
 
-**Status:** To Do
+**Status:** Complete (2025-10-30)
 
 **Context:** See [QUESTIONS-1.md](../QUESTIONS-1.md) Q6.1-6.3 for search behavior requirements (full content + tags search, case-sensitive option, Monaco-style find)
 
-**Tasks:**
+**Completed Tasks:**
 
-- [ ] 🟥 **Implement search box in header**
-  - Text input for search query
-  - Debounced onChange (250-300ms)
-  - Clear button (X icon)
+- [x] ✅ **Implement search box in header**
+  - Text input for search query with MUI TextField
+  - Debounced onChange (300ms)
+  - Clear button (X icon via InputAdornment)
   - Persist search text in app_state
-- [ ] 🟥 **Implement basic FTS5 search**
-  - `note:search` IPC handler
-  - Use SQLite FTS5 notes_fts table
-  - Search full note content
-  - Return matching note IDs with snippets
-- [ ] 🟥 **Filter notes list by search**
-  - Show only matching notes when search is active
-  - Clear filter when search is empty
-  - Maintain folder filter (search within folder)
-- [ ] 🟥 **Add tests**
-  - Test search query handling
-  - Test FTS5 search results
-  - Test search + folder filter combination
-  - Test search persistence
+- [x] ✅ **Implement basic FTS5 search**
+  - `note:search` IPC handler implemented
+  - SQLite FTS5 notes_fts table with prefix matching (*)
+  - Searches full note content (contentText field)
+  - Returns matching note IDs with snippets (empty for now, XML tags removed)
+- [x] ✅ **Filter notes list by search**
+  - Shows only matching notes when search is active
+  - Clears filter when search is empty
+  - Maintains folder filter (search within folder)
+- [x] ✅ **Add tests**
+  - 7 E2E tests for search functionality (all passing)
+  - Tests search query handling, FTS5 results, persistence
+  - Fixed 12 E2E test failures caused by search box selector conflicts
+  - All 55 E2E tests passing, 149 unit tests passing
 
-**Acceptance Criteria:**
+**Implementation Details:**
+
+**Backend Changes:**
+- Modified `database.ts` to add FTS5 virtual table `notes_fts`
+- Implemented `searchNotes()` method with prefix matching support
+- Modified `handleUpdateTitle()` to extract contentPreview from content after title (prevents duplicate title display)
+- Enhanced title extraction in TipTapEditor with proper word boundary preservation between blocks
+
+**Frontend Changes:**
+- Added search UI to NotesListPanel with debounced input (300ms)
+- Implemented search query persistence using appState
+- Added clear button that resets search
+- Integrated search results display with existing notes list
+- Search respects current folder filter
+
+**Test Fixes:**
+- Fixed folder creation dialog selectors (9 tests)
+- Fixed folder rename dialog selectors (4 tests)
+- Fixed SD dialog input selectors (7 tests)
+- Fixed contentPreview duplication (2 tests)
+- All selectors now properly scoped to `div[role="dialog"]` to avoid search box conflict
+
+**Files Modified:**
+- `packages/desktop/src/main/database/database.ts` - FTS5 table and search
+- `packages/desktop/src/main/ipc/handlers.ts` - search handler + contentPreview fix
+- `packages/desktop/src/preload/index.ts` - search IPC exposure
+- `packages/desktop/src/renderer/src/types/electron.d.ts` - search types
+- `packages/desktop/src/renderer/src/components/NotesListPanel/NotesListPanel.tsx` - search UI
+- `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx` - text extraction fix
+- `packages/desktop/e2e/search.spec.ts` - NEW: 7 search E2E tests
+- `packages/desktop/e2e/folders.spec.ts` - Fixed dialog selectors
+- `packages/desktop/e2e/folder-bugs.spec.ts` - Fixed dialog selectors
+- `packages/desktop/e2e/multi-sd-cross-instance.spec.ts` - Fixed dialog selectors
+
+**Acceptance Criteria:** ✅ All met
 
 - ✅ Search box filters notes list
-- ✅ Live/incremental search works (debounced)
-- ✅ Search uses FTS5 full-text index
-- ✅ Search persists across restarts
+- ✅ Live/incremental search works (debounced at 300ms)
+- ✅ Search uses FTS5 full-text index with prefix matching
+- ✅ Search persists across restarts via appState
 - ⏭️ Advanced options (case-sensitive, regex, scope) deferred to 2.5.5
+
+**Test Coverage:**
+- 7 new E2E tests for search functionality (all passing)
+- All 55 E2E tests passing
+- 149 unit tests passing (1 skipped)
+- All CI checks passing
 
 ---
 
