@@ -28,7 +28,10 @@ test.describe('Collaboration Demo', () => {
     // Create a unique temporary directory for this test's userData
     testUserDataDir = mkdtempSync(join(tmpdir(), 'notecove-e2e-'));
     console.log('[Collaboration E2E] Launching Electron with main process at:', mainPath);
-    console.log('[Collaboration E2E] Launching fresh Electron instance with userData at:', testUserDataDir);
+    console.log(
+      '[Collaboration E2E] Launching fresh Electron instance with userData at:',
+      testUserDataDir
+    );
 
     electronApp = await electron.launch({
       args: [mainPath, `--user-data-dir=${testUserDataDir}`],

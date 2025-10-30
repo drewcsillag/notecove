@@ -156,14 +156,10 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     await expect(page.locator('text=Work')).toBeVisible();
     await expect(page.locator('text=Personal')).toBeVisible();
 
-    // Expand "Personal" to see "Ideas" and "Recipes" by clicking the chevron icon
-    const personalFolder = page.getByRole('button', { name: /Personal/ }).first();
-    const personalChevron = personalFolder.locator('svg').first(); // ChevronRight icon
-    await personalChevron.click();
-
-    // Wait for nested folders to be visible after expansion
-    await expect(page.locator('text=Ideas')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=Recipes')).toBeVisible({ timeout: 5000 });
+    // Folders should start fully expanded, so Ideas and Recipes should be visible
+    // Wait for them with a longer timeout to allow expansion to complete
+    await expect(page.locator('text=Ideas')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Recipes')).toBeVisible({ timeout: 10000 });
 
     // Get tree items for drag and drop - be very specific to avoid selecting parent
     // Use getByRole with exact name to ensure we get the right element
@@ -315,10 +311,10 @@ test.describe("Bug: Folders don't persist across app restarts", () => {
     // Close the app
     await electronApp.close();
 
-    // Relaunch the app with same storage directory
+    // Relaunch the app with same storage directory and userData
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
     electronApp = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${testUserDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -360,12 +356,12 @@ test.describe("Bug: Folders don't persist across app restarts", () => {
     await page.waitForSelector('text=Rename Folder', { state: 'hidden' });
     await page.waitForSelector('text=Career', { timeout: 5000 });
 
-    // Close and relaunch with same storage directory
+    // Close and relaunch with same storage directory and userData
     await electronApp.close();
 
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
     electronApp = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${testUserDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',

@@ -299,12 +299,17 @@ export const FolderTree: FC<FolderTreeProps> = ({
           const allIds = [...sdList.map((s) => `sd:${s.id}`), ...allFolderIds];
           setAllFolderIds(allIds);
 
-          // For default expansion: only expand SD nodes (top level), not all folders
-          // This gives users a clean view without deep nesting
-          const sdIds = sdList.map((s) => `sd:${s.id}`);
+          // For default expansion: expand all folders for better discoverability
+          // Users can collapse folders they don't need, and the state persists
           if (expandedFolderIds.length === 0) {
-            // Only set default expansion if no saved state
-            onExpandedChange?.(sdIds);
+            // Only set default expansion if no saved state - expand everything
+            // Call this synchronously so the Tree gets the right initialOpen on first render
+            onExpandedChange?.(allIds);
+          }
+
+          // Also increment remount counter to ensure Tree re-renders with expanded state
+          if (expandedFolderIds.length === 0 && allIds.length > 0) {
+            setRemountCounter((prev) => prev + 1);
           }
         } else {
           // Single SD mode: original behavior
@@ -315,6 +320,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
           // Set all folder IDs for initial expansion (start fully expanded)
           const folderIds = folderList.map((f) => f.id);
           setAllFolderIds(folderIds);
+
+          // Expand all folders on first load (no saved state)
+          if (expandedFolderIds.length === 0) {
+            onExpandedChange?.(folderIds);
+          }
         }
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -740,9 +750,22 @@ export const FolderTree: FC<FolderTreeProps> = ({
             onDrop={(tree, options) => void handleDrop(tree, options)}
             canDrag={canDrag}
             canDrop={canDrop}
-            initialOpen={
-              isCollapsedAll ? [] : expandedFolderIds.length > 0 ? expandedFolderIds : allFolderIds
-            }
+            initialOpen={(() => {
+              const result = isCollapsedAll
+                ? []
+                : expandedFolderIds.length > 0
+                  ? expandedFolderIds
+                  : allFolderIds.length > 0
+                    ? allFolderIds
+                    : [];
+              console.log('[FolderTree] Tree initialOpen:', {
+                isCollapsedAll,
+                expandedFolderIds: expandedFolderIds.length,
+                allFolderIds: allFolderIds.length,
+                result: result.length,
+              });
+              return result;
+            })()}
             onChangeOpen={(newOpenIds) => {
               // Skip callback if this is a programmatic change (expand/collapse all)
               if (isProgrammaticChange.current) {
