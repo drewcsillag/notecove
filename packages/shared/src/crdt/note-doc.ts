@@ -75,6 +75,16 @@ export class NoteDoc {
   }
 
   /**
+   * Mark note as restored (undelete)
+   */
+  markRestored(): void {
+    this.updateMetadata({
+      deleted: false,
+      modified: Date.now(),
+    });
+  }
+
+  /**
    * Get the current state as an update
    */
   encodeStateAsUpdate(): Uint8Array {

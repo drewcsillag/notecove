@@ -41,6 +41,7 @@ export class IPCHandlers {
     ipcMain.handle('note:applyUpdate', this.handleApplyUpdate.bind(this));
     ipcMain.handle('note:create', this.handleCreateNote.bind(this));
     ipcMain.handle('note:delete', this.handleDeleteNote.bind(this));
+    ipcMain.handle('note:restore', this.handleRestoreNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
     ipcMain.handle('note:getMetadata', this.handleGetMetadata.bind(this));
     ipcMain.handle('note:updateTitle', this.handleUpdateTitle.bind(this));
@@ -205,6 +206,39 @@ export class IPCHandlers {
 
     // Broadcast delete event to all windows
     this.broadcastToAll('note:deleted', noteId);
+  }
+
+  private async handleRestoreNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
+    // Get the note from cache
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    // Update CRDT metadata to mark as not deleted
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (noteDoc) {
+      noteDoc.markRestored();
+    } else {
+      // Note not loaded in memory, load it first with its sdId
+      await this.crdtManager.loadNote(noteId, note.sdId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (loadedNoteDoc) {
+        loadedNoteDoc.markRestored();
+      } else {
+        console.error(`[Note] Failed to load NoteDoc for ${noteId}`);
+      }
+    }
+
+    // Update SQLite cache
+    await this.database.upsertNote({
+      ...note,
+      deleted: false,
+      modified: Date.now(),
+    });
+
+    // Broadcast restore event to all windows
+    this.broadcastToAll('note:restored', noteId);
   }
 
   private async handleMoveNote(

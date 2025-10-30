@@ -23,14 +23,17 @@ const mockElectronAPI = {
     applyUpdate: jest.fn(),
     create: jest.fn().mockResolvedValue('new-note-id'),
     delete: jest.fn(),
+    restore: jest.fn(),
     move: jest.fn(),
     getMetadata: jest.fn(),
     list: jest.fn().mockResolvedValue([]),
     onUpdated: jest.fn(),
     onDeleted: jest.fn(),
+    onRestored: jest.fn(),
     onCreated: jest.fn(),
     onExternalUpdate: jest.fn(),
     onTitleUpdated: jest.fn(),
+    onMoved: jest.fn(),
     updateTitle: jest.fn(),
   },
   folder: {
@@ -74,6 +77,9 @@ describe('App', () => {
     mockElectronAPI.note.onDeleted.mockReturnValue(() => {
       /* unsubscribe */
     });
+    mockElectronAPI.note.onRestored.mockReturnValue(() => {
+      /* unsubscribe */
+    });
     mockElectronAPI.note.onCreated.mockReturnValue(() => {
       /* unsubscribe */
     });
@@ -81,6 +87,9 @@ describe('App', () => {
       /* unsubscribe */
     });
     mockElectronAPI.note.onTitleUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onMoved.mockReturnValue(() => {
       /* unsubscribe */
     });
     mockElectronAPI.sd.onUpdated.mockReturnValue(() => {

@@ -326,6 +326,25 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       }
     });
 
+    const unsubscribeRestored = window.electronAPI.note.onRestored((noteId) => {
+      console.log('[NotesListPanel] Note restored:', noteId);
+      // If we're viewing "Recently Deleted", remove the note from the list
+      // Otherwise, if we're viewing "All Notes" or the note's folder, refetch to show it
+      if (
+        selectedFolderId &&
+        (selectedFolderId === 'recently-deleted' ||
+          selectedFolderId.startsWith('recently-deleted:'))
+      ) {
+        // Remove from Recently Deleted view
+        setNotes((prev) => prev.filter((note) => note.id !== noteId));
+      } else {
+        // Refresh other views to potentially show the restored note
+        if (selectedFolderId !== null) {
+          void fetchNotes(selectedFolderId);
+        }
+      }
+    });
+
     const unsubscribeExternal = window.electronAPI.note.onExternalUpdate((data) => {
       console.log('[NotesListPanel] External update:', data);
       // Refresh notes list
@@ -345,6 +364,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     return () => {
       unsubscribeCreated();
       unsubscribeDeleted();
+      unsubscribeRestored();
       unsubscribeExternal();
       unsubscribeTitleUpdated();
     };
@@ -410,6 +430,30 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     setDeleteDialogOpen(false);
     setNoteToDelete(null);
   }, []);
+
+  // Handle restore from menu
+  const handleRestoreFromMenu = useCallback(() => {
+    if (!contextMenu) return;
+
+    const { noteId } = contextMenu;
+    handleContextMenuClose();
+
+    // Call IPC to restore note
+    window.electronAPI.note
+      .restore(noteId)
+      .then(() => {
+        console.log('[NotesListPanel] Note restored:', noteId);
+        // If we just restored the selected note, clear selection
+        if (selectedNoteId === noteId) {
+          onNoteSelect('');
+        }
+        // Note: The notes list will be updated automatically via onRestored event
+      })
+      .catch((err) => {
+        console.error('Failed to restore note:', err);
+        setError(err instanceof Error ? err.message : 'Failed to restore note');
+      });
+  }, [contextMenu, handleContextMenuClose, selectedNoteId, onNoteSelect]);
 
   // Format date for display
   const formatDate = (timestamp: number): string => {
@@ -579,8 +623,18 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           anchorReference="anchorPosition"
           anchorPosition={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
         >
-          <MenuItem onClick={handleNewNoteFromMenu}>New Note</MenuItem>
-          <MenuItem onClick={handleDeleteFromMenu}>Delete</MenuItem>
+          {selectedFolderId &&
+          (selectedFolderId === 'recently-deleted' ||
+            selectedFolderId.startsWith('recently-deleted:')) ? (
+            <>
+              <MenuItem onClick={handleRestoreFromMenu}>Restore</MenuItem>
+            </>
+          ) : (
+            <>
+              <MenuItem onClick={handleNewNoteFromMenu}>New Note</MenuItem>
+              <MenuItem onClick={handleDeleteFromMenu}>Delete</MenuItem>
+            </>
+          )}
         </Menu>
       )}
 

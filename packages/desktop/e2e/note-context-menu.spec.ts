@@ -200,7 +200,7 @@ test.describe('Note Deletion', () => {
     expect(afterCount).toBe(beforeCount - 1);
   });
 
-  test.skip('should move deleted note to "Recently Deleted" folder', async () => {
+  test('should move deleted note to "Recently Deleted" folder', async () => {
     // Create a note
     const createButton = page.locator('#middle-panel button[title="Create note"]');
     await createButton.click();
@@ -239,14 +239,21 @@ test.describe('Note Deletion', () => {
     await expect(deletedNotesList).toContainText(noteTitle);
   });
 
-  test.skip('should not show deleted notes in "All Notes"', async () => {
+  test('should not show deleted notes in "All Notes"', async () => {
+    // Count notes before creating a new one (should have default note)
+    const notesList = page.locator('#middle-panel [data-testid="notes-list"]');
+    const initialCount = await notesList.locator('li').count();
+
     // Create a note
     const createButton = page.locator('#middle-panel button[title="Create note"]');
     await createButton.click();
     await page.waitForTimeout(1000);
 
-    // Delete the note
-    const notesList = page.locator('#middle-panel [data-testid="notes-list"]');
+    // Should now have one more note
+    const afterCreateCount = await notesList.locator('li').count();
+    expect(afterCreateCount).toBe(initialCount + 1);
+
+    // Delete the first note (the newly created one)
     const firstNote = notesList.locator('li').first();
     await firstNote.click({ button: 'right' });
     await page.waitForTimeout(500);
@@ -267,13 +274,13 @@ test.describe('Note Deletion', () => {
     await allNotes.click();
     await page.waitForTimeout(1000);
 
-    // Should have no notes in "All Notes"
+    // Should be back to the initial count (deleted note should not show)
     const notesListAfter = page.locator('#middle-panel [data-testid="notes-list"]');
-    const count = await notesListAfter.locator('li').count();
-    expect(count).toBe(0);
+    const finalCount = await notesListAfter.locator('li').count();
+    expect(finalCount).toBe(initialCount);
   });
 
-  test.skip('should not show deleted notes in search results', async () => {
+  test('should not show deleted notes in search results', async () => {
     // Create a note with searchable content
     const createButton = page.locator('#middle-panel button[title="Create note"]');
     await createButton.click();
@@ -316,6 +323,65 @@ test.describe('Note Deletion', () => {
     const searchResults = page.locator('#middle-panel [data-testid="notes-list"]');
     const count = await searchResults.locator('li').count();
     expect(count).toBe(0);
+  });
+
+  test('should restore note from Recently Deleted', async () => {
+    // Create a note
+    const createButton = page.locator('#middle-panel button[title="Create note"]');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    // Add content to identify the note
+    const editor = page.locator('.tiptap.ProseMirror');
+    await editor.click();
+    await editor.type('Note to restore');
+    await page.waitForTimeout(1500); // Wait for title extraction
+
+    // Count notes before deletion
+    const notesList = page.locator('#middle-panel [data-testid="notes-list"]');
+    const beforeCount = await notesList.locator('li').count();
+
+    // Delete the note
+    const firstNote = notesList.locator('li').first();
+    await firstNote.click({ button: 'right' });
+    await page.waitForTimeout(500);
+    await page.locator('[role="menuitem"]:has-text("Delete")').click();
+    await page.waitForTimeout(500);
+    const dialog = page.locator('[role="dialog"]');
+    const confirmButton = dialog.locator('button:has-text("Delete")');
+    await confirmButton.click();
+    await page.waitForTimeout(1000);
+
+    // Navigate to Recently Deleted
+    const recentlyDeleted = page.locator('text=Recently Deleted').first();
+    await recentlyDeleted.click();
+    await page.waitForTimeout(1000);
+
+    // Should see the deleted note
+    const deletedNotesList = page.locator('#middle-panel [data-testid="notes-list"]');
+    const deletedNote = deletedNotesList.locator('li').first();
+    await expect(deletedNote).toBeVisible();
+
+    // Restore the note via context menu
+    await deletedNote.click({ button: 'right' });
+    await page.waitForTimeout(500);
+    await page.locator('[role="menuitem"]:has-text("Restore")').click();
+    await page.waitForTimeout(1000);
+
+    // Recently Deleted should now be empty
+    const afterRestoreCount = await deletedNotesList.locator('li').count();
+    expect(afterRestoreCount).toBe(0);
+
+    // Navigate back to All Notes
+    const allNotes = page.locator('text=All Notes').first();
+    await allNotes.click();
+    await page.waitForTimeout(1000);
+
+    // Should see the restored note
+    const allNotesList = page.locator('#middle-panel [data-testid="notes-list"]');
+    const afterCount = await allNotesList.locator('li').count();
+    expect(afterCount).toBe(beforeCount);
+    await expect(allNotesList).toContainText('Note to restore');
   });
 
   test('should cancel deletion when clicking cancel', async () => {

@@ -16,6 +16,7 @@ declare global {
         applyUpdate: (noteId: string, update: Uint8Array) => Promise<void>;
         create: (sdId: string, folderId: string, initialContent: string) => Promise<string>;
         delete: (noteId: string) => Promise<void>;
+        restore: (noteId: string) => Promise<void>;
         move: (noteId: string, newFolderId: string) => Promise<void>;
         getMetadata: (noteId: string) => Promise<NoteMetadata>;
         updateTitle: (noteId: string, title: string, contentText?: string) => Promise<void>;
@@ -48,6 +49,7 @@ declare global {
         >;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
+        onRestored: (callback: (noteId: string) => void) => () => void;
         onCreated: (
           callback: (data: { sdId: string; noteId: string; folderId: string | null }) => void
         ) => () => void;
