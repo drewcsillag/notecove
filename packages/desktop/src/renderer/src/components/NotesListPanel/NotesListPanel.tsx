@@ -43,7 +43,7 @@ interface Note {
 
 interface NotesListPanelProps {
   selectedNoteId: string | null;
-  onNoteSelect: (noteId: string) => void;
+  onNoteSelect: (noteId: string | null) => void;
   activeSdId?: string;
 }
 
@@ -297,6 +297,19 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       clearInterval(interval);
     };
   }, [loadSelectedFolder]);
+
+  // Clear selected note if it's not in the current notes list
+  useEffect(() => {
+    if (selectedNoteId && notes.length > 0) {
+      const noteExists = notes.some((note) => note.id === selectedNoteId);
+      if (!noteExists) {
+        onNoteSelect(null); // Clear selection
+      }
+    } else if (selectedNoteId && notes.length === 0 && !loading) {
+      // If folder is empty, clear selection
+      onNoteSelect(null);
+    }
+  }, [notes, selectedNoteId, onNoteSelect, loading]);
 
   // Listen for note updates from other windows
   useEffect(() => {
