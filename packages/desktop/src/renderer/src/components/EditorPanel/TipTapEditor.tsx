@@ -65,6 +65,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         return;
       }
 
+      // Don't extract title if editor is read-only (e.g., for deleted notes)
+      if (readOnly) {
+        return;
+      }
+
       // Extract title from first line and debounce the update
       const firstLine = editor.state.doc.firstChild;
       if (firstLine && onTitleChange) {

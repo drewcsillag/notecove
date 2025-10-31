@@ -1543,6 +1543,63 @@ This phase is split into 4 sub-phases:
 
 ---
 
+#### 2.5.7.5 Recently Deleted Bug Fixes ✅
+
+**Status:** Complete (2025-10-31)
+
+**Context:** Four bugs were discovered in the Recently Deleted folder implementation that affected user experience and data integrity.
+
+**Completed Tasks:**
+
+- [x] ✅ **Bug 1: Prevent note creation in Recently Deleted**
+  - Issue: Clicking "+" button while Recently Deleted selected created notes in All Notes
+  - Fix: Added early return in `handleCreateNote` (NotesListPanel.tsx:299-305)
+  - Behavior: Create button now does nothing when Recently Deleted is selected
+
+- [x] ✅ **Bug 2: Drag-to-restore from Recently Deleted**
+  - Issue: Notes couldn't be dragged from Recently Deleted to restore them to folders
+  - Fix: Added restore logic in `handleNoteDrop` (FolderTree.tsx:733-779)
+  - Behavior: Dragging deleted notes to any folder now restores them and moves to target folder
+  - Implementation: Check if note is deleted, call restore API, then move to target folder
+
+- [x] ✅ **Bug 3: Title changes to "Untitled" when selected**
+  - Issue: Selecting a deleted note caused its title to change to "Untitled" in the list
+  - Fix: Prevent title extraction for read-only editors (TipTapEditor.tsx:68-71)
+  - Behavior: Deleted notes maintain their original title when selected
+
+- [x] ✅ **Bug 4: Changing folders clears editor pane**
+  - Issue: Switching folders automatically cleared the selected note and editor content
+  - Fix: Removed auto-clear useEffect (NotesListPanel.tsx:377-379)
+  - Behavior: Users can now browse folders while keeping current note open in editor
+
+**Implementation Details:**
+
+Files Modified:
+- `NotesListPanel.tsx` - Bug 1, 3, 4 fixes
+- `TipTapEditor.tsx` - Bug 3 fix (read-only title extraction)
+- `FolderTree.tsx` - Bug 2 fix (drag-to-restore logic)
+
+**Test Coverage:**
+
+E2E tests added in `recently-deleted-bugs.spec.ts`:
+- ✅ "Bug 1: + button should not create notes when Recently Deleted is selected"
+- ✅ "Bug 2: Dragging note from Recently Deleted should restore to target folder"
+- ✅ "Bug 3: Note title should not change to 'Untitled' when selected in Recently Deleted"
+- ✅ "Bug 4: Changing folders should not change editor pane content"
+
+All 4 tests passing. Total E2E: 91 passing.
+
+**Acceptance Criteria:** ✅ All met
+
+- ✅ Cannot create notes while Recently Deleted is selected
+- ✅ Can drag notes from Recently Deleted to folders to restore them
+- ✅ Note titles remain unchanged when viewing deleted notes
+- ✅ Editor content persists when changing folders
+- ✅ All E2E tests passing (91/91)
+- ✅ CI passing (format, lint, typecheck, build, tests)
+
+---
+
 #### 2.5.8 Notes List Polish (Optional/Future) 🟥
 
 **Status:** To Do (Low Priority)

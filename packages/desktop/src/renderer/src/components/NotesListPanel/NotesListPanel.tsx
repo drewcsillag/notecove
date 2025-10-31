@@ -296,6 +296,14 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const handleCreateNote = useCallback(async () => {
     if (creating) return; // Prevent double-clicks
 
+    // Don't allow note creation in Recently Deleted
+    if (
+      selectedFolderId &&
+      (selectedFolderId === 'recently-deleted' || selectedFolderId.startsWith('recently-deleted:'))
+    ) {
+      return;
+    }
+
     setCreating(true);
     try {
       // Determine folder for new note
@@ -366,28 +374,16 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     };
   }, [loadSelectedFolder]);
 
-  // Clear selected note if it's not in the current notes list
-  // This runs when folder changes or when notes are loaded/updated
-  useEffect(() => {
-    if (selectedNoteId && notes.length > 0) {
-      const noteExists = notes.some((note) => note.id === selectedNoteId);
-      if (!noteExists) {
-        onNoteSelect(null); // Clear selection
-      }
-    } else if (selectedNoteId && notes.length === 0 && !loading) {
-      // If folder is empty, clear selection
-      onNoteSelect(null);
-    }
-    // Now depends on notes array too, but title updates don't refetch the whole array anymore
-    // so this won't trigger on every keystroke
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFolderId, notes, onNoteSelect]);
+  // NOTE: We intentionally DON'T clear the selected note when changing folders
+  // This allows users to browse folders while keeping their current note open in the editor
+  // The notes list will update to show notes in the new folder, but the editor stays put
 
   // Listen for note updates from other windows
   useEffect(() => {
     const unsubscribeCreated = window.electronAPI.note.onCreated((data) => {
       console.log('[NotesListPanel] Note created:', data);
       // Refresh notes if it's in the current folder
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
       if (
         selectedFolderId === 'all-notes' ||
         (data.folderId != null && selectedFolderId === data.folderId)

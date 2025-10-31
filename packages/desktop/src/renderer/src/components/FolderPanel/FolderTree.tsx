@@ -729,6 +729,17 @@ export const FolderTree: FC<FolderTreeProps> = ({
     });
 
     try {
+      // Check if the first note is deleted to detect drag from Recently Deleted
+      if (noteIds.length === 0) {
+        return; // No notes to move
+      }
+      const firstNoteId = noteIds[0];
+      if (!firstNoteId) {
+        return; // Safety check, should never happen due to length check
+      }
+      const firstNoteMetadata = await window.electronAPI.note.getMetadata(firstNoteId);
+      const isDraggingDeletedNotes = firstNoteMetadata.deleted;
+
       // Determine the target SD ID and actual folder ID
       let targetSdId: string;
       let actualFolderId: string | null = null;
@@ -740,9 +751,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
         targetSdId = parts.length > 1 && parts[1] ? parts[1] : effectiveSourceSdId;
         actualFolderId = null;
       } else if (targetFolderId.startsWith('recently-deleted')) {
-        // Dropping on "Recently Deleted" should delete the notes
-        await Promise.all(noteIds.map((noteId) => window.electronAPI.note.delete(noteId)));
-        console.log('[FolderTree] Deleted notes:', noteIds);
+        // Dropping on "Recently Deleted" should delete the notes (if not already deleted)
+        if (!isDraggingDeletedNotes) {
+          await Promise.all(noteIds.map((noteId) => window.electronAPI.note.delete(noteId)));
+          console.log('[FolderTree] Deleted notes:', noteIds);
+        }
         return;
       } else if (targetFolderId.startsWith('sd:')) {
         // Dropping on an SD node - extract SD ID (e.g., "sd:default")
@@ -763,6 +776,13 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
         targetSdId = folderSdId;
         actualFolderId = targetFolderId;
+      }
+
+      // If dragging deleted notes to a non-Recently-Deleted folder, restore them first
+      if (isDraggingDeletedNotes && !targetFolderId.startsWith('recently-deleted')) {
+        console.log('[FolderTree] Restoring deleted notes:', noteIds);
+        await Promise.all(noteIds.map((noteId) => window.electronAPI.note.restore(noteId)));
+        // After restoring, we'll continue to move them to the target folder below
       }
 
       // Check if this is a cross-SD operation
