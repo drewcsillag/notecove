@@ -205,9 +205,9 @@ Files created in Phase 1.5 (schema and interfaces):
 
 **Deferred Items:**
 
-- Tags CRUD operations (deferred to Phase 2.6)
-- Users table operations (deferred to multi-user features)
-- Custom database path configuration UI (deferred to Settings phase)
+- Tags CRUD operations → Phase 2.7 (Tags Panel)
+- Users table operations → Phase 4 (Post-MVP multi-user features)
+- Custom database path configuration UI → Phase 2.6 (Settings Window - Low Priority)
 
 **Acceptance Criteria:** ✅ All met
 
@@ -251,10 +251,11 @@ Files created in Phase 1.5 (schema and interfaces):
   - Standard formatting buttons
   - Keyboard shortcuts (Cmd/Ctrl+B, etc.)
   - Markdown-style shortcuts (e.g., `**bold**`, `# heading`)
-- [ ] 🟨 Implement collaborative cursors (deferred to later phase)
+- [ ] 🟨 Implement collaborative cursors → Phase 4 (Post-MVP)
   - Show other users' cursors with username
   - Different colors per user
-  - **Note:** Basic TipTap+Yjs integration complete. Collaborative cursors will be added when IPC integration is complete.
+  - Requires Yjs awareness protocol implementation
+  - **Note:** Basic TipTap+Yjs integration complete. Collaborative cursors deferred to post-MVP multi-user features.
 - [x] ✅ Handle note loading/unloading
   - Lazy load: only load note content when opened
   - Unload when editor is closed
@@ -269,9 +270,9 @@ Files created in Phase 1.5 (schema and interfaces):
 
 - ✅ Editor renders and is editable
 - ✅ Formatting works (toolbar + shortcuts)
-- 🟨 Changes sync to CRDT immediately (via IPC to main process) - **Pending IPC integration**
-- 🟨 Changes from other instances appear in real-time - **Pending IPC integration**
-- 🟨 Collaborative cursors show other users (if available) - **Deferred to later phase**
+- ✅ Changes sync to CRDT immediately (via IPC to main process) - **DONE in Phase 2.5.2**
+- ✅ Changes from other instances appear in real-time - **DONE in Phase 2.5.2**
+- 🟨 Collaborative cursors show other users (if available) → **Phase 4 (Post-MVP)**
 - ✅ Can extract title from note content
 
 **Design Docs:**
@@ -384,7 +385,7 @@ This phase is split into 5 sub-phases for better manageability:
   - Show user folders from CRDT (sorted by order)
   - Show "Recently Deleted" at bottom (UI-only, not in CRDT)
   - Display folder names with proper nesting via buildTreeItems()
-  - Note count badges deferred to Phase 2.6 (Notes List Panel)
+  - Note count badges → Phase 2.5.8 (Notes List Polish - optional)
 - [x] ✅ Implement folder selection
   - Click folder to select
   - Visual feedback for selected folder
@@ -405,7 +406,7 @@ This phase is split into 5 sub-phases for better manageability:
 - ✅ "All Notes" and "Recently Deleted" appear at correct positions
 - ✅ Can select folders (persists across restarts)
 - ✅ Can expand/collapse folders (persists across restarts)
-- ⏭️ Note count badges deferred to Phase 2.6
+- ⏭️ Note count badges → Phase 2.5.8 (optional)
 
 **Deferred to Later Sub-Phases:**
 
@@ -475,7 +476,7 @@ This phase is split into 5 sub-phases for better manageability:
 - [x] ✅ Create folder UI functional with validation
 - [x] ✅ Changes persist to CRDT and SQLite
 - [x] ✅ Rename/delete UI (completed in 2.4.3)
-- [ ] ⏭️ Folder changes sync to all open windows (requires IPC events in 2.6)
+- [x] ✅ Folder changes sync to all open windows - **DONE via file watcher + IPC events (Phase 2.4.4)**
 
 ---
 
@@ -715,9 +716,9 @@ These tests are documented in `e2e/BUG-TEST-SUMMARY.md` as expected failures. Th
 
 ### 2.5 Notes List Panel 🟡
 
-**Status:** In Progress (7/10 sub-phases complete)
+**Status:** In Progress (7/8 sub-phases complete, Phase 2.5.8 optional)
 
-This phase is split into 10 sub-phases for better manageability:
+This phase is split into 8 sub-phases for better manageability (Phase 2.5.8 is optional polish):
 
 ---
 
@@ -879,7 +880,7 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 - ✅ Note switching doesn't mix content
 - ✅ Multi-window selection is isolated
 - ✅ Cross-instance sync works
-- ⏭️ Context menu creation deferred to 2.5.4
+- ✅ Context menu creation - **DONE in Phase 2.5.4**
 
 ---
 
@@ -955,7 +956,7 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 - ✅ Live/incremental search works (debounced at 300ms)
 - ✅ Search uses FTS5 full-text index with prefix matching
 - ✅ Search persists across restarts via appState
-- ⏭️ Advanced options (case-sensitive, regex, scope) deferred to 2.5.5
+- ⏭️ Advanced options (case-sensitive, regex, scope) → Phase 2.7+ (or Phase 4)
 
 **Test Coverage:**
 
@@ -1009,8 +1010,11 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
 - ✅ Can delete notes (soft delete)
 - ✅ Deleted notes hidden from search results
 - ✅ Deleted notes hidden from folder views
-- ⏭️ Deleted notes appear in "Recently Deleted" → Deferred to 2.5.5
-- ⏭️ Pin/Unpin, Open in New Window, Move to..., Duplicate → Deferred to 2.5.6+
+- ✅ Deleted notes appear in "Recently Deleted" - **DONE in Phase 2.5.5**
+- ✅ Pin/Unpin - **DONE in Phase 2.5.6**
+- ✅ Move to... - **DONE in Phase 2.5.7.1**
+- ⏭️ Open in New Window → Phase 2.10 (Window Management)
+- ⏭️ Duplicate → Phase 2.5.8 (Notes List Polish - optional)
 
 ---
 
@@ -1034,10 +1038,10 @@ Database is a cache of CRDT data (source of truth). Cross-instance sync works by
   - Removes deleted flag from CRDT and SQLite
   - Note returns to original folder
   - Event broadcasting: `note:restored` to all windows
-- [x] ⏭️ **Permanent delete** - Deferred to Phase 2.5.6
+- [ ] ⏭️ **Permanent delete** → Phase 2.5.8 (Notes List Polish - optional)
   - Not required for basic "Recently Deleted" functionality
   - Can be added when needed
-- [x] ⏭️ **Add auto-cleanup** - Deferred to Phase 2.5.6
+- [ ] ⏭️ **Add auto-cleanup** → Phase 2.5.8 (Notes List Polish - optional)
   - Not required for basic "Recently Deleted" functionality
   - 30-day auto-cleanup can be added later
 
@@ -1066,8 +1070,8 @@ All 11 E2E tests passing in note-context-menu.spec.ts:
 
 - ✅ "Recently Deleted" folder shows deleted notes
 - ✅ Can restore notes from "Recently Deleted"
-- ⏭️ Permanent delete - Deferred to 2.5.6
-- ⏭️ Auto-cleanup - Deferred to 2.5.6
+- ⏭️ Permanent delete → Phase 2.5.8 (optional)
+- ⏭️ Auto-cleanup → Phase 2.5.8 (optional)
 - ✅ All 11 E2E tests passing
 
 ---
@@ -1104,17 +1108,15 @@ All 11 E2E tests passing in note-context-menu.spec.ts:
 
 **Deferred Items:**
 
-- [ ] ⏭️ **Advanced search options** - Deferred to Phase 2.7 or later
+- [ ] ⏭️ **Advanced search options** → Phase 2.7+ or Phase 4 (Post-MVP)
   - Case-sensitive toggle
   - Regex toggle
   - Whole word toggle
   - Search scope selector (Current Folder / Current SD / All SDs)
   - Advanced search dialog
-- [ ] ⏭️ **Move to...** - Deferred to Phase 2.5.7 or later
-  - Submenu of folders for moving notes
-  - Will require folder tree data in context menu
-- [ ] ⏭️ **Open in New Window** - Deferred to Phase 2.10 (Window Management)
-- [ ] ⏭️ **Duplicate to...** - Deferred (requires complex CRDT copying logic)
+- [x] ✅ **Move to...** - **DONE in Phase 2.5.7.1**
+- [ ] ⏭️ **Open in New Window** → Phase 2.10 (Window Management)
+- [ ] ⏭️ **Duplicate Note** → Phase 2.5.8 (Notes List Polish - optional)
 
 **Implementation Details:**
 
@@ -1179,10 +1181,10 @@ All 11 E2E tests passing in note-context-menu.spec.ts:
 - ✅ Pinned notes sort by modified date within pinned group
 - ✅ Pin status persists across app restarts
 - ✅ Pin status syncs across windows via IPC events
-- ⏭️ Advanced search options deferred to Phase 2.7+
-- ⏭️ Move to... deferred to Phase 2.5.7+
-- ⏭️ "Open in New Window" deferred to Phase 2.10
-- ⏭️ "Duplicate to..." deferred
+- ⏭️ Advanced search options → Phase 2.7+ or Phase 4 (Post-MVP)
+- ✅ Move to... - **DONE in Phase 2.5.7.1**
+- ⏭️ "Open in New Window" → Phase 2.10 (Window Management)
+- ⏭️ "Duplicate Note" → Phase 2.5.8 (Notes List Polish - optional)
 
 **Test Coverage:**
 
@@ -1267,10 +1269,10 @@ This phase is split into 4 sub-phases:
 - ✅ All 18 E2E tests passing
 - ✅ Multi-SD mode bug fixed
 
-**Deferred to 2.5.7.2:**
+**Completed in 2.5.7.2:**
 
-- Multi-select support
-- Moving multiple notes at once
+- ✅ Multi-select support - **DONE in Phase 2.5.7.2**
+- ✅ Moving multiple notes at once - **DONE in Phase 2.5.7.2**
 
 **Test Coverage:**
 
@@ -1401,9 +1403,9 @@ This phase is split into 4 sub-phases:
 - Folders highlight on hover during drag
 - Multi-select drag works seamlessly (drag any selected note)
 
-**Deferred:**
+**Completed in 2.5.7.4:**
 
-- Cross-SD drag & drop → Moved to 2.5.7.4
+- ✅ Cross-SD drag & drop - **DONE in Phase 2.5.7.4**
 
 ---
 
@@ -1541,6 +1543,48 @@ This phase is split into 4 sub-phases:
 
 ---
 
+#### 2.5.8 Notes List Polish (Optional/Future) 🟥
+
+**Status:** To Do (Low Priority)
+
+**Context:** Quality-of-life improvements for notes list management. These are nice-to-have features that can be added as time permits.
+
+**Tasks:**
+
+- [ ] 🟥 **Implement permanent delete**
+  - "Delete Permanently" option in "Recently Deleted" context menu
+  - Confirmation dialog with warning
+  - Actually delete CRDT files from disk (note-id folder)
+  - Remove from SQLite cache
+  - Cannot be undone
+- [ ] 🟥 **Implement auto-cleanup for Recently Deleted**
+  - Automatically delete notes older than 30 days in Recently Deleted
+  - Background job or on-app-start check
+  - User configurable time period in settings (optional)
+- [ ] 🟥 **Implement "Duplicate Note" feature**
+  - Context menu option: "Duplicate"
+  - Creates new note with copied content
+  - Generates new UUID
+  - Copies full CRDT Y.Doc state
+  - New note title: "Copy of [original title]"
+  - Places duplicate in same folder
+- [ ] 🟥 **Implement note count badges** (if not already done)
+  - Show count of notes in each folder
+  - Badge display next to folder name
+  - Update reactively when notes move/delete
+  - Performance optimization for large folders
+
+**Acceptance Criteria:**
+
+- Can permanently delete notes from Recently Deleted
+- Auto-cleanup runs automatically
+- Can duplicate notes with full content
+- Note count badges display correctly (if implemented)
+
+**Note:** These features are optional enhancements and can be implemented as time permits or based on user feedback.
+
+---
+
 ### 2.6 Settings Window 🟡
 
 **Status:** Partial (UI Complete, Integration Pending)
@@ -1587,6 +1631,7 @@ This phase is split into 4 sub-phases:
 
 - [ ] 🟥 Add Settings to application menu
 - [ ] 🟥 Write E2E tests for Settings dialog
+- [ ] 🟥 Custom database path configuration UI (deferred from Phase 2.2.5)
 
 **Completed:**
 
