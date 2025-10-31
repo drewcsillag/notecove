@@ -331,6 +331,81 @@ test.describe('Note Drag & Drop - Multi-Select', () => {
     const deletedNotes = page.locator('[data-testid="notes-list"] li');
     await expect(deletedNotes).toHaveCount(2);
   });
+
+  test('should clear multi-select badge after dropping notes', async () => {
+    // Wait for folder panel to load
+    await page.waitForSelector('text=Folders', { timeout: 10000 });
+    await page.waitForTimeout(2000);
+
+    // Create a test folder
+    const createButton = page.locator('button[title="Create folder"]');
+    await createButton.click();
+    await page.waitForSelector('text=Create New Folder');
+    const folderNameInput = page.locator('input[label="Folder Name"]');
+    await folderNameInput.fill('Badge Test Folder');
+    await page.locator('button:has-text("Create")').click();
+    await page.waitForTimeout(1500);
+
+    // Click on "All Notes"
+    const allNotesButton = page.getByTestId('folder-tree-node-all-notes:default');
+    await allNotesButton.click();
+    await page.waitForTimeout(1000);
+
+    // Create 3 test notes
+    for (let i = 0; i < 3; i++) {
+      const addNoteButton = page.locator('button[title="Create note"]');
+      await addNoteButton.click();
+      await page.waitForTimeout(1000);
+    }
+
+    await page.waitForTimeout(1000);
+
+    // Select all 3 notes
+    const notesList = page.locator('[data-testid="notes-list"]');
+    const notes = notesList.locator('li');
+    await expect(notes).toHaveCount(3, { timeout: 5000 });
+
+    // Click first note normally
+    const firstNote = notes.nth(0);
+    await firstNote.click();
+    await page.waitForTimeout(200);
+
+    // Cmd+Click second note
+    const secondNote = notes.nth(1);
+    await secondNote.click({ modifiers: ['Meta'] });
+    await page.waitForTimeout(200);
+
+    // Cmd+Click third note
+    const thirdNote = notes.nth(2);
+    await thirdNote.click({ modifiers: ['Meta'] });
+    await page.waitForTimeout(500);
+
+    // Verify multi-select badge is visible
+    const badge = page.locator('text=3 notes selected');
+    await expect(badge).toBeVisible();
+
+    // Get the target folder
+    const badgeTestFolderButton = page.getByRole('button', {
+      name: 'Badge Test Folder',
+      exact: true,
+    });
+    await expect(badgeTestFolderButton).toBeVisible();
+
+    // Drag one of the selected notes to the folder (all should move)
+    await secondNote.dragTo(badgeTestFolderButton);
+    await page.waitForTimeout(2000);
+
+    // Verify the badge is no longer visible (bug fix verification)
+    await expect(badge).not.toBeVisible();
+
+    // Click on the badge test folder to verify all notes moved there
+    await badgeTestFolderButton.click();
+    await page.waitForTimeout(1000);
+
+    // Verify all 3 notes are now in the folder
+    const notesInFolder = page.locator('[data-testid="notes-list"] li');
+    await expect(notesInFolder).toHaveCount(3);
+  });
 });
 
 test.describe('Note Drag & Drop - Visual Feedback', () => {

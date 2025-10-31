@@ -472,6 +472,20 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     const unsubscribeMoved = window.electronAPI.note.onMoved((data) => {
       console.log('[NotesListPanel] Note moved:', data);
 
+      // Remove the moved note from multi-select if it's selected
+      setSelectedNoteIds((prev) => {
+        if (prev.has(data.noteId)) {
+          const newSet = new Set(prev);
+          newSet.delete(data.noteId);
+          // If this was the last selected note, clear the lastSelectedIndex
+          if (newSet.size === 0) {
+            lastSelectedIndexRef.current = -1;
+          }
+          return newSet;
+        }
+        return prev;
+      });
+
       // Remove note from list if it's no longer in the current folder
       setNotes((prevNotes) => {
         const note = prevNotes.find((n) => n.id === data.noteId);
