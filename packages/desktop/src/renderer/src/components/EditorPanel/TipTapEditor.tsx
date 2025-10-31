@@ -26,41 +26,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
   const titleUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
 
-  // Keep noteIdRef in sync with noteId prop and handle note deselection
-  useEffect(() => {
-    const previousNoteId = noteIdRef.current;
-
-    if (previousNoteId !== noteId) {
-      // If we're deselecting a note (changing from a valid ID to null or different ID),
-      // immediately save the current editor content
-      if (previousNoteId && editor && onTitleChange) {
-        // Clear any pending debounced update
-        if (titleUpdateTimerRef.current) {
-          clearTimeout(titleUpdateTimerRef.current);
-          titleUpdateTimerRef.current = null;
-        }
-
-        // Extract and save title immediately
-        const firstLine = editor.state.doc.firstChild;
-        if (firstLine) {
-          const titleText = firstLine.textContent.trim();
-          let text = '';
-          editor.state.doc.descendants((node) => {
-            if (node.isText) {
-              text += node.text;
-            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
-              text += ' ';
-            }
-            return true;
-          });
-          onTitleChange(previousNoteId, titleText || 'Untitled', text.trim());
-        }
-      }
-
-      noteIdRef.current = noteId;
-    }
-  }, [noteId]); // Only depend on noteId changes, not editor/onTitleChange
-
   const editor = useEditor({
     extensions: [
       // Use StarterKit but exclude History (Collaboration provides its own)
@@ -128,6 +93,42 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
       }
     },
   });
+
+  // Keep noteIdRef in sync with noteId prop and handle note deselection
+  useEffect(() => {
+    const previousNoteId = noteIdRef.current;
+
+    if (previousNoteId !== noteId) {
+      // If we're deselecting a note (changing from a valid ID to null or different ID),
+      // immediately save the current editor content
+      if (previousNoteId && editor && onTitleChange) {
+        // Clear any pending debounced update
+        if (titleUpdateTimerRef.current) {
+          clearTimeout(titleUpdateTimerRef.current);
+          titleUpdateTimerRef.current = null;
+        }
+
+        // Extract and save title immediately
+        const firstLine = editor.state.doc.firstChild;
+        if (firstLine) {
+          const titleText = firstLine.textContent.trim();
+          let text = '';
+          editor.state.doc.descendants((node) => {
+            if (node.isText) {
+              text += node.text;
+            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
+              text += ' ';
+            }
+            return true;
+          });
+          onTitleChange(previousNoteId, titleText || 'Untitled', text.trim());
+        }
+      }
+
+      noteIdRef.current = noteId;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId]); // editor and onTitleChange intentionally excluded to avoid re-running on every editor update
 
   // Cleanup on unmount - save any pending changes before destroying editor
   useEffect(() => {

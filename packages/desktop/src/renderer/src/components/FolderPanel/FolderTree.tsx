@@ -335,7 +335,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
     };
 
     void loadData();
-  }, [sdId, refreshTrigger, isMultiSDMode, activeSdId]);
+  }, [sdId, refreshTrigger, isMultiSDMode, activeSdId, expandedFolderIds.length, onExpandedChange]);
 
   if (loading) {
     return (

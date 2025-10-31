@@ -32,7 +32,11 @@ const checks = [
   { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
 ];
 
-console.log(fastMode ? '⚡ Running local CI checks (FAST MODE - skipping coverage)...\n' : '🚀 Running local CI checks (FULL MODE - with coverage)...\n');
+console.log(
+  fastMode
+    ? '⚡ Running local CI checks (FAST MODE - skipping coverage)...\n'
+    : '🚀 Running local CI checks (FULL MODE - with coverage)...\n'
+);
 
 let failed = false;
 

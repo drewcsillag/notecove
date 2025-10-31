@@ -5,7 +5,7 @@
  * Phase 2.4.1: Basic display with persistent state.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -39,43 +39,7 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stateLoaded, setStateLoaded] = useState(false);
 
-  // Load persisted state on mount
-  useEffect(() => {
-    void loadState();
-  }, []);
-
-  // Listen for folder updates from other windows or file system changes
-  useEffect(() => {
-    const unsubscribe = window.electronAPI.folder.onUpdated((data) => {
-      console.log('[FolderPanel] Received folder:updated event:', data);
-      // Refresh the folder tree
-      setRefreshTrigger((prev) => prev + 1);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  // Listen for SD updates (create, setActive)
-  useEffect(() => {
-    const unsubscribe = window.electronAPI.sd.onUpdated((data) => {
-      console.log('[FolderPanel] Received sd:updated event:', data);
-      // Refresh the folder tree to show new SD or active SD change
-      setRefreshTrigger((prev) => prev + 1);
-
-      // If SD was set active, update local state
-      if (data.operation === 'setActive' && onActiveSdChange) {
-        onActiveSdChange(data.sdId);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  const loadState = async (): Promise<void> => {
+  const loadState = useCallback(async (): Promise<void> => {
     try {
       // Load active SD
       const loadedActiveSdId = await window.electronAPI.sd.getActive();
@@ -111,9 +75,45 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
       setSelectedFolderId('all-notes');
       setStateLoaded(true); // Still mark as loaded even on error
     }
-  };
+  }, [onActiveSdChange]);
 
-  const handleFolderSelect = (folderId: string | null): void => {
+  // Load persisted state on mount
+  useEffect(() => {
+    void loadState();
+  }, [loadState]);
+
+  // Listen for folder updates from other windows or file system changes
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.folder.onUpdated((data) => {
+      console.log('[FolderPanel] Received folder:updated event:', data);
+      // Refresh the folder tree
+      setRefreshTrigger((prev) => prev + 1);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Listen for SD updates (create, setActive)
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.sd.onUpdated((data) => {
+      console.log('[FolderPanel] Received sd:updated event:', data);
+      // Refresh the folder tree to show new SD or active SD change
+      setRefreshTrigger((prev) => prev + 1);
+
+      // If SD was set active, update local state
+      if (data.operation === 'setActive' && onActiveSdChange) {
+        onActiveSdChange(data.sdId);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [onActiveSdChange]);
+
+  const handleFolderSelect = useCallback((folderId: string | null): void => {
     setSelectedFolderId(folderId);
 
     // Persist selection
@@ -122,9 +122,9 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
         console.error('Failed to save selected folder:', err);
       });
     }
-  };
+  }, []);
 
-  const handleExpandedChange = (expandedIds: string[]): void => {
+  const handleExpandedChange = useCallback((expandedIds: string[]): void => {
     setExpandedFolderIds(expandedIds);
 
     // Persist expansion state
@@ -133,7 +133,7 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
       .catch((err) => {
         console.error('Failed to save expanded folders:', err);
       });
-  };
+  }, []);
 
   const handleActiveSdChange = async (sdId: string): Promise<void> => {
     try {

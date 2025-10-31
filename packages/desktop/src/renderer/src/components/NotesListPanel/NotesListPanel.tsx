@@ -70,6 +70,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Multi-select state
+  const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
+  const lastSelectedIndexRef = useRef<number>(-1);
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
@@ -206,6 +210,50 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     },
     [onNoteSelect]
   );
+
+  // Handle multi-select click
+  const handleNoteClick = useCallback(
+    (noteId: string, index: number, event: React.MouseEvent) => {
+      const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+      const isShift = event.shiftKey;
+
+      if (isCmdOrCtrl) {
+        // Cmd/Ctrl+Click: Toggle individual note selection
+        setSelectedNoteIds((prev) => {
+          const newSet = new Set(prev);
+          if (newSet.has(noteId)) {
+            newSet.delete(noteId);
+          } else {
+            newSet.add(noteId);
+          }
+          return newSet;
+        });
+        lastSelectedIndexRef.current = index;
+      } else if (isShift && lastSelectedIndexRef.current !== -1) {
+        // Shift+Click: Select range
+        const start = Math.min(lastSelectedIndexRef.current, index);
+        const end = Math.max(lastSelectedIndexRef.current, index);
+        const rangeIds = notes.slice(start, end + 1).map((note) => note.id);
+        setSelectedNoteIds((prev) => {
+          const newSet = new Set(prev);
+          rangeIds.forEach((id) => newSet.add(id));
+          return newSet;
+        });
+      } else {
+        // Normal click: Clear multi-select and select single note for editing
+        setSelectedNoteIds(new Set());
+        handleNoteSelect(noteId);
+        lastSelectedIndexRef.current = index;
+      }
+    },
+    [notes, handleNoteSelect]
+  );
+
+  // Clear multi-select when folder changes
+  useEffect(() => {
+    setSelectedNoteIds(new Set());
+    lastSelectedIndexRef.current = -1;
+  }, [selectedFolderId]);
 
   // Handle search input change
   const handleSearchChange = useCallback(
@@ -474,14 +522,23 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
 
   // Handle context menu open
-  const handleContextMenu = useCallback((event: React.MouseEvent, noteId: string) => {
-    event.preventDefault();
-    setContextMenu({
-      mouseX: event.clientX - 2,
-      mouseY: event.clientY - 4,
-      noteId,
-    });
-  }, []);
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent, noteId: string) => {
+      event.preventDefault();
+
+      // If right-clicking on a note that's not in the multi-select, add it
+      if (selectedNoteIds.size > 0 && !selectedNoteIds.has(noteId)) {
+        setSelectedNoteIds((prev) => new Set([...prev, noteId]));
+      }
+
+      setContextMenu({
+        mouseX: event.clientX - 2,
+        mouseY: event.clientY - 4,
+        noteId,
+      });
+    },
+    [selectedNoteIds]
+  );
 
   // Handle context menu close
   const handleContextMenuClose = useCallback(() => {
@@ -508,15 +565,21 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     if (!noteToDelete) return;
 
     try {
-      // Call IPC to delete note (soft delete)
-      await window.electronAPI.note.delete(noteToDelete);
+      // If multi-select is active, delete all selected notes
+      const notesToDelete = selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [noteToDelete];
+
+      // Delete all notes
+      await Promise.all(notesToDelete.map((id) => window.electronAPI.note.delete(id)));
 
       // Close dialog
       setDeleteDialogOpen(false);
       setNoteToDelete(null);
 
+      // Clear multi-select
+      setSelectedNoteIds(new Set());
+
       // If we just deleted the selected note, clear selection
-      if (selectedNoteId === noteToDelete) {
+      if (selectedNoteId && notesToDelete.includes(selectedNoteId)) {
         onNoteSelect('');
       }
 
@@ -526,7 +589,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       console.error('Failed to delete note:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete note');
     }
-  }, [noteToDelete, selectedNoteId, onNoteSelect]);
+  }, [noteToDelete, selectedNoteId, selectedNoteIds, onNoteSelect]);
 
   // Handle delete cancellation
   const handleCancelDelete = useCallback(() => {
@@ -607,17 +670,28 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     if (!noteToMove) return;
 
     try {
-      await window.electronAPI.note.move(noteToMove, selectedDestinationFolder);
-      console.log('[NotesListPanel] Note moved:', noteToMove, 'to', selectedDestinationFolder);
+      // If multi-select is active, move all selected notes
+      const notesToMove = selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [noteToMove];
+
+      // Move all notes
+      await Promise.all(
+        notesToMove.map((id) => window.electronAPI.note.move(id, selectedDestinationFolder))
+      );
+
+      console.log('[NotesListPanel] Notes moved:', notesToMove, 'to', selectedDestinationFolder);
       setMoveDialogOpen(false);
       setNoteToMove(null);
       setSelectedDestinationFolder(null);
+
+      // Clear multi-select
+      setSelectedNoteIds(new Set());
+
       // Note: The notes list will be updated automatically via note:moved event
     } catch (err) {
       console.error('Failed to move note:', err);
       setError(err instanceof Error ? err.message : 'Failed to move note');
     }
-  }, [noteToMove, selectedDestinationFolder]);
+  }, [noteToMove, selectedDestinationFolder, selectedNoteIds]);
 
   // Handle move dialog close
   const handleCancelMove = useCallback(() => {
@@ -708,6 +782,44 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         />
       </Box>
 
+      {/* Multi-select Badge */}
+      {selectedNoteIds.size > 0 && (
+        <Box
+          sx={{
+            padding: 1,
+            backgroundColor: 'primary.light',
+            color: 'primary.contrastText',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            {selectedNoteIds.size} {selectedNoteIds.size === 1 ? 'note' : 'notes'} selected
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSelectedNoteIds(new Set());
+              lastSelectedIndexRef.current = -1;
+            }}
+            sx={{
+              color: 'inherit',
+              borderColor: 'primary.contrastText',
+              '&:hover': {
+                borderColor: 'primary.contrastText',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              },
+            }}
+          >
+            Clear Selection
+          </Button>
+        </Box>
+      )}
+
       {/* Notes List or Status */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         {loading && notes.length === 0 ? (
@@ -730,68 +842,81 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           </Box>
         ) : (
           <List disablePadding data-testid="notes-list">
-            {notes.map((note) => (
-              <ListItem key={note.id} disablePadding>
-                <ListItemButton
-                  selected={selectedNoteId === note.id}
-                  onClick={() => {
-                    handleNoteSelect(note.id);
-                  }}
-                  onContextMenu={(e) => {
-                    handleContextMenu(e, note.id);
-                  }}
-                  sx={{
-                    paddingY: 1.5,
-                    paddingX: 2,
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                  }}
-                >
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        {note.pinned && (
-                          <PushPinIcon
+            {notes.map((note, index) => {
+              const isMultiSelected = selectedNoteIds.has(note.id);
+              const isSingleSelected = selectedNoteId === note.id;
+              return (
+                <ListItem key={note.id} disablePadding>
+                  <ListItemButton
+                    selected={isSingleSelected}
+                    onClick={(event) => {
+                      handleNoteClick(note.id, index, event);
+                    }}
+                    onContextMenu={(e) => {
+                      handleContextMenu(e, note.id);
+                    }}
+                    sx={{
+                      paddingY: 1.5,
+                      paddingX: 2,
+                      borderBottom: 1,
+                      borderColor: 'divider',
+                      // Highlight multi-selected notes with a different background
+                      backgroundColor: isMultiSelected
+                        ? 'rgba(33, 150, 243, 0.12)'
+                        : isSingleSelected
+                          ? 'action.selected'
+                          : 'transparent',
+                      '&:hover': {
+                        backgroundColor: isMultiSelected ? 'rgba(33, 150, 243, 0.2)' : undefined,
+                      },
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          {note.pinned && (
+                            <PushPinIcon
+                              sx={{
+                                fontSize: '1rem',
+                                color: 'primary.main',
+                              }}
+                            />
+                          )}
+                          <Typography variant="subtitle1" noWrap sx={{ flex: 1 }}>
+                            {note.title || 'Untitled Note'}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <>
+                          <Typography
+                            component="span"
+                            variant="body2"
+                            color="text.secondary"
                             sx={{
-                              fontSize: '1rem',
-                              color: 'primary.main',
+                              display: 'block',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
                             }}
-                          />
-                        )}
-                        <Typography variant="subtitle1" noWrap sx={{ flex: 1 }}>
-                          {note.title || 'Untitled Note'}
-                        </Typography>
-                      </Box>
-                    }
-                    secondary={
-                      <>
-                        <Typography
-                          component="span"
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            display: 'block',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {truncatePreview(note.contentPreview)}
-                        </Typography>
-                        <Typography
-                          component="span"
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: 'block', marginTop: 0.5 }}
-                        >
-                          {formatDate(note.modified)}
-                        </Typography>
-                      </>
-                    }
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
+                          >
+                            {truncatePreview(note.contentPreview)}
+                          </Typography>
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: 'block', marginTop: 0.5 }}
+                          >
+                            {formatDate(note.modified)}
+                          </Typography>
+                        </>
+                      }
+                    />
+                  </ListItemButton>
+                </ListItem>
+              );
+            })}
           </List>
         )}
       </Box>
@@ -813,11 +938,19 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           ) : (
             <>
               <MenuItem onClick={handleNewNoteFromMenu}>New Note</MenuItem>
-              <MenuItem onClick={handleTogglePinFromMenu}>
-                {notes.find((n) => n.id === contextMenu.noteId)?.pinned ? 'Unpin' : 'Pin'}
+              {selectedNoteIds.size === 0 && (
+                <MenuItem onClick={handleTogglePinFromMenu}>
+                  {notes.find((n) => n.id === contextMenu.noteId)?.pinned ? 'Unpin' : 'Pin'}
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => void handleMoveToFromMenu()}>
+                {selectedNoteIds.size > 0
+                  ? `Move ${selectedNoteIds.size} notes to...`
+                  : 'Move to...'}
               </MenuItem>
-              <MenuItem onClick={() => void handleMoveToFromMenu()}>Move to...</MenuItem>
-              <MenuItem onClick={handleDeleteFromMenu}>Delete</MenuItem>
+              <MenuItem onClick={handleDeleteFromMenu}>
+                {selectedNoteIds.size > 0 ? `Delete ${selectedNoteIds.size} notes` : 'Delete'}
+              </MenuItem>
             </>
           )}
         </Menu>
@@ -825,11 +958,14 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
-        <DialogTitle>Delete Note?</DialogTitle>
+        <DialogTitle>
+          {selectedNoteIds.size > 0 ? `Delete ${selectedNoteIds.size} Notes?` : 'Delete Note?'}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This note will be moved to Recently Deleted. You can restore it later or permanently
-            delete it from there.
+            {selectedNoteIds.size > 0
+              ? `These ${selectedNoteIds.size} notes will be moved to Recently Deleted. You can restore them later or permanently delete them from there.`
+              : 'This note will be moved to Recently Deleted. You can restore it later or permanently delete it from there.'}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -842,7 +978,11 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
       {/* Move to Folder Dialog */}
       <Dialog open={moveDialogOpen} onClose={handleCancelMove} maxWidth="sm" fullWidth>
-        <DialogTitle>Move Note to Folder</DialogTitle>
+        <DialogTitle>
+          {selectedNoteIds.size > 0
+            ? `Move ${selectedNoteIds.size} Notes to Folder`
+            : 'Move Note to Folder'}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>Select a destination folder:</DialogContentText>
           <RadioGroup
@@ -862,20 +1002,31 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
                 </Box>
               }
             />
-            {availableFolders.map((folder) => (
-              <FormControlLabel
-                key={folder.id}
-                value={folder.id}
-                control={<Radio />}
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <FolderIcon fontSize="small" />
-                    <Typography>{folder.name}</Typography>
-                  </Box>
-                }
-                disabled={notes.find((n) => n.id === noteToMove)?.folderId === folder.id}
-              />
-            ))}
+            {availableFolders.map((folder) => {
+              // For multi-select, disable if ALL selected notes are in this folder
+              // For single note, disable if the note is in this folder
+              const isCurrentFolder =
+                selectedNoteIds.size > 0
+                  ? Array.from(selectedNoteIds).every(
+                      (id) => notes.find((n) => n.id === id)?.folderId === folder.id
+                    )
+                  : notes.find((n) => n.id === noteToMove)?.folderId === folder.id;
+
+              return (
+                <FormControlLabel
+                  key={folder.id}
+                  value={folder.id}
+                  control={<Radio />}
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <FolderIcon fontSize="small" />
+                      <Typography>{folder.name}</Typography>
+                    </Box>
+                  }
+                  disabled={isCurrentFolder}
+                />
+              );
+            })}
           </RadioGroup>
         </DialogContent>
         <DialogActions>
@@ -885,7 +1036,13 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             color="primary"
             autoFocus
             disabled={
-              selectedDestinationFolder === notes.find((n) => n.id === noteToMove)?.folderId
+              // For multi-select, disable if destination is the same as ALL selected notes' current folder
+              // For single note, disable if destination matches the note's current folder
+              selectedNoteIds.size > 0
+                ? Array.from(selectedNoteIds).every(
+                    (id) => selectedDestinationFolder === notes.find((n) => n.id === id)?.folderId
+                  )
+                : selectedDestinationFolder === notes.find((n) => n.id === noteToMove)?.folderId
             }
           >
             Move
