@@ -263,7 +263,7 @@ export class IPCHandlers {
     }
 
     // Unload note from memory if loaded
-    this.crdtManager.unloadNote(noteId);
+    await this.crdtManager.unloadNote(noteId);
 
     // Delete CRDT files from disk
     const sd = await this.database.getStorageDir(note.sdId);

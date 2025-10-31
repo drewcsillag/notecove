@@ -24,12 +24,14 @@ const mockElectronAPI = {
     create: jest.fn().mockResolvedValue('new-note-id'),
     delete: jest.fn(),
     restore: jest.fn(),
+    permanentDelete: jest.fn(),
     move: jest.fn(),
     getMetadata: jest.fn(),
     list: jest.fn().mockResolvedValue([]),
     onUpdated: jest.fn(),
     onDeleted: jest.fn(),
     onRestored: jest.fn(),
+    onPermanentDeleted: jest.fn(),
     onCreated: jest.fn(),
     onExternalUpdate: jest.fn(),
     onTitleUpdated: jest.fn(),
@@ -80,6 +82,9 @@ describe('App', () => {
       /* unsubscribe */
     });
     mockElectronAPI.note.onRestored.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onPermanentDeleted.mockReturnValue(() => {
       /* unsubscribe */
     });
     mockElectronAPI.note.onCreated.mockReturnValue(() => {
