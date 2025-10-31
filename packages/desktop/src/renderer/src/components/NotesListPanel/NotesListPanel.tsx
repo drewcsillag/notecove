@@ -706,6 +706,31 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       });
   }, [contextMenu, handleContextMenuClose]);
 
+  // Handle "Duplicate" from context menu
+  const handleDuplicateFromMenu = useCallback(() => {
+    if (!contextMenu) return;
+
+    const { noteId } = contextMenu;
+    handleContextMenuClose();
+
+    // Call IPC to duplicate note
+    window.electronAPI.note
+      .duplicate(noteId)
+      .then((newNoteId) => {
+        console.log('[NotesListPanel] Note duplicated:', noteId, '-> New ID:', newNoteId);
+        // Select the new note
+        onNoteSelect(newNoteId);
+        // Refresh notes list to show the duplicate
+        if (selectedFolderId !== null) {
+          void fetchNotes(selectedFolderId);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to duplicate note:', err);
+        setError(err instanceof Error ? err.message : 'Failed to duplicate note');
+      });
+  }, [contextMenu, handleContextMenuClose, onNoteSelect, selectedFolderId, fetchNotes]);
+
   // Handle "Move to..." from context menu
   const handleMoveToFromMenu = useCallback(async () => {
     if (!contextMenu) return;
@@ -956,6 +981,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
                 <MenuItem onClick={handleTogglePinFromMenu}>
                   {notes.find((n) => n.id === contextMenu.noteId)?.pinned ? 'Unpin' : 'Pin'}
                 </MenuItem>
+              )}
+              {selectedNoteIds.size === 0 && (
+                <MenuItem onClick={handleDuplicateFromMenu}>Duplicate</MenuItem>
               )}
               <MenuItem onClick={() => void handleMoveToFromMenu()}>
                 {selectedNoteIds.size > 0

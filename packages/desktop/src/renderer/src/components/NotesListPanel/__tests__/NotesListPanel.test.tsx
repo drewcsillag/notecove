@@ -18,6 +18,7 @@ const mockElectronAPI = {
     search: jest.fn().mockResolvedValue([]),
     restore: jest.fn().mockResolvedValue(undefined),
     permanentDelete: jest.fn().mockResolvedValue(undefined),
+    duplicate: jest.fn().mockResolvedValue('new-note-id'),
     togglePin: jest.fn().mockResolvedValue(undefined),
     onCreated: jest.fn().mockReturnValue(() => {}),
     onDeleted: jest.fn().mockReturnValue(() => {}),

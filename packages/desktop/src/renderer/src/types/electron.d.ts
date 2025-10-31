@@ -18,6 +18,7 @@ declare global {
         delete: (noteId: string) => Promise<void>;
         restore: (noteId: string) => Promise<void>;
         permanentDelete: (noteId: string) => Promise<void>;
+        duplicate: (noteId: string) => Promise<string>;
         togglePin: (noteId: string) => Promise<void>;
         move: (noteId: string, newFolderId: string | null) => Promise<void>;
         moveToSD: (

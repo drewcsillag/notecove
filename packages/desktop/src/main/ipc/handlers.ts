@@ -45,6 +45,7 @@ export class IPCHandlers {
     ipcMain.handle('note:delete', this.handleDeleteNote.bind(this));
     ipcMain.handle('note:restore', this.handleRestoreNote.bind(this));
     ipcMain.handle('note:permanentDelete', this.handlePermanentDeleteNote.bind(this));
+    ipcMain.handle('note:duplicate', this.handleDuplicateNote.bind(this));
     ipcMain.handle('note:togglePin', this.handleTogglePinNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
     ipcMain.handle('note:moveToSD', this.handleMoveNoteToSD.bind(this));
@@ -287,6 +288,94 @@ export class IPCHandlers {
 
     // Broadcast permanent delete event to all windows
     this.broadcastToAll('note:permanentDeleted', noteId);
+  }
+
+  private async handleDuplicateNote(
+    _event: IpcMainInvokeEvent,
+    sourceNoteId: string
+  ): Promise<string> {
+    // Get the source note from cache
+    const sourceNote = await this.database.getNote(sourceNoteId);
+    if (!sourceNote) {
+      throw new Error(`Source note ${sourceNoteId} not found`);
+    }
+
+    // Generate new note ID for the duplicate
+    const newNoteId = crypto.randomUUID();
+
+    // Load source note to get its CRDT state (if not already loaded)
+    let sourceDoc = this.crdtManager.getDocument(sourceNoteId);
+    const wasSourceLoaded = sourceDoc !== null;
+
+    if (!wasSourceLoaded) {
+      await this.crdtManager.loadNote(sourceNoteId, sourceNote.sdId);
+      sourceDoc = this.crdtManager.getDocument(sourceNoteId);
+      if (!sourceDoc) {
+        throw new Error(`Failed to load CRDT document for source note ${sourceNoteId}`);
+      }
+    }
+
+    // Get the full state as an update (sourceDoc is guaranteed to be non-null here)
+    const sourceState = Y.encodeStateAsUpdate(sourceDoc!);
+
+    // Create new note with the same SD and folder
+    await this.crdtManager.loadNote(newNoteId, sourceNote.sdId);
+
+    // Get the new note document
+    const newDoc = this.crdtManager.getDocument(newNoteId);
+    if (!newDoc) {
+      throw new Error(`Failed to get CRDT document for new note ${newNoteId}`);
+    }
+
+    // Apply the source note's state to the new note
+    Y.applyUpdate(newDoc, sourceState);
+
+    // Update the metadata for the duplicate
+    const now = Date.now();
+    const newNoteDoc = this.crdtManager.getNoteDoc(newNoteId);
+    if (newNoteDoc) {
+      newNoteDoc.initializeNote({
+        id: newNoteId,
+        created: now,
+        modified: now,
+        sdId: sourceNote.sdId,
+        folderId: sourceNote.folderId,
+        deleted: false,
+      });
+    }
+
+    // Generate title for duplicate
+    const duplicateTitle = sourceNote.title.startsWith('Copy of ')
+      ? sourceNote.title
+      : `Copy of ${sourceNote.title}`;
+
+    // Create note cache entry in SQLite
+    await this.database.upsertNote({
+      id: newNoteId,
+      title: duplicateTitle,
+      sdId: sourceNote.sdId,
+      folderId: sourceNote.folderId,
+      created: now,
+      modified: now,
+      deleted: false,
+      pinned: false,
+      contentPreview: sourceNote.contentPreview,
+      contentText: sourceNote.contentText,
+    });
+
+    // Unload source note if it wasn't loaded before
+    if (!wasSourceLoaded) {
+      await this.crdtManager.unloadNote(sourceNoteId);
+    }
+
+    // Broadcast note creation to all windows
+    this.broadcastToAll('note:created', {
+      sdId: sourceNote.sdId,
+      noteId: newNoteId,
+      folderId: sourceNote.folderId,
+    });
+
+    return newNoteId;
   }
 
   private async handleTogglePinNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {

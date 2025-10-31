@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:restore', noteId) as Promise<void>,
     permanentDelete: (noteId: string): Promise<void> =>
       ipcRenderer.invoke('note:permanentDelete', noteId) as Promise<void>,
+    duplicate: (noteId: string): Promise<string> =>
+      ipcRenderer.invoke('note:duplicate', noteId) as Promise<string>,
     togglePin: (noteId: string): Promise<void> =>
       ipcRenderer.invoke('note:togglePin', noteId) as Promise<void>,
     move: (noteId: string, newFolderId: string): Promise<void> =>

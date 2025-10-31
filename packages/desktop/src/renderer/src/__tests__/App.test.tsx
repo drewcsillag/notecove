@@ -25,6 +25,7 @@ const mockElectronAPI = {
     delete: jest.fn(),
     restore: jest.fn(),
     permanentDelete: jest.fn(),
+    duplicate: jest.fn().mockResolvedValue('new-note-id'),
     move: jest.fn(),
     getMetadata: jest.fn(),
     list: jest.fn().mockResolvedValue([]),
