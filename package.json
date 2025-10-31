@@ -20,7 +20,8 @@
     "test:e2e": "turbo run test:e2e",
     "test:coverage": "turbo run test:coverage",
     "ci-local": "node tools/ci-local.js",
-    "clean": "turbo run clean && rm -rf node_modules .turbo"
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "read-crdt-update": "node tools/read-crdt-update.js"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
