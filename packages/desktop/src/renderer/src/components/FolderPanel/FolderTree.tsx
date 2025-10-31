@@ -21,8 +21,7 @@ import {
   ListItemText,
 } from '@mui/material';
 import { Tree, type NodeModel, type DropOptions } from '@minoru/react-dnd-treeview';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { DroppableFolderNode } from './DroppableFolderNode';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -696,6 +695,42 @@ export const FolderTree: FC<FolderTreeProps> = ({
     onExpandedChange?.([]);
   };
 
+  // Handle note drop on folder
+  const handleNoteDrop = async (noteIds: string[], targetFolderId: string): Promise<void> => {
+    console.log('[FolderTree] Note drop:', { noteIds, targetFolderId });
+
+    try {
+      // Determine the actual folder ID
+      let actualFolderId: string | null = null;
+
+      // Handle special nodes
+      if (targetFolderId.startsWith('all-notes')) {
+        // "All Notes" means root level (folderId = null)
+        actualFolderId = null;
+      } else if (targetFolderId.startsWith('recently-deleted')) {
+        // Dropping on "Recently Deleted" should delete the notes
+        await Promise.all(noteIds.map((noteId) => window.electronAPI.note.delete(noteId)));
+        console.log('[FolderTree] Deleted notes:', noteIds);
+        return;
+      } else if (targetFolderId.startsWith('sd:')) {
+        // Dropping on an SD node means root level for that SD
+        actualFolderId = null;
+      } else {
+        // Regular folder
+        actualFolderId = targetFolderId;
+      }
+
+      // Move all notes to the target folder
+      await Promise.all(
+        noteIds.map((noteId) => window.electronAPI.note.move(noteId, actualFolderId))
+      );
+
+      console.log('[FolderTree] Moved notes:', { noteIds, actualFolderId });
+    } catch (err) {
+      console.error('[FolderTree] Failed to move notes:', err);
+    }
+  };
+
   // Determine if all folders are expanded (but not if user explicitly collapsed all)
   const allExpanded =
     !isCollapsedAll &&
@@ -742,83 +777,95 @@ export const FolderTree: FC<FolderTreeProps> = ({
           },
         }}
       >
-        <DndProvider backend={HTML5Backend}>
-          <Tree
-            key={`tree-${remountCounter}`} // Force remount when expand/collapse all is clicked
-            tree={treeData}
-            rootId={0}
-            onDrop={(tree, options) => void handleDrop(tree, options)}
-            canDrag={canDrag}
-            canDrop={canDrop}
-            initialOpen={(() => {
-              const result = isCollapsedAll
-                ? []
-                : expandedFolderIds.length > 0
-                  ? expandedFolderIds
-                  : allFolderIds.length > 0
-                    ? allFolderIds
-                    : [];
-              console.log('[FolderTree] Tree initialOpen:', {
-                isCollapsedAll,
-                expandedFolderIds: expandedFolderIds.length,
-                allFolderIds: allFolderIds.length,
-                result: result.length,
-              });
-              return result;
-            })()}
-            onChangeOpen={(newOpenIds) => {
-              // Skip callback if this is a programmatic change (expand/collapse all)
-              if (isProgrammaticChange.current) {
-                isProgrammaticChange.current = false; // Reset flag
-                return;
-              }
-              // Sync library's internal state with our parent component (but don't trigger remount)
-              onExpandedChange?.(newOpenIds.map(String));
-            }}
-            dragPreviewRender={(monitorProps) => {
-              // Custom drag preview to show ONLY the dragged folder, not the entire tree
-              return (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px 8px',
-                    backgroundColor: 'primary.light',
-                    borderRadius: 1,
-                    opacity: 0.8,
-                  }}
-                >
-                  <FolderIcon fontSize="small" sx={{ mr: 1 }} />
-                  <Typography variant="body2">{monitorProps.item.text}</Typography>
-                </Box>
-              );
-            }}
-            render={(node, { depth, onToggle, isDropTarget }) => {
-              const isSelected = String(node.id) === selectedFolderId;
-              const isExpanded = expandedFolderIds.includes(String(node.id));
-              const noExpand = (node.data as { noExpand?: boolean }).noExpand ?? false;
-              const nodeData = node.data as { isSD?: boolean; isActive?: boolean; path?: string };
-              const isSDNode = nodeData.isSD ?? false;
-              const isActiveSD = nodeData.isActive ?? false;
+        <Tree
+          key={`tree-${remountCounter}`} // Force remount when expand/collapse all is clicked
+          tree={treeData}
+          rootId={0}
+          onDrop={(tree, options) => void handleDrop(tree, options)}
+          canDrag={canDrag}
+          canDrop={canDrop}
+          initialOpen={(() => {
+            const result = isCollapsedAll
+              ? []
+              : expandedFolderIds.length > 0
+                ? expandedFolderIds
+                : allFolderIds.length > 0
+                  ? allFolderIds
+                  : [];
+            console.log('[FolderTree] Tree initialOpen:', {
+              isCollapsedAll,
+              expandedFolderIds: expandedFolderIds.length,
+              allFolderIds: allFolderIds.length,
+              result: result.length,
+            });
+            return result;
+          })()}
+          onChangeOpen={(newOpenIds) => {
+            // Skip callback if this is a programmatic change (expand/collapse all)
+            if (isProgrammaticChange.current) {
+              isProgrammaticChange.current = false; // Reset flag
+              return;
+            }
+            // Sync library's internal state with our parent component (but don't trigger remount)
+            onExpandedChange?.(newOpenIds.map(String));
+          }}
+          dragPreviewRender={(monitorProps) => {
+            // Custom drag preview to show ONLY the dragged folder, not the entire tree
+            return (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px 8px',
+                  backgroundColor: 'primary.light',
+                  borderRadius: 1,
+                  opacity: 0.8,
+                }}
+              >
+                <FolderIcon fontSize="small" sx={{ mr: 1 }} />
+                <Typography variant="body2">{monitorProps.item.text}</Typography>
+              </Box>
+            );
+          }}
+          render={(node, { depth, onToggle, isDropTarget }) => {
+            const isSelected = String(node.id) === selectedFolderId;
+            const isExpanded = expandedFolderIds.includes(String(node.id));
+            const noExpand = (node.data as { noExpand?: boolean }).noExpand ?? false;
+            const nodeData = node.data as {
+              isSD?: boolean;
+              isActive?: boolean;
+              path?: string;
+              isSpecial?: boolean;
+            };
+            const isSDNode = nodeData.isSD ?? false;
+            const isActiveSD = nodeData.isActive ?? false;
+            const isSpecialNode = nodeData.isSpecial ?? false;
 
-              // Check if this node has children
-              const hasChildren = treeData.some((n) => n.parent === node.id);
+            // Check if this node has children
+            const hasChildren = treeData.some((n) => n.parent === node.id);
 
-              // Determine if this node belongs to the active SD (for test selectors)
-              const nodeDataWithSdId = node.data as {
-                sdId?: string;
-                isSD?: boolean;
-                isActive?: boolean;
-                path?: string;
-              };
-              const belongsToActiveSD =
-                isMultiSDMode &&
-                activeSdId &&
-                ((isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
-                  (!isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
-                  (String(node.id).includes(':') && String(node.id).split(':')[1] === activeSdId));
+            // Determine if this node belongs to the active SD (for test selectors)
+            const nodeDataWithSdId = node.data as {
+              sdId?: string;
+              isSD?: boolean;
+              isActive?: boolean;
+              path?: string;
+            };
+            const belongsToActiveSD =
+              isMultiSDMode &&
+              activeSdId &&
+              ((isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
+                (!isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
+                (String(node.id).includes(':') && String(node.id).split(':')[1] === activeSdId));
 
-              return (
+            return (
+              <DroppableFolderNode
+                folderId={String(node.id)}
+                onDrop={(noteIds, targetFolderId) => {
+                  void handleNoteDrop(noteIds, targetFolderId);
+                }}
+                isSpecial={isSpecialNode || isSDNode}
+              >
                 <ListItemButton
                   data-testid={`folder-tree-node-${node.id}`}
                   data-active-sd={belongsToActiveSD ? 'true' : undefined}
@@ -895,10 +942,10 @@ export const FolderTree: FC<FolderTreeProps> = ({
                     />
                   )}
                 </ListItemButton>
-              );
-            }}
-          />
-        </DndProvider>
+              </DroppableFolderNode>
+            );
+          }}
+        />
       </Box>
 
       {/* Context Menu */}

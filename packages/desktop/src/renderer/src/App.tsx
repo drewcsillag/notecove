@@ -4,6 +4,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { CssBaseline, ThemeProvider } from '@mui/material';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import { theme } from './theme';
 import './i18n';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
@@ -77,35 +79,37 @@ function App(): React.ReactElement {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <div data-testid="app-root" data-active-sd-id={activeSdId}>
-        <ThreePanelLayout
-          leftPanel={
-            <FolderPanel
-              onOpenSettings={() => {
-                setSettingsOpen(true);
-              }}
-              activeSdId={activeSdId}
-              onActiveSdChange={setActiveSdId}
-            />
-          }
-          middlePanel={
-            <NotesListPanel
-              selectedNoteId={selectedNoteId}
-              onNoteSelect={setSelectedNoteId}
-              activeSdId={activeSdId}
-            />
-          }
-          rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
-          onLayoutChange={handleLayoutChange}
-          initialSizes={initialPanelSizes}
+      <DndProvider backend={HTML5Backend}>
+        <div data-testid="app-root" data-active-sd-id={activeSdId}>
+          <ThreePanelLayout
+            leftPanel={
+              <FolderPanel
+                onOpenSettings={() => {
+                  setSettingsOpen(true);
+                }}
+                activeSdId={activeSdId}
+                onActiveSdChange={setActiveSdId}
+              />
+            }
+            middlePanel={
+              <NotesListPanel
+                selectedNoteId={selectedNoteId}
+                onNoteSelect={setSelectedNoteId}
+                activeSdId={activeSdId}
+              />
+            }
+            rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
+            onLayoutChange={handleLayoutChange}
+            initialSizes={initialPanelSizes}
+          />
+        </div>
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => {
+            setSettingsOpen(false);
+          }}
         />
-      </div>
-      <SettingsDialog
-        open={settingsOpen}
-        onClose={() => {
-          setSettingsOpen(false);
-        }}
-      />
+      </DndProvider>
     </ThemeProvider>
   );
 }

@@ -10,9 +10,6 @@ import {
   Box,
   Typography,
   List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
   IconButton,
   TextField,
   InputAdornment,
@@ -28,12 +25,8 @@ import {
   FormControlLabel,
   Radio,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Clear as ClearIcon,
-  PushPin as PushPinIcon,
-  Folder as FolderIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon, Clear as ClearIcon, Folder as FolderIcon } from '@mui/icons-material';
+import { DraggableNoteItem } from './DraggableNoteItem';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -846,75 +839,22 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
               const isMultiSelected = selectedNoteIds.has(note.id);
               const isSingleSelected = selectedNoteId === note.id;
               return (
-                <ListItem key={note.id} disablePadding>
-                  <ListItemButton
-                    selected={isSingleSelected}
-                    onClick={(event) => {
-                      handleNoteClick(note.id, index, event);
-                    }}
-                    onContextMenu={(e) => {
-                      handleContextMenu(e, note.id);
-                    }}
-                    sx={{
-                      paddingY: 1.5,
-                      paddingX: 2,
-                      borderBottom: 1,
-                      borderColor: 'divider',
-                      // Highlight multi-selected notes with a different background
-                      backgroundColor: isMultiSelected
-                        ? 'rgba(33, 150, 243, 0.12)'
-                        : isSingleSelected
-                          ? 'action.selected'
-                          : 'transparent',
-                      '&:hover': {
-                        backgroundColor: isMultiSelected ? 'rgba(33, 150, 243, 0.2)' : undefined,
-                      },
-                    }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          {note.pinned && (
-                            <PushPinIcon
-                              sx={{
-                                fontSize: '1rem',
-                                color: 'primary.main',
-                              }}
-                            />
-                          )}
-                          <Typography variant="subtitle1" noWrap sx={{ flex: 1 }}>
-                            {note.title || 'Untitled Note'}
-                          </Typography>
-                        </Box>
-                      }
-                      secondary={
-                        <>
-                          <Typography
-                            component="span"
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              display: 'block',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {truncatePreview(note.contentPreview)}
-                          </Typography>
-                          <Typography
-                            component="span"
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: 'block', marginTop: 0.5 }}
-                          >
-                            {formatDate(note.modified)}
-                          </Typography>
-                        </>
-                      }
-                    />
-                  </ListItemButton>
-                </ListItem>
+                <DraggableNoteItem
+                  key={note.id}
+                  note={note}
+                  index={index}
+                  isMultiSelected={isMultiSelected}
+                  isSingleSelected={isSingleSelected}
+                  selectedNoteIds={selectedNoteIds}
+                  onClick={(event) => {
+                    handleNoteClick(note.id, index, event);
+                  }}
+                  onContextMenu={(e) => {
+                    handleContextMenu(e, note.id);
+                  }}
+                  truncatePreview={truncatePreview}
+                  formatDate={formatDate}
+                />
               );
             })}
           </List>
