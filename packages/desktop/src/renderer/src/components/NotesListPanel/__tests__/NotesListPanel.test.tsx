@@ -17,11 +17,13 @@ const mockElectronAPI = {
     create: jest.fn().mockResolvedValue('new-note-id'),
     search: jest.fn().mockResolvedValue([]),
     restore: jest.fn().mockResolvedValue(undefined),
+    togglePin: jest.fn().mockResolvedValue(undefined),
     onCreated: jest.fn().mockReturnValue(() => {}),
     onDeleted: jest.fn().mockReturnValue(() => {}),
     onRestored: jest.fn().mockReturnValue(() => {}),
     onExternalUpdate: jest.fn().mockReturnValue(() => {}),
     onTitleUpdated: jest.fn().mockReturnValue(() => {}),
+    onPinned: jest.fn().mockReturnValue(() => {}),
     onMoved: jest.fn().mockReturnValue(() => {}),
   },
   appState: {

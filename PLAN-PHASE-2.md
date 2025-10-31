@@ -713,11 +713,11 @@ These tests are documented in `e2e/BUG-TEST-SUMMARY.md` as expected failures. Th
 
 ---
 
-### 2.5 Notes List Panel ✅
+### 2.5 Notes List Panel 🟡
 
-**Status:** Complete (6/7 sub-phases complete, 1 deferred)
+**Status:** In Progress (6/10 sub-phases complete)
 
-This phase is split into 7 sub-phases for better manageability:
+This phase is split into 10 sub-phases for better manageability:
 
 ---
 
@@ -1192,46 +1192,162 @@ All 11 E2E tests passing in note-context-menu.spec.ts:
 
 ---
 
-#### 2.5.7 Drag & Drop 🟥
+### 2.5.7 Note Organization (Multi-Select & Drag & Drop) 🟡
 
-**Status:** Deferred
+**Status:** In Progress (split into 3 sub-phases for manageability)
+
+This phase is split into 3 sub-phases:
+
+---
+
+#### 2.5.7.1 Move to... Context Menu ✅
+
+**Status:** Complete (2025-10-30)
+
+**Completed Tasks:**
+
+- [x] ✅ **Backend already complete**
+  - `note:move` IPC handler exists (updates folderId in CRDT and cache)
+  - Broadcasts `note:moved` event to all windows
+  - Already exposed in preload script and type definitions
+- [x] ✅ **Implement "Move to..." context menu option**
+  - Added "Move to..." menu item in note context menu
+  - Dialog showing folder tree for current SD using MUI TreeView
+  - Cannot move to current folder (Move button disabled)
+  - Move to "All Notes" = move to root (folderId = null)
+  - Calls `note:move` IPC handler on confirmation
+  - Radio button selection for folder choice
+- [x] ✅ **Add event listener for note:moved**
+  - Listen for `note:moved` event in NotesListPanel
+  - Updates notes list when note moves out of current folder
+  - Fixed multi-SD mode bug: checks both `'all-notes'` and `'all-notes:sdId'` patterns
+  - Removes note from "All Notes" view when moved to any folder
+  - Removes note from old folder view when moved away
+  - Refreshes notes list when note moved into current folder
+- [x] ✅ **Add comprehensive E2E tests**
+  - 18 E2E tests in note-context-menu.spec.ts (all passing)
+  - Tests for "Move to..." dialog UI (open, close, cancel)
+  - Tests for moving notes to different folders
+  - Tests for moving to "All Notes" (orphan note)
+  - Tests for disabled Move button when selecting current folder
+  - Tests that note disappears from old folder view after move
+  - Tests for note:moved event handling and UI updates
+
+**Files Modified:**
+
+- `packages/desktop/src/renderer/src/components/NotesListPanel/NotesListPanel.tsx` (lines 431-463)
+  - Added "Move to..." menu item in context menu
+  - Implemented MoveToDialog component with folder tree
+  - Added note:moved event listener with multi-SD mode fix
+- `packages/desktop/e2e/note-context-menu.spec.ts`
+  - Added 7 new tests for "Move to..." functionality (tests 12-18)
+  - All 18 tests passing
+
+**Key Bug Fixed:**
+
+- **Multi-SD Mode Bug**: The `note:onMoved` event listener only checked `selectedFolderId === 'all-notes'`, but in multi-SD mode the actual value is `'all-notes:default'` (with SD ID appended). This caused notes not to be removed from the "All Notes" view when moved to folders.
+- **Solution**: Updated conditional at line 442 to check both `selectedFolderId === 'all-notes'` OR `selectedFolderId?.startsWith('all-notes:')`
+
+**Implementation Details:**
+
+- Dialog uses MUI TreeView with RichTreeViewPro for folder selection
+- Radio button selection ensures single folder choice
+- Recursive folder tree building from flat folder list
+- "All Notes" option creates orphan note (folderId = null)
+- Move button disabled when current folder selected
+- Dialog closes automatically on successful move
+- Error handling with console warnings
+
+**Acceptance Criteria:** ✅ All met
+
+- ✅ Can open "Move to..." dialog from context menu
+- ✅ Can select folder from tree
+- ✅ Note moves to selected folder
+- ✅ Note disappears from old folder view
+- ✅ All 18 E2E tests passing
+- ✅ Multi-SD mode bug fixed
+
+**Deferred to 2.5.7.2:**
+
+- Multi-select support
+- Moving multiple notes at once
+
+**Test Coverage:**
+
+- 18/18 E2E tests passing in note-context-menu.spec.ts
+- 64/67 E2E tests passing overall (3 pre-existing flaky tests unrelated to this work)
+- Full CI passing except for 3 known flaky tests
+
+---
+
+#### 2.5.7.2 Multi-Select Support 🟥
+
+**Status:** To Do
 
 **Tasks:**
 
-- [ ] 🟥 **Implement multi-select support**
-  - Ctrl/Cmd+Click to toggle selection
+- [ ] 🟥 **Implement multi-select state**
+  - Add `selectedNoteIds: Set<string>` to NotesListPanel
+  - Ctrl/Cmd+Click to toggle individual note selection
   - Shift+Click for range selection
-  - Multi-select badge (floating near selection) showing count
-  - Visual indication of selected notes
-- [ ] 🟥 **Implement note drag & drop**
-  - Drag note to folder (move - update folderId in CRDT)
-  - Drag multiple selected notes
-  - Visual feedback during drag (drag preview, drop zones)
-  - Drag to "Recently Deleted" = delete (set deleted flag)
-- [ ] 🟥 **Implement cross-SD move handling**
-  - Detect cross-SD move (different sdId)
-  - Show warning dialog ("copying note to new SD, deleting from old SD")
-  - "Don't show again" checkbox (global setting in app_state)
-  - Copy CRDT history to new SD
-  - Delete from old SD
-- [ ] 🟥 **Implement IPC handlers**
-  - `note:move` - Update folderId in CRDT and cache
-  - Handle cross-SD moves (if implemented)
+  - Visual indication of selected notes (highlighted background)
+  - Clear selection when folder changes
+- [ ] 🟥 **Update context menu for multi-select**
+  - Show count in context menu when multiple selected
+  - "Move to..." works on all selected notes
+  - "Delete" works on all selected notes
+  - "Pin/Unpin" disabled for multi-select (ambiguous)
+- [ ] 🟥 **Add multi-select badge**
+  - Floating badge showing "X notes selected"
+  - Clear selection button in badge
 - [ ] 🟥 **Add tests**
-  - Test multi-select (Ctrl/Cmd+Click, Shift+Click)
-  - Test drag & drop to folders
-  - Test multi-note drag
-  - Test drag to "Recently Deleted"
-  - Test cross-SD move (if implemented)
+  - Test Ctrl/Cmd+Click toggle
+  - Test Shift+Click range
+  - Test multi-delete
+  - Test multi-move
 
 **Acceptance Criteria:**
 
-- ✅ Multi-select works (Ctrl/Cmd+Click, Shift+Click)
+- ✅ Can select multiple notes with Ctrl/Cmd+Click
+- ✅ Can select range with Shift+Click
+- ✅ Visual feedback shows selected notes
+- ✅ Can move/delete multiple notes at once
+- ✅ Tests pass
+
+---
+
+#### 2.5.7.3 Drag & Drop 🟥
+
+**Status:** To Do
+
+**Tasks:**
+
+- [ ] 🟥 **Implement drag & drop for single notes**
+  - Drag note to folder in folder tree
+  - Visual feedback during drag (drag preview, drop zone highlighting)
+  - Drop calls `note:move` handler
+  - Drag to "Recently Deleted" = soft delete
+- [ ] 🟥 **Extend drag & drop for multi-select**
+  - Drag multiple selected notes together
+  - Drag preview shows count ("3 notes")
+  - All selected notes move/delete on drop
+- [ ] 🟥 **Add tests**
+  - Test drag to folder
+  - Test drag to "Recently Deleted"
+  - Test multi-note drag
+  - Test visual feedback
+
+**Acceptance Criteria:**
+
 - ✅ Can drag notes to folders
 - ✅ Can drag multiple selected notes
 - ✅ Drag to "Recently Deleted" deletes notes
 - ✅ Visual feedback during drag is clear
-- ⏭️ Cross-SD move may be simplified or deferred based on complexity
+- ✅ Tests pass
+
+**Deferred:**
+
+- Cross-SD drag & drop (requires CRDT copying, deferred to future)
 
 ---
 

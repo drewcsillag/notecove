@@ -24,8 +24,16 @@ import {
   DialogContentText,
   DialogActions,
   Button,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
 } from '@mui/material';
-import { Add as AddIcon, Clear as ClearIcon, PushPin as PushPinIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Clear as ClearIcon,
+  PushPin as PushPinIcon,
+  Folder as FolderIcon,
+} from '@mui/icons-material';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -72,6 +80,14 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+
+  // Move to folder dialog state
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [noteToMove, setNoteToMove] = useState<string | null>(null);
+  const [selectedDestinationFolder, setSelectedDestinationFolder] = useState<string | null>(null);
+  const [availableFolders, setAvailableFolders] = useState<
+    { id: string; name: string; parentId: string | null; sdId: string }[]
+  >([]);
 
   // Load selected folder from app state
   const loadSelectedFolder = useCallback(async () => {
@@ -412,6 +428,40 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       });
     });
 
+    const unsubscribeMoved = window.electronAPI.note.onMoved((data) => {
+      console.log('[NotesListPanel] Note moved:', data);
+
+      // Remove note from list if it's no longer in the current folder
+      setNotes((prevNotes) => {
+        const note = prevNotes.find((n) => n.id === data.noteId);
+        if (!note) return prevNotes;
+
+        // If we're viewing "All Notes" (can be 'all-notes' or 'all-notes:sdId'),
+        // we need to check if the note is moving INTO a folder
+        // (it should disappear from "All Notes" when moved to any folder)
+        if (selectedFolderId === 'all-notes' || selectedFolderId?.startsWith('all-notes:')) {
+          // Note is moving to a specific folder, remove it from "All Notes" view
+          if (data.newFolderId !== null && data.newFolderId !== '') {
+            return prevNotes.filter((n) => n.id !== data.noteId);
+          }
+          // Note is moving back to "All Notes", keep it
+          return prevNotes;
+        }
+
+        // If the note is moving OUT of the current folder, remove it
+        if (selectedFolderId === data.oldFolderId) {
+          return prevNotes.filter((n) => n.id !== data.noteId);
+        }
+
+        // If the note is moving INTO the current folder, refresh to show it
+        if (selectedFolderId === data.newFolderId) {
+          void fetchNotes(selectedFolderId);
+        }
+
+        return prevNotes;
+      });
+    });
+
     return () => {
       unsubscribeCreated();
       unsubscribeDeleted();
@@ -419,6 +469,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       unsubscribeExternal();
       unsubscribeTitleUpdated();
       unsubscribePinned();
+      unsubscribeMoved();
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
 
@@ -525,6 +576,55 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         setError(err instanceof Error ? err.message : 'Failed to toggle pin');
       });
   }, [contextMenu, handleContextMenuClose]);
+
+  // Handle "Move to..." from context menu
+  const handleMoveToFromMenu = useCallback(async () => {
+    if (!contextMenu) return;
+
+    const { noteId } = contextMenu;
+    handleContextMenuClose();
+
+    // Load folders for the current SD
+    try {
+      const sdId = activeSdId ?? DEFAULT_SD_ID;
+      const folders = await window.electronAPI.folder.list(sdId);
+      setAvailableFolders(folders.filter((f) => !f.deleted));
+      setNoteToMove(noteId);
+
+      // Get current note's folder to pre-select or exclude
+      const note = notes.find((n) => n.id === noteId);
+      setSelectedDestinationFolder(note?.folderId ?? null);
+
+      setMoveDialogOpen(true);
+    } catch (err) {
+      console.error('Failed to load folders:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load folders');
+    }
+  }, [contextMenu, handleContextMenuClose, activeSdId, notes]);
+
+  // Handle move confirmation
+  const handleConfirmMove = useCallback(async () => {
+    if (!noteToMove) return;
+
+    try {
+      await window.electronAPI.note.move(noteToMove, selectedDestinationFolder);
+      console.log('[NotesListPanel] Note moved:', noteToMove, 'to', selectedDestinationFolder);
+      setMoveDialogOpen(false);
+      setNoteToMove(null);
+      setSelectedDestinationFolder(null);
+      // Note: The notes list will be updated automatically via note:moved event
+    } catch (err) {
+      console.error('Failed to move note:', err);
+      setError(err instanceof Error ? err.message : 'Failed to move note');
+    }
+  }, [noteToMove, selectedDestinationFolder]);
+
+  // Handle move dialog close
+  const handleCancelMove = useCallback(() => {
+    setMoveDialogOpen(false);
+    setNoteToMove(null);
+    setSelectedDestinationFolder(null);
+  }, []);
 
   // Format date for display
   const formatDate = (timestamp: number): string => {
@@ -716,6 +816,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
               <MenuItem onClick={handleTogglePinFromMenu}>
                 {notes.find((n) => n.id === contextMenu.noteId)?.pinned ? 'Unpin' : 'Pin'}
               </MenuItem>
+              <MenuItem onClick={() => void handleMoveToFromMenu()}>Move to...</MenuItem>
               <MenuItem onClick={handleDeleteFromMenu}>Delete</MenuItem>
             </>
           )}
@@ -735,6 +836,59 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           <Button onClick={handleCancelDelete}>Cancel</Button>
           <Button onClick={() => void handleConfirmDelete()} color="error" autoFocus>
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Move to Folder Dialog */}
+      <Dialog open={moveDialogOpen} onClose={handleCancelMove} maxWidth="sm" fullWidth>
+        <DialogTitle>Move Note to Folder</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Select a destination folder:</DialogContentText>
+          <RadioGroup
+            value={selectedDestinationFolder ?? 'null'}
+            onChange={(e) => {
+              setSelectedDestinationFolder(e.target.value === 'null' ? null : e.target.value);
+            }}
+            sx={{ mt: 2 }}
+          >
+            <FormControlLabel
+              value="null"
+              control={<Radio />}
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <FolderIcon fontSize="small" />
+                  <Typography>All Notes (No Folder)</Typography>
+                </Box>
+              }
+            />
+            {availableFolders.map((folder) => (
+              <FormControlLabel
+                key={folder.id}
+                value={folder.id}
+                control={<Radio />}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FolderIcon fontSize="small" />
+                    <Typography>{folder.name}</Typography>
+                  </Box>
+                }
+                disabled={notes.find((n) => n.id === noteToMove)?.folderId === folder.id}
+              />
+            ))}
+          </RadioGroup>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelMove}>Cancel</Button>
+          <Button
+            onClick={() => void handleConfirmMove()}
+            color="primary"
+            autoFocus
+            disabled={
+              selectedDestinationFolder === notes.find((n) => n.id === noteToMove)?.folderId
+            }
+          >
+            Move
           </Button>
         </DialogActions>
       </Dialog>

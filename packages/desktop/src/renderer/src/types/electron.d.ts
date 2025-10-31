@@ -18,7 +18,7 @@ declare global {
         delete: (noteId: string) => Promise<void>;
         restore: (noteId: string) => Promise<void>;
         togglePin: (noteId: string) => Promise<void>;
-        move: (noteId: string, newFolderId: string) => Promise<void>;
+        move: (noteId: string, newFolderId: string | null) => Promise<void>;
         getMetadata: (noteId: string) => Promise<NoteMetadata>;
         updateTitle: (noteId: string, title: string, contentText?: string) => Promise<void>;
         list: (
@@ -64,7 +64,7 @@ declare global {
           callback: (data: {
             noteId: string;
             oldFolderId: string | null;
-            newFolderId: string;
+            newFolderId: string | null;
           }) => void
         ) => () => void;
       };

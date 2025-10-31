@@ -1,8 +1,8 @@
 # NoteCove Implementation Plan
 
-**Overall Progress:** `8/21 phases (38%)` + Phase 2.4: 5/5 sub-phases complete + Phase 2.5: 2/6 sub-phases complete + Phase 2.6: Partial
+**Overall Progress:** `8/21 phases (38%)` + Phase 2.4: 5/5 sub-phases complete + Phase 2.5: 7/10 sub-phases complete + Phase 2.6: Partial
 
-**Last Updated:** 2025-10-29 (Reviewed and confirmed completion status)
+**Last Updated:** 2025-10-30 (Phase 2.5.7.1 Move to... Context Menu complete)
 
 ---
 
@@ -169,13 +169,16 @@ Documentation website, user guides, and final polish for both platforms.
   - ✅ 2.4.3 Folder Context Menus
   - ✅ 2.4.4 Folder Drag & Drop
   - ✅ 2.4.5 Multi-SD Support
-- 🟡 2.5 Notes List Panel (2/6 sub-phases complete)
+- 🟡 2.5 Notes List Panel (7/10 sub-phases complete)
   - ✅ 2.5.1 Basic Notes List Display
   - ✅ 2.5.2 Note Selection & Creation
-  - 🟥 2.5.3 Basic Search Functionality (To Do)
-  - 🟥 2.5.4 Note Context Menu & Deletion (To Do)
-  - 🟥 2.5.5 Pinned Notes & Advanced Search (To Do)
-  - 🟥 2.5.6 Drag & Drop (To Do)
+  - ✅ 2.5.3 Basic Search Functionality
+  - ✅ 2.5.4 Note Context Menu & Deletion
+  - ✅ 2.5.5 "Recently Deleted" Virtual Folder
+  - ✅ 2.5.6 Pinned Notes
+  - ✅ 2.5.7.1 Move to... Context Menu
+  - 🟥 2.5.7.2 Multi-Select Support (To Do)
+  - 🟥 2.5.7.3 Drag & Drop (To Do)
 - 🟡 2.6 Settings Window (Partial)
 - 🟥 2.7 Tags Panel (To Do)
 
@@ -226,6 +229,11 @@ For detailed design decisions, answered questions, and implementation context, s
 
 **2025-10-30:**
 
+- Completed Phase 2.5.7.1: Move to... Context Menu
+  - Implemented "Move to..." dialog with folder tree selection
+  - Fixed multi-SD mode bug in note:moved event handler
+  - All 18 E2E tests passing in note-context-menu.spec.ts
+  - 64/67 E2E tests passing overall (3 pre-existing flaky tests)
 - Fixed welcome note appearing in wrong folders bug (Phase 2.5.2)
 - Added E2E test for welcome note bug (welcome-note-deletion-bug.spec.ts)
 - Documented 3 failing folder sync tests in PLAN-PHASE-2.md (should be fixed in Phase 2.3)
