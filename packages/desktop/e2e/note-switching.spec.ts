@@ -9,18 +9,25 @@
 
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 
 let electronApp: ElectronApplication;
 let window1: Page;
+let testUserDataDir: string;
 
 test.describe('Note Switching', () => {
   test.beforeAll(async () => {
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Create a unique temporary directory for this test's userData
+    testUserDataDir = mkdtempSync(join(tmpdir(), 'notecove-e2e-'));
     console.log('[Note Switching E2E] Launching Electron with main process at:', mainPath);
+    console.log('[Note Switching E2E] Using fresh userData directory:', testUserDataDir);
 
     electronApp = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${testUserDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -46,6 +53,14 @@ test.describe('Note Switching', () => {
   test.afterAll(async () => {
     console.log('[Note Switching E2E] Closing Electron app');
     await electronApp.close();
+
+    // Clean up the temporary user data directory
+    try {
+      rmSync(testUserDataDir, { recursive: true, force: true });
+      console.log('[Note Switching E2E] Cleaned up test userData directory:', testUserDataDir);
+    } catch (err) {
+      console.error('[Note Switching E2E] Failed to clean up test userData directory:', err);
+    }
   });
 
   test('should update note title when editing', async () => {
@@ -119,13 +134,18 @@ test.describe('Note Switching', () => {
 
 test.describe('Note Switching - Multi-Window', () => {
   let window2: Page;
+  let testUserDataDir2: string;
 
   test.beforeAll(async () => {
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Create a unique temporary directory for this test's userData
+    testUserDataDir2 = mkdtempSync(join(tmpdir(), 'notecove-e2e-'));
     console.log('[Multi-Window E2E] Launching Electron with main process at:', mainPath);
+    console.log('[Multi-Window E2E] Using fresh userData directory:', testUserDataDir2);
 
     electronApp = await electron.launch({
-      args: [mainPath],
+      args: [mainPath, `--user-data-dir=${testUserDataDir2}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -146,6 +166,14 @@ test.describe('Note Switching - Multi-Window', () => {
   test.afterAll(async () => {
     console.log('[Multi-Window E2E] Closing Electron app');
     await electronApp.close();
+
+    // Clean up the temporary user data directory
+    try {
+      rmSync(testUserDataDir2, { recursive: true, force: true });
+      console.log('[Multi-Window E2E] Cleaned up test userData directory:', testUserDataDir2);
+    } catch (err) {
+      console.error('[Multi-Window E2E] Failed to clean up test userData directory:', err);
+    }
   });
 
   test('should not clear content in window 2 when switching away in window 1', async () => {

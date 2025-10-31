@@ -1759,4 +1759,17 @@ CLI tools in `/tools/` still available for advanced SD management:
 - Other 10 tests in suite pass consistently after test architecture fix
 - **TODO:** Investigate and fix this timing issue when time permits
 
+### E2E Test Database Schema Compatibility (Fixed 2025-10-30)
+
+**Issue:** Tests were failing due to old database files with incompatible schemas
+
+- **Problem:** `app.spec.ts` and `note-switching.spec.ts` were using default Electron userData directory, which contained old database (schema v1) incompatible with current schema (v2 with `pinned` column)
+- **Impact:** 3 tests failing with "Target page, context or browser has been closed" - app crashed on startup due to SqliteError
+- **Solution:** Updated both test files to use fresh temporary userData directories via `--user-data-dir=${testUserDataDir}` flag
+- **Files Modified:**
+  - `packages/desktop/e2e/app.spec.ts` - Added temp directory creation/cleanup
+  - `packages/desktop/e2e/note-switching.spec.ts` - Added temp directory creation/cleanup for both test suites
+- **Result:** All 10 previously failing tests now passing ✅
+- **Prevention:** All E2E tests now use isolated temporary databases, preventing future schema migration issues
+
 ---

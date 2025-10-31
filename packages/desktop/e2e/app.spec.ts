@@ -7,18 +7,25 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import { join, resolve } from 'path';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 
 let electronApp: ElectronApplication;
 let page: Page;
+let testUserDataDir: string;
 
 test.beforeAll(async () => {
   // Use absolute path to ensure correct resolution
   const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+  // Create a unique temporary directory for this test's userData
+  testUserDataDir = mkdtempSync(join(tmpdir(), 'notecove-e2e-'));
   console.log('[E2E] Launching Electron with main process at:', mainPath);
+  console.log('[E2E] Using fresh userData directory:', testUserDataDir);
 
   // Launch Electron app with extended timeout
   electronApp = await electron.launch({
-    args: [mainPath],
+    args: [mainPath, `--user-data-dir=${testUserDataDir}`],
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -37,6 +44,14 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await electronApp.close();
+
+  // Clean up the temporary user data directory
+  try {
+    rmSync(testUserDataDir, { recursive: true, force: true });
+    console.log('[E2E] Cleaned up test userData directory:', testUserDataDir);
+  } catch (err) {
+    console.error('[E2E] Failed to clean up test userData directory:', err);
+  }
 });
 
 test.describe('NoteCove Desktop App', () => {

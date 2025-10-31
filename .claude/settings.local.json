@@ -80,7 +80,9 @@
       "Bash(done)",
       "Bash(pnpm -w run ci-local:*)",
       "Bash(timeout 120 pnpm test:e2e:*)",
-      "Bash(pnpm -w format:*)"
+      "Bash(pnpm -w format:*)",
+      "Bash(npm test:*)",
+      "Bash(jobs:*)"
     ],
     "deny": [],
     "ask": []

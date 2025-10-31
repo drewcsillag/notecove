@@ -3,10 +3,16 @@
 /**
  * Local CI script - runs all checks that would run in CI
  * Run this before merging to main to ensure everything passes
+ *
+ * Usage:
+ *   pnpm ci-local        # Full CI with coverage (for pre-commit)
+ *   pnpm ci-local --fast # Skip coverage (for rapid iteration)
  */
 
 import { execSync } from 'child_process';
 import { exit } from 'process';
+
+const fastMode = process.argv.includes('--fast');
 
 const checks = [
   { name: 'Format Check', cmd: 'pnpm format:check' },
@@ -18,7 +24,7 @@ const checks = [
     cmd: 'cd packages/desktop && pnpm rebuild better-sqlite3',
   },
   { name: 'Unit Tests', cmd: 'pnpm test' },
-  { name: 'Coverage', cmd: 'pnpm test:coverage' },
+  ...(fastMode ? [] : [{ name: 'Coverage', cmd: 'pnpm test:coverage' }]),
   {
     name: 'Rebuild for Electron',
     cmd: 'cd packages/desktop && npx @electron/rebuild -f -w better-sqlite3',
@@ -26,7 +32,7 @@ const checks = [
   { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
 ];
 
-console.log('🚀 Running local CI checks...\n');
+console.log(fastMode ? '⚡ Running local CI checks (FAST MODE - skipping coverage)...\n' : '🚀 Running local CI checks (FULL MODE - with coverage)...\n');
 
 let failed = false;
 
