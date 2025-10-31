@@ -78,6 +78,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
 
+  // Permanent delete confirmation dialog state
+  const [permanentDeleteDialogOpen, setPermanentDeleteDialogOpen] = useState(false);
+  const [noteToPermanentDelete, setNoteToPermanentDelete] = useState<string | null>(null);
+
   // Move to folder dialog state
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [noteToMove, setNoteToMove] = useState<string | null>(null);
@@ -426,6 +430,12 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       }
     });
 
+    const unsubscribePermanentDeleted = window.electronAPI.note.onPermanentDeleted((noteId) => {
+      console.log('[NotesListPanel] Note permanently deleted:', noteId);
+      // Remove from notes list (should only happen in Recently Deleted view)
+      setNotes((prev) => prev.filter((note) => note.id !== noteId));
+    });
+
     const unsubscribeExternal = window.electronAPI.note.onExternalUpdate((data) => {
       console.log('[NotesListPanel] External update:', data);
       // Refresh notes list
@@ -521,6 +531,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       unsubscribeCreated();
       unsubscribeDeleted();
       unsubscribeRestored();
+      unsubscribePermanentDeleted();
       unsubscribeExternal();
       unsubscribeTitleUpdated();
       unsubscribePinned();
@@ -627,6 +638,54 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         setError(err instanceof Error ? err.message : 'Failed to restore note');
       });
   }, [contextMenu, handleContextMenuClose, selectedNoteId, onNoteSelect]);
+
+  // Handle permanent delete from menu
+  const handlePermanentDeleteFromMenu = useCallback(() => {
+    if (!contextMenu) return;
+
+    const { noteId } = contextMenu;
+    setNoteToPermanentDelete(noteId);
+    setPermanentDeleteDialogOpen(true);
+    handleContextMenuClose();
+  }, [contextMenu, handleContextMenuClose]);
+
+  // Handle cancel permanent delete
+  const handleCancelPermanentDelete = useCallback(() => {
+    setPermanentDeleteDialogOpen(false);
+    setNoteToPermanentDelete(null);
+  }, []);
+
+  // Handle confirm permanent delete
+  const handleConfirmPermanentDelete = useCallback(async () => {
+    if (!noteToPermanentDelete) return;
+
+    try {
+      await window.electronAPI.note.permanentDelete(noteToPermanentDelete);
+      console.log('[NotesListPanel] Note permanently deleted:', noteToPermanentDelete);
+
+      // If we just deleted the selected note, clear selection
+      if (selectedNoteId === noteToPermanentDelete) {
+        onNoteSelect('');
+      }
+
+      // Refresh notes list
+      if (selectedFolderId !== null) {
+        await fetchNotes(selectedFolderId);
+      }
+    } catch (err) {
+      console.error('Failed to permanently delete note:', err);
+      setError(err instanceof Error ? err.message : 'Failed to permanently delete note');
+    } finally {
+      handleCancelPermanentDelete();
+    }
+  }, [
+    noteToPermanentDelete,
+    handleCancelPermanentDelete,
+    selectedNoteId,
+    onNoteSelect,
+    selectedFolderId,
+    fetchNotes,
+  ]);
 
   const handleTogglePinFromMenu = useCallback(() => {
     if (!contextMenu) return;
@@ -888,6 +947,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             selectedFolderId.startsWith('recently-deleted:')) ? (
             <>
               <MenuItem onClick={handleRestoreFromMenu}>Restore</MenuItem>
+              <MenuItem onClick={handlePermanentDeleteFromMenu}>Delete Permanently</MenuItem>
             </>
           ) : (
             <>
@@ -926,6 +986,23 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           <Button onClick={handleCancelDelete}>Cancel</Button>
           <Button onClick={() => void handleConfirmDelete()} color="error" autoFocus>
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <Dialog open={permanentDeleteDialogOpen} onClose={handleCancelPermanentDelete}>
+        <DialogTitle>Permanently Delete Note?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This action cannot be undone. The note and all its content will be permanently deleted
+            from disk.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelPermanentDelete}>Cancel</Button>
+          <Button onClick={() => void handleConfirmPermanentDelete()} color="error" autoFocus>
+            Delete Permanently
           </Button>
         </DialogActions>
       </Dialog>

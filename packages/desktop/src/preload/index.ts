@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:delete', noteId) as Promise<void>,
     restore: (noteId: string): Promise<void> =>
       ipcRenderer.invoke('note:restore', noteId) as Promise<void>,
+    permanentDelete: (noteId: string): Promise<void> =>
+      ipcRenderer.invoke('note:permanentDelete', noteId) as Promise<void>,
     togglePin: (noteId: string): Promise<void> =>
       ipcRenderer.invoke('note:togglePin', noteId) as Promise<void>,
     move: (noteId: string, newFolderId: string): Promise<void> =>
@@ -124,6 +126,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       });
       return () => {
         ipcRenderer.removeAllListeners('note:restored');
+      };
+    },
+    onPermanentDeleted: (callback: (noteId: string) => void): (() => void) => {
+      ipcRenderer.on('note:permanentDeleted', (_event, noteId: string) => {
+        callback(noteId);
+      });
+      return () => {
+        ipcRenderer.removeAllListeners('note:permanentDeleted');
       };
     },
     onPinned: (callback: (data: { noteId: string; pinned: boolean }) => void): (() => void) => {

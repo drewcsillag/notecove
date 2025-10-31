@@ -82,7 +82,10 @@
       "Bash(timeout 120 pnpm test:e2e:*)",
       "Bash(pnpm -w format:*)",
       "Bash(npm test:*)",
-      "Bash(jobs:*)"
+      "Bash(jobs:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(timeout 60 pnpm test:e2e:*)",
+      "Bash(timeout 90 pnpm test:e2e:*)"
     ],
     "deny": [],
     "ask": []

@@ -17,6 +17,7 @@ declare global {
         create: (sdId: string, folderId: string, initialContent: string) => Promise<string>;
         delete: (noteId: string) => Promise<void>;
         restore: (noteId: string) => Promise<void>;
+        permanentDelete: (noteId: string) => Promise<void>;
         togglePin: (noteId: string) => Promise<void>;
         move: (noteId: string, newFolderId: string | null) => Promise<void>;
         moveToSD: (
@@ -59,6 +60,7 @@ declare global {
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
         onRestored: (callback: (noteId: string) => void) => () => void;
+        onPermanentDeleted: (callback: (noteId: string) => void) => () => void;
         onPinned: (callback: (data: { noteId: string; pinned: boolean }) => void) => () => void;
         onCreated: (
           callback: (data: { sdId: string; noteId: string; folderId: string | null }) => void

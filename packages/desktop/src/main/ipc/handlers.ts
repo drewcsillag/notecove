@@ -44,6 +44,7 @@ export class IPCHandlers {
     ipcMain.handle('note:create', this.handleCreateNote.bind(this));
     ipcMain.handle('note:delete', this.handleDeleteNote.bind(this));
     ipcMain.handle('note:restore', this.handleRestoreNote.bind(this));
+    ipcMain.handle('note:permanentDelete', this.handlePermanentDeleteNote.bind(this));
     ipcMain.handle('note:togglePin', this.handleTogglePinNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
     ipcMain.handle('note:moveToSD', this.handleMoveNoteToSD.bind(this));
@@ -244,6 +245,48 @@ export class IPCHandlers {
 
     // Broadcast restore event to all windows
     this.broadcastToAll('note:restored', noteId);
+  }
+
+  private async handlePermanentDeleteNote(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<void> {
+    // Get the note from cache
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    // Note must be deleted (in Recently Deleted) before permanent delete
+    if (!note.deleted) {
+      throw new Error(`Note ${noteId} must be soft-deleted before permanent delete`);
+    }
+
+    // Unload note from memory if loaded
+    this.crdtManager.unloadNote(noteId);
+
+    // Delete CRDT files from disk
+    const sd = await this.database.getStorageDir(note.sdId);
+    if (!sd) {
+      throw new Error(`Storage directory ${note.sdId} not found`);
+    }
+
+    const noteDir = path.join(sd.path, 'notes', noteId);
+
+    try {
+      // Delete the entire note directory (contains updates/ and meta/ subdirs)
+      await fs.rm(noteDir, { recursive: true, force: true });
+      console.log(`[Note] Permanently deleted note directory: ${noteDir}`);
+    } catch (err) {
+      console.error(`[Note] Failed to delete note directory: ${noteDir}`, err);
+      // Continue anyway - we still want to remove from database
+    }
+
+    // Delete from SQLite cache
+    await this.database.deleteNote(noteId);
+
+    // Broadcast permanent delete event to all windows
+    this.broadcastToAll('note:permanentDeleted', noteId);
   }
 
   private async handleTogglePinNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
