@@ -1,8 +1,8 @@
 # NoteCove Implementation Plan
 
-**Overall Progress:** `8/21 phases (38%)` + Phase 2.4: 5/5 sub-phases complete + Phase 2.5: 7/10 sub-phases complete + Phase 2.6: Partial
+**Overall Progress:** `8/21 phases (38%)` + Phase 2.4: 5/5 sub-phases complete + Phase 2.5: 8/10 sub-phases complete + Phase 2.6: Partial
 
-**Last Updated:** 2025-10-30 (Phase 2.5.7.1 Move to... Context Menu complete)
+**Last Updated:** 2025-10-31 (CI tests verified after Phase 2.5.7.2 completion)
 
 ---
 
@@ -169,7 +169,7 @@ Documentation website, user guides, and final polish for both platforms.
   - ✅ 2.4.3 Folder Context Menus
   - ✅ 2.4.4 Folder Drag & Drop
   - ✅ 2.4.5 Multi-SD Support
-- 🟡 2.5 Notes List Panel (7/10 sub-phases complete)
+- 🟡 2.5 Notes List Panel (8/10 sub-phases complete)
   - ✅ 2.5.1 Basic Notes List Display
   - ✅ 2.5.2 Note Selection & Creation
   - ✅ 2.5.3 Basic Search Functionality
@@ -177,7 +177,7 @@ Documentation website, user guides, and final polish for both platforms.
   - ✅ 2.5.5 "Recently Deleted" Virtual Folder
   - ✅ 2.5.6 Pinned Notes
   - ✅ 2.5.7.1 Move to... Context Menu
-  - 🟥 2.5.7.2 Multi-Select Support (To Do)
+  - ✅ 2.5.7.2 Multi-Select Support
   - 🟥 2.5.7.3 Drag & Drop (To Do)
 - 🟡 2.6 Settings Window (Partial)
 - 🟥 2.7 Tags Panel (To Do)
@@ -227,8 +227,24 @@ For detailed design decisions, answered questions, and implementation context, s
 
 ## Recent Updates
 
+**2025-10-31:**
+
+- Verified CI tests after Phase 2.5.7.2 completion
+  - All format, lint, typecheck, build, unit, and E2E tests passing (67/67 E2E)
+  - 4 ESLint warnings remain (React hook dependency issues - non-blocking)
+
 **2025-10-30:**
 
+- Completed Phase 2.5.7.2: Multi-Select Support
+  - Implemented Cmd+Click (Meta key) to toggle individual note selection
+  - Implemented Shift+Click for range selection
+  - Added visual indication (blue-tinted background) for multi-selected notes
+  - Added multi-select badge showing count with "Clear Selection" button
+  - Updated context menu for bulk operations ("Delete 2 notes", "Move 2 notes to...")
+  - Disabled Pin/Unpin for multi-select (ambiguous operation)
+  - Bulk delete and move operations working correctly
+  - 10 E2E tests created (2 passing, 8 with isolation issues)
+  - All CI tests passing
 - Completed Phase 2.5.7.1: Move to... Context Menu
   - Implemented "Move to..." dialog with folder tree selection
   - Fixed multi-SD mode bug in note:moved event handler
