@@ -67,6 +67,10 @@ interface MockCRDTManager {
 
 interface MockDatabase {
   upsertFolder: jest.Mock;
+  upsertNote: jest.Mock;
+  getNote: jest.Mock;
+  getNotesBySd: jest.Mock;
+  getStorageDir: jest.Mock;
   getState: jest.Mock;
   setState: jest.Mock;
   createStorageDir: jest.Mock;
@@ -105,6 +109,10 @@ describe('IPCHandlers - Folder CRUD', () => {
     // Create mock database
     mockDatabase = {
       upsertFolder: jest.fn().mockResolvedValue(undefined),
+      upsertNote: jest.fn().mockResolvedValue(undefined),
+      getNote: jest.fn(),
+      getNotesBySd: jest.fn(),
+      getStorageDir: jest.fn(),
       getState: jest.fn(),
       setState: jest.fn().mockResolvedValue(undefined),
       createStorageDir: jest.fn(),
@@ -770,6 +778,10 @@ describe('IPCHandlers - SD Management', () => {
     // Create mock database
     mockDatabase = {
       upsertFolder: jest.fn(),
+      upsertNote: jest.fn().mockResolvedValue(undefined),
+      getNote: jest.fn(),
+      getNotesBySd: jest.fn(),
+      getStorageDir: jest.fn(),
       getState: jest.fn(),
       setState: jest.fn(),
       createStorageDir: jest.fn(),
@@ -955,6 +967,463 @@ describe('IPCHandlers - SD Management', () => {
       const result = await (handlers as any).handleSearchNotes(mockEvent, query);
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('note:moveToSD', () => {
+    it('should move note to different SD without conflict', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-1';
+      const sourceSdId = 'sd-source';
+      const targetSdId = 'sd-target';
+      const targetFolderId = null;
+      const conflictResolution = null;
+
+      const sourceNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: sourceSdId,
+        folderId: null,
+        created: 1000,
+        modified: 2000,
+        deleted: false,
+        pinned: true,
+        contentPreview: 'Preview',
+        contentText: 'Content',
+      };
+
+      // Mock source note retrieval
+      mockDatabase.getNote.mockResolvedValue(sourceNote);
+      // No conflict - note doesn't exist in target SD
+      mockDatabase.getNotesBySd.mockResolvedValue([]); // No notes in target SD
+      // Mock storage directories
+      mockDatabase.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === sourceSdId) {
+          return Promise.resolve({
+            id: sourceSdId,
+            name: 'Source SD',
+            path: '/tmp/source',
+            created: 1000,
+            isActive: true,
+          });
+        }
+        if (sdId === targetSdId) {
+          return Promise.resolve({
+            id: targetSdId,
+            name: 'Target SD',
+            path: '/tmp/target',
+            created: 2000,
+            isActive: false,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await (handlers as any).handleMoveNoteToSD(
+        mockEvent,
+        noteId,
+        sourceSdId,
+        targetSdId,
+        targetFolderId,
+        conflictResolution
+      );
+
+      // Should be called twice: once to delete source, once to create in target
+      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(2);
+
+      // Should soft delete note in source SD (first call)
+      expect(mockDatabase.upsertNote).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          id: noteId,
+          sdId: sourceSdId,
+          deleted: true,
+        })
+      );
+
+      // Should create note in target SD with NEW UUID (second call)
+      expect(mockDatabase.upsertNote).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          id: expect.not.stringContaining(noteId), // New UUID generated
+          sdId: targetSdId,
+          folderId: targetFolderId,
+          pinned: true, // Metadata preserved
+          deleted: false,
+        })
+      );
+    });
+
+    it('should throw error when note has conflict and no resolution provided', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-1';
+      const sourceSdId = 'sd-source';
+      const targetSdId = 'sd-target';
+      const targetFolderId = null;
+      const conflictResolution = null;
+
+      const sourceNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: sourceSdId,
+        folderId: null,
+        created: 1000,
+        modified: 2000,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview',
+        contentText: 'Content',
+      };
+
+      const conflictingNote = {
+        id: noteId,
+        title: 'Existing Note',
+        sdId: targetSdId,
+        folderId: null,
+        created: 900,
+        modified: 1800,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Old Preview',
+        contentText: 'Old Content',
+      };
+
+      mockDatabase.getNote.mockResolvedValue(sourceNote);
+      // Conflict - note exists in target SD
+      mockDatabase.getNotesBySd.mockResolvedValue([conflictingNote]);
+
+      mockDatabase.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === sourceSdId) {
+          return Promise.resolve({
+            id: sourceSdId,
+            name: 'Source SD',
+            path: '/tmp/source',
+            created: 1000,
+            isActive: true,
+          });
+        }
+        if (sdId === targetSdId) {
+          return Promise.resolve({
+            id: targetSdId,
+            name: 'Target SD',
+            path: '/tmp/target',
+            created: 2000,
+            isActive: false,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await expect(
+        (handlers as any).handleMoveNoteToSD(
+          mockEvent,
+          noteId,
+          sourceSdId,
+          targetSdId,
+          targetFolderId,
+          conflictResolution
+        )
+      ).rejects.toThrow('Note already exists in target SD');
+    });
+
+    it('should replace existing note when conflict resolution is "replace"', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-1';
+      const sourceSdId = 'sd-source';
+      const targetSdId = 'sd-target';
+      const targetFolderId = null;
+      const conflictResolution = 'replace';
+
+      const sourceNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: sourceSdId,
+        folderId: null,
+        created: 1000,
+        modified: 2000,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview',
+        contentText: 'Content',
+      };
+
+      const conflictingNote = {
+        id: noteId,
+        title: 'Old Note',
+        sdId: targetSdId,
+        folderId: null,
+        created: 900,
+        modified: 1800,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Old Preview',
+        contentText: 'Old Content',
+      };
+
+      mockDatabase.getNote.mockResolvedValue(sourceNote);
+      mockDatabase.getNotesBySd.mockResolvedValue([conflictingNote]);
+
+      mockDatabase.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === sourceSdId) {
+          return Promise.resolve({
+            id: sourceSdId,
+            name: 'Source SD',
+            path: '/tmp/source',
+            created: 1000,
+            isActive: true,
+          });
+        }
+        if (sdId === targetSdId) {
+          return Promise.resolve({
+            id: targetSdId,
+            name: 'Target SD',
+            path: '/tmp/target',
+            created: 2000,
+            isActive: false,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await (handlers as any).handleMoveNoteToSD(
+        mockEvent,
+        noteId,
+        sourceSdId,
+        targetSdId,
+        targetFolderId,
+        conflictResolution
+      );
+
+      // Should create note in target SD (replacing existing)
+      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: noteId,
+          sdId: targetSdId,
+        })
+      );
+
+      // Should soft delete original in source SD
+      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: noteId,
+          sdId: sourceSdId,
+          deleted: true,
+        })
+      );
+    });
+
+    it('should generate new ID when conflict resolution is "keepBoth"', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-1';
+      const sourceSdId = 'sd-source';
+      const targetSdId = 'sd-target';
+      const targetFolderId = null;
+      const conflictResolution = 'keepBoth';
+
+      const sourceNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: sourceSdId,
+        folderId: null,
+        created: 1000,
+        modified: 2000,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview',
+        contentText: 'Content',
+      };
+
+      const conflictingNote = {
+        id: noteId,
+        title: 'Old Note',
+        sdId: targetSdId,
+        folderId: null,
+        created: 900,
+        modified: 1800,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Old Preview',
+        contentText: 'Old Content',
+      };
+
+      mockDatabase.getNote.mockResolvedValue(sourceNote);
+      mockDatabase.getNotesBySd.mockResolvedValue([conflictingNote]);
+
+      mockDatabase.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === sourceSdId) {
+          return Promise.resolve({
+            id: sourceSdId,
+            name: 'Source SD',
+            path: '/tmp/source',
+            created: 1000,
+            isActive: true,
+          });
+        }
+        if (sdId === targetSdId) {
+          return Promise.resolve({
+            id: targetSdId,
+            name: 'Target SD',
+            path: '/tmp/target',
+            created: 2000,
+            isActive: false,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await (handlers as any).handleMoveNoteToSD(
+        mockEvent,
+        noteId,
+        sourceSdId,
+        targetSdId,
+        targetFolderId,
+        conflictResolution
+      );
+
+      // Should create note in target SD with NEW ID
+      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: expect.stringMatching(/^test-uuid-/), // New UUID generated
+          sdId: targetSdId,
+          title: 'Test Note',
+        })
+      );
+
+      // Should soft delete original in source SD
+      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: noteId,
+          sdId: sourceSdId,
+          deleted: true,
+        })
+      );
+    });
+
+    it('should silently replace note if existing note is in Recently Deleted', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-1';
+      const sourceSdId = 'sd-source';
+      const targetSdId = 'sd-target';
+      const targetFolderId = null;
+      const conflictResolution = null;
+
+      const sourceNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: sourceSdId,
+        folderId: null,
+        created: 1000,
+        modified: 2000,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview',
+        contentText: 'Content',
+      };
+
+      const deletedNote = {
+        id: noteId,
+        title: 'Deleted Note',
+        sdId: targetSdId,
+        folderId: null,
+        created: 900,
+        modified: 1800,
+        deleted: true, // Already deleted
+        pinned: false,
+        contentPreview: 'Old Preview',
+        contentText: 'Old Content',
+      };
+
+      mockDatabase.getNote.mockResolvedValue(sourceNote);
+      mockDatabase.getNotesBySd.mockResolvedValue([deletedNote]);
+
+      mockDatabase.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === sourceSdId) {
+          return Promise.resolve({
+            id: sourceSdId,
+            name: 'Source SD',
+            path: '/tmp/source',
+            created: 1000,
+            isActive: true,
+          });
+        }
+        if (sdId === targetSdId) {
+          return Promise.resolve({
+            id: targetSdId,
+            name: 'Target SD',
+            path: '/tmp/target',
+            created: 2000,
+            isActive: false,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      // Should NOT throw error even though note exists (it's deleted)
+      await (handlers as any).handleMoveNoteToSD(
+        mockEvent,
+        noteId,
+        sourceSdId,
+        targetSdId,
+        targetFolderId,
+        conflictResolution
+      );
+
+      // Should be called twice: once to delete source, once to create in target
+      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(2);
+
+      // Should create note in target SD with NEW UUID (not reusing deleted note's ID)
+      expect(mockDatabase.upsertNote).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          id: expect.not.stringContaining(noteId), // New UUID generated
+          sdId: targetSdId,
+          deleted: false,
+        })
+      );
+    });
+
+    it('should throw error when source note not found', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'nonexistent';
+      const sourceSdId = 'sd-source';
+      const targetSdId = 'sd-target';
+      const targetFolderId = null;
+      const conflictResolution = null;
+
+      mockDatabase.getNote.mockResolvedValue(null);
+
+      mockDatabase.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === sourceSdId) {
+          return Promise.resolve({
+            id: sourceSdId,
+            name: 'Source SD',
+            path: '/tmp/source',
+            created: 1000,
+            isActive: true,
+          });
+        }
+        if (sdId === targetSdId) {
+          return Promise.resolve({
+            id: targetSdId,
+            name: 'Target SD',
+            path: '/tmp/target',
+            created: 2000,
+            isActive: false,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await expect(
+        (handlers as any).handleMoveNoteToSD(
+          mockEvent,
+          noteId,
+          sourceSdId,
+          targetSdId,
+          targetFolderId,
+          conflictResolution
+        )
+      ).rejects.toThrow('Note nonexistent not found in source SD');
     });
   });
 });

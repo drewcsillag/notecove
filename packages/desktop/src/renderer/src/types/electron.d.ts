@@ -19,6 +19,13 @@ declare global {
         restore: (noteId: string) => Promise<void>;
         togglePin: (noteId: string) => Promise<void>;
         move: (noteId: string, newFolderId: string | null) => Promise<void>;
+        moveToSD: (
+          noteId: string,
+          sourceSdId: string,
+          targetSdId: string,
+          targetFolderId: string | null,
+          conflictResolution: 'replace' | 'keepBoth' | null
+        ) => Promise<void>;
         getMetadata: (noteId: string) => Promise<NoteMetadata>;
         updateTitle: (noteId: string, title: string, contentText?: string) => Promise<void>;
         list: (

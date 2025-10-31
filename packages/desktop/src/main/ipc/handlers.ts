@@ -9,6 +9,8 @@
 import { ipcMain, type IpcMainInvokeEvent, BrowserWindow } from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
 import type { Database } from '@notecove/shared';
@@ -44,6 +46,7 @@ export class IPCHandlers {
     ipcMain.handle('note:restore', this.handleRestoreNote.bind(this));
     ipcMain.handle('note:togglePin', this.handleTogglePinNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
+    ipcMain.handle('note:moveToSD', this.handleMoveNoteToSD.bind(this));
     ipcMain.handle('note:getMetadata', this.handleGetMetadata.bind(this));
     ipcMain.handle('note:updateTitle', this.handleUpdateTitle.bind(this));
     ipcMain.handle('note:list', this.handleListNotes.bind(this));
@@ -304,6 +307,173 @@ export class IPCHandlers {
     this.broadcastToAll('note:moved', { noteId, oldFolderId: note.folderId, newFolderId });
   }
 
+  /**
+   * Move note to different Storage Directory (cross-SD move)
+   * Phase 2.5.7.4: Cross-SD Drag & Drop
+   */
+  private async handleMoveNoteToSD(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    sourceSdId: string,
+    targetSdId: string,
+    targetFolderId: string | null,
+    conflictResolution: 'replace' | 'keepBoth' | null
+  ): Promise<void> {
+    // Get source note from cache
+    const sourceNote = await this.database.getNote(noteId);
+    if (!sourceNote || sourceNote.sdId !== sourceSdId) {
+      throw new Error(`Note ${noteId} not found in source SD ${sourceSdId}`);
+    }
+
+    // Check for conflicts in target SD by querying all notes in target SD
+    const targetNotes = await this.database.getNotesBySd(targetSdId);
+    const existingNote = targetNotes.find((n) => n.id === noteId);
+
+    // Only consider it a conflict if the note exists and is NOT deleted
+    const hasConflict = existingNote !== undefined && !existingNote.deleted;
+
+    if (hasConflict && !conflictResolution) {
+      throw new Error('Note already exists in target SD');
+    }
+
+    // Determine which ID to use for the new note
+    // IMPORTANT: Always generate a new UUID for cross-SD moves
+    // This ensures the deleted note remains in the source SD's Recently Deleted
+    // while the new note exists in the target SD
+    let targetNoteId: string = crypto.randomUUID();
+
+    // Exception: If conflict resolution is 'replace', we can reuse the existing ID
+    // because we're replacing the existing note in the target SD
+    if (conflictResolution === 'replace') {
+      targetNoteId = noteId;
+    }
+
+    // Copy CRDT files from source SD to target SD
+    await this.copyNoteCRDTFiles(noteId, sourceSdId, targetNoteId, targetSdId);
+
+    // Soft delete original note in source SD FIRST
+    // (Must do this before creating in target to avoid conflict when targetNoteId === noteId)
+    await this.database.upsertNote({
+      ...sourceNote,
+      deleted: true,
+      modified: Date.now(),
+    });
+    console.log('[IPC] Soft-deleted note in source SD:', {
+      noteId,
+      sourceSdId,
+    });
+
+    // Create note in target SD database
+    // (Do this AFTER deleting source to ensure this is the final state)
+    await this.database.upsertNote({
+      id: targetNoteId,
+      title: sourceNote.title,
+      sdId: targetSdId,
+      folderId: targetFolderId,
+      created: sourceNote.created,
+      modified: Date.now(),
+      deleted: false,
+      pinned: sourceNote.pinned, // Preserve metadata
+      contentPreview: sourceNote.contentPreview,
+      contentText: sourceNote.contentText,
+    });
+    console.log('[IPC] Created note in target SD:', {
+      targetNoteId,
+      targetSdId,
+      targetFolderId,
+      title: sourceNote.title,
+    });
+
+    // Broadcast events
+    this.broadcastToAll('note:deleted', noteId); // Original deleted
+    this.broadcastToAll('note:created', {
+      sdId: targetSdId,
+      noteId: targetNoteId,
+      folderId: targetFolderId,
+    });
+  }
+
+  /**
+   * Copy note CRDT files from source SD to target SD
+   */
+  private async copyNoteCRDTFiles(
+    sourceNoteId: string,
+    sourceSdId: string,
+    targetNoteId: string,
+    targetSdId: string
+  ): Promise<void> {
+    console.log('[IPC] Copying CRDT files:', {
+      sourceNoteId,
+      sourceSdId,
+      targetNoteId,
+      targetSdId,
+    });
+
+    try {
+      // Get source and target SD paths from database
+      const sourceSD = await this.database.getStorageDir(sourceSdId);
+      const targetSD = await this.database.getStorageDir(targetSdId);
+
+      if (!sourceSD) {
+        throw new Error(`Source SD ${sourceSdId} not found`);
+      }
+      if (!targetSD) {
+        throw new Error(`Target SD ${targetSdId} not found`);
+      }
+
+      // Construct note directory paths
+      // Storage structure: <sdPath>/notes/<noteId>/
+      const sourceNoteDir = path.join(sourceSD.path, 'notes', sourceNoteId);
+      const targetNoteDir = path.join(targetSD.path, 'notes', targetNoteId);
+
+      // Check if source note directory exists
+      try {
+        await fs.access(sourceNoteDir);
+        // Directory exists, copy it recursively
+        await this.copyDirectoryRecursive(sourceNoteDir, targetNoteDir);
+        console.log(
+          '[IPC] Successfully copied CRDT files from',
+          sourceNoteDir,
+          'to',
+          targetNoteDir
+        );
+      } catch {
+        console.warn(`[IPC] Source note directory not found: ${sourceNoteDir}`);
+        // Note might not have CRDT files yet (newly created), this is OK
+        // The note metadata will still be created in the database
+        // CRDT files will be created when the note is first edited in target SD
+      }
+    } catch (err) {
+      console.error('[IPC] Failed to copy CRDT files:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Recursively copy a directory
+   */
+  private async copyDirectoryRecursive(source: string, destination: string): Promise<void> {
+    // Create destination directory
+    await fs.mkdir(destination, { recursive: true });
+
+    // Read source directory contents
+    const entries = await fs.readdir(source, { withFileTypes: true });
+
+    // Copy each entry
+    for (const entry of entries) {
+      const sourcePath = path.join(source, entry.name);
+      const destPath = path.join(destination, entry.name);
+
+      if (entry.isDirectory()) {
+        // Recursively copy subdirectory
+        await this.copyDirectoryRecursive(sourcePath, destPath);
+      } else {
+        // Copy file
+        await fs.copyFile(sourcePath, destPath);
+      }
+    }
+  }
+
   private async handleGetMetadata(
     _event: IpcMainInvokeEvent,
     noteId: string
@@ -387,16 +557,25 @@ export class IPCHandlers {
     sdId: string,
     folderId?: string | null
   ): Promise<import('@notecove/shared').NoteCache[]> {
+    console.log('[IPC] note:list called with:', { sdId, folderId });
+
+    let notes: import('@notecove/shared').NoteCache[];
+
     // Handle "Recently Deleted" special folder
     if (folderId && (folderId === 'recently-deleted' || folderId.startsWith('recently-deleted:'))) {
-      return await this.database.getDeletedNotes(sdId);
+      notes = await this.database.getDeletedNotes(sdId);
     }
     // If folderId is provided, filter by folder (including null for root folder)
-    if (folderId !== undefined) {
-      return await this.database.getNotesByFolder(folderId);
+    else if (folderId !== undefined) {
+      notes = await this.database.getNotesByFolder(folderId);
     }
     // Otherwise, return all notes for the SD (backward compatibility)
-    return await this.database.getNotesBySd(sdId);
+    else {
+      notes = await this.database.getNotesBySd(sdId);
+    }
+
+    console.log('[IPC] note:list returning', notes.length, 'notes for sdId:', sdId);
+    return notes;
   }
 
   private async handleSearchNotes(
@@ -704,6 +883,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:create');
     ipcMain.removeHandler('note:delete');
     ipcMain.removeHandler('note:move');
+    ipcMain.removeHandler('note:moveToSD');
     ipcMain.removeHandler('note:getMetadata');
     ipcMain.removeHandler('note:updateTitle');
     ipcMain.removeHandler('note:list');

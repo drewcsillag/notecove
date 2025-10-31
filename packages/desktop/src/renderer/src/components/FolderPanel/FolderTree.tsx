@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { Tree, type NodeModel, type DropOptions } from '@minoru/react-dnd-treeview';
 import { DroppableFolderNode } from './DroppableFolderNode';
+import { CrossSDConfirmDialog } from '../NotesListPanel/CrossSDConfirmDialog';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -31,6 +32,9 @@ import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import StorageIcon from '@mui/icons-material/Storage';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { IconButton, Tooltip, Chip } from '@mui/material';
+
+// Phase 2.5.1: Single SD only
+const DEFAULT_SD_ID = 'default';
 
 interface FolderData {
   id: string;
@@ -262,6 +266,21 @@ export const FolderTree: FC<FolderTreeProps> = ({
     open: false,
     folderId: '',
     folderName: '',
+  });
+
+  // Cross-SD confirmation dialog state
+  const [crossSDDialog, setCrossSDDialog] = useState<{
+    open: boolean;
+    noteIds: string[];
+    sourceSdId: string;
+    targetSdId: string;
+    targetFolderId: string | null;
+  }>({
+    open: false,
+    noteIds: [],
+    sourceSdId: '',
+    targetSdId: '',
+    targetFolderId: null,
   });
 
   useEffect(() => {
@@ -696,16 +715,29 @@ export const FolderTree: FC<FolderTreeProps> = ({
   };
 
   // Handle note drop on folder
-  const handleNoteDrop = async (noteIds: string[], targetFolderId: string): Promise<void> => {
-    console.log('[FolderTree] Note drop:', { noteIds, targetFolderId });
+  const handleNoteDrop = async (
+    noteIds: string[],
+    targetFolderId: string,
+    sourceSdId?: string
+  ): Promise<void> => {
+    // Use default SD ID if sourceSdId is undefined (single-SD scenarios)
+    const effectiveSourceSdId = sourceSdId ?? DEFAULT_SD_ID;
+    console.log('[FolderTree] Note drop:', {
+      noteIds,
+      targetFolderId,
+      sourceSdId: effectiveSourceSdId,
+    });
 
     try {
-      // Determine the actual folder ID
+      // Determine the target SD ID and actual folder ID
+      let targetSdId: string;
       let actualFolderId: string | null = null;
 
-      // Handle special nodes
+      // Handle special nodes and extract target SD ID
       if (targetFolderId.startsWith('all-notes')) {
-        // "All Notes" means root level (folderId = null)
+        // "All Notes" - extract SD ID from suffix (e.g., "all-notes:default")
+        const parts = targetFolderId.split(':');
+        targetSdId = parts.length > 1 && parts[1] ? parts[1] : effectiveSourceSdId;
         actualFolderId = null;
       } else if (targetFolderId.startsWith('recently-deleted')) {
         // Dropping on "Recently Deleted" should delete the notes
@@ -713,14 +745,48 @@ export const FolderTree: FC<FolderTreeProps> = ({
         console.log('[FolderTree] Deleted notes:', noteIds);
         return;
       } else if (targetFolderId.startsWith('sd:')) {
-        // Dropping on an SD node means root level for that SD
+        // Dropping on an SD node - extract SD ID (e.g., "sd:default")
+        const parts = targetFolderId.split(':');
+        targetSdId = parts.length > 1 && parts[1] ? parts[1] : effectiveSourceSdId;
         actualFolderId = null;
       } else {
-        // Regular folder
+        // Regular folder - look up which SD it belongs to
+        let folderSdId = effectiveSourceSdId; // Default to source SD
+
+        // Search through all folders to find this folder's SD
+        for (const [sdId, sdFolders] of foldersBySd.entries()) {
+          if (sdFolders.some((f) => f.id === targetFolderId)) {
+            folderSdId = sdId;
+            break;
+          }
+        }
+
+        targetSdId = folderSdId;
         actualFolderId = targetFolderId;
       }
 
-      // Move all notes to the target folder
+      // Check if this is a cross-SD operation
+      // Only treat as cross-SD if both IDs are defined and different
+      const isCrossSD = effectiveSourceSdId !== targetSdId;
+
+      if (isCrossSD) {
+        console.log('[FolderTree] Cross-SD operation detected:', {
+          sourceSdId: effectiveSourceSdId,
+          targetSdId,
+        });
+
+        // Show confirmation dialog for cross-SD move
+        setCrossSDDialog({
+          open: true,
+          noteIds,
+          sourceSdId: effectiveSourceSdId,
+          targetSdId,
+          targetFolderId: actualFolderId,
+        });
+        return;
+      }
+
+      // Same-SD move - proceed normally
       await Promise.all(
         noteIds.map((noteId) => window.electronAPI.note.move(noteId, actualFolderId))
       );
@@ -729,6 +795,38 @@ export const FolderTree: FC<FolderTreeProps> = ({
     } catch (err) {
       console.error('[FolderTree] Failed to move notes:', err);
     }
+  };
+
+  // Handle cross-SD confirmation
+  const handleCrossSDConfirm = async (): Promise<void> => {
+    const { noteIds, sourceSdId, targetSdId, targetFolderId } = crossSDDialog;
+
+    // Close dialog
+    setCrossSDDialog({ ...crossSDDialog, open: false });
+
+    try {
+      // Move each note to target SD
+      // TODO: Handle conflicts - for now, we pass null (no conflict resolution)
+      // Full conflict handling will be implemented when backend supports it
+      await Promise.all(
+        noteIds.map((noteId) =>
+          window.electronAPI.note.moveToSD(noteId, sourceSdId, targetSdId, targetFolderId, null)
+        )
+      );
+
+      console.log('[FolderTree] Cross-SD move completed:', {
+        noteIds,
+        sourceSdId,
+        targetSdId,
+        targetFolderId,
+      });
+    } catch (err) {
+      console.error('[FolderTree] Failed to move notes across SDs:', err);
+    }
+  };
+
+  const handleCrossSDCancel = (): void => {
+    setCrossSDDialog({ ...crossSDDialog, open: false });
   };
 
   // Determine if all folders are expanded (but not if user explicitly collapsed all)
@@ -861,8 +959,8 @@ export const FolderTree: FC<FolderTreeProps> = ({
             return (
               <DroppableFolderNode
                 folderId={String(node.id)}
-                onDrop={(noteIds, targetFolderId) => {
-                  void handleNoteDrop(noteIds, targetFolderId);
+                onDrop={(noteIds, targetFolderId, sourceSdId) => {
+                  void handleNoteDrop(noteIds, targetFolderId, sourceSdId);
                 }}
                 isSpecial={isSpecialNode || isSDNode}
               >
@@ -1024,6 +1122,29 @@ export const FolderTree: FC<FolderTreeProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Cross-SD Move Confirmation Dialog */}
+      {crossSDDialog.open && (
+        <CrossSDConfirmDialog
+          open={crossSDDialog.open}
+          noteCount={crossSDDialog.noteIds.length}
+          sourceSdName={
+            sds.find((sd) => sd.id === crossSDDialog.sourceSdId)?.name ?? crossSDDialog.sourceSdId
+          }
+          targetSdName={
+            sds.find((sd) => sd.id === crossSDDialog.targetSdId)?.name ?? crossSDDialog.targetSdId
+          }
+          targetFolderName={
+            crossSDDialog.targetFolderId
+              ? (folders.find((f) => f.id === crossSDDialog.targetFolderId)?.name ?? null)
+              : null
+          }
+          onConfirm={() => {
+            void handleCrossSDConfirm();
+          }}
+          onCancel={handleCrossSDCancel}
+        />
+      )}
     </Box>
   );
 };

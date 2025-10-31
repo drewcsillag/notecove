@@ -16,7 +16,7 @@ export const ItemTypes = {
 interface DroppableFolderNodeProps {
   folderId: string;
   children: ReactNode;
-  onDrop: (noteIds: string[], targetFolderId: string) => void;
+  onDrop: (noteIds: string[], targetFolderId: string, sourceSdId?: string) => void;
   isSpecial?: boolean; // For "All Notes" and "Recently Deleted" (currently unused but kept for future use)
 }
 
@@ -30,9 +30,9 @@ export const DroppableFolderNode: React.FC<DroppableFolderNodeProps> = ({
   const [{ isOver, canDropNote }, drop] = useDrop(
     () => ({
       accept: ItemTypes.NOTE,
-      drop: (item: { noteIds: string[]; count: number }) => {
-        // Handle the drop
-        onDrop(item.noteIds, folderId);
+      drop: (item: { noteIds: string[]; count: number; sdId?: string }) => {
+        // Handle the drop - now includes sdId for cross-SD detection
+        onDrop(item.noteIds, folderId, item.sdId);
       },
       collect: (monitor) => ({
         isOver: monitor.isOver(),

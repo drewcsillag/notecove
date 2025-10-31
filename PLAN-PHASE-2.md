@@ -1403,7 +1403,94 @@ This phase is split into 3 sub-phases:
 
 **Deferred:**
 
-- Cross-SD drag & drop (requires CRDT copying, deferred to future)
+- Cross-SD drag & drop → Moved to 2.5.7.4
+
+---
+
+#### 2.5.7.4 Cross-SD Drag & Drop 🟡
+
+**Status:** In Progress (2025-10-31)
+
+**Context:** Allow dragging notes between different Storage Directories. Requires CRDT copying and conflict resolution.
+
+**Approved Design Specifications:**
+
+1. **MOVE by default** (delete from source SD, create in target SD)
+2. **Keep same note ID** across SDs (UUID collision probability negligible)
+3. **Preserve all metadata** (created, modified, pinned status)
+4. **Copy Y.Doc binary as-is** to preserve full CRDT content
+5. **Support multi-select** for consistency with single-SD drag & drop
+6. **Drop to root level** if target folder doesn't exist in target SD
+7. **Only allow dropping on folders/all-notes**, not SD nodes directly
+8. **Show confirmation dialog** for cross-SD operations
+9. **Soft delete original** (move to Recently Deleted in source SD) for recoverability
+
+**Conflict Resolution Logic:**
+
+- **If note exists in target SD's Recently Deleted**: Silently hard delete and replace (user already deleted it)
+- **If note exists as active note in target SD**: Show dialog with options:
+  - **Replace**: Hard delete existing note, create new one
+  - **Keep Both**: Generate new UUID for dragged note, create as new note
+  - **Cancel**: Abort operation
+- **Dialog message**: "A note with this ID already exists in the target Storage Directory. This can happen if you previously moved and recovered this note. Choose an option below."
+
+**Tasks:**
+
+- [ ] 🟥 **Add Phase 2.5.7.4 section to PLAN-PHASE-2.md**
+- [ ] 🟥 **Detect cross-SD drops in handleNoteDrop**
+  - Check if source note's sdId differs from target folder's sdId
+  - Show confirmation dialog for cross-SD operations
+- [ ] 🟥 **Create conflict resolution dialog component**
+  - CrossSDConflictDialog with Replace/Keep Both/Cancel options
+  - Clear messaging about why conflict exists
+- [ ] 🟥 **Implement note:moveToSD IPC handler**
+  - Check for conflicts in target SD (query SQLite for note with same ID)
+  - Handle "Replace" option: hard delete existing note
+  - Handle "Keep Both" option: generate new UUID for dragged note
+  - Copy CRDT Y.Doc binary from source to target SD
+  - Copy all metadata (created, modified, pinned)
+  - Soft delete original in source SD
+  - Update SQLite cache in both SDs
+  - Broadcast events: note:deleted (source), note:created (target)
+- [ ] 🟥 **Implement copyNoteToSD function**
+  - Read Y.Doc binary from source SD filesystem
+  - Write Y.Doc binary to target SD filesystem
+  - Preserve all CRDT state
+  - Handle file I/O errors gracefully
+- [ ] 🟥 **Update DroppableFolderNode for cross-SD confirmation**
+  - Show confirmation dialog before cross-SD drop
+  - "Move X note(s) from [Source SD] to [Target SD]?"
+  - Proceed only on user confirmation
+- [ ] 🟥 **Handle multi-select cross-SD moves**
+  - Apply same conflict resolution logic to each note
+  - Show aggregate conflict dialog if multiple conflicts
+  - Allow user to choose strategy: "Replace All", "Keep All Separate", "Decide Per Note"
+- [ ] 🟥 **Write E2E tests for cross-SD drag & drop**
+  - Test single note drag between SDs
+  - Test multi-select drag between SDs
+  - Test conflict resolution (replace, keep both, cancel)
+  - Test soft delete in source SD
+  - Test metadata preservation
+- [ ] 🟥 **Run CI tests to verify implementation**
+- [ ] 🟥 **Perform code review of Phase 2.5.7.4**
+
+**Implementation Notes:**
+
+- Cross-SD operations are fundamentally different from same-SD moves
+- Same-SD move: Simple folderId update in CRDT
+- Cross-SD move: Full CRDT copy + original deletion
+- Conflict detection necessary because user may have previously moved and recovered the note
+- Soft delete provides safety net for user error
+
+**Acceptance Criteria:**
+
+- Can drag notes from one SD to another
+- Confirmation dialog shows for cross-SD operations
+- Conflict resolution works correctly (replace, keep both, cancel)
+- Note content and metadata preserved in target SD
+- Original note soft deleted in source SD
+- Multi-select cross-SD drag works
+- All tests pass
 
 ---
 
@@ -1529,7 +1616,7 @@ CLI tools in `/tools/` still available for advanced SD management:
   - Persist tag filter state across restarts (app_state table)
 - [ ] 🟥 Extract tags from note content
   - Parse `#tagname` from notes (case-insensitive)
-  - No spaces in tag names (stop at whitespace or punctuation)
+  - No spaces in tag names (stop at whitespace or punctuation or end of line)
   - Update tag index in SQLite (tags, note_tags tables)
 
 **Acceptance Criteria:**

@@ -32,6 +32,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:togglePin', noteId) as Promise<void>,
     move: (noteId: string, newFolderId: string): Promise<void> =>
       ipcRenderer.invoke('note:move', noteId, newFolderId) as Promise<void>,
+    moveToSD: (
+      noteId: string,
+      sourceSdId: string,
+      targetSdId: string,
+      targetFolderId: string | null,
+      conflictResolution: 'replace' | 'keepBoth' | null
+    ): Promise<void> =>
+      ipcRenderer.invoke(
+        'note:moveToSD',
+        noteId,
+        sourceSdId,
+        targetSdId,
+        targetFolderId,
+        conflictResolution
+      ) as Promise<void>,
     getMetadata: (noteId: string): Promise<NoteMetadata> =>
       ipcRenderer.invoke('note:getMetadata', noteId) as Promise<NoteMetadata>,
     updateTitle: (noteId: string, title: string, contentText?: string): Promise<void> =>

@@ -61,19 +61,21 @@ export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
           return {
             noteIds: Array.from(selectedNoteIds),
             count: selectedNoteIds.size,
+            sdId: note.sdId, // Include SD ID for cross-SD detection
           };
         }
         // Otherwise, drag just this note
         return {
           noteIds: [note.id],
           count: 1,
+          sdId: note.sdId, // Include SD ID for cross-SD detection
         };
       },
       collect: (monitor) => ({
         isDragging: monitor.isDragging(),
       }),
     }),
-    [note.id, selectedNoteIds]
+    [note.id, selectedNoteIds, note.sdId]
   );
 
   return (
