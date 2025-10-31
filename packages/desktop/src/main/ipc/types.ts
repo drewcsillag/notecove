@@ -59,6 +59,7 @@ export interface NoteMetadata {
   folderId: string;
   createdAt: number;
   modifiedAt: number;
+  deleted: boolean;
 }
 
 /**

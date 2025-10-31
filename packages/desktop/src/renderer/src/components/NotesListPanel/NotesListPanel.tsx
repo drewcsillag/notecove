@@ -388,7 +388,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     const unsubscribeCreated = window.electronAPI.note.onCreated((data) => {
       console.log('[NotesListPanel] Note created:', data);
       // Refresh notes if it's in the current folder
-      if (selectedFolderId === 'all-notes' || selectedFolderId === data.folderId) {
+      if (
+        selectedFolderId === 'all-notes' ||
+        (data.folderId != null && selectedFolderId === data.folderId)
+      ) {
         void fetchNotes(selectedFolderId);
       }
       // Don't auto-select here - let the creating window handle selection
@@ -976,7 +979,18 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             </>
           ) : (
             <>
-              <MenuItem onClick={handleNewNoteFromMenu}>New Note</MenuItem>
+              <MenuItem
+                onClick={handleNewNoteFromMenu}
+                disabled={
+                  !!(
+                    selectedFolderId &&
+                    (selectedFolderId === 'recently-deleted' ||
+                      selectedFolderId.startsWith('recently-deleted:'))
+                  )
+                }
+              >
+                New Note
+              </MenuItem>
               {selectedNoteIds.size === 0 && (
                 <MenuItem onClick={handleTogglePinFromMenu}>
                   {notes.find((n) => n.id === contextMenu.noteId)?.pinned ? 'Unpin' : 'Pin'}

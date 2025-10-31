@@ -16,10 +16,15 @@ import { EditorToolbar } from './EditorToolbar';
 
 export interface TipTapEditorProps {
   noteId: string | null;
+  readOnly?: boolean;
   onTitleChange?: (noteId: string, title: string, contentText: string) => void;
 }
 
-export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChange }) => {
+export const TipTapEditor: React.FC<TipTapEditorProps> = ({
+  noteId,
+  readOnly = false,
+  onTitleChange,
+}) => {
   const [yDoc] = useState(() => new Y.Doc());
   const isLoadingNoteRef = useRef(false);
   const noteIdRef = useRef<string | null>(noteId);
@@ -42,6 +47,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({ noteId, onTitleChang
       }),
     ],
     content: '<p>Start typing...</p>',
+    editable: !readOnly,
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',

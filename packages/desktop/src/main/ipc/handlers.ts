@@ -305,18 +305,20 @@ export class IPCHandlers {
 
     // Load source note to get its CRDT state (if not already loaded)
     let sourceDoc = this.crdtManager.getDocument(sourceNoteId);
-    const wasSourceLoaded = sourceDoc !== null;
+    const wasSourceLoaded = sourceDoc != null;
 
     if (!wasSourceLoaded) {
       await this.crdtManager.loadNote(sourceNoteId, sourceNote.sdId);
       sourceDoc = this.crdtManager.getDocument(sourceNoteId);
-      if (!sourceDoc) {
-        throw new Error(`Failed to load CRDT document for source note ${sourceNoteId}`);
-      }
     }
 
-    // Get the full state as an update (sourceDoc is guaranteed to be non-null here)
-    const sourceState = Y.encodeStateAsUpdate(sourceDoc!);
+    // Ensure sourceDoc is loaded
+    if (!sourceDoc) {
+      throw new Error(`Failed to load CRDT document for source note ${sourceNoteId}`);
+    }
+
+    // Get the full state as an update
+    const sourceState = Y.encodeStateAsUpdate(sourceDoc);
 
     // Create new note with the same SD and folder
     await this.crdtManager.loadNote(newNoteId, sourceNote.sdId);
@@ -329,6 +331,27 @@ export class IPCHandlers {
 
     // Apply the source note's state to the new note
     Y.applyUpdate(newDoc, sourceState);
+
+    // Update the actual document content to include "Copy of" prefix
+    // This ensures title extraction will preserve the prefix
+    const contentFragment = newDoc.getXmlFragment('content');
+    if (contentFragment.length > 0) {
+      // Get the first element (paragraph or heading)
+      const firstElement = contentFragment.get(0);
+      if (firstElement instanceof Y.XmlElement) {
+        // Get the first text node within the element
+        const firstText = firstElement.get(0);
+        if (firstText instanceof Y.XmlText) {
+          // Get the current text content
+          const currentText = firstText.toString() as string;
+          // Only prepend if it doesn't already start with "Copy of"
+          if (typeof currentText === 'string' && !currentText.startsWith('Copy of ')) {
+            // Prepend "Copy of " to the text content
+            firstText.insert(0, 'Copy of ');
+          }
+        }
+      }
+    }
 
     // Update the metadata for the duplicate
     const now = Date.now();
@@ -344,10 +367,18 @@ export class IPCHandlers {
       });
     }
 
-    // Generate title for duplicate
+    // Generate title for duplicate (will match the content now)
     const duplicateTitle = sourceNote.title.startsWith('Copy of ')
       ? sourceNote.title
       : `Copy of ${sourceNote.title}`;
+
+    // Update content preview and text to include "Copy of" prefix
+    const duplicateContentText = sourceNote.contentText.startsWith('Copy of ')
+      ? sourceNote.contentText
+      : `Copy of ${sourceNote.contentText}`;
+    const duplicateContentPreview = sourceNote.contentPreview.startsWith('Copy of ')
+      ? sourceNote.contentPreview
+      : `Copy of ${sourceNote.contentPreview}`;
 
     // Create note cache entry in SQLite
     await this.database.upsertNote({
@@ -359,8 +390,8 @@ export class IPCHandlers {
       modified: now,
       deleted: false,
       pinned: false,
-      contentPreview: sourceNote.contentPreview,
-      contentText: sourceNote.contentText,
+      contentPreview: duplicateContentPreview,
+      contentText: duplicateContentText,
     });
 
     // Unload source note if it wasn't loaded before
@@ -638,6 +669,7 @@ export class IPCHandlers {
       folderId: crdtMetadata?.folderId ?? note.folderId ?? '',
       createdAt: crdtMetadata?.created ?? note.created,
       modifiedAt: crdtMetadata?.modified ?? note.modified,
+      deleted: note.deleted,
     };
   }
 
