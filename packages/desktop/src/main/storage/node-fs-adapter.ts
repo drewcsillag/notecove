@@ -42,7 +42,8 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
     }
 
     // Atomic write: write to temp file, then rename
-    const tempPath = `${path}.tmp`;
+    // Use unique temp file name to avoid race conditions with concurrent writes
+    const tempPath = `${path}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 9)}`;
     await fs.writeFile(tempPath, data);
     await fs.rename(tempPath, path);
   }
