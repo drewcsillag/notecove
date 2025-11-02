@@ -104,93 +104,118 @@ contextBridge.exposeInMainWorld('electronAPI', {
           rank: number;
         }[]
       >,
+    getCountForFolder: (sdId: string, folderId: string | null): Promise<number> =>
+      ipcRenderer.invoke('note:getCountForFolder', sdId, folderId) as Promise<number>,
+    getAllNotesCount: (sdId: string): Promise<number> =>
+      ipcRenderer.invoke('note:getAllNotesCount', sdId) as Promise<number>,
+    getDeletedNoteCount: (sdId: string): Promise<number> =>
+      ipcRenderer.invoke('note:getDeletedNoteCount', sdId) as Promise<number>,
 
     // Event listeners
     onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
-      ipcRenderer.on('note:updated', (_event, noteId: string, update: Uint8Array) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        noteId: string,
+        update: Uint8Array
+      ): void => {
         callback(noteId, update);
-      });
+      };
+      ipcRenderer.on('note:updated', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:updated');
+        ipcRenderer.removeListener('note:updated', listener);
       };
     },
     onDeleted: (callback: (noteId: string) => void): (() => void) => {
-      ipcRenderer.on('note:deleted', (_event, noteId: string) => {
+      const listener = (_event: Electron.IpcRendererEvent, noteId: string): void => {
         callback(noteId);
-      });
+      };
+      ipcRenderer.on('note:deleted', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:deleted');
+        ipcRenderer.removeListener('note:deleted', listener);
       };
     },
     onRestored: (callback: (noteId: string) => void): (() => void) => {
-      ipcRenderer.on('note:restored', (_event, noteId: string) => {
+      const listener = (_event: Electron.IpcRendererEvent, noteId: string): void => {
         callback(noteId);
-      });
+      };
+      ipcRenderer.on('note:restored', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:restored');
+        ipcRenderer.removeListener('note:restored', listener);
       };
     },
     onPermanentDeleted: (callback: (noteId: string) => void): (() => void) => {
-      ipcRenderer.on('note:permanentDeleted', (_event, noteId: string) => {
+      const listener = (_event: Electron.IpcRendererEvent, noteId: string): void => {
         callback(noteId);
-      });
+      };
+      ipcRenderer.on('note:permanentDeleted', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:permanentDeleted');
+        ipcRenderer.removeListener('note:permanentDeleted', listener);
       };
     },
     onPinned: (callback: (data: { noteId: string; pinned: boolean }) => void): (() => void) => {
-      ipcRenderer.on('note:pinned', (_event, data: { noteId: string; pinned: boolean }) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { noteId: string; pinned: boolean }
+      ): void => {
         callback(data);
-      });
+      };
+      ipcRenderer.on('note:pinned', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:pinned');
+        ipcRenderer.removeListener('note:pinned', listener);
       };
     },
     onCreated: (
       callback: (data: { sdId: string; noteId: string; folderId: string | null }) => void
     ): (() => void) => {
-      ipcRenderer.on(
-        'note:created',
-        (_event, data: { sdId: string; noteId: string; folderId: string | null }) => {
-          callback(data);
-        }
-      );
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { sdId: string; noteId: string; folderId: string | null }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('note:created', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:created');
+        ipcRenderer.removeListener('note:created', listener);
       };
     },
     onExternalUpdate: (
       callback: (data: { operation: string; noteIds: string[] }) => void
     ): (() => void) => {
-      ipcRenderer.on(
-        'note:external-update',
-        (_event, data: { operation: string; noteIds: string[] }) => {
-          callback(data);
-        }
-      );
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { operation: string; noteIds: string[] }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('note:external-update', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:external-update');
+        ipcRenderer.removeListener('note:external-update', listener);
       };
     },
     onTitleUpdated: (callback: (data: { noteId: string; title: string }) => void): (() => void) => {
-      ipcRenderer.on('note:title-updated', (_event, data: { noteId: string; title: string }) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { noteId: string; title: string }
+      ): void => {
         callback(data);
-      });
+      };
+      ipcRenderer.on('note:title-updated', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:title-updated');
+        ipcRenderer.removeListener('note:title-updated', listener);
       };
     },
     onMoved: (
       callback: (data: { noteId: string; oldFolderId: string | null; newFolderId: string }) => void
     ): (() => void) => {
-      ipcRenderer.on(
-        'note:moved',
-        (_event, data: { noteId: string; oldFolderId: string | null; newFolderId: string }) => {
-          callback(data);
-        }
-      );
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { noteId: string; oldFolderId: string | null; newFolderId: string }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('note:moved', listener);
       return () => {
-        ipcRenderer.removeAllListeners('note:moved');
+        ipcRenderer.removeListener('note:moved', listener);
       };
     },
   },
@@ -251,14 +276,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onUpdated: (
       callback: (data: { sdId: string; operation: string; folderId: string }) => void
     ): (() => void) => {
-      ipcRenderer.on(
-        'folder:updated',
-        (_event, data: { sdId: string; operation: string; folderId: string }) => {
-          callback(data);
-        }
-      );
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { sdId: string; operation: string; folderId: string }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('folder:updated', listener);
       return () => {
-        ipcRenderer.removeAllListeners('folder:updated');
+        ipcRenderer.removeListener('folder:updated', listener);
       };
     },
   },
@@ -292,11 +318,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Event listeners
     onUpdated: (callback: (data: { operation: string; sdId: string }) => void): (() => void) => {
-      ipcRenderer.on('sd:updated', (_event, data: { operation: string; sdId: string }) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { operation: string; sdId: string }
+      ): void => {
         callback(data);
-      });
+      };
+      ipcRenderer.on('sd:updated', listener);
       return () => {
-        ipcRenderer.removeAllListeners('sd:updated');
+        ipcRenderer.removeListener('sd:updated', listener);
       };
     },
   },
@@ -304,11 +334,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Sync operations
   sync: {
     onProgress: (callback: (sdId: string, progress: SyncProgress) => void): (() => void) => {
-      ipcRenderer.on('sync:progress', (_event, sdId: string, progress: SyncProgress) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        sdId: string,
+        progress: SyncProgress
+      ): void => {
         callback(sdId, progress);
-      });
+      };
+      ipcRenderer.on('sync:progress', listener);
       return () => {
-        ipcRenderer.removeAllListeners('sync:progress');
+        ipcRenderer.removeListener('sync:progress', listener);
       };
     },
   },
@@ -324,5 +359,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Testing operations (only available if main process registered handler)
   testing: {
     createWindow: (): Promise<void> => ipcRenderer.invoke('testing:createWindow') as Promise<void>,
+    // Test-only: Set note timestamp (only available in NODE_ENV=test)
+    setNoteTimestamp: (noteId: string, timestamp: number): Promise<void> =>
+      ipcRenderer.invoke('test:setNoteTimestamp', noteId, timestamp) as Promise<void>,
   },
 });

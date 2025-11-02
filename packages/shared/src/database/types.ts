@@ -102,6 +102,35 @@ export interface NoteCacheOperations {
   deleteNote(noteId: UUID): Promise<void>;
 
   /**
+   * Auto-cleanup: Find notes from Recently Deleted that are older than the threshold
+   * @param thresholdDays Number of days after which deleted notes should be permanently deleted (default: 30)
+   * @returns Array of note IDs that should be permanently deleted
+   */
+  autoCleanupDeletedNotes(thresholdDays?: number): Promise<UUID[]>;
+
+  /**
+   * Get count of non-deleted notes in a specific folder
+   * @param sdId Storage directory ID
+   * @param folderId Folder ID, or null for root "All Notes"
+   * @returns Count of notes
+   */
+  getNoteCountForFolder(sdId: string, folderId: string | null): Promise<number>;
+
+  /**
+   * Get count of all non-deleted notes in a storage directory (for "All Notes")
+   * @param sdId Storage directory ID
+   * @returns Count of notes
+   */
+  getAllNotesCount(sdId: string): Promise<number>;
+
+  /**
+   * Get count of deleted notes in a storage directory (for "Recently Deleted")
+   * @param sdId Storage directory ID
+   * @returns Count of deleted notes
+   */
+  getDeletedNoteCount(sdId: string): Promise<number>;
+
+  /**
    * Full-text search notes
    */
   searchNotes(query: string, limit?: number): Promise<SearchResult[]>;

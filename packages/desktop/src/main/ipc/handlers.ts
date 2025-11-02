@@ -35,6 +35,59 @@ export class IPCHandlers {
     }
   }
 
+  /**
+   * Auto-cleanup: Permanently delete notes from Recently Deleted that are older than the threshold
+   * This method should be called on app startup.
+   * @param thresholdDays Number of days after which deleted notes should be permanently deleted (default: 30)
+   */
+  async runAutoCleanup(thresholdDays = 30): Promise<void> {
+    const cutoffTimestamp = Date.now() - thresholdDays * 24 * 60 * 60 * 1000;
+    const logMsg = (msg: string) => {
+      console.log(msg);
+      if (process.env['NODE_ENV'] === 'test') {
+        // Also write to file for debugging E2E tests
+        void fs
+          .appendFile('/var/tmp/auto-cleanup.log', `${new Date().toISOString()} ${msg}\n`)
+          .catch(() => {
+            // ignore errors
+          });
+      }
+    };
+
+    logMsg(
+      `[auto-cleanup] Starting auto-cleanup (threshold: ${thresholdDays} days, cutoff: ${cutoffTimestamp} = ${new Date(cutoffTimestamp).toISOString()})...`
+    );
+
+    try {
+      // Get old deleted notes from database
+      const noteIds: string[] = await this.database.autoCleanupDeletedNotes(thresholdDays);
+      logMsg(
+        `[auto-cleanup] Found ${noteIds.length} old notes to clean: ${JSON.stringify(noteIds)}`
+      );
+
+      if (noteIds.length > 0) {
+        // Permanently delete each note (files + database entry)
+        for (const noteId of noteIds) {
+          try {
+            logMsg(`[auto-cleanup] Permanently deleting note ${noteId}...`);
+            await this.permanentlyDeleteNote(noteId, true); // Skip deleted check since we know they're deleted
+            logMsg(`[auto-cleanup] Successfully deleted note ${noteId}`);
+          } catch (err) {
+            logMsg(`[auto-cleanup] Failed to permanently delete note ${noteId}: ${String(err)}`);
+            // Continue with other notes even if one fails
+          }
+        }
+
+        logMsg(`[auto-cleanup] Successfully cleaned up ${noteIds.length} notes`);
+      } else {
+        logMsg('[auto-cleanup] No notes to clean up');
+      }
+    } catch (err) {
+      logMsg(`[auto-cleanup] Auto-cleanup failed: ${String(err)}`);
+      // Don't throw - auto-cleanup failure should not prevent app startup
+    }
+  }
+
   private registerHandlers(): void {
     // Note operations
     ipcMain.handle('note:load', this.handleLoadNote.bind(this));
@@ -53,6 +106,9 @@ export class IPCHandlers {
     ipcMain.handle('note:updateTitle', this.handleUpdateTitle.bind(this));
     ipcMain.handle('note:list', this.handleListNotes.bind(this));
     ipcMain.handle('note:search', this.handleSearchNotes.bind(this));
+    ipcMain.handle('note:getCountForFolder', this.handleGetNoteCountForFolder.bind(this));
+    ipcMain.handle('note:getAllNotesCount', this.handleGetAllNotesCount.bind(this));
+    ipcMain.handle('note:getDeletedNoteCount', this.handleGetDeletedNoteCount.bind(this));
 
     // Folder operations
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
@@ -75,6 +131,11 @@ export class IPCHandlers {
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
       ipcMain.handle('testing:createWindow', this.handleCreateWindow.bind(this));
+    }
+
+    // Test-only operations (only available in NODE_ENV=test)
+    if (process.env['NODE_ENV'] === 'test') {
+      ipcMain.handle('test:setNoteTimestamp', this.handleSetNoteTimestamp.bind(this));
     }
   }
 
@@ -248,46 +309,82 @@ export class IPCHandlers {
     this.broadcastToAll('note:restored', noteId);
   }
 
+  /**
+   * Internal method to permanently delete a note (used by both IPC handler and auto-cleanup)
+   */
+  private async permanentlyDeleteNote(noteId: string, skipDeletedCheck = false): Promise<void> {
+    const logMsg = (msg: string) => {
+      console.log(msg);
+      if (process.env['NODE_ENV'] === 'test') {
+        void fs
+          .appendFile('/var/tmp/auto-cleanup.log', `${new Date().toISOString()} ${msg}\n`)
+          .catch(() => {
+            // ignore errors
+          });
+      }
+    };
+
+    try {
+      logMsg(`[permanentlyDeleteNote] Starting permanent delete for note ${noteId}`);
+
+      // Get the note from cache
+      const note = await this.database.getNote(noteId);
+      if (!note) {
+        throw new Error(`Note ${noteId} not found`);
+      }
+
+      logMsg(`[permanentlyDeleteNote] Found note ${noteId} in SD ${note.sdId}`);
+
+      // Note must be deleted (in Recently Deleted) before permanent delete (unless skipping check)
+      if (!skipDeletedCheck && !note.deleted) {
+        throw new Error(`Note ${noteId} must be soft-deleted before permanent delete`);
+      }
+
+      // Unload note from memory if loaded
+      await this.crdtManager.unloadNote(noteId);
+      logMsg(`[permanentlyDeleteNote] Unloaded note ${noteId} from memory`);
+
+      // Delete CRDT files from disk
+      const sd = await this.database.getStorageDir(note.sdId);
+      if (!sd) {
+        logMsg(
+          `[permanentlyDeleteNote] WARNING: Storage directory ${note.sdId} not found, skipping file deletion`
+        );
+      } else {
+        const noteDir = path.join(sd.path, 'notes', noteId);
+        logMsg(`[permanentlyDeleteNote] Deleting note directory: ${noteDir}`);
+
+        try {
+          // Delete the entire note directory (contains updates/ and meta/ subdirs)
+          await fs.rm(noteDir, { recursive: true, force: true });
+          logMsg(`[permanentlyDeleteNote] Successfully deleted note directory: ${noteDir}`);
+        } catch (err) {
+          logMsg(
+            `[permanentlyDeleteNote] ERROR: Failed to delete note directory: ${noteDir}, error: ${String(err)}`
+          );
+          // Continue anyway - we still want to remove from database
+        }
+      }
+
+      // Delete from SQLite cache
+      await this.database.deleteNote(noteId);
+      logMsg(`[permanentlyDeleteNote] Deleted note ${noteId} from database`);
+
+      // Broadcast permanent delete event to all windows
+      this.broadcastToAll('note:permanentDeleted', noteId);
+      logMsg(`[permanentlyDeleteNote] Broadcast permanentDeleted event for note ${noteId}`);
+    } catch (err) {
+      // Log error but don't throw to prevent app crash
+      logMsg(`[permanentlyDeleteNote] ERROR permanently deleting note ${noteId}: ${String(err)}`);
+      throw err; // Re-throw for IPC handler, but caught in auto-cleanup
+    }
+  }
+
   private async handlePermanentDeleteNote(
     _event: IpcMainInvokeEvent,
     noteId: string
   ): Promise<void> {
-    // Get the note from cache
-    const note = await this.database.getNote(noteId);
-    if (!note) {
-      throw new Error(`Note ${noteId} not found`);
-    }
-
-    // Note must be deleted (in Recently Deleted) before permanent delete
-    if (!note.deleted) {
-      throw new Error(`Note ${noteId} must be soft-deleted before permanent delete`);
-    }
-
-    // Unload note from memory if loaded
-    await this.crdtManager.unloadNote(noteId);
-
-    // Delete CRDT files from disk
-    const sd = await this.database.getStorageDir(note.sdId);
-    if (!sd) {
-      throw new Error(`Storage directory ${note.sdId} not found`);
-    }
-
-    const noteDir = path.join(sd.path, 'notes', noteId);
-
-    try {
-      // Delete the entire note directory (contains updates/ and meta/ subdirs)
-      await fs.rm(noteDir, { recursive: true, force: true });
-      console.log(`[Note] Permanently deleted note directory: ${noteDir}`);
-    } catch (err) {
-      console.error(`[Note] Failed to delete note directory: ${noteDir}`, err);
-      // Continue anyway - we still want to remove from database
-    }
-
-    // Delete from SQLite cache
-    await this.database.deleteNote(noteId);
-
-    // Broadcast permanent delete event to all windows
-    this.broadcastToAll('note:permanentDeleted', noteId);
+    await this.permanentlyDeleteNote(noteId, false);
   }
 
   private async handleDuplicateNote(
@@ -725,8 +822,12 @@ export class IPCHandlers {
 
     let notes: import('@notecove/shared').NoteCache[];
 
+    // Handle "All Notes" special folder
+    if (folderId && (folderId === 'all-notes' || folderId.startsWith('all-notes:'))) {
+      notes = await this.database.getNotesBySd(sdId);
+    }
     // Handle "Recently Deleted" special folder
-    if (folderId && (folderId === 'recently-deleted' || folderId.startsWith('recently-deleted:'))) {
+    else if (folderId && (folderId === 'recently-deleted' || folderId.startsWith('recently-deleted:'))) {
       notes = await this.database.getDeletedNotes(sdId);
     }
     // If folderId is provided, filter by folder (including null for root folder)
@@ -748,6 +849,25 @@ export class IPCHandlers {
     limit?: number
   ): Promise<import('@notecove/shared').SearchResult[]> {
     return await this.database.searchNotes(query, limit);
+  }
+
+  private async handleGetNoteCountForFolder(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string | null
+  ): Promise<number> {
+    return await this.database.getNoteCountForFolder(sdId, folderId);
+  }
+
+  private async handleGetAllNotesCount(_event: IpcMainInvokeEvent, sdId: string): Promise<number> {
+    return await this.database.getAllNotesCount(sdId);
+  }
+
+  private async handleGetDeletedNoteCount(
+    _event: IpcMainInvokeEvent,
+    sdId: string
+  ): Promise<number> {
+    return await this.database.getDeletedNoteCount(sdId);
   }
 
   private async handleListFolders(
@@ -1037,6 +1157,83 @@ export class IPCHandlers {
   }
 
   /**
+   * Test-only: Set note timestamp (for testing auto-cleanup)
+   * Only available when NODE_ENV=test
+   *
+   * Updates both CRDT metadata and SQLite database to ensure consistency
+   */
+  private async handleSetNoteTimestamp(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    timestamp: number
+  ): Promise<void> {
+    if (process.env['NODE_ENV'] !== 'test') {
+      throw new Error('test:setNoteTimestamp is only available in test mode');
+    }
+
+    console.log(
+      `[Test Helper] Setting timestamp for note ${noteId} to ${timestamp} (${new Date(timestamp).toISOString()})`
+    );
+
+    // Get the note to find its SD
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note ${noteId} not found`);
+    }
+
+    console.log(
+      `[Test Helper] Note ${noteId} before update - modified: ${note.modified}, deleted: ${note.deleted}`
+    );
+
+    // Load the CRDT document (or get it if already loaded)
+    let noteDoc = this.crdtManager.getNoteDoc(noteId);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const wasLoaded = noteDoc !== null;
+    if (!noteDoc) {
+      await this.crdtManager.loadNote(noteId, note.sdId);
+      noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        throw new Error(`Failed to load CRDT for note ${noteId}`);
+      }
+    }
+
+    noteDoc.updateMetadata({ modified: timestamp });
+
+    // Manually trigger a write by applying the current state as an update
+    // This ensures the update is written to disk immediately
+    const fullUpdate = noteDoc.encodeStateAsUpdate();
+    await this.crdtManager.applyUpdate(noteId, fullUpdate);
+
+    // Also update the SQLite cache
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+    await (this.database as any).adapter.exec('UPDATE notes SET modified = ? WHERE id = ?', [
+      timestamp,
+      noteId,
+    ]);
+
+    // Verify the update
+    const updatedNote = await this.database.getNote(noteId);
+    const updatedMetadata = noteDoc.getMetadata();
+
+    console.log(
+      `[Test Helper] After update - SQL modified: ${updatedNote?.modified}, CRDT modified: ${updatedMetadata.modified}`
+    );
+
+    if (updatedNote?.modified !== timestamp || updatedMetadata.modified !== timestamp) {
+      throw new Error(
+        `Timestamp update failed! Expected ${timestamp}, got SQL: ${updatedNote?.modified}, CRDT: ${updatedMetadata.modified}`
+      );
+    }
+
+    // Unload the note if it wasn't loaded before (clean up)
+    if (!wasLoaded) {
+      await this.crdtManager.unloadNote(noteId);
+    }
+
+    console.log(`[Test Helper] Timestamp successfully set and saved for note ${noteId}`);
+  }
+
+  /**
    * Clean up all handlers
    */
   destroy(): void {
@@ -1066,6 +1263,10 @@ export class IPCHandlers {
 
     if (this.createWindowFn) {
       ipcMain.removeHandler('testing:createWindow');
+    }
+
+    if (process.env['NODE_ENV'] === 'test') {
+      ipcMain.removeHandler('test:setNoteTimestamp');
     }
   }
 }

@@ -1,11 +1,11 @@
 {
-      "name": "@notecove/tools",
-      "version": "0.1.0",
-      "private": true,
-      "type": "module",
-      "description": "Build tools and scripts for NoteCove",
-      "dependencies": {
-            "fs": "0.0.1-security",
-            "yjs": "^13.6.27"
-      }
+  "name": "@notecove/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Build tools and scripts for NoteCove",
+  "dependencies": {
+    "fs": "0.0.1-security",
+    "yjs": "^13.6.27"
+  }
 }

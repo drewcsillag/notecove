@@ -842,6 +842,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             onClick={() => void handleCreateNote()}
             disabled={creating}
             title="Create note"
+            aria-label="create note"
             sx={{ marginLeft: 1 }}
           >
             <AddIcon />

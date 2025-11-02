@@ -214,6 +214,10 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const [foldersBySd, setFoldersBySd] = useState<Map<string, FolderData[]>>(new Map());
   const isMultiSDMode = sdId === undefined;
 
+  // Note count badges state
+  const [noteCounts, setNoteCounts] = useState<Map<string, number>>(new Map());
+  const [noteCountRefreshTrigger, setNoteCountRefreshTrigger] = useState(0);
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     anchorEl: HTMLElement;
@@ -354,6 +358,105 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
     void loadData();
   }, [sdId, refreshTrigger, isMultiSDMode, activeSdId, expandedFolderIds.length, onExpandedChange]);
+
+  // Auto-refresh note counts when notes change
+  useEffect(() => {
+    // Guard against tests where electronAPI might not be available
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!window.electronAPI?.note) {
+      return;
+    }
+
+    const refreshCounts = (): void => {
+      // Small delay to let database update, then trigger reload
+      setTimeout(() => {
+        setNoteCountRefreshTrigger((prev) => prev + 1);
+      }, 500); // Delay to ensure DB write completes
+    };
+
+    // Subscribe to note events
+    const unsubCreated = window.electronAPI.note.onCreated(refreshCounts);
+    const unsubDeleted = window.electronAPI.note.onDeleted(refreshCounts);
+    const unsubRestored = window.electronAPI.note.onRestored(refreshCounts);
+    const unsubPermanentDeleted = window.electronAPI.note.onPermanentDeleted(refreshCounts);
+    const unsubMoved = window.electronAPI.note.onMoved(refreshCounts);
+
+    return () => {
+      unsubCreated();
+      unsubDeleted();
+      unsubRestored();
+      unsubPermanentDeleted();
+      unsubMoved();
+    };
+  }, []);
+
+  // Load note counts for badges
+  useEffect(() => {
+    const loadNoteCounts = async (): Promise<void> => {
+      // Guard against tests where electronAPI might not be available
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!window.electronAPI?.note) {
+        return;
+      }
+
+      if (!sds.length && !sdId) {
+        return; // No SDs loaded yet
+      }
+
+      const counts = new Map<string, number>();
+
+      if (isMultiSDMode) {
+        // Multi-SD mode: load counts for each SD
+        for (const sd of sds) {
+          try {
+            // "All Notes" for this SD
+            const allNotesCount = await window.electronAPI.note.getAllNotesCount(sd.id);
+            counts.set(`all-notes:${sd.id}`, allNotesCount);
+
+            // Recently Deleted for this SD
+            const deletedCount = await window.electronAPI.note.getDeletedNoteCount(sd.id);
+            counts.set(`recently-deleted:${sd.id}`, deletedCount);
+
+            // Each folder in this SD
+            const folders = foldersBySd.get(sd.id) ?? [];
+            await Promise.all(
+              folders.map(async (folder) => {
+                const count = await window.electronAPI.note.getCountForFolder(sd.id, folder.id);
+                counts.set(folder.id, count);
+              })
+            );
+          } catch (err) {
+            console.error(`Failed to load note counts for SD ${sd.id}:`, err);
+          }
+        }
+      } else if (sdId) {
+        // Single SD mode
+        try {
+          // "All Notes"
+          const allNotesCount = await window.electronAPI.note.getAllNotesCount(sdId);
+          counts.set('all-notes', allNotesCount);
+
+          // Recently Deleted
+          const deletedCount = await window.electronAPI.note.getDeletedNoteCount(sdId);
+          counts.set('recently-deleted', deletedCount);
+
+          // Each folder
+          await Promise.all(
+            folders.map(async (folder) => {
+              const count = await window.electronAPI.note.getCountForFolder(sdId, folder.id);
+              counts.set(folder.id, count);
+            })
+          );
+        } catch (err) {
+          console.error('Failed to load note counts:', err);
+        }
+      }
+
+      setNoteCounts(counts);
+    };
+
+    void loadNoteCounts();
+  }, [folders, foldersBySd, sds, sdId, isMultiSDMode, refreshTrigger, noteCountRefreshTrigger]);
 
   if (loading) {
     return (
@@ -1050,6 +1153,28 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
                   {/* Text and active indicator */}
                   <ListItemText primary={node.text} />
+
+                  {/* Note count badge */}
+                  {(() => {
+                    const count = noteCounts.get(String(node.id));
+                    return (
+                      count !== undefined &&
+                      count > 0 && (
+                        <Chip
+                          label={count}
+                          size="small"
+                          sx={{
+                            ml: 1,
+                            height: 20,
+                            backgroundColor: 'action.hover',
+                            color: 'text.secondary',
+                            fontSize: '0.75rem',
+                          }}
+                        />
+                      )
+                    );
+                  })()}
+
                   {isSDNode && isActiveSD && (
                     <Chip
                       label="Active"

@@ -18,6 +18,7 @@ import {
 import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
+import * as fs from 'fs/promises';
 import { NodeFileWatcher } from './storage/node-file-watcher';
 import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
@@ -80,8 +81,7 @@ function createWindow(): void {
  */
 async function initializeDatabase(): Promise<Database> {
   // Determine database path based on platform
-  const userDataPath = app.getPath('userData');
-  const dbPath = join(userDataPath, 'notecove.db');
+  const dbPath = process.env['TEST_DB_PATH'] ?? join(app.getPath('userData'), 'notecove.db');
 
   if (process.env['NODE_ENV'] === 'test') {
     console.log(`[TEST MODE] Initializing database at: ${dbPath}`);
@@ -100,16 +100,23 @@ async function initializeDatabase(): Promise<Database> {
 
 /**
  * Ensure a default note exists for the user
+ * @param db Database instance
+ * @param crdtMgr CRDT manager instance
+ * @param defaultStoragePath Path to use for the default storage directory (e.g., from TEST_STORAGE_DIR in tests)
  */
-async function ensureDefaultNote(db: Database, crdtMgr: CRDTManager): Promise<void> {
+async function ensureDefaultNote(
+  db: Database,
+  crdtMgr: CRDTManager,
+  defaultStoragePath?: string
+): Promise<void> {
   const DEFAULT_NOTE_ID = 'default-note';
 
   // Ensure default SD exists
   let DEFAULT_SD_ID: string;
   const existingSDs = await db.getAllStorageDirs();
   if (existingSDs.length === 0) {
-    // Create default SD
-    const defaultPath = join(app.getPath('documents'), 'NoteCove');
+    // Create default SD - use provided path or fallback to Documents folder
+    const defaultPath = defaultStoragePath ?? join(app.getPath('documents'), 'NoteCove');
     DEFAULT_SD_ID = 'default';
     await db.createStorageDir(DEFAULT_SD_ID, 'Default', defaultPath);
     console.log('[Main] Created default SD at:', defaultPath);
@@ -522,8 +529,18 @@ function createMenu(): void {
 
 void app.whenReady().then(async () => {
   try {
+    // Debug logging for environment (test mode only)
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] App ready, starting initialization...');
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        await fs.appendFile(
+          '/var/tmp/electron-env.log',
+          `\n=== New Launch ===\nNODE_ENV: ${process.env['NODE_ENV']}\nTEST_DB_PATH: ${process.env['TEST_DB_PATH']}\n`
+        );
+      } catch (e) {
+        console.error('Failed to write env log:', e);
+      }
     }
 
     // Initialize database
@@ -677,9 +694,41 @@ void app.whenReady().then(async () => {
 
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)
     ipcHandlers = new IPCHandlers(crdtManager, database, createWindow, handleNewStorageDir);
+    if (process.env['NODE_ENV'] === 'test') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await fs.appendFile(
+        '/var/tmp/auto-cleanup.log',
+        `${new Date().toISOString()} [Init] IPC handlers created\n`
+      );
+    }
 
     // Create default note if none exists
-    await ensureDefaultNote(database, crdtManager);
+    await ensureDefaultNote(database, crdtManager, storageDir);
+    if (process.env['NODE_ENV'] === 'test') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await fs.appendFile(
+        '/var/tmp/auto-cleanup.log',
+        `${new Date().toISOString()} [Init] Default note ensured\n`
+      );
+    }
+
+    // Run auto-cleanup for old deleted notes (30-day threshold)
+    console.log('[Init] Running auto-cleanup for old deleted notes...');
+    if (process.env['NODE_ENV'] === 'test') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await fs.appendFile(
+        '/var/tmp/auto-cleanup.log',
+        `${new Date().toISOString()} [Init] About to run auto-cleanup\n`
+      );
+    }
+    await ipcHandlers.runAutoCleanup(30);
+    if (process.env['NODE_ENV'] === 'test') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await fs.appendFile(
+        '/var/tmp/auto-cleanup.log',
+        `${new Date().toISOString()} [Init] Auto-cleanup completed\n`
+      );
+    }
 
     // Set up watchers for default SD
     await setupSDWatchers('default', storageDir, fsAdapter, instanceId, updateManager, crdtManager);

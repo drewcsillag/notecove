@@ -247,6 +247,69 @@ export class SqliteDatabase implements Database {
     await this.adapter.exec('DELETE FROM notes WHERE id = ?', [noteId]);
   }
 
+  /**
+   * Auto-cleanup: Find notes from Recently Deleted that are older than the threshold
+   * @param thresholdDays Number of days after which deleted notes should be permanently deleted (default: 30)
+   * @returns Array of note IDs that should be permanently deleted
+   */
+  async autoCleanupDeletedNotes(thresholdDays = 30): Promise<UUID[]> {
+    const cutoffTimestamp = Date.now() - thresholdDays * 24 * 60 * 60 * 1000;
+
+    // Find notes that are deleted and older than the threshold
+    const rows = await this.adapter.all<{ id: string }>(
+      'SELECT id FROM notes WHERE deleted = 1 AND modified < ?',
+      [cutoffTimestamp]
+    );
+
+    const noteIds = rows.map((row) => row.id);
+    return noteIds;
+  }
+
+  /**
+   * Get count of non-deleted notes in a specific folder
+   * @param sdId Storage directory ID
+   * @param folderId Folder ID, or null for root "All Notes"
+   * @returns Count of notes
+   */
+  async getNoteCountForFolder(sdId: string, folderId: string | null): Promise<number> {
+    const row = await this.adapter.get<{ count: number }>(
+      folderId === null
+        ? 'SELECT COUNT(*) as count FROM notes WHERE sd_id = ? AND folder_id IS NULL AND deleted = 0'
+        : 'SELECT COUNT(*) as count FROM notes WHERE sd_id = ? AND folder_id = ? AND deleted = 0',
+      folderId === null ? [sdId] : [sdId, folderId]
+    );
+
+    return row?.count ?? 0;
+  }
+
+  /**
+   * Get count of all non-deleted notes in a storage directory (for "All Notes")
+   * @param sdId Storage directory ID
+   * @returns Count of notes
+   */
+  async getAllNotesCount(sdId: string): Promise<number> {
+    const row = await this.adapter.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM notes WHERE sd_id = ? AND deleted = 0',
+      [sdId]
+    );
+
+    return row?.count ?? 0;
+  }
+
+  /**
+   * Get count of deleted notes in a storage directory (for "Recently Deleted")
+   * @param sdId Storage directory ID
+   * @returns Count of deleted notes
+   */
+  async getDeletedNoteCount(sdId: string): Promise<number> {
+    const row = await this.adapter.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM notes WHERE sd_id = ? AND deleted = 1',
+      [sdId]
+    );
+
+    return row?.count ?? 0;
+  }
+
   async searchNotes(query: string, limit = 50): Promise<SearchResult[]> {
     // Transform query to support prefix matching
     // For each word >=3 chars, add wildcard for prefix search

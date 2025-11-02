@@ -58,6 +58,9 @@ declare global {
             rank: number;
           }[]
         >;
+        getCountForFolder: (sdId: string, folderId: string | null) => Promise<number>;
+        getAllNotesCount: (sdId: string) => Promise<number>;
+        getDeletedNoteCount: (sdId: string) => Promise<number>;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
         onRestored: (callback: (noteId: string) => void) => () => void;
@@ -137,6 +140,7 @@ declare global {
 
       testing: {
         createWindow: () => Promise<void>;
+        setNoteTimestamp: (noteId: string, timestamp: number) => Promise<void>;
       };
     };
   }
