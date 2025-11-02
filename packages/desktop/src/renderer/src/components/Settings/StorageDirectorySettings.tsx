@@ -98,14 +98,19 @@ export const StorageDirectorySettings: React.FC = () => {
     setRemoveDialogOpen(true);
   };
 
-  const handleRemoveConfirm = () => {
+  const handleRemoveConfirm = async () => {
     if (!sdToRemove) return;
 
-    // TODO: Implement sd:delete IPC handler
-    console.log('Remove SD:', sdToRemove.id);
-    setRemoveDialogOpen(false);
-    setSdToRemove(null);
-    setError('SD removal not yet implemented');
+    try {
+      setError(null);
+      await window.electronAPI.sd.delete(sdToRemove.id);
+      await loadSds();
+      setRemoveDialogOpen(false);
+      setSdToRemove(null);
+    } catch (err) {
+      console.error('Failed to delete SD:', err);
+      setError('Failed to remove Storage Directory');
+    }
   };
 
   const handleSetActive = async (sdId: string) => {
@@ -119,10 +124,17 @@ export const StorageDirectorySettings: React.FC = () => {
     }
   };
 
-  const handleBrowsePath = () => {
-    // TODO: Implement native file picker dialog
-    // For now, user must enter path manually
-    setError('File picker not yet implemented - please enter path manually');
+  const handleBrowsePath = async () => {
+    try {
+      const selectedPath = await window.electronAPI.sd.selectPath();
+      if (selectedPath) {
+        setNewSdPath(selectedPath);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Failed to select path:', err);
+      setError('Failed to open file picker');
+    }
   };
 
   if (loading) {
@@ -304,7 +316,7 @@ export const StorageDirectorySettings: React.FC = () => {
           >
             Cancel
           </Button>
-          <Button onClick={handleRemoveConfirm} color="error" variant="contained">
+          <Button onClick={() => void handleRemoveConfirm()} color="error" variant="contained">
             Remove
           </Button>
         </DialogActions>
