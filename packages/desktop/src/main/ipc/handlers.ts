@@ -11,14 +11,17 @@ import * as Y from 'yjs';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
 import type { Database } from '@notecove/shared';
+import type { ConfigManager } from '../config/manager';
 
 export class IPCHandlers {
   constructor(
     private crdtManager: CRDTManager,
     private database: Database,
+    private configManager: ConfigManager,
     private createWindowFn?: () => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
   ) {
@@ -125,10 +128,15 @@ export class IPCHandlers {
     ipcMain.handle('sd:getActive', this.handleGetActiveStorageDir.bind(this));
     ipcMain.handle('sd:delete', this.handleDeleteStorageDir.bind(this));
     ipcMain.handle('sd:selectPath', this.handleSelectSDPath.bind(this));
+    ipcMain.handle('sd:getCloudStoragePaths', this.handleGetCloudStoragePaths.bind(this));
 
     // App state operations
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
     ipcMain.handle('appState:set', this.handleSetAppState.bind(this));
+
+    // Config operations
+    ipcMain.handle('config:getDatabasePath', this.handleGetDatabasePath.bind(this));
+    ipcMain.handle('config:setDatabasePath', this.handleSetDatabasePath.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -829,7 +837,10 @@ export class IPCHandlers {
       notes = await this.database.getNotesBySd(sdId);
     }
     // Handle "Recently Deleted" special folder
-    else if (folderId && (folderId === 'recently-deleted' || folderId.startsWith('recently-deleted:'))) {
+    else if (
+      folderId &&
+      (folderId === 'recently-deleted' || folderId.startsWith('recently-deleted:'))
+    ) {
       notes = await this.database.getDeletedNotes(sdId);
     }
     // If folderId is provided, filter by folder (including null for root folder)
@@ -1088,6 +1099,18 @@ export class IPCHandlers {
   }
 
   // ============================================================================
+  // Config Handlers
+  // ============================================================================
+
+  private async handleGetDatabasePath(_event: IpcMainInvokeEvent): Promise<string> {
+    return await this.configManager.getDatabasePath();
+  }
+
+  private async handleSetDatabasePath(_event: IpcMainInvokeEvent, path: string): Promise<void> {
+    await this.configManager.setDatabasePath(path);
+  }
+
+  // ============================================================================
   // Storage Directory Handlers
   // ============================================================================
 
@@ -1156,23 +1179,89 @@ export class IPCHandlers {
     this.broadcastToAll('sd:updated', { operation: 'delete', sdId });
   }
 
-  private async handleSelectSDPath(event: IpcMainInvokeEvent): Promise<string | null> {
+  private async handleSelectSDPath(
+    event: IpcMainInvokeEvent,
+    defaultPath?: string
+  ): Promise<string | null> {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!window) {
       return null;
     }
 
-    const result = await dialog.showOpenDialog(window, {
+    const dialogOptions: Electron.OpenDialogOptions = {
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select Storage Directory Location',
       buttonLabel: 'Select Folder',
-    });
+    };
+
+    // Only set defaultPath if it's provided
+    if (defaultPath) {
+      dialogOptions.defaultPath = defaultPath;
+    }
+
+    const result = await dialog.showOpenDialog(window, dialogOptions);
 
     if (result.canceled || result.filePaths.length === 0) {
       return null;
     }
 
-    return result.filePaths[0];
+    return result.filePaths[0] ?? null;
+  }
+
+  /**
+   * Get common cloud storage paths for the current platform
+   * Only returns paths that actually exist on the system
+   */
+  private async handleGetCloudStoragePaths(
+    _event: IpcMainInvokeEvent
+  ): Promise<Record<string, string>> {
+    const homeDir = os.homedir();
+    const platform = os.platform();
+    const candidatePaths: Record<string, string> = {};
+
+    if (platform === 'darwin') {
+      // macOS
+      candidatePaths['iCloudDrive'] = path.join(
+        homeDir,
+        'Library/Mobile Documents/com~apple~CloudDocs'
+      );
+      candidatePaths['Dropbox'] = path.join(homeDir, 'Dropbox');
+      candidatePaths['GoogleDrive'] = path.join(homeDir, 'Google Drive');
+      candidatePaths['OneDrive'] = path.join(homeDir, 'OneDrive');
+    } else if (platform === 'win32') {
+      // Windows
+      candidatePaths['iCloudDrive'] = path.join(homeDir, 'iCloudDrive');
+      candidatePaths['Dropbox'] = path.join(homeDir, 'Dropbox');
+      candidatePaths['GoogleDrive'] = path.join(homeDir, 'Google Drive');
+      candidatePaths['OneDrive'] = path.join(homeDir, 'OneDrive');
+    } else {
+      // Linux
+      candidatePaths['Dropbox'] = path.join(homeDir, 'Dropbox');
+      candidatePaths['GoogleDrive'] = path.join(homeDir, 'Google Drive');
+    }
+
+    // Check which paths actually exist
+    const existingPaths: Record<string, string> = {};
+    for (const [name, dirPath] of Object.entries(candidatePaths)) {
+      try {
+        const stats = await fs.stat(dirPath);
+        if (stats.isDirectory()) {
+          existingPaths[name] = dirPath;
+        }
+      } catch {
+        // Directory doesn't exist, skip it
+      }
+    }
+
+    return existingPaths;
+  }
+
+  /**
+   * Open Settings dialog
+   * Broadcasts to all windows to open settings
+   */
+  openSettings(): void {
+    this.broadcastToAll('settings:open', {});
   }
 
   /**
@@ -1288,6 +1377,8 @@ export class IPCHandlers {
     ipcMain.removeHandler('sd:getActive');
     ipcMain.removeHandler('appState:get');
     ipcMain.removeHandler('appState:set');
+    ipcMain.removeHandler('config:getDatabasePath');
+    ipcMain.removeHandler('config:setDatabasePath');
 
     if (this.createWindowFn) {
       ipcMain.removeHandler('testing:createWindow');

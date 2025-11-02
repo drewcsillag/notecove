@@ -17,10 +17,16 @@ const mockElectronAPI = {
     create: jest.fn(),
     setActive: jest.fn(),
     getActive: jest.fn(),
+    selectPath: jest.fn(),
+    getCloudStoragePaths: jest.fn().mockResolvedValue({}),
   },
   appState: {
     get: jest.fn(),
     set: jest.fn(),
+  },
+  config: {
+    getDatabasePath: jest.fn().mockResolvedValue('/test/path/notecove.db'),
+    setDatabasePath: jest.fn(),
   },
 };
 
@@ -40,6 +46,8 @@ beforeAll(() => {
 });
 
 describe('SettingsDialog', () => {
+  const mockOnThemeChange = jest.fn();
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockElectronAPI.sd.list.mockResolvedValue([]);
@@ -47,30 +55,59 @@ describe('SettingsDialog', () => {
 
   it('should render when open is true', () => {
     const onClose = jest.fn();
-    render(<SettingsDialog open={true} onClose={onClose} />);
+    render(
+      <SettingsDialog
+        open={true}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
   it('should not render when open is false', () => {
     const onClose = jest.fn();
-    render(<SettingsDialog open={false} onClose={onClose} />);
+    render(
+      <SettingsDialog
+        open={false}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
   });
 
-  it('should show three tabs', () => {
+  it('should show four tabs', () => {
     const onClose = jest.fn();
-    render(<SettingsDialog open={true} onClose={onClose} />);
+    render(
+      <SettingsDialog
+        open={true}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     expect(screen.getByText('Storage Directories')).toBeInTheDocument();
     expect(screen.getByText('User')).toBeInTheDocument();
     expect(screen.getByText('Appearance')).toBeInTheDocument();
+    expect(screen.getByText('Database')).toBeInTheDocument();
   });
 
   it('should call onClose when close button is clicked', () => {
     const onClose = jest.fn();
-    render(<SettingsDialog open={true} onClose={onClose} />);
+    render(
+      <SettingsDialog
+        open={true}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     const closeButtons = screen.getAllByRole('button', { name: /close/i });
     if (closeButtons[0]) {
@@ -82,7 +119,14 @@ describe('SettingsDialog', () => {
 
   it('should switch tabs when clicked', async () => {
     const onClose = jest.fn();
-    render(<SettingsDialog open={true} onClose={onClose} />);
+    render(
+      <SettingsDialog
+        open={true}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     // Initially on Storage Directories tab
     await waitFor(() => {
@@ -110,7 +154,14 @@ describe('SettingsDialog', () => {
     const onClose = jest.fn();
     mockElectronAPI.sd.list.mockResolvedValue([]);
 
-    const { rerender } = render(<SettingsDialog open={true} onClose={onClose} />);
+    const { rerender } = render(
+      <SettingsDialog
+        open={true}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     // Wait for initial load
     await waitFor(() => {
@@ -129,10 +180,24 @@ describe('SettingsDialog', () => {
     });
 
     // Close dialog
-    rerender(<SettingsDialog open={false} onClose={onClose} />);
+    rerender(
+      <SettingsDialog
+        open={false}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     // Reopen dialog
-    rerender(<SettingsDialog open={true} onClose={onClose} />);
+    rerender(
+      <SettingsDialog
+        open={true}
+        onClose={onClose}
+        themeMode="light"
+        onThemeChange={mockOnThemeChange}
+      />
+    );
 
     // Should be back on Storage Directories tab
     await waitFor(() => {

@@ -101,6 +101,9 @@ export enum AppStateKey {
   SearchText = 'searchText',
   WindowPosition = 'windowPosition',
   WindowSize = 'windowSize',
+  ThemeMode = 'themeMode', // 'light' or 'dark'
+  Username = 'username', // User's display name
+  UserHandle = 'userHandle', // User's @mention handle
 }
 
 /**

@@ -316,10 +316,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getActive: (): Promise<string | null> =>
       ipcRenderer.invoke('sd:getActive') as Promise<string | null>,
     delete: (sdId: string): Promise<void> => ipcRenderer.invoke('sd:delete', sdId) as Promise<void>,
-    selectPath: (): Promise<string | null> =>
-      ipcRenderer.invoke('sd:selectPath') as Promise<string | null>,
+    selectPath: (defaultPath?: string): Promise<string | null> =>
+      ipcRenderer.invoke('sd:selectPath', defaultPath) as Promise<string | null>,
+    getCloudStoragePaths: (): Promise<Record<string, string>> =>
+      ipcRenderer.invoke('sd:getCloudStoragePaths') as Promise<Record<string, string>>,
 
     // Event listeners
+    onOpenSettings: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('settings:open', listener);
+      return () => {
+        ipcRenderer.removeListener('settings:open', listener);
+      };
+    },
     onUpdated: (callback: (data: { operation: string; sdId: string }) => void): (() => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
@@ -357,6 +368,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('appState:get', key) as Promise<string | null>,
     set: (key: string, value: string): Promise<void> =>
       ipcRenderer.invoke('appState:set', key, value) as Promise<void>,
+  },
+
+  // Config operations
+  config: {
+    getDatabasePath: (): Promise<string> =>
+      ipcRenderer.invoke('config:getDatabasePath') as Promise<string>,
+    setDatabasePath: (path: string): Promise<void> =>
+      ipcRenderer.invoke('config:setDatabasePath', path) as Promise<void>,
   },
 
   // Testing operations (only available if main process registered handler)

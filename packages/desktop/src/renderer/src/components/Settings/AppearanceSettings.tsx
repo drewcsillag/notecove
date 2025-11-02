@@ -6,24 +6,21 @@
  * - (Future: custom colors, font size, etc.)
  */
 
-import React, { useEffect, useState } from 'react';
-import { Box, Typography, FormControlLabel, Switch, Alert } from '@mui/material';
+import React from 'react';
+import { Box, Typography, FormControlLabel, Switch } from '@mui/material';
 
-export const AppearanceSettings: React.FC = () => {
-  const [darkMode, setDarkMode] = useState(false);
+export interface AppearanceSettingsProps {
+  themeMode: 'light' | 'dark';
+  onThemeChange: (mode: 'light' | 'dark') => void;
+}
 
-  useEffect(() => {
-    // Load dark mode preference
-    // TODO: Implement loading from app state and applying theme
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setDarkMode(prefersDark);
-  }, []);
-
+export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
+  themeMode,
+  onThemeChange,
+}) => {
   const handleDarkModeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = event.target.checked;
-    setDarkMode(newValue);
-    // TODO: Implement saving to app state and applying theme
-    console.log('Dark mode:', newValue);
+    const newMode = event.target.checked ? 'dark' : 'light';
+    onThemeChange(newMode);
   };
 
   return (
@@ -36,12 +33,8 @@ export const AppearanceSettings: React.FC = () => {
         Customize the look and feel of NoteCove.
       </Typography>
 
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Dark mode implementation is pending. Theme changes will take effect after restart.
-      </Alert>
-
       <FormControlLabel
-        control={<Switch checked={darkMode} onChange={handleDarkModeToggle} />}
+        control={<Switch checked={themeMode === 'dark'} onChange={handleDarkModeToggle} />}
         label="Dark Mode"
       />
 

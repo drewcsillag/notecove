@@ -8,27 +8,49 @@
 
 import React, { useEffect, useState } from 'react';
 import { Box, TextField, Typography, Button, Alert } from '@mui/material';
+import { AppStateKey } from '@notecove/shared';
 
 export const UserSettings: React.FC = () => {
   const [username, setUsername] = useState('');
   const [handle, setHandle] = useState('');
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load username from app state
-    // TODO: Implement loading from database
-    const systemUsername = 'User'; // Placeholder
-    setUsername(systemUsername);
-    setHandle(systemUsername.toLowerCase());
+    const loadSettings = async () => {
+      try {
+        setLoading(true);
+        const savedUsername = await window.electronAPI.appState.get(AppStateKey.Username);
+        const savedHandle = await window.electronAPI.appState.get(AppStateKey.UserHandle);
+
+        // Use saved values or defaults
+        const defaultUsername = savedUsername ?? 'User';
+        const defaultHandle = savedHandle ?? 'user';
+
+        setUsername(defaultUsername);
+        setHandle(defaultHandle);
+      } catch (error) {
+        console.error('Failed to load user settings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadSettings();
   }, []);
 
-  const handleSave = () => {
-    // TODO: Implement saving to database/app state
-    console.log('Save user settings:', { username, handle });
-    setSaved(true);
-    setTimeout(() => {
-      setSaved(false);
-    }, 3000);
+  const handleSave = async () => {
+    try {
+      await window.electronAPI.appState.set(AppStateKey.Username, username);
+      await window.electronAPI.appState.set(AppStateKey.UserHandle, handle);
+
+      setSaved(true);
+      setTimeout(() => {
+        setSaved(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to save user settings:', error);
+    }
   };
 
   return (
@@ -48,6 +70,7 @@ export const UserSettings: React.FC = () => {
       )}
 
       <TextField
+        id="username"
         label="Username"
         fullWidth
         variant="outlined"
@@ -60,6 +83,7 @@ export const UserSettings: React.FC = () => {
       />
 
       <TextField
+        id="user-handle"
         label="Mention Handle"
         fullWidth
         variant="outlined"
@@ -75,7 +99,7 @@ export const UserSettings: React.FC = () => {
       />
 
       <Box display="flex" justifyContent="flex-end">
-        <Button variant="contained" onClick={handleSave}>
+        <Button variant="contained" onClick={() => void handleSave()} disabled={loading}>
           Save Changes
         </Button>
       </Box>

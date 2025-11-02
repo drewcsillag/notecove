@@ -150,12 +150,9 @@ test.describe('Settings - Storage Directory Management', () => {
     await fs.mkdir(newSdPath, { recursive: true });
 
     // Create SD via API
-    await window.evaluate(
-      async (sdPath) => {
-        await window.electronAPI.sd.create('Test SD', sdPath);
-      },
-      newSdPath
-    );
+    await window.evaluate(async (sdPath) => {
+      await window.electronAPI.sd.create('Test SD', sdPath);
+    }, newSdPath);
 
     // Open Settings
     const settingsButton = window.locator('button[aria-label="Settings"]');

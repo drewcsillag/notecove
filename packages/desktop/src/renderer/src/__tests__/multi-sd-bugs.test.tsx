@@ -64,6 +64,9 @@ const mockElectronAPI = {
     setActive: jest.fn(),
     getActive: jest.fn().mockResolvedValue('default'),
     onUpdated: jest.fn(() => () => {}),
+    onOpenSettings: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   sync: {
     onProgress: jest.fn(() => () => {}),

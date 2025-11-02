@@ -2,11 +2,11 @@
  * Main App Component
  */
 
-import React, { useEffect, useState } from 'react';
-import { CssBaseline, ThemeProvider } from '@mui/material';
+import React, { useEffect, useState, useMemo } from 'react';
+import { CssBaseline, ThemeProvider, type PaletteMode } from '@mui/material';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { theme } from './theme';
+import { createAppTheme } from './theme';
 import './i18n';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
 import { FolderPanel } from './components/FolderPanel/FolderPanel';
@@ -16,12 +16,18 @@ import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
+const THEME_MODE_KEY = AppStateKey.ThemeMode;
 
 function App(): React.ReactElement {
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeSdId, setActiveSdId] = useState<string>('default');
+  const [themeMode, setThemeMode] = useState<PaletteMode>('light');
+  const [themeLoaded, setThemeLoaded] = useState(false);
+
+  // Create theme based on mode
+  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
 
   // Debug: Log when activeSdId changes
   useEffect(() => {
@@ -45,6 +51,39 @@ function App(): React.ReactElement {
     void loadPanelSizes();
   }, []);
 
+  // Load saved theme preference on mount
+  useEffect(() => {
+    const loadTheme = async (): Promise<void> => {
+      try {
+        const saved = await window.electronAPI.appState.get(THEME_MODE_KEY);
+        if (saved === 'dark' || saved === 'light') {
+          setThemeMode(saved as PaletteMode);
+        }
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+      } finally {
+        setThemeLoaded(true);
+      }
+    };
+
+    void loadTheme();
+  }, []);
+
+  // Save theme preference when it changes (only after initial load)
+  useEffect(() => {
+    if (!themeLoaded) return;
+
+    const saveTheme = async (): Promise<void> => {
+      try {
+        await window.electronAPI.appState.set(THEME_MODE_KEY, themeMode);
+      } catch (error) {
+        console.error('Failed to save theme:', error);
+      }
+    };
+
+    void saveTheme();
+  }, [themeMode, themeLoaded]);
+
   // Auto-select default note on first load
   useEffect(() => {
     const loadDefaultNote = async (): Promise<void> => {
@@ -61,6 +100,31 @@ function App(): React.ReactElement {
     };
 
     void loadDefaultNote();
+  }, []);
+
+  // Keyboard shortcut: Cmd+, or Ctrl+, to open Settings
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      // Check for Cmd+, (macOS) or Ctrl+, (Windows/Linux)
+      if (event.key === ',' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setSettingsOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Listen for menu command to open Settings
+  useEffect(() => {
+    const cleanup = window.electronAPI.sd.onOpenSettings(() => {
+      setSettingsOpen(true);
+    });
+
+    return cleanup;
   }, []);
 
   const handleLayoutChange = (sizes: number[]): void => {
@@ -103,12 +167,16 @@ function App(): React.ReactElement {
             initialSizes={initialPanelSizes}
           />
         </div>
-        <SettingsDialog
-          open={settingsOpen}
-          onClose={() => {
-            setSettingsOpen(false);
-          }}
-        />
+        {settingsOpen && (
+          <SettingsDialog
+            open={settingsOpen}
+            onClose={() => {
+              setSettingsOpen(false);
+            }}
+            themeMode={themeMode}
+            onThemeChange={setThemeMode}
+          />
+        )}
       </DndProvider>
     </ThemeProvider>
   );

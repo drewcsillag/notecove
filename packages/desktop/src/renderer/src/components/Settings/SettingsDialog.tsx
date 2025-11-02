@@ -23,6 +23,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { StorageDirectorySettings } from './StorageDirectorySettings';
 import { UserSettings } from './UserSettings';
 import { AppearanceSettings } from './AppearanceSettings';
+import { DatabaseSettings } from './DatabaseSettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -56,9 +57,16 @@ function a11yProps(index: number) {
 export interface SettingsDialogProps {
   open: boolean;
   onClose: () => void;
+  themeMode: 'light' | 'dark';
+  onThemeChange: (mode: 'light' | 'dark') => void;
 }
 
-export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose }) => {
+export const SettingsDialog: React.FC<SettingsDialogProps> = ({
+  open,
+  onClose,
+  themeMode,
+  onThemeChange,
+}) => {
   const [tabValue, setTabValue] = useState(0);
 
   // Reset to first tab when dialog closes
@@ -108,6 +116,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
             <Tab label="Storage Directories" {...a11yProps(0)} />
             <Tab label="User" {...a11yProps(1)} />
             <Tab label="Appearance" {...a11yProps(2)} />
+            <Tab label="Database" {...a11yProps(3)} />
           </Tabs>
         </Box>
         <TabPanel value={tabValue} index={0}>
@@ -117,7 +126,10 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ open, onClose })
           <UserSettings />
         </TabPanel>
         <TabPanel value={tabValue} index={2}>
-          <AppearanceSettings />
+          <AppearanceSettings themeMode={themeMode} onThemeChange={onThemeChange} />
+        </TabPanel>
+        <TabPanel value={tabValue} index={3}>
+          <DatabaseSettings />
         </TabPanel>
       </DialogContent>
       <DialogActions>

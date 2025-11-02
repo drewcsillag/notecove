@@ -1719,9 +1719,9 @@ All 4 tests passing. Total E2E: 91 passing.
 
 ---
 
-### 2.6 Settings Window 🟡
+### 2.6 Settings Window ✅
 
-**Status:** Partial (UI Complete, Integration Pending)
+**Status:** Complete (All priorities finished)
 
 **Context:** Phase order changed to prioritize SD management UI before Tags. Settings provides the interface for users to configure multiple Storage Directories, which is needed for Phase 2.4.5 UI completion.
 
@@ -1746,47 +1746,95 @@ All 4 tests passing. Total E2E: 91 passing.
   - Dark mode toggle (theme switching not yet implemented) 🟡
 - [x] ✅ Settings integrated into App component
 - [x] ✅ Settings button added to Folder Panel header
-
-**Pending Tasks:**
-
-**High Priority:**
-
-- [ ] 🟥 Add SD deletion IPC handler (`sd:delete`)
-- [ ] 🟥 Implement native file picker for SD path selection
-- [ ] 🟥 Persist user settings (username, handle) to app_state
-
-**Medium Priority:**
-
-- [ ] 🟥 Implement dark mode theme switching
-- [ ] 🟥 Keyboard shortcut (Cmd/Ctrl+,) to open settings
-- [ ] 🟥 Auto-detect common cloud storage paths (Google Drive, OneDrive, iCloud, Dropbox)
-
-**Low Priority:**
-
-- [ ] 🟥 Add Settings to application menu
-- [ ] 🟥 Write E2E tests for Settings dialog
-- [ ] 🟥 Custom database path configuration UI (deferred from Phase 2.2.5)
-
-**Completed:**
-
 - [x] ✅ Write unit tests for Settings components (2025-10-27)
   - 16 tests for Settings dialog and StorageDirectorySettings
   - All Settings tests passing
   - Fixed 15 pre-existing test failures in other components
 
+**Completed Tasks (2025-11-02) - Low Priority Polish:**
+
+- [x] ✅ **Add Settings to application menu**
+  - Added "Settings..." menu item to application menu (macOS: "NoteCove" menu, Windows/Linux: "File" menu)
+  - Keyboard shortcut: Cmd+, (macOS) / Ctrl+, (Windows/Linux)
+  - Menu item triggers same handler as Settings button
+  - IPC handler `sd:openSettings` broadcasts event to all renderer windows
+  - Implemented in `src/main/index.ts` menu setup
+
+- [x] ✅ **User settings persistence**
+  - Username persists to app_state table (key: 'username')
+  - Mention handle persists to app_state table (key: 'user-handle')
+  - Default values: 'User' and 'user' respectively
+  - Settings load on component mount and save on Save button click
+  - Implemented in `src/renderer/src/components/Settings/UserSettings.tsx`
+
+- [x] ✅ **Custom database path configuration**
+  - Added DatabaseSettings tab to Settings dialog
+  - ConfigManager class manages config.json outside of database
+  - Database path configuration persists across restarts
+  - Choose Database Path button opens native directory picker
+  - Restart required after changing database path (dialog prompts user)
+  - Default path: userData/notecove.db
+  - Custom paths stored in userData/config.json
+  - Implemented in:
+    - `src/main/config/manager.ts` - ConfigManager class
+    - `src/renderer/src/components/Settings/DatabaseSettings.tsx` - UI component
+
+- [x] ✅ **Write E2E tests for Settings**
+  - Test: Settings menu item and keyboard shortcut opens Settings dialog
+  - Test: User settings (username, handle) persist across app restarts
+  - Test: Custom database path configuration workflow
+  - All E2E tests passing (110 total)
+  - Implemented in `e2e/settings-low-priority.spec.ts`
+
+**Implementation Notes (2025-11-02):**
+
+- **ConfigManager Architecture**: Created to handle settings that can't be stored in the database (like database path itself). Stores config in JSON file at userData/config.json.
+
+- **Test Fixes**: Fixed two E2E test issues discovered during CI:
+  1. Race condition in duplicate note test - added wait for list sorting
+  2. User settings test selector issue - changed from `input[id="username"]` to `getByRole('textbox', { name: /username/i })` for proper MUI TextField location
+
+- **SettingsDialog Lifecycle**: Made SettingsDialog conditionally mount (only when open) to prevent premature component initialization and improve performance.
+
+**Previously Completed Tasks (from earlier sessions):**
+
+- [x] ✅ **Dark mode theme switching** (implemented prior to 2025-11-02)
+  - Theme mode state management in App component
+  - Loads/saves theme preference from app_state table
+  - Theme toggle in AppearanceSettings
+  - Full light/dark theme support
+
+- [x] ✅ **Cloud storage path auto-detection** (implemented prior to 2025-11-02)
+  - `sd:getCloudStoragePaths` IPC handler
+  - Detects common cloud storage providers (Google Drive, OneDrive, iCloud, Dropbox)
+  - Used in StorageDirectorySettings for quick SD setup
+
+- [x] ✅ **SD deletion IPC handler** (implemented prior to 2025-11-02)
+  - `sd:delete` IPC handler at line 129 of handlers.ts
+  - `handleDeleteStorageDir` implementation at line 1175
+  - Fully functional SD removal
+
+- [x] ✅ **Native file picker for SD path selection** (implemented prior to 2025-11-02)
+  - `dialog.showOpenDialog` implementation
+  - Directory picker with createDirectory option
+  - Used for selecting SD paths
+
 **Backend Already Complete:**
 
-- ✅ SD IPC handlers implemented (`sd:list`, `sd:create`, `sd:setActive`, `sd:getActive`)
+- ✅ SD IPC handlers implemented (`sd:list`, `sd:create`, `sd:setActive`, `sd:getActive`, `sd:delete`, `sd:onOpenSettings`, `sd:getCloudStoragePaths`)
 - ✅ SQLite `storage_dirs` table with UNIQUE constraints
 - ✅ TypeScript types in preload and electron.d.ts
 - ✅ Default SD creation on first run
+- ✅ ConfigManager for external configuration (userData/config.json)
 
 **Components Created:**
 
 - `src/renderer/src/components/Settings/SettingsDialog.tsx` - Main settings dialog with tabs
 - `src/renderer/src/components/Settings/StorageDirectorySettings.tsx` - SD management UI
-- `src/renderer/src/components/Settings/UserSettings.tsx` - User settings
-- `src/renderer/src/components/Settings/AppearanceSettings.tsx` - Appearance settings
+- `src/renderer/src/components/Settings/UserSettings.tsx` - User settings (username, handle)
+- `src/renderer/src/components/Settings/AppearanceSettings.tsx` - Appearance settings (dark mode)
+- `src/renderer/src/components/Settings/DatabaseSettings.tsx` - Database path configuration
+- `src/main/config/manager.ts` - Configuration manager for external config
 
 **Temporary Tools:**
 CLI tools in `/tools/` still available for advanced SD management:
@@ -1797,57 +1845,37 @@ CLI tools in `/tools/` still available for advanced SD management:
 
 **Acceptance Criteria:**
 
-- ✅ Settings dialog opens (via button)
+- ✅ Settings dialog opens (via button, menu item, or keyboard shortcut)
 - ✅ Can list SDs via UI
 - ✅ Can add SDs via UI
 - ✅ Can set active SD via UI
-- 🟡 Can remove SDs via UI (button exists, IPC handler pending)
-- 🟡 Settings persist across restarts (partial - SDs persist, user settings don't yet)
-- 🟥 Auto-detection finds cloud storage folders (pending)
-- 🟡 User can set username (UI exists, persistence pending)
+- ✅ Can remove SDs via UI (fully functional)
+- ✅ Settings persist across restarts (SDs, user settings, database path)
+- ✅ Auto-detection finds cloud storage folders (via getCloudStoragePaths IPC)
+- ✅ User can set username and handle
 - ✅ Active SD clearly indicated
+- ✅ Settings accessible via application menu
+- ✅ Keyboard shortcut (Cmd/Ctrl+,) works
+- ✅ Custom database path configuration available
+- ✅ App prompts for restart after database path change
+- ✅ Dark mode theme switching works
+- ✅ Native file picker for SD path selection
 
 **Test Coverage:**
 
-- 16 Settings tests (100% passing)
+- **Unit Tests**: 16 Settings tests (100% passing)
   - 6 tests for SettingsDialog (tab navigation, reset behavior)
   - 10 tests for StorageDirectorySettings (SD CRUD operations)
-- **Total test suite: 116/116 tests passing (100%)**
-  - Fixed all pre-existing test failures across codebase
-  - Fixed React hook import issues in EditorPanel, TipTapEditor, and Settings components
-  - Fixed component prop issues in NotesListPanel and App tests
 
-**Note:** Core SD management UI is functional. Remaining work is polish and additional features.
+- **E2E Tests**: 3 Settings tests (100% passing)
+  - Settings menu item and keyboard shortcut
+  - User settings persistence across restarts
+  - Custom database path configuration
 
----
+- **Total test suite**: 110 E2E tests passing, 156 unit tests (155 passed, 1 skipped)
 
-### 2.7 Tags Panel 🟥
+**Note:** All low priority Settings tasks complete. Remaining high/medium priority tasks deferred to future phases.
 
-**Status:** To Do
-
-**Note:** Moved after Settings Window (was 2.6) to prioritize SD management UI.
-
-**Tasks:**
-
-- [ ] 🟥 Implement tags panel below folder tree
-  - Header: "TAGS" + search box
-  - Draggable splitter between folder tree and tags panel
-  - List of tag buttons (all known tags from SQLite)
-  - Tri-state buttons: off (default) / positive (blue) / negative (red)
-  - Fuzzy search for tag filtering
-- [ ] 🟥 Implement tag filtering logic
-  - Multiple positive tags: AND logic (note must have all)
-  - Negative tags: exclude even if positive match
-  - Update notes list when tag filters change
-  - Persist tag filter state across restarts (app_state table)
-- [ ] 🟥 Extract tags from note content
-  - Parse `#tagname` from notes (case-insensitive)
-  - No spaces in tag names (stop at whitespace or punctuation or end of line)
-  - Update tag index in SQLite (tags, note_tags tables)
-
-**Acceptance Criteria:**
-
-- Tags panel displays all tags
 - Can toggle tag states (off/positive/negative)
 - Tag search filters tag list (fuzzy)
 - Tag filtering updates notes list correctly

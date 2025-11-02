@@ -127,7 +127,9 @@ declare global {
         setActive: (sdId: string) => Promise<void>;
         getActive: () => Promise<string | null>;
         delete: (sdId: string) => Promise<void>;
-        selectPath: () => Promise<string | null>;
+        selectPath: (defaultPath?: string) => Promise<string | null>;
+        getCloudStoragePaths: () => Promise<Record<string, string>>;
+        onOpenSettings: (callback: () => void) => () => void;
         onUpdated: (callback: (data: { operation: string; sdId: string }) => void) => () => void;
       };
 
@@ -138,6 +140,11 @@ declare global {
       appState: {
         get: (key: string) => Promise<string | null>;
         set: (key: string, value: string) => Promise<void>;
+      };
+
+      config: {
+        getDatabasePath: () => Promise<string>;
+        setDatabasePath: (path: string) => Promise<void>;
       };
 
       testing: {

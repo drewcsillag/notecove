@@ -46,6 +46,7 @@ import { IPCHandlers } from '../handlers';
 import type { CRDTManager } from '../../crdt';
 import type { Database } from '@notecove/shared';
 import type { FolderData } from '@notecove/shared';
+import type { ConfigManager } from '../../config/manager';
 
 // Mock types
 interface MockFolderTreeDoc {
@@ -80,10 +81,16 @@ interface MockDatabase {
   searchNotes: jest.Mock;
 }
 
+interface MockConfigManager {
+  getDatabasePath: jest.Mock;
+  setDatabasePath: jest.Mock;
+}
+
 describe('IPCHandlers - Folder CRUD', () => {
   let handlers: IPCHandlers;
   let mockCRDTManager: MockCRDTManager;
   let mockDatabase: MockDatabase;
+  let mockConfigManager: MockConfigManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -122,10 +129,17 @@ describe('IPCHandlers - Folder CRUD', () => {
       searchNotes: jest.fn().mockResolvedValue([]),
     };
 
+    // Create mock config manager
+    mockConfigManager = {
+      getDatabasePath: jest.fn().mockResolvedValue('/test/path/notecove.db'),
+      setDatabasePath: jest.fn().mockResolvedValue(undefined),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
-      mockDatabase as unknown as Database
+      mockDatabase as unknown as Database,
+      mockConfigManager as unknown as ConfigManager
     );
   });
 
@@ -753,6 +767,7 @@ describe('IPCHandlers - SD Management', () => {
   let handlers: IPCHandlers;
   let mockCRDTManager: MockCRDTManager;
   let mockDatabase: MockDatabase;
+  let mockConfigManager: MockConfigManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -791,10 +806,17 @@ describe('IPCHandlers - SD Management', () => {
       searchNotes: jest.fn().mockResolvedValue([]),
     };
 
+    // Create mock config manager
+    mockConfigManager = {
+      getDatabasePath: jest.fn().mockResolvedValue('/test/path/notecove.db'),
+      setDatabasePath: jest.fn().mockResolvedValue(undefined),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
-      mockDatabase as unknown as Database
+      mockDatabase as unknown as Database,
+      mockConfigManager as unknown as ConfigManager
     );
   });
 

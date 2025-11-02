@@ -135,6 +135,9 @@ test.describe('Permanent Delete and Duplicate Note', () => {
     let noteItems = getNotesList(window);
     await expect(noteItems).toHaveCount(2); // welcome + new note
 
+    // Wait for the note to be sorted to the top (most recently modified)
+    await window.waitForTimeout(500);
+
     // The newly created note should be first (most recently modified)
     await noteItems.first().click({ button: 'right' });
     await window.waitForTimeout(300);

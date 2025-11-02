@@ -99,7 +99,15 @@
       "Bash(timeout 120 NODE_ENV=test npx playwright test:*)",
       "Bash(NODE_ENV=test timeout 120 npx playwright test:*)",
       "Bash(NODE_ENV=test timeout 90 npx playwright test:*)",
-      "Bash(NODE_ENV=test timeout 120 pnpm:*)"
+      "Bash(NODE_ENV=test timeout 120 pnpm:*)",
+      "Bash(NODE_ENV=test timeout 150 npx playwright test:*)",
+      "Bash(for i in {1..3})",
+      "Bash(do echo \"=== Run $i ===\")",
+      "Bash(NODE_ENV=test timeout 180 npx playwright:*)",
+      "Bash(pnpm -w ci-local:*)",
+      "Bash(NODE_ENV=test npx playwright test:*)",
+      "Bash(NODE_ENV=test timeout 60 npx playwright test:*)",
+      "Bash(/tmp/phase-2-6-section.txt)"
     ],
     "deny": [],
     "ask": []

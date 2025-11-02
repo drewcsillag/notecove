@@ -27,11 +27,13 @@ import {
   TextField,
   Alert,
   CircularProgress,
+  ButtonGroup,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloudIcon from '@mui/icons-material/Cloud';
 
 interface StorageDirectory {
   id: string;
@@ -50,11 +52,22 @@ export const StorageDirectorySettings: React.FC = () => {
   const [sdToRemove, setSdToRemove] = useState<StorageDirectory | null>(null);
   const [newSdName, setNewSdName] = useState('');
   const [newSdPath, setNewSdPath] = useState('');
+  const [cloudPaths, setCloudPaths] = useState<Record<string, string>>({});
 
   // Load SDs on mount
   useEffect(() => {
     void loadSds();
+    void loadCloudPaths();
   }, []);
+
+  const loadCloudPaths = async () => {
+    try {
+      const paths = await window.electronAPI.sd.getCloudStoragePaths();
+      setCloudPaths(paths);
+    } catch (err) {
+      console.error('Failed to load cloud storage paths:', err);
+    }
+  };
 
   const loadSds = async () => {
     try {
@@ -126,7 +139,8 @@ export const StorageDirectorySettings: React.FC = () => {
 
   const handleBrowsePath = async () => {
     try {
-      const selectedPath = await window.electronAPI.sd.selectPath();
+      // Start at the current path if one is already entered
+      const selectedPath = await window.electronAPI.sd.selectPath(newSdPath.trim() || undefined);
       if (selectedPath) {
         setNewSdPath(selectedPath);
         setError(null);
@@ -135,6 +149,14 @@ export const StorageDirectorySettings: React.FC = () => {
       console.error('Failed to select path:', err);
       setError('Failed to open file picker');
     }
+  };
+
+  const handleCloudStorageQuickAdd = (name: string, basePath: string) => {
+    setNewSdName(name);
+    // Append /NoteCove to the cloud storage path
+    const noteCovePath = `${basePath}/NoteCove`;
+    setNewSdPath(noteCovePath);
+    setAddDialogOpen(true);
   };
 
   if (loading) {
@@ -176,6 +198,61 @@ export const StorageDirectorySettings: React.FC = () => {
         Storage Directories sync your notes across devices. Each directory contains its own
         collection of notes and folders.
       </Typography>
+
+      {/* Cloud Storage Quick Add */}
+      {Object.keys(cloudPaths).length > 0 && (
+        <Box mb={3}>
+          <Typography variant="subtitle2" color="text.secondary" mb={1}>
+            Quick Add from Cloud Storage:
+          </Typography>
+          <ButtonGroup variant="outlined" size="small">
+            {cloudPaths['iCloudDrive'] && (
+              <Button
+                startIcon={<CloudIcon />}
+                onClick={() => {
+                  const path = cloudPaths['iCloudDrive'];
+                  if (path) handleCloudStorageQuickAdd('iCloud Drive', path);
+                }}
+              >
+                iCloud Drive
+              </Button>
+            )}
+            {cloudPaths['Dropbox'] && (
+              <Button
+                startIcon={<CloudIcon />}
+                onClick={() => {
+                  const path = cloudPaths['Dropbox'];
+                  if (path) handleCloudStorageQuickAdd('Dropbox', path);
+                }}
+              >
+                Dropbox
+              </Button>
+            )}
+            {cloudPaths['GoogleDrive'] && (
+              <Button
+                startIcon={<CloudIcon />}
+                onClick={() => {
+                  const path = cloudPaths['GoogleDrive'];
+                  if (path) handleCloudStorageQuickAdd('Google Drive', path);
+                }}
+              >
+                Google Drive
+              </Button>
+            )}
+            {cloudPaths['OneDrive'] && (
+              <Button
+                startIcon={<CloudIcon />}
+                onClick={() => {
+                  const path = cloudPaths['OneDrive'];
+                  if (path) handleCloudStorageQuickAdd('OneDrive', path);
+                }}
+              >
+                OneDrive
+              </Button>
+            )}
+          </ButtonGroup>
+        </Box>
+      )}
 
       {sds.length === 0 ? (
         <Alert severity="info">No Storage Directories configured. Add one to get started.</Alert>
@@ -270,7 +347,9 @@ export const StorageDirectorySettings: React.FC = () => {
             />
             <Button
               variant="outlined"
-              onClick={handleBrowsePath}
+              onClick={() => {
+                void handleBrowsePath();
+              }}
               sx={{ mt: 1, mb: 1, flexShrink: 0 }}
             >
               Browse...

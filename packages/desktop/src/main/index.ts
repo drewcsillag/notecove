@@ -22,9 +22,11 @@ import * as fs from 'fs/promises';
 import { NodeFileWatcher } from './storage/node-file-watcher';
 import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
+import { ConfigManager } from './config/manager';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
+let configManager: ConfigManager | null = null;
 let ipcHandlers: IPCHandlers | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
 const allWindows: BrowserWindow[] = [];
@@ -80,8 +82,22 @@ function createWindow(): void {
  * Initialize database
  */
 async function initializeDatabase(): Promise<Database> {
-  // Determine database path based on platform
-  const dbPath = process.env['TEST_DB_PATH'] ?? join(app.getPath('userData'), 'notecove.db');
+  // Initialize config manager if not already done
+  if (!configManager) {
+    const configPath = process.env['TEST_CONFIG_PATH'] ?? undefined;
+    configManager = new ConfigManager(configPath);
+  }
+
+  // Determine database path:
+  // 1. Use TEST_DB_PATH if in test mode
+  // 2. Otherwise use custom path from config if set
+  // 3. Fall back to default userData/notecove.db
+  let dbPath: string;
+  if (process.env['TEST_DB_PATH']) {
+    dbPath = process.env['TEST_DB_PATH'];
+  } else {
+    dbPath = await configManager.getDatabasePath();
+  }
 
   if (process.env['NODE_ENV'] === 'test') {
     console.log(`[TEST MODE] Initializing database at: ${dbPath}`);
@@ -469,6 +485,16 @@ function createMenu(): void {
           },
         },
         { type: 'separator' },
+        {
+          label: 'Settings',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => {
+            if (ipcHandlers) {
+              ipcHandlers.openSettings();
+            }
+          },
+        },
+        { type: 'separator' },
         { role: 'quit' },
       ],
     },
@@ -693,7 +719,16 @@ void app.whenReady().then(async () => {
     };
 
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)
-    ipcHandlers = new IPCHandlers(crdtManager, database, createWindow, handleNewStorageDir);
+    if (!configManager) {
+      throw new Error('ConfigManager not initialized');
+    }
+    ipcHandlers = new IPCHandlers(
+      crdtManager,
+      database,
+      configManager,
+      createWindow,
+      handleNewStorageDir
+    );
     if (process.env['NODE_ENV'] === 'test') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await fs.appendFile(
