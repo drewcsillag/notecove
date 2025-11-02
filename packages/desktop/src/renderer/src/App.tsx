@@ -127,6 +127,72 @@ function App(): React.ReactElement {
     return cleanup;
   }, []);
 
+  // Listen for menu commands
+  useEffect(() => {
+    // New Note
+    const cleanupNewNote = window.electronAPI.menu.onNewNote(() => {
+      // Trigger create note button click in NotesListPanel
+      const createButton = document.querySelector<HTMLButtonElement>('button[title="Create note"]');
+      createButton?.click();
+    });
+
+    // New Folder
+    const cleanupNewFolder = window.electronAPI.menu.onNewFolder(() => {
+      // Trigger create folder button click in FolderPanel
+      const createButton = document.querySelector<HTMLButtonElement>(
+        'button[title="Create folder"]'
+      );
+      createButton?.click();
+    });
+
+    // Find (focus search box)
+    const cleanupFind = window.electronAPI.menu.onFind(() => {
+      // Focus search input in NotesListPanel
+      const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+      searchInput?.focus();
+    });
+
+    // Find in Note (not implemented yet - TipTap doesn't have search built in)
+    const cleanupFindInNote = window.electronAPI.menu.onFindInNote(() => {
+      console.log('[Menu] Find in Note - not yet implemented');
+      // TODO: Implement in-editor search when TipTap search extension is added
+    });
+
+    // Toggle Dark Mode
+    const cleanupToggleDarkMode = window.electronAPI.menu.onToggleDarkMode(() => {
+      setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'));
+    });
+
+    // Toggle Folder Panel (not implemented - would need panel collapse state)
+    const cleanupToggleFolderPanel = window.electronAPI.menu.onToggleFolderPanel(() => {
+      console.log('[Menu] Toggle Folder Panel - not yet implemented');
+      // TODO: Would need to add collapsible state to ThreePanelLayout
+    });
+
+    // Toggle Tags Panel (not implemented - tags panel doesn't exist yet)
+    const cleanupToggleTagsPanel = window.electronAPI.menu.onToggleTagsPanel(() => {
+      console.log('[Menu] Toggle Tags Panel - not yet implemented');
+      // TODO: Implement when Tags Panel is added (Phase 2.7)
+    });
+
+    // About dialog (not implemented yet)
+    const cleanupAbout = window.electronAPI.menu.onAbout(() => {
+      console.log('[Menu] About NoteCove - not yet implemented');
+      // TODO: Create About dialog with version info, license, etc.
+    });
+
+    return () => {
+      cleanupNewNote();
+      cleanupNewFolder();
+      cleanupFind();
+      cleanupFindInNote();
+      cleanupToggleDarkMode();
+      cleanupToggleFolderPanel();
+      cleanupToggleTagsPanel();
+      cleanupAbout();
+    };
+  }, []);
+
   const handleLayoutChange = (sizes: number[]): void => {
     // Persist panel sizes to app state
     const savePanelSizes = async (): Promise<void> => {

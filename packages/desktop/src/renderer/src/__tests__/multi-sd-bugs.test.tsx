@@ -75,6 +75,16 @@ const mockElectronAPI = {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
   },
+  menu: {
+    onNewNote: jest.fn(() => () => {}),
+    onNewFolder: jest.fn(() => () => {}),
+    onFind: jest.fn(() => () => {}),
+    onFindInNote: jest.fn(() => () => {}),
+    onToggleDarkMode: jest.fn(() => () => {}),
+    onToggleFolderPanel: jest.fn(() => () => {}),
+    onToggleTagsPanel: jest.fn(() => () => {}),
+    onAbout: jest.fn(() => () => {}),
+  },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */
 

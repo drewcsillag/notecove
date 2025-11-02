@@ -473,29 +473,98 @@ async function setupSDWatchers(
 }
 
 function createMenu(): void {
+  const isMac = process.platform === 'darwin';
+
   const template: Electron.MenuItemConstructorOptions[] = [
+    // macOS application menu
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              {
+                label: 'About NoteCove',
+                click: () => {
+                  // TODO: Show About dialog
+                  if (mainWindow) {
+                    mainWindow.webContents.send('menu:about');
+                  }
+                },
+              },
+              { type: 'separator' as const },
+              {
+                label: 'Settings...',
+                accelerator: 'Cmd+,',
+                click: () => {
+                  if (ipcHandlers) {
+                    ipcHandlers.openSettings();
+                  }
+                },
+              },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const },
+            ],
+          },
+        ]
+      : []),
     {
       label: 'File',
       submenu: [
         {
-          label: 'New Window',
+          label: 'New Note',
           accelerator: 'CmdOrCtrl+N',
+          click: () => {
+            // TODO: Create new note
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:new-note');
+            }
+          },
+        },
+        {
+          label: 'New Folder',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => {
+            // TODO: Create new folder
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:new-folder');
+            }
+          },
+        },
+        {
+          label: 'New Window',
+          accelerator: isMac ? 'Cmd+Shift+W' : 'Ctrl+Shift+W',
           click: () => {
             createWindow();
           },
         },
         { type: 'separator' },
+        // Settings on Windows/Linux only (on macOS it's in app menu)
+        ...(!isMac
+          ? [
+              {
+                label: 'Settings...',
+                accelerator: 'Ctrl+,',
+                click: () => {
+                  if (ipcHandlers) {
+                    ipcHandlers.openSettings();
+                  }
+                },
+              },
+              { type: 'separator' as const },
+            ]
+          : []),
         {
-          label: 'Settings',
-          accelerator: 'CmdOrCtrl+,',
-          click: () => {
-            if (ipcHandlers) {
-              ipcHandlers.openSettings();
-            }
-          },
+          label: 'Close Window',
+          accelerator: 'CmdOrCtrl+W',
+          role: 'close' as const,
         },
-        { type: 'separator' },
-        { role: 'quit' },
+        ...(!isMac ? [{ type: 'separator' as const }, { role: 'quit' as const }] : []),
       ],
     },
     {
@@ -508,43 +577,128 @@ function createMenu(): void {
         { role: 'copy' },
         { role: 'paste' },
         { role: 'selectAll' },
+        { type: 'separator' },
+        {
+          label: 'Find...',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => {
+            // TODO: Focus search box in UI
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:find');
+            }
+          },
+        },
+        {
+          label: 'Find in Note',
+          accelerator: 'CmdOrCtrl+Shift+F',
+          click: () => {
+            // TODO: Open in-editor search
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:find-in-note');
+            }
+          },
+        },
       ],
     },
     {
       label: 'View',
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
+        {
+          label: 'Toggle Dark Mode',
+          accelerator: 'CmdOrCtrl+Shift+D',
+          click: () => {
+            // TODO: Toggle dark mode
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:toggle-dark-mode');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle Folder Panel',
+          accelerator: 'CmdOrCtrl+Shift+1',
+          click: () => {
+            // TODO: Toggle folder panel
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:toggle-folder-panel');
+            }
+          },
+        },
+        {
+          label: 'Toggle Tags Panel',
+          accelerator: 'CmdOrCtrl+Shift+2',
+          click: () => {
+            // TODO: Toggle tags panel (when implemented)
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:toggle-tags-panel');
+            }
+          },
+        },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
         { role: 'togglefullscreen' },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
       ],
     },
     {
       label: 'Window',
-      submenu: [{ role: 'minimize' }, { role: 'close' }],
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac
+          ? [
+              { type: 'separator' as const },
+              { role: 'front' as const },
+              { type: 'separator' as const },
+              { role: 'window' as const },
+            ]
+          : [{ role: 'close' as const }]),
+      ],
     },
     {
       label: 'Help',
       submenu: [
         {
-          label: 'Demo: Open 2nd Window',
-          accelerator: 'CmdOrCtrl+Shift+N',
+          label: 'Documentation',
           click: () => {
-            createWindow();
+            // TODO: Update with actual docs URL when available
+            void shell.openExternal('https://github.com/anthropics/notecove/wiki');
+          },
+        },
+        {
+          label: 'Report Issue',
+          click: () => {
+            void shell.openExternal('https://github.com/anthropics/notecove/issues/new');
           },
         },
         { type: 'separator' },
         {
-          label: 'Learn More',
+          label: 'Show Logs',
           click: () => {
-            void shell.openExternal('https://github.com/anthropics/notecove');
+            const logsPath = app.getPath('logs');
+            void shell.openPath(logsPath);
           },
         },
+        ...(!isMac
+          ? [
+              { type: 'separator' as const },
+              {
+                label: 'About NoteCove',
+                click: () => {
+                  // TODO: Show About dialog
+                  if (mainWindow) {
+                    mainWindow.webContents.send('menu:about');
+                  }
+                },
+              },
+            ]
+          : []),
       ],
     },
   ];

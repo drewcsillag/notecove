@@ -65,6 +65,32 @@ const mockElectronAPI = {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
   },
+  menu: {
+    onNewNote: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onNewFolder: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onFind: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onFindInNote: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onToggleDarkMode: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onToggleFolderPanel: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onToggleTagsPanel: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onAbout: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+  },
 };
 
 Object.defineProperty(window, 'electronAPI', {

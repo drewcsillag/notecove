@@ -378,6 +378,82 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('config:setDatabasePath', path) as Promise<void>,
   },
 
+  // Menu event listeners
+  menu: {
+    onNewNote: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:new-note', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:new-note', listener);
+      };
+    },
+    onNewFolder: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:new-folder', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:new-folder', listener);
+      };
+    },
+    onFind: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:find', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:find', listener);
+      };
+    },
+    onFindInNote: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:find-in-note', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:find-in-note', listener);
+      };
+    },
+    onToggleDarkMode: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:toggle-dark-mode', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:toggle-dark-mode', listener);
+      };
+    },
+    onToggleFolderPanel: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:toggle-folder-panel', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:toggle-folder-panel', listener);
+      };
+    },
+    onToggleTagsPanel: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:toggle-tags-panel', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:toggle-tags-panel', listener);
+      };
+    },
+    onAbout: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:about', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:about', listener);
+      };
+    },
+  },
+
   // Testing operations (only available if main process registered handler)
   testing: {
     createWindow: (): Promise<void> => ipcRenderer.invoke('testing:createWindow') as Promise<void>,

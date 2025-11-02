@@ -107,7 +107,8 @@
       "Bash(pnpm -w ci-local:*)",
       "Bash(NODE_ENV=test npx playwright test:*)",
       "Bash(NODE_ENV=test timeout 60 npx playwright test:*)",
-      "Bash(/tmp/phase-2-6-section.txt)"
+      "Bash(/tmp/phase-2-6-section.txt)",
+      "Bash(env NODE_ENV=test npx playwright test:*)"
     ],
     "deny": [],
     "ask": []

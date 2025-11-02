@@ -147,6 +147,17 @@ declare global {
         setDatabasePath: (path: string) => Promise<void>;
       };
 
+      menu: {
+        onNewNote: (callback: () => void) => () => void;
+        onNewFolder: (callback: () => void) => () => void;
+        onFind: (callback: () => void) => () => void;
+        onFindInNote: (callback: () => void) => () => void;
+        onToggleDarkMode: (callback: () => void) => () => void;
+        onToggleFolderPanel: (callback: () => void) => () => void;
+        onToggleTagsPanel: (callback: () => void) => () => void;
+        onAbout: (callback: () => void) => () => void;
+      };
+
       testing: {
         createWindow: () => Promise<void>;
         setNoteTimestamp: (noteId: string, timestamp: number) => Promise<void>;
