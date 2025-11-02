@@ -126,6 +126,8 @@ declare global {
         create: (name: string, path: string) => Promise<string>;
         setActive: (sdId: string) => Promise<void>;
         getActive: () => Promise<string | null>;
+        delete: (sdId: string) => Promise<void>;
+        selectPath: () => Promise<string | null>;
         onUpdated: (callback: (data: { operation: string; sdId: string }) => void) => () => void;
       };
 

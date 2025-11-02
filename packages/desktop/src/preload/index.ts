@@ -315,6 +315,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('sd:setActive', sdId) as Promise<void>,
     getActive: (): Promise<string | null> =>
       ipcRenderer.invoke('sd:getActive') as Promise<string | null>,
+    delete: (sdId: string): Promise<void> => ipcRenderer.invoke('sd:delete', sdId) as Promise<void>,
+    selectPath: (): Promise<string | null> =>
+      ipcRenderer.invoke('sd:selectPath') as Promise<string | null>,
 
     // Event listeners
     onUpdated: (callback: (data: { operation: string; sdId: string }) => void): (() => void) => {

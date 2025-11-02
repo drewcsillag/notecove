@@ -6,7 +6,7 @@
 
 /* eslint-disable @typescript-eslint/require-await */
 
-import { ipcMain, type IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent, BrowserWindow, dialog } from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
@@ -123,6 +123,8 @@ export class IPCHandlers {
     ipcMain.handle('sd:create', this.handleCreateStorageDir.bind(this));
     ipcMain.handle('sd:setActive', this.handleSetActiveStorageDir.bind(this));
     ipcMain.handle('sd:getActive', this.handleGetActiveStorageDir.bind(this));
+    ipcMain.handle('sd:delete', this.handleDeleteStorageDir.bind(this));
+    ipcMain.handle('sd:selectPath', this.handleSelectSDPath.bind(this));
 
     // App state operations
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
@@ -1145,6 +1147,32 @@ export class IPCHandlers {
   private async handleGetActiveStorageDir(_event: IpcMainInvokeEvent): Promise<string | null> {
     const activeSD = await this.database.getActiveStorageDir();
     return activeSD ? activeSD.id : null;
+  }
+
+  private async handleDeleteStorageDir(_event: IpcMainInvokeEvent, sdId: string): Promise<void> {
+    await this.database.deleteStorageDir(sdId);
+
+    // Broadcast SD update to all windows
+    this.broadcastToAll('sd:updated', { operation: 'delete', sdId });
+  }
+
+  private async handleSelectSDPath(event: IpcMainInvokeEvent): Promise<string | null> {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) {
+      return null;
+    }
+
+    const result = await dialog.showOpenDialog(window, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Storage Directory Location',
+      buttonLabel: 'Select Folder',
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
   }
 
   /**
