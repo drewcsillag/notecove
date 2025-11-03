@@ -37,6 +37,7 @@
     "@tiptap/pm": "^2.26.4",
     "@tiptap/react": "^2.26.4",
     "@tiptap/starter-kit": "^2.26.4",
+    "@tiptap/suggestion": "^2.27.1",
     "better-sqlite3": "^12.4.1",
     "chokidar": "^3.5.3",
     "i18next": "^23.7.0",

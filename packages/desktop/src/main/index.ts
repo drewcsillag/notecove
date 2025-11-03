@@ -14,6 +14,7 @@ import {
   ActivitySync,
   type ActivitySyncCallbacks,
   extractTitleFromDoc,
+  extractTags,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
@@ -36,6 +37,103 @@ const sdFileWatchers = new Map<string, NodeFileWatcher>();
 const sdActivityWatchers = new Map<string, NodeFileWatcher>();
 const sdActivitySyncs = new Map<string, ActivitySync>();
 const sdActivityLoggers = new Map<string, ActivityLogger>();
+
+/**
+ * Reindex tags for a set of notes after external sync
+ */
+async function reindexTagsForNotes(
+  noteIds: Set<string>,
+  crdtManager: CRDTManager,
+  database: Database
+): Promise<void> {
+  if (noteIds.size === 0) {
+    return;
+  }
+
+  console.log(`[TagSync] Reindexing tags for ${noteIds.size} notes after external sync`);
+
+  for (const noteId of noteIds) {
+    try {
+      // Get the note from database to verify it exists
+      const note = await database.getNote(noteId);
+      if (!note || note.deleted) {
+        console.log(`[TagSync] Skipping deleted or non-existent note: ${noteId}`);
+        continue;
+      }
+
+      // Get the CRDT document
+      const doc = crdtManager.getDocument(noteId);
+      if (!doc) {
+        console.warn(`[TagSync] No CRDT document found for note ${noteId}`);
+        continue;
+      }
+
+      // Extract plain text from the document
+      const content = doc.getXmlFragment('content');
+      let contentText = '';
+
+      // Simple text extraction from Y.XmlFragment
+      content.forEach((item) => {
+        if (item instanceof Y.XmlText) {
+          contentText += item.toString() + '\n';
+        } else if (item instanceof Y.XmlElement) {
+          // Recursively extract text from elements
+          const extractText = (elem: Y.XmlElement): string => {
+            let text = '';
+            elem.forEach((child) => {
+              if (child instanceof Y.XmlText) {
+                text += child.toString();
+              } else if (child instanceof Y.XmlElement) {
+                text += extractText(child);
+              }
+            });
+            return text;
+          };
+          contentText += extractText(item) + '\n';
+        }
+      });
+
+      // Extract and update tags
+      const tags = extractTags(contentText);
+      console.log(`[TagSync] Found ${tags.length} tags in note ${noteId}: ${tags.join(', ')}`);
+
+      // Get existing tags for this note
+      const existingTags = await database.getTagsForNote(noteId);
+      const existingTagsMap = new Map(existingTags.map((t) => [t.name.toLowerCase(), t]));
+
+      // Build a set of new tag names for O(1) lookup
+      const newTagNames = new Set(tags);
+
+      // Determine which tags to remove
+      const tagsToRemove = existingTags.filter((tag) => !newTagNames.has(tag.name.toLowerCase()));
+
+      // Determine which tags to add
+      const tagsToAdd = tags.filter((tagName) => !existingTagsMap.has(tagName));
+
+      // Process removals
+      for (const tag of tagsToRemove) {
+        console.log(`[TagSync] Removing tag ${tag.name} from note ${noteId}`);
+        await database.removeTagFromNote(noteId, tag.id);
+      }
+
+      // Process additions
+      for (const tagName of tagsToAdd) {
+        let tag = await database.getTagByName(tagName);
+        if (!tag) {
+          console.log(`[TagSync] Creating new tag: ${tagName}`);
+          tag = await database.createTag(tagName);
+        }
+        console.log(`[TagSync] Adding tag ${tag.name} to note ${noteId}`);
+        await database.addTagToNote(noteId, tag.id);
+      }
+    } catch (err) {
+      console.error(`[TagSync] Failed to reindex tags for note ${noteId}:`, err);
+      // Continue with other notes even if one fails
+    }
+  }
+
+  console.log(`[TagSync] Completed tag reindexing for ${noteIds.size} notes`);
+}
 
 function createWindow(): void {
   // Create the browser window
@@ -248,7 +346,8 @@ async function setupSDWatchers(
   fsAdapter: NodeFileSystemAdapter,
   instanceId: string,
   updateManager: UpdateManager,
-  crdtManager: CRDTManager
+  crdtManager: CRDTManager,
+  db: Database
 ): Promise<void> {
   console.log(`[Init] Setting up watchers for SD: ${sdId} at ${sdPath}`);
 
@@ -272,12 +371,7 @@ async function setupSDWatchers(
   const activitySyncCallbacks: ActivitySyncCallbacks = {
     reloadNote: async (noteId: string, sdIdFromSync: string) => {
       try {
-        if (!database) {
-          console.error('[ActivitySync] Database not initialized');
-          return;
-        }
-
-        const existingNote = await database.getNote(noteId);
+        const existingNote = await db.getNote(noteId);
 
         if (!existingNote) {
           // Note created in another instance
@@ -294,7 +388,7 @@ async function setupSDWatchers(
           const crdtMetadata = noteDoc?.getMetadata();
           const folderId = crdtMetadata?.folderId ?? null;
 
-          await database.upsertNote({
+          await db.upsertNote({
             id: noteId,
             title: extractTitleFromDoc(doc, 'content'),
             sdId: sdIdFromSync,
@@ -322,7 +416,7 @@ async function setupSDWatchers(
             const crdtMetadata = noteDoc?.getMetadata();
             const newTitle = extractTitleFromDoc(doc, 'content');
 
-            await database.upsertNote({
+            await db.upsertNote({
               id: noteId,
               title: newTitle,
               sdId: existingNote.sdId,
@@ -428,6 +522,11 @@ async function setupSDWatchers(
       try {
         const affectedNotes = await activitySync.syncFromOtherInstances();
 
+        // Reindex tags for affected notes
+        if (affectedNotes.size > 0) {
+          await reindexTagsForNotes(affectedNotes, crdtManager, db);
+        }
+
         // Broadcast updates to all windows for affected notes
         if (affectedNotes.size > 0) {
           const noteIds = Array.from(affectedNotes);
@@ -454,6 +553,11 @@ async function setupSDWatchers(
       `[Init] Initial sync complete for SD: ${sdId}, affected notes:`,
       affectedNotes.size
     );
+
+    // Reindex tags for affected notes
+    if (affectedNotes.size > 0) {
+      await reindexTagsForNotes(affectedNotes, crdtManager, db);
+    }
 
     // Broadcast updates to all windows for affected notes
     if (affectedNotes.size > 0) {
@@ -780,6 +884,11 @@ void app.whenReady().then(async () => {
 
     // Handler for when new SD is created (for IPC)
     const handleNewStorageDir = async (sdId: string, sdPath: string): Promise<void> => {
+      if (!database) {
+        console.error('[Init] Database not initialized');
+        throw new Error('Database not initialized');
+      }
+
       try {
         console.log(`[Init] ===== Initializing new SD: ${sdId} at ${sdPath} =====`);
 
@@ -808,7 +917,15 @@ void app.whenReady().then(async () => {
 
         // 5. Set up watchers for this SD
         console.log(`[Init] Step 5: Setting up watchers`);
-        await setupSDWatchers(sdId, sdPath, fsAdapter, instanceId, updateManager, crdtManager);
+        await setupSDWatchers(
+          sdId,
+          sdPath,
+          fsAdapter,
+          instanceId,
+          updateManager,
+          crdtManager,
+          database
+        );
         console.log(`[Init] Step 5: Watchers set up successfully`);
 
         // 6. Scan for existing notes on disk and load them into database
@@ -825,7 +942,7 @@ void app.whenReady().then(async () => {
             }
 
             // Check if note is already in database
-            const existingNote = await database?.getNote(noteId);
+            const existingNote = await database.getNote(noteId);
             if (existingNote) continue;
 
             try {
@@ -840,7 +957,7 @@ void app.whenReady().then(async () => {
                 const folderId = crdtMetadata?.folderId ?? null;
                 const title = extractTitleFromDoc(doc, 'content');
 
-                await database?.upsertNote({
+                await database.upsertNote({
                   id: noteId,
                   title,
                   sdId,
@@ -920,7 +1037,15 @@ void app.whenReady().then(async () => {
     }
 
     // Set up watchers for default SD
-    await setupSDWatchers('default', storageDir, fsAdapter, instanceId, updateManager, crdtManager);
+    await setupSDWatchers(
+      'default',
+      storageDir,
+      fsAdapter,
+      instanceId,
+      updateManager,
+      crdtManager,
+      database
+    );
 
     // Set up watchers for all other registered SDs (only if fully initialized)
     for (const sd of allSDs) {
@@ -930,7 +1055,15 @@ void app.whenReady().then(async () => {
         const isInitialized = await fsAdapter.exists(folderUpdatesPath);
         if (isInitialized) {
           console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
-          await setupSDWatchers(sd.id, sd.path, fsAdapter, instanceId, updateManager, crdtManager);
+          await setupSDWatchers(
+            sd.id,
+            sd.path,
+            fsAdapter,
+            instanceId,
+            updateManager,
+            crdtManager,
+            database
+          );
         } else {
           console.log(
             `[Init] Skipping watchers for SD: ${sd.id} (not fully initialized: ${sd.path})`

@@ -108,7 +108,8 @@
       "Bash(NODE_ENV=test npx playwright test:*)",
       "Bash(NODE_ENV=test timeout 60 npx playwright test:*)",
       "Bash(/tmp/phase-2-6-section.txt)",
-      "Bash(env NODE_ENV=test npx playwright test:*)"
+      "Bash(env NODE_ENV=test npx playwright test:*)",
+      "Bash(env NODE_ENV=test timeout 120 npx playwright test:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,31 +1,36 @@
 ## Phase 4: Advanced Features (Post-MVP)
 
-### 4.1 Tags System 🟥
+### 4.1 Tags System 🟡
 
-**Status:** To Do (Post-MVP)
+**Status:** Partially Complete
 
 **Tasks:**
 
-- [ ] 🟥 Implement tag parsing from note content
+- [x] ✅ Implement tag parsing from note content
   - `#tagname` syntax
-  - Case-insensitive
+  - Case-insensitive (normalized to lowercase)
   - No spaces
   - Theme-dependent color (blue accent)
+  - Max length: 50 characters
+  - Pattern: Must start with letter, followed by letters/numbers/underscores
 - [ ] 🟥 Implement tag autocomplete in editor
   - Show existing tags as user types `#`
   - Insert selected tag
-- [ ] 🟥 Implement tag index updates
+- [x] ✅ Implement tag index updates
   - Real-time as notes are edited
   - Update SQLite tags table
-- [ ] 🟥 Enhance tag panel functionality (already basic version exists in Phase 2)
+  - N+1 query problem fixed (batch processing)
+- [ ] 🟥 Implement tag panel component (does not currently exist)
+  - Display all tags with counts
+  - Clickable to filter notes
   - Full tri-state filtering
   - Tag count badges
 
 **Acceptance Criteria:**
 
-- Tags are recognized in notes
-- Autocomplete works
-- Tag filtering works correctly
+- ✅ Tags are recognized in notes
+- ❌ Autocomplete works
+- ❌ Tag filtering works correctly (requires tag panel)
 
 ---
 

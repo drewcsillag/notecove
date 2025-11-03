@@ -10,9 +10,10 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import Underline from '@tiptap/extension-underline';
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import * as Y from 'yjs';
 import { EditorToolbar } from './EditorToolbar';
+import { Hashtag } from './extensions/Hashtag';
 
 export interface TipTapEditorProps {
   noteId: string | null;
@@ -25,6 +26,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   readOnly = false,
   onTitleChange,
 }) => {
+  const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
   const isLoadingNoteRef = useRef(false);
   const noteIdRef = useRef<string | null>(noteId);
@@ -39,6 +41,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }),
       // Add Underline extension (not in StarterKit)
       Underline,
+      // Add Hashtag extension for #tag support
+      Hashtag,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
@@ -339,6 +343,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             marginLeft: 0,
             fontStyle: 'italic',
             color: 'text.secondary',
+          },
+          // Hashtag styling
+          '& .hashtag': {
+            color: theme.palette.primary.main,
+            fontWeight: 500,
+            cursor: 'pointer',
+            textDecoration: 'none',
+            '&:hover': {
+              textDecoration: 'underline',
+            },
           },
         },
       }}

@@ -14,8 +14,9 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
-import type { Database } from '@notecove/shared';
+import type { Database, NoteCache } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
+import { extractTags } from '@notecove/shared';
 
 export class IPCHandlers {
   constructor(
@@ -146,6 +147,9 @@ export class IPCHandlers {
     // Test-only operations (only available in NODE_ENV=test)
     if (process.env['NODE_ENV'] === 'test') {
       ipcMain.handle('test:setNoteTimestamp', this.handleSetNoteTimestamp.bind(this));
+      ipcMain.handle('test:getAllTags', this.handleTestGetAllTags.bind(this));
+      ipcMain.handle('test:getTagsForNote', this.handleTestGetTagsForNote.bind(this));
+      ipcMain.handle('test:getNoteById', this.handleTestGetNoteById.bind(this));
     }
   }
 
@@ -193,6 +197,80 @@ export class IPCHandlers {
     update: Uint8Array
   ): Promise<void> {
     await this.crdtManager.applyUpdate(noteId, update);
+
+    // Reindex tags after applying update
+    // This ensures tags are indexed even when updates come from other windows
+    try {
+      const note = await this.database.getNote(noteId);
+      if (note) {
+        const doc = this.crdtManager.getDocument(noteId);
+        if (doc) {
+          // Extract plain text from the document
+          const content = doc.getXmlFragment('content');
+          let contentText = '';
+
+          // Simple text extraction from Y.XmlFragment
+          content.forEach((item) => {
+            if (item instanceof Y.XmlText) {
+              contentText += item.toString() + '\n';
+            } else if (item instanceof Y.XmlElement) {
+              // Recursively extract text from elements
+              const extractText = (elem: Y.XmlElement): string => {
+                let text = '';
+                elem.forEach((child) => {
+                  if (child instanceof Y.XmlText) {
+                    text += child.toString();
+                  } else if (child instanceof Y.XmlElement) {
+                    text += extractText(child);
+                  }
+                });
+                return text;
+              };
+              contentText += extractText(item) + '\n';
+            }
+          });
+
+          // Extract and update tags
+          const tags = extractTags(contentText);
+          console.log(`[IPC] Reindexing ${tags.length} tags after CRDT update for note ${noteId}`);
+
+          // Get existing tags for this note
+          const existingTags = await this.database.getTagsForNote(noteId);
+          const existingTagsMap = new Map(existingTags.map((t) => [t.name.toLowerCase(), t]));
+
+          // Build a set of new tag names for O(1) lookup
+          const newTagNames = new Set(tags);
+
+          // Determine which tags to remove
+          const tagsToRemove = existingTags.filter(
+            (tag) => !newTagNames.has(tag.name.toLowerCase())
+          );
+
+          // Determine which tags to add
+          const tagsToAdd = tags.filter((tagName) => !existingTagsMap.has(tagName));
+
+          // Process removals
+          for (const tag of tagsToRemove) {
+            console.log(`[IPC] Removing tag ${tag.name} from note ${noteId}`);
+            await this.database.removeTagFromNote(noteId, tag.id);
+          }
+
+          // Process additions
+          for (const tagName of tagsToAdd) {
+            let tag = await this.database.getTagByName(tagName);
+            if (!tag) {
+              console.log(`[IPC] Creating new tag: ${tagName}`);
+              tag = await this.database.createTag(tagName);
+            }
+            console.log(`[IPC] Adding tag ${tag.name} to note ${noteId}`);
+            await this.database.addTagToNote(noteId, tag.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[IPC] Failed to reindex tags after CRDT update for note ${noteId}:`, err);
+      // Don't throw - tag indexing failure should not prevent update broadcast
+    }
 
     // Broadcast update to all other windows
     this.broadcastToAll('note:updated', noteId, update);
@@ -819,6 +897,50 @@ export class IPCHandlers {
       `[IPC] Title${contentText !== undefined ? ' and content' : ''} updated successfully in database`
     );
 
+    // Extract and update tags if content was provided
+    if (contentText !== undefined) {
+      try {
+        const tags = extractTags(contentText);
+        console.log(`[IPC] Extracted ${tags.length} tags from note ${noteId}:`, tags);
+
+        // Get existing tags for this note (single query)
+        const existingTags = await this.database.getTagsForNote(noteId);
+        const existingTagsMap = new Map(existingTags.map((t) => [t.name.toLowerCase(), t]));
+
+        // Build a set of new tag names for O(1) lookup
+        const newTagNames = new Set(tags);
+
+        // Determine which tags to remove (tags that exist but aren't in new set)
+        const tagsToRemove = existingTags.filter((tag) => !newTagNames.has(tag.name.toLowerCase()));
+
+        // Determine which tags to add (tags that are new)
+        const tagsToAdd = tags.filter((tagName) => !existingTagsMap.has(tagName));
+
+        // Process removals (batch by executing sequentially but only for tags that need removal)
+        for (const tag of tagsToRemove) {
+          console.log(`[IPC] Removing tag ${tag.name} from note ${noteId}`);
+          await this.database.removeTagFromNote(noteId, tag.id);
+        }
+
+        // Process additions
+        for (const tagName of tagsToAdd) {
+          // Check if tag exists in database
+          let tag = await this.database.getTagByName(tagName);
+          if (!tag) {
+            console.log(`[IPC] Creating new tag: ${tagName}`);
+            tag = await this.database.createTag(tagName);
+          }
+          console.log(`[IPC] Adding tag ${tag.name} to note ${noteId}`);
+          await this.database.addTagToNote(noteId, tag.id);
+        }
+
+        console.log(`[IPC] Tags updated successfully for note ${noteId}`);
+      } catch (err) {
+        console.error(`[IPC] Failed to update tags for note ${noteId}:`, err);
+        // Don't throw - tag indexing failure should not prevent note update
+      }
+    }
+
     // Broadcast title update to all windows so they can refresh their notes list
     this.broadcastToAll('note:title-updated', { noteId, title });
   }
@@ -1386,6 +1508,31 @@ export class IPCHandlers {
 
     if (process.env['NODE_ENV'] === 'test') {
       ipcMain.removeHandler('test:setNoteTimestamp');
+      ipcMain.removeHandler('test:getAllTags');
+      ipcMain.removeHandler('test:getTagsForNote');
+      ipcMain.removeHandler('test:getNoteById');
     }
+  }
+
+  // Test-only handlers
+  private async handleTestGetAllTags(): Promise<{ id: string; name: string }[]> {
+    const tags = await this.database.getAllTags();
+    return tags.map((t) => ({ id: t.id, name: t.name }));
+  }
+
+  private async handleTestGetTagsForNote(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<{ id: string; name: string }[]> {
+    const tags = await this.database.getTagsForNote(noteId);
+    return tags.map((t) => ({ id: t.id, name: t.name }));
+  }
+
+  private async handleTestGetNoteById(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<NoteCache | null> {
+    const note = await this.database.getNote(noteId);
+    return note;
   }
 }

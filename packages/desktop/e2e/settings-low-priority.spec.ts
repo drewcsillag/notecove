@@ -74,11 +74,12 @@ test.describe('Phase 2.6 Low Priority Settings', () => {
     // Click on User tab
     const userTab = window.locator('button[role="tab"]', { hasText: 'User' });
     await userTab.click();
+    await window.waitForTimeout(1000); // Wait for tab transition
 
     // Wait for user settings fields to be visible
-    const usernameField = window.getByRole('textbox', { name: /username/i });
-    const handleField = window.getByRole('textbox', { name: /mention handle/i });
-    await usernameField.waitFor({ state: 'visible', timeout: 5000 });
+    const usernameField = window.locator('input[id="username"]');
+    const handleField = window.locator('input[id="user-handle"]');
+    await usernameField.waitFor({ state: 'visible', timeout: 10000 });
 
     await usernameField.fill('Test User');
     await handleField.fill('testuser');
@@ -104,11 +105,12 @@ test.describe('Phase 2.6 Low Priority Settings', () => {
     // Click on User tab again
     const userTab2 = window.locator('button[role="tab"]', { hasText: 'User' });
     await userTab2.click();
+    await window.waitForTimeout(1000); // Wait for tab transition
 
     // Wait for fields to be visible again
-    const usernameField2 = window.getByRole('textbox', { name: /username/i });
-    const handleField2 = window.getByRole('textbox', { name: /mention handle/i });
-    await usernameField2.waitFor({ state: 'visible', timeout: 5000 });
+    const usernameField2 = window.locator('input[id="username"]');
+    const handleField2 = window.locator('input[id="user-handle"]');
+    await usernameField2.waitFor({ state: 'visible', timeout: 10000 });
 
     // Verify settings persisted
     await expect(usernameField2).toHaveValue('Test User');

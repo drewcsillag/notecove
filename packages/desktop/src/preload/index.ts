@@ -7,6 +7,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { NoteMetadata, SyncProgress } from '../main/ipc/types';
+import type { NoteCache } from '@notecove/shared';
 
 // Expose IPC API to renderer
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -460,5 +461,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Test-only: Set note timestamp (only available in NODE_ENV=test)
     setNoteTimestamp: (noteId: string, timestamp: number): Promise<void> =>
       ipcRenderer.invoke('test:setNoteTimestamp', noteId, timestamp) as Promise<void>,
+    // Test-only: Tag database queries (only available in NODE_ENV=test)
+    getAllTags: (): Promise<{ id: string; name: string }[]> =>
+      ipcRenderer.invoke('test:getAllTags') as Promise<{ id: string; name: string }[]>,
+    getTagsForNote: (noteId: string): Promise<{ id: string; name: string }[]> =>
+      ipcRenderer.invoke('test:getTagsForNote', noteId) as Promise<{ id: string; name: string }[]>,
+    getNoteById: (noteId: string): Promise<NoteCache | null> =>
+      ipcRenderer.invoke('test:getNoteById', noteId) as Promise<NoteCache | null>,
   },
 });

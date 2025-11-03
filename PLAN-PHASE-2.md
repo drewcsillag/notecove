@@ -1943,6 +1943,7 @@ CLI tools in `/tools/` still available for advanced SD management:
 **Implementation Details:**
 
 **Files Modified:**
+
 - `src/main/index.ts` - Complete menu implementation with platform-specific handling
 - `src/preload/index.ts` - Added menu event listeners (onNewNote, onNewFolder, etc.)
 - `src/renderer/src/types/electron.d.ts` - Added TypeScript types for menu API
@@ -1951,6 +1952,7 @@ CLI tools in `/tools/` still available for advanced SD management:
 - `src/renderer/src/__tests__/multi-sd-bugs.test.tsx` - Added menu mocks
 
 **Menu Event Handlers:**
+
 - New Note - triggers create note button via DOM query
 - New Folder - triggers create folder button via DOM query
 - Find - focuses search input in notes list
@@ -1961,6 +1963,7 @@ CLI tools in `/tools/` still available for advanced SD management:
 - About - placeholder for About dialog
 
 **Platform-Specific Behavior:**
+
 - macOS: App name menu with About, Settings, Services, Hide, Quit
 - Windows/Linux: Settings in File menu, About in Help menu
 - macOS: Services menu, window management (Front, Zoom)
@@ -1974,11 +1977,13 @@ CLI tools in `/tools/` still available for advanced SD management:
 - ✅ Platform-specific conventions followed (Cmd on macOS, Ctrl elsewhere)
 
 **Test Coverage:**
+
 - ✅ Unit tests updated with menu mocks
 - ✅ All 156 unit tests pass (155 passed, 1 skipped)
 - ✅ All 110 E2E tests pass
 
 **Notes:**
+
 - Toggle Dark Mode is fully functional and tested
 - Find in Note awaits TipTap search extension (not yet in library)
 - Toggle Folder/Tags Panel await collapsible panel state
