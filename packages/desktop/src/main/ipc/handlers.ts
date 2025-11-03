@@ -198,6 +198,58 @@ export class IPCHandlers {
   ): Promise<void> {
     await this.crdtManager.applyUpdate(noteId, update);
 
+    // Sync CRDT metadata back to SQLite cache
+    // This ensures that metadata changes (like deleted flag) are reflected in the cache
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (noteDoc) {
+        const crdtMetadata = noteDoc.getMetadata();
+        const cachedNote = await this.database.getNote(noteId);
+
+        if (cachedNote) {
+          // Check if metadata has changed and needs to be synced to SQLite
+          const metadataChanged =
+            cachedNote.deleted !== crdtMetadata.deleted ||
+            cachedNote.folderId !== crdtMetadata.folderId ||
+            cachedNote.sdId !== crdtMetadata.sdId;
+
+          if (metadataChanged) {
+            console.log(`[IPC] Syncing CRDT metadata to SQLite cache for note ${noteId}:`, {
+              deleted: crdtMetadata.deleted,
+              folderId: crdtMetadata.folderId,
+              sdId: crdtMetadata.sdId,
+            });
+
+            // Update SQLite cache with CRDT metadata
+            await this.database.upsertNote({
+              ...cachedNote,
+              deleted: crdtMetadata.deleted,
+              folderId: crdtMetadata.folderId,
+              sdId: crdtMetadata.sdId,
+              modified: crdtMetadata.modified,
+            });
+
+            // If note was deleted, broadcast delete event
+            if (crdtMetadata.deleted && !cachedNote.deleted) {
+              console.log(`[IPC] Broadcasting note:deleted event for synced deletion of ${noteId}`);
+              this.broadcastToAll('note:deleted', noteId);
+            }
+            // If note was restored, broadcast restore event
+            else if (!crdtMetadata.deleted && cachedNote.deleted) {
+              console.log(
+                `[IPC] Broadcasting note:restored event for synced restoration of ${noteId}`
+              );
+              // Note: There's no explicit note:restored event, so we use note:updated
+              // The UI will pick up the change when it refreshes
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[IPC] Failed to sync CRDT metadata to SQLite for note ${noteId}:`, err);
+      // Don't throw - metadata sync failure should not prevent update broadcast
+    }
+
     // Reindex tags after applying update
     // This ensures tags are indexed even when updates come from other windows
     try {
@@ -685,34 +737,19 @@ export class IPCHandlers {
     }
 
     // Determine which ID to use for the new note
-    // IMPORTANT: Always generate a new UUID for cross-SD moves
-    // This ensures the deleted note remains in the source SD's Recently Deleted
-    // while the new note exists in the target SD
-    let targetNoteId: string = crypto.randomUUID();
+    // IMPORTANT: Preserve the same UUID when moving across SDs
+    // This ensures the note maintains its identity across SDs
+    let targetNoteId: string = noteId;
 
-    // Exception: If conflict resolution is 'replace', we can reuse the existing ID
-    // because we're replacing the existing note in the target SD
-    if (conflictResolution === 'replace') {
-      targetNoteId = noteId;
+    // Exception: If there's a conflict and resolution is 'keepBoth', generate a new UUID
+    if (hasConflict && conflictResolution === 'keepBoth') {
+      targetNoteId = crypto.randomUUID();
     }
 
     // Copy CRDT files from source SD to target SD
     await this.copyNoteCRDTFiles(noteId, sourceSdId, targetNoteId, targetSdId);
 
-    // Soft delete original note in source SD FIRST
-    // (Must do this before creating in target to avoid conflict when targetNoteId === noteId)
-    await this.database.upsertNote({
-      ...sourceNote,
-      deleted: true,
-      modified: Date.now(),
-    });
-    console.log('[IPC] Soft-deleted note in source SD:', {
-      noteId,
-      sourceSdId,
-    });
-
-    // Create note in target SD database
-    // (Do this AFTER deleting source to ensure this is the final state)
+    // Create note in target SD database FIRST
     await this.database.upsertNote({
       id: targetNoteId,
       title: sourceNote.title,
@@ -732,8 +769,28 @@ export class IPCHandlers {
       title: sourceNote.title,
     });
 
-    // Broadcast events
-    this.broadcastToAll('note:deleted', noteId); // Original deleted
+    // Permanently delete original note from source SD
+    // deleteNote() deletes from ALL SDs, so only call it if the note IDs are different
+    // If they're the same, the note now exists in target SD, so we just delete the source SD entry
+    if (targetNoteId !== noteId) {
+      await this.database.deleteNote(noteId);
+    } else {
+      // Same ID: delete only from source SD (UUID is preserved)
+      // We access adapter directly for SD-specific deletion
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      await (this.database as any).adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
+        noteId,
+        sourceSdId,
+      ]);
+    }
+    console.log('[IPC] Permanently deleted note from source SD:', {
+      noteId,
+      sourceSdId,
+    });
+
+    // Broadcast consistent events for cross-SD moves
+    // Use note:deleted for the source and note:created for the target
+    this.broadcastToAll('note:deleted', noteId); // Original deleted from source
     this.broadcastToAll('note:created', {
       sdId: targetSdId,
       noteId: targetNoteId,

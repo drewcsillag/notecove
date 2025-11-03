@@ -117,6 +117,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       // If we're deselecting a note (changing from a valid ID to null or different ID),
       // immediately save the current editor content
       if (previousNoteId && editor && onTitleChange) {
+        // Don't save if the note is still loading
+        if (isLoadingNoteRef.current) {
+          console.log(
+            `[TipTapEditor] Skipping save during deselection - note ${previousNoteId} still loading`
+          );
+          noteIdRef.current = noteId;
+          return;
+        }
+
         // Clear any pending debounced update
         if (titleUpdateTimerRef.current) {
           clearTimeout(titleUpdateTimerRef.current);

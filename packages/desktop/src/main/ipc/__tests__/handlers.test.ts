@@ -79,6 +79,10 @@ interface MockDatabase {
   getActiveStorageDir: jest.Mock;
   setActiveStorageDir: jest.Mock;
   searchNotes: jest.Mock;
+  deleteNote: jest.Mock;
+  adapter: {
+    exec: jest.Mock;
+  };
 }
 
 interface MockConfigManager {
@@ -127,6 +131,10 @@ describe('IPCHandlers - Folder CRUD', () => {
       getActiveStorageDir: jest.fn(),
       setActiveStorageDir: jest.fn(),
       searchNotes: jest.fn().mockResolvedValue([]),
+      deleteNote: jest.fn().mockResolvedValue(undefined),
+      adapter: {
+        exec: jest.fn().mockResolvedValue(undefined),
+      },
     };
 
     // Create mock config manager
@@ -804,6 +812,10 @@ describe('IPCHandlers - SD Management', () => {
       getActiveStorageDir: jest.fn(),
       setActiveStorageDir: jest.fn(),
       searchNotes: jest.fn().mockResolvedValue([]),
+      deleteNote: jest.fn().mockResolvedValue(undefined),
+      adapter: {
+        exec: jest.fn().mockResolvedValue(undefined),
+      },
     };
 
     // Create mock config manager
@@ -1050,29 +1062,24 @@ describe('IPCHandlers - SD Management', () => {
         conflictResolution
       );
 
-      // Should be called twice: once to delete source, once to create in target
-      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(2);
+      // Should be called once to create in target (no conflict, so UUID is preserved)
+      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(1);
 
-      // Should soft delete note in source SD (first call)
-      expect(mockDatabase.upsertNote).toHaveBeenNthCalledWith(
-        1,
+      // Should create note in target SD with SAME UUID (no conflict)
+      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: noteId,
-          sdId: sourceSdId,
-          deleted: true,
-        })
-      );
-
-      // Should create note in target SD with NEW UUID (second call)
-      expect(mockDatabase.upsertNote).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          id: expect.not.stringContaining(noteId), // New UUID generated
+          id: noteId, // UUID preserved when no conflict
           sdId: targetSdId,
           folderId: targetFolderId,
           pinned: true, // Metadata preserved
           deleted: false,
         })
+      );
+
+      // Should permanently delete from source SD using adapter.exec (same UUID)
+      expect(mockDatabase.adapter.exec).toHaveBeenCalledWith(
+        'DELETE FROM notes WHERE id = ? AND sd_id = ?',
+        [noteId, sourceSdId]
       );
     });
 
@@ -1216,6 +1223,9 @@ describe('IPCHandlers - SD Management', () => {
         conflictResolution
       );
 
+      // Should be called once to create in target (replace uses same UUID)
+      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(1);
+
       // Should create note in target SD (replacing existing)
       expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1224,13 +1234,10 @@ describe('IPCHandlers - SD Management', () => {
         })
       );
 
-      // Should soft delete original in source SD
-      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: noteId,
-          sdId: sourceSdId,
-          deleted: true,
-        })
+      // Should permanently delete from source SD using adapter.exec (same UUID)
+      expect(mockDatabase.adapter.exec).toHaveBeenCalledWith(
+        'DELETE FROM notes WHERE id = ? AND sd_id = ?',
+        [noteId, sourceSdId]
       );
     });
 
@@ -1302,6 +1309,9 @@ describe('IPCHandlers - SD Management', () => {
         conflictResolution
       );
 
+      // Should be called once to create in target with new UUID
+      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(1);
+
       // Should create note in target SD with NEW ID
       expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1311,14 +1321,8 @@ describe('IPCHandlers - SD Management', () => {
         })
       );
 
-      // Should soft delete original in source SD
-      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: noteId,
-          sdId: sourceSdId,
-          deleted: true,
-        })
-      );
+      // Should permanently delete original from source SD using deleteNote (different UUIDs)
+      expect(mockDatabase.deleteNote).toHaveBeenCalledWith(noteId);
     });
 
     it('should silently replace note if existing note is in Recently Deleted', async () => {
@@ -1390,17 +1394,22 @@ describe('IPCHandlers - SD Management', () => {
         conflictResolution
       );
 
-      // Should be called twice: once to delete source, once to create in target
-      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(2);
+      // Should be called once to create in target (deleted note doesn't count as conflict)
+      expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(1);
 
-      // Should create note in target SD with NEW UUID (not reusing deleted note's ID)
-      expect(mockDatabase.upsertNote).toHaveBeenNthCalledWith(
-        2,
+      // Should create note in target SD with SAME UUID (deleted note doesn't count as conflict)
+      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: expect.not.stringContaining(noteId), // New UUID generated
+          id: noteId, // UUID preserved since deleted note doesn't count as conflict
           sdId: targetSdId,
           deleted: false,
         })
+      );
+
+      // Should permanently delete from source SD using adapter.exec (same UUID)
+      expect(mockDatabase.adapter.exec).toHaveBeenCalledWith(
+        'DELETE FROM notes WHERE id = ? AND sd_id = ?',
+        [noteId, sourceSdId]
       );
     });
 

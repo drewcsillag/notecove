@@ -265,7 +265,7 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
     // expect(editorContent).toContain('Test note content for cross-SD move');
   });
 
-  test('should move original note to Recently Deleted in source SD', async () => {
+  test('should permanently delete note from source SD (not in Recently Deleted)', async () => {
     // Setup: Create second SD
     await window.locator('[title="Settings"]').click();
     await window.waitForTimeout(500);
@@ -299,7 +299,36 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
 
     const addNoteButton = window.locator('button[title="Create note"]');
     await addNoteButton.click();
+    await window.waitForTimeout(1000);
+
+    // Type some content so the note is saved - use keyboard.type() instead of fill()
+    const editor = window.locator('.ProseMirror');
+    await editor.click();
+    await window.keyboard.type('Test note for cross-SD move');
+    // Wait for save and title extraction
     await window.waitForTimeout(2000);
+
+    // Verify note appears in list
+    await expect(window.locator('text=Test note for cross-SD move').first()).toBeVisible({
+      timeout: 5000,
+    });
+    console.log('[Test] Note visible in list');
+
+    // Wait longer to ensure database save completes
+    await window.waitForTimeout(2000);
+
+    // Get the note ID before moving
+    const noteId = await window.evaluate(async () => {
+      const notes = await window.electronAPI.note.list('default');
+      console.log('[Test] All notes before move:', notes);
+      const activeNotes = notes.filter((n: any) => !n.deleted);
+      const sorted = activeNotes.sort((a: any, b: any) => b.created - a.created);
+      console.log('[Test] Most recent note:', sorted[0]);
+      return sorted[0]?.id;
+    });
+
+    console.log('[Test] Captured noteId:', noteId);
+    expect(noteId).toBeDefined();
 
     // Get the note
     const notesList = window.locator('[data-testid="notes-list"]');
@@ -318,14 +347,31 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
     await confirmDialog.locator('button:has-text("Move")').click();
     await window.waitForTimeout(2000);
 
-    // Check Recently Deleted in source SD
-    const recentlyDeletedDefault = window.getByTestId('folder-tree-node-recently-deleted:default');
-    await recentlyDeletedDefault.click();
-    await window.waitForTimeout(500);
+    // Verify note is NOT in source SD anymore (not even in Recently Deleted)
+    const noteExistsInSource = await window.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list('default');
+      console.log(
+        '[Test] All notes in default SD after move:',
+        notes.map((n: any) => ({ id: n.id, sdId: n.sdId, deleted: n.deleted }))
+      );
+      return notes.some((n: any) => n.id === id);
+    }, noteId);
+    console.log('[Test] noteId:', noteId);
+    console.log('[Test] Note exists in source:', noteExistsInSource);
+    expect(noteExistsInSource).toBe(false);
 
-    // Verify note is in Recently Deleted
-    const deletedNotes = notesList.locator('.MuiListItemButton-root');
-    await expect(deletedNotes).toHaveCount(1);
+    // Verify note exists in target SD with same ID
+    const noteExistsInTarget = await window.evaluate(
+      async (args) => {
+        const notes = await window.electronAPI.note.list(args.targetSdId);
+        const targetNote = notes.find((n: any) => n.id === args.id);
+        console.log('[Test] Target note:', targetNote);
+        return notes.some((n: any) => n.id === args.id && !n.deleted);
+      },
+      { id: noteId, targetSdId }
+    );
+    console.log('[Test] Note exists in target:', noteExistsInTarget, 'targetSdId:', targetSdId);
+    expect(noteExistsInTarget).toBe(true);
   });
 });
 
