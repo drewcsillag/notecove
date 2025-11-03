@@ -20,6 +20,8 @@ import { SyncDirectoryStructure } from './sd-structure';
  */
 export class UpdateManager {
   private sdStructures = new Map<UUID, SyncDirectoryStructure>();
+  // Sequence counters: key = "documentType:documentId", value = next sequence number
+  private sequenceCounters = new Map<string, number>();
 
   constructor(
     private readonly fs: FileSystemAdapter,
@@ -67,7 +69,16 @@ export class UpdateManager {
     // Ensure note directory exists
     await sdStructure.initializeNote(noteId);
 
-    const filename = generateUpdateFilename(UpdateType.Note, this.instanceId, noteId, Date.now());
+    // Get next sequence number for this note
+    const sequence = await this.getNextSequence(UpdateType.Note, sdId, noteId);
+
+    const filename = generateUpdateFilename(
+      UpdateType.Note,
+      this.instanceId,
+      noteId,
+      Date.now(),
+      sequence
+    );
 
     const encoded = encodeUpdateFile(update);
     const filePath = sdStructure.getNoteUpdateFilePath(noteId, filename);
@@ -82,11 +93,15 @@ export class UpdateManager {
   async writeFolderUpdate(sdId: UUID, update: Uint8Array): Promise<string> {
     const sdStructure = this.getSDStructure(sdId);
 
+    // Get next sequence number for this folder tree
+    const sequence = await this.getNextSequence(UpdateType.FolderTree, sdId, sdId);
+
     const filename = generateUpdateFilename(
       UpdateType.FolderTree,
       this.instanceId,
       sdId,
-      Date.now()
+      Date.now(),
+      sequence
     );
 
     const encoded = encodeUpdateFile(update);
@@ -243,5 +258,58 @@ export class UpdateManager {
         console.error(`Failed to delete update file ${filePath}:`, error);
       }
     }
+  }
+
+  /**
+   * Get next sequence number for a document
+   * Initializes by scanning existing files if not yet initialized
+   */
+  private async getNextSequence(
+    type: UpdateType,
+    sdId: UUID,
+    documentId: UUID
+  ): Promise<number> {
+    const key = `${type}:${documentId}`;
+
+    // If already initialized, return next sequence
+    if (this.sequenceCounters.has(key)) {
+      const current = this.sequenceCounters.get(key)!;
+      this.sequenceCounters.set(key, current + 1);
+      return current;
+    }
+
+    // Initialize by scanning existing files written by this instance
+    let maxSeq = -1;
+
+    try {
+      if (type === UpdateType.Note) {
+        const files = await this.listNoteUpdateFiles(sdId, documentId);
+        // Only look at files written by this instance
+        const ourFiles = files.filter((f) => f.instanceId === this.instanceId);
+        for (const file of ourFiles) {
+          const metadata = parseUpdateFilename(file.filename);
+          if (metadata?.sequence !== undefined && metadata.sequence > maxSeq) {
+            maxSeq = metadata.sequence;
+          }
+        }
+      } else if (type === UpdateType.FolderTree) {
+        const files = await this.listFolderUpdateFiles(sdId);
+        const ourFiles = files.filter((f) => f.instanceId === this.instanceId);
+        for (const file of ourFiles) {
+          const metadata = parseUpdateFilename(file.filename);
+          if (metadata?.sequence !== undefined && metadata.sequence > maxSeq) {
+            maxSeq = metadata.sequence;
+          }
+        }
+      }
+    } catch (error) {
+      // If scanning fails, start from 0
+      console.warn(`Failed to scan existing files for ${key}, starting from 0:`, error);
+    }
+
+    // Start from maxSeq + 1 (or 0 if no files found)
+    const nextSeq = maxSeq + 1;
+    this.sequenceCounters.set(key, nextSeq + 1);
+    return nextSeq;
   }
 }

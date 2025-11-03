@@ -27,6 +27,7 @@ export interface UpdateFileMetadata {
   documentId: string; // note-id or sd-id
   timestamp: number;
   version: number;
+  sequence?: number; // Optional: sequence number (new format), undefined for old format
 }
 
 /**
@@ -53,17 +54,42 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
     return null;
   }
 
-  // Extract timestamp (handle both "timestamp-random" and legacy "timestamp" formats)
-  const timestampStr = lastPart.includes('-') ? lastPart.split('-')[0] : lastPart;
-  const timestamp = parseInt(timestampStr ?? '', 10);
+  // Extract timestamp and sequence number
+  // Formats:
+  //   - Legacy: "timestamp" (no suffix)
+  //   - Old: "timestamp-random" (4-digit random suffix)
+  //   - New: "timestamp-seq" (sequence number suffix)
+  let timestamp: number;
+  let sequence: number | undefined;
 
-  if (isNaN(timestamp)) {
-    return null;
+  if (lastPart.includes('-')) {
+    const parts = lastPart.split('-');
+    const timestampStr = parts[0];
+    const sequenceStr = parts[1];
+
+    timestamp = parseInt(timestampStr ?? '', 10);
+    if (isNaN(timestamp)) {
+      return null;
+    }
+
+    // Parse sequence number (could be old random suffix or new sequence)
+    if (sequenceStr) {
+      const seq = parseInt(sequenceStr, 10);
+      if (!isNaN(seq)) {
+        sequence = seq;
+      }
+    }
+  } else {
+    // Legacy format without suffix
+    timestamp = parseInt(lastPart, 10);
+    if (isNaN(timestamp)) {
+      return null;
+    }
   }
 
   // Determine type and document ID
   if (parts[1] === 'folder-tree') {
-    // Format: <instance-id>_folder-tree_<sd-id>_<timestamp>[-random]
+    // Format: <instance-id>_folder-tree_<sd-id>_<timestamp>[-seq]
     const sdId = parts.slice(2, -1).join('_');
     return {
       type: UpdateType.FolderTree,
@@ -71,9 +97,10 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
       documentId: sdId,
       timestamp,
       version: UPDATE_FORMAT_VERSION,
+      sequence,
     };
   } else {
-    // Format: <instance-id>_<note-id>_<timestamp>[-random]
+    // Format: <instance-id>_<note-id>_<timestamp>[-seq]
     const noteId = parts.slice(1, -1).join('_');
     return {
       type: UpdateType.Note,
@@ -81,25 +108,31 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
       documentId: noteId,
       timestamp,
       version: UPDATE_FORMAT_VERSION,
+      sequence,
     };
   }
 }
 
 /**
  * Generate update filename
- * Includes random suffix to prevent collisions when multiple updates happen in same millisecond
+ * Includes suffix to prevent collisions and track sequence
+ * @param sequence - Optional sequence number (new format). If not provided, uses random 4-digit suffix (old format)
  */
 export function generateUpdateFilename(
   type: UpdateType,
   instanceId: string,
   documentId: string,
-  timestamp: number = Date.now()
+  timestamp: number = Date.now(),
+  sequence?: number
 ): string {
-  // Add 4-digit random suffix to prevent filename collisions
-  const randomSuffix = Math.floor(Math.random() * 10000)
-    .toString()
-    .padStart(4, '0');
-  const uniqueTimestamp = `${timestamp}-${randomSuffix}`;
+  // If sequence provided, use it (new format)
+  // Otherwise, use random 4-digit suffix (old format, backward compatible)
+  const suffix =
+    sequence !== undefined
+      ? sequence.toString()
+      : Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+
+  const uniqueTimestamp = `${timestamp}-${suffix}`;
 
   if (type === UpdateType.FolderTree) {
     return `${instanceId}_folder-tree_${documentId}_${uniqueTimestamp}.yjson`;

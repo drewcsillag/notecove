@@ -67,6 +67,39 @@ describe('update-format', () => {
 
       expect(metadata).toBeNull();
     });
+
+    it('should parse sequence number from new format', () => {
+      const filename = 'inst-123_note-456_1234567890-42.yjson';
+      const metadata = parseUpdateFilename(filename);
+
+      expect(metadata).not.toBeNull();
+      expect(metadata?.timestamp).toBe(1234567890);
+      expect(metadata?.sequence).toBe(42);
+    });
+
+    it('should parse large sequence numbers', () => {
+      const filename = 'inst-123_note-456_1234567890-999999.yjson';
+      const metadata = parseUpdateFilename(filename);
+
+      expect(metadata).not.toBeNull();
+      expect(metadata?.sequence).toBe(999999);
+    });
+
+    it('should handle sequence number 0', () => {
+      const filename = 'inst-123_note-456_1234567890-0.yjson';
+      const metadata = parseUpdateFilename(filename);
+
+      expect(metadata).not.toBeNull();
+      expect(metadata?.sequence).toBe(0);
+    });
+
+    it('should parse old random suffix as sequence', () => {
+      const filename = 'inst-123_note-456_1234567890-5678.yjson';
+      const metadata = parseUpdateFilename(filename);
+
+      expect(metadata).not.toBeNull();
+      expect(metadata?.sequence).toBe(5678);
+    });
   });
 
   describe('generateUpdateFilename', () => {
@@ -113,6 +146,54 @@ describe('update-format', () => {
       // Should be parseable
       const metadata = parseUpdateFilename(filename);
       expect(metadata?.documentId).toBe('note_with_underscores');
+    });
+
+    it('should generate note update filename with sequence number', () => {
+      const filename = generateUpdateFilename(
+        UpdateType.Note,
+        'inst-123',
+        'note-456',
+        1234567890,
+        42
+      );
+
+      expect(filename).toBe('inst-123_note-456_1234567890-42.yjson');
+    });
+
+    it('should generate folder-tree update filename with sequence number', () => {
+      const filename = generateUpdateFilename(
+        UpdateType.FolderTree,
+        'inst-123',
+        'sd-789',
+        1234567890,
+        100
+      );
+
+      expect(filename).toBe('inst-123_folder-tree_sd-789_1234567890-100.yjson');
+    });
+
+    it('should handle sequence number 0', () => {
+      const filename = generateUpdateFilename(
+        UpdateType.Note,
+        'inst-123',
+        'note-456',
+        1234567890,
+        0
+      );
+
+      expect(filename).toBe('inst-123_note-456_1234567890-0.yjson');
+    });
+
+    it('should handle large sequence numbers', () => {
+      const filename = generateUpdateFilename(
+        UpdateType.Note,
+        'inst-123',
+        'note-456',
+        1234567890,
+        999999
+      );
+
+      expect(filename).toBe('inst-123_note-456_1234567890-999999.yjson');
     });
   });
 
@@ -179,6 +260,38 @@ describe('update-format', () => {
       expect(metadata?.instanceId).toBe(instanceId);
       expect(metadata?.documentId).toBe(documentId);
       expect(metadata?.timestamp).toBe(timestamp);
+    });
+
+    it('should correctly round-trip with sequence numbers', () => {
+      const type = UpdateType.Note;
+      const instanceId = 'inst-abc-123';
+      const documentId = 'note-def-456';
+      const timestamp = 1234567890;
+      const sequence = 42;
+
+      const filename = generateUpdateFilename(type, instanceId, documentId, timestamp, sequence);
+      const metadata = parseUpdateFilename(filename);
+
+      expect(metadata).not.toBeNull();
+      expect(metadata?.type).toBe(type);
+      expect(metadata?.instanceId).toBe(instanceId);
+      expect(metadata?.documentId).toBe(documentId);
+      expect(metadata?.timestamp).toBe(timestamp);
+      expect(metadata?.sequence).toBe(sequence);
+    });
+
+    it('should correctly round-trip with sequence 0', () => {
+      const type = UpdateType.Note;
+      const instanceId = 'inst-test';
+      const documentId = 'note-test';
+      const timestamp = 1234567890;
+      const sequence = 0;
+
+      const filename = generateUpdateFilename(type, instanceId, documentId, timestamp, sequence);
+      const metadata = parseUpdateFilename(filename);
+
+      expect(metadata).not.toBeNull();
+      expect(metadata?.sequence).toBe(0);
     });
   });
 });
