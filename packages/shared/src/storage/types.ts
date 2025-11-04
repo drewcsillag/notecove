@@ -20,6 +20,7 @@ export interface NotePaths {
   root: string;
   updates: string;
   snapshots: string;
+  packs: string;
   meta: string;
 }
 

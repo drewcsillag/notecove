@@ -27,4 +27,15 @@ export {
   type SnapshotFileMetadata,
   type VectorClock,
 } from './snapshot-format';
+export {
+  PACK_FORMAT_VERSION,
+  parsePackFilename,
+  generatePackFilename,
+  encodePackFile,
+  decodePackFile,
+  validatePackData,
+  type PackData,
+  type PackUpdateEntry,
+  type PackFileMetadata,
+} from './pack-format';
 export { extractTitleFromFragment, extractTitleFromDoc } from './title-extractor';
