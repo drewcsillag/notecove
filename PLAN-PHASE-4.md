@@ -48,6 +48,7 @@
 **Detailed Architecture:** See [docs/architecture/crdt-snapshot-packing.md](./docs/architecture/crdt-snapshot-packing.md)
 
 **Problem:**
+
 - Brief documents reach thousands of CRDT update files
 - Cold load takes 3-5 seconds (thousands of file reads + Y.applyUpdate() calls)
 - Cloud sync struggles with thousands of tiny files
@@ -55,6 +56,7 @@
 
 **Solution:**
 Hybrid three-tier system:
+
 1. **Snapshots:** Full document state + vector clock (every ~1000 updates)
 2. **Packs:** Batches of 50-100 updates per instance
 3. **Recent:** Last 50 unpacked updates for fast sync
@@ -64,6 +66,7 @@ Hybrid three-tier system:
 #### Phase 1: Snapshots (Foundational) 🟥
 
 **Tasks:**
+
 - [ ] 🟥 Design snapshot format
   - Filename: `snapshot_<total-changes>_<instance-id>.yjson`
   - Contents: document state + vector clock (maxSequences)
@@ -104,6 +107,7 @@ Hybrid three-tier system:
   - Verify 80-90% reduction (3-5s → 100-250ms)
 
 **Acceptance Criteria:**
+
 - Cold load time reduced by 80-90%
 - All update files after snapshot are applied correctly
 - No data loss in any scenario
@@ -115,6 +119,7 @@ Hybrid three-tier system:
 #### Phase 2: Packing (File Count Reduction) 🟥
 
 **Tasks:**
+
 - [ ] 🟥 Design pack format
   - Filename: `<instance-id>_pack_<start-seq>-<end-seq>.yjson`
   - Contents: Array of {seq, timestamp, data} entries
@@ -153,6 +158,7 @@ Hybrid three-tier system:
   - Verify 90-95% reduction (2000 files → 50-100 files)
 
 **Acceptance Criteria:**
+
 - File count reduced by 90-95%
 - Cold load still fast (no regression)
 - Packs load correctly during cold start
@@ -164,6 +170,7 @@ Hybrid three-tier system:
 #### Phase 3: Garbage Collection (Disk Space) 🟥
 
 **Tasks:**
+
 - [ ] 🟥 Implement snapshot GC
   - Keep last 2-3 snapshots by total-changes
   - Delete older snapshots
@@ -193,6 +200,7 @@ Hybrid three-tier system:
   - Verify disk usage stable (doesn't grow unbounded)
 
 **Acceptance Criteria:**
+
 - Disk usage stable over time
 - Old snapshots/packs/updates properly deleted
 - Minimum history retained (configurable)
@@ -204,6 +212,7 @@ Hybrid three-tier system:
 #### Phase 4: Optimizations and Monitoring 🟥
 
 **Tasks:**
+
 - [ ] 🟥 Add telemetry
   - Cold load time (P50, P95, P99)
   - File count per note (histogram)
@@ -239,6 +248,7 @@ Hybrid three-tier system:
   - Document configuration options
 
 **Acceptance Criteria:**
+
 - Metrics available for monitoring
 - Edge cases handled gracefully
 - Performance validated at scale
@@ -248,14 +258,15 @@ Hybrid three-tier system:
 
 **Overall Expected Improvements:**
 
-| Metric | Before | After Phase 1 | After Phase 3 |
-|--------|--------|---------------|---------------|
-| Cold load time | 3-5 seconds | 100-250ms | 100-200ms |
-| File count (brief doc) | 2,000 files | ~100 files | ~65 files |
-| Disk usage growth | Unbounded | Unbounded | Bounded (GC) |
-| Cloud sync time | Slow (many files) | Improved | Fast (few files) |
+| Metric                 | Before            | After Phase 1 | After Phase 3    |
+| ---------------------- | ----------------- | ------------- | ---------------- |
+| Cold load time         | 3-5 seconds       | 100-250ms     | 100-200ms        |
+| File count (brief doc) | 2,000 files       | ~100 files    | ~65 files        |
+| Disk usage growth      | Unbounded         | Unbounded     | Bounded (GC)     |
+| Cloud sync time        | Slow (many files) | Improved      | Fast (few files) |
 
 **Links:**
+
 - **Architecture:** [docs/architecture/crdt-snapshot-packing.md](./docs/architecture/crdt-snapshot-packing.md)
 - **Related:** Phase 2.7 (CRDT sync), Phase 3 (Multi-instance sync)
 

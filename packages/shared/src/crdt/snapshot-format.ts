@@ -139,11 +139,7 @@ export function createEmptyVectorClock(): VectorClock {
 /**
  * Update vector clock with a sequence number
  */
-export function updateVectorClock(
-  clock: VectorClock,
-  instanceId: string,
-  sequence: number
-): void {
+export function updateVectorClock(clock: VectorClock, instanceId: string, sequence: number): void {
   const current = clock[instanceId] ?? -1;
   if (sequence > current) {
     clock[instanceId] = sequence;
@@ -171,9 +167,7 @@ export function shouldApplyUpdate(
  * Picks snapshot with highest totalChanges (most comprehensive)
  * If tied, picks lexicographically first instance-id (deterministic)
  */
-export function selectBestSnapshot(
-  snapshots: SnapshotFileMetadata[]
-): SnapshotFileMetadata | null {
+export function selectBestSnapshot(snapshots: SnapshotFileMetadata[]): SnapshotFileMetadata | null {
   if (snapshots.length === 0) {
     return null;
   }

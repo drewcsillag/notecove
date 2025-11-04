@@ -11,6 +11,7 @@ This document describes the snapshot and packing optimization system for CRDT up
 **File Format:** `<instance-id>_<note-id>_<timestamp>-<random>.yjson`
 
 Each change to a document creates a new update file. For a brief note with active editing:
+
 - **File count:** 2,000+ individual update files
 - **Cold load time:** 3-5 seconds
 - **Operations:** Thousands of file reads + thousands of Y.applyUpdate() calls
@@ -53,6 +54,7 @@ notes/<note-id>/
 **Filename:** `snapshot_<total-changes>_<instance-id>.yjson`
 
 **File Contents:**
+
 ```typescript
 {
   version: 1,
@@ -90,12 +92,14 @@ notes/<note-id>/
 The `totalChanges` count is **encoded in the filename**, not assumed by code.
 
 **Why This Matters:**
+
 1. **Tunable frequency:** Snapshot trigger can change (every 500 → 1000 → 2000 updates) without code changes
 2. **Re-snapshotting:** Can create new snapshots with higher totalChanges to supersede old ones
 3. **Variable triggers:** Different notes can snapshot at different frequencies
 4. **Selection algorithm:** Always pick highest totalChanges (most comprehensive snapshot)
 
 **Example Evolution:**
+
 ```
 # Early snapshots (frequent):
 snapshot_500_instance-A.yjson     (500 updates incorporated)
@@ -109,15 +113,16 @@ snapshot_5000_instance-A.yjson    (replaces all above, most comprehensive)
 ```
 
 **Code Implementation:**
+
 ```typescript
 // GOOD: Parse totalChanges from filename, select highest
 const snapshots = listSnapshotFiles();
-const selected = snapshots.sort((a, b) =>
-  b.totalChanges - a.totalChanges  // Highest first
+const selected = snapshots.sort(
+  (a, b) => b.totalChanges - a.totalChanges // Highest first
 )[0];
 
 // BAD: Assume snapshots every 1000 updates
-const SNAPSHOT_INTERVAL = 1000;  // ❌ Hard-coded assumption
+const SNAPSHOT_INTERVAL = 1000; // ❌ Hard-coded assumption
 ```
 
 ### Pack Format
@@ -127,6 +132,7 @@ const SNAPSHOT_INTERVAL = 1000;  // ❌ Hard-coded assumption
 Example: `instance-abc_pack_2501-2600.yjson`
 
 **File Contents:**
+
 ```typescript
 {
   version: 1,
@@ -154,12 +160,14 @@ Example: `instance-abc_pack_2501-2600.yjson`
 The sequence range is **encoded in the filename** (`<start-seq>-<end-seq>`), not assumed by code.
 
 **Why This Matters:**
+
 1. **Tunable parameters:** Pack size can change over time (50 → 100 → 200) without code changes
 2. **Repacking:** Can consolidate packs (merge `pack_1-50` + `pack_51-100` → `pack_1-100`)
 3. **Variable sizes:** Different instances or notes can use different pack sizes
 4. **Forward compatibility:** Code reads actual range from filename, works with any size
 
 **Example Evolution:**
+
 ```
 # Early version (small packs):
 instance-abc_pack_1-50.yjson      (50 updates)
@@ -173,6 +181,7 @@ instance-abc_pack_1-300.yjson     (replaces all above)
 ```
 
 **Code Implementation:**
+
 ```typescript
 // GOOD: Parse range from filename
 const [startSeq, endSeq] = parsePackFilename(filename);
@@ -183,7 +192,7 @@ for (const update of pack.updates) {
 }
 
 // BAD: Assume fixed pack size
-const PACK_SIZE = 100;  // ❌ Hard-coded assumption
+const PACK_SIZE = 100; // ❌ Hard-coded assumption
 ```
 
 ### Update File Format (Unpacked)
@@ -232,6 +241,7 @@ Example: `instance-abc_1699028345123-4799.yjson`
 ```
 
 **Expected Performance:**
+
 - Load 1 snapshot file: ~10-50ms
 - Load 5-10 pack files: ~50-100ms
 - Load ~50 update files: ~50-100ms
@@ -240,11 +250,13 @@ Example: `instance-abc_1699028345123-4799.yjson`
 ### Snapshot Creation Algorithm
 
 **Triggers:**
+
 - Document close (if ≥100 updates since last snapshot)
 - Background job (periodic scan for documents with ≥500 updates since last snapshot)
 - Manual trigger (future: user-initiated)
 
 **Process:**
+
 ```
 1. Calculate totalChanges:
    - Count all update files + entries in all packs + snapshots
@@ -269,6 +281,7 @@ Example: `instance-abc_1699028345123-4799.yjson`
 **Conflict Handling:**
 
 If two instances create snapshots simultaneously with same totalChanges:
+
 - Both are valid (same totalChanges, different instance-id in filename)
 - Load algorithm picks one arbitrarily (deterministic: lexicographic by instance-id)
 - No data loss: Both snapshots represent same document state (CRDT convergence)
@@ -276,10 +289,12 @@ If two instances create snapshots simultaneously with same totalChanges:
 ### Packing Algorithm
 
 **Triggers:**
+
 - Background job runs every 5 minutes
 - Scans for instances with ≥100 unpacked updates older than 5 minutes
 
 **Process:**
+
 ```
 1. Group update files by instance-id
 
@@ -305,11 +320,13 @@ If two instances create snapshots simultaneously with same totalChanges:
 ### Garbage Collection Algorithm
 
 **Triggers:**
+
 - Background job runs every 30 minutes
 - After snapshot creation
 - When disk space is low (future)
 
 **Process:**
+
 ```
 1. List all snapshots, sort by totalChanges descending
 
@@ -348,6 +365,7 @@ Each instance maintains a **monotonically increasing sequence counter** for upda
 **Location:** Per-instance, per-document metadata
 
 **Options:**
+
 1. **In-memory + persisted to special file:** `<instance-id>_sequence_<note-id>.json`
    - Fast access
    - Survives crashes (written after each update)
@@ -359,6 +377,7 @@ Each instance maintains a **monotonically increasing sequence counter** for upda
    - No extra files needed
 
 **Recommendation:** Option 2 (parse from filenames)
+
 - Simpler (no extra files)
 - Self-healing (if metadata lost, can reconstruct)
 - Slightly slower startup (negligible: already scanning files)
@@ -370,6 +389,7 @@ Each instance maintains a **monotonically increasing sequence counter** for upda
 **New format:** `<instance-id>_<timestamp>-<seq>.yjson`
 
 **Migration:** Both formats coexist during transition
+
 - Parser handles both: `timestamp-random` (old) and `timestamp-seq` (new)
 - Old files gradually get packed/deleted via GC
 - No data loss
@@ -379,11 +399,13 @@ Each instance maintains a **monotonically increasing sequence counter** for upda
 **Scenario:** Instance crashes, sequence 1050 was never written, next is 1051.
 
 **Packing behavior:**
+
 - Only pack contiguous sequences: 1-1049 (stop at gap)
 - Leave 1051+ unpacked until gap is resolved or timed out
 - Timeout: After 24 hours, assume gap is permanent, treat 1051 as valid continuation
 
 **Rationale:**
+
 - Gaps should be rare (only crashes during write)
 - Preserves data integrity (don't skip updates)
 - Timeout prevents indefinite blocking
@@ -393,11 +415,13 @@ Each instance maintains a **monotonically increasing sequence counter** for upda
 **Scenario:** Instance C wants to create snapshot, but Instance B has a gap in its sequences.
 
 **Example:**
+
 - Instance B's files visible to Instance C: 1-50 ✅, **51 ❌ (missing - laptop rebooted before sync)**, 52-80 ✅
 
 **Snapshot Behavior: Record Highest Contiguous Sequence**
 
 Instance C creates snapshot with:
+
 ```typescript
 maxSequences: {
   "instance-A": 150,  // Complete
@@ -413,6 +437,7 @@ maxSequences: {
 - When seq 51 eventually syncs (hours/days later), everything works correctly
 
 **Cold Load After Gap Is Filled:**
+
 1. Load snapshot (has Instance B up to seq 50)
 2. Load update files for Instance B:
    - seq 51 (51 > 50 → apply) ✅
@@ -420,12 +445,14 @@ maxSequences: {
 3. Document is now fully up-to-date
 
 **Why This Works:**
+
 - Snapshots don't need to be "complete" - just consistent with visible state
 - CRDT convergence guarantees correctness regardless of update order
 - Gap eventually gets filled (or timeout assumes permanent loss)
 - No indefinite blocking on snapshot creation
 
 **Alternative (Not Chosen):**
+
 - Block snapshot creation until all gaps filled
 - Problem: Could wait hours/days if Instance B is offline
 - Result: Snapshot creation stalls indefinitely (bad UX)
@@ -439,14 +466,17 @@ maxSequences: {
 **Scenario:** Two instances create snapshots with same totalChanges value.
 
 **Filenames:**
+
 - Instance A: `snapshot_4800_instance-abc.yjson`
 - Instance B: `snapshot_4800_instance-xyz.yjson`
 
 **Selection Algorithm:**
+
 - Sort filenames lexicographically
 - Pick first (deterministic): `snapshot_4800_instance-abc.yjson`
 
 **Result:**
+
 - Both snapshots are valid (CRDT convergence guarantees same state)
 - Picking one arbitrarily is safe
 - No coordination needed between instances
@@ -479,11 +509,12 @@ Each instance MUST only pack updates it wrote itself (identified by instance-id 
    - No conflicts, no coordination needed
 
 **Implementation:**
+
 ```typescript
 // Packing job filters by instance ID
 const myInstanceId = getInstanceId();
 const updateFiles = listUpdateFiles(noteId).filter(
-  file => file.instanceId === myInstanceId  // Only pack own updates
+  (file) => file.instanceId === myInstanceId // Only pack own updates
 );
 ```
 
@@ -500,12 +531,14 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Scenario:** Two instances create snapshots simultaneously.
 
 **Behavior:**
+
 - Both snapshots created successfully
 - Filenames differ by instance-id
 - Load algorithm picks one (deterministic)
 - GC eventually deletes older one (when newer snapshot exists)
 
 **Optimization:**
+
 - Record "last snapshot totalChanges" in shared metadata file
 - Instances check before creating snapshot
 - Reduces duplicate snapshots (but not harmful if they occur)
@@ -515,16 +548,19 @@ const updateFiles = listUpdateFiles(noteId).filter(
 ### Phase 1: Add Snapshots (Foundational)
 
 **Goals:**
+
 - Implement snapshot creation on document close
 - Implement snapshot loading on cold start
 - Fallback to update files if no snapshot
 
 **Files Modified:**
+
 - `packages/shared/src/crdt/snapshot-format.ts` (new)
 - `packages/shared/src/storage/update-manager.ts`
 - `packages/desktop/src/main/crdt/crdt-manager.ts`
 
 **Success Metrics:**
+
 - Cold load time reduced by 80-90%
 - No data loss
 - All tests pass
@@ -532,16 +568,19 @@ const updateFiles = listUpdateFiles(noteId).filter(
 ### Phase 2: Add Packing (File Count Reduction)
 
 **Goals:**
+
 - Background job to pack old updates
 - Load packs on cold start
 - Keep last 50 updates unpacked
 
 **Files Modified:**
+
 - `packages/shared/src/crdt/pack-format.ts` (new)
 - `packages/shared/src/storage/update-manager.ts`
 - `packages/desktop/src/main/background-jobs/packing-job.ts` (new)
 
 **Success Metrics:**
+
 - File count reduced by 90-95%
 - Cloud sync faster (fewer files)
 - All tests pass
@@ -549,15 +588,18 @@ const updateFiles = listUpdateFiles(noteId).filter(
 ### Phase 3: Add Garbage Collection (Disk Space)
 
 **Goals:**
+
 - Delete old snapshots (keep last 2-3)
 - Delete packs/updates incorporated into snapshots
 - Configurable retention period
 
 **Files Modified:**
+
 - `packages/desktop/src/main/background-jobs/gc-job.ts` (new)
 - `packages/shared/src/storage/update-manager.ts`
 
 **Success Metrics:**
+
 - Disk usage stable (doesn't grow unbounded)
 - Old data properly cleaned up
 - Retention policy respected
@@ -565,11 +607,13 @@ const updateFiles = listUpdateFiles(noteId).filter(
 ### Phase 4: Optimizations and Monitoring
 
 **Goals:**
+
 - Add metrics/telemetry (file counts, load times)
 - Optimize snapshot/pack triggers
 - Handle edge cases (corrupted files, gaps, conflicts)
 
 **Files Modified:**
+
 - All previous files (optimizations)
 - `packages/desktop/src/main/telemetry/crdt-metrics.ts` (new)
 
@@ -580,6 +624,7 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Detection:** Y.applyUpdate() throws error
 
 **Recovery:**
+
 1. Log error with snapshot filename
 2. Try next-newest snapshot
 3. If all snapshots fail: Fall back to loading all update files
@@ -590,6 +635,7 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Detection:** Sequence gap in update files for an instance
 
 **Recovery:**
+
 1. Load up to the gap (don't skip)
 2. Load updates after gap (assuming gap is permanent)
 3. Log warning about gap (for debugging)
@@ -600,6 +646,7 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Scenario:** Google Drive not synced, files missing temporarily
 
 **Mitigation:**
+
 1. Retry file reads (exponential backoff)
 2. Cache loaded documents longer (don't unload aggressively)
 3. Graceful degradation: If can't load, show error but don't crash
@@ -663,23 +710,27 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Future:** Background job to consolidate fragmented files
 
 **Repacking (Pack Consolidation):**
+
 - Merge multiple small packs into larger packs
 - Example: `pack_1-50` + `pack_51-100` + `pack_101-150` → `pack_1-150`
 - Reduces file count further
 - Especially useful after parameter tuning (old small packs → new large packs)
 
 **Re-snapshotting (Snapshot Refresh):**
+
 - Create new snapshot with higher totalChanges
 - Allows GC to delete more old packs/updates
 - Example: Old snapshot at 2000, new at 5000 → delete packs 2000-5000
 - Useful for long-lived documents with many updates
 
 **Implementation:**
+
 ```typescript
 // Repacking
 async function consolidatePacks(noteId: string, instanceId: string) {
   const packs = listPacks(noteId, instanceId);
-  if (packs.length >= 5) {  // Consolidate if fragmented
+  if (packs.length >= 5) {
+    // Consolidate if fragmented
     const merged = mergePacks(packs);
     writePack(merged);
     deletePacks(packs);
@@ -690,13 +741,15 @@ async function consolidatePacks(noteId: string, instanceId: string) {
 async function refreshSnapshot(noteId: string) {
   const latestSnapshot = getNewestSnapshot(noteId);
   const updateCount = countUpdatesSince(latestSnapshot);
-  if (updateCount >= 1000) {  // Enough new updates
+  if (updateCount >= 1000) {
+    // Enough new updates
     createSnapshot(noteId);
   }
 }
 ```
 
 **Benefits:**
+
 - Reduces file count over time (even for old documents)
 - Faster cold load (fewer files to scan)
 - More efficient GC (larger gaps to clean up)
@@ -706,6 +759,7 @@ async function refreshSnapshot(noteId: string) {
 **Current:** Raw Yjs updates (uncompressed)
 
 **Future:** Apply gzip or brotli to snapshot/pack contents
+
 - Reduces file size 50-80%
 - Tradeoff: CPU cost for compression/decompression
 - Worthwhile for large documents or slow networks
@@ -715,6 +769,7 @@ async function refreshSnapshot(noteId: string) {
 **Current:** Full document state in each snapshot
 
 **Future:** Store delta from previous snapshot
+
 - Reduces snapshot file size
 - Requires loading base snapshot + deltas (more complex)
 - Worthwhile if snapshots are large (>1MB)
@@ -724,6 +779,7 @@ async function refreshSnapshot(noteId: string) {
 **Current:** Snapshots stored in same directory as updates
 
 **Future:** Store snapshots in separate cloud storage (S3, etc.)
+
 - Faster sync (small updates sync quickly, large snapshots separate)
 - Better for mobile (don't download entire snapshot unless needed)
 - Requires additional infrastructure
@@ -733,6 +789,7 @@ async function refreshSnapshot(noteId: string) {
 **Current:** Fixed threshold (every 1000 updates)
 
 **Future:** Adjust based on document characteristics
+
 - Large documents: Snapshot more frequently
 - Idle documents: Snapshot less frequently
 - High-edit-rate documents: Snapshot more frequently

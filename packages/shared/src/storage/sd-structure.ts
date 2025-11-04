@@ -40,6 +40,7 @@ export class SyncDirectoryStructure {
     return {
       root: noteRoot,
       updates: this.fs.joinPath(noteRoot, 'updates'),
+      snapshots: this.fs.joinPath(noteRoot, 'snapshots'),
       meta: this.fs.joinPath(noteRoot, 'meta'),
     };
   }
@@ -80,6 +81,7 @@ export class SyncDirectoryStructure {
     const notePaths = this.getNotePaths(noteId);
     await this.fs.mkdir(notePaths.root);
     await this.fs.mkdir(notePaths.updates);
+    await this.fs.mkdir(notePaths.snapshots);
     await this.fs.mkdir(notePaths.meta);
   }
 
@@ -130,5 +132,21 @@ export class SyncDirectoryStructure {
   getFolderUpdateFilePath(filename: string): string {
     const folderPaths = this.getFolderPaths();
     return this.fs.joinPath(folderPaths.updates, filename);
+  }
+
+  /**
+   * Get snapshots directory path for a note
+   */
+  getSnapshotsPath(noteId: UUID): string {
+    const notePaths = this.getNotePaths(noteId);
+    return notePaths.snapshots;
+  }
+
+  /**
+   * Get snapshot file path for a note
+   */
+  getSnapshotFilePath(noteId: UUID, filename: string): string {
+    const snapshotsPath = this.getSnapshotsPath(noteId);
+    return this.fs.joinPath(snapshotsPath, filename);
   }
 }

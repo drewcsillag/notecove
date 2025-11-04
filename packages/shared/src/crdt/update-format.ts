@@ -91,25 +91,31 @@ export function parseUpdateFilename(filename: string): UpdateFileMetadata | null
   if (parts[1] === 'folder-tree') {
     // Format: <instance-id>_folder-tree_<sd-id>_<timestamp>[-seq]
     const sdId = parts.slice(2, -1).join('_');
-    return {
+    const metadata: UpdateFileMetadata = {
       type: UpdateType.FolderTree,
       instanceId,
       documentId: sdId,
       timestamp,
       version: UPDATE_FORMAT_VERSION,
-      sequence,
     };
+    if (sequence !== undefined) {
+      metadata.sequence = sequence;
+    }
+    return metadata;
   } else {
     // Format: <instance-id>_<note-id>_<timestamp>[-seq]
     const noteId = parts.slice(1, -1).join('_');
-    return {
+    const metadata: UpdateFileMetadata = {
       type: UpdateType.Note,
       instanceId,
       documentId: noteId,
       timestamp,
       version: UPDATE_FORMAT_VERSION,
-      sequence,
     };
+    if (sequence !== undefined) {
+      metadata.sequence = sequence;
+    }
+    return metadata;
   }
 }
 
@@ -130,7 +136,9 @@ export function generateUpdateFilename(
   const suffix =
     sequence !== undefined
       ? sequence.toString()
-      : Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      : Math.floor(Math.random() * 10000)
+          .toString()
+          .padStart(4, '0');
 
   const uniqueTimestamp = `${timestamp}-${suffix}`;
 

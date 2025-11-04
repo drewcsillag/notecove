@@ -751,6 +751,19 @@ function createMenu(): void {
       ],
     },
     {
+      label: 'Tools',
+      submenu: [
+        {
+          label: 'Create Snapshot',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:createSnapshot');
+            }
+          },
+        },
+      ],
+    },
+    {
       label: 'Window',
       submenu: [
         { role: 'minimize' },
@@ -997,6 +1010,7 @@ void app.whenReady().then(async () => {
       crdtManager,
       database,
       configManager,
+      updateManager,
       createWindow,
       handleNewStorageDir
     );

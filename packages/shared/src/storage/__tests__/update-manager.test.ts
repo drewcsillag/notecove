@@ -3,6 +3,8 @@ import { SyncDirectoryStructure } from '../sd-structure';
 import type { FileSystemAdapter, SyncDirectoryConfig } from '../types';
 import type { UUID } from '../../types';
 import { NoteDoc } from '../../crdt/note-doc';
+import type { VectorClock } from '../../crdt/snapshot-format';
+import * as Y from 'yjs';
 
 /**
  * Mock file system adapter
@@ -353,5 +355,238 @@ describe('UpdateManager', () => {
       noteDoc1.destroy();
       noteDoc2.destroy();
     });
+  });
+
+  describe('snapshot operations', () => {
+    describe('writeSnapshot', () => {
+      it('should write snapshot to correct location', async () => {
+        const noteId = 'note-123' as UUID;
+
+        // Create a simple Yjs document with some data
+        const doc = new Y.Doc();
+        const text = doc.getText('content');
+        text.insert(0, 'Hello world');
+
+        const documentState = Y.encodeStateAsUpdate(doc);
+
+        // Create vector clock
+        const maxSequences: VectorClock = {
+          'instance-a': 10,
+          'instance-b': 20,
+        };
+
+        const filename = await updateManager.writeSnapshot(
+          sdId,
+          noteId,
+          documentState,
+          maxSequences
+        );
+
+        // Check filename format: snapshot_<totalChanges>_<instanceId>.yjson
+        // totalChanges = (10 + 1) + (20 + 1) = 32
+        expect(filename).toBe('snapshot_32_test-instance-123.yjson');
+        expect(fs.hasFile(`/test/sd/notes/note-123/snapshots/${filename}`)).toBe(true);
+
+        doc.destroy();
+      });
+
+      it('should create snapshot directory if it does not exist', async () => {
+        const noteId = 'note-456' as UUID;
+        const documentState = new Uint8Array([1, 2, 3]);
+        const maxSequences: VectorClock = { 'instance-a': 5 };
+
+        await updateManager.writeSnapshot(sdId, noteId, documentState, maxSequences);
+
+        expect(await fs.exists('/test/sd/notes/note-456/snapshots')).toBe(true);
+      });
+
+      it('should calculate totalChanges correctly from vector clock', async () => {
+        const noteId = 'note-789' as UUID;
+        const documentState = new Uint8Array([1, 2, 3]);
+
+        // Vector clock with multiple instances
+        const maxSequences: VectorClock = {
+          'instance-a': 99, // 100 changes (0-99)
+          'instance-b': 49, // 50 changes (0-49)
+          'instance-c': 24, // 25 changes (0-24)
+        };
+
+        const filename = await updateManager.writeSnapshot(
+          sdId,
+          noteId,
+          documentState,
+          maxSequences
+        );
+
+        // totalChanges = 100 + 50 + 25 = 175
+        expect(filename).toBe('snapshot_175_test-instance-123.yjson');
+      });
+    });
+
+    describe('listSnapshotFiles', () => {
+      it('should list all snapshot files sorted by totalChanges', async () => {
+        const noteId = 'note-123' as UUID;
+        const documentState = new Uint8Array([1, 2, 3]);
+
+        // Write multiple snapshots with different totalChanges
+        await updateManager.writeSnapshot(sdId, noteId, documentState, {
+          'instance-a': 9,
+        }); // 10 changes
+
+        await updateManager.writeSnapshot(sdId, noteId, documentState, {
+          'instance-a': 29,
+        }); // 30 changes
+
+        await updateManager.writeSnapshot(sdId, noteId, documentState, {
+          'instance-a': 19,
+        }); // 20 changes
+
+        const snapshots = await updateManager.listSnapshotFiles(sdId, noteId);
+
+        expect(snapshots).toHaveLength(3);
+        // Should be sorted by totalChanges (highest first)
+        expect(snapshots[0]?.totalChanges).toBe(30);
+        expect(snapshots[1]?.totalChanges).toBe(20);
+        expect(snapshots[2]?.totalChanges).toBe(10);
+        expect(snapshots[0]?.instanceId).toBe('test-instance-123');
+      });
+
+      it('should return empty array if no snapshots exist', async () => {
+        const noteId = 'note-nonexistent' as UUID;
+        const snapshots = await updateManager.listSnapshotFiles(sdId, noteId);
+        expect(snapshots).toEqual([]);
+      });
+
+      it('should ignore non-snapshot files', async () => {
+        const noteId = 'note-123' as UUID;
+        const documentState = new Uint8Array([1, 2, 3]);
+
+        // Write a valid snapshot
+        await updateManager.writeSnapshot(sdId, noteId, documentState, {
+          'instance-a': 9,
+        });
+
+        // Manually add an invalid file
+        await fs.writeFile(
+          '/test/sd/notes/note-123/snapshots/invalid-file.txt',
+          new Uint8Array([1, 2, 3])
+        );
+
+        const snapshots = await updateManager.listSnapshotFiles(sdId, noteId);
+
+        expect(snapshots).toHaveLength(1);
+        expect(snapshots[0]?.totalChanges).toBe(10);
+      });
+    });
+
+    describe('readSnapshot', () => {
+      it('should read and decode snapshot correctly', async () => {
+        const noteId = 'note-123' as UUID;
+
+        // Create a Yjs document with data
+        const doc = new Y.Doc();
+        const text = doc.getText('content');
+        text.insert(0, 'Test content');
+
+        const documentState = Y.encodeStateAsUpdate(doc);
+        const maxSequences: VectorClock = {
+          'instance-a': 10,
+          'instance-b': 20,
+        };
+
+        const filename = await updateManager.writeSnapshot(
+          sdId,
+          noteId,
+          documentState,
+          maxSequences
+        );
+
+        // Read it back
+        const snapshot = await updateManager.readSnapshot(sdId, noteId, filename);
+
+        expect(snapshot.noteId).toBe(noteId);
+        expect(snapshot.version).toBe(1);
+        expect(snapshot.totalChanges).toBe(32); // (10+1) + (20+1)
+        expect(snapshot.maxSequences).toEqual(maxSequences);
+        expect(snapshot.documentState).toBeInstanceOf(Uint8Array);
+        expect(snapshot.timestamp).toBeGreaterThan(0);
+
+        // Verify document state can be applied
+        const doc2 = new Y.Doc();
+        Y.applyUpdate(doc2, snapshot.documentState);
+        expect(doc2.getText('content').toJSON()).toBe('Test content');
+
+        doc.destroy();
+        doc2.destroy();
+      });
+
+      it('should throw error for non-existent snapshot', async () => {
+        const noteId = 'note-123' as UUID;
+
+        await expect(
+          updateManager.readSnapshot(sdId, noteId, 'snapshot_100_nonexistent.yjson')
+        ).rejects.toThrow('File not found');
+      });
+    });
+
+    describe('snapshot integration with CRDT', () => {
+      it('should round-trip full document state through snapshot', async () => {
+        const noteId = 'note-integration' as UUID;
+
+        // Create a note with some data
+        const noteDoc1 = new NoteDoc(noteId);
+        noteDoc1.initializeNote({
+          id: noteId,
+          created: 1234567890,
+          modified: 1234567890,
+          folderId: 'folder-1' as UUID,
+          deleted: false,
+        });
+
+        // Add some content (XmlFragment doesn't support insert directly, so we use a text node)
+        const text = new Y.XmlText();
+        text.insert(0, 'This is test content');
+        noteDoc1.content.insert(0, [text]);
+
+        // Write some updates first
+        const update1 = noteDoc1.encodeStateAsUpdate();
+        await updateManager.writeNoteUpdate(sdId, noteId, update1);
+
+        // Create snapshot
+        const documentState = noteDoc1.encodeStateAsUpdate();
+        const maxSequences: VectorClock = { 'test-instance-123': 0 };
+
+        const filename = await updateManager.writeSnapshot(
+          sdId,
+          noteId,
+          documentState,
+          maxSequences
+        );
+
+        // Read snapshot back
+        const snapshot = await updateManager.readSnapshot(sdId, noteId, filename);
+
+        // Apply to new document
+        const noteDoc2 = new NoteDoc(noteId);
+        noteDoc2.applyUpdate(snapshot.documentState);
+
+        // Verify all data restored
+        const metadata2 = noteDoc2.getMetadata();
+        expect(metadata2.id).toBe(noteId);
+        expect(metadata2.created).toBe(1234567890);
+        expect(metadata2.folderId).toBe('folder-1');
+
+        // Verify content was restored
+        expect(noteDoc2.content.length).toBe(1);
+        const restoredText = noteDoc2.content.get(0) as Y.XmlText;
+        expect(restoredText.toString()).toBe('This is test content');
+
+        noteDoc1.destroy();
+        noteDoc2.destroy();
+      });
+    });
+
+    // TODO: Add tests for buildVectorClock() and shouldCreateSnapshot() helper methods
+    // These are tested indirectly through snapshot creation tests above
   });
 });

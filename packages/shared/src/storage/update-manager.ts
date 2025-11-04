@@ -12,6 +12,16 @@ import {
   encodeUpdateFile,
   decodeUpdateFile,
 } from '../crdt/update-format';
+import {
+  type SnapshotData,
+  type SnapshotFileMetadata,
+  type VectorClock,
+  SNAPSHOT_FORMAT_VERSION,
+  parseSnapshotFilename,
+  generateSnapshotFilename,
+  encodeSnapshotFile,
+  decodeSnapshotFile,
+} from '../crdt/snapshot-format';
 import { SyncDirectoryStructure } from './sd-structure';
 
 /**
@@ -264,16 +274,12 @@ export class UpdateManager {
    * Get next sequence number for a document
    * Initializes by scanning existing files if not yet initialized
    */
-  private async getNextSequence(
-    type: UpdateType,
-    sdId: UUID,
-    documentId: UUID
-  ): Promise<number> {
+  private async getNextSequence(type: UpdateType, sdId: UUID, documentId: UUID): Promise<number> {
     const key = `${type}:${documentId}`;
 
     // If already initialized, return next sequence
-    if (this.sequenceCounters.has(key)) {
-      const current = this.sequenceCounters.get(key)!;
+    const current = this.sequenceCounters.get(key);
+    if (current !== undefined) {
       this.sequenceCounters.set(key, current + 1);
       return current;
     }
@@ -311,5 +317,191 @@ export class UpdateManager {
     const nextSeq = maxSeq + 1;
     this.sequenceCounters.set(key, nextSeq + 1);
     return nextSeq;
+  }
+
+  /**
+   * Write a snapshot for a note
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @param documentState - Full Yjs document state (from Y.encodeStateAsUpdate)
+   * @param maxSequences - Vector clock (highest sequence per instance)
+   * @returns Snapshot filename
+   */
+  async writeSnapshot(
+    sdId: UUID,
+    noteId: UUID,
+    documentState: Uint8Array,
+    maxSequences: VectorClock
+  ): Promise<string> {
+    const sdStructure = this.getSDStructure(sdId);
+
+    // Ensure note directory exists
+    await sdStructure.initializeNote(noteId);
+
+    // Calculate total changes from vector clock
+    const totalChanges = Object.values(maxSequences).reduce((sum, seq) => sum + seq + 1, 0);
+
+    // Create snapshot data
+    const snapshot: SnapshotData = {
+      version: SNAPSHOT_FORMAT_VERSION,
+      noteId,
+      timestamp: Date.now(),
+      totalChanges,
+      documentState,
+      maxSequences,
+    };
+
+    // Generate filename
+    const filename = generateSnapshotFilename(totalChanges, this.instanceId);
+
+    // Encode and write
+    const encoded = encodeSnapshotFile(snapshot);
+    const filePath = sdStructure.getSnapshotFilePath(noteId, filename);
+
+    await this.fs.writeFile(filePath, encoded);
+    return filename;
+  }
+
+  /**
+   * List all snapshot files for a note
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @returns Array of snapshot metadata, sorted by totalChanges (highest first)
+   */
+  async listSnapshotFiles(sdId: UUID, noteId: UUID): Promise<SnapshotFileMetadata[]> {
+    const sdStructure = this.getSDStructure(sdId);
+    const snapshotsPath = sdStructure.getSnapshotsPath(noteId);
+
+    const snapshotsExist = await this.fs.exists(snapshotsPath);
+    if (!snapshotsExist) {
+      return [];
+    }
+
+    const files = await this.fs.listFiles(snapshotsPath);
+    const snapshots: SnapshotFileMetadata[] = [];
+
+    for (const filename of files) {
+      const metadata = parseSnapshotFilename(filename);
+      if (!metadata) {
+        continue;
+      }
+
+      snapshots.push(metadata);
+    }
+
+    // Sort by totalChanges (highest first) for easy selection of best snapshot
+    snapshots.sort((a, b) => b.totalChanges - a.totalChanges);
+    return snapshots;
+  }
+
+  /**
+   * Read a snapshot file
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @param filename - Snapshot filename
+   * @returns Snapshot data
+   * @throws Error if snapshot file is corrupted or not found
+   */
+  async readSnapshot(sdId: UUID, noteId: UUID, filename: string): Promise<SnapshotData> {
+    const sdStructure = this.getSDStructure(sdId);
+    const filePath = sdStructure.getSnapshotFilePath(noteId, filename);
+
+    const encoded = await this.fs.readFile(filePath);
+    return decodeSnapshotFile(encoded);
+  }
+
+  /**
+   * Read a single update file by path
+   * @param filePath - Full path to the update file
+   * @returns Decoded update data
+   * @throws Error if file is corrupted or not found
+   */
+  async readUpdateFile(filePath: string): Promise<Uint8Array> {
+    const encoded = await this.fs.readFile(filePath);
+    return decodeUpdateFile(encoded);
+  }
+
+  /**
+   * Build vector clock from update files for a note
+   * Maps instance-id -> highest sequence number seen
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @returns Vector clock
+   */
+  async buildVectorClock(sdId: UUID, noteId: UUID): Promise<VectorClock> {
+    const updateFiles = await this.listNoteUpdateFiles(sdId, noteId);
+    const vectorClock: VectorClock = {};
+
+    for (const file of updateFiles) {
+      const metadata = parseUpdateFilename(file.filename);
+      if (!metadata || metadata.sequence === undefined) {
+        // Skip old format files without sequence numbers
+        continue;
+      }
+
+      const currentMax = vectorClock[metadata.instanceId] ?? -1;
+      if (metadata.sequence > currentMax) {
+        vectorClock[metadata.instanceId] = metadata.sequence;
+      }
+    }
+
+    return vectorClock;
+  }
+
+  /**
+   * Check if a snapshot should be created for a note
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @param threshold - Minimum number of new updates to trigger snapshot (default: 100)
+   * @returns True if snapshot should be created
+   */
+  async shouldCreateSnapshot(sdId: UUID, noteId: UUID, threshold = 100): Promise<boolean> {
+    // Get existing snapshots
+    const snapshots = await this.listSnapshotFiles(sdId, noteId);
+
+    // Get all update files
+    const updateFiles = await this.listNoteUpdateFiles(sdId, noteId);
+
+    // Count updates with sequence numbers
+    const updatesWithSequence = updateFiles.filter((file) => {
+      const metadata = parseUpdateFilename(file.filename);
+      return metadata && metadata.sequence !== undefined;
+    });
+
+    if (snapshots.length === 0) {
+      // No snapshots yet - create one if we have enough updates
+      return updatesWithSequence.length >= threshold;
+    }
+
+    // Get the best (most recent) snapshot
+    const bestSnapshot = snapshots[0]; // Already sorted by totalChanges desc
+    if (!bestSnapshot) {
+      return updatesWithSequence.length >= threshold;
+    }
+
+    // Count how many updates are newer than the snapshot
+    // Updates are newer if their sequence > snapshot.maxSequences[instanceId]
+    try {
+      const snapshot = await this.readSnapshot(sdId, noteId, bestSnapshot.filename);
+      let newUpdateCount = 0;
+
+      for (const file of updateFiles) {
+        const metadata = parseUpdateFilename(file.filename);
+        if (!metadata || metadata.sequence === undefined) {
+          continue;
+        }
+
+        const snapshotSeq = snapshot.maxSequences[metadata.instanceId] ?? -1;
+        if (metadata.sequence > snapshotSeq) {
+          newUpdateCount++;
+        }
+      }
+
+      return newUpdateCount >= threshold;
+    } catch (error) {
+      // If we can't read the snapshot, create a new one if we have enough updates
+      console.error('Failed to read snapshot for shouldCreateSnapshot check:', error);
+      return updatesWithSequence.length >= threshold;
+    }
   }
 }

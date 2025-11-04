@@ -14,7 +14,7 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
-import type { Database, NoteCache } from '@notecove/shared';
+import type { Database, NoteCache, UpdateManager } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags } from '@notecove/shared';
 
@@ -23,6 +23,7 @@ export class IPCHandlers {
     private crdtManager: CRDTManager,
     private database: Database,
     private configManager: ConfigManager,
+    private updateManager: UpdateManager,
     private createWindowFn?: () => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
   ) {
@@ -113,6 +114,7 @@ export class IPCHandlers {
     ipcMain.handle('note:getCountForFolder', this.handleGetNoteCountForFolder.bind(this));
     ipcMain.handle('note:getAllNotesCount', this.handleGetAllNotesCount.bind(this));
     ipcMain.handle('note:getDeletedNoteCount', this.handleGetDeletedNoteCount.bind(this));
+    ipcMain.handle('note:createSnapshot', this.handleCreateSnapshot.bind(this));
 
     // Folder operations
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
@@ -180,6 +182,48 @@ export class IPCHandlers {
 
   private async handleUnloadNote(_event: IpcMainInvokeEvent, noteId: string): Promise<void> {
     await this.crdtManager.unloadNote(noteId);
+  }
+
+  private async handleCreateSnapshot(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<{ success: boolean; filename?: string; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        throw new Error(`Note ${noteId} not loaded`);
+      }
+
+      const metadata = noteDoc.getMetadata();
+      const sdId = metadata.sdId;
+
+      // Build vector clock from existing update files
+      const vectorClock = await this.updateManager.buildVectorClock(sdId, noteId);
+
+      // Get full document state
+      const doc = this.crdtManager.getDocument(noteId);
+      if (!doc) {
+        throw new Error(`Note ${noteId} document not found`);
+      }
+      const documentState = Y.encodeStateAsUpdate(doc);
+
+      // Write snapshot
+      const filename = await this.updateManager.writeSnapshot(
+        sdId,
+        noteId,
+        documentState,
+        vectorClock
+      );
+
+      console.log(`[IPC] Manual snapshot created for note ${noteId}: ${filename}`);
+      return { success: true, filename };
+    } catch (error) {
+      console.error(`[IPC] Failed to create snapshot for note ${noteId}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   private async handleGetState(_event: IpcMainInvokeEvent, noteId: string): Promise<Uint8Array> {

@@ -111,6 +111,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:getAllNotesCount', sdId) as Promise<number>,
     getDeletedNoteCount: (sdId: string): Promise<number> =>
       ipcRenderer.invoke('note:getDeletedNoteCount', sdId) as Promise<number>,
+    createSnapshot: (
+      noteId: string
+    ): Promise<{ success: boolean; filename?: string; error?: string }> =>
+      ipcRenderer.invoke('note:createSnapshot', noteId) as Promise<{
+        success: boolean;
+        filename?: string;
+        error?: string;
+      }>,
 
     // Event listeners
     onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
@@ -442,6 +450,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:toggle-tags-panel', listener);
       return () => {
         ipcRenderer.removeListener('menu:toggle-tags-panel', listener);
+      };
+    },
+    onCreateSnapshot: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:createSnapshot', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:createSnapshot', listener);
       };
     },
     onAbout: (callback: () => void): (() => void) => {

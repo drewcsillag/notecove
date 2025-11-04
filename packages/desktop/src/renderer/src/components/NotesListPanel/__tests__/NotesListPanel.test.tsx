@@ -51,13 +51,14 @@ describe('NotesListPanel', () => {
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
 
   it('should show loading state initially', () => {
     const onNoteSelect = jest.fn();
-    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
+    render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
     expect(screen.getByText('Loading notes...')).toBeInTheDocument();
   });
 
@@ -70,7 +71,9 @@ describe('NotesListPanel', () => {
     });
 
     const onNoteSelect = jest.fn();
-    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
+    render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('No notes in this folder')).toBeInTheDocument();
@@ -111,7 +114,9 @@ describe('NotesListPanel', () => {
     });
 
     const onNoteSelect = jest.fn();
-    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
+    render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Notes (2)')).toBeInTheDocument();
@@ -145,7 +150,9 @@ describe('NotesListPanel', () => {
     });
 
     const onNoteSelect = jest.fn();
-    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
+    render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Untitled Note')).toBeInTheDocument();
@@ -162,7 +169,9 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.list.mockResolvedValue([]);
 
     const onNoteSelect = jest.fn();
-    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
+    render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
 
     // Advance timers to trigger the polling interval
     jest.advanceTimersByTime(1000);
@@ -181,7 +190,9 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.list.mockResolvedValue([]);
 
     const onNoteSelect = jest.fn();
-    render(<NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />);
+    render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
 
     await waitFor(() => {
       expect(mockElectronAPI.note.list).toHaveBeenCalledWith('default');
@@ -215,7 +226,7 @@ describe('NotesListPanel', () => {
 
     const onNoteSelect = jest.fn();
     const { getByText, unmount } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
     );
 
     await waitFor(() => {
@@ -250,7 +261,7 @@ describe('NotesListPanel', () => {
 
     const onNoteSelect = jest.fn();
     const { getByTitle, unmount } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} />
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
     );
 
     await waitFor(() => {

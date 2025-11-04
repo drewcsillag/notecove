@@ -181,6 +181,28 @@ function App(): React.ReactElement {
       // TODO: Create About dialog with version info, license, etc.
     });
 
+    // Create Snapshot
+    const cleanupCreateSnapshot = window.electronAPI.menu.onCreateSnapshot(() => {
+      if (selectedNoteId) {
+        window.electronAPI.note
+          .createSnapshot(selectedNoteId)
+          .then((result) => {
+            if (result.success) {
+              console.log(`[Menu] Snapshot created: ${result.filename}`);
+              // TODO: Show success notification to user
+            } else {
+              console.error(`[Menu] Failed to create snapshot: ${result.error}`);
+              // TODO: Show error notification to user
+            }
+          })
+          .catch((error) => {
+            console.error('[Menu] Error creating snapshot:', error);
+          });
+      } else {
+        console.log('[Menu] No note selected for snapshot creation');
+      }
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -190,8 +212,9 @@ function App(): React.ReactElement {
       cleanupToggleFolderPanel();
       cleanupToggleTagsPanel();
       cleanupAbout();
+      cleanupCreateSnapshot();
     };
-  }, []);
+  }, [selectedNoteId]);
 
   const handleLayoutChange = (sizes: number[]): void => {
     // Persist panel sizes to app state

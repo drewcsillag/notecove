@@ -61,6 +61,9 @@ declare global {
         getCountForFolder: (sdId: string, folderId: string | null) => Promise<number>;
         getAllNotesCount: (sdId: string) => Promise<number>;
         getDeletedNoteCount: (sdId: string) => Promise<number>;
+        createSnapshot: (
+          noteId: string
+        ) => Promise<{ success: boolean; filename?: string; error?: string }>;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
         onRestored: (callback: (noteId: string) => void) => () => void;
@@ -155,6 +158,7 @@ declare global {
         onToggleDarkMode: (callback: () => void) => () => void;
         onToggleFolderPanel: (callback: () => void) => () => void;
         onToggleTagsPanel: (callback: () => void) => () => void;
+        onCreateSnapshot: (callback: () => void) => () => void;
         onAbout: (callback: () => void) => () => void;
       };
 

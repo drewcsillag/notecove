@@ -48,6 +48,7 @@ const mockElectronAPI = {
     onPinned: jest.fn(() => () => {}),
     onMoved: jest.fn(() => () => {}),
     updateTitle: jest.fn(),
+    createSnapshot: jest.fn().mockResolvedValue({ success: true, filename: 'test-snapshot.yjson' }),
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),
@@ -84,6 +85,7 @@ const mockElectronAPI = {
     onToggleFolderPanel: jest.fn(() => () => {}),
     onToggleTagsPanel: jest.fn(() => () => {}),
     onAbout: jest.fn(() => () => {}),
+    onCreateSnapshot: jest.fn(() => () => {}),
   },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */

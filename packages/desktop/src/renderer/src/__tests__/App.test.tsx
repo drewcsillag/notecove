@@ -40,6 +40,7 @@ const mockElectronAPI = {
     onMoved: jest.fn(),
     updateTitle: jest.fn(),
     togglePin: jest.fn(),
+    createSnapshot: jest.fn().mockResolvedValue({ success: true, filename: 'test-snapshot.yjson' }),
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),
@@ -88,6 +89,9 @@ const mockElectronAPI = {
       /* unsubscribe */
     }),
     onAbout: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onCreateSnapshot: jest.fn(() => () => {
       /* unsubscribe */
     }),
   },

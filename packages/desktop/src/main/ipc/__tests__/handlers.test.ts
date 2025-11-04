@@ -90,11 +90,17 @@ interface MockConfigManager {
   setDatabasePath: jest.Mock;
 }
 
+interface MockUpdateManager {
+  buildVectorClock: jest.Mock;
+  writeSnapshot: jest.Mock;
+}
+
 describe('IPCHandlers - Folder CRUD', () => {
   let handlers: IPCHandlers;
   let mockCRDTManager: MockCRDTManager;
   let mockDatabase: MockDatabase;
   let mockConfigManager: MockConfigManager;
+  let mockUpdateManager: MockUpdateManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -143,11 +149,18 @@ describe('IPCHandlers - Folder CRUD', () => {
       setDatabasePath: jest.fn().mockResolvedValue(undefined),
     };
 
+    // Create mock update manager
+    mockUpdateManager = {
+      buildVectorClock: jest.fn(),
+      writeSnapshot: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
-      mockConfigManager as unknown as ConfigManager
+      mockConfigManager as unknown as ConfigManager,
+      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager
     );
   });
 
@@ -776,6 +789,7 @@ describe('IPCHandlers - SD Management', () => {
   let mockCRDTManager: MockCRDTManager;
   let mockDatabase: MockDatabase;
   let mockConfigManager: MockConfigManager;
+  let mockUpdateManager: MockUpdateManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -824,11 +838,18 @@ describe('IPCHandlers - SD Management', () => {
       setDatabasePath: jest.fn().mockResolvedValue(undefined),
     };
 
+    // Create mock update manager
+    mockUpdateManager = {
+      buildVectorClock: jest.fn(),
+      writeSnapshot: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
-      mockConfigManager as unknown as ConfigManager
+      mockConfigManager as unknown as ConfigManager,
+      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager
     );
   });
 

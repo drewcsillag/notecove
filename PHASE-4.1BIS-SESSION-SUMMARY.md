@@ -11,6 +11,7 @@
 This session focused on implementing the foundational infrastructure for the CRDT snapshot and packing system, which will dramatically improve cold-load performance and reduce file count.
 
 **Key Goals:**
+
 - Reduce cold load time from 3-5 seconds → 100-250ms (80-90% reduction)
 - Reduce file count from 2,000 → 50-100 files (90-95% reduction)
 - Enable bounded disk usage via garbage collection
@@ -20,9 +21,11 @@ This session focused on implementing the foundational infrastructure for the CRD
 ## ✅ Completed Work (6/11 tasks)
 
 ### 1. Architecture Documentation
+
 **Commit:** `cf306ee` - "docs: Add Phase 4.1bis CRDT Snapshot and Packing System"
 
 **Files Created:**
+
 - `docs/architecture/crdt-snapshot-packing.md` (774 lines)
   - Complete architecture specification
   - Algorithms for snapshot/pack creation, loading, GC
@@ -36,6 +39,7 @@ This session focused on implementing the foundational infrastructure for the CRD
   - Expected performance improvements table
 
 **Key Design Decisions Documented:**
+
 1. **Instance-only packing** - Each instance only packs its own updates to avoid false gaps from filesystem replication lag
 2. **Non-blocking snapshots** - Record highest contiguous sequence per instance, skip gaps
 3. **Self-describing filenames** - Parameters in filename (totalChanges, sequence ranges) for future flexibility
@@ -44,9 +48,11 @@ This session focused on implementing the foundational infrastructure for the CRD
 ---
 
 ### 2. Sequence Numbers in Update Filenames
+
 **Commit:** `c1fddd5` - "feat: Add sequence numbers to CRDT update filenames"
 
 **Changes:**
+
 - Modified `packages/shared/src/crdt/update-format.ts`:
   - Added `sequence?: number` to `UpdateFileMetadata` interface
   - Updated `parseUpdateFilename()` to extract sequence numbers
@@ -63,12 +69,14 @@ This session focused on implementing the foundational infrastructure for the CRD
   - 2 tests updated in `update-manager.test.ts` to accept new format
 
 **Filename Formats:**
+
 ```
 Old format: <instance-id>_<timestamp>-XXXX.yjson  (XXXX = 4-digit random)
 New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 ```
 
 **Sequence Counter Management:**
+
 - **Self-healing:** Scans existing files to determine next sequence (no metadata files needed)
 - **Per (instanceId, documentId) tracking:** Each note/folder-tree has independent sequence
 - **Monotonically increasing:** Guarantees strict ordering per instance
@@ -78,9 +86,11 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 ---
 
 ### 3. Snapshot File Format Implementation
+
 **Commit:** `250b2e3` - "feat: Implement snapshot file format with vector clock"
 
 **Files Created:**
+
 - `packages/shared/src/crdt/snapshot-format.ts` (196 lines)
   - Snapshot data structure with vector clock
   - Filename parsing/generation
@@ -98,10 +108,12 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 **Snapshot Format:**
 
 **Filename:** `snapshot_<total-changes>_<instance-id>.yjson`
+
 - `total-changes`: Total updates incorporated from all instances (used for selection)
 - `instance-id`: ID of instance that created the snapshot (tie-breaker)
 
 **File Contents:**
+
 ```typescript
 {
   version: 1,                     // Format version
@@ -118,11 +130,13 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 ```
 
 **Vector Clock (maxSequences):**
+
 - Maps instance-id → highest sequence number seen from that instance
 - Used to filter which update files to apply after loading snapshot
 - Only apply updates where `update.seq > maxSequences[update.instanceId]`
 
 **Key Functions:**
+
 - `parseSnapshotFilename()` - Extract metadata from filename
 - `generateSnapshotFilename()` - Create filename with totalChanges and instanceId
 - `encodeSnapshotFile()` / `decodeSnapshotFile()` - Serialize/deserialize
@@ -138,10 +152,12 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 ## 📋 Remaining Tasks (5/11)
 
 ### 7. Implement Snapshot Creation Logic ⏳
+
 **Status:** Not started
 **Next step:** Add methods to UpdateManager
 
 **What needs to be done:**
+
 - Add `writeSnapshot()` method to UpdateManager
   - Build vector clock from existing update files
   - Calculate totalChanges count
@@ -158,16 +174,19 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
   - Background job for idle documents (future enhancement)
 
 **Files to modify:**
+
 - `packages/shared/src/storage/update-manager.ts`
 - `packages/shared/src/storage/__tests__/update-manager.test.ts`
 
 ---
 
 ### 8. Implement Snapshot Loading and Selection ⏳
+
 **Status:** Not started
 **Next step:** Modify CRDTManager cold load logic
 
 **What needs to be done:**
+
 - Modify `CRDTManager.loadNote()`:
   1. Check for snapshots in UpdateManager
   2. If snapshots exist: Select best with `selectBestSnapshot()`
@@ -186,6 +205,7 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
   ```
 
 **Files to modify:**
+
 - `packages/desktop/src/main/crdt/crdt-manager.ts`
 - `packages/shared/src/storage/sd-structure.ts` (add getSnapshotsPath())
 - Tests for cold load with snapshots
@@ -193,24 +213,29 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 ---
 
 ### 9. Add Error Handling ⏳
+
 **Status:** Not started
 
 **Scenarios to handle:**
+
 - **Corrupted snapshot:** Try next-newest snapshot, fallback to update files
 - **Missing update files:** Handle gaps gracefully (log warning, continue)
 - **Filesystem errors:** Retry with exponential backoff
 - **JSON parse errors:** Catch and recover
 
 **Files to modify:**
+
 - `packages/desktop/src/main/crdt/crdt-manager.ts`
 - `packages/shared/src/storage/update-manager.ts`
 
 ---
 
 ### 10. Write Integration Tests ⏳
+
 **Status:** Not started
 
 **Tests needed:**
+
 - Cold load with snapshot + recent updates
 - Cold load with multiple snapshots (select best)
 - Cold load with corrupted snapshot (fallback)
@@ -218,14 +243,17 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 - Update filtering with vector clock
 
 **Files to create/modify:**
+
 - New test file or add to existing CRDT manager tests
 
 ---
 
 ### 11. Run Performance Benchmarks ⏳
+
 **Status:** Not started
 
 **Benchmarks to run:**
+
 - Cold load time: Before (all updates) vs. After (snapshot + filtered)
 - File count: Before vs. After
 - Expected results:
@@ -239,6 +267,7 @@ New format: <instance-id>_<timestamp>-N.yjson     (N = sequence number)
 ### Sequence Number Management
 
 **Self-Healing Approach:**
+
 ```typescript
 async getNextSequence(type: UpdateType, sdId: UUID, documentId: UUID): Promise<number> {
   const key = `${type}:${documentId}`;
@@ -269,6 +298,7 @@ async getNextSequence(type: UpdateType, sdId: UUID, documentId: UUID): Promise<n
 ```
 
 **Benefits:**
+
 - No extra metadata files to maintain
 - Survives crashes (reconstructs from filenames)
 - Handles migrations automatically (old files without sequence → -1)
@@ -278,6 +308,7 @@ async getNextSequence(type: UpdateType, sdId: UUID, documentId: UUID): Promise<n
 ### Vector Clock Filtering
 
 **Algorithm:**
+
 ```typescript
 // After loading snapshot
 const maxSequences = snapshot.maxSequences;
@@ -299,6 +330,7 @@ for (const updateFile of updateFiles) {
 ```
 
 **Example:**
+
 ```
 Snapshot maxSequences: { "inst-A": 100, "inst-B": 50 }
 
@@ -315,6 +347,7 @@ Update files on disk:
 ### Snapshot Selection
 
 **Algorithm:**
+
 ```typescript
 function selectBestSnapshot(snapshots: SnapshotFileMetadata[]): SnapshotFileMetadata | null {
   if (snapshots.length === 0) return null;
@@ -334,6 +367,7 @@ function selectBestSnapshot(snapshots: SnapshotFileMetadata[]): SnapshotFileMeta
 ```
 
 **Why this works:**
+
 - **Most comprehensive:** Snapshot with most updates incorporated loads fastest
 - **Deterministic:** Multiple instances always pick same snapshot (prevents conflicts)
 - **Multi-instance safe:** No coordination needed
@@ -345,12 +379,14 @@ function selectBestSnapshot(snapshots: SnapshotFileMetadata[]): SnapshotFileMeta
 **Total Tests:** 260 passing ✅
 
 **Breakdown:**
+
 - Update format: 26 tests (16 existing + 10 new for sequences)
 - Snapshot format: 33 tests (all new)
 - Update manager: Existing tests updated for new filename format
 - All other existing tests: 201 tests (unchanged, still passing)
 
 **Test Files Modified/Created:**
+
 - `packages/shared/src/crdt/__tests__/update-format.test.ts` (updated)
 - `packages/shared/src/crdt/__tests__/snapshot-format.test.ts` (new)
 - `packages/shared/src/storage/__tests__/update-manager.test.ts` (updated)
@@ -360,16 +396,19 @@ function selectBestSnapshot(snapshots: SnapshotFileMetadata[]): SnapshotFileMeta
 ## 📁 Files Modified/Created
 
 ### Documentation (1 new, 1 updated)
+
 - ✅ `docs/architecture/crdt-snapshot-packing.md` (new, 774 lines)
 - ✅ `PLAN-PHASE-4.md` (updated, added section 4.1bis)
 
 ### Source Code (4 new, 4 updated)
+
 - ✅ `packages/shared/src/crdt/snapshot-format.ts` (new, 196 lines)
 - ✅ `packages/shared/src/crdt/update-format.ts` (updated, added sequence support)
 - ✅ `packages/shared/src/crdt/index.ts` (updated, exported snapshot format)
 - ✅ `packages/shared/src/storage/update-manager.ts` (updated, sequence counters)
 
 ### Tests (2 new, 2 updated)
+
 - ✅ `packages/shared/src/crdt/__tests__/snapshot-format.test.ts` (new, 316 lines, 33 tests)
 - ✅ `packages/shared/src/crdt/__tests__/update-format.test.ts` (updated, 10 new tests)
 - ✅ `packages/shared/src/storage/__tests__/update-manager.test.ts` (updated, 2 tests)
@@ -382,6 +421,7 @@ function selectBestSnapshot(snapshots: SnapshotFileMetadata[]): SnapshotFileMeta
 **Commits ahead of origin:** 3
 
 **Commit History:**
+
 ```
 250b2e3 feat: Implement snapshot file format with vector clock
 c1fddd5 feat: Add sequence numbers to CRDT update filenames
@@ -390,6 +430,7 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
 ```
 
 **Changes Summary:**
+
 - 9 files changed (4 new source, 2 new tests, 1 new doc, 2 docs updated)
 - +1,794 insertions, -26 deletions
 - 260 tests passing (100% success rate)
@@ -401,7 +442,9 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
 ### Immediate Next Steps (Session 2)
 
 **Task 7: Implement Snapshot Creation Logic**
+
 1. Add `writeSnapshot()` to UpdateManager:
+
    ```typescript
    async writeSnapshot(
      sdId: UUID,
@@ -413,11 +456,13 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
    ```
 
 2. Add `listSnapshotFiles()` to UpdateManager:
+
    ```typescript
    async listSnapshotFiles(sdId: UUID, noteId: UUID): Promise<SnapshotFileMetadata[]>
    ```
 
 3. Create directory structure helper in SyncDirectoryStructure:
+
    ```typescript
    getSnapshotsPath(noteId: UUID): string
    ```
@@ -425,6 +470,7 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
 4. Write tests for snapshot creation
 
 **Task 8: Implement Snapshot Loading and Selection**
+
 1. Modify `CRDTManager.loadNote()`:
    - Check for snapshots before loading updates
    - Select best snapshot
@@ -443,15 +489,18 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
 ### Later Tasks (Session 3)
 
 **Task 9: Error Handling**
+
 - Corrupted snapshot recovery
 - Filesystem error retries
 - Gap handling
 
 **Task 10: Integration Tests**
+
 - Multi-instance scenarios
 - Edge cases
 
 **Task 11: Performance Benchmarks**
+
 - Measure actual improvements
 - Validate assumptions
 
@@ -499,6 +548,7 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
 ## 🎯 Success Criteria
 
 ### Phase 1 Complete When:
+
 - ✅ Sequence numbers working (Done)
 - ✅ Snapshot format implemented (Done)
 - ⏳ Snapshot creation integrated (Next)
@@ -507,6 +557,7 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
 - ⏳ Cold load time reduced 80-90%
 
 ### Expected Metrics After Phase 1:
+
 - Cold load: 3-5s → 100-250ms ✅
 - File count: 2,000 → ~100 (with packs, Phase 2)
 - Disk usage: Unbounded → Bounded (with GC, Phase 3)
@@ -516,12 +567,14 @@ cf306ee docs: Add Phase 4.1bis CRDT Snapshot and Packing System
 ## 📞 Contact Points
 
 **If session is interrupted:**
+
 - Resume from Task 7 (Implement snapshot creation logic)
 - All foundational work is committed and tested
 - Architecture doc has full implementation details
 - This summary captures current state
 
 **Key files for next session:**
+
 - `packages/shared/src/storage/update-manager.ts` (add writeSnapshot, listSnapshotFiles)
 - `packages/desktop/src/main/crdt/crdt-manager.ts` (modify loadNote)
 - `packages/shared/src/storage/sd-structure.ts` (add getSnapshotsPath)

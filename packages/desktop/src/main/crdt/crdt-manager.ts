@@ -8,6 +8,7 @@
 import * as Y from 'yjs';
 import type { CRDTManager, DocumentState } from './types';
 import { NoteDoc, FolderTreeDoc } from '@shared/crdt';
+import { shouldApplyUpdate, parseUpdateFilename } from '@shared/crdt';
 import type { UpdateManager } from '@shared/storage';
 import type { UUID, FolderData } from '@shared/types';
 import type { Database } from '@notecove/shared';
@@ -16,11 +17,15 @@ export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
   private folderTrees = new Map<string, FolderTreeDoc>();
   private activityLoggers = new Map<string, import('@shared/storage').ActivityLogger>();
+  private snapshotCheckTimer: NodeJS.Timeout | undefined;
 
   constructor(
     private updateManager: UpdateManager,
     private database?: Database
-  ) {}
+  ) {
+    // Start periodic snapshot checker (every 10 minutes)
+    this.startPeriodicSnapshotChecker();
+  }
 
   async loadNote(noteId: string, sdId?: string): Promise<Y.Doc> {
     const existing = this.documents.get(noteId);
@@ -41,19 +46,123 @@ export class CRDTManagerImpl implements CRDTManager {
     const noteDoc = new NoteDoc(noteId);
     const doc = noteDoc.doc;
 
-    // Load all updates from disk
+    // Load from snapshot if available, otherwise fall back to loading all updates
     try {
-      const updates = await this.updateManager.readNoteUpdates(noteSdId, noteId);
-      console.log(
-        `[CRDT Manager] Loading note ${noteId} from SD ${noteSdId}, found ${updates.length} updates from disk`
-      );
+      // Check for snapshots
+      const snapshots = await this.updateManager.listSnapshotFiles(noteSdId, noteId);
 
-      for (const update of updates) {
-        console.log(`[CRDT Manager] Applying update of size ${update.length} bytes`);
-        Y.applyUpdate(doc, update);
+      if (snapshots.length > 0) {
+        // Use snapshot-based loading with error recovery
+        let snapshotLoaded = false;
+
+        // Try snapshots in order (best to worst) until one works
+        for (const snapshotMeta of snapshots) {
+          try {
+            console.log(
+              `[CRDT Manager] Attempting to load snapshot ${snapshotMeta.filename} (${snapshotMeta.totalChanges} changes)`
+            );
+
+            // Load the snapshot
+            const snapshot = await this.updateManager.readSnapshot(
+              noteSdId,
+              noteId,
+              snapshotMeta.filename
+            );
+
+            // Apply snapshot's document state
+            Y.applyUpdate(doc, snapshot.documentState);
+
+            console.log(
+              `[CRDT Manager] Snapshot loaded successfully, now loading remaining updates with vector clock filter`
+            );
+
+            // Load update files and filter based on vector clock
+            const updateFiles = await this.updateManager.listNoteUpdateFiles(noteSdId, noteId);
+
+            let appliedCount = 0;
+            let skippedCount = 0;
+
+            for (const updateFile of updateFiles) {
+              try {
+                const metadata = parseUpdateFilename(updateFile.filename);
+
+                if (metadata?.sequence === undefined) {
+                  // Old format without sequence numbers, skip
+                  console.log(
+                    `[CRDT Manager] Skipping update file without sequence: ${updateFile.filename}`
+                  );
+                  skippedCount++;
+                  continue;
+                }
+
+                // Check if this update needs to be applied
+                if (
+                  shouldApplyUpdate(snapshot.maxSequences, metadata.instanceId, metadata.sequence)
+                ) {
+                  // Apply this update (not in snapshot)
+                  const update = await this.updateManager.readUpdateFile(updateFile.path);
+                  Y.applyUpdate(doc, update);
+                  appliedCount++;
+                } else {
+                  // Skip (already in snapshot)
+                  skippedCount++;
+                }
+              } catch (error) {
+                // Log error but continue with other update files
+                console.error(
+                  `[CRDT Manager] Failed to load update file ${updateFile.filename}, skipping:`,
+                  error
+                );
+                skippedCount++;
+              }
+            }
+
+            console.log(
+              `[CRDT Manager] Applied ${appliedCount} updates, skipped ${skippedCount} (already in snapshot or failed)`
+            );
+
+            snapshotLoaded = true;
+            break; // Successfully loaded snapshot, exit loop
+          } catch (error) {
+            console.error(
+              `[CRDT Manager] Failed to load snapshot ${snapshotMeta.filename}, trying next:`,
+              error
+            );
+            // Continue to next snapshot
+          }
+        }
+
+        // If all snapshots failed, fall back to loading all updates
+        if (!snapshotLoaded) {
+          console.warn(
+            `[CRDT Manager] All snapshots failed for note ${noteId}, falling back to loading all updates`
+          );
+          const updates = await this.updateManager.readNoteUpdates(noteSdId, noteId);
+          console.log(
+            `[CRDT Manager] Fallback: loading note ${noteId} from ${updates.length} update files`
+          );
+
+          for (const update of updates) {
+            try {
+              Y.applyUpdate(doc, update);
+            } catch (error) {
+              console.error(`[CRDT Manager] Failed to apply update, skipping:`, error);
+            }
+          }
+        }
+      } else {
+        // No snapshots available, load all updates (old behavior)
+        const updates = await this.updateManager.readNoteUpdates(noteSdId, noteId);
+        console.log(
+          `[CRDT Manager] No snapshots found, loading note ${noteId} from ${updates.length} update files`
+        );
+
+        for (const update of updates) {
+          Y.applyUpdate(doc, update);
+        }
       }
     } catch (error) {
-      console.error(`Failed to load updates for note ${noteId}:`, error);
+      console.error(`Failed to load note ${noteId}:`, error);
       // Continue with empty document
     }
 
@@ -74,25 +183,32 @@ export class CRDTManagerImpl implements CRDTManager {
       });
     });
 
+    // Check if we should create a snapshot immediately after loading
+    // (e.g., if note has 1000s of updates but no snapshot)
+    this.checkAndCreateSnapshot(noteId).catch((error) => {
+      console.error(`Failed to check/create snapshot for note ${noteId}:`, error);
+    });
+
     return doc;
   }
 
-  unloadNote(noteId: string): Promise<void> {
+  async unloadNote(noteId: string): Promise<void> {
     const state = this.documents.get(noteId);
 
     if (!state) {
-      return Promise.resolve();
+      return;
     }
 
     state.refCount--;
 
     // Only actually unload if no more windows are using it
     if (state.refCount <= 0) {
+      // Check if we should create a snapshot before unloading
+      await this.checkAndCreateSnapshot(noteId);
+
       state.doc.destroy();
       this.documents.delete(noteId);
     }
-
-    return Promise.resolve();
   }
 
   async applyUpdate(noteId: string, update: Uint8Array): Promise<void> {
@@ -373,9 +489,91 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Start periodic snapshot checker
+   * Checks all loaded notes every 10 minutes and creates snapshots if needed
+   */
+  private startPeriodicSnapshotChecker(): void {
+    // Check every 10 minutes
+    const intervalMs = 10 * 60 * 1000;
+
+    this.snapshotCheckTimer = setInterval(() => {
+      this.checkAllLoadedNotesForSnapshots().catch((error) => {
+        console.error('[CRDT Manager] Error during periodic snapshot check:', error);
+      });
+    }, intervalMs);
+
+    console.log('[CRDT Manager] Started periodic snapshot checker (every 10 minutes)');
+  }
+
+  /**
+   * Check all loaded notes and create snapshots if needed
+   */
+  private async checkAllLoadedNotesForSnapshots(): Promise<void> {
+    const noteIds = Array.from(this.documents.keys());
+
+    if (noteIds.length === 0) {
+      return;
+    }
+
+    console.log(`[CRDT Manager] Periodic snapshot check for ${noteIds.length} loaded notes`);
+
+    for (const noteId of noteIds) {
+      await this.checkAndCreateSnapshot(noteId);
+    }
+  }
+
+  /**
+   * Check if a note needs a snapshot and create one if needed
+   * @param noteId Note ID
+   */
+  private async checkAndCreateSnapshot(noteId: string): Promise<void> {
+    const state = this.documents.get(noteId);
+    if (!state) {
+      return;
+    }
+
+    try {
+      const shouldSnapshot = await this.updateManager.shouldCreateSnapshot(
+        state.sdId,
+        noteId,
+        100 // threshold: create snapshot if ≥100 updates since last snapshot
+      );
+
+      if (shouldSnapshot) {
+        console.log(`[CRDT Manager] Creating snapshot for note ${noteId}`);
+
+        // Build vector clock from existing update files
+        const vectorClock = await this.updateManager.buildVectorClock(state.sdId, noteId);
+
+        // Get full document state
+        const documentState = Y.encodeStateAsUpdate(state.doc);
+
+        // Write snapshot
+        const filename = await this.updateManager.writeSnapshot(
+          state.sdId,
+          noteId,
+          documentState,
+          vectorClock
+        );
+
+        console.log(`[CRDT Manager] Snapshot created: ${filename}`);
+      }
+    } catch (error) {
+      console.error(`[CRDT Manager] Failed to create snapshot for note ${noteId}:`, error);
+    }
+  }
+
+  /**
    * Clean up all documents
    */
   destroy(): void {
+    // Stop periodic snapshot checker
+    if (this.snapshotCheckTimer) {
+      clearInterval(this.snapshotCheckTimer);
+      this.snapshotCheckTimer = undefined;
+      console.log('[CRDT Manager] Stopped periodic snapshot checker');
+    }
+
     for (const state of this.documents.values()) {
       state.doc.destroy();
     }

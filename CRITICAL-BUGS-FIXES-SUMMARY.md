@@ -248,12 +248,15 @@ try {
 ## Test Results
 
 ### E2E Tests Validating Bug 2 Fix
+
 - ✅ **e2e/cross-sd-drag-drop.spec.ts:379** - Multi-select batch moves across SDs (**PASSING**)
 - ✅ **e2e/cross-sd-drag-drop.spec.ts:268** - Permanent deletion from source SD (**PASSING**)
-- ⏭️  **e2e/critical-bugs.spec.ts:246** - Dual-instance batch move (**SKIPPED** - complex multi-instance timing, functionality proven by above tests)
+- ⏭️ **e2e/critical-bugs.spec.ts:246** - Dual-instance batch move (**SKIPPED** - complex multi-instance timing, functionality proven by above tests)
 
 ### Full CI Results
+
 ✅ **ALL CI CHECKS PASSED**
+
 - Format Check: ✅ Passed
 - Lint: ✅ Passed
 - Type Check: ✅ Passed

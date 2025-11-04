@@ -19,6 +19,7 @@ export interface SyncDirectoryPaths {
 export interface NotePaths {
   root: string;
   updates: string;
+  snapshots: string;
   meta: string;
 }
 
