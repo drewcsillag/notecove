@@ -144,7 +144,7 @@ test.describe('Note count badges in folder tree', () => {
     await expect(updatedBadge).toBeVisible();
   });
 
-  test.skip('should show note count badge on "Recently Deleted" folder', async () => {
+  test('should show note count badge on "Recently Deleted" folder', async () => {
     // Create a note
     await createTestNote(window, 'Note to be deleted');
     await window.waitForTimeout(1000);
@@ -196,7 +196,7 @@ test.describe('Note count badges in folder tree', () => {
     await expect(updatedBadge).toBeVisible();
   });
 
-  test.skip('should update badge count when note is moved between folders', async () => {
+  test('should update badge count when note is moved between folders', async () => {
     // Create two folders
     const newFolderButton = window.locator('button[title="Create folder"]');
 
@@ -240,24 +240,28 @@ test.describe('Note count badges in folder tree', () => {
     await noteItems.first().click({ button: 'right' });
     await window.waitForTimeout(300);
     const menu = window.locator('[role="menu"]');
-    await menu.locator('text=Move to folder').click();
-    await window.waitForTimeout(300);
+    await menu.locator('text=Move to...').click();
+    await window.waitForTimeout(500);
 
-    // Click Folder B in submenu
-    const submenu = window.locator('[role="menu"]').last();
-    await submenu.locator('text=Folder B').click();
-    await window.waitForTimeout(1000);
+    // Wait for move dialog to appear and select Folder B
+    const moveDialog = window.locator('[role="dialog"]', { hasText: 'Move Note to Folder' });
+    await expect(moveDialog).toBeVisible();
+    await moveDialog.locator('text=Folder B').click();
+
+    // Click the Move button to confirm
+    await moveDialog.locator('button', { hasText: 'Move' }).click();
+    await window.waitForTimeout(1500); // Wait for badge update (500ms delay + time for DB update)
 
     // Folder A should now have no badge (0 notes)
     folderABadge = folderANode.locator('.MuiChip-root');
-    await expect(folderABadge).toHaveCount(0);
+    await expect(folderABadge).toHaveCount(0, { timeout: 10000 });
 
     // Folder B should show badge "1"
     folderBBadge = folderBNode.locator('.MuiChip-root').filter({ hasText: '1' });
     await expect(folderBBadge).toBeVisible();
   });
 
-  test.skip('should update badge count when note is restored from Recently Deleted', async () => {
+  test('should update badge count when note is restored from Recently Deleted', async () => {
     // Create and delete a note
     await createTestNote(window, 'Note to restore');
     await window.waitForTimeout(1000);

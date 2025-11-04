@@ -56,9 +56,9 @@ test.describe('Settings - Storage Directory Management', () => {
     }
   });
 
-  test.skip('should open Settings dialog via button', async () => {
+  test('should open Settings dialog via button', async () => {
     // Find and click Settings button in folder panel
-    const settingsButton = window.locator('button[aria-label="Settings"]');
+    const settingsButton = window.locator('button[title="Settings"]');
     await expect(settingsButton).toBeVisible();
     await settingsButton.click();
 
@@ -67,26 +67,35 @@ test.describe('Settings - Storage Directory Management', () => {
     await expect(settingsDialog).toBeVisible();
 
     // Should show Storage Directories tab by default
-    await expect(window.locator('text=Storage Directories')).toBeVisible();
+    await expect(settingsDialog.locator('button[role="tab"]', { hasText: 'Storage Directories' })).toBeVisible();
   });
 
-  test.skip('should list existing Storage Directory', async () => {
+  test('should list existing Storage Directory', async () => {
     // Open Settings
-    const settingsButton = window.locator('button[aria-label="Settings"]');
+    const settingsButton = window.locator('button[title="Settings"]');
     await settingsButton.click();
 
-    // Should show the default SD
-    await expect(window.locator('text=Default')).toBeVisible();
-    await expect(window.locator('text=Active')).toBeVisible();
+    // Wait for Settings dialog
+    const settingsDialog = window.locator('[role="dialog"]', { hasText: 'Settings' });
+    await expect(settingsDialog).toBeVisible();
+
+    // Should show the default SD in the Storage Directories section
+    await expect(settingsDialog.locator('h6', { hasText: 'Default' })).toBeVisible();
+    await expect(settingsDialog.locator('text=Active')).toBeVisible();
   });
 
-  test.skip('should disable delete button for last SD', async () => {
+  test('should disable delete button for last SD', async () => {
     // Open Settings
-    const settingsButton = window.locator('button[aria-label="Settings"]');
+    const settingsButton = window.locator('button[title="Settings"]');
     await settingsButton.click();
 
-    // Find delete button
-    const deleteButton = window.locator('button[aria-label="delete"]');
+    // Wait for Settings dialog
+    const settingsDialog = window.locator('[role="dialog"]', { hasText: 'Settings' });
+    await expect(settingsDialog).toBeVisible();
+    await window.waitForTimeout(500);
+
+    // Find delete button in the Settings dialog
+    const deleteButton = settingsDialog.locator('button[aria-label="delete"]');
     await expect(deleteButton).toBeDisabled();
   });
 
@@ -117,34 +126,41 @@ test.describe('Settings - Storage Directory Management', () => {
     await window.waitForTimeout(60000); // Wait 60 seconds for manual testing
   });
 
-  test.skip('should create new SD with manual path entry', async () => {
+  test('should create new SD with manual path entry', async () => {
     // Create a test SD directory
     const newSdPath = path.join(os.tmpdir(), `test-sd-${Date.now()}`);
     await fs.mkdir(newSdPath, { recursive: true });
 
     // Open Settings
-    const settingsButton = window.locator('button[aria-label="Settings"]');
+    const settingsButton = window.locator('button[title="Settings"]');
     await settingsButton.click();
 
     // Click Add Directory
     await window.locator('button', { hasText: 'Add Directory' }).click();
+    await window.waitForTimeout(500);
+
+    // Wait for Add SD dialog
+    const addDialog = window.locator('[role="dialog"]', { hasText: 'Add Storage Directory' });
+    await expect(addDialog).toBeVisible();
 
     // Fill in the form (manual path entry)
-    await window.locator('input[label="Name"]').fill('Test SD');
-    await window.locator('input[label="Path"]').fill(newSdPath);
+    await addDialog.getByLabel('Name').fill('Test SD');
+    await addDialog.getByLabel('Path').fill(newSdPath);
 
-    // Click Add button
-    await window.locator('button', { hasText: 'Add' }).click();
+    // Click Add button (in the add dialog)
+    await addDialog.locator('button', { hasText: 'Add' }).click();
+    await window.waitForTimeout(1000);
 
-    // Verify SD appears in list
-    await expect(window.locator('text=Test SD')).toBeVisible();
-    await expect(window.locator(`text=${newSdPath}`)).toBeVisible();
+    // Verify SD appears in the Settings dialog
+    const settingsDialog = window.locator('[role="dialog"]', { hasText: 'Settings' });
+    await expect(settingsDialog.getByText('Test SD')).toBeVisible();
+    await expect(settingsDialog.getByText(newSdPath, { exact: true })).toBeVisible();
 
     // Clean up
     await fs.rm(newSdPath, { recursive: true, force: true });
   });
 
-  test.skip('should delete SD after confirmation', async () => {
+  test('should delete SD after confirmation', async () => {
     // First, create a second SD so we can delete one
     const newSdPath = path.join(os.tmpdir(), `test-sd-${Date.now()}`);
     await fs.mkdir(newSdPath, { recursive: true });
@@ -155,15 +171,22 @@ test.describe('Settings - Storage Directory Management', () => {
     }, newSdPath);
 
     // Open Settings
-    const settingsButton = window.locator('button[aria-label="Settings"]');
+    const settingsButton = window.locator('button[title="Settings"]');
     await settingsButton.click();
 
-    // Verify we have 2 SDs
-    const sdItems = window.locator('[role="listitem"]');
+    // Wait for Settings dialog
+    const settingsDialog = window.locator('[role="dialog"]', { hasText: 'Settings' });
+    await expect(settingsDialog).toBeVisible();
+    await window.waitForTimeout(1000);
+
+    // Verify we have 2 SDs in the list
+    // Look for list within the tab panel (MUI uses role="tabpanel")
+    const sdList = settingsDialog.locator('[role="tabpanel"] ul');
+    const sdItems = sdList.locator('li[class*="MuiListItem"]');
     await expect(sdItems).toHaveCount(2);
 
     // Find delete button for Test SD
-    const testSdItem = window.locator('[role="listitem"]', { hasText: 'Test SD' });
+    const testSdItem = sdList.locator('li', { hasText: 'Test SD' });
     const deleteButton = testSdItem.locator('button[aria-label="delete"]');
     await deleteButton.click();
 
@@ -172,9 +195,10 @@ test.describe('Settings - Storage Directory Management', () => {
 
     // Click Remove button
     await window.locator('button', { hasText: 'Remove' }).click();
+    await window.waitForTimeout(500);
 
     // SD should be removed from list
-    await expect(window.locator('text=Test SD')).not.toBeVisible();
+    await expect(settingsDialog.locator('text=Test SD')).not.toBeVisible();
 
     // Should only have 1 SD now
     await expect(sdItems).toHaveCount(1);
