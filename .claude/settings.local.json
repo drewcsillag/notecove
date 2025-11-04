@@ -115,7 +115,17 @@
       "Bash(NODE_ENV=test timeout 240 npx playwright test:*)",
       "Bash(env NODE_ENV=test timeout 240 pnpm:*)",
       "Bash(pnpm --filter @notecove/shared test:*)",
-      "Bash(pnpm --filter @notecove/shared test:coverage:*)"
+      "Bash(pnpm --filter @notecove/shared test:coverage:*)",
+      "Bash(NODE_ENV=test timeout 240 pnpm test:e2e:*)",
+      "Bash(env NODE_ENV=test timeout 120 pnpm:*)",
+      "Bash(/tmp/folder-persist-test.log)",
+      "Bash(pnpm -w format:check:*)",
+      "Bash(pnpm -w lint:*)",
+      "Bash(pnpm -w typecheck:*)",
+      "Bash(env NODE_ENV=test timeout 60 pnpm:*)",
+      "Bash(env NODE_ENV=test timeout 7200 pnpm:*)",
+      "Bash(env NODE_ENV=test timeout 90 pnpm --filter @notecove/desktop test:e2e e2e/search.spec.ts --grep \"should persist search query\")",
+      "Bash(env NODE_ENV=test timeout 300 npx playwright test:*)"
     ],
     "deny": [],
     "ask": []

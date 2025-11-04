@@ -32,6 +32,8 @@ export class UpdateManager {
   private sdStructures = new Map<UUID, SyncDirectoryStructure>();
   // Sequence counters: key = "documentType:documentId", value = next sequence number
   private sequenceCounters = new Map<string, number>();
+  // Locks for sequence initialization to prevent race conditions
+  private sequenceInitLocks = new Map<string, Promise<void>>();
 
   constructor(
     private readonly fs: FileSystemAdapter,
@@ -273,6 +275,7 @@ export class UpdateManager {
   /**
    * Get next sequence number for a document
    * Initializes by scanning existing files if not yet initialized
+   * Uses locking to prevent race conditions during initialization
    */
   private async getNextSequence(type: UpdateType, sdId: UUID, documentId: UUID): Promise<number> {
     const key = `${type}:${documentId}`;
@@ -284,39 +287,63 @@ export class UpdateManager {
       return current;
     }
 
-    // Initialize by scanning existing files written by this instance
-    let maxSeq = -1;
-
-    try {
-      if (type === UpdateType.Note) {
-        const files = await this.listNoteUpdateFiles(sdId, documentId);
-        // Only look at files written by this instance
-        const ourFiles = files.filter((f) => f.instanceId === this.instanceId);
-        for (const file of ourFiles) {
-          const metadata = parseUpdateFilename(file.filename);
-          if (metadata?.sequence !== undefined && metadata.sequence > maxSeq) {
-            maxSeq = metadata.sequence;
-          }
-        }
-      } else if (type === UpdateType.FolderTree) {
-        const files = await this.listFolderUpdateFiles(sdId);
-        const ourFiles = files.filter((f) => f.instanceId === this.instanceId);
-        for (const file of ourFiles) {
-          const metadata = parseUpdateFilename(file.filename);
-          if (metadata?.sequence !== undefined && metadata.sequence > maxSeq) {
-            maxSeq = metadata.sequence;
-          }
-        }
-      }
-    } catch (error) {
-      // If scanning fails, start from 0
-      console.warn(`Failed to scan existing files for ${key}, starting from 0:`, error);
+    // Check if another call is already initializing this sequence
+    const existingLock = this.sequenceInitLocks.get(key);
+    if (existingLock) {
+      // Wait for the other initialization to complete
+      await existingLock;
+      // Now try again (should be initialized)
+      return this.getNextSequence(type, sdId, documentId);
     }
 
-    // Start from maxSeq + 1 (or 0 if no files found)
-    const nextSeq = maxSeq + 1;
-    this.sequenceCounters.set(key, nextSeq + 1);
-    return nextSeq;
+    // Create a lock for this initialization
+    let resolveLock: (() => void) | undefined;
+    const lockPromise = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    this.sequenceInitLocks.set(key, lockPromise);
+
+    try {
+      // Initialize by scanning existing files written by this instance
+      let maxSeq = -1;
+
+      try {
+        if (type === UpdateType.Note) {
+          const files = await this.listNoteUpdateFiles(sdId, documentId);
+          // Only look at files written by this instance
+          const ourFiles = files.filter((f) => f.instanceId === this.instanceId);
+          for (const file of ourFiles) {
+            const metadata = parseUpdateFilename(file.filename);
+            if (metadata?.sequence !== undefined && metadata.sequence > maxSeq) {
+              maxSeq = metadata.sequence;
+            }
+          }
+        } else if (type === UpdateType.FolderTree) {
+          const files = await this.listFolderUpdateFiles(sdId);
+          const ourFiles = files.filter((f) => f.instanceId === this.instanceId);
+          for (const file of ourFiles) {
+            const metadata = parseUpdateFilename(file.filename);
+            if (metadata?.sequence !== undefined && metadata.sequence > maxSeq) {
+              maxSeq = metadata.sequence;
+            }
+          }
+        }
+      } catch (error) {
+        // If scanning fails, start from 0
+        console.warn(`Failed to scan existing files for ${key}, starting from 0:`, error);
+      }
+
+      // Start from maxSeq + 1 (or 0 if no files found)
+      const nextSeq = maxSeq + 1;
+      this.sequenceCounters.set(key, nextSeq + 1);
+      return nextSeq;
+    } finally {
+      // Release the lock
+      this.sequenceInitLocks.delete(key);
+      if (resolveLock) {
+        resolveLock();
+      }
+    }
   }
 
   /**

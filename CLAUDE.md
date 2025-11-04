@@ -39,3 +39,8 @@ Suggest tooling that might be applicable where I've not considered it
 If I ask you to make a change, and you start doing it, NEVER start rolling back the change without asking me and explaining in detail what the problem is.
 
 When you complete a phase (or subphase), tell me you're done before proceeding so I can look and make a git commit, or I can approve and you can commit after I say ok.
+you will NEVER skip a test without asking me first
+
+YOU WILL ALWAYS run CI before every commit -- NEVER claim that test failed because they were pre-existing failures, especially without checking that they actually failed on the previous commit.
+
+YOU WILL NOT make time estimates on how long things will take, you're rubbish at that.

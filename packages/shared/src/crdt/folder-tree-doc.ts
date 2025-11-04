@@ -16,8 +16,10 @@ export class FolderTreeDoc {
 
   /**
    * Create a new folder
+   * @param folder Folder data
+   * @param origin Optional origin for the transaction (e.g., 'load' to prevent persistence)
    */
-  createFolder(folder: FolderData): void {
+  createFolder(folder: FolderData, origin?: unknown): void {
     this.doc.transact(() => {
       const folderMap = new Y.Map<unknown>();
       folderMap.set('id', folder.id);
@@ -28,7 +30,7 @@ export class FolderTreeDoc {
       folderMap.set('deleted', folder.deleted);
 
       this.folders.set(folder.id, folderMap);
-    });
+    }, origin);
   }
 
   /**
@@ -151,9 +153,11 @@ export class FolderTreeDoc {
 
   /**
    * Apply an update from another instance
+   * @param update Update bytes
+   * @param origin Optional origin (e.g., 'load', 'external') to prevent re-persistence
    */
-  applyUpdate(update: Uint8Array): void {
-    Y.applyUpdate(this.doc, update);
+  applyUpdate(update: Uint8Array, origin?: unknown): void {
+    Y.applyUpdate(this.doc, update, origin);
   }
 
   /**
