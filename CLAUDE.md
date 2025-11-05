@@ -44,3 +44,6 @@ you will NEVER skip a test without asking me first
 YOU WILL ALWAYS run CI before every commit -- NEVER claim that test failed because they were pre-existing failures, especially without checking that they actually failed on the previous commit.
 
 YOU WILL NOT make time estimates on how long things will take, you're rubbish at that.
+
+- always use [ci-runner] agent to run the ci-local script that gets run via `pnpm ci-local`
+- when using [ci-local] don't tail its output, it's already summarized for you
