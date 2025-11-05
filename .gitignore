@@ -60,6 +60,7 @@ Thumbs.db
 packages/desktop/.vite/
 packages/desktop/.electron-vite/
 packages/desktop/dist-electron/
+packages/desktop/release/
 
 # iOS
 packages/ios/build/
