@@ -222,20 +222,34 @@ Hybrid three-tier system:
 
 #### Phase 4: Optimizations and Monitoring 🟥
 
+**Technology Choice:** OpenTelemetry (OTel)
+- Industry standard for observability
+- Export to Datadog for dashboards
+- Optional remote metrics (user-controlled via settings)
+- Always collect locally for dev/debugging
+
 **Tasks:**
 
-- [ ] 🟥 Add telemetry
-  - Cold load time (P50, P95, P99)
+- [ ] 🟥 Set up OpenTelemetry infrastructure
+  - Install @opentelemetry/sdk-node and related packages
+  - Configure OTLP exporter (optional, settings-controlled)
+  - Set up local console/file exporter (always on)
+  - Add settings panel toggle for remote metrics
+  - Configure Datadog endpoint when enabled
+- [ ] 🟥 Add telemetry metrics
+  - Cold load time (P50, P95, P99 histogram)
   - File count per note (histogram)
-  - Snapshot creation time
-  - Pack creation time
-  - GC deleted file count
-- [ ] 🟥 Add observability
+  - Snapshot creation time (histogram)
+  - Pack creation time (histogram)
+  - GC deleted file count (counter)
+  - GC disk space freed (counter)
+- [ ] 🟥 Add observability/structured logging
   - Log snapshot creation (totalChanges, size, duration)
   - Log snapshot selection (which snapshot chosen, why)
   - Log pack creation (instance, seq range, file count)
   - Log GC activity (deleted files, space freed)
   - Structured logging (JSON, easily parseable)
+  - Integration with OTel traces/spans
 - [ ] 🟥 Optimize snapshot triggers
   - Adaptive frequency based on edit rate
   - Snapshot on document close if ≥N updates
@@ -246,7 +260,7 @@ Hybrid three-tier system:
   - Sequence gaps (crashes, conflicts)
   - Concurrent operations (multiple instances)
 - [ ] 🟥 Add compression (optional)
-  - gzip or brotli for snapshots/packs
+  - gzip or brotli or zstd for snapshots/packs
   - Reduces file size 50-80%
   - Tradeoff: CPU cost vs. I/O savings
 - [ ] 🟥 Performance testing
