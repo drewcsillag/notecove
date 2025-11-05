@@ -106,11 +106,7 @@ export function parsePackFilename(filename: string): PackFileMetadata | null {
  * @param endSeq - Last sequence number in pack
  * @returns Pack filename
  */
-export function generatePackFilename(
-  instanceId: string,
-  startSeq: number,
-  endSeq: number
-): string {
+export function generatePackFilename(instanceId: string, startSeq: number, endSeq: number): string {
   return `${instanceId}_pack_${startSeq}-${endSeq}.yjson`;
 }
 
@@ -210,9 +206,7 @@ export function validatePackData(pack: PackData): void {
 
     const expectedSeq = startSeq + i;
     if (update.seq !== expectedSeq) {
-      throw new Error(
-        `Pack update at index ${i} has seq ${update.seq}, expected ${expectedSeq}`
-      );
+      throw new Error(`Pack update at index ${i} has seq ${update.seq}, expected ${expectedSeq}`);
     }
   }
 }

@@ -22,6 +22,17 @@ import {
   encodeSnapshotFile,
   decodeSnapshotFile,
 } from '../crdt/snapshot-format';
+import {
+  type PackData,
+  type PackUpdateEntry,
+  type PackFileMetadata,
+  PACK_FORMAT_VERSION,
+  parsePackFilename,
+  generatePackFilename,
+  encodePackFile,
+  decodePackFile,
+  validatePackData,
+} from '../crdt/pack-format';
 import { SyncDirectoryStructure } from './sd-structure';
 
 /**
@@ -188,6 +199,14 @@ export class UpdateManager {
     }
 
     return updates;
+  }
+
+  /**
+   * List all note IDs in an SD
+   */
+  async listNotes(sdId: UUID): Promise<UUID[]> {
+    const sdStructure = this.getSDStructure(sdId);
+    return await sdStructure.listNotes();
   }
 
   /**
@@ -435,6 +454,161 @@ export class UpdateManager {
 
     const encoded = await this.fs.readFile(filePath);
     return decodeSnapshotFile(encoded);
+  }
+
+  /**
+   * List pack files for a note, sorted by start sequence (ascending)
+   * Phase 4.1bis Phase 2: Packing
+   *
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @returns Array of pack file metadata
+   */
+  async listPackFiles(sdId: UUID, noteId: UUID): Promise<PackFileMetadata[]> {
+    const sdStructure = this.getSDStructure(sdId);
+    const packsPath = sdStructure.getPacksPath(noteId);
+
+    const packsExist = await this.fs.exists(packsPath);
+    if (!packsExist) {
+      return [];
+    }
+
+    const files = await this.fs.listFiles(packsPath);
+    const packs: PackFileMetadata[] = [];
+
+    for (const filename of files) {
+      const metadata = parsePackFilename(filename);
+      if (!metadata) {
+        continue;
+      }
+
+      packs.push(metadata);
+    }
+
+    // Sort by start sequence (ascending) for sequential loading
+    packs.sort((a, b) => a.startSeq - b.startSeq);
+    return packs;
+  }
+
+  /**
+   * Read a pack file
+   * Phase 4.1bis Phase 2: Packing
+   *
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @param filename - Pack filename
+   * @returns Pack data
+   * @throws Error if pack file is corrupted or not found
+   */
+  async readPackFile(sdId: UUID, noteId: UUID, filename: string): Promise<PackData> {
+    const sdStructure = this.getSDStructure(sdId);
+    const filePath = sdStructure.getPackFilePath(noteId, filename);
+
+    const encoded = await this.fs.readFile(filePath);
+    const pack = decodePackFile(encoded);
+
+    // Validate pack integrity
+    validatePackData(pack);
+
+    return pack;
+  }
+
+  /**
+   * Create a pack from update files
+   * Phase 4.1bis Phase 2: Packing
+   *
+   * Atomic operation: writes pack file, then deletes source update files
+   *
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @param updateFiles - Array of update file paths to pack (must be contiguous sequences)
+   * @returns Pack filename
+   * @throws Error if sequences are not contiguous or files can't be read
+   */
+  async createPack(
+    sdId: UUID,
+    noteId: UUID,
+    updateFiles: Array<{ path: string; metadata: { seq: number; timestamp: number } }>
+  ): Promise<string> {
+    if (updateFiles.length === 0) {
+      throw new Error('Cannot create pack from empty update list');
+    }
+
+    // Sort by sequence to ensure contiguity
+    updateFiles.sort((a, b) => a.metadata.seq - b.metadata.seq);
+
+    // Extract metadata
+    const firstFile = updateFiles[0];
+    const lastFile = updateFiles[updateFiles.length - 1];
+    if (!firstFile || !lastFile) {
+      throw new Error('Invalid update files array');
+    }
+
+    const startSeq = firstFile.metadata.seq;
+    const endSeq = lastFile.metadata.seq;
+
+    // Verify contiguous sequences
+    for (let i = 0; i < updateFiles.length; i++) {
+      const file = updateFiles[i];
+      if (!file) continue;
+
+      const expectedSeq = startSeq + i;
+      if (file.metadata.seq !== expectedSeq) {
+        throw new Error(
+          `Non-contiguous sequence: expected ${expectedSeq}, got ${file.metadata.seq}`
+        );
+      }
+    }
+
+    // Extract instance ID from first file path
+    const firstFilename = this.fs.basename(firstFile.path);
+    const firstMetadata = parseUpdateFilename(firstFilename);
+    if (!firstMetadata) {
+      throw new Error(`Cannot parse update filename: ${firstFilename}`);
+    }
+    const instanceId = firstMetadata.instanceId;
+
+    // Read all update files
+    const updates: PackUpdateEntry[] = [];
+    for (const file of updateFiles) {
+      const data = await this.readUpdateFile(file.path);
+      updates.push({
+        seq: file.metadata.seq,
+        timestamp: file.metadata.timestamp,
+        data,
+      });
+    }
+
+    // Create pack data
+    const pack: PackData = {
+      version: PACK_FORMAT_VERSION,
+      instanceId,
+      noteId,
+      sequenceRange: [startSeq, endSeq],
+      updates,
+    };
+
+    // Validate before writing
+    validatePackData(pack);
+
+    // Write pack file
+    const sdStructure = this.getSDStructure(sdId);
+    const filename = generatePackFilename(instanceId, startSeq, endSeq);
+    const packPath = sdStructure.getPackFilePath(noteId, filename);
+    const encoded = encodePackFile(pack);
+    await this.fs.writeFile(packPath, encoded);
+
+    // Delete original update files (atomic: pack written first)
+    for (const file of updateFiles) {
+      try {
+        await this.fs.deleteFile(file.path);
+      } catch (error) {
+        // Log error but don't fail - duplicates are OK (CRDT convergence)
+        console.warn(`[Packing] Failed to delete update file ${file.path}:`, error);
+      }
+    }
+
+    return filename;
   }
 
   /**

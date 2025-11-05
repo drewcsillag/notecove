@@ -30,6 +30,8 @@ let database: Database | null = null;
 let configManager: ConfigManager | null = null;
 let ipcHandlers: IPCHandlers | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
+let updateManager: UpdateManager | null = null;
+let crdtManager: CRDTManager | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -871,7 +873,7 @@ void app.whenReady().then(async () => {
 
     // Initialize UpdateManager with instance ID (multi-SD aware)
     const instanceId = process.env['INSTANCE_ID'] ?? randomUUID();
-    const updateManager = new UpdateManager(fsAdapter, instanceId);
+    updateManager = new UpdateManager(fsAdapter, instanceId);
 
     // Register the default SD
     updateManager.registerSD('default', storageDir);
@@ -889,7 +891,7 @@ void app.whenReady().then(async () => {
     // Initialize CRDT manager with database reference
     // Type assertion needed due to TypeScript module resolution quirk between dist and src
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    const crdtManager = new CRDTManagerImpl(updateManager as any, database);
+    crdtManager = new CRDTManagerImpl(updateManager as any, database);
 
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
@@ -900,6 +902,16 @@ void app.whenReady().then(async () => {
       if (!database) {
         console.error('[Init] Database not initialized');
         throw new Error('Database not initialized');
+      }
+
+      if (!updateManager) {
+        console.error('[Init] UpdateManager not initialized');
+        throw new Error('UpdateManager not initialized');
+      }
+
+      if (!crdtManager) {
+        console.error('[Init] CRDTManager not initialized');
+        throw new Error('CRDTManager not initialized');
       }
 
       try {
