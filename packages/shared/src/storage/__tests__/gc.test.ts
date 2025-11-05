@@ -140,7 +140,7 @@ describe('Garbage Collection', () => {
         snapshots.push(snapshot);
 
         const filename = generateSnapshotFilename((i + 1) * 100, instanceId);
-        const encoded = encodeSnapshotFile(snapshot);
+        const encoded = await encodeSnapshotFile(snapshot);
         const path = `/test/sd/notes/${noteId}/snapshots/${filename}`;
         await fs.writeFile(path, encoded);
       }
@@ -187,7 +187,7 @@ describe('Garbage Collection', () => {
         };
 
         const filename = generateSnapshotFilename((i + 1) * 100, instanceId);
-        const encoded = encodeSnapshotFile(snapshot);
+        const encoded = await encodeSnapshotFile(snapshot);
         const path = `/test/sd/notes/${noteId}/snapshots/${filename}`;
         await fs.writeFile(path, encoded);
       }
@@ -217,7 +217,7 @@ describe('Garbage Collection', () => {
       };
 
       const snapshotFilename = generateSnapshotFilename(200, instanceId);
-      const snapshotEncoded = encodeSnapshotFile(snapshot);
+      const snapshotEncoded = await encodeSnapshotFile(snapshot);
       const snapshotPath = `/test/sd/notes/${noteId}/snapshots/${snapshotFilename}`;
       await fs.writeFile(snapshotPath, snapshotEncoded);
 
@@ -236,7 +236,7 @@ describe('Garbage Collection', () => {
       };
 
       const pack1Filename = generatePackFilename(instanceId, 0, 49);
-      const pack1Encoded = encodePackFile(pack1);
+      const pack1Encoded = await encodePackFile(pack1);
       const pack1Path = `/test/sd/notes/${noteId}/packs/${pack1Filename}`;
       await fs.writeFile(pack1Path, pack1Encoded);
 
@@ -255,7 +255,7 @@ describe('Garbage Collection', () => {
       };
 
       const pack2Filename = generatePackFilename(instanceId, 50, 99);
-      const pack2Encoded = encodePackFile(pack2);
+      const pack2Encoded = await encodePackFile(pack2);
       const pack2Path = `/test/sd/notes/${noteId}/packs/${pack2Filename}`;
       await fs.writeFile(pack2Path, pack2Encoded);
 
@@ -273,7 +273,7 @@ describe('Garbage Collection', () => {
       };
 
       const pack3Filename = generatePackFilename(instanceId, 100, 149);
-      const pack3Encoded = encodePackFile(pack3);
+      const pack3Encoded = await encodePackFile(pack3);
       const pack3Path = `/test/sd/notes/${noteId}/packs/${pack3Filename}`;
       await fs.writeFile(pack3Path, pack3Encoded);
 
@@ -302,7 +302,7 @@ describe('Garbage Collection', () => {
       };
 
       const snapshotFilename = generateSnapshotFilename(100, instanceId);
-      const snapshotEncoded = encodeSnapshotFile(snapshot);
+      const snapshotEncoded = await encodeSnapshotFile(snapshot);
       const snapshotPath = `/test/sd/notes/${noteId}/snapshots/${snapshotFilename}`;
       await fs.writeFile(snapshotPath, snapshotEncoded);
 
@@ -355,7 +355,7 @@ describe('Garbage Collection', () => {
         };
 
         const filename = generateSnapshotFilename((i + 1) * 100, instanceId);
-        const encoded = encodeSnapshotFile(snapshot);
+        const encoded = await encodeSnapshotFile(snapshot);
         const path = `/test/sd/notes/${noteId}/snapshots/${filename}`;
         await fs.writeFile(path, encoded);
       }
@@ -376,7 +376,7 @@ describe('Garbage Collection', () => {
         })),
       };
       const packOldPath = `/test/sd/notes/${noteId}/packs/${generatePackFilename(instanceId, 0, 49)}`;
-      await fs.writeFile(packOldPath, encodePackFile(packOld));
+      await fs.writeFile(packOldPath, await encodePackFile(packOld));
 
       // Create new pack (not incorporated)
       const packNew: PackData = {
@@ -391,7 +391,7 @@ describe('Garbage Collection', () => {
         })),
       };
       const packNewPath = `/test/sd/notes/${noteId}/packs/${generatePackFilename(instanceId, 60, 109)}`;
-      await fs.writeFile(packNewPath, encodePackFile(packNew));
+      await fs.writeFile(packNewPath, await encodePackFile(packNew));
 
       // Create old update (incorporated)
       const updateOldFilename = generateUpdateFilename(instanceId, noteId, 50, oldTimestamp);
@@ -456,7 +456,7 @@ describe('Garbage Collection', () => {
       };
 
       const snapshotPath = `/test/sd/notes/${noteId}/snapshots/${generateSnapshotFilename(100, instanceId)}`;
-      await fs.writeFile(snapshotPath, encodeSnapshotFile(snapshot));
+      await fs.writeFile(snapshotPath, await encodeSnapshotFile(snapshot));
 
       // Create pack that's incorporated but recent (within 24h)
       const recentTimestamp = Date.now() - 12 * 60 * 60 * 1000;
@@ -473,7 +473,7 @@ describe('Garbage Collection', () => {
       };
 
       const packPath = `/test/sd/notes/${noteId}/packs/${generatePackFilename(instanceId, 0, 49)}`;
-      await fs.writeFile(packPath, encodePackFile(pack));
+      await fs.writeFile(packPath, await encodePackFile(pack));
 
       const stats = await updateManager.runGarbageCollection(sdId, noteId, DEFAULT_GC_CONFIG);
 
@@ -527,7 +527,7 @@ describe('Garbage Collection', () => {
       };
 
       const snapshotPath = `/test/sd/notes/${noteId}/snapshots/${generateSnapshotFilename(100, instanceId)}`;
-      await fs.writeFile(snapshotPath, encodeSnapshotFile(snapshot));
+      await fs.writeFile(snapshotPath, await encodeSnapshotFile(snapshot));
 
       // Create corrupted pack file
       const packPath = `/test/sd/notes/${noteId}/packs/${generatePackFilename(instanceId, 0, 49)}`;
@@ -577,7 +577,7 @@ describe('Garbage Collection', () => {
         };
 
         const filename = generateSnapshotFilename((i + 1) * 100, instanceId);
-        const encoded = encodeSnapshotFile(snapshot);
+        const encoded = await encodeSnapshotFile(snapshot);
         const path = `/test/sd/notes/${noteId}/snapshots/${filename}`;
         await failingFs.writeFile(path, encoded);
       }

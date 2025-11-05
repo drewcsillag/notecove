@@ -38,17 +38,19 @@ export interface SnapshotFileMetadata {
 
 /**
  * Parse snapshot filename to extract metadata
- * @param filename - e.g., "snapshot_4800_instance-abc.yjson"
+ * @param filename - e.g., "snapshot_4800_instance-abc.yjson" or "snapshot_4800_instance-abc.yjson.zst"
  * @returns Metadata or null if invalid format
  */
 export function parseSnapshotFilename(filename: string): SnapshotFileMetadata | null {
-  // Check extension
-  if (!filename.endsWith('.yjson')) {
+  // Check extension (support both compressed and uncompressed)
+  let baseName: string;
+  if (filename.endsWith('.yjson.zst')) {
+    baseName = filename.slice(0, -10); // Remove .yjson.zst
+  } else if (filename.endsWith('.yjson')) {
+    baseName = filename.slice(0, -6); // Remove .yjson
+  } else {
     return null;
   }
-
-  // Remove extension
-  const baseName = filename.slice(0, -6);
 
   // Split by underscore: snapshot_<total-changes>_<instance-id>
   const parts = baseName.split('_');
@@ -80,17 +82,28 @@ export function parseSnapshotFilename(filename: string): SnapshotFileMetadata | 
  * Generate snapshot filename
  * @param totalChanges - Total number of updates incorporated
  * @param instanceId - ID of instance creating the snapshot
+ * @param compressed - Whether the snapshot will be compressed (adds .zst extension)
  * @returns Filename
  */
-export function generateSnapshotFilename(totalChanges: number, instanceId: string): string {
-  return `snapshot_${totalChanges}_${instanceId}.yjson`;
+export function generateSnapshotFilename(
+  totalChanges: number,
+  instanceId: string,
+  compressed = true
+): string {
+  const base = `snapshot_${totalChanges}_${instanceId}.yjson`;
+  return compressed ? `${base}.zst` : base;
 }
 
 /**
  * Encode snapshot data for storage
- * Currently stores as-is, future versions could add compression
+ * @param snapshot - Snapshot data to encode
+ * @param compress - Optional compression function (for environments with zstd available)
+ * @returns Encoded data (compressed if compress function provided)
  */
-export function encodeSnapshotFile(snapshot: SnapshotData): Uint8Array {
+export async function encodeSnapshotFile(
+  snapshot: SnapshotData,
+  compress?: (data: Uint8Array) => Promise<Uint8Array>
+): Promise<Uint8Array> {
   // Convert to JSON-serializable object
   const serializable = {
     version: snapshot.version,
@@ -102,14 +115,26 @@ export function encodeSnapshotFile(snapshot: SnapshotData): Uint8Array {
   };
 
   const json = JSON.stringify(serializable);
-  return new TextEncoder().encode(json);
+  const encoded = new TextEncoder().encode(json);
+
+  // Apply compression if provided
+  return compress ? await compress(encoded) : encoded;
 }
 
 /**
  * Decode snapshot data from storage
+ * @param data - Raw file data
+ * @param decompress - Optional decompression function (for environments with zstd available)
+ * @returns Decoded snapshot data
  */
-export function decodeSnapshotFile(data: Uint8Array): SnapshotData {
-  const json = new TextDecoder().decode(data);
+export async function decodeSnapshotFile(
+  data: Uint8Array,
+  decompress?: (data: Uint8Array) => Promise<Uint8Array>
+): Promise<SnapshotData> {
+  // Apply decompression if provided
+  const decompressed = decompress ? await decompress(data) : data;
+
+  const json = new TextDecoder().decode(decompressed);
   const parsed = JSON.parse(json) as {
     version: number;
     noteId: UUID;

@@ -94,39 +94,45 @@ describe('pack-format', () => {
   });
 
   describe('generatePackFilename', () => {
-    it('should generate valid pack filename', () => {
+    it('should generate compressed pack filename by default', () => {
       const filename = generatePackFilename('instance-abc', 0, 99);
+
+      expect(filename).toBe('instance-abc_pack_0-99.yjson.zst');
+    });
+
+    it('should generate uncompressed pack filename when specified', () => {
+      const filename = generatePackFilename('instance-abc', 0, 99, false);
 
       expect(filename).toBe('instance-abc_pack_0-99.yjson');
     });
 
     it('should handle instance IDs with underscores', () => {
-      const filename = generatePackFilename('instance_with_underscores', 100, 199);
+      const filename = generatePackFilename('instance_with_underscores', 100, 199, false);
 
       expect(filename).toBe('instance_with_underscores_pack_100-199.yjson');
     });
 
     it('should handle sequence 0', () => {
-      const filename = generatePackFilename('inst-123', 0, 0);
+      const filename = generatePackFilename('inst-123', 0, 0, false);
 
       expect(filename).toBe('inst-123_pack_0-0.yjson');
     });
 
     it('should handle large sequence numbers', () => {
-      const filename = generatePackFilename('inst-123', 1000000, 1000099);
+      const filename = generatePackFilename('inst-123', 1000000, 1000099, false);
 
       expect(filename).toBe('inst-123_pack_1000000-1000099.yjson');
     });
 
     it('should handle single update pack', () => {
-      const filename = generatePackFilename('inst-123', 50, 50);
+      const filename = generatePackFilename('inst-123', 50, 50, false);
 
       expect(filename).toBe('inst-123_pack_50-50.yjson');
     });
   });
 
   describe('encodePackFile / decodePackFile', () => {
-    it('should encode and decode pack data', () => {
+    it('should encode and decode pack data', async () => {
       const updates: PackUpdateEntry[] = [
         { seq: 0, timestamp: 1000, data: new Uint8Array([1, 2, 3]) },
         { seq: 1, timestamp: 2000, data: new Uint8Array([4, 5, 6]) },
@@ -141,8 +147,8 @@ describe('pack-format', () => {
         updates,
       };
 
-      const encoded = encodePackFile(original);
-      const decoded = decodePackFile(encoded);
+      const encoded = await encodePackFile(original);
+      const decoded = await decodePackFile(encoded);
 
       expect(decoded.version).toBe(original.version);
       expect(decoded.instanceId).toBe(original.instanceId);
@@ -154,7 +160,7 @@ describe('pack-format', () => {
       expect(decoded.updates[2]?.data).toEqual(new Uint8Array([7, 8, 9]));
     });
 
-    it('should handle empty update data', () => {
+    it('should handle empty update data', async () => {
       const updates: PackUpdateEntry[] = [{ seq: 0, timestamp: 1000, data: new Uint8Array([]) }];
 
       const original: PackData = {
@@ -165,13 +171,13 @@ describe('pack-format', () => {
         updates,
       };
 
-      const encoded = encodePackFile(original);
-      const decoded = decodePackFile(encoded);
+      const encoded = await encodePackFile(original);
+      const decoded = await decodePackFile(encoded);
 
       expect(decoded.updates[0]?.data).toEqual(new Uint8Array([]));
     });
 
-    it('should handle large update data', () => {
+    it('should handle large update data', async () => {
       const largeData = new Uint8Array(10000);
       for (let i = 0; i < largeData.length; i++) {
         largeData[i] = i % 256;
@@ -187,13 +193,13 @@ describe('pack-format', () => {
         updates,
       };
 
-      const encoded = encodePackFile(original);
-      const decoded = decodePackFile(encoded);
+      const encoded = await encodePackFile(original);
+      const decoded = await decodePackFile(encoded);
 
       expect(decoded.updates[0]?.data).toEqual(largeData);
     });
 
-    it('should handle many updates', () => {
+    it('should handle many updates', async () => {
       const updates: PackUpdateEntry[] = [];
       for (let i = 0; i < 100; i++) {
         updates.push({
@@ -211,8 +217,8 @@ describe('pack-format', () => {
         updates,
       };
 
-      const encoded = encodePackFile(original);
-      const decoded = decodePackFile(encoded);
+      const encoded = await encodePackFile(original);
+      const decoded = await decodePackFile(encoded);
 
       expect(decoded.updates).toHaveLength(100);
       for (let i = 0; i < 100; i++) {
@@ -222,7 +228,7 @@ describe('pack-format', () => {
       }
     });
 
-    it('should throw error for unsupported version', () => {
+    it('should throw error for unsupported version', async () => {
       const updates: PackUpdateEntry[] = [
         { seq: 0, timestamp: 1000, data: new Uint8Array([1, 2, 3]) },
       ];
@@ -235,9 +241,9 @@ describe('pack-format', () => {
         updates,
       };
 
-      const encoded = encodePackFile(original);
+      const encoded = await encodePackFile(original);
 
-      expect(() => decodePackFile(encoded)).toThrow(/Unsupported pack format version/);
+      await expect(decodePackFile(encoded)).rejects.toThrow(/Unsupported pack format version/);
     });
   });
 
@@ -371,7 +377,7 @@ describe('pack-format', () => {
       expect(metadata?.endSeq).toBe(endSeq);
     });
 
-    it('should correctly round-trip pack encoding and decoding', () => {
+    it('should correctly round-trip pack encoding and decoding', async () => {
       const updates: PackUpdateEntry[] = [];
       for (let i = 0; i < 50; i++) {
         updates.push({
@@ -389,8 +395,8 @@ describe('pack-format', () => {
         updates,
       };
 
-      const encoded = encodePackFile(original);
-      const decoded = decodePackFile(encoded);
+      const encoded = await encodePackFile(original);
+      const decoded = await decodePackFile(encoded);
 
       // Deep equality check
       expect(decoded).toEqual(original);
@@ -399,7 +405,7 @@ describe('pack-format', () => {
       expect(() => validatePackData(decoded)).not.toThrow();
     });
 
-    it('should handle complete workflow', () => {
+    it('should handle complete workflow', async () => {
       // Create pack data
       const updates: PackUpdateEntry[] = [
         { seq: 0, timestamp: 1000, data: new Uint8Array([1, 2, 3]) },
@@ -418,9 +424,9 @@ describe('pack-format', () => {
       // Validate before encoding
       expect(() => validatePackData(pack)).not.toThrow();
 
-      // Generate filename
+      // Generate filename (with compression by default)
       const filename = generatePackFilename(pack.instanceId, 0, 2);
-      expect(filename).toBe('inst-workflow_pack_0-2.yjson');
+      expect(filename).toBe('inst-workflow_pack_0-2.yjson.zst');
 
       // Parse filename
       const metadata = parsePackFilename(filename);
@@ -429,10 +435,10 @@ describe('pack-format', () => {
       expect(metadata?.endSeq).toBe(2);
 
       // Encode
-      const encoded = encodePackFile(pack);
+      const encoded = await encodePackFile(pack);
 
       // Decode
-      const decoded = decodePackFile(encoded);
+      const decoded = await decodePackFile(encoded);
 
       // Validate after decoding
       expect(() => validatePackData(decoded)).not.toThrow();

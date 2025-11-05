@@ -19,19 +19,20 @@
     "pretest": "pnpm rebuild:node",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "pretest:e2e": "npx @electron/rebuild -f -w better-sqlite3",
+    "pretest:e2e": "npx @electron/rebuild -f -w better-sqlite3 && npx @electron/rebuild -f -w @mongodb-js/zstd",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "rebuild": "npx @electron/rebuild",
     "rebuild:node": "cd ../../node_modules/.pnpm/better-sqlite3@12.4.1/node_modules/better-sqlite3 && npm run build-release",
-    "rebuild:electron": "npx @electron/rebuild -f -w better-sqlite3"
+    "rebuild:electron": "npx @electron/rebuild -f -w better-sqlite3 -w @mongodb-js/zstd"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
     "@minoru/react-dnd-treeview": "^3.5.3",
+    "@mongodb-js/zstd": "^2.0.1",
     "@mui/icons-material": "^5.15.0",
     "@mui/material": "^5.15.0",
     "@mui/x-tree-view": "^8.15.0",

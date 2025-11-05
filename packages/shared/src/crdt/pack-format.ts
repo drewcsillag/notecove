@@ -45,19 +45,21 @@ export interface PackFileMetadata {
 
 /**
  * Parse pack filename to extract metadata
- * Format: <instance-id>_pack_<start-seq>-<end-seq>.yjson
+ * Format: <instance-id>_pack_<start-seq>-<end-seq>.yjson or .yjson.zst
  *
  * @param filename - Pack filename to parse
  * @returns Metadata or null if invalid format
  */
 export function parsePackFilename(filename: string): PackFileMetadata | null {
-  // Check extension
-  if (!filename.endsWith('.yjson')) {
+  // Check extension (support both compressed and uncompressed)
+  let base: string;
+  if (filename.endsWith('.yjson.zst')) {
+    base = filename.slice(0, -10); // Remove .yjson.zst
+  } else if (filename.endsWith('.yjson')) {
+    base = filename.slice(0, -6); // Remove .yjson
+  } else {
     return null;
   }
-
-  // Remove extension
-  const base = filename.slice(0, -6);
 
   // Split into parts
   const parts = base.split('_pack_');
@@ -99,24 +101,35 @@ export function parsePackFilename(filename: string): PackFileMetadata | null {
 
 /**
  * Generate pack filename from metadata
- * Format: <instance-id>_pack_<start-seq>-<end-seq>.yjson
+ * Format: <instance-id>_pack_<start-seq>-<end-seq>.yjson or .yjson.zst
  *
  * @param instanceId - Instance that created these updates
  * @param startSeq - First sequence number in pack
  * @param endSeq - Last sequence number in pack
+ * @param compressed - Whether the pack will be compressed (adds .zst extension)
  * @returns Pack filename
  */
-export function generatePackFilename(instanceId: string, startSeq: number, endSeq: number): string {
-  return `${instanceId}_pack_${startSeq}-${endSeq}.yjson`;
+export function generatePackFilename(
+  instanceId: string,
+  startSeq: number,
+  endSeq: number,
+  compressed = true
+): string {
+  const base = `${instanceId}_pack_${startSeq}-${endSeq}.yjson`;
+  return compressed ? `${base}.zst` : base;
 }
 
 /**
  * Encode pack data for storage
  *
  * @param pack - Pack data to encode
- * @returns Encoded data as Uint8Array
+ * @param compress - Optional compression function (for environments with zstd available)
+ * @returns Encoded data as Uint8Array (compressed if compress function provided)
  */
-export function encodePackFile(pack: PackData): Uint8Array {
+export async function encodePackFile(
+  pack: PackData,
+  compress?: (data: Uint8Array) => Promise<Uint8Array>
+): Promise<Uint8Array> {
   // Convert to JSON-serializable object
   const serializable = {
     version: pack.version,
@@ -131,17 +144,27 @@ export function encodePackFile(pack: PackData): Uint8Array {
   };
 
   const json = JSON.stringify(serializable);
-  return new TextEncoder().encode(json);
+  const encoded = new TextEncoder().encode(json);
+
+  // Apply compression if provided
+  return compress ? await compress(encoded) : encoded;
 }
 
 /**
  * Decode pack file from storage
  *
  * @param data - Encoded pack data
+ * @param decompress - Optional decompression function (for environments with zstd available)
  * @returns Decoded pack data
  */
-export function decodePackFile(data: Uint8Array): PackData {
-  const json = new TextDecoder().decode(data);
+export async function decodePackFile(
+  data: Uint8Array,
+  decompress?: (data: Uint8Array) => Promise<Uint8Array>
+): Promise<PackData> {
+  // Apply decompression if provided
+  const decompressed = decompress ? await decompress(data) : data;
+
+  const json = new TextDecoder().decode(decompressed);
   const parsed = JSON.parse(json) as {
     version: number;
     instanceId: string;

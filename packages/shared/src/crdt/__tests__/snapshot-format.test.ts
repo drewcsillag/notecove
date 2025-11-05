@@ -70,33 +70,39 @@ describe('snapshot-format', () => {
   });
 
   describe('generateSnapshotFilename', () => {
-    it('should generate valid snapshot filename', () => {
+    it('should generate compressed snapshot filename by default', () => {
       const filename = generateSnapshotFilename(4800, 'instance-abc');
+
+      expect(filename).toBe('snapshot_4800_instance-abc.yjson.zst');
+    });
+
+    it('should generate uncompressed snapshot filename when specified', () => {
+      const filename = generateSnapshotFilename(4800, 'instance-abc', false);
 
       expect(filename).toBe('snapshot_4800_instance-abc.yjson');
     });
 
     it('should handle instance IDs with underscores', () => {
-      const filename = generateSnapshotFilename(1000, 'instance_with_underscores');
+      const filename = generateSnapshotFilename(1000, 'instance_with_underscores', false);
 
       expect(filename).toBe('snapshot_1000_instance_with_underscores.yjson');
     });
 
     it('should handle totalChanges of 0', () => {
-      const filename = generateSnapshotFilename(0, 'inst-123');
+      const filename = generateSnapshotFilename(0, 'inst-123', false);
 
       expect(filename).toBe('snapshot_0_inst-123.yjson');
     });
 
     it('should handle large totalChanges', () => {
-      const filename = generateSnapshotFilename(999999, 'inst-123');
+      const filename = generateSnapshotFilename(999999, 'inst-123', false);
 
       expect(filename).toBe('snapshot_999999_inst-123.yjson');
     });
   });
 
   describe('encodeSnapshotFile / decodeSnapshotFile', () => {
-    it('should encode and decode snapshot data', () => {
+    it('should encode and decode snapshot data', async () => {
       const original: SnapshotData = {
         version: SNAPSHOT_FORMAT_VERSION,
         noteId: 'note-123',
@@ -110,8 +116,8 @@ describe('snapshot-format', () => {
         },
       };
 
-      const encoded = encodeSnapshotFile(original);
-      const decoded = decodeSnapshotFile(encoded);
+      const encoded = await encodeSnapshotFile(original);
+      const decoded = await decodeSnapshotFile(encoded);
 
       expect(decoded.version).toBe(original.version);
       expect(decoded.noteId).toBe(original.noteId);
@@ -121,7 +127,7 @@ describe('snapshot-format', () => {
       expect(decoded.maxSequences).toEqual(original.maxSequences);
     });
 
-    it('should handle empty document state', () => {
+    it('should handle empty document state', async () => {
       const original: SnapshotData = {
         version: 1,
         noteId: 'note-456',
@@ -131,14 +137,14 @@ describe('snapshot-format', () => {
         maxSequences: {},
       };
 
-      const encoded = encodeSnapshotFile(original);
-      const decoded = decodeSnapshotFile(encoded);
+      const encoded = await encodeSnapshotFile(original);
+      const decoded = await decodeSnapshotFile(encoded);
 
       expect(decoded.documentState).toEqual(new Uint8Array([]));
       expect(decoded.maxSequences).toEqual({});
     });
 
-    it('should handle large document state', () => {
+    it('should handle large document state', async () => {
       const largeState = new Uint8Array(10000);
       for (let i = 0; i < largeState.length; i++) {
         largeState[i] = i % 256;
@@ -153,8 +159,8 @@ describe('snapshot-format', () => {
         maxSequences: { 'inst-1': 100, 'inst-2': 200, 'inst-3': 200 },
       };
 
-      const encoded = encodeSnapshotFile(original);
-      const decoded = decodeSnapshotFile(encoded);
+      const encoded = await encodeSnapshotFile(original);
+      const decoded = await decodeSnapshotFile(encoded);
 
       expect(decoded.documentState).toEqual(largeState);
     });
@@ -322,7 +328,7 @@ describe('snapshot-format', () => {
       expect(metadata?.instanceId).toBe(instanceId);
     });
 
-    it('should correctly round-trip snapshot encoding and decoding', () => {
+    it('should correctly round-trip snapshot encoding and decoding', async () => {
       const original: SnapshotData = {
         version: SNAPSHOT_FORMAT_VERSION,
         noteId: 'note-test-123',
@@ -336,8 +342,8 @@ describe('snapshot-format', () => {
         },
       };
 
-      const encoded = encodeSnapshotFile(original);
-      const decoded = decodeSnapshotFile(encoded);
+      const encoded = await encodeSnapshotFile(original);
+      const decoded = await decodeSnapshotFile(encoded);
 
       // Deep equality check
       expect(decoded).toEqual(original);

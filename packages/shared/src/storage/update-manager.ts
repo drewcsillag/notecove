@@ -37,6 +37,11 @@ import { type GCConfig, type GCStats } from '../crdt/gc-config';
 import { SyncDirectoryStructure } from './sd-structure';
 
 /**
+ * Compression/decompression function type
+ */
+export type CompressionFn = (data: Uint8Array) => Promise<Uint8Array>;
+
+/**
  * Manages reading and writing update files
  * Supports multiple Storage Directories
  */
@@ -49,7 +54,9 @@ export class UpdateManager {
 
   constructor(
     private readonly fs: FileSystemAdapter,
-    private readonly instanceId: string
+    private readonly instanceId: string,
+    private readonly compress?: CompressionFn,
+    private readonly decompress?: CompressionFn
   ) {}
 
   /**
@@ -398,11 +405,11 @@ export class UpdateManager {
       maxSequences,
     };
 
-    // Generate filename
-    const filename = generateSnapshotFilename(totalChanges, this.instanceId);
+    // Generate filename (with compression if available)
+    const filename = generateSnapshotFilename(totalChanges, this.instanceId, !!this.compress);
 
-    // Encode and write
-    const encoded = encodeSnapshotFile(snapshot);
+    // Encode and write (with compression if available)
+    const encoded = await encodeSnapshotFile(snapshot, this.compress);
     const filePath = sdStructure.getSnapshotFilePath(noteId, filename);
 
     await this.fs.writeFile(filePath, encoded);
@@ -454,7 +461,7 @@ export class UpdateManager {
     const filePath = sdStructure.getSnapshotFilePath(noteId, filename);
 
     const encoded = await this.fs.readFile(filePath);
-    return decodeSnapshotFile(encoded);
+    return await decodeSnapshotFile(encoded, this.decompress);
   }
 
   /**
@@ -506,7 +513,7 @@ export class UpdateManager {
     const filePath = sdStructure.getPackFilePath(noteId, filename);
 
     const encoded = await this.fs.readFile(filePath);
-    const pack = decodePackFile(encoded);
+    const pack = await decodePackFile(encoded, this.decompress);
 
     // Validate pack integrity
     validatePackData(pack);
@@ -592,11 +599,11 @@ export class UpdateManager {
     // Validate before writing
     validatePackData(pack);
 
-    // Write pack file
+    // Write pack file (with compression if available)
     const sdStructure = this.getSDStructure(sdId);
-    const filename = generatePackFilename(instanceId, startSeq, endSeq);
+    const filename = generatePackFilename(instanceId, startSeq, endSeq, !!this.compress);
     const packPath = sdStructure.getPackFilePath(noteId, filename);
-    const encoded = encodePackFile(pack);
+    const encoded = await encodePackFile(pack, this.compress);
     await this.fs.writeFile(packPath, encoded);
 
     // Delete original update files (atomic: pack written first)

@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
 import { ConfigManager } from './config/manager';
 import { initializeTelemetry } from './telemetry/config';
+import { compress, decompress } from './utils/compression';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
@@ -879,9 +880,9 @@ void app.whenReady().then(async () => {
     const folderUpdatesPath = join(storageDir, 'folders', 'updates');
     await fsAdapter.mkdir(folderUpdatesPath);
 
-    // Initialize UpdateManager with instance ID (multi-SD aware)
+    // Initialize UpdateManager with instance ID and compression (multi-SD aware)
     const instanceId = process.env['INSTANCE_ID'] ?? randomUUID();
-    updateManager = new UpdateManager(fsAdapter, instanceId);
+    updateManager = new UpdateManager(fsAdapter, instanceId, compress, decompress);
 
     // Register the default SD
     updateManager.registerSD('default', storageDir);
