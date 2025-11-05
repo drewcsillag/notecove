@@ -6,7 +6,7 @@
 
 import { promises as fs } from 'fs';
 import { join, basename as pathBasename, dirname } from 'path';
-import type { FileSystemAdapter } from '@notecove/shared';
+import type { FileSystemAdapter, FileStats } from '@notecove/shared';
 
 export class NodeFileSystemAdapter implements FileSystemAdapter {
   async exists(path: string): Promise<boolean> {
@@ -62,5 +62,14 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
 
   basename(path: string): string {
     return pathBasename(path);
+  }
+
+  async stat(path: string): Promise<FileStats> {
+    const stats = await fs.stat(path);
+    return {
+      size: stats.size,
+      mtimeMs: stats.mtimeMs,
+      ctimeMs: stats.ctimeMs,
+    };
   }
 }

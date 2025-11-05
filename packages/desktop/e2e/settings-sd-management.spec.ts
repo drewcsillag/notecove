@@ -67,7 +67,9 @@ test.describe('Settings - Storage Directory Management', () => {
     await expect(settingsDialog).toBeVisible();
 
     // Should show Storage Directories tab by default
-    await expect(settingsDialog.locator('button[role="tab"]', { hasText: 'Storage Directories' })).toBeVisible();
+    await expect(
+      settingsDialog.locator('button[role="tab"]', { hasText: 'Storage Directories' })
+    ).toBeVisible();
   });
 
   test('should list existing Storage Directory', async () => {

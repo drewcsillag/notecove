@@ -68,6 +68,20 @@ export interface FileSystemAdapter {
    * Get the base name of a path
    */
   basename(path: string): string;
+
+  /**
+   * Get file stats (size, timestamps)
+   */
+  stat(path: string): Promise<FileStats>;
+}
+
+/**
+ * File statistics
+ */
+export interface FileStats {
+  size: number; // File size in bytes
+  mtimeMs: number; // Modified time in milliseconds
+  ctimeMs: number; // Created time in milliseconds
 }
 
 /**

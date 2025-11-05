@@ -38,4 +38,5 @@ export {
   type PackUpdateEntry,
   type PackFileMetadata,
 } from './pack-format';
+export { DEFAULT_GC_CONFIG, type GCConfig, type GCStats } from './gc-config';
 export { extractTitleFromFragment, extractTitleFromDoc } from './title-extractor';

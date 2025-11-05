@@ -9,6 +9,7 @@ import * as Y from 'yjs';
 import type { CRDTManager, DocumentState } from './types';
 import { NoteDoc, FolderTreeDoc } from '@shared/crdt';
 import { shouldApplyUpdate, parseUpdateFilename } from '@shared/crdt';
+import { DEFAULT_GC_CONFIG, type GCConfig } from '@shared/crdt';
 import type { UpdateManager } from '@shared/storage';
 import type { UUID, FolderData } from '@shared/types';
 import type { Database } from '@notecove/shared';
@@ -19,6 +20,7 @@ export class CRDTManagerImpl implements CRDTManager {
   private activityLoggers = new Map<string, import('@shared/storage').ActivityLogger>();
   private snapshotCheckTimer: NodeJS.Timeout | undefined;
   private packingTimer: NodeJS.Timeout | undefined;
+  private gcTimer: NodeJS.Timeout | undefined;
 
   constructor(
     private updateManager: UpdateManager,
@@ -28,6 +30,8 @@ export class CRDTManagerImpl implements CRDTManager {
     this.startPeriodicSnapshotChecker();
     // Start periodic packing job (every 5 minutes)
     this.startPeriodicPacking();
+    // Start periodic garbage collection (every 30 minutes)
+    this.startPeriodicGC();
   }
 
   async loadNote(noteId: string, sdId?: string): Promise<Y.Doc> {
@@ -793,6 +797,111 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Start periodic garbage collection job (runs every 30 minutes)
+   * @private
+   */
+  private startPeriodicGC(): void {
+    const config: GCConfig = DEFAULT_GC_CONFIG;
+
+    this.gcTimer = setInterval(() => {
+      this.runGarbageCollection(config).catch((error) => {
+        console.error('[CRDT Manager] GC job failed:', error);
+      });
+    }, config.gcInterval);
+
+    console.log(`[CRDT Manager] Started periodic GC job (interval: ${config.gcInterval}ms)`);
+  }
+
+  /**
+   * Run garbage collection across all notes in all SDs
+   * @private
+   */
+  private async runGarbageCollection(config: GCConfig): Promise<void> {
+    console.log('[CRDT Manager] Starting garbage collection...');
+
+    try {
+      // Get all unique SDs from loaded documents and activity loggers
+      const sdIds = new Set<string>();
+
+      // From loaded documents
+      for (const state of this.documents.values()) {
+        if (state.sdId) {
+          sdIds.add(state.sdId);
+        }
+      }
+
+      // From activity loggers
+      for (const sdId of this.activityLoggers.keys()) {
+        sdIds.add(sdId);
+      }
+
+      // Run GC on each SD
+      for (const sdId of sdIds) {
+        try {
+          await this.gcNotesInSD(sdId, config);
+        } catch (error) {
+          console.error(`[CRDT Manager] GC failed for SD ${sdId}:`, error);
+        }
+      }
+
+      console.log('[CRDT Manager] Garbage collection completed');
+    } catch (error) {
+      console.error('[CRDT Manager] GC failed:', error);
+    }
+  }
+
+  /**
+   * Run GC on all notes in a specific SD
+   * @private
+   */
+  private async gcNotesInSD(sdId: string, config: GCConfig): Promise<void> {
+    try {
+      // Get all notes in this SD
+      const noteIds = await this.updateManager.listNotes(sdId);
+
+      console.log(`[CRDT Manager] Running GC on ${noteIds.length} notes in SD ${sdId}`);
+
+      // Run GC on each note
+      for (const noteId of noteIds) {
+        try {
+          await this.gcNote(sdId, noteId, config);
+        } catch (error) {
+          console.error(`[CRDT Manager] GC failed for note ${noteId}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`[CRDT Manager] Failed to list notes in SD ${sdId}:`, error);
+    }
+  }
+
+  /**
+   * Run GC on a specific note
+   * @private
+   */
+  private async gcNote(sdId: string, noteId: string, config: GCConfig): Promise<void> {
+    try {
+      const stats = await this.updateManager.runGarbageCollection(sdId, noteId, config);
+
+      // Only log if we actually deleted something
+      if (stats.totalFilesDeleted > 0) {
+        console.log(
+          `[CRDT Manager] GC for note ${noteId}: ` +
+            `deleted ${stats.snapshotsDeleted} snapshots, ` +
+            `${stats.packsDeleted} packs, ` +
+            `${stats.updatesDeleted} updates ` +
+            `(freed ${stats.diskSpaceFreed} bytes in ${stats.duration}ms)`
+        );
+
+        if (stats.errors.length > 0) {
+          console.warn(`[CRDT Manager] GC errors for note ${noteId}:`, stats.errors);
+        }
+      }
+    } catch (error) {
+      console.error(`[CRDT Manager] Failed to run GC on note ${noteId}:`, error);
+    }
+  }
+
+  /**
    * Clean up all documents
    */
   destroy(): void {
@@ -808,6 +917,13 @@ export class CRDTManagerImpl implements CRDTManager {
       clearInterval(this.packingTimer);
       this.packingTimer = undefined;
       console.log('[CRDT Manager] Stopped periodic packing job');
+    }
+
+    // Stop periodic GC job
+    if (this.gcTimer) {
+      clearInterval(this.gcTimer);
+      this.gcTimer = undefined;
+      console.log('[CRDT Manager] Stopped periodic GC job');
     }
 
     for (const state of this.documents.values()) {

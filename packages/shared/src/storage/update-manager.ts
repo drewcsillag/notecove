@@ -33,6 +33,7 @@ import {
   decodePackFile,
   validatePackData,
 } from '../crdt/pack-format';
+import { type GCConfig, type GCStats } from '../crdt/gc-config';
 import { SyncDirectoryStructure } from './sd-structure';
 
 /**
@@ -703,6 +704,250 @@ export class UpdateManager {
       // If we can't read the snapshot, create a new one if we have enough updates
       console.error('Failed to read snapshot for shouldCreateSnapshot check:', error);
       return updatesWithSequence.length >= threshold;
+    }
+  }
+
+  /**
+   * Run garbage collection on a note's CRDT files
+   * Deletes old snapshots, packs, and updates according to the GC config
+   *
+   * Algorithm:
+   * 1. Keep newest N snapshots (per config)
+   * 2. Find oldest kept snapshot's vector clock
+   * 3. Delete packs fully incorporated into oldest kept snapshot
+   * 4. Delete updates fully incorporated into oldest kept snapshot
+   * 5. Respect minimum history duration (keep recent files regardless)
+   *
+   * @param sdId - Storage directory ID
+   * @param noteId - Note ID
+   * @param config - GC configuration
+   * @returns Statistics from the GC run
+   */
+  async runGarbageCollection(sdId: UUID, noteId: UUID, config: GCConfig): Promise<GCStats> {
+    const startTime = Date.now();
+    const stats: GCStats = {
+      startTime,
+      duration: 0,
+      snapshotsDeleted: 0,
+      packsDeleted: 0,
+      updatesDeleted: 0,
+      totalFilesDeleted: 0,
+      diskSpaceFreed: 0,
+      errors: [],
+    };
+
+    try {
+      // Step 1: Clean up old snapshots (keep newest N)
+      await this.gcSnapshots(sdId, noteId, config, stats);
+
+      // Step 2: Determine oldest kept snapshot's vector clock
+      const oldestKeptSnapshot = await this.getOldestKeptSnapshot(
+        sdId,
+        noteId,
+        config.snapshotRetentionCount
+      );
+
+      if (oldestKeptSnapshot) {
+        // Step 3: Clean up packs incorporated into snapshot
+        await this.gcPacks(sdId, noteId, oldestKeptSnapshot.maxSequences, config, stats);
+
+        // Step 4: Clean up updates incorporated into snapshot
+        await this.gcUpdates(sdId, noteId, oldestKeptSnapshot.maxSequences, config, stats);
+      }
+
+      stats.totalFilesDeleted = stats.snapshotsDeleted + stats.packsDeleted + stats.updatesDeleted;
+      stats.duration = Date.now() - startTime;
+
+      return stats;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      stats.errors.push(`GC failed: ${errorMsg}`);
+      stats.duration = Date.now() - startTime;
+      throw error;
+    }
+  }
+
+  /**
+   * Delete old snapshots, keeping only the newest N
+   * @private
+   */
+  private async gcSnapshots(
+    sdId: UUID,
+    noteId: UUID,
+    config: GCConfig,
+    stats: GCStats
+  ): Promise<void> {
+    try {
+      const snapshots = await this.listSnapshotFiles(sdId, noteId);
+
+      // Sort by totalChanges descending (newest first)
+      snapshots.sort((a, b) => b.totalChanges - a.totalChanges);
+
+      // Keep newest N snapshots
+      const snapshotsToDelete = snapshots.slice(config.snapshotRetentionCount);
+
+      for (const snapshot of snapshotsToDelete) {
+        try {
+          const sdStructure = this.getSDStructure(sdId);
+          const filePath = sdStructure.getSnapshotFilePath(noteId, snapshot.filename);
+
+          // Get file size before deletion
+          const size = await this.getFileSize(filePath);
+
+          await this.fs.deleteFile(filePath);
+          stats.snapshotsDeleted++;
+          stats.diskSpaceFreed += size;
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          stats.errors.push(`Failed to delete snapshot ${snapshot.filename}: ${errorMsg}`);
+        }
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      stats.errors.push(`Failed to list snapshots: ${errorMsg}`);
+    }
+  }
+
+  /**
+   * Get the oldest snapshot that will be kept (for determining what to GC)
+   * @private
+   */
+  private async getOldestKeptSnapshot(
+    sdId: UUID,
+    noteId: UUID,
+    retentionCount: number
+  ): Promise<SnapshotData | null> {
+    try {
+      const snapshots = await this.listSnapshotFiles(sdId, noteId);
+
+      if (snapshots.length === 0) {
+        return null;
+      }
+
+      // Sort by totalChanges descending (newest first)
+      snapshots.sort((a, b) => b.totalChanges - a.totalChanges);
+
+      // Get the Nth snapshot (oldest one we'll keep), or the oldest available
+      const oldestKeptIndex = Math.min(retentionCount - 1, snapshots.length - 1);
+      const oldestKept = snapshots[oldestKeptIndex];
+
+      if (!oldestKept) {
+        return null;
+      }
+
+      // Load it to get the vector clock
+      return await this.readSnapshot(sdId, noteId, oldestKept.filename);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Delete packs fully incorporated into the oldest kept snapshot
+   * @private
+   */
+  private async gcPacks(
+    sdId: UUID,
+    noteId: UUID,
+    oldestMaxSequences: VectorClock,
+    config: GCConfig,
+    stats: GCStats
+  ): Promise<void> {
+    try {
+      const packs = await this.listPackFiles(sdId, noteId);
+      const now = Date.now();
+      const minHistoryTimestamp = now - config.minimumHistoryDuration;
+
+      for (const pack of packs) {
+        try {
+          const maxSeqForInstance = oldestMaxSequences[pack.instanceId] ?? -1;
+
+          // Pack is fully incorporated if its endSeq <= maxSeq for that instance
+          if (pack.endSeq <= maxSeqForInstance) {
+            // Check minimum history duration
+            const packData = await this.readPackFile(sdId, noteId, pack.filename);
+            const newestUpdate = packData.updates[packData.updates.length - 1];
+
+            if (newestUpdate && newestUpdate.timestamp < minHistoryTimestamp) {
+              // Pack is old enough to delete
+              const sdStructure = this.getSDStructure(sdId);
+              const filePath = sdStructure.getPackFilePath(noteId, pack.filename);
+
+              const size = await this.getFileSize(filePath);
+
+              await this.fs.deleteFile(filePath);
+              stats.packsDeleted++;
+              stats.diskSpaceFreed += size;
+            }
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          stats.errors.push(`Failed to GC pack ${pack.filename}: ${errorMsg}`);
+        }
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      stats.errors.push(`Failed to list packs: ${errorMsg}`);
+    }
+  }
+
+  /**
+   * Delete update files fully incorporated into the oldest kept snapshot
+   * @private
+   */
+  private async gcUpdates(
+    sdId: UUID,
+    noteId: UUID,
+    oldestMaxSequences: VectorClock,
+    config: GCConfig,
+    stats: GCStats
+  ): Promise<void> {
+    try {
+      const updateFiles = await this.listNoteUpdateFiles(sdId, noteId);
+      const now = Date.now();
+      const minHistoryTimestamp = now - config.minimumHistoryDuration;
+
+      for (const updateFile of updateFiles) {
+        try {
+          const metadata = parseUpdateFilename(updateFile.filename);
+
+          if (!metadata?.sequence) continue;
+
+          const maxSeqForInstance = oldestMaxSequences[metadata.instanceId] ?? -1;
+
+          // Update is fully incorporated if its seq <= maxSeq for that instance
+          if (metadata.sequence <= maxSeqForInstance) {
+            // Check minimum history duration
+            if (metadata.timestamp < minHistoryTimestamp) {
+              // Update is old enough to delete
+              const size = await this.getFileSize(updateFile.path);
+
+              await this.fs.deleteFile(updateFile.path);
+              stats.updatesDeleted++;
+              stats.diskSpaceFreed += size;
+            }
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          stats.errors.push(`Failed to GC update ${updateFile.filename}: ${errorMsg}`);
+        }
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      stats.errors.push(`Failed to list updates: ${errorMsg}`);
+    }
+  }
+
+  /**
+   * Get file size in bytes
+   * @private
+   */
+  private async getFileSize(filePath: string): Promise<number> {
+    try {
+      const stats = await this.fs.stat(filePath);
+      return stats.size;
+    } catch {
+      return 0;
     }
   }
 }
