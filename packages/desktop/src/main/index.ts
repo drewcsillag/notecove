@@ -24,6 +24,7 @@ import { NodeFileWatcher } from './storage/node-file-watcher';
 import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
 import { ConfigManager } from './config/manager';
+import { initializeTelemetry } from './telemetry/config';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
@@ -828,6 +829,13 @@ function createMenu(): void {
 
 void app.whenReady().then(async () => {
   try {
+    // Initialize telemetry (local mode always on, remote opt-in)
+    await initializeTelemetry({
+      remoteMetricsEnabled: false, // Will be controlled via settings panel
+      devMode: process.env['NODE_ENV'] !== 'production',
+    });
+    console.log('[Telemetry] OpenTelemetry initialized');
+
     // Debug logging for environment (test mode only)
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] App ready, starting initialization...');

@@ -17,6 +17,7 @@ import type { NoteMetadata } from './types';
 import type { Database, NoteCache, UpdateManager } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags } from '@notecove/shared';
+import { getTelemetryManager } from '../telemetry/config';
 
 export class IPCHandlers {
   constructor(
@@ -140,6 +141,10 @@ export class IPCHandlers {
     // Config operations
     ipcMain.handle('config:getDatabasePath', this.handleGetDatabasePath.bind(this));
     ipcMain.handle('config:setDatabasePath', this.handleSetDatabasePath.bind(this));
+
+    // Telemetry operations
+    ipcMain.handle('telemetry:getSettings', this.handleGetTelemetrySettings.bind(this));
+    ipcMain.handle('telemetry:updateSettings', this.handleUpdateTelemetrySettings.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -1613,6 +1618,46 @@ export class IPCHandlers {
       ipcMain.removeHandler('test:getTagsForNote');
       ipcMain.removeHandler('test:getNoteById');
     }
+  }
+
+  // Telemetry handlers
+  private async handleGetTelemetrySettings(): Promise<{
+    remoteMetricsEnabled: boolean;
+    datadogApiKey?: string;
+  }> {
+    const telemetryManager = getTelemetryManager();
+    const config = telemetryManager.getConfig();
+
+    const result: { remoteMetricsEnabled: boolean; datadogApiKey?: string } = {
+      remoteMetricsEnabled: config.remoteMetricsEnabled,
+    };
+
+    if (config.datadogApiKey !== undefined) {
+      result.datadogApiKey = config.datadogApiKey;
+    }
+
+    return result;
+  }
+
+  private async handleUpdateTelemetrySettings(
+    _event: IpcMainInvokeEvent,
+    settings: { remoteMetricsEnabled: boolean; datadogApiKey?: string }
+  ): Promise<void> {
+    const telemetryManager = getTelemetryManager();
+
+    const config: { remoteMetricsEnabled: boolean; datadogApiKey?: string } = {
+      remoteMetricsEnabled: settings.remoteMetricsEnabled,
+    };
+
+    if (settings.datadogApiKey !== undefined) {
+      config.datadogApiKey = settings.datadogApiKey;
+    }
+
+    await telemetryManager.updateConfig(config);
+
+    console.log(
+      `[Telemetry] Settings updated: remoteMetricsEnabled=${settings.remoteMetricsEnabled}`
+    );
   }
 
   // Test-only handlers

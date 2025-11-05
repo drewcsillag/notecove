@@ -24,6 +24,7 @@ import { StorageDirectorySettings } from './StorageDirectorySettings';
 import { UserSettings } from './UserSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { DatabaseSettings } from './DatabaseSettings';
+import { TelemetrySettings } from './TelemetrySettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -116,7 +117,8 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <Tab label="Storage Directories" {...a11yProps(0)} />
             <Tab label="User" {...a11yProps(1)} />
             <Tab label="Appearance" {...a11yProps(2)} />
-            <Tab label="Database" {...a11yProps(3)} />
+            <Tab label="Telemetry" {...a11yProps(3)} />
+            <Tab label="Database" {...a11yProps(4)} />
           </Tabs>
         </Box>
         <TabPanel value={tabValue} index={0}>
@@ -129,6 +131,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
           <AppearanceSettings themeMode={themeMode} onThemeChange={onThemeChange} />
         </TabPanel>
         <TabPanel value={tabValue} index={3}>
+          <TelemetrySettings />
+        </TabPanel>
+        <TabPanel value={tabValue} index={4}>
           <DatabaseSettings />
         </TabPanel>
       </DialogContent>

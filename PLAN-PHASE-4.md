@@ -223,6 +223,7 @@ Hybrid three-tier system:
 #### Phase 4: Optimizations and Monitoring 🟥
 
 **Technology Choice:** OpenTelemetry (OTel)
+
 - Industry standard for observability
 - Export to Datadog for dashboards
 - Optional remote metrics (user-controlled via settings)

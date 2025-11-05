@@ -387,6 +387,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('config:setDatabasePath', path) as Promise<void>,
   },
 
+  // Telemetry operations
+  telemetry: {
+    getSettings: (): Promise<{ remoteMetricsEnabled: boolean; datadogApiKey?: string }> =>
+      ipcRenderer.invoke('telemetry:getSettings') as Promise<{
+        remoteMetricsEnabled: boolean;
+        datadogApiKey?: string;
+      }>,
+    updateSettings: (settings: {
+      remoteMetricsEnabled: boolean;
+      datadogApiKey?: string;
+    }): Promise<void> => ipcRenderer.invoke('telemetry:updateSettings', settings) as Promise<void>,
+  },
+
   // Menu event listeners
   menu: {
     onNewNote: (callback: () => void): (() => void) => {

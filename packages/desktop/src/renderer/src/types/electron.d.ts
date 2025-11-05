@@ -150,6 +150,14 @@ declare global {
         setDatabasePath: (path: string) => Promise<void>;
       };
 
+      telemetry: {
+        getSettings: () => Promise<{ remoteMetricsEnabled: boolean; datadogApiKey?: string }>;
+        updateSettings: (settings: {
+          remoteMetricsEnabled: boolean;
+          datadogApiKey?: string;
+        }) => Promise<void>;
+      };
+
       menu: {
         onNewNote: (callback: () => void) => () => void;
         onNewFolder: (callback: () => void) => () => void;

@@ -13,6 +13,7 @@ import { DEFAULT_GC_CONFIG, type GCConfig } from '@shared/crdt';
 import type { UpdateManager } from '@shared/storage';
 import type { UUID, FolderData } from '@shared/types';
 import type { Database } from '@notecove/shared';
+import { getCRDTMetrics } from '../telemetry/crdt-metrics';
 
 export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
@@ -42,6 +43,9 @@ export class CRDTManagerImpl implements CRDTManager {
       existing.refCount++;
       return existing.doc;
     }
+
+    // Track cold load time
+    const loadStartTime = Date.now();
 
     // If sdId not provided, try to determine it from existing updates
     let noteSdId = sdId;
@@ -247,6 +251,15 @@ export class CRDTManagerImpl implements CRDTManager {
     // (e.g., if note has 1000s of updates but no snapshot)
     this.checkAndCreateSnapshot(noteId).catch((error) => {
       console.error(`Failed to check/create snapshot for note ${noteId}:`, error);
+    });
+
+    // Record cold load metrics
+    const loadDuration = Date.now() - loadStartTime;
+    getCRDTMetrics().recordColdLoad(loadDuration, { note_id: noteId, sd_id: noteSdId });
+
+    // Record file counts (async, don't block return)
+    this.recordFileCountsAsync(noteSdId, noteId).catch((error) => {
+      console.error(`Failed to record file counts for note ${noteId}:`, error);
     });
 
     return doc;
@@ -602,6 +615,8 @@ export class CRDTManagerImpl implements CRDTManager {
       if (shouldSnapshot) {
         console.log(`[CRDT Manager] Creating snapshot for note ${noteId}`);
 
+        const snapshotStartTime = Date.now();
+
         // Build vector clock from existing update files
         const vectorClock = await this.updateManager.buildVectorClock(state.sdId, noteId);
 
@@ -615,6 +630,13 @@ export class CRDTManagerImpl implements CRDTManager {
           documentState,
           vectorClock
         );
+
+        // Record snapshot creation metrics
+        const snapshotDuration = Date.now() - snapshotStartTime;
+        getCRDTMetrics().recordSnapshotCreation(snapshotDuration, {
+          note_id: noteId,
+          sd_id: state.sdId,
+        });
 
         console.log(`[CRDT Manager] Snapshot created: ${filename}`);
       }
@@ -780,7 +802,17 @@ export class CRDTManagerImpl implements CRDTManager {
 
         // Create the pack
         try {
+          const packStartTime = Date.now();
           const filename = await this.updateManager.createPack(sdId, noteId, contiguous);
+          const packDuration = Date.now() - packStartTime;
+
+          // Record pack creation metrics
+          getCRDTMetrics().recordPackCreation(packDuration, contiguous.length, {
+            note_id: noteId,
+            sd_id: sdId,
+            instance_id: instanceId,
+          });
+
           console.log(
             `[CRDT Manager] Created pack ${filename} for note ${noteId} (${contiguous.length} updates)`
           );
@@ -882,6 +914,17 @@ export class CRDTManagerImpl implements CRDTManager {
     try {
       const stats = await this.updateManager.runGarbageCollection(sdId, noteId, config);
 
+      // Record GC metrics
+      getCRDTMetrics().recordGC(
+        {
+          durationMs: stats.duration,
+          filesDeleted: stats.totalFilesDeleted,
+          bytesFreed: stats.diskSpaceFreed,
+          errorCount: stats.errors.length,
+        },
+        { note_id: noteId, sd_id: sdId }
+      );
+
       // Only log if we actually deleted something
       if (stats.totalFilesDeleted > 0) {
         console.log(
@@ -898,6 +941,33 @@ export class CRDTManagerImpl implements CRDTManager {
       }
     } catch (error) {
       console.error(`[CRDT Manager] Failed to run GC on note ${noteId}:`, error);
+    }
+  }
+
+  /**
+   * Record file counts for a note (async helper)
+   * @private
+   */
+  private async recordFileCountsAsync(sdId: string, noteId: string): Promise<void> {
+    try {
+      const snapshots = await this.updateManager.listSnapshotFiles(sdId, noteId);
+      const packs = await this.updateManager.listPackFiles(sdId, noteId);
+      const updates = await this.updateManager.listNoteUpdateFiles(sdId, noteId);
+
+      const total = snapshots.length + packs.length + updates.length;
+
+      getCRDTMetrics().recordFileCounts(
+        {
+          total,
+          snapshots: snapshots.length,
+          packs: packs.length,
+          updates: updates.length,
+        },
+        { note_id: noteId, sd_id: sdId }
+      );
+    } catch (error) {
+      // Silent failure - don't interrupt normal operation
+      console.error(`[CRDT Manager] Failed to record file counts for note ${noteId}:`, error);
     }
   }
 
