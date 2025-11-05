@@ -14,9 +14,9 @@ Implemented automatic garbage collection for the CRDT system to prevent unbounde
 
 ```typescript
 export interface GCConfig {
-  snapshotRetentionCount: number;    // Default: 3
-  minimumHistoryDuration: number;    // Default: 24 hours
-  gcInterval: number;                // Default: 30 minutes
+  snapshotRetentionCount: number; // Default: 3
+  minimumHistoryDuration: number; // Default: 24 hours
+  gcInterval: number; // Default: 30 minutes
 }
 
 export interface GCStats {
@@ -32,6 +32,7 @@ export interface GCStats {
 ```
 
 **Key Decisions:**
+
 - Keep 3 snapshots by default (safety buffer)
 - Minimum 24-hour history (debugging/recovery window)
 - Run every 30 minutes (balance between cleanup and overhead)
@@ -39,11 +40,13 @@ export interface GCStats {
 ### 2. UpdateManager GC Methods (`packages/shared/src/storage/update-manager.ts`)
 
 **Main orchestration:**
+
 ```typescript
 async runGarbageCollection(sdId: UUID, noteId: UUID, config: GCConfig): Promise<GCStats>
 ```
 
 **Component methods:**
+
 - `gcSnapshots()` - Delete old snapshots beyond retention count
 - `gcPacks()` - Delete packs fully incorporated into snapshots
 - `gcUpdates()` - Delete updates fully incorporated into snapshots
@@ -51,6 +54,7 @@ async runGarbageCollection(sdId: UUID, noteId: UUID, config: GCConfig): Promise<
 - `getFileSize()` - Track disk space freed
 
 **Key Implementation Details:**
+
 - Vector clock-based deletion: Only delete files incorporated into oldest kept snapshot
 - Minimum history enforcement: Always keep files newer than 24 hours
 - Error isolation: Individual file failures don't stop GC run
@@ -59,6 +63,7 @@ async runGarbageCollection(sdId: UUID, noteId: UUID, config: GCConfig): Promise<
 ### 3. CRDTManager Integration (`packages/desktop/src/main/crdt/crdt-manager.ts`)
 
 **Background job:**
+
 ```typescript
 private startPeriodicGC(): void {
   const config: GCConfig = DEFAULT_GC_CONFIG;
@@ -72,6 +77,7 @@ private startPeriodicGC(): void {
 ```
 
 **Features:**
+
 - Runs automatically every 30 minutes
 - Iterates over all storage directories and notes
 - Detailed console logging for monitoring
@@ -80,6 +86,7 @@ private startPeriodicGC(): void {
 ### 4. FileSystemAdapter Enhancement
 
 **New capability:**
+
 ```typescript
 export interface FileStats {
   size: number;      // File size in bytes
@@ -91,6 +98,7 @@ stat(path: string): Promise<FileStats>;
 ```
 
 **Implementation in NodeFileSystemAdapter:**
+
 ```typescript
 async stat(path: string): Promise<FileStats> {
   const stats = await fs.stat(path);
@@ -137,11 +145,13 @@ async stat(path: string): Promise<FileStats> {
    - File deletion errors
 
 **Test Implementation Detail:**
+
 - MockFileSystemAdapter with in-memory file storage
 - All methods return `Promise.resolve()` to avoid unnecessary async/await
 - Comprehensive error path coverage
 
 ### Coverage Results
+
 - **Overall:** 86.34% statements, 73.44% branches, 92.35% functions, 87.38% lines
 - **Branch coverage:** 73.44% (above 73% threshold) ✅
 - **Total tests:** 321 unit tests, 18 test suites
@@ -153,6 +163,7 @@ async stat(path: string): Promise<FileStats> {
 **Question:** When are updates deleted?
 
 **Answer:** Updates are deleted in two places:
+
 1. **Immediately after packing** - Each instance deletes its own updates after creating pack files
 2. **During GC** - Cleans up stragglers (failed deletions, old/dead instances)
 
@@ -161,6 +172,7 @@ async stat(path: string): Promise<FileStats> {
 ### 2. Vector Clock-Based Deletion
 
 Only delete files that are **fully incorporated** into the oldest kept snapshot:
+
 ```typescript
 // For packs
 if (pack.endSeq <= oldestMaxSequences[instanceId]) {
@@ -176,6 +188,7 @@ if (update.seq <= oldestMaxSequences[instanceId]) {
 ### 3. Minimum History Duration
 
 Always keep files newer than 24 hours, regardless of incorporation:
+
 ```typescript
 const minHistoryTimestamp = Date.now() - config.minimumHistoryDuration;
 
@@ -189,6 +202,7 @@ if (metadata.timestamp < minHistoryTimestamp) {
 ### 4. Error Handling Philosophy
 
 **Graceful degradation:**
+
 - Individual file errors don't stop GC
 - Errors collected in `stats.errors[]`
 - GC continues to next file/note
@@ -199,21 +213,26 @@ if (metadata.timestamp < minHistoryTimestamp) {
 ## Bugs Fixed During Implementation
 
 ### 1. Unused Variable
+
 **Error:** `oldTimestamp` declared but never used in gc.test.ts
 **Fix:** Removed the variable (wasn't needed)
 
 ### 2. Test Expectation Mismatch
+
 **Error:** Test expected corrupted snapshot to cause error
 **Reality:** GC only parses filename, not content - corrupted files deleted successfully
 **Fix:** Updated test expectation to match actual behavior
 
 ### 3. ESLint Async Issues
+
 **Error:** Mock methods declared `async` without `await`
 **Fix:** Removed `async` keyword, returned `Promise.resolve()`
 
 ### 4. Template Literal Type Error
+
 **Error:** Using `${error}` with unknown type
 **Fix:** Type check before string interpolation:
+
 ```typescript
 const errorMsg = error instanceof Error ? error.message : String(error);
 ```
@@ -221,6 +240,7 @@ const errorMsg = error instanceof Error ? error.message : String(error);
 ## CI Results
 
 All checks passing:
+
 ```
 ✅ Format Check passed
 ✅ Lint passed
@@ -234,18 +254,21 @@ All checks passing:
 ## Commits
 
 ### 284ee84 - feat: Implement Phase 4.1bis Phase 3 - Garbage Collection
+
 - Full GC implementation
 - 8 files changed, 1050 insertions(+), 2 deletions(-)
 - New files: gc-config.ts (64 lines), gc.test.ts (597 lines)
 - Major additions: update-manager.ts (+245 lines), crdt-manager.ts (+116 lines)
 
 ### 917423b - docs: Update PLAN-PHASE-4.md
+
 - Mark Phase 4.1bis Phase 3 as complete
 - Update status from 🟡 to ✅
 - Document all completed tasks
 - Update improvements table
 
 ### 537bc26 - docs: Document OpenTelemetry choice for Phase 4
+
 - Add OTel as technology choice for Phase 4 observability
 - Document dual-mode operation (local always-on, remote opt-in)
 - Add settings panel requirements
@@ -255,26 +278,27 @@ All checks passing:
 
 **All three phases now complete:**
 
-| Phase | Status | Date | Key Achievement |
-|-------|--------|------|----------------|
-| Phase 1: Snapshots | ✅ | 2025-11-04 | 80-90% load time reduction |
-| Phase 2: Packing | ✅ | 2025-11-05 | 90-95% file count reduction |
-| Phase 3: GC | ✅ | 2025-11-05 | Bounded disk usage |
+| Phase              | Status | Date       | Key Achievement             |
+| ------------------ | ------ | ---------- | --------------------------- |
+| Phase 1: Snapshots | ✅     | 2025-11-04 | 80-90% load time reduction  |
+| Phase 2: Packing   | ✅     | 2025-11-05 | 90-95% file count reduction |
+| Phase 3: GC        | ✅     | 2025-11-05 | Bounded disk usage          |
 
 **Overall improvements achieved:**
 
-| Metric | Before | After All Phases |
-|--------|--------|-----------------|
-| Cold load time | 3-5 seconds | 100-200ms |
-| File count | 2,000 files | ~65 files |
-| Disk usage | Unbounded | Bounded ✅ |
-| Cloud sync | Slow | Fast |
+| Metric         | Before      | After All Phases |
+| -------------- | ----------- | ---------------- |
+| Cold load time | 3-5 seconds | 100-200ms        |
+| File count     | 2,000 files | ~65 files        |
+| Disk usage     | Unbounded   | Bounded ✅       |
+| Cloud sync     | Slow        | Fast             |
 
 ## Next Steps: Phase 4 - Optimizations and Monitoring
 
 **Technology choice:** OpenTelemetry (OTel)
 
 **Planned features:**
+
 1. OTel infrastructure setup
 2. Metrics collection (P50, P95, P99 histograms)
 3. Optional remote export to Datadog
@@ -285,6 +309,7 @@ All checks passing:
 8. Compression (optional)
 
 **Privacy approach:**
+
 - Local metrics always on (dev/debugging)
 - Remote metrics opt-in (user controlled)
 - No PII in metrics
@@ -301,16 +326,19 @@ All checks passing:
 ## Architecture Validation
 
 The three-tier system works as designed:
+
 1. **Snapshots** provide fast cold load
 2. **Packs** reduce file count dramatically
 3. **GC** prevents unbounded growth
 
 Each phase builds on the previous, creating a complete lifecycle:
+
 ```
 Create updates → Pack updates → Create snapshots → Delete old files
 ```
 
 All operations are:
+
 - ✅ Multi-instance safe
 - ✅ Crash-safe (atomic operations)
 - ✅ CRDT-consistent (vector clock based)
@@ -320,10 +348,12 @@ All operations are:
 ## Files Modified
 
 **New files:**
+
 - `packages/shared/src/crdt/gc-config.ts`
 - `packages/shared/src/storage/__tests__/gc.test.ts`
 
 **Modified files:**
+
 - `packages/shared/src/storage/update-manager.ts`
 - `packages/desktop/src/main/crdt/crdt-manager.ts`
 - `packages/shared/src/storage/types.ts`

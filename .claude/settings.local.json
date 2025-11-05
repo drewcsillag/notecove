@@ -125,7 +125,15 @@
       "Bash(env NODE_ENV=test timeout 60 pnpm:*)",
       "Bash(env NODE_ENV=test timeout 7200 pnpm:*)",
       "Bash(env NODE_ENV=test timeout 90 pnpm --filter @notecove/desktop test:e2e e2e/search.spec.ts --grep \"should persist search query\")",
-      "Bash(env NODE_ENV=test timeout 300 npx playwright test:*)"
+      "Bash(env NODE_ENV=test timeout 300 npx playwright test:*)",
+      "Bash(env NODE_ENV=test timeout 180 npx playwright test:*)",
+      "Bash(env NODE_ENV=test timeout 10 npx playwright test:*)",
+      "Bash(timeout 60 pnpm:*)",
+      "Bash(pnpm -w build:*)",
+      "Bash(pnpm -w test)",
+      "Bash(pnpm prettier:*)",
+      "Bash(git log:*)",
+      "Bash(NODE_ENV=test pnpm exec jest:*)"
     ],
     "deny": [],
     "ask": []
