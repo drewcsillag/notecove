@@ -11,11 +11,13 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **Diagnostic Steps:**
 
 1. Check console logs for snapshot loading:
+
    ```
    [CRDT Manager] Attempting to load snapshot <filename>
    ```
 
 2. Check if snapshots exist:
+
    ```bash
    ls -la ~/Library/Application\ Support/NoteCove/notes/<note-id>/snapshots/
    ```
@@ -55,6 +57,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **Diagnostic Steps:**
 
 1. Count files by type:
+
    ```bash
    cd ~/Library/Application\ Support/NoteCove/notes/<note-id>
    echo "Snapshots: $(find snapshots -type f 2>/dev/null | wc -l)"
@@ -91,11 +94,13 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **Diagnostic Steps:**
 
 1. Check GC logs:
+
    ```
    [CRDT Manager] GC: deleted X snapshots, Y packs, Z updates
    ```
 
 2. Count old snapshots:
+
    ```bash
    ls snapshots/ | wc -l
    # Should be ≤ 3 (configurable, default retention)
@@ -127,6 +132,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **Diagnostic Steps:**
 
 1. Check if files are cloud-synced:
+
    ```bash
    # macOS: look for cloud icon in Finder
    xattr -l <file-path>
@@ -160,6 +166,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **Diagnostic Steps:**
 
 1. Check telemetry for operation frequency:
+
    ```
    [Telemetry] Snapshot creation: X ms
    [Telemetry] Pack creation: Y ms
@@ -194,6 +201,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **File:** `packages/desktop/src/main/crdt/crdt-manager.ts`
 
 **Thresholds:**
+
 - Very high activity (>10 edits/min): 50 updates
 - High activity (5-10 edits/min): 100 updates
 - Medium activity (1-5 edits/min): 200 updates
@@ -207,6 +215,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **File:** `packages/desktop/src/main/crdt/crdt-manager.ts`
 
 **Settings:**
+
 - Interval: Every 5 minutes (`startPeriodicPacking()`)
 - Keep recent: Last 50 updates unpacked
 - Minimum pack size: 10 updates
@@ -218,6 +227,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **File:** `packages/shared/src/crdt/gc-config.ts`
 
 **Settings:**
+
 - Interval: Every 30 minutes
 - Snapshot retention: Last 3 snapshots
 - Minimum history: 24 hours
@@ -229,6 +239,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **File:** Settings → Telemetry tab
 
 **Options:**
+
 - Local metrics: Always on (console/file)
 - Remote metrics: Optional (Datadog via OTLP)
 - Export interval: 60 seconds
@@ -240,21 +251,25 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 ### Key Performance Indicators
 
 **Cold Load Time:**
+
 - Target: < 250ms
 - Warning: > 500ms
 - Critical: > 1000ms
 
 **File Count per Note:**
+
 - Target: 50-100 files
 - Warning: > 200 files
 - Critical: > 500 files
 
 **Snapshot Frequency:**
+
 - Should match activity level
 - Very active: snapshot every few minutes
 - Idle: snapshot every 30+ minutes
 
 **Pack/GC Success Rate:**
+
 - Target: 100% (no errors)
 - Warning: Occasional errors OK
 - Critical: Repeated failures
@@ -262,6 +277,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 ### Viewing Metrics
 
 **Console Logs:**
+
 ```
 [Telemetry] Cold load: 150ms
 [Telemetry] Snapshot created: 45ms (threshold: 100, edits: 127)
@@ -270,6 +286,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 ```
 
 **Datadog Dashboard (if enabled):**
+
 - crdt.cold_load.duration_ms (P50, P95, P99)
 - crdt.files.total_per_note (histogram)
 - crdt.snapshot.created (counter)
@@ -282,6 +299,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **When:** Corrupted state, excessive file count, testing
 
 **Procedure:**
+
 1. Close NoteCove app
 2. Delete snapshot and pack directories:
    ```bash
@@ -294,6 +312,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 5. New snapshot will be created on close
 
 **Effect:**
+
 - Next load will be slower (loading all updates)
 - File count may temporarily increase
 - System will self-heal within 30 minutes
@@ -303,6 +322,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **When:** Packing stalled due to gaps
 
 **Procedure:**
+
 1. Identify gap in sequence numbers:
    ```bash
    ls updates/ | grep instance-ABC | grep -oE '[0-9]+\.yjson' | sed 's/.yjson//' | sort -n
@@ -318,6 +338,7 @@ This guide helps diagnose and resolve performance issues with the CRDT snapshot 
 **When:** Privacy concerns, testing
 
 **Procedure:**
+
 - Telemetry is ephemeral (not persisted)
 - To disable remote metrics: Settings → Telemetry → Toggle off
 - Local metrics cannot be disabled (used for debugging)

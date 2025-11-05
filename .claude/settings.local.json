@@ -133,7 +133,12 @@
       "Bash(pnpm -w test)",
       "Bash(pnpm prettier:*)",
       "Bash(git log:*)",
-      "Bash(NODE_ENV=test pnpm exec jest:*)"
+      "Bash(NODE_ENV=test pnpm exec jest:*)",
+      "Bash(pnpm format:fix:*)",
+      "Bash(pnpm -F @notecove/shared typecheck:*)",
+      "Bash(pnpm -F @notecove/desktop typecheck:*)",
+      "Bash(pnpm -F @notecove/shared build:*)",
+      "Bash(pnpm -F @notecove/shared test:*)"
     ],
     "deny": [],
     "ask": []
