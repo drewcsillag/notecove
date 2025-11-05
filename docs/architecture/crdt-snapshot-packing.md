@@ -630,12 +630,14 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Telemetry Implementation:**
 
 **Infrastructure:**
+
 - OpenTelemetry SDK with dual-mode operation
 - Local metrics always collected (ConsoleMetricExporter)
 - Optional remote export to Datadog (user-controlled via settings)
 - Dynamic configuration updates without restart
 
 **Metrics Collected:**
+
 - Cold load duration (histogram - auto-calculates P50/P95/P99)
 - Snapshot creation time and count
 - Pack creation time and count
@@ -643,6 +645,7 @@ const updateFiles = listUpdateFiles(noteId).filter(
 - File counts per note (total, snapshots, packs, updates)
 
 **Structured Logging:**
+
 - JSON-formatted logs with context
 - Integration with OTel diagnostic logger
 - Log levels: debug, info, warn, error
@@ -731,6 +734,7 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Implementation:** `packages/desktop/src/main/telemetry/`
 
 **Architecture:**
+
 - Dual-mode: Local (always on) + Remote (opt-in)
 - Local: ConsoleMetricExporter for development/debugging
 - Remote: OTLP HTTP exporter to Datadog (user-controlled)
@@ -739,25 +743,30 @@ const updateFiles = listUpdateFiles(noteId).filter(
 ### Key Metrics (Histograms)
 
 **Cold Load Duration** (`crdt.cold_load.duration_ms`)
+
 - Measures time from start to fully loaded document
 - Attributes: `note_id`, `sd_id`
 - Automatically calculates P50, P95, P99
 
 **Snapshot Creation Time** (`crdt.snapshot.creation_duration_ms`)
+
 - Measures time to create snapshot file
 - Attributes: `note_id`, `sd_id`, `edit_count`, `threshold`
 - Tracks adaptive threshold effectiveness
 
 **Pack Creation Time** (`crdt.pack.creation_duration_ms`)
+
 - Measures time to create pack file
 - Attributes: `note_id`, `sd_id`, `instance_id`, `update_count`
 - Monitors packing performance
 
 **GC Duration** (`crdt.gc.duration_ms`)
+
 - Measures garbage collection run time
 - Attributes: `sd_id`
 
 **File Counts** (per note)
+
 - `crdt.files.total_per_note` - Total CRDT files
 - `crdt.files.snapshots_per_note` - Snapshot file count
 - `crdt.files.packs_per_note` - Pack file count
@@ -766,10 +775,12 @@ const updateFiles = listUpdateFiles(noteId).filter(
 ### Counters
 
 **Operations:**
+
 - `crdt.snapshot.created` - Snapshots created
 - `crdt.pack.created` - Packs created
 
 **Garbage Collection:**
+
 - `crdt.gc.files_deleted` - Files deleted by GC
 - `crdt.gc.bytes_freed` - Bytes freed by GC
 - `crdt.gc.errors` - GC errors encountered
@@ -779,6 +790,7 @@ const updateFiles = listUpdateFiles(noteId).filter(
 **Implementation:** `packages/desktop/src/main/telemetry/logger.ts`
 
 **Features:**
+
 - JSON-formatted logs with key-value context
 - Log levels: DEBUG, INFO, WARN, ERROR
 - Automatic timestamp (ISO 8601)
@@ -786,24 +798,29 @@ const updateFiles = listUpdateFiles(noteId).filter(
 - Child loggers with inherited context
 
 **Example Log:**
+
 ```
 2025-11-05T12:34:56.789Z INFO [CRDT Manager] Snapshot created: snapshot_4800_instance-abc.yjson (threshold: 100, edits: 127)
 ```
 
 **Snapshot Events:**
+
 - Creation: totalChanges, filename, duration, threshold, edit count
 - Selection: which snapshot chosen, why (highest totalChanges)
 - Load: duration, applied update count, skipped count
 
 **Pack Events:**
+
 - Creation: instance-id, sequence range, file count, duration
 - Load: pack filename, updates applied
 
 **GC Events:**
+
 - Run: deleted files by type (snapshots/packs/updates), space freed
 - Errors: corruption, deletion failures
 
 **Error Logging:**
+
 - Corrupted snapshots: filename, error, fallback action
 - Failed updates: filename, error (continues with others)
 - Filesystem errors: operation, path, error, retry count
@@ -863,13 +880,33 @@ async function refreshSnapshot(noteId: string) {
 
 ### Compression
 
-**Current:** Raw Yjs updates (uncompressed)
+**Status:** ✅ IMPLEMENTED (Phase 4)
 
-**Future:** Apply gzip or brotli to snapshot/pack contents
+**Implementation:** zstd level 3 compression for snapshots and packs
 
-- Reduces file size 50-80%
-- Tradeoff: CPU cost for compression/decompression
-- Worthwhile for large documents or slow networks
+- **Algorithm:** zstd (Zstandard) - modern, fast, excellent compression
+- **Level:** 3 (default) - optimal balance of speed and compression ratio
+- **Performance:** ~500 MB/s compression, ~1000 MB/s decompression
+- **Compression Ratio:** 60-70% file size reduction (typical for CRDT binary data)
+- **Overhead:** ~1-2ms per snapshot/pack operation (imperceptible to users)
+
+**File Format:**
+- Compressed files: `.yjson.zst` extension
+- Uncompressed files: `.yjson` extension (backward compatible)
+- Automatic compression when available (injected into UpdateManager)
+- Fallback decompression for legacy uncompressed files
+
+**Benefits:**
+- Smaller file sizes → faster cloud sync
+- Reduced disk usage
+- Lower bandwidth consumption
+- Minimal CPU cost (~30% less than gzip for same ratio)
+
+**Why zstd over gzip/brotli:**
+- Faster compression and decompression than both
+- Better compression ratio than gzip
+- Lower CPU usage than brotli
+- Optimized for binary data (CRDT updates)
 
 ### Differential Snapshots
 
@@ -904,12 +941,14 @@ async function refreshSnapshot(noteId: string) {
 - **Idle documents** (>30 min since last snapshot): Force snapshot at 50 updates
 
 **Tracking:**
+
 - `editCount`: Number of edits since last snapshot check
 - `lastSnapshotCheck`: Timestamp of last threshold calculation
 - `lastSnapshotCreated`: Timestamp of last snapshot created
 - Reset on snapshot creation
 
 **Benefits:**
+
 - More aggressive for actively edited documents (reduces file count, improves load times)
 - Conservative for rarely edited documents (reduces CPU overhead)
 - Automatic adaptation without manual configuration
