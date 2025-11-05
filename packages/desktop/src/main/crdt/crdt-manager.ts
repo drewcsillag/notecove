@@ -231,13 +231,17 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     // Store document state
+    const now = Date.now();
     this.documents.set(noteId, {
       doc,
       noteDoc,
       noteId,
       sdId: noteSdId,
       refCount: 1,
-      lastModified: Date.now(),
+      lastModified: now,
+      editCount: 0,
+      lastSnapshotCheck: now,
+      lastSnapshotCreated: now,
     });
 
     // Set up update listener to write changes to disk
@@ -323,7 +327,9 @@ export class CRDTManagerImpl implements CRDTManager {
     // Write update to disk using the note's SD ID
     await this.updateManager.writeNoteUpdate(state.sdId, noteId, update);
 
-    state.lastModified = Date.now();
+    const now = Date.now();
+    state.lastModified = now;
+    state.editCount++; // Track edits for adaptive snapshot frequency
 
     // Record activity for cross-instance sync using the correct SD's activity logger
     const activityLogger = this.activityLoggers.get(state.sdId);
@@ -596,6 +602,39 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Calculate adaptive snapshot threshold based on edit rate
+   * High activity documents get more frequent snapshots
+   */
+  private calculateSnapshotThreshold(state: DocumentState): number {
+    const now = Date.now();
+    const timeSinceLastCheck = now - state.lastSnapshotCheck;
+    const timeSinceLastSnapshot = now - state.lastSnapshotCreated;
+
+    // Calculate edits per minute
+    const minutesSinceCheck = timeSinceLastCheck / (60 * 1000);
+    const editsPerMinute = minutesSinceCheck > 0 ? state.editCount / minutesSinceCheck : 0;
+
+    // Adaptive thresholds based on edit rate:
+    // - Very high activity (>10 edits/min): snapshot every 50 updates
+    // - High activity (5-10 edits/min): snapshot every 100 updates
+    // - Medium activity (1-5 edits/min): snapshot every 200 updates
+    // - Low activity (<1 edit/min): snapshot every 500 updates
+    // - Also snapshot if >30 minutes since last snapshot (catch idle documents)
+
+    if (editsPerMinute > 10) {
+      return 50; // Very active
+    } else if (editsPerMinute > 5) {
+      return 100; // High activity
+    } else if (editsPerMinute > 1) {
+      return 200; // Medium activity
+    } else if (timeSinceLastSnapshot > 30 * 60 * 1000) {
+      return 50; // Force snapshot for idle documents (>30 min)
+    } else {
+      return 500; // Low activity
+    }
+  }
+
+  /**
    * Check if a note needs a snapshot and create one if needed
    * @param noteId Note ID
    */
@@ -606,10 +645,13 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     try {
+      // Calculate adaptive threshold based on edit rate
+      const threshold = this.calculateSnapshotThreshold(state);
+
       const shouldSnapshot = await this.updateManager.shouldCreateSnapshot(
         state.sdId,
         noteId,
-        100 // threshold: create snapshot if ≥100 updates since last snapshot
+        threshold // adaptive threshold based on document activity
       );
 
       if (shouldSnapshot) {
@@ -632,14 +674,26 @@ export class CRDTManagerImpl implements CRDTManager {
         );
 
         // Record snapshot creation metrics
-        const snapshotDuration = Date.now() - snapshotStartTime;
+        const now = Date.now();
+        const snapshotDuration = now - snapshotStartTime;
         getCRDTMetrics().recordSnapshotCreation(snapshotDuration, {
           note_id: noteId,
           sd_id: state.sdId,
+          edit_count: state.editCount,
+          threshold,
         });
 
-        console.log(`[CRDT Manager] Snapshot created: ${filename}`);
+        console.log(
+          `[CRDT Manager] Snapshot created: ${filename} (threshold: ${threshold}, edits: ${state.editCount})`
+        );
+
+        // Reset edit tracking
+        state.editCount = 0;
+        state.lastSnapshotCreated = now;
       }
+
+      // Update last snapshot check time
+      state.lastSnapshotCheck = Date.now();
     } catch (error) {
       console.error(`[CRDT Manager] Failed to create snapshot for note ${noteId}:`, error);
     }

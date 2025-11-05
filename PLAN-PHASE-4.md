@@ -231,30 +231,30 @@ Hybrid three-tier system:
 
 **Tasks:**
 
-- [ ] 🟥 Set up OpenTelemetry infrastructure
+- [x] ✅ Set up OpenTelemetry infrastructure
   - Install @opentelemetry/sdk-node and related packages
   - Configure OTLP exporter (optional, settings-controlled)
   - Set up local console/file exporter (always on)
   - Add settings panel toggle for remote metrics
   - Configure Datadog endpoint when enabled
-- [ ] 🟥 Add telemetry metrics
+- [x] ✅ Add telemetry metrics
   - Cold load time (P50, P95, P99 histogram)
   - File count per note (histogram)
   - Snapshot creation time (histogram)
   - Pack creation time (histogram)
   - GC deleted file count (counter)
   - GC disk space freed (counter)
-- [ ] 🟥 Add observability/structured logging
+- [x] ✅ Add observability/structured logging
   - Log snapshot creation (totalChanges, size, duration)
   - Log snapshot selection (which snapshot chosen, why)
   - Log pack creation (instance, seq range, file count)
   - Log GC activity (deleted files, space freed)
   - Structured logging (JSON, easily parseable)
   - Integration with OTel traces/spans
-- [ ] 🟥 Optimize snapshot triggers
-  - Adaptive frequency based on edit rate
-  - Snapshot on document close if ≥N updates
-  - Background snapshot job for idle documents
+- [x] ✅ Optimize snapshot triggers
+  - Adaptive frequency based on edit rate (very high/high/medium/low activity thresholds)
+  - Snapshot on document close if ≥N updates (already implemented in unloadNote)
+  - Background snapshot job for idle documents (every 10 minutes + forced snapshot >30min idle)
 - [ ] 🟥 Handle edge cases
   - Corrupted snapshot recovery
   - Filesystem errors (Google Drive sync issues)

@@ -14,6 +14,10 @@ export interface DocumentState {
   sdId: string; // Storage Directory ID for this note
   refCount: number; // Number of renderer windows using this document
   lastModified: number;
+  // Edit rate tracking for adaptive snapshot frequency
+  editCount: number; // Number of edits since last snapshot check
+  lastSnapshotCheck: number; // Timestamp of last snapshot check
+  lastSnapshotCreated: number; // Timestamp of last snapshot created
 }
 
 /**
