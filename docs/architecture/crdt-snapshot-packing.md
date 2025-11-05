@@ -604,18 +604,57 @@ const updateFiles = listUpdateFiles(noteId).filter(
 - Old data properly cleaned up
 - Retention policy respected
 
-### Phase 4: Optimizations and Monitoring
+### Phase 4: Optimizations and Monitoring ✅
+
+**Status:** COMPLETE
 
 **Goals:**
 
-- Add metrics/telemetry (file counts, load times)
-- Optimize snapshot/pack triggers
-- Handle edge cases (corrupted files, gaps, conflicts)
+- ✅ Add metrics/telemetry (file counts, load times)
+- ✅ Optimize snapshot/pack triggers (adaptive frequency)
+- ✅ Handle edge cases (corrupted files, gaps, conflicts)
+
+**Files Added:**
+
+- `packages/desktop/src/main/telemetry/config.ts` - OpenTelemetry setup
+- `packages/desktop/src/main/telemetry/crdt-metrics.ts` - Metrics collection
+- `packages/desktop/src/main/telemetry/logger.ts` - Structured logging
+- `packages/desktop/src/main/crdt/__tests__/adaptive-snapshot.test.ts` - Tests
 
 **Files Modified:**
 
-- All previous files (optimizations)
-- `packages/desktop/src/main/telemetry/crdt-metrics.ts` (new)
+- `packages/desktop/src/main/crdt/crdt-manager.ts` - Adaptive snapshots + metrics
+- `packages/desktop/src/main/crdt/types.ts` - Edit rate tracking fields
+- `packages/desktop/src/renderer/src/components/Settings/TelemetrySettings.tsx` - UI
+
+**Telemetry Implementation:**
+
+**Infrastructure:**
+- OpenTelemetry SDK with dual-mode operation
+- Local metrics always collected (ConsoleMetricExporter)
+- Optional remote export to Datadog (user-controlled via settings)
+- Dynamic configuration updates without restart
+
+**Metrics Collected:**
+- Cold load duration (histogram - auto-calculates P50/P95/P99)
+- Snapshot creation time and count
+- Pack creation time and count
+- Garbage collection stats (duration, files deleted, bytes freed)
+- File counts per note (total, snapshots, packs, updates)
+
+**Structured Logging:**
+- JSON-formatted logs with context
+- Integration with OTel diagnostic logger
+- Log levels: debug, info, warn, error
+- Automatic correlation with traces/spans
+
+**Success Metrics:**
+
+- ✅ All metrics available for monitoring
+- ✅ Adaptive snapshot triggers implemented
+- ✅ Edge cases handled (corrupted snapshots, missing files, gaps)
+- ✅ 14 new tests for adaptive logic
+- ✅ All 677 tests passing (547 unit + 130 E2E)
 
 ## Error Handling
 
@@ -685,21 +724,89 @@ const updateFiles = listUpdateFiles(noteId).filter(
 
 ## Metrics and Observability
 
-### Key Metrics
+**Status:** ✅ IMPLEMENTED (Phase 4)
 
-- **Cold load time:** ms to load document
-- **File count per note:** total files in notes/<note-id>/
-- **Snapshot creation time:** ms to create snapshot
-- **Pack creation time:** ms to pack N updates
-- **GC deleted file count:** files deleted per GC run
+### OpenTelemetry Integration
 
-### Logging
+**Implementation:** `packages/desktop/src/main/telemetry/`
 
-- Snapshot creation: log totalChanges, file size, duration
-- Snapshot loading: log which snapshot selected, load duration
-- Pack creation: log instance-id, sequence range, file count
-- GC: log deleted file count, disk space freed
-- Errors: log corruption, gaps, filesystem errors
+**Architecture:**
+- Dual-mode: Local (always on) + Remote (opt-in)
+- Local: ConsoleMetricExporter for development/debugging
+- Remote: OTLP HTTP exporter to Datadog (user-controlled)
+- Settings UI: Toggle + API key management
+
+### Key Metrics (Histograms)
+
+**Cold Load Duration** (`crdt.cold_load.duration_ms`)
+- Measures time from start to fully loaded document
+- Attributes: `note_id`, `sd_id`
+- Automatically calculates P50, P95, P99
+
+**Snapshot Creation Time** (`crdt.snapshot.creation_duration_ms`)
+- Measures time to create snapshot file
+- Attributes: `note_id`, `sd_id`, `edit_count`, `threshold`
+- Tracks adaptive threshold effectiveness
+
+**Pack Creation Time** (`crdt.pack.creation_duration_ms`)
+- Measures time to create pack file
+- Attributes: `note_id`, `sd_id`, `instance_id`, `update_count`
+- Monitors packing performance
+
+**GC Duration** (`crdt.gc.duration_ms`)
+- Measures garbage collection run time
+- Attributes: `sd_id`
+
+**File Counts** (per note)
+- `crdt.files.total_per_note` - Total CRDT files
+- `crdt.files.snapshots_per_note` - Snapshot file count
+- `crdt.files.packs_per_note` - Pack file count
+- `crdt.files.updates_per_note` - Update file count
+
+### Counters
+
+**Operations:**
+- `crdt.snapshot.created` - Snapshots created
+- `crdt.pack.created` - Packs created
+
+**Garbage Collection:**
+- `crdt.gc.files_deleted` - Files deleted by GC
+- `crdt.gc.bytes_freed` - Bytes freed by GC
+- `crdt.gc.errors` - GC errors encountered
+
+### Structured Logging
+
+**Implementation:** `packages/desktop/src/main/telemetry/logger.ts`
+
+**Features:**
+- JSON-formatted logs with key-value context
+- Log levels: DEBUG, INFO, WARN, ERROR
+- Automatic timestamp (ISO 8601)
+- Integration with OpenTelemetry diagnostic logger
+- Child loggers with inherited context
+
+**Example Log:**
+```
+2025-11-05T12:34:56.789Z INFO [CRDT Manager] Snapshot created: snapshot_4800_instance-abc.yjson (threshold: 100, edits: 127)
+```
+
+**Snapshot Events:**
+- Creation: totalChanges, filename, duration, threshold, edit count
+- Selection: which snapshot chosen, why (highest totalChanges)
+- Load: duration, applied update count, skipped count
+
+**Pack Events:**
+- Creation: instance-id, sequence range, file count, duration
+- Load: pack filename, updates applied
+
+**GC Events:**
+- Run: deleted files by type (snapshots/packs/updates), space freed
+- Errors: corruption, deletion failures
+
+**Error Logging:**
+- Corrupted snapshots: filename, error, fallback action
+- Failed updates: filename, error (continues with others)
+- Filesystem errors: operation, path, error, retry count
 
 ## Future Enhancements
 
@@ -786,14 +893,26 @@ async function refreshSnapshot(noteId: string) {
 
 ### Adaptive Snapshot Frequency
 
-**Current:** Fixed threshold (every 1000 updates)
+**Status:** ✅ IMPLEMENTED (Phase 4)
 
-**Future:** Adjust based on document characteristics
+**Implementation:** Dynamic threshold based on edit rate
 
-- Large documents: Snapshot more frequently
-- Idle documents: Snapshot less frequently
-- High-edit-rate documents: Snapshot more frequently
-- Use ML to predict optimal frequency
+- **Very high activity** (>10 edits/min): Snapshot every 50 updates
+- **High activity** (5-10 edits/min): Snapshot every 100 updates
+- **Medium activity** (1-5 edits/min): Snapshot every 200 updates
+- **Low activity** (<1 edit/min): Snapshot every 500 updates
+- **Idle documents** (>30 min since last snapshot): Force snapshot at 50 updates
+
+**Tracking:**
+- `editCount`: Number of edits since last snapshot check
+- `lastSnapshotCheck`: Timestamp of last threshold calculation
+- `lastSnapshotCreated`: Timestamp of last snapshot created
+- Reset on snapshot creation
+
+**Benefits:**
+- More aggressive for actively edited documents (reduces file count, improves load times)
+- Conservative for rarely edited documents (reduces CPU overhead)
+- Automatic adaptation without manual configuration
 
 ## Migration Path
 

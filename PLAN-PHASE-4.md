@@ -255,11 +255,11 @@ Hybrid three-tier system:
   - Adaptive frequency based on edit rate (very high/high/medium/low activity thresholds)
   - Snapshot on document close if ≥N updates (already implemented in unloadNote)
   - Background snapshot job for idle documents (every 10 minutes + forced snapshot >30min idle)
-- [ ] 🟥 Handle edge cases
-  - Corrupted snapshot recovery
-  - Filesystem errors (Google Drive sync issues)
-  - Sequence gaps (crashes, conflicts)
-  - Concurrent operations (multiple instances)
+- [x] ✅ Handle edge cases (mostly complete)
+  - Corrupted snapshot recovery (✅ tries snapshots in order, falls back to updates)
+  - Filesystem errors (🟡 basic error logging, retry with backoff could be added later)
+  - Sequence gaps (✅ vector clock filtering handles crashes/conflicts)
+  - Concurrent operations (✅ multi-instance safe via instance IDs and sequence numbers)
 - [ ] 🟥 Add compression (optional)
   - gzip or brotli or zstd for snapshots/packs
   - Reduces file size 50-80%
@@ -268,10 +268,10 @@ Hybrid three-tier system:
   - Benchmark with 10K, 50K, 100K updates
   - Test with slow filesystem (simulate Google Drive)
   - Test with multiple concurrent instances
-- [ ] 🟥 Documentation
-  - Update architecture docs
-  - Add troubleshooting guide
-  - Document configuration options
+- [x] ✅ Documentation
+  - Update architecture docs (crdt-snapshot-packing.md with Phase 4 details)
+  - Add troubleshooting guide (docs/troubleshooting/crdt-performance.md)
+  - Document configuration options (included in troubleshooting guide)
 
 **Acceptance Criteria:**
 
