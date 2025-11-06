@@ -26,7 +26,7 @@
     "rebuild": "npx @electron/rebuild",
     "rebuild:node": "cd ../../node_modules/.pnpm/better-sqlite3@12.4.1/node_modules/better-sqlite3 && npm run build-release",
     "rebuild:electron": "npx @electron/rebuild -f -w better-sqlite3 -w @mongodb-js/zstd",
-    "migrate:flag-byte": "node dist-electron/main/storage/migrate-flag-byte.js"
+    "migrate:flag-byte": "tsx src/main/storage/migrate-flag-byte.ts"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
@@ -83,6 +83,7 @@
     "jest-environment-jsdom": "^29.7.0",
     "playwright": "^1.56.1",
     "ts-jest": "^29.1.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "vite": "^5.0.10"
   }

@@ -32,11 +32,24 @@ Each Storage Directory has a version number stored in the `SD_VERSION` file in t
 ### Running a Migration
 
 ```bash
+# From the desktop package directory
+cd packages/desktop
+
 # Dry run (preview changes)
-node dist/migrate-flag-byte.js /path/to/sd --dry-run
+pnpm migrate:flag-byte /path/to/sd --dry-run
 
 # Actual migration
-node dist/migrate-flag-byte.js /path/to/sd
+pnpm migrate:flag-byte /path/to/sd
+```
+
+Or from the repository root:
+
+```bash
+# Dry run
+pnpm --filter @notecove/desktop migrate:flag-byte /path/to/sd --dry-run
+
+# Actual migration
+pnpm --filter @notecove/desktop migrate:flag-byte /path/to/sd
 ```
 
 ### Migration Safety Features
