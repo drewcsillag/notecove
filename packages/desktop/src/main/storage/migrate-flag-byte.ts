@@ -17,12 +17,16 @@
 
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { createMigrationLock, removeMigrationLock, writeSDVersion } from './sd-version.js';
+import {
+  checkSDVersion,
+  createMigrationLock,
+  removeMigrationLock,
+  writeSDVersion,
+} from './sd-version.js';
 
 interface MigrationStats {
   totalFiles: number;
   migratedFiles: number;
-  skippedFiles: number;
   errorFiles: number;
   errors: { file: string; error: string }[];
 }
@@ -66,15 +70,6 @@ async function migrateFile(filePath: string, dryRun: boolean): Promise<boolean> 
     // Read existing file
     const existingData = await fs.readFile(filePath);
 
-    // Check if already has flag byte
-    if (existingData.length > 0) {
-      const firstByte = existingData[0];
-      if (firstByte === 0x01 || firstByte === 0x00) {
-        console.log(`  ⏭️  Skipping ${path.basename(filePath)} (already has flag byte)`);
-        return false; // Already migrated
-      }
-    }
-
     if (dryRun) {
       console.log(`  ✅ Would migrate ${path.basename(filePath)} (${existingData.length} bytes)`);
       return true;
@@ -85,7 +80,7 @@ async function migrateFile(filePath: string, dryRun: boolean): Promise<boolean> 
     migratedData[0] = 0x01; // Ready flag
     migratedData.set(existingData, 1);
 
-    // Write to temp file first (one last time!)
+    // Write to temp file first
     const tempPath = `${filePath}.migration.tmp`;
     await fs.writeFile(tempPath, migratedData);
 
@@ -109,7 +104,6 @@ async function migrateSD(sdPath: string, dryRun: boolean): Promise<MigrationStat
   const stats: MigrationStats = {
     totalFiles: 0,
     migratedFiles: 0,
-    skippedFiles: 0,
     errorFiles: 0,
     errors: [],
   };
@@ -131,12 +125,8 @@ async function migrateSD(sdPath: string, dryRun: boolean): Promise<MigrationStat
   // Migrate each file
   for (const filePath of files) {
     try {
-      const migrated = await migrateFile(filePath, dryRun);
-      if (migrated) {
-        stats.migratedFiles++;
-      } else {
-        stats.skippedFiles++;
-      }
+      await migrateFile(filePath, dryRun);
+      stats.migratedFiles++;
     } catch (error) {
       stats.errorFiles++;
       stats.errors.push({
@@ -171,10 +161,11 @@ Examples:
   node migrate-flag-byte.js ~/Documents/NoteCove/my-sd
 
 What This Tool Does:
-  - Scans all .yjson files in the SD (notes/*/updates/*.yjson)
+  - Checks SD_VERSION to determine if migration is needed
+  - If SD version is 0 (or missing), scans all .yjson files
   - Prepends a 0x01 flag byte to each file
-  - Skips files that already have the flag byte
   - Uses atomic rename for safety
+  - Writes SD_VERSION file (version 1) on completion
 
 Why This Is Needed:
   After upgrading to the flag byte protocol, all existing .yjson files
@@ -208,9 +199,35 @@ Why This Is Needed:
   console.log('  FLAG BYTE MIGRATION TOOL');
   console.log('='.repeat(70));
 
+  // Check SD version - if already migrated, exit early
+  const versionCheck = await checkSDVersion(sdPath);
+  if (versionCheck.compatible) {
+    console.log(`\n✅ SD is already at version ${versionCheck.version} - no migration needed`);
+    console.log('='.repeat(70) + '\n');
+    process.exit(0);
+  }
+
+  if (versionCheck.reason === 'too-new') {
+    console.error(
+      `\n❌ Error: SD version ${versionCheck.sdVersion} is newer than supported version ${versionCheck.appVersion}`
+    );
+    console.error('   Please upgrade the migration tool');
+    console.log('='.repeat(70) + '\n');
+    process.exit(1);
+  }
+
+  if (versionCheck.reason === 'locked') {
+    console.error('\n❌ Error: Migration is already in progress (lock file exists)');
+    console.log('='.repeat(70) + '\n');
+    process.exit(1);
+  }
+
+  // At this point, reason is 'too-old' or version is 0 (legacy SD)
+  console.log(`\n📋 SD version: ${versionCheck.sdVersion ?? 0} → 1`);
+
   // Create migration lock (unless dry run)
   if (!dryRun) {
-    console.log('\n🔒 Creating migration lock...');
+    console.log('🔒 Creating migration lock...');
     await createMigrationLock(sdPath);
   }
 
@@ -225,7 +242,6 @@ Why This Is Needed:
     console.log('='.repeat(70));
     console.log(`Total files found:     ${stats.totalFiles}`);
     console.log(`Files migrated:        ${stats.migratedFiles}`);
-    console.log(`Files skipped:         ${stats.skippedFiles}`);
     console.log(`Files with errors:     ${stats.errorFiles}`);
     console.log(`Duration:              ${duration}ms`);
 
