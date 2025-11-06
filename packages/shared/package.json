@@ -11,6 +11,16 @@
       "require": "./dist/cjs/index.js",
       "import": "./dist/esm/index.js",
       "types": "./dist/esm/index.d.ts"
+    },
+    "./storage/versioning/sd-version": {
+      "require": "./dist/cjs/storage/versioning/sd-version.js",
+      "import": "./dist/esm/storage/versioning/sd-version.js",
+      "types": "./dist/esm/storage/versioning/sd-version.d.ts"
+    },
+    "./storage/versioning/types": {
+      "require": "./dist/cjs/storage/versioning/types.js",
+      "import": "./dist/esm/storage/versioning/types.js",
+      "types": "./dist/esm/storage/versioning/types.d.ts"
     }
   },
   "scripts": {

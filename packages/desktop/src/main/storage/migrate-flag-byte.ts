@@ -22,7 +22,9 @@ import {
   createMigrationLock,
   removeMigrationLock,
   writeSDVersion,
-} from './sd-version.js';
+} from '@notecove/shared/storage/versioning/sd-version';
+import type { VersionCheckResult } from '@notecove/shared/storage/versioning/types';
+import { NodeFileSystemAdapter } from './node-fs-adapter.js';
 
 interface MigrationStats {
   totalFiles: number;
@@ -201,8 +203,11 @@ Why This Is Needed:
   console.log('  FLAG BYTE MIGRATION TOOL');
   console.log('='.repeat(70));
 
+  // Create filesystem adapter for sd-version operations
+  const fsAdapter = new NodeFileSystemAdapter();
+
   // Check SD version - if already migrated, exit early
-  const versionCheck = await checkSDVersion(sdPath);
+  const versionCheck: VersionCheckResult = await checkSDVersion(sdPath, fsAdapter);
   if (versionCheck.compatible) {
     console.log(`\n✅ SD is already at version ${versionCheck.version} - no migration needed`);
     console.log('='.repeat(70) + '\n');
@@ -230,7 +235,7 @@ Why This Is Needed:
   // Create migration lock (unless dry run)
   if (!dryRun) {
     console.log('🔒 Creating migration lock...');
-    await createMigrationLock(sdPath);
+    await createMigrationLock(sdPath, fsAdapter);
   }
 
   try {
@@ -257,7 +262,7 @@ Why This Is Needed:
     // Write SD version file (unless dry run or errors)
     if (!dryRun && stats.errorFiles === 0) {
       console.log('\n📝 Writing SD version file (version 1)...');
-      await writeSDVersion(sdPath, 1);
+      await writeSDVersion(sdPath, 1, fsAdapter);
     }
 
     if (dryRun) {
@@ -277,7 +282,7 @@ Why This Is Needed:
   } finally {
     // Always remove lock (unless dry run)
     if (!dryRun) {
-      await removeMigrationLock(sdPath);
+      await removeMigrationLock(sdPath, fsAdapter);
     }
   }
 }

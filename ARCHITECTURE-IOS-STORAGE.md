@@ -47,6 +47,7 @@ These are Node.js/Electron-specific:
 Move to `packages/shared/src/storage/interfaces/`:
 
 1. **`fs-adapter.ts`** - FileSystemAdapter interface
+
    ```typescript
    export interface FileSystemAdapter {
      readFile(path: string): Promise<Uint8Array>;
@@ -60,6 +61,7 @@ Move to `packages/shared/src/storage/interfaces/`:
    ```
 
 2. **`file-watcher.ts`** - FileWatcher interface
+
    ```typescript
    export interface FileWatcher {
      watch(path: string, callback: (eventType: string, filename: string) => void): void;
@@ -68,6 +70,7 @@ Move to `packages/shared/src/storage/interfaces/`:
    ```
 
 3. **`sd-registry.ts`** - SDRegistry interface
+
    ```typescript
    export interface SDRegistry {
      listSDs(): Promise<SDConfig[]>;
@@ -178,18 +181,21 @@ packages/ios/src/storage/            # 🆕 FUTURE
 Desktop has CLI migration tool (`migrate-flag-byte.ts`), but iOS needs different approach:
 
 **Option 1: On-demand migration**
+
 - First time app opens SD with version 0, show dialog
 - "Migrate Storage Directory to latest version?"
 - Run migration in background with progress indicator
 - Can't use SD until migration completes
 
 **Option 2: Automatic migration**
+
 - App detects version 0 on SD open
 - Automatically migrates in background
 - Lock file prevents other instances from accessing during migration
 - Show progress indicator
 
 **Option 3: Share migration via iCloud**
+
 - Desktop migrates SD
 - SD_VERSION file and migrated .yjson files sync via iCloud
 - iOS sees version 1, no migration needed
@@ -217,10 +223,10 @@ The flag byte protocol (0x00/0x01) **must work identically** on iOS:
 
 ## Action Items
 
-- [ ] Create abstraction interfaces in shared package
-- [ ] Move sd-version.ts to shared with FileSystemAdapter dependency
-- [ ] Refactor desktop storage to implement interfaces
-- [ ] Update desktop migration tool to use shared sd-version
+- [x] Create abstraction interfaces in shared package (Already existed!)
+- [x] Move sd-version.ts to shared with FileSystemAdapter dependency
+- [x] Refactor desktop storage to implement interfaces (Already done!)
+- [x] Update desktop migration tool to use shared sd-version
 - [ ] Test desktop still works after refactoring
 - [ ] Design iOS migration UX
 - [ ] Implement iOS storage adapters
@@ -236,8 +242,8 @@ The flag byte protocol (0x00/0x01) **must work identically** on iOS:
 
 ## Related Files
 
-- `/packages/desktop/src/main/storage/` - Current desktop implementation
-- `/packages/shared/src/storage/` - Current shared storage logic
+- `/packages/desktop/src/main/storage/` - Desktop-specific storage implementation
+- `/packages/shared/src/storage/` - Shared cross-platform storage logic
+- `/packages/shared/src/storage/versioning/` - ✅ SD version management (cross-platform)
 - `/packages/desktop/src/main/storage/MIGRATIONS.md` - Migration documentation
-- `/packages/desktop/src/main/storage/sd-version.ts` - Version checking (needs refactoring)
-- `/packages/desktop/src/main/storage/migrate-flag-byte.ts` - Desktop migration tool
+- `/packages/desktop/src/main/storage/migrate-flag-byte.ts` - Desktop migration CLI tool
