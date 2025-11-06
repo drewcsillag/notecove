@@ -26,9 +26,10 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
     const buffer = await fs.readFile(path);
     const data = new Uint8Array(buffer);
 
-    // Only apply flag byte protocol to .yjson files (CRDT update files)
+    // Only apply flag byte protocol to .yjson files (CRDT update/snapshot/pack files)
+    // This includes .yjson.zst compressed files
     // Other files like activity logs (.log) are plain text
-    if (!path.endsWith('.yjson')) {
+    if (!path.includes('.yjson')) {
       return data;
     }
 
@@ -72,9 +73,10 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
       }
     }
 
-    // Only apply flag byte protocol to .yjson files (CRDT update files)
+    // Only apply flag byte protocol to .yjson files (CRDT update/snapshot/pack files)
+    // This includes .yjson.zst compressed files
     // Other files like activity logs (.log) are plain text
-    if (!path.endsWith('.yjson')) {
+    if (!path.includes('.yjson')) {
       await fs.writeFile(path, data);
       return;
     }
