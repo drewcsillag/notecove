@@ -891,18 +891,21 @@ async function refreshSnapshot(noteId: string) {
 - **Overhead:** ~1-2ms per snapshot/pack operation (imperceptible to users)
 
 **File Format:**
+
 - Compressed files: `.yjson.zst` extension
 - Uncompressed files: `.yjson` extension (backward compatible)
 - Automatic compression when available (injected into UpdateManager)
 - Fallback decompression for legacy uncompressed files
 
 **Benefits:**
+
 - Smaller file sizes → faster cloud sync
 - Reduced disk usage
 - Lower bandwidth consumption
 - Minimal CPU cost (~30% less than gzip for same ratio)
 
 **Why zstd over gzip/brotli:**
+
 - Faster compression and decompression than both
 - Better compression ratio than gzip
 - Lower CPU usage than brotli

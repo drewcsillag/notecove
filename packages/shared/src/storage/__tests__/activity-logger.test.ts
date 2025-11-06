@@ -41,31 +41,33 @@ describe('ActivityLogger', () => {
     });
 
     it('should append new line for different note', async () => {
-      mockFs.readFile.mockResolvedValue(new TextEncoder().encode('1000|note-1|1\n'));
+      mockFs.readFile.mockResolvedValue(new TextEncoder().encode('note-1|test-instance_100\n'));
 
-      await logger.recordNoteActivity('note-2', 1);
+      await logger.recordNoteActivity('note-2', 101);
 
       const written = mockFs.writeFile.mock.calls[0]?.[1] ?? new Uint8Array();
       const text = new TextDecoder().decode(written);
       const lines = text.split('\n').filter((l) => l.length > 0);
 
       expect(lines).toHaveLength(2);
-      expect(lines[0]).toBe('1000|note-1|1');
-      expect(lines[1]).toMatch(/^\d+\|note-2\|1$/);
+      expect(lines[0]).toBe('note-1|test-instance_100');
+      expect(lines[1]).toBe('note-2|test-instance_101');
     });
 
     it('should replace last line for same note edited consecutively', async () => {
       // First edit to note-1
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode(''));
-      await logger.recordNoteActivity('note-1', 1);
+      await logger.recordNoteActivity('note-1', 100);
 
       // Get what was written
       const firstWrite = mockFs.writeFile.mock.calls[0]?.[1] ?? new Uint8Array();
+      const firstText = new TextDecoder().decode(firstWrite);
+      expect(firstText).toBe('note-1|test-instance_100\n');
 
-      // Second edit to note-1 (consecutive)
+      // Second edit to note-1 (consecutive) - should replace last line
       mockFs.readFile.mockResolvedValue(firstWrite);
       jest.clearAllMocks();
-      await logger.recordNoteActivity('note-1', 5);
+      await logger.recordNoteActivity('note-1', 105);
 
       const written = mockFs.writeFile.mock.calls[0]?.[1] ?? new Uint8Array();
       const text = new TextDecoder().decode(written);
@@ -73,26 +75,26 @@ describe('ActivityLogger', () => {
 
       // Should have only 1 line (replaced the previous one)
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toMatch(/^\d+\|note-1\|5$/);
+      expect(lines[0]).toBe('note-1|test-instance_105');
     });
 
-    it('should ensure monotonically increasing timestamps', async () => {
+    it('should use monotonically increasing sequence numbers', async () => {
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode(''));
 
-      // Record two entries in quick succession
-      await logger.recordNoteActivity('note-1', 1);
+      // Record two entries with increasing sequences
+      await logger.recordNoteActivity('note-1', 100);
       const firstWrite = mockFs.writeFile.mock.calls[0]?.[1];
       const firstText = new TextDecoder().decode(firstWrite);
-      const firstTimestamp = parseInt(firstText.split('|')[0] ?? '0');
+      expect(firstText).toBe('note-1|test-instance_100\n');
 
       mockFs.readFile.mockResolvedValue(firstWrite);
-      await logger.recordNoteActivity('note-2', 1);
+      await logger.recordNoteActivity('note-2', 101);
       const secondWrite = mockFs.writeFile.mock.calls[1]?.[1];
       const secondText = new TextDecoder().decode(secondWrite);
       const lines = secondText.split('\n').filter((l) => l.length > 0);
-      const secondTimestamp = parseInt(lines[1]?.split('|')[0] ?? '0');
 
-      expect(secondTimestamp).toBeGreaterThan(firstTimestamp);
+      expect(lines[0]).toBe('note-1|test-instance_100');
+      expect(lines[1]).toBe('note-2|test-instance_101');
     });
   });
 
@@ -105,7 +107,8 @@ describe('ActivityLogger', () => {
 
     it('should not write if under retention limit', async () => {
       const lines =
-        Array.from({ length: 500 }, (_, i) => `${1000 + i}|note-${i}|1`).join('\n') + '\n';
+        Array.from({ length: 500 }, (_, i) => `note-${i}|test-instance_${1000 + i}`).join('\n') +
+        '\n';
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode(lines));
 
       await logger.compact();
@@ -117,7 +120,8 @@ describe('ActivityLogger', () => {
 
     it('should trim to retention limit if over', async () => {
       const lines =
-        Array.from({ length: 1500 }, (_, i) => `${1000 + i}|note-${i}|1`).join('\n') + '\n';
+        Array.from({ length: 1500 }, (_, i) => `note-${i}|test-instance_${1000 + i}`).join('\n') +
+        '\n';
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode(lines));
 
       await logger.compact();
@@ -128,8 +132,8 @@ describe('ActivityLogger', () => {
 
       expect(writtenLines).toHaveLength(1000);
       // Should keep the most recent 1000 lines
-      expect(writtenLines[0]).toBe('1500|note-500|1');
-      expect(writtenLines[writtenLines.length - 1]).toBe('2499|note-1499|1');
+      expect(writtenLines[0]).toBe('note-500|test-instance_1500');
+      expect(writtenLines[writtenLines.length - 1]).toBe('note-1499|test-instance_2499');
     });
   });
 });

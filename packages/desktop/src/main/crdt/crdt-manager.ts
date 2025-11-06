@@ -324,8 +324,8 @@ export class CRDTManagerImpl implements CRDTManager {
       return;
     }
 
-    // Write update to disk using the note's SD ID
-    await this.updateManager.writeNoteUpdate(state.sdId, noteId, update);
+    // Write update to disk using the note's SD ID and get the sequence number
+    const sequenceNumber = await this.updateManager.writeNoteUpdate(state.sdId, noteId, update);
 
     const now = Date.now();
     state.lastModified = now;
@@ -335,8 +335,10 @@ export class CRDTManagerImpl implements CRDTManager {
     const activityLogger = this.activityLoggers.get(state.sdId);
     if (activityLogger) {
       try {
-        console.log(`[CRDT Manager] Recording activity for note ${noteId} in SD ${state.sdId}`);
-        await activityLogger.recordNoteActivity(noteId, state.refCount);
+        console.log(
+          `[CRDT Manager] Recording activity for note ${noteId} in SD ${state.sdId} (sequence: ${sequenceNumber})`
+        );
+        await activityLogger.recordNoteActivity(noteId, sequenceNumber);
       } catch (error) {
         // Don't let activity logging errors break the update
         console.error(`[CRDT Manager] Failed to record activity for note ${noteId}:`, error);

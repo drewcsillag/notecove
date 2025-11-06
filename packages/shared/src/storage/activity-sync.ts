@@ -20,7 +20,8 @@ export interface ActivitySyncCallbacks {
 }
 
 export class ActivitySync {
-  private lastSeenTimestamps = new Map<string, number>();
+  private lastSeenSequences = new Map<string, number>(); // instanceId -> last sequence number
+  private pendingSyncs = new Map<string, Promise<void>>(); // noteId -> pending sync promise
 
   constructor(
     private fs: FileSystemAdapter,
@@ -34,6 +35,7 @@ export class ActivitySync {
    * Sync from other instances' activity logs
    *
    * Returns a set of note IDs that were affected by the sync.
+   * Polls for update files in parallel to avoid head-of-line blocking.
    */
   async syncFromOtherInstances(): Promise<Set<string>> {
     const affectedNotes = new Set<string>();
@@ -44,8 +46,8 @@ export class ActivitySync {
       for (const file of files) {
         if (!file.endsWith('.log')) continue;
 
-        const instanceId = file.replace('.log', '');
-        if (instanceId === this.instanceId) continue; // Skip our own
+        const otherInstanceId = file.replace('.log', '');
+        if (otherInstanceId === this.instanceId) continue; // Skip our own
 
         const filePath = this.fs.joinPath(this.activityDir, file);
 
@@ -56,45 +58,60 @@ export class ActivitySync {
 
           if (lines.length === 0) continue;
 
-          const lastSeen = this.lastSeenTimestamps.get(instanceId) ?? 0;
-          const oldestLine = lines[0];
-          if (!oldestLine) continue;
-          const oldestPart = oldestLine.split('|')[0];
-          if (!oldestPart) continue;
-          const oldestTimestamp = parseInt(oldestPart);
+          const lastSeen = this.lastSeenSequences.get(otherInstanceId) ?? 0;
 
-          // Gap detection: compaction removed entries we haven't seen yet
-          if (oldestTimestamp > lastSeen && lastSeen > 0) {
-            console.warn(
-              `[ActivitySync] Gap detected for ${instanceId} (oldest: ${oldestTimestamp}, last seen: ${lastSeen}), performing full scan`
-            );
-            const reloadedNotes = await this.fullScanAllNotes();
-            // Add all reloaded notes to affected set
-            for (const noteId of reloadedNotes) {
-              affectedNotes.add(noteId);
+          // Parse first line to check for sequence gap
+          const firstLine = lines[0];
+          if (firstLine) {
+            const firstParts = firstLine.split('|');
+            if (firstParts.length >= 2) {
+              const firstInstanceSeq = firstParts[1];
+              if (firstInstanceSeq) {
+                const firstSeqParts = firstInstanceSeq.split('_');
+                const firstSequence = parseInt(firstSeqParts[1] ?? '0');
+
+                // Gap detection: compaction removed entries we haven't seen yet
+                if (firstSequence > lastSeen + 1 && lastSeen > 0) {
+                  console.warn(
+                    `[ActivitySync] Gap detected for ${otherInstanceId} (oldest: ${firstSequence}, last seen: ${lastSeen}), performing full scan`
+                  );
+                  const reloadedNotes = await this.fullScanAllNotes();
+                  for (const noteId of reloadedNotes) {
+                    affectedNotes.add(noteId);
+                  }
+                }
+              }
             }
-            // Don't continue - still process new entries below
-            // We need to process the current activity log to discover new notes
           }
 
-          // Process new entries (those with timestamp > lastSeen)
+          // Process new entries (those with sequence > lastSeen)
           for (const line of lines) {
             const parts = line.split('|');
             if (parts.length < 2) continue; // Invalid line
 
-            const timestamp = parts[0];
-            const noteId = parts[1];
-            if (!timestamp || !noteId) continue;
+            const noteId = parts[0];
+            const instanceSeq = parts[1];
+            if (!noteId || !instanceSeq) continue;
 
-            const ts = parseInt(timestamp);
+            const seqParts = instanceSeq.split('_');
+            const sequence = parseInt(seqParts[1] ?? '0');
 
-            if (ts > lastSeen) {
-              await this.callbacks.reloadNote(noteId, this.sdId);
+            if (sequence > lastSeen) {
               affectedNotes.add(noteId);
+
+              // Launch parallel poll for this update (fire and forget)
+              // Don't await - let all notes poll in parallel
+              if (!this.pendingSyncs.has(noteId)) {
+                const syncPromise = this.pollAndReload(instanceSeq, noteId);
+                this.pendingSyncs.set(noteId, syncPromise);
+
+                // Clean up when done (intentionally fire and forget)
+                void syncPromise.finally(() => this.pendingSyncs.delete(noteId));
+              }
             }
           }
 
-          this.updateWatermark(instanceId, lines);
+          this.updateWatermark(otherInstanceId, lines);
         } catch (error) {
           // File might have been deleted or is corrupted
           console.error(`[ActivitySync] Failed to read ${file}:`, error);
@@ -108,16 +125,64 @@ export class ActivitySync {
   }
 
   /**
+   * Poll for an update file and reload the note when it appears
+   *
+   * Uses exponential backoff to avoid hammering the filesystem.
+   */
+  private async pollAndReload(instanceSeq: string, noteId: string): Promise<void> {
+    const [instanceId, seqStr] = instanceSeq.split('_');
+    const sequenceNum = parseInt(seqStr ?? '0');
+    const updateFileName = `${instanceId}_${sequenceNum}.yjson`;
+
+    // Exponential backoff delays (ms)
+    const delays = [100, 200, 500, 1000, 2000, 5000, 10000];
+
+    for (const delay of delays) {
+      // Check if update file exists
+      const updatePath = this.fs.joinPath(this.activityDir, '..', 'updates', updateFileName);
+      const exists = await this.fs.exists(updatePath);
+
+      if (exists) {
+        // File exists - reload the note
+        await this.callbacks.reloadNote(noteId, this.sdId);
+        return;
+      }
+
+      // Wait before next attempt
+      await this.sleep(delay);
+    }
+
+    // Timeout - log warning but don't fail
+    console.warn(
+      `[ActivitySync] Timeout waiting for ${updateFileName} for note ${noteId}. File may sync later.`
+    );
+  }
+
+  /**
+   * Sleep for a given number of milliseconds
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
    * Update our watermark for an instance
    */
   private updateWatermark(instanceId: string, lines: string[]): void {
     if (lines.length > 0) {
       const lastLine = lines[lines.length - 1];
       if (!lastLine) return;
-      const latestPart = lastLine.split('|')[0];
-      if (!latestPart) return;
-      const latestTimestamp = parseInt(latestPart);
-      this.lastSeenTimestamps.set(instanceId, latestTimestamp);
+
+      const parts = lastLine.split('|');
+      if (parts.length < 2) return;
+
+      const instanceSeq = parts[1];
+      if (!instanceSeq) return;
+
+      const seqParts = instanceSeq.split('_');
+      const sequence = parseInt(seqParts[1] ?? '0');
+
+      this.lastSeenSequences.set(instanceId, sequence);
     }
   }
 
@@ -166,13 +231,13 @@ export class ActivitySync {
    * Reset watermark tracking (useful for testing)
    */
   resetWatermarks(): void {
-    this.lastSeenTimestamps.clear();
+    this.lastSeenSequences.clear();
   }
 
   /**
    * Get current watermarks (useful for debugging)
    */
   getWatermarks(): Map<string, number> {
-    return new Map(this.lastSeenTimestamps);
+    return new Map(this.lastSeenSequences);
   }
 }

@@ -121,11 +121,16 @@ describe('UpdateManager', () => {
       });
 
       const update = noteDoc.encodeStateAsUpdate();
-      const filename = await updateManager.writeNoteUpdate(sdId, noteId, update);
+      const sequence = await updateManager.writeNoteUpdate(sdId, noteId, update);
 
-      // New format: timestamp-seq (sequence numbers, variable length)
-      expect(filename).toMatch(/^test-instance-123_note-123_\d+-\d+\.yjson$/);
-      expect(fs.hasFile(`/test/sd/notes/note-123/updates/${filename}`)).toBe(true);
+      // writeNoteUpdate now returns sequence number
+      expect(typeof sequence).toBe('number');
+      expect(sequence).toBeGreaterThanOrEqual(0);
+
+      // Check file exists with correct pattern
+      const files = await fs.listFiles(`/test/sd/notes/note-123/updates`);
+      expect(files.length).toBe(1);
+      expect(files[0]).toMatch(/^test-instance-123_note-123_\d+-\d+\.yjson$/);
 
       noteDoc.destroy();
     });
@@ -296,12 +301,16 @@ describe('UpdateManager', () => {
     it('should delete specified files', async () => {
       const noteId = 'note-123' as UUID;
 
-      const filename1 = await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([1]));
+      await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([1]));
       await new Promise((resolve) => setTimeout(resolve, 2));
-      const filename2 = await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([2]));
+      await updateManager.writeNoteUpdate(sdId, noteId, new Uint8Array([2]));
 
-      const path1 = `/test/sd/notes/note-123/updates/${filename1}`;
-      const path2 = `/test/sd/notes/note-123/updates/${filename2}`;
+      // Get the actual filenames from the filesystem
+      const files = await fs.listFiles(`/test/sd/notes/note-123/updates`);
+      expect(files.length).toBe(2);
+
+      const path1 = `/test/sd/notes/note-123/updates/${files[0]}`;
+      const path2 = `/test/sd/notes/note-123/updates/${files[1]}`;
 
       expect(fs.hasFile(path1)).toBe(true);
       expect(fs.hasFile(path2)).toBe(true);

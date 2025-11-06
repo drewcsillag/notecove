@@ -10,7 +10,7 @@ import type { FileSystemAdapter } from './types';
 export class ActivityLogger {
   private lastNoteWritten: string | null = null;
   private activityLogPath: string;
-  private lastTimestamp = 0;
+  private instanceId = '';
 
   constructor(
     private fs: FileSystemAdapter,
@@ -24,6 +24,7 @@ export class ActivityLogger {
    * Set instance ID and initialize log path
    */
   setInstanceId(instanceId: string): void {
+    this.instanceId = instanceId;
     this.activityLogPath = this.fs.joinPath(this.activityDir, `${instanceId}.log`);
   }
 
@@ -40,17 +41,11 @@ export class ActivityLogger {
    * If the same note is edited consecutively, replaces the last line.
    * Otherwise, appends a new line.
    *
-   * Handles backwards-moving clocks by ensuring timestamps are monotonically increasing.
+   * Format: noteId|instanceId_sequenceNumber
+   * This allows other instances to poll for the specific update file.
    */
-  async recordNoteActivity(noteId: string, updateCount: number): Promise<void> {
-    // Get current time in milliseconds
-    const now = Date.now();
-
-    // Ensure monotonically increasing timestamps (handle clock skew/backwards jumps)
-    const timestamp = now > this.lastTimestamp ? now : this.lastTimestamp + 1;
-    this.lastTimestamp = timestamp;
-
-    const line = `${timestamp}|${noteId}|${updateCount}`;
+  async recordNoteActivity(noteId: string, sequenceNumber: number): Promise<void> {
+    const line = `${noteId}|${this.instanceId}_${sequenceNumber}`;
 
     if (this.lastNoteWritten === noteId) {
       // Same note edited consecutively - replace last line

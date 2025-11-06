@@ -94,7 +94,7 @@ export class UpdateManager {
   /**
    * Write a note update to disk
    */
-  async writeNoteUpdate(sdId: UUID, noteId: UUID, update: Uint8Array): Promise<string> {
+  async writeNoteUpdate(sdId: UUID, noteId: UUID, update: Uint8Array): Promise<number> {
     const sdStructure = this.getSDStructure(sdId);
 
     // Ensure note directory exists
@@ -115,7 +115,7 @@ export class UpdateManager {
     const filePath = sdStructure.getNoteUpdateFilePath(noteId, filename);
 
     await this.fs.writeFile(filePath, encoded);
-    return filename;
+    return sequence;
   }
 
   /**
