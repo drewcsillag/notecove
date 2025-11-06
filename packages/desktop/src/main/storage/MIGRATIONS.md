@@ -43,19 +43,19 @@ node dist/migrate-flag-byte.js /path/to/sd
 
 - **Migration lock**: Creates `.migration-lock` file to prevent concurrent access
 - **Atomic operations**: Uses temp files and rename for safety
-- **Skip already migrated**: Automatically skips files that already have the new format
+- **Version checking**: Checks `SD_VERSION` to determine if migration is needed
 - **Version file**: Updates `SD_VERSION` after successful migration
 
 ### What Happens During Migration
 
-1. Migration creates `.migration-lock` file
-2. Scans all `.yjson` files in the SD
-3. For each file:
-   - Checks if already migrated (skip if yes)
-   - Writes to temp file with new format
+1. Checks `SD_VERSION` file - if version >= 1, exits early (already migrated)
+2. Creates `.migration-lock` file
+3. Scans all `.yjson` files in the SD
+4. For each file:
+   - Writes to temp file with new format (0x01 flag byte + data)
    - Atomically renames temp file to original
-4. Writes `SD_VERSION` file with new version number
-5. Removes `.migration-lock` file
+5. Writes `SD_VERSION` file with new version number
+6. Removes `.migration-lock` file
 
 ## App Version Checking
 
@@ -117,10 +117,10 @@ Another instance is migrating the SD. Wait for it to complete or manually remove
 
 The SD is from a newer app version. Update your app or use a different SD.
 
-### Files already migrated
+### SD already migrated
 
-Migration automatically skips files that already have the new format. This is normal and safe.
+If you run the migration on an SD that's already at version 1 or higher, the tool will detect this via `SD_VERSION` and exit immediately without modifying any files.
 
 ### Migration failed partway through
 
-Some files may be migrated while others are not. You can safely re-run the migration - it will skip already-migrated files and complete the rest.
+Some files may be migrated while others are not. The `SD_VERSION` file is only written after ALL files are successfully migrated. If migration fails partway through, you can safely re-run it - the tool will complete the remaining files.
