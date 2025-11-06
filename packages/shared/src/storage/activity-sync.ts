@@ -128,6 +128,7 @@ export class ActivitySync {
    * Poll for an update file and reload the note when it appears
    *
    * Uses exponential backoff to avoid hammering the filesystem.
+   * Handles both missing files and incomplete files (0x00 flag byte).
    */
   private async pollAndReload(instanceSeq: string, noteId: string): Promise<void> {
     const [instanceId, seqStr] = instanceSeq.split('_');
@@ -138,21 +139,38 @@ export class ActivitySync {
     const delays = [100, 200, 500, 1000, 2000, 5000, 10000];
 
     for (const delay of delays) {
-      // Check if update file exists
-      const updatePath = this.fs.joinPath(this.activityDir, '..', 'updates', updateFileName);
-      const exists = await this.fs.exists(updatePath);
-
-      if (exists) {
-        // File exists - reload the note
+      try {
+        // Try to reload the note - this will check file existence AND flag byte
         await this.callbacks.reloadNote(noteId, this.sdId);
+        return; // Success!
+      } catch (error) {
+        const errorMessage = (error as Error).message || '';
+
+        // Check if file doesn't exist yet
+        if (errorMessage.includes('ENOENT') || errorMessage.includes('does not exist')) {
+          // Wait and retry
+          await this.sleep(delay);
+          continue;
+        }
+
+        // Check if file is incomplete (still being written)
+        if (errorMessage.includes('incomplete') || errorMessage.includes('still being written')) {
+          // Wait and retry - file sync is in progress
+          await this.sleep(delay);
+          continue;
+        }
+
+        // Other error (corrupted file, permissions, etc.) - give up
+        console.error(
+          `[ActivitySync] Failed to reload ${updateFileName} for note ${noteId}:`,
+          error
+        );
         return;
       }
-
-      // Wait before next attempt
-      await this.sleep(delay);
     }
 
     // Timeout - log warning but don't fail
+    // File will be retried on next ActivitySync cycle
     console.warn(
       `[ActivitySync] Timeout waiting for ${updateFileName} for note ${noteId}. File may sync later.`
     );

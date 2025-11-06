@@ -19,15 +19,39 @@ class MockFileSystemAdapter implements FileSystemAdapter {
   }
 
   async readFile(path: string): Promise<Uint8Array> {
-    const data = this.files.get(path);
-    if (!data) {
+    const storedData = this.files.get(path);
+    if (!storedData) {
       throw new Error(`File not found: ${path}`);
     }
-    return data;
+
+    // Check for empty file
+    if (storedData.length === 0) {
+      throw new Error(`File is empty: ${path}`);
+    }
+
+    // Check flag byte (first byte of file)
+    const flagByte = storedData[0];
+
+    if (flagByte === 0x00) {
+      // File is still being written
+      throw new Error(`File is incomplete (still being written): ${path}`);
+    }
+
+    if (flagByte !== 0x01) {
+      // Invalid flag byte - file may be corrupted or from old version
+      throw new Error(`Invalid file format (flag byte: 0x${flagByte.toString(16)}): ${path}`);
+    }
+
+    // Return actual data (strip flag byte)
+    return storedData.subarray(1);
   }
 
   async writeFile(path: string, data: Uint8Array): Promise<void> {
-    this.files.set(path, data);
+    // Prepend 0x01 flag byte (ready) to simulate the flag byte protocol
+    const flaggedData = new Uint8Array(1 + data.length);
+    flaggedData[0] = 0x01; // Ready flag
+    flaggedData.set(data, 1);
+    this.files.set(path, flaggedData);
   }
 
   async deleteFile(path: string): Promise<void> {

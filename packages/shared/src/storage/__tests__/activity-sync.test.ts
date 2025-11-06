@@ -76,9 +76,12 @@ describe('ActivitySync', () => {
 
       // Simulate delay: file doesn't exist on first check, exists on second
       let callCount = 0;
-      mockFs.exists.mockImplementation(() => {
+      mockCallbacks.reloadNote.mockImplementation(() => {
         callCount++;
-        return Promise.resolve(callCount > 2); // Exists after 2 attempts
+        if (callCount <= 2) {
+          return Promise.reject(new Error('ENOENT: File does not exist'));
+        }
+        return Promise.resolve();
       });
 
       await sync.syncFromOtherInstances();
@@ -86,8 +89,7 @@ describe('ActivitySync', () => {
       await sleep(500);
 
       // Should have polled multiple times
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(mockFs.exists).toHaveBeenCalledTimes(3); // Initial + 2 retries
+      expect(callCount).toBeGreaterThanOrEqual(3); // Initial + 2 retries
       // Should eventually reload
       expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
     });
@@ -224,7 +226,8 @@ describe('ActivitySync', () => {
     it('should timeout gracefully if update file never appears', async () => {
       mockFs.listFiles.mockResolvedValue(['other-instance.log']);
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode('note-1|other-instance_100\n'));
-      mockFs.exists.mockResolvedValue(false); // File never appears
+      // File never appears - reloadNote always fails with ENOENT
+      mockCallbacks.reloadNote.mockRejectedValue(new Error('ENOENT: File does not exist'));
 
       // Mock console.warn to suppress output
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();

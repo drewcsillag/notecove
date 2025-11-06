@@ -138,7 +138,12 @@
       "Bash(pnpm -F @notecove/shared typecheck:*)",
       "Bash(pnpm -F @notecove/desktop typecheck:*)",
       "Bash(pnpm -F @notecove/shared build:*)",
-      "Bash(pnpm -F @notecove/shared test:*)"
+      "Bash(pnpm -F @notecove/shared test:*)",
+      "Bash(NODE_ENV=test timeout 90 node:*)",
+      "Bash(NODE_ENV=test timeout 60 node:*)",
+      "Bash(NODE_ENV=test timeout 120 node:*)",
+      "Bash(env NODE_ENV=test timeout 120 node:*)",
+      "Bash(env NODE_ENV=test timeout 300 node dist/cjs/__manual__/sync-fuzz-test.js --scenario quick-smoke)"
     ],
     "deny": [],
     "ask": []
