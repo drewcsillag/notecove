@@ -32,6 +32,20 @@ export class ActivitySync {
   ) {}
 
   /**
+   * Wait for all pending syncs to complete
+   *
+   * This ensures that all poll-and-reload operations have finished before
+   * broadcasting update events to renderer processes.
+   */
+  async waitForPendingSyncs(): Promise<void> {
+    if (this.pendingSyncs.size === 0) {
+      return;
+    }
+
+    await Promise.all(Array.from(this.pendingSyncs.values()));
+  }
+
+  /**
    * Sync from other instances' activity logs
    *
    * Returns a set of note IDs that were affected by the sync.

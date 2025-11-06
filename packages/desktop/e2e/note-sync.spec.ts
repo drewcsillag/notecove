@@ -127,13 +127,7 @@ test.describe('Note Multi-Instance Sync', () => {
     console.log('[E2E] Note editing completed, activity log infrastructure is active');
   });
 
-  test.skip('should sync multiple consecutive edits between separate instances', async () => {
-    // SKIPPED: This test exposes an architectural limitation where TipTapEditor doesn't
-    // automatically reload when a note is updated by another instance. The note content
-    // IS successfully synced to the database, but the editor component doesn't refresh.
-    // Fixing this requires refactoring TipTapEditor to watch for external note updates.
-    // Related: The editor should subscribe to note:external-update events and reload.
-    //
+  test('should sync multiple consecutive edits between separate instances', async () => {
     // Create a shared storage directory for both instances
     const sharedStorageDir = mkdtempSync(join(tmpdir(), 'notecove-cross-instance-'));
     console.log('[E2E Cross-Instance] Shared storage directory:', sharedStorageDir);
@@ -207,56 +201,24 @@ test.describe('Note Multi-Instance Sync', () => {
       await editor1.click();
       await editor1.fill(firstEdit);
 
-      // Wait for:
-      // 1. Instance 1 to write the update file
-      // 2. File watcher to detect the change
-      // 3. Activity sync to process it
-      // 4. Database to be updated
-      console.log('[E2E Cross-Instance] Waiting for sync to complete...');
-      await page1.waitForTimeout(5000);
+      // Wait for CRDT to converge - the activity sync will poll and apply updates
+      // This involves: detecting file, polling for flag byte, loading updates, applying to CRDT
+      console.log('[E2E Cross-Instance] Waiting for CRDT to converge...');
 
-      // Click on the note in instance 2 to trigger reload
-      // (Editor doesn't auto-reload when note is updated externally - architectural limitation)
-      // First, click somewhere else to deselect the current note
-      console.log('[E2E Cross-Instance] Deselecting note in instance 2...');
-      await page2.locator('text=Folders').click();
-      await page2.waitForTimeout(500);
-
-      // Now click on the note to reload it
-      console.log('[E2E Cross-Instance] Clicking note in instance 2 to trigger reload...');
-      const noteListItem2 = page2.locator('[data-testid="note-list-item"]').first();
-      await noteListItem2.waitFor({ state: 'visible', timeout: 5000 });
-      await noteListItem2.click();
-      console.log('[E2E Cross-Instance] Note clicked, waiting for editor to update...');
-      await page2.waitForTimeout(2000);
-
-      // Verify first edit appears in instance 2
+      // Verify first edit appears in instance 2 (with generous timeout for convergence)
       console.log('[E2E Cross-Instance] Checking first edit in instance 2...');
-      await expect(editor2).toContainText(firstEdit, { timeout: 5000 });
+      await expect(editor2).toContainText(firstEdit, { timeout: 15000 });
       console.log('[E2E Cross-Instance] ✅ First edit synced successfully');
 
-      // Second edit in instance 1 (this is where the bug manifests)
+      // Second edit in instance 1
       console.log('[E2E Cross-Instance] Making second edit in instance 1...');
       const secondEdit = `${firstEdit} + Second edit ${Date.now()}`;
       await editor1.click();
       await editor1.fill(secondEdit);
 
-      // Wait for sync
-      await page1.waitForTimeout(3000);
-
-      // Deselect and click on the note in instance 2 to trigger reload
-      console.log('[E2E Cross-Instance] Deselecting note in instance 2...');
-      await page2.locator('text=Folders').click();
-      await page2.waitForTimeout(500);
-
-      console.log('[E2E Cross-Instance] Clicking note in instance 2 to trigger reload...');
-      await noteListItem2.waitFor({ state: 'visible', timeout: 5000 });
-      await noteListItem2.click();
-      await page2.waitForTimeout(1000);
-
-      // Verify second edit appears in instance 2
+      // Verify second edit appears in instance 2 (CRDT convergence)
       console.log('[E2E Cross-Instance] Checking second edit in instance 2...');
-      await expect(editor2).toContainText('Second edit', { timeout: 5000 });
+      await expect(editor2).toContainText('Second edit', { timeout: 15000 });
       console.log('[E2E Cross-Instance] ✅ Second edit synced successfully');
 
       // Third edit to be thorough
@@ -265,22 +227,9 @@ test.describe('Note Multi-Instance Sync', () => {
       await editor1.click();
       await editor1.fill(thirdEdit);
 
-      // Wait for sync
-      await page1.waitForTimeout(3000);
-
-      // Deselect and click on the note in instance 2 to trigger reload
-      console.log('[E2E Cross-Instance] Deselecting note in instance 2...');
-      await page2.locator('text=Folders').click();
-      await page2.waitForTimeout(500);
-
-      console.log('[E2E Cross-Instance] Clicking note in instance 2 to trigger reload...');
-      await noteListItem2.waitFor({ state: 'visible', timeout: 5000 });
-      await noteListItem2.click();
-      await page2.waitForTimeout(1000);
-
-      // Verify third edit appears in instance 2
+      // Verify third edit appears in instance 2 (CRDT convergence)
       console.log('[E2E Cross-Instance] Checking third edit in instance 2...');
-      await expect(editor2).toContainText('Third edit', { timeout: 5000 });
+      await expect(editor2).toContainText('Third edit', { timeout: 15000 });
       console.log('[E2E Cross-Instance] ✅ Third edit synced successfully');
     } finally {
       // Clean up both instances

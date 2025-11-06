@@ -526,6 +526,10 @@ async function setupSDWatchers(
       try {
         const affectedNotes = await activitySync.syncFromOtherInstances();
 
+        // Wait for all pending syncs to complete before broadcasting
+        // This ensures CRDT state is up-to-date when renderers reload
+        await activitySync.waitForPendingSyncs();
+
         // Reindex tags for affected notes
         if (affectedNotes.size > 0) {
           await reindexTagsForNotes(affectedNotes, crdtManager, db);
@@ -553,6 +557,10 @@ async function setupSDWatchers(
   console.log(`[Init] Performing initial sync from other instances for SD: ${sdId}`);
   try {
     const affectedNotes = await activitySync.syncFromOtherInstances();
+
+    // Wait for all pending syncs to complete before broadcasting
+    await activitySync.waitForPendingSyncs();
+
     console.log(
       `[Init] Initial sync complete for SD: ${sdId}, affected notes:`,
       affectedNotes.size
