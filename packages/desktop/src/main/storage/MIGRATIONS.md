@@ -63,7 +63,7 @@ pnpm --filter @notecove/desktop migrate:flag-byte /path/to/sd
 
 1. Checks `SD_VERSION` file - if version >= 1, exits early (already migrated)
 2. Creates `.migration-lock` file
-3. Scans all `.yjson` files in the SD
+3. Scans all `.yjson` files in the SD (including `.yjson.zst` compressed files)
 4. For each file:
    - Writes to temp file with new format (0x01 flag byte + data)
    - Atomically renames temp file to original

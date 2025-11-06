@@ -33,6 +33,7 @@ interface MigrationStats {
 
 /**
  * Recursively find all .yjson files in a directory
+ * This includes .yjson.zst compressed files (snapshots and packs)
  */
 async function findYjsonFiles(dirPath: string): Promise<string[]> {
   const files: string[] = [];
@@ -49,7 +50,7 @@ async function findYjsonFiles(dirPath: string): Promise<string[]> {
           if (!entry.name.startsWith('.')) {
             await scan(fullPath);
           }
-        } else if (entry.isFile() && entry.name.endsWith('.yjson')) {
+        } else if (entry.isFile() && entry.name.includes('.yjson')) {
           files.push(fullPath);
         }
       }
@@ -163,6 +164,7 @@ Examples:
 What This Tool Does:
   - Checks SD_VERSION to determine if migration is needed
   - If SD version is 0 (or missing), scans all .yjson files
+  - This includes compressed files (.yjson.zst snapshots/packs)
   - Prepends a 0x01 flag byte to each file
   - Uses atomic rename for safety
   - Writes SD_VERSION file (version 1) on completion
