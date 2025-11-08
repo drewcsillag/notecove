@@ -187,7 +187,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window2.waitForTimeout(1000);
 
     // Verify note synced by checking the notes list count
-    const notesList2 = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2 = window2.locator('[data-testid="notes-list"] li');
     const noteCount = await notesList2.count();
     expect(noteCount).toBeGreaterThan(0);
 
@@ -264,7 +264,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await personalSdButton2.click();
     await window2.waitForTimeout(1000);
 
-    const notesList2Before = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2Before = window2.locator('[data-testid="notes-list"] li');
     const initialCount = await notesList2Before.count();
     console.log('[Test] Initial note count in instance 2:', initialCount);
 
@@ -282,7 +282,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window2.waitForTimeout(3000);
 
     // Check if note appears in instance 2
-    const notesList2After = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2After = window2.locator('[data-testid="notes-list"] li');
     const finalCount = await notesList2After.count();
     console.log('[Test] Final note count in instance 2:', finalCount);
 
@@ -399,7 +399,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window2.waitForTimeout(3000);
 
     // In instance 2, check if the note appears in the notes list with the title
-    const notesList2 = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2 = window2.locator('[data-testid="notes-list"] li');
     const noteCount = await notesList2.count();
 
     console.log('[Test] Note count in instance 2:', noteCount);
@@ -491,7 +491,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window2.waitForTimeout(2000);
 
     // Check if the note appears in instance 2
-    const notesList2 = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2 = window2.locator('[data-testid="notes-list"] li');
     const noteCount = await notesList2.count();
 
     console.log('[Test] Note count in instance 2:', noteCount);
@@ -606,7 +606,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(1000);
 
     // Check that notes list is not empty
-    const notesList1 = window1.locator('[data-testid="notes-list"] > li');
+    const notesList1 = window1.locator('[data-testid="notes-list"] li');
     const noteCount1 = await notesList1.count();
     console.log('[Test] Note count in Default SD:', noteCount1);
     expect(noteCount1).toBeGreaterThan(0);
@@ -617,7 +617,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window1.waitForTimeout(1000);
 
     // Check that notes list still has the note
-    const notesList2 = window1.locator('[data-testid="notes-list"] > li');
+    const notesList2 = window1.locator('[data-testid="notes-list"] li');
     const noteCount2 = await notesList2.count();
     console.log('[Test] Note count in new SD after switch:', noteCount2);
     expect(noteCount2).toBeGreaterThan(0);
@@ -706,7 +706,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window2.waitForTimeout(2000);
 
     // Check that the note appears
-    const notesList1 = window2.locator('[data-testid="notes-list"] > li');
+    const notesList1 = window2.locator('[data-testid="notes-list"] li');
     const noteCount1 = await notesList1.count();
     console.log('[Test] Initial note count in instance 2:', noteCount1);
     expect(noteCount1).toBeGreaterThan(0);
@@ -722,7 +722,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await window2.waitForTimeout(1000);
 
     // Check that notes list is still populated
-    const notesList2 = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2 = window2.locator('[data-testid="notes-list"] li');
     const noteCount2 = await notesList2.count();
     console.log('[Test] Note count after switch in instance 2:', noteCount2);
     expect(noteCount2).toBeGreaterThan(0);
@@ -746,7 +746,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     await allNotesButton1.click();
     await window1.waitForTimeout(1000);
 
-    const notesList1 = window1.locator('[data-testid="notes-list"] > li');
+    const notesList1 = window1.locator('[data-testid="notes-list"] li');
     const initialNoteItems = await notesList1.count();
     console.log('[Test] Initial note count in All Notes:', initialNoteItems);
 
@@ -822,7 +822,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     const noteA1 = window1.locator('[data-testid="notes-list"]').getByText(/Note A Title/);
     await expect(noteA1).toBeVisible({ timeout: 3000 });
 
-    const notesList1 = window1.locator('[data-testid="notes-list"] > li');
+    const notesList1 = window1.locator('[data-testid="notes-list"] .MuiListItemButton-root');
     const count1 = await notesList1.count();
     console.log('[Test] Note count in instance 1:', count1);
     expect(count1).toBeGreaterThanOrEqual(2); // Welcome note + Note A
@@ -856,7 +856,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     console.log('[Test] Checking if note A appears in instance 2...');
     await window2.waitForTimeout(2000); // Give time for sync
 
-    const notesList2Before = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2Before = window2.locator('[data-testid="notes-list"] .MuiListItemButton-root');
     const count2Before = await notesList2Before.count();
     console.log('[Test] Note count in instance 2 before edit:', count2Before);
 
@@ -883,7 +883,7 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
 
     // Now check if note A appears
     console.log('[Test] Checking if note A appears after editing note B...');
-    const notesList2After = window2.locator('[data-testid="notes-list"] > li');
+    const notesList2After = window2.locator('[data-testid="notes-list"] .MuiListItemButton-root');
     const count2After = await notesList2After.count();
     console.log('[Test] Note count in instance 2 after edit:', count2After);
 
