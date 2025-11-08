@@ -1,8 +1,8 @@
 # Phase 4.1bis.1: Robust Cross-SD Note Moves
 
-**Overall Progress:** `0%` (0/57 tasks complete)
+**Overall Progress:** `14%` (8/57 tasks complete)
 
-**Status:** 🟥 To Do
+**Status:** 🟡 In Progress
 
 **Architecture Doc:** [docs/architecture/cross-sd-move-state-machine.md](./docs/architecture/cross-sd-move-state-machine.md)
 
@@ -20,27 +20,27 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 
 ## Phase 4.1bis.1.1: SD UUIDs + Move State Machine
 
-**Progress:** `0%` (0/26 tasks complete)
+**Progress:** `31%` (8/26 tasks complete)
 
 ### 1. SD UUID System
 
-- [ ] 🟥 **Add SD_ID file support**
-  - [ ] 🟥 Create SD_ID file when SD is first initialized
-  - [ ] 🟥 Generate UUID using standard UUID format
-  - [ ] 🟥 Write UUID to `{sd-path}/SD_ID` file
-  - [ ] 🟥 Read UUID on SD mount/startup
+- [x] ✅ **Add SD_ID file support** (Commits: cc553aa, 62acc9f)
+  - [x] ✅ Create SD_ID file when SD is first initialized (SdUuidManager.writeUuid)
+  - [x] ✅ Generate UUID using standard UUID format (uses uuid v4)
+  - [x] ✅ Write UUID to `{sd-path}/SD_ID` file
+  - [x] ✅ Read UUID on SD mount/startup (SdUuidManager.readUuid)
 
-- [ ] 🟥 **Implement UUID migration for existing SDs (Option C)**
-  - [ ] 🟥 Try to read existing SD_ID file on startup
-  - [ ] 🟥 If missing, generate new UUID and write file
-  - [ ] 🟥 Immediately read back to detect race condition (another instance may have written first)
-  - [ ] 🟥 If UUID changed, adopt the existing one (another instance won the race)
-  - [ ] 🟥 Note: Race condition window could be minutes depending on sync speed, but chance of collision is low due to infrequent SD operations
+- [x] ✅ **Implement UUID migration for existing SDs (Option C)** (Commit: cc553aa)
+  - [x] ✅ Try to read existing SD_ID file on startup (SdUuidManager.initializeUuid)
+  - [x] ✅ If missing, generate new UUID and write file
+  - [x] ✅ Immediately read back to detect race condition (another instance may have written first)
+  - [x] ✅ If UUID changed, adopt the existing one (another instance won the race)
+  - [x] ✅ Note: Race condition window could be minutes depending on sync speed, but chance of collision is low due to infrequent SD operations
 
-- [ ] 🟥 **Update database schema**
-  - [ ] 🟥 Add `uuid` column to `storage_dirs` table (TEXT)
-  - [ ] 🟥 Create index on `uuid` column for fast lookups
-  - [ ] 🟥 Update SD initialization code to store UUID in database
+- [x] ✅ **Update database schema** (Commit: cc553aa)
+  - [x] ✅ Add `uuid` column to `storage_dirs` table (TEXT)
+  - [x] ✅ Create index on `uuid` column for fast lookups
+  - [ ] 🟥 Update SD initialization code to store UUID in database (runtime integration pending)
 
 - [ ] 🟥 **Add SD lookup by UUID**
   - [ ] 🟥 Implement `findSDByUuid(uuid: string)` method
@@ -49,13 +49,13 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 
 ### 2. Move State Machine
 
-- [ ] 🟥 **Create note_moves table**
-  - [ ] 🟥 Define schema with columns: id, note_id, source_sd_uuid, target_sd_uuid, target_folder_id, state, initiated_by, initiated_at, last_modified, source_sd_path, target_sd_path, error
-  - [ ] 🟥 Create indexes on state, note_id, and last_modified columns
-  - [ ] 🟥 Add migration to create table on app startup
+- [x] ✅ **Create note_moves table** (Commit: cc553aa)
+  - [x] ✅ Define schema with columns: id, note_id, source_sd_uuid, target_sd_uuid, target_folder_id, state, initiated_by, initiated_at, last_modified, source_sd_path, target_sd_path, error
+  - [x] ✅ Create indexes on state, note_id, and last_modified columns
+  - [x] ✅ Add migration to create table on app startup
 
-- [ ] 🟥 **Implement state transitions**
-  - [ ] 🟥 Define state enum: initiated, copying, files_copied, db_updated, cleaning, completed, cancelled, rolled_back
+- [x] ✅ **Implement state transitions** (Commit: cc553aa)
+  - [x] ✅ Define state enum: initiated, copying, files_copied, db_updated, cleaning, completed, cancelled, rolled_back (NoteMoveState type)
   - [ ] 🟥 Implement state update function with timestamp tracking
   - [ ] 🟥 Add validation to ensure valid state transitions
 
