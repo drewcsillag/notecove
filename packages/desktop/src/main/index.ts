@@ -245,7 +245,22 @@ async function ensureDefaultNote(
     console.log('[Main] Using existing SD:', DEFAULT_SD_ID);
   }
 
-  // Check if the default note exists
+  // Check if the default note exists in ANY SD (not just the default SD)
+  // This is important because the note might have been moved to another SD
+  const defaultNoteInAnySD = await db.getNote(DEFAULT_NOTE_ID);
+
+  if (defaultNoteInAnySD) {
+    // Default note exists somewhere, use it
+    console.log(
+      '[ensureDefaultNote] Found default note in SD:',
+      defaultNoteInAnySD.sdId,
+      '(might have been moved)'
+    );
+    await db.setState('selectedNoteId', DEFAULT_NOTE_ID);
+    return;
+  }
+
+  // Check if other notes exist in the default SD
   const existingNotes = await db.getNotesBySd(DEFAULT_SD_ID);
   const defaultNote = existingNotes.find((note) => note.id === DEFAULT_NOTE_ID);
 
@@ -1051,6 +1066,18 @@ void app.whenReady().then(async () => {
       );
     }
 
+    // Set up watchers for default SD BEFORE ensureDefaultNote
+    // This ensures activity logger is registered before any CRDT updates
+    await setupSDWatchers(
+      'default',
+      storageDir,
+      fsAdapter,
+      instanceId,
+      updateManager,
+      crdtManager,
+      database
+    );
+
     // Create default note if none exists
     await ensureDefaultNote(database, crdtManager, storageDir);
     if (process.env['NODE_ENV'] === 'test') {
@@ -1078,17 +1105,6 @@ void app.whenReady().then(async () => {
         `${new Date().toISOString()} [Init] Auto-cleanup completed\n`
       );
     }
-
-    // Set up watchers for default SD
-    await setupSDWatchers(
-      'default',
-      storageDir,
-      fsAdapter,
-      instanceId,
-      updateManager,
-      crdtManager,
-      database
-    );
 
     // Set up watchers for all other registered SDs (only if fully initialized)
     for (const sd of allSDs) {

@@ -281,6 +281,11 @@ export interface StorageDirOperations {
   getStorageDir(id: string): Promise<StorageDirCache | null>;
 
   /**
+   * Get a storage directory by UUID
+   */
+  getStorageDirByUuid(uuid: string): Promise<StorageDirCache | null>;
+
+  /**
    * Get all storage directories
    */
   getAllStorageDirs(): Promise<StorageDirCache[]>;

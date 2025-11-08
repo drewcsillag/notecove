@@ -143,7 +143,15 @@
       "Bash(NODE_ENV=test timeout 60 node:*)",
       "Bash(NODE_ENV=test timeout 120 node:*)",
       "Bash(env NODE_ENV=test timeout 120 node:*)",
-      "Bash(env NODE_ENV=test timeout 300 node dist/cjs/__manual__/sync-fuzz-test.js --scenario quick-smoke)"
+      "Bash(env NODE_ENV=test timeout 300 node dist/cjs/__manual__/sync-fuzz-test.js --scenario quick-smoke)",
+      "Bash(NODE_ENV=test timeout 300 pnpm test:e2e:*)",
+      "Bash(pnpm --filter @notecove/shared lint:*)",
+      "Bash(env NODE_ENV=test timeout 150 npx playwright test:*)",
+      "Bash(env NODE_ENV=test timeout 200 npx playwright test:*)",
+      "Bash(env NODE_ENV=test timeout 240 npx playwright test:*)",
+      "Bash(pnpm --filter @notecove/shared add:*)",
+      "Bash(npm run build:*)",
+      "Bash(pnpm test:e2e:multi-sd:*)"
     ],
     "deny": [],
     "ask": []

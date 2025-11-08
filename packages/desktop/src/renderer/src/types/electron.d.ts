@@ -64,6 +64,10 @@ declare global {
         createSnapshot: (
           noteId: string
         ) => Promise<{ success: boolean; filename?: string; error?: string }>;
+        checkExistsInSD: (
+          noteId: string,
+          targetSdId: string
+        ) => Promise<{ exists: boolean; isDeleted: boolean }>;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
         onRestored: (callback: (noteId: string) => void) => () => void;
@@ -94,6 +98,20 @@ declare global {
             sdId: string;
             order: number;
             deleted: boolean;
+          }[]
+        >;
+        listAll: () => Promise<
+          {
+            sdId: string;
+            sdName: string;
+            folders: {
+              id: string;
+              name: string;
+              parentId: string | null;
+              sdId: string;
+              order: number;
+              deleted: boolean;
+            }[];
           }[]
         >;
         get: (

@@ -24,7 +24,7 @@ interface CrossSDConflictDialogProps {
   open: boolean;
   noteTitle: string;
   targetSdName: string;
-  onResolve: (resolution: 'replace' | 'keepBoth' | 'cancel') => void;
+  onResolve: (resolution: 'replace' | 'keepBoth' | 'cancel') => void | Promise<void>;
 }
 
 export const CrossSDConflictDialog: React.FC<CrossSDConflictDialogProps> = ({
@@ -39,7 +39,7 @@ export const CrossSDConflictDialog: React.FC<CrossSDConflictDialogProps> = ({
     <Dialog
       open={open}
       onClose={() => {
-        onResolve('cancel');
+        void onResolve('cancel');
       }}
       maxWidth="sm"
       fullWidth
@@ -93,7 +93,7 @@ export const CrossSDConflictDialog: React.FC<CrossSDConflictDialogProps> = ({
       <DialogActions>
         <Button
           onClick={() => {
-            onResolve('cancel');
+            void onResolve('cancel');
           }}
           color="inherit"
         >
@@ -101,7 +101,7 @@ export const CrossSDConflictDialog: React.FC<CrossSDConflictDialogProps> = ({
         </Button>
         <Button
           onClick={() => {
-            onResolve(resolution);
+            void onResolve(resolution);
           }}
           variant="contained"
           color="primary"

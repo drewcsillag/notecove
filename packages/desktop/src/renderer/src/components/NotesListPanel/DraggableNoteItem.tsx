@@ -84,7 +84,7 @@ export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
         selected={isSingleSelected}
         onClick={onClick}
         onContextMenu={onContextMenu}
-        data-testid="note-list-item"
+        data-testid={`note-item-${note.id}`}
         sx={{
           paddingY: 1.5,
           paddingX: 2,

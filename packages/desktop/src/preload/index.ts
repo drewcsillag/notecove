@@ -119,6 +119,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         filename?: string;
         error?: string;
       }>,
+    checkExistsInSD: (
+      noteId: string,
+      targetSdId: string
+    ): Promise<{ exists: boolean; isDeleted: boolean }> =>
+      ipcRenderer.invoke('note:checkExistsInSD', noteId, targetSdId) as Promise<{
+        exists: boolean;
+        isDeleted: boolean;
+      }>,
 
     // Event listeners
     onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
@@ -251,6 +259,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
           sdId: string;
           order: number;
           deleted: boolean;
+        }[]
+      >,
+    listAll: (): Promise<
+      {
+        sdId: string;
+        sdName: string;
+        folders: {
+          id: string;
+          name: string;
+          parentId: string | null;
+          sdId: string;
+          order: number;
+          deleted: boolean;
+        }[];
+      }[]
+    > =>
+      ipcRenderer.invoke('folder:listAll') as Promise<
+        {
+          sdId: string;
+          sdName: string;
+          folders: {
+            id: string;
+            name: string;
+            parentId: string | null;
+            sdId: string;
+            order: number;
+            deleted: boolean;
+          }[];
         }[]
       >,
     get: (

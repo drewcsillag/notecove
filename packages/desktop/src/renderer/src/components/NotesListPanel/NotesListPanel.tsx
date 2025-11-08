@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Clear as ClearIcon, Folder as FolderIcon } from '@mui/icons-material';
 import { DraggableNoteItem } from './DraggableNoteItem';
+import { CrossSDConflictDialog } from './CrossSDConflictDialog';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -86,8 +87,29 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [noteToMove, setNoteToMove] = useState<string | null>(null);
   const [selectedDestinationFolder, setSelectedDestinationFolder] = useState<string | null>(null);
+  const [selectedDestinationSdId, setSelectedDestinationSdId] = useState<string | null>(null);
   const [availableFolders, setAvailableFolders] = useState<
-    { id: string; name: string; parentId: string | null; sdId: string }[]
+    {
+      sdId: string;
+      sdName: string;
+      folders: { id: string; name: string; parentId: string | null; sdId: string }[];
+    }[]
+  >([]);
+
+  // Cross-SD conflict dialog state
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [conflictNote, setConflictNote] = useState<{
+    noteId: string;
+    noteTitle: string;
+    targetSdName: string;
+  } | null>(null);
+  const [pendingMoves, setPendingMoves] = useState<
+    {
+      noteId: string;
+      sourceSdId: string;
+      targetSdId: string;
+      targetFolderId: string | null;
+    }[]
   >([]);
 
   // Load selected folder from app state
@@ -737,16 +759,21 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     const { noteId } = contextMenu;
     handleContextMenuClose();
 
-    // Load folders for the current SD
+    // Load folders from all SDs
     try {
-      const sdId = activeSdId ?? DEFAULT_SD_ID;
-      const folders = await window.electronAPI.folder.list(sdId);
-      setAvailableFolders(folders.filter((f) => !f.deleted));
+      const allFolders = await window.electronAPI.folder.listAll();
+      // Filter out deleted folders
+      const activeFolders = allFolders.map((sd) => ({
+        ...sd,
+        folders: sd.folders.filter((f) => !f.deleted),
+      }));
+      setAvailableFolders(activeFolders);
       setNoteToMove(noteId);
 
-      // Get current note's folder to pre-select or exclude
+      // Get current note's folder and SD to pre-select
       const note = notes.find((n) => n.id === noteId);
       setSelectedDestinationFolder(note?.folderId ?? null);
+      setSelectedDestinationSdId(note?.sdId ?? activeSdId ?? DEFAULT_SD_ID);
 
       setMoveDialogOpen(true);
     } catch (err) {
@@ -757,38 +784,181 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
   // Handle move confirmation
   const handleConfirmMove = useCallback(async () => {
-    if (!noteToMove) return;
+    if (!noteToMove || selectedDestinationSdId === null) return;
 
     try {
       // If multi-select is active, move all selected notes
       const notesToMove = selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [noteToMove];
 
-      // Move all notes
-      await Promise.all(
-        notesToMove.map((id) => window.electronAPI.note.move(id, selectedDestinationFolder))
-      );
+      // Get the source SD of the notes
+      const sourceNote = notes.find((n) => n.id === noteToMove);
+      if (!sourceNote) {
+        throw new Error('Source note not found');
+      }
+      const sourceSdId = sourceNote.sdId;
 
-      console.log('[NotesListPanel] Notes moved:', notesToMove, 'to', selectedDestinationFolder);
-      setMoveDialogOpen(false);
-      setNoteToMove(null);
-      setSelectedDestinationFolder(null);
+      // Check if this is a cross-SD move
+      const isCrossSdMove = sourceSdId !== selectedDestinationSdId;
 
-      // Clear multi-select
-      setSelectedNoteIds(new Set());
+      if (isCrossSdMove) {
+        // Cross-SD move - check for conflicts first
+        let conflictFound = false;
+
+        // Check each note for conflicts
+        for (const noteId of notesToMove) {
+          const conflictCheck = await window.electronAPI.note.checkExistsInSD(
+            noteId,
+            selectedDestinationSdId
+          );
+
+          if (conflictCheck.exists && !conflictCheck.isDeleted) {
+            // Note exists and is NOT in Recently Deleted - show conflict dialog
+            const note = notes.find((n) => n.id === noteId);
+            const targetSd = availableFolders.find((sd) => sd.sdId === selectedDestinationSdId);
+
+            setConflictNote({
+              noteId: noteId,
+              noteTitle: note?.title ?? 'Untitled',
+              targetSdName: targetSd?.sdName ?? 'Unknown SD',
+            });
+
+            // Store pending moves for after conflict resolution
+            setPendingMoves(
+              notesToMove.map((id) => ({
+                noteId: id,
+                sourceSdId: sourceSdId,
+                targetSdId: selectedDestinationSdId,
+                targetFolderId: selectedDestinationFolder,
+              }))
+            );
+
+            setConflictDialogOpen(true);
+            conflictFound = true;
+            break; // Only show dialog for first conflict
+          }
+        }
+
+        // If no conflicts (or all conflicts are in Recently Deleted), proceed with moves
+        if (!conflictFound) {
+          await Promise.all(
+            notesToMove.map((id) =>
+              window.electronAPI.note.moveToSD(
+                id,
+                sourceSdId,
+                selectedDestinationSdId,
+                selectedDestinationFolder,
+                'replace' // Auto-replace if in Recently Deleted, or no conflict
+              )
+            )
+          );
+          console.log(
+            '[NotesListPanel] Notes moved cross-SD:',
+            notesToMove,
+            'from',
+            sourceSdId,
+            'to',
+            selectedDestinationSdId,
+            'folder',
+            selectedDestinationFolder
+          );
+
+          setMoveDialogOpen(false);
+          setNoteToMove(null);
+          setSelectedDestinationFolder(null);
+          setSelectedDestinationSdId(null);
+          setSelectedNoteIds(new Set());
+        }
+      } else {
+        // Same-SD move - use regular move
+        await Promise.all(
+          notesToMove.map((id) => window.electronAPI.note.move(id, selectedDestinationFolder))
+        );
+        console.log('[NotesListPanel] Notes moved:', notesToMove, 'to', selectedDestinationFolder);
+
+        setMoveDialogOpen(false);
+        setNoteToMove(null);
+        setSelectedDestinationFolder(null);
+        setSelectedDestinationSdId(null);
+        setSelectedNoteIds(new Set());
+      }
 
       // Note: The notes list will be updated automatically via note:moved event
     } catch (err) {
       console.error('Failed to move note:', err);
       setError(err instanceof Error ? err.message : 'Failed to move note');
     }
-  }, [noteToMove, selectedDestinationFolder, selectedNoteIds]);
+  }, [
+    noteToMove,
+    selectedDestinationFolder,
+    selectedDestinationSdId,
+    selectedNoteIds,
+    notes,
+    availableFolders,
+  ]);
 
   // Handle move dialog close
   const handleCancelMove = useCallback(() => {
     setMoveDialogOpen(false);
     setNoteToMove(null);
     setSelectedDestinationFolder(null);
+    setSelectedDestinationSdId(null);
+    setSelectedNoteIds(new Set()); // Clear multiselect
+    lastSelectedIndexRef.current = -1;
   }, []);
+
+  // Handle conflict resolution
+  const handleConflictResolution = useCallback(
+    async (resolution: 'replace' | 'keepBoth' | 'cancel') => {
+      try {
+        if (resolution === 'cancel') {
+          // User cancelled - close dialogs and clear selection
+          setConflictDialogOpen(false);
+          setConflictNote(null);
+          setPendingMoves([]);
+          setMoveDialogOpen(false);
+          setNoteToMove(null);
+          setSelectedDestinationFolder(null);
+          setSelectedDestinationSdId(null);
+          setSelectedNoteIds(new Set()); // Clear multiselect
+          lastSelectedIndexRef.current = -1;
+          return;
+        }
+
+        // Execute all pending moves with the chosen resolution
+        await Promise.all(
+          pendingMoves.map((move) =>
+            window.electronAPI.note.moveToSD(
+              move.noteId,
+              move.sourceSdId,
+              move.targetSdId,
+              move.targetFolderId,
+              resolution
+            )
+          )
+        );
+
+        console.log(
+          '[NotesListPanel] Cross-SD moves completed with resolution:',
+          resolution,
+          pendingMoves
+        );
+
+        // Close both dialogs and cleanup
+        setConflictDialogOpen(false);
+        setConflictNote(null);
+        setPendingMoves([]);
+        setMoveDialogOpen(false);
+        setNoteToMove(null);
+        setSelectedDestinationFolder(null);
+        setSelectedDestinationSdId(null);
+        setSelectedNoteIds(new Set());
+      } catch (err) {
+        console.error('Failed to complete cross-SD moves:', err);
+        setError(err instanceof Error ? err.message : 'Failed to move notes');
+      }
+    },
+    [pendingMoves]
+  );
 
   // Format date for display
   const formatDate = (timestamp: number): string => {
@@ -816,6 +986,27 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const truncatePreview = (text: string, maxLength = 100): string => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+  };
+
+  // Build folder hierarchy path for display
+  const buildFolderPath = (
+    folderId: string,
+    folders: { id: string; name: string; parentId: string | null }[]
+  ): string => {
+    const folder = folders.find((f) => f.id === folderId);
+    if (!folder) return '';
+
+    const path: string[] = [folder.name];
+    let currentFolder = folder;
+
+    while (currentFolder.parentId) {
+      const parent = folders.find((f) => f.id === currentFolder.parentId);
+      if (!parent) break;
+      path.unshift(parent.name);
+      currentFolder = parent;
+    }
+
+    return path.join(' / ');
   };
 
   return (
@@ -912,7 +1103,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       )}
 
       {/* Notes List or Status */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Box sx={{ flexGrow: 1, overflow: 'auto' }} data-testid="notes-list">
         {loading && notes.length === 0 ? (
           <Box sx={{ padding: 2 }}>
             <Typography variant="body2" color="text.secondary">
@@ -932,7 +1123,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             </Typography>
           </Box>
         ) : (
-          <List disablePadding data-testid="notes-list">
+          <List disablePadding>
             {notes.map((note, index) => {
               const isMultiSelected = selectedNoteIds.has(note.id);
               const isSingleSelected = selectedNoteId === note.id;
@@ -1046,57 +1237,100 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         </DialogActions>
       </Dialog>
 
+      {/* Cross-SD Conflict Dialog */}
+      {conflictNote && (
+        <CrossSDConflictDialog
+          open={conflictDialogOpen}
+          noteTitle={conflictNote.noteTitle}
+          targetSdName={conflictNote.targetSdName}
+          onResolve={handleConflictResolution}
+        />
+      )}
+
       {/* Move to Folder Dialog */}
-      <Dialog open={moveDialogOpen} onClose={handleCancelMove} maxWidth="sm" fullWidth>
+      <Dialog open={moveDialogOpen} onClose={handleCancelMove} maxWidth="md" fullWidth>
         <DialogTitle>
           {selectedNoteIds.size > 0
             ? `Move ${selectedNoteIds.size} Notes to Folder`
             : 'Move Note to Folder'}
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>Select a destination folder:</DialogContentText>
+          <DialogContentText>
+            Select a destination folder (folders are grouped by Storage Directory):
+          </DialogContentText>
           <RadioGroup
-            value={selectedDestinationFolder ?? 'null'}
+            value={`${selectedDestinationSdId}:${selectedDestinationFolder ?? 'null'}`}
             onChange={(e) => {
-              setSelectedDestinationFolder(e.target.value === 'null' ? null : e.target.value);
+              const [sdId, folderId] = e.target.value.split(':');
+              setSelectedDestinationSdId(sdId ?? null);
+              setSelectedDestinationFolder(folderId === 'null' ? null : (folderId ?? null));
             }}
             sx={{ mt: 2 }}
           >
-            <FormControlLabel
-              value="null"
-              control={<Radio />}
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <FolderIcon fontSize="small" />
-                  <Typography>All Notes (No Folder)</Typography>
-                </Box>
-              }
-            />
-            {availableFolders.map((folder) => {
-              // For multi-select, disable if ALL selected notes are in this folder
-              // For single note, disable if the note is in this folder
-              const isCurrentFolder =
-                selectedNoteIds.size > 0
-                  ? Array.from(selectedNoteIds).every(
-                      (id) => notes.find((n) => n.id === id)?.folderId === folder.id
-                    )
-                  : notes.find((n) => n.id === noteToMove)?.folderId === folder.id;
+            {availableFolders.map((sd) => (
+              <Box key={sd.sdId} sx={{ mb: 2 }}>
+                {/* SD Heading */}
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    fontWeight: 'bold',
+                    color: 'text.secondary',
+                    mb: 0.5,
+                    mt: 1,
+                  }}
+                >
+                  {sd.sdName}
+                </Typography>
 
-              return (
+                {/* "No Folder" option for this SD */}
                 <FormControlLabel
-                  key={folder.id}
-                  value={folder.id}
+                  value={`${sd.sdId}:null`}
                   control={<Radio />}
                   label={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <FolderIcon fontSize="small" />
-                      <Typography>{folder.name}</Typography>
+                      <Typography>All Notes (No Folder)</Typography>
                     </Box>
                   }
-                  disabled={isCurrentFolder}
                 />
-              );
-            })}
+
+                {/* Folders for this SD */}
+                {sd.folders.map((folder) => {
+                  const folderPath = buildFolderPath(folder.id, sd.folders);
+                  const sourceNote = notes.find((n) => n.id === noteToMove);
+
+                  // For multi-select, disable if ALL selected notes are in this folder and SD
+                  // For single note, disable if the note is in this folder and SD
+                  const isCurrentLocation =
+                    selectedNoteIds.size > 0
+                      ? Array.from(selectedNoteIds).every((id) => {
+                          const note = notes.find((n) => n.id === id);
+                          return note
+                            ? note.folderId === folder.id && note.sdId === sd.sdId
+                            : false;
+                        })
+                      : sourceNote
+                        ? sourceNote.folderId === folder.id && sourceNote.sdId === sd.sdId
+                        : false;
+
+                  return (
+                    <FormControlLabel
+                      key={folder.id}
+                      value={`${sd.sdId}:${folder.id}`}
+                      control={<Radio />}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <FolderIcon fontSize="small" />
+                          <Typography>{folderPath}</Typography>
+                        </Box>
+                      }
+                      disabled={isCurrentLocation}
+                      sx={{ ml: 2 }}
+                    />
+                  );
+                })}
+              </Box>
+            ))}
           </RadioGroup>
         </DialogContent>
         <DialogActions>
@@ -1106,13 +1340,25 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             color="primary"
             autoFocus
             disabled={
-              // For multi-select, disable if destination is the same as ALL selected notes' current folder
-              // For single note, disable if destination matches the note's current folder
-              selectedNoteIds.size > 0
-                ? Array.from(selectedNoteIds).every(
-                    (id) => selectedDestinationFolder === notes.find((n) => n.id === id)?.folderId
-                  )
-                : selectedDestinationFolder === notes.find((n) => n.id === noteToMove)?.folderId
+              // Disable if no destination selected
+              !selectedDestinationSdId ||
+              // For multi-select, disable if destination is the same as ALL selected notes' current location
+              // For single note, disable if destination matches the note's current location
+              (selectedNoteIds.size > 0
+                ? Array.from(selectedNoteIds).every((id) => {
+                    const note = notes.find((n) => n.id === id);
+                    return note
+                      ? selectedDestinationFolder === note.folderId &&
+                          selectedDestinationSdId === note.sdId
+                      : false;
+                  })
+                : (() => {
+                    const sourceNote = notes.find((n) => n.id === noteToMove);
+                    return sourceNote
+                      ? selectedDestinationFolder === sourceNote.folderId &&
+                          selectedDestinationSdId === sourceNote.sdId
+                      : false;
+                  })())
             }
           >
             Move

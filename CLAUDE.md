@@ -47,4 +47,4 @@ YOU WILL NOT make time estimates on how long things will take, you're rubbish at
 
 ALWAYS use [ci-runner] agent to run the ci-local script that gets run via `pnpm ci-local`
 
-when using [ci-local] DO NOT tail its output, it's already summarized for you
+when using [ci-runner] DO NOT tail its output, it's already summarized for you

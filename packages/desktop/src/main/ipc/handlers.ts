@@ -116,9 +116,11 @@ export class IPCHandlers {
     ipcMain.handle('note:getAllNotesCount', this.handleGetAllNotesCount.bind(this));
     ipcMain.handle('note:getDeletedNoteCount', this.handleGetDeletedNoteCount.bind(this));
     ipcMain.handle('note:createSnapshot', this.handleCreateSnapshot.bind(this));
+    ipcMain.handle('note:checkExistsInSD', this.handleCheckNoteExistsInSD.bind(this));
 
     // Folder operations
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
+    ipcMain.handle('folder:listAll', this.handleListAllFolders.bind(this));
     ipcMain.handle('folder:get', this.handleGetFolder.bind(this));
     ipcMain.handle('folder:create', this.handleCreateFolder.bind(this));
     ipcMain.handle('folder:rename', this.handleRenameFolder.bind(this));
@@ -798,44 +800,77 @@ export class IPCHandlers {
     // Copy CRDT files from source SD to target SD
     await this.copyNoteCRDTFiles(noteId, sourceSdId, targetNoteId, targetSdId);
 
-    // Create note in target SD database FIRST
-    await this.database.upsertNote({
-      id: targetNoteId,
-      title: sourceNote.title,
-      sdId: targetSdId,
-      folderId: targetFolderId,
-      created: sourceNote.created,
-      modified: Date.now(),
-      deleted: false,
-      pinned: sourceNote.pinned, // Preserve metadata
-      contentPreview: sourceNote.contentPreview,
-      contentText: sourceNote.contentText,
-    });
-    console.log('[IPC] Created note in target SD:', {
-      targetNoteId,
-      targetSdId,
-      targetFolderId,
-      title: sourceNote.title,
-    });
+    // Use a transaction to ensure atomicity
+    // This prevents the note from existing in both SDs if the app crashes mid-move
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+    await (this.database as any).adapter.exec('BEGIN TRANSACTION');
 
-    // Permanently delete original note from source SD
-    // deleteNote() deletes from ALL SDs, so only call it if the note IDs are different
-    // If they're the same, the note now exists in target SD, so we just delete the source SD entry
-    if (targetNoteId !== noteId) {
-      await this.database.deleteNote(noteId);
-    } else {
-      // Same ID: delete only from source SD (UUID is preserved)
-      // We access adapter directly for SD-specific deletion
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-      await (this.database as any).adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
+    try {
+      // Create note in target SD database FIRST
+      await this.database.upsertNote({
+        id: targetNoteId,
+        title: sourceNote.title,
+        sdId: targetSdId,
+        folderId: targetFolderId,
+        created: sourceNote.created,
+        modified: Date.now(),
+        deleted: false,
+        pinned: sourceNote.pinned, // Preserve metadata
+        contentPreview: sourceNote.contentPreview,
+        contentText: sourceNote.contentText,
+      });
+      console.log('[IPC] Created note in target SD:', {
+        targetNoteId,
+        targetSdId,
+        targetFolderId,
+        title: sourceNote.title,
+      });
+
+      // Permanently delete original note from source SD
+      // deleteNote() deletes from ALL SDs, so only call it if the note IDs are different
+      // If they're the same, the note now exists in target SD, so we just delete the source SD entry
+      if (targetNoteId !== noteId) {
+        await this.database.deleteNote(noteId);
+      } else {
+        // Same ID: delete only from source SD (UUID is preserved)
+        // We access adapter directly for SD-specific deletion
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+        await (this.database as any).adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
+          noteId,
+          sourceSdId,
+        ]);
+      }
+      console.log('[IPC] Permanently deleted note from source SD:', {
         noteId,
         sourceSdId,
-      ]);
+      });
+
+      // Commit transaction
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      await (this.database as any).adapter.exec('COMMIT');
+    } catch (err) {
+      // Rollback on error
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      await (this.database as any).adapter.exec('ROLLBACK');
+      throw err;
     }
-    console.log('[IPC] Permanently deleted note from source SD:', {
-      noteId,
-      sourceSdId,
-    });
+
+    // After transaction commits successfully, delete CRDT files from source SD
+    // This prevents duplicate rows from being recreated if the app scans CRDT files on startup
+    if (targetNoteId === noteId) {
+      // Same ID: delete source CRDT files
+      try {
+        const sourceSD = await this.database.getStorageDir(sourceSdId);
+        if (sourceSD) {
+          const sourceNoteDir = path.join(sourceSD.path, 'notes', noteId);
+          await fs.rm(sourceNoteDir, { recursive: true, force: true });
+          console.log('[IPC] Deleted source CRDT files:', sourceNoteDir);
+        }
+      } catch (err) {
+        console.warn('[IPC] Failed to delete source CRDT files:', err);
+        // Don't throw - the database is already consistent, file cleanup failure is not critical
+      }
+    }
 
     // Broadcast consistent events for cross-SD moves
     // Use note:deleted for the source and note:created for the target
@@ -962,6 +997,23 @@ export class IPCHandlers {
       modifiedAt: crdtMetadata?.modified ?? note.modified,
       deleted: note.deleted,
     };
+  }
+
+  private async handleCheckNoteExistsInSD(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    targetSdId: string
+  ): Promise<{ exists: boolean; isDeleted: boolean }> {
+    // Check if note exists in the target SD
+    const note = await this.database.getNote(noteId);
+
+    // If note doesn't exist at all, or exists in a different SD
+    if (!note || note.sdId !== targetSdId) {
+      return { exists: false, isDeleted: false };
+    }
+
+    // Note exists in the target SD
+    return { exists: true, isDeleted: note.deleted };
   }
 
   private async handleUpdateTitle(
@@ -1117,6 +1169,33 @@ export class IPCHandlers {
   ): Promise<import('@notecove/shared').FolderData[]> {
     const folderTree = this.crdtManager.loadFolderTree(sdId);
     return folderTree.getActiveFolders();
+  }
+
+  /**
+   * List all folders from all Storage Directories
+   * Used for cross-SD move dialog
+   */
+  private async handleListAllFolders(_event: IpcMainInvokeEvent): Promise<
+    {
+      sdId: string;
+      sdName: string;
+      folders: import('@notecove/shared').FolderData[];
+    }[]
+  > {
+    // Get all Storage Directories
+    const sds = await this.database.getAllStorageDirs();
+
+    // Fetch folders from each SD
+    const allFolders = sds.map((sd) => {
+      const folderTree = this.crdtManager.loadFolderTree(sd.id);
+      return {
+        sdId: sd.id,
+        sdName: sd.name,
+        folders: folderTree.getActiveFolders(),
+      };
+    });
+
+    return allFolders;
   }
 
   private async handleGetFolder(
@@ -1594,6 +1673,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:updateTitle');
     ipcMain.removeHandler('note:list');
     ipcMain.removeHandler('folder:list');
+    ipcMain.removeHandler('folder:listAll');
     ipcMain.removeHandler('folder:get');
     ipcMain.removeHandler('folder:create');
     ipcMain.removeHandler('folder:rename');
