@@ -16,7 +16,7 @@ import type { UUID } from '../../types';
 describe('Database Schema', () => {
   describe('SCHEMA_VERSION', () => {
     it('should be defined', () => {
-      expect(SCHEMA_VERSION).toBe(2);
+      expect(SCHEMA_VERSION).toBe(3);
     });
   });
 
@@ -28,6 +28,8 @@ describe('Database Schema', () => {
       expect(SCHEMA_SQL.tags).toContain('CREATE TABLE IF NOT EXISTS tags');
       expect(SCHEMA_SQL.noteTags).toContain('CREATE TABLE IF NOT EXISTS note_tags');
       expect(SCHEMA_SQL.users).toContain('CREATE TABLE IF NOT EXISTS users');
+      expect(SCHEMA_SQL.storageDirs).toContain('CREATE TABLE IF NOT EXISTS storage_dirs');
+      expect(SCHEMA_SQL.noteMoves).toContain('CREATE TABLE IF NOT EXISTS note_moves');
       expect(SCHEMA_SQL.appState).toContain('CREATE TABLE IF NOT EXISTS app_state');
       expect(SCHEMA_SQL.version).toContain('CREATE TABLE IF NOT EXISTS schema_version');
     });

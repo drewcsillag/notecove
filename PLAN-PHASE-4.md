@@ -298,6 +298,45 @@ Hybrid three-tier system:
 
 ---
 
+### 4.1bis.1 Robust Cross-SD Note Moves 🟥
+
+**Status:** To Do
+
+**Detailed Plan:** See [PLAN-PHASE-4.1bis.1.md](./PLAN-PHASE-4.1bis.1.md) for implementation details.
+
+**Architecture Doc:** See [docs/architecture/cross-sd-move-state-machine.md](./docs/architecture/cross-sd-move-state-machine.md)
+
+**Problem:**
+
+Current cross-SD move implementation has non-atomic operations that can leave notes in inconsistent states if the app crashes mid-move or if multiple instances are running. Notes can "revert" to the original SD after editing and restarting.
+
+**Solution:**
+
+Three-phase implementation:
+
+1. **Phase 4.1bis.1.1**: SD UUIDs + Move State Machine (atomic operations with crash recovery)
+2. **Phase 4.1bis.1.2**: Basic Recovery Panel (manual intervention for stuck operations)
+3. **Phase 4.1bis.1.3**: Advanced Recovery + Backup/Restore (content preview, backups)
+
+**Key Features:**
+
+- SD identification via UUID files
+- State machine for atomic move operations (initiated → copying → files_copied → db_updated → cleaning → completed)
+- Instance ownership for recovery (each instance resumes its own moves)
+- Manual takeover for stuck operations via Recovery Panel
+- Backup/restore system for safety
+- Fuzz testing for multi-instance eventual consistency
+
+**Acceptance Criteria:**
+
+- Zero data loss from move operations
+- Zero duplicate notes after move completion
+- <1% of moves require manual intervention
+- Recovery time from crash: <5 seconds
+- All instances eventually converge to consistent state
+
+---
+
 ### 4.2 Inter-Note Links 🟥
 
 **Status:** To Do (Post-MVP)

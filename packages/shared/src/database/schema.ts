@@ -67,8 +67,40 @@ export interface StorageDirCache {
   id: string;
   name: string;
   path: string;
+  uuid: string | null; // Globally unique identifier for cross-instance coordination
   created: number;
   isActive: boolean; // Only one SD can be active at a time
+}
+
+/**
+ * Note move operation state
+ */
+export type NoteMoveState =
+  | 'initiated'
+  | 'copying'
+  | 'files_copied'
+  | 'db_updated'
+  | 'cleaning'
+  | 'completed'
+  | 'cancelled'
+  | 'rolled_back';
+
+/**
+ * Note move operation record
+ */
+export interface NoteMove {
+  id: string; // UUID for the move operation
+  noteId: string; // Note being moved
+  sourceSdUuid: string; // Source SD UUID
+  targetSdUuid: string; // Target SD UUID
+  targetFolderId: string | null; // Target folder (null = All Notes)
+  state: NoteMoveState; // Current state
+  initiatedBy: string; // Instance ID that started the move
+  initiatedAt: number; // Timestamp (milliseconds)
+  lastModified: number; // Timestamp (milliseconds)
+  sourceSdPath: string | null; // Original path (informational)
+  targetSdPath: string | null; // Original path (informational)
+  error: string | null; // Last error message if any
 }
 
 /**
@@ -122,12 +154,13 @@ export interface SearchResult {
  * Version history:
  * - v1: Initial schema
  * - v2: Added pinned field to notes table
+ * - v3: Added uuid to storage_dirs, added note_moves table
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
  * - User data tables (tags, note_tags, app_state): Migrate with version-specific logic
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * SQL schema definitions
@@ -250,11 +283,37 @@ export const SCHEMA_SQL = {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
       path TEXT NOT NULL UNIQUE,
+      uuid TEXT,
       created INTEGER NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE INDEX IF NOT EXISTS idx_storage_dirs_is_active ON storage_dirs(is_active);
+    CREATE INDEX IF NOT EXISTS idx_storage_dirs_uuid ON storage_dirs(uuid);
+  `,
+
+  /**
+   * Note Moves table (for atomic cross-SD move operations)
+   */
+  noteMoves: `
+    CREATE TABLE IF NOT EXISTS note_moves (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      source_sd_uuid TEXT NOT NULL,
+      target_sd_uuid TEXT NOT NULL,
+      target_folder_id TEXT,
+      state TEXT NOT NULL,
+      initiated_by TEXT NOT NULL,
+      initiated_at INTEGER NOT NULL,
+      last_modified INTEGER NOT NULL,
+      source_sd_path TEXT,
+      target_sd_path TEXT,
+      error TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_note_moves_state ON note_moves(state);
+    CREATE INDEX IF NOT EXISTS idx_note_moves_note_id ON note_moves(note_id);
+    CREATE INDEX IF NOT EXISTS idx_note_moves_last_modified ON note_moves(last_modified);
   `,
 
   /**

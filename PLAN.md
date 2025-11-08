@@ -123,18 +123,20 @@ iOS native application with basic UI, note editing via WKWebView, and folder man
 
 ---
 
-### [Phase 4: Advanced Features (Post-MVP)](./PLAN-PHASE-4.md) ⏸️
+### [Phase 4: Advanced Features (Post-MVP)](./PLAN-PHASE-4.md) 🟡
 
-**Status:** Not Started
+**Status:** Partially Started
 
-Advanced features for both platforms including tags, inter-note links, advanced search, and export functionality.
+Advanced features for both platforms including tags, CRDT optimization, cross-SD moves, inter-note links, advanced search, and export functionality.
 
 **Sub-phases:**
 
-- 4.1 Tags Implementation
-- 4.2 Inter-Note Links
-- 4.3 Advanced Search (FTS5)
-- 4.4 Export Functionality
+- 4.1 Tags Implementation 🟡 (Partially Complete)
+- 4.1bis CRDT Snapshot and Packing System ✅ (Complete)
+- 4.1bis.1 Robust Cross-SD Note Moves 🟥 (To Do - [Plan](./PLAN-PHASE-4.1bis.1.md) | [Architecture](./docs/architecture/cross-sd-move-state-machine.md))
+- 4.2 Inter-Note Links 🟥
+- 4.3 Advanced Search (FTS5) 🟥
+- 4.4 Export Functionality 🟥
 
 ---
 

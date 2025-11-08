@@ -59,6 +59,7 @@ export class SqliteDatabase implements Database {
     // Create tables in order (respecting foreign keys)
     await this.adapter.exec(SCHEMA_SQL.version);
     await this.adapter.exec(SCHEMA_SQL.storageDirs);
+    await this.adapter.exec(SCHEMA_SQL.noteMoves);
     await this.adapter.exec(SCHEMA_SQL.notes);
 
     // Create FTS5 table without external content for simplicity
@@ -668,11 +669,11 @@ export class SqliteDatabase implements Database {
     }
 
     await this.adapter.exec(
-      'INSERT INTO storage_dirs (id, name, path, created, is_active) VALUES (?, ?, ?, ?, ?)',
-      [id, name, sdPath, created, isActive ? 1 : 0]
+      'INSERT INTO storage_dirs (id, name, path, uuid, created, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, name, sdPath, null, created, isActive ? 1 : 0]
     );
 
-    return { id, name, path: sdPath, created, isActive };
+    return { id, name, path: sdPath, uuid: null, created, isActive };
   }
 
   async getStorageDir(id: string): Promise<StorageDirCache | null> {
@@ -680,6 +681,7 @@ export class SqliteDatabase implements Database {
       id: string;
       name: string;
       path: string;
+      uuid: string | null;
       created: number;
       is_active: number;
     }>('SELECT * FROM storage_dirs WHERE id = ?', [id]);
@@ -692,6 +694,7 @@ export class SqliteDatabase implements Database {
       id: string;
       name: string;
       path: string;
+      uuid: string | null;
       created: number;
       is_active: number;
     }>('SELECT * FROM storage_dirs ORDER BY created ASC');
@@ -704,6 +707,7 @@ export class SqliteDatabase implements Database {
       id: string;
       name: string;
       path: string;
+      uuid: string | null;
       created: number;
       is_active: number;
     }>('SELECT * FROM storage_dirs WHERE is_active = 1 LIMIT 1');
@@ -727,6 +731,7 @@ export class SqliteDatabase implements Database {
     id: string;
     name: string;
     path: string;
+    uuid: string | null;
     created: number;
     is_active: number;
   }): StorageDirCache {
@@ -734,6 +739,7 @@ export class SqliteDatabase implements Database {
       id: row.id,
       name: row.name,
       path: row.path,
+      uuid: row.uuid,
       created: row.created,
       isActive: row.is_active === 1,
     };

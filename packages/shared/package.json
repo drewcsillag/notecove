@@ -35,12 +35,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "yjs": "^13.6.10",
-    "lib0": "^0.2.94"
+    "lib0": "^0.2.94",
+    "uuid": "^13.0.0",
+    "yjs": "^13.6.10"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
     "@types/node": "^20.10.0",
+    "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "eslint": "^8.56.0",

@@ -2,5 +2,16 @@
   "extends": "../../.eslintrc.json",
   "parserOptions": {
     "project": "./tsconfig.eslint.json"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/__tests__/**/*.ts", "**/__tests__/**/*.tsx"],
+      "rules": {
+        "@typescript-eslint/require-await": "off",
+        "@typescript-eslint/unbound-method": "off",
+        "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-unnecessary-type-assertion": "off"
+      }
+    }
+  ]
 }
