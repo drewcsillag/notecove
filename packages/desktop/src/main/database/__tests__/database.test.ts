@@ -40,7 +40,7 @@ describe('SqliteDatabase', () => {
     it('should initialize database schema', async () => {
       // Database is initialized in beforeEach
       const version = await db.getCurrentVersion();
-      expect(version).toBe(2);
+      expect(version).toBe(3);
     });
 
     it('should create all required tables', async () => {

@@ -22,8 +22,9 @@ module.exports = {
     '^@minoru/react-dnd-treeview$': '<rootDir>/src/__mocks__/@minoru/react-dnd-treeview.tsx',
     '^react-dnd$': '<rootDir>/src/__mocks__/react-dnd.tsx',
     '^react-dnd-html5-backend$': '<rootDir>/src/__mocks__/react-dnd-html5-backend.tsx',
+    '^uuid$': '<rootDir>/src/__mocks__/uuid.ts',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@minoru/react-dnd-treeview|react-dnd|dnd-core|@react-dnd)/)',
+    'node_modules/(?!(@minoru/react-dnd-treeview|react-dnd|dnd-core|@react-dnd|uuid)/)',
   ],
 };
