@@ -1,6 +1,6 @@
 # Phase 4.1bis.1: Robust Cross-SD Note Moves
 
-**Overall Progress:** `19%` (11/57 tasks complete)
+**Overall Progress:** `40%` (23/57 tasks complete)
 
 **Status:** 🟡 In Progress
 
@@ -20,7 +20,7 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 
 ## Phase 4.1bis.1.1: SD UUIDs + Move State Machine
 
-**Progress:** `42%` (11/26 tasks complete)
+**Progress:** `88%` (23/26 tasks complete)
 
 ### 1. SD UUID System
 
@@ -54,51 +54,51 @@ Implement a robust state machine-based system for cross-SD note moves that handl
   - [x] ✅ Create indexes on state, note_id, and last_modified columns
   - [x] ✅ Add migration to create table on app startup
 
-- [x] ✅ **Implement state transitions** (Commit: cc553aa)
+- [x] ✅ **Implement state transitions** (Commit: 86f4622)
   - [x] ✅ Define state enum: initiated, copying, files_copied, db_updated, cleaning, completed, cancelled, rolled_back (NoteMoveState type)
-  - [ ] 🟥 Implement state update function with timestamp tracking
-  - [ ] 🟥 Add validation to ensure valid state transitions
+  - [x] ✅ Implement state update function with timestamp tracking
+  - [x] ✅ Add validation to ensure valid state transitions
 
-- [ ] 🟥 **Implement atomic move operation**
-  - [ ] 🟥 Create temporary directory for file copying (`.moving-{noteId}` in target SD)
-  - [ ] 🟥 Copy CRDT files to temporary directory (state: copying)
-  - [ ] 🟥 Mark files copied (state: files_copied)
-  - [ ] 🟥 Begin SQL transaction
-  - [ ] 🟥 Insert note into target SD database
-  - [ ] 🟥 Delete note from source SD database
-  - [ ] 🟥 Commit transaction (state: db_updated)
-  - [ ] 🟥 Atomic rename from temp directory to final location
-  - [ ] 🟥 Delete source CRDT files (state: cleaning)
-  - [ ] 🟥 Mark move completed (state: completed)
+- [x] ✅ **Implement atomic move operation** (Commit: 86f4622)
+  - [x] ✅ Create temporary directory for file copying (`.moving-{noteId}` in target SD)
+  - [x] ✅ Copy CRDT files to temporary directory (state: copying)
+  - [x] ✅ Mark files copied (state: files_copied)
+  - [x] ✅ Begin SQL transaction
+  - [x] ✅ Insert note into target SD database
+  - [x] ✅ Delete note from source SD database
+  - [x] ✅ Commit transaction (state: db_updated)
+  - [x] ✅ Atomic rename from temp directory to final location
+  - [x] ✅ Delete source CRDT files (state: cleaning)
+  - [x] ✅ Mark move completed (state: completed)
 
-- [ ] 🟥 **Implement error handling**
-  - [ ] 🟥 Rollback transaction on database errors
-  - [ ] 🟥 Clean up temporary directory on failure
-  - [ ] 🟥 Mark move as rolled_back with error message
-  - [ ] 🟥 Log detailed error information for debugging
+- [x] ✅ **Implement error handling** (Commit: 86f4622)
+  - [x] ✅ Rollback transaction on database errors
+  - [x] ✅ Clean up temporary directory on failure
+  - [x] ✅ Mark move as rolled_back with error message
+  - [x] ✅ Log detailed error information for debugging
 
 ### 3. Recovery Logic
 
-- [ ] 🟥 **Implement startup recovery**
-  - [ ] 🟥 Query for incomplete moves (state not in completed, cancelled, rolled_back)
-  - [ ] 🟥 Filter for moves initiated by current instance (instance ownership)
-  - [ ] 🟥 Check if both source and target SDs are accessible
-  - [ ] 🟥 Resume move from current state
-  - [ ] 🟥 Log warning for stale moves from other instances (>5 minutes old)
+- [x] ✅ **Implement startup recovery** (Commit: 86f4622)
+  - [x] ✅ Query for incomplete moves (state not in completed, cancelled, rolled_back)
+  - [x] ✅ Filter for moves initiated by current instance (instance ownership)
+  - [x] ✅ Check if both source and target SDs are accessible
+  - [x] ✅ Resume move from current state
+  - [x] ✅ Log warning for stale moves from other instances (>5 minutes old)
 
-- [ ] 🟥 **Implement state-specific recovery**
-  - [ ] 🟥 Handle recovery from 'initiated' state (start fresh)
-  - [ ] 🟥 Handle recovery from 'copying' state (clean temp dir, restart)
-  - [ ] 🟥 Handle recovery from 'files_copied' state (continue with DB update)
-  - [ ] 🟥 Handle recovery from 'db_updated' state (verify DB, continue with file finalization)
-  - [ ] 🟥 Handle recovery from 'cleaning' state (retry file operations)
+- [x] ✅ **Implement state-specific recovery** (Commit: 86f4622)
+  - [x] ✅ Handle recovery from 'initiated' state (start fresh)
+  - [x] ✅ Handle recovery from 'copying' state (clean temp dir, restart)
+  - [x] ✅ Handle recovery from 'files_copied' state (continue with DB update)
+  - [x] ✅ Handle recovery from 'db_updated' state (verify DB, continue with file finalization)
+  - [x] ✅ Handle recovery from 'cleaning' state (retry file operations)
 
 ### 4. Cleanup & Maintenance
 
-- [ ] 🟥 **Implement move record cleanup**
-  - [ ] 🟥 Clean up completed/cancelled/rolled_back moves older than 30 days
-  - [ ] 🟥 Run cleanup on app startup
-  - [ ] 🟥 Run cleanup once per day in background
+- [x] ✅ **Implement move record cleanup** (Commit: 86f4622)
+  - [x] ✅ Clean up completed/cancelled/rolled_back moves older than 30 days
+  - [x] ✅ Run cleanup on app startup (implemented, needs integration)
+  - [x] ✅ Run cleanup once per day in background (implemented, needs integration)
 
 ### 5. Integration & Testing
 
