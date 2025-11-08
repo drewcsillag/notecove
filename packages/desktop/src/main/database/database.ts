@@ -20,8 +20,59 @@ import type {
   SchemaVersionRecord,
   StorageDirCache,
 } from '@notecove/shared';
-import { SCHEMA_SQL, SCHEMA_VERSION } from '@notecove/shared';
-import type { UUID } from '@notecove/shared';
+import { SCHEMA_SQL, SCHEMA_VERSION, SdUuidManager } from '@notecove/shared';
+import type { UUID, FileSystemAdapter, FileStats } from '@notecove/shared';
+
+/**
+ * Node.js implementation of FileSystemAdapter for SD UUID management
+ */
+class NodeFsAdapter implements FileSystemAdapter {
+  async exists(filepath: string): Promise<boolean> {
+    try {
+      await fs.promises.access(filepath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async mkdir(dirpath: string): Promise<void> {
+    await fs.promises.mkdir(dirpath, { recursive: true });
+  }
+
+  async readFile(filepath: string): Promise<Uint8Array> {
+    return await fs.promises.readFile(filepath);
+  }
+
+  async writeFile(filepath: string, data: Uint8Array): Promise<void> {
+    await fs.promises.writeFile(filepath, data);
+  }
+
+  async deleteFile(filepath: string): Promise<void> {
+    await fs.promises.unlink(filepath);
+  }
+
+  async listFiles(dirpath: string): Promise<string[]> {
+    return await fs.promises.readdir(dirpath);
+  }
+
+  joinPath(...segments: string[]): string {
+    return path.join(...segments);
+  }
+
+  basename(filepath: string): string {
+    return path.basename(filepath);
+  }
+
+  async stat(filepath: string): Promise<FileStats> {
+    const stats = await fs.promises.stat(filepath);
+    return {
+      size: stats.size,
+      mtimeMs: stats.mtimeMs,
+      ctimeMs: stats.ctimeMs,
+    };
+  }
+}
 
 export class SqliteDatabase implements Database {
   constructor(private readonly adapter: DatabaseAdapter) {}
@@ -668,12 +719,23 @@ export class SqliteDatabase implements Database {
       fs.mkdirSync(notesDir, { recursive: true });
     }
 
-    await this.adapter.exec(
-      'INSERT INTO storage_dirs (id, name, path, uuid, created, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, name, sdPath, null, created, isActive ? 1 : 0]
+    // Initialize SD UUID (Option C: auto-generate + read-back reconciliation)
+    const fsAdapter = new NodeFsAdapter();
+    const uuidManager = new SdUuidManager(fsAdapter);
+    const uuidResult = await uuidManager.initializeUuid(sdPath);
+
+    console.log(
+      `[SD UUID] Initialized UUID for SD at ${sdPath}: ${uuidResult.uuid}`,
+      uuidResult.wasGenerated ? '(generated)' : '(existing)',
+      uuidResult.hadRaceCondition ? '⚠️ race condition detected, adopted existing UUID' : ''
     );
 
-    return { id, name, path: sdPath, uuid: null, created, isActive };
+    await this.adapter.exec(
+      'INSERT INTO storage_dirs (id, name, path, uuid, created, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, name, sdPath, uuidResult.uuid, created, isActive ? 1 : 0]
+    );
+
+    return { id, name, path: sdPath, uuid: uuidResult.uuid, created, isActive };
   }
 
   async getStorageDir(id: string): Promise<StorageDirCache | null> {
@@ -685,6 +747,19 @@ export class SqliteDatabase implements Database {
       created: number;
       is_active: number;
     }>('SELECT * FROM storage_dirs WHERE id = ?', [id]);
+
+    return row ? this.mapStorageDirRow(row) : null;
+  }
+
+  async getStorageDirByUuid(uuid: string): Promise<StorageDirCache | null> {
+    const row = await this.adapter.get<{
+      id: string;
+      name: string;
+      path: string;
+      uuid: string | null;
+      created: number;
+      is_active: number;
+    }>('SELECT * FROM storage_dirs WHERE uuid = ?', [uuid]);
 
     return row ? this.mapStorageDirRow(row) : null;
   }
