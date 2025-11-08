@@ -1,6 +1,6 @@
 # Phase 4.1bis.1: Robust Cross-SD Note Moves
 
-**Overall Progress:** `14%` (8/57 tasks complete)
+**Overall Progress:** `19%` (11/57 tasks complete)
 
 **Status:** 🟡 In Progress
 
@@ -20,7 +20,7 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 
 ## Phase 4.1bis.1.1: SD UUIDs + Move State Machine
 
-**Progress:** `31%` (8/26 tasks complete)
+**Progress:** `42%` (11/26 tasks complete)
 
 ### 1. SD UUID System
 
@@ -40,12 +40,12 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 - [x] ✅ **Update database schema** (Commit: cc553aa)
   - [x] ✅ Add `uuid` column to `storage_dirs` table (TEXT)
   - [x] ✅ Create index on `uuid` column for fast lookups
-  - [ ] 🟥 Update SD initialization code to store UUID in database (runtime integration pending)
+  - [x] ✅ Update SD initialization code to store UUID in database (Commit: f23c74f)
 
-- [ ] 🟥 **Add SD lookup by UUID**
-  - [ ] 🟥 Implement `findSDByUuid(uuid: string)` method
-  - [ ] 🟥 Return SD info including database ID and filesystem path
-  - [ ] 🟥 Handle case where SD is not currently mounted
+- [x] ✅ **Add SD lookup by UUID** (Commit: f23c74f)
+  - [x] ✅ Implement `getStorageDirByUuid(uuid: string)` method
+  - [x] ✅ Return SD info including database ID and filesystem path
+  - [x] ✅ Handle case where SD is not currently mounted (returns null)
 
 ### 2. Move State Machine
 
