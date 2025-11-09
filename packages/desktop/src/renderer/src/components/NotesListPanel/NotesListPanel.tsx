@@ -28,6 +28,7 @@ import {
 import { Add as AddIcon, Clear as ClearIcon, Folder as FolderIcon } from '@mui/icons-material';
 import { DraggableNoteItem } from './DraggableNoteItem';
 import { CrossSDConflictDialog } from './CrossSDConflictDialog';
+import { extractTags } from '@notecove/shared';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -48,12 +49,14 @@ interface NotesListPanelProps {
   selectedNoteId: string | null;
   onNoteSelect: (noteId: string | null) => void;
   activeSdId?: string;
+  selectedTags?: string[];
 }
 
 export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   selectedNoteId,
   onNoteSelect,
   activeSdId,
+  selectedTags = [],
 }) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -202,6 +205,28 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           notesList = await window.electronAPI.note.list(sdId, folderId);
         }
 
+        // Filter by selected tags if any
+        if (selectedTags.length > 0) {
+          // Get all tags to map tag IDs to tag names
+          const allTags = await window.electronAPI.tag.getAll();
+          const tagIdToName = new Map(allTags.map((t) => [t.id, t.name]));
+
+          // Get selected tag names
+          const selectedTagNames = selectedTags
+            .map((tagId) => tagIdToName.get(tagId)?.toLowerCase())
+            .filter((name): name is string => name !== undefined);
+
+          // Filter notes that have ANY of the selected tags (OR logic)
+          notesList = notesList.filter((note) => {
+            // Extract tags from note content
+            const noteTags = extractTags(note.contentText);
+            const noteTagsLower = noteTags.map((t) => t.toLowerCase());
+
+            // Check if note has any of the selected tags
+            return selectedTagNames.some((selectedTag) => noteTagsLower.includes(selectedTag));
+          });
+        }
+
         // Sort by pinned status first, then by modified date (newest first)
         notesList.sort((a, b) => {
           if (a.pinned !== b.pinned) {
@@ -219,7 +244,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         setLoading(false);
       }
     },
-    [activeSdId]
+    [activeSdId, selectedTags]
   );
 
   // Handle note selection - delegate to parent

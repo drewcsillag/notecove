@@ -124,6 +124,9 @@ export class IPCHandlers {
     ipcMain.handle('note:createSnapshot', this.handleCreateSnapshot.bind(this));
     ipcMain.handle('note:checkExistsInSD', this.handleCheckNoteExistsInSD.bind(this));
 
+    // Tag operations
+    ipcMain.handle('tag:getAll', this.handleGetAllTags.bind(this));
+
     // Folder operations
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
     ipcMain.handle('folder:listAll', this.handleListAllFolders.bind(this));
@@ -1765,6 +1768,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:getMetadata');
     ipcMain.removeHandler('note:updateTitle');
     ipcMain.removeHandler('note:list');
+    ipcMain.removeHandler('tag:getAll');
     ipcMain.removeHandler('folder:list');
     ipcMain.removeHandler('folder:listAll');
     ipcMain.removeHandler('folder:get');
@@ -2054,6 +2058,15 @@ export class IPCHandlers {
    */
   private async handleGetBackupDirectory(_event: IpcMainInvokeEvent): Promise<string> {
     return this.backupManager.getBackupDirectory();
+  }
+
+  /**
+   * Tag: Get all tags with note counts
+   */
+  private async handleGetAllTags(
+    _event: IpcMainInvokeEvent
+  ): Promise<{ id: string; name: string; count: number }[]> {
+    return await this.database.getAllTags();
   }
 
   // Test-only handlers

@@ -567,12 +567,16 @@ export class SqliteDatabase implements Database {
     return row ? { id: row.id, name: row.name } : null;
   }
 
-  async getAllTags(): Promise<Tag[]> {
-    const rows = await this.adapter.all<{ id: string; name: string }>(
-      'SELECT * FROM tags ORDER BY name COLLATE NOCASE'
+  async getAllTags(): Promise<Array<Tag & { count: number }>> {
+    const rows = await this.adapter.all<{ id: string; name: string; count: number }>(
+      `SELECT t.id, t.name, COUNT(nt.note_id) as count
+       FROM tags t
+       LEFT JOIN note_tags nt ON t.id = nt.tag_id
+       GROUP BY t.id, t.name
+       ORDER BY t.name COLLATE NOCASE`
     );
 
-    return rows.map((row) => ({ id: row.id, name: row.name }));
+    return rows;
   }
 
   async getTagsForNote(noteId: UUID): Promise<Tag[]> {

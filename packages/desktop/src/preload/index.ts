@@ -237,6 +237,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
+  // Tag operations
+  tag: {
+    getAll: (): Promise<{ id: string; name: string; count: number }[]> =>
+      ipcRenderer.invoke('tag:getAll') as Promise<{ id: string; name: string; count: number }[]>,
+  },
+
   // Folder operations
   folder: {
     list: (

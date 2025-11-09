@@ -6,6 +6,8 @@
  *
  * This uses a ProseMirror decoration plugin to identify and style hashtags
  * without modifying the document structure itself.
+ *
+ * Also provides autocomplete suggestions when typing `#` using TipTap's suggestion API.
  */
 
 import { Extension } from '@tiptap/react';
@@ -13,9 +15,16 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { HASHTAG_PATTERN, MAX_TAG_LENGTH } from '@notecove/shared';
+import Suggestion from '@tiptap/suggestion';
+import { ReactRenderer } from '@tiptap/react';
+import { TagSuggestionList, type TagSuggestionListRef } from './TagSuggestionList';
+import type { SuggestionOptions } from '@tiptap/suggestion';
+import tippy from 'tippy.js';
+import type { Instance as TippyInstance } from 'tippy.js';
 
 export interface HashtagOptions {
   HTMLAttributes: Record<string, unknown>;
+  suggestion: Omit<SuggestionOptions, 'editor'>;
 }
 
 export const Hashtag = Extension.create<HashtagOptions>({
@@ -24,11 +33,94 @@ export const Hashtag = Extension.create<HashtagOptions>({
   addOptions() {
     return {
       HTMLAttributes: {},
+      suggestion: {
+        char: '#',
+        pluginKey: new PluginKey('hashtagSuggestion'),
+        command: ({ editor, range, props }) => {
+          // Insert the tag name (without #) at the current position
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(range, `#${props.name}`)
+            .run();
+        },
+        items: async ({ query }) => {
+          try {
+            // Fetch all tags from database
+            const allTags = await window.electronAPI.tag.getAll();
+
+            // Filter tags based on the query
+            const filtered = allTags.filter((tag) =>
+              tag.name.toLowerCase().includes(query.toLowerCase())
+            );
+
+            // Limit to 10 suggestions
+            return filtered.slice(0, 10);
+          } catch (error) {
+            console.error('Failed to fetch tags:', error);
+            return [];
+          }
+        },
+        render: () => {
+          let component: ReactRenderer | undefined;
+          let popup: TippyInstance[] | undefined;
+
+          return {
+            onStart: (props) => {
+              component = new ReactRenderer(TagSuggestionList, {
+                props,
+                editor: props.editor,
+              });
+
+              if (!props.clientRect) {
+                return;
+              }
+
+              popup = tippy('body', {
+                getReferenceClientRect: props.clientRect as () => DOMRect,
+                appendTo: () => document.body,
+                content: component.element,
+                showOnCreate: true,
+                interactive: true,
+                trigger: 'manual',
+                placement: 'bottom-start',
+              });
+            },
+
+            onUpdate(props) {
+              component?.updateProps(props);
+
+              if (!props.clientRect) {
+                return;
+              }
+
+              popup?.[0]?.setProps({
+                getReferenceClientRect: props.clientRect as () => DOMRect,
+              });
+            },
+
+            onKeyDown(props) {
+              if (props.event.key === 'Escape') {
+                popup?.[0]?.hide();
+                return true;
+              }
+
+              return (component?.ref as TagSuggestionListRef | undefined)?.onKeyDown(props) ?? false;
+            },
+
+            onExit() {
+              popup?.[0]?.destroy();
+              component?.destroy();
+            },
+          };
+        },
+      },
     };
   },
 
   addProseMirrorPlugins() {
     return [
+      // Decoration plugin for styling existing hashtags
       new Plugin({
         key: new PluginKey('hashtag'),
         state: {
@@ -50,6 +142,11 @@ export const Hashtag = Extension.create<HashtagOptions>({
             return this.getState(state);
           },
         },
+      }),
+      // Suggestion plugin for autocomplete
+      Suggestion({
+        editor: this.editor,
+        ...this.options.suggestion,
       }),
     ];
   },

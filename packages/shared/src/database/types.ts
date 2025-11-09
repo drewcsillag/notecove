@@ -191,9 +191,9 @@ export interface TagOperations {
   getTagByName(name: string): Promise<Tag | null>;
 
   /**
-   * Get all tags
+   * Get all tags with note counts
    */
-  getAllTags(): Promise<Tag[]>;
+  getAllTags(): Promise<Array<Tag & { count: number }>>;
 
   /**
    * Get tags for a note

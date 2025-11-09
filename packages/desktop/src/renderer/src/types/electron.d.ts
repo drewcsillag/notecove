@@ -89,6 +89,10 @@ declare global {
         ) => () => void;
       };
 
+      tag: {
+        getAll: () => Promise<{ id: string; name: string; count: number }[]>;
+      };
+
       folder: {
         list: (sdId: string) => Promise<
           {

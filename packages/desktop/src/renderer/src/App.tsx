@@ -9,7 +9,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { createAppTheme } from './theme';
 import './i18n';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
-import { FolderPanel } from './components/FolderPanel/FolderPanel';
+import { LeftSidebar } from './components/LeftSidebar/LeftSidebar';
 import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
 import { EditorPanel } from './components/EditorPanel/EditorPanel';
 import { SettingsDialog } from './components/Settings/SettingsDialog';
@@ -25,6 +25,8 @@ function App(): React.ReactElement {
   const [activeSdId, setActiveSdId] = useState<string>('default');
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showTagPanel, setShowTagPanel] = useState(true);
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
@@ -169,10 +171,9 @@ function App(): React.ReactElement {
       // TODO: Would need to add collapsible state to ThreePanelLayout
     });
 
-    // Toggle Tags Panel (not implemented - tags panel doesn't exist yet)
+    // Toggle Tags Panel
     const cleanupToggleTagsPanel = window.electronAPI.menu.onToggleTagsPanel(() => {
-      console.log('[Menu] Toggle Tags Panel - not yet implemented');
-      // TODO: Implement when Tags Panel is added (Phase 2.7)
+      setShowTagPanel((prev) => !prev);
     });
 
     // About dialog (not implemented yet)
@@ -229,6 +230,23 @@ function App(): React.ReactElement {
     void savePanelSizes();
   };
 
+  // Tag selection handlers
+  const handleTagSelect = (tagId: string): void => {
+    setSelectedTags((prev) => {
+      if (prev.includes(tagId)) {
+        // Deselect if already selected
+        return prev.filter((id) => id !== tagId);
+      } else {
+        // Add to selection
+        return [...prev, tagId];
+      }
+    });
+  };
+
+  const handleClearTagFilters = (): void => {
+    setSelectedTags([]);
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -236,12 +254,16 @@ function App(): React.ReactElement {
         <div data-testid="app-root" data-active-sd-id={activeSdId}>
           <ThreePanelLayout
             leftPanel={
-              <FolderPanel
+              <LeftSidebar
                 onOpenSettings={() => {
                   setSettingsOpen(true);
                 }}
                 activeSdId={activeSdId}
                 onActiveSdChange={setActiveSdId}
+                selectedTags={selectedTags}
+                onTagSelect={handleTagSelect}
+                onClearTagFilters={handleClearTagFilters}
+                showTagPanel={showTagPanel}
               />
             }
             middlePanel={
@@ -249,6 +271,7 @@ function App(): React.ReactElement {
                 selectedNoteId={selectedNoteId}
                 onNoteSelect={setSelectedNoteId}
                 activeSdId={activeSdId}
+                selectedTags={selectedTags}
               />
             }
             rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}

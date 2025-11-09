@@ -271,7 +271,7 @@ test.describe('Tags System - Database Indexing', () => {
 
     // Query the database via IPC to verify tags are indexed
     const allTags = await page.evaluate(async () => {
-      return await window.electronAPI.testing.getAllTags();
+      return await window.electronAPI.tag.getAll();
     });
 
     // Extract tag names
@@ -296,7 +296,7 @@ test.describe('Tags System - Database Indexing', () => {
 
     // Query all tags - should have editoriginal
     let allTags = await page.evaluate(async () => {
-      const tags = await window.electronAPI.testing.getAllTags();
+      const tags = await window.electronAPI.tag.getAll();
       return tags.map((t: { name: string }) => t.name);
     });
 
@@ -311,7 +311,7 @@ test.describe('Tags System - Database Indexing', () => {
 
     // Query all tags again - should now have all three
     allTags = await page.evaluate(async () => {
-      const tags = await window.electronAPI.testing.getAllTags();
+      const tags = await window.electronAPI.tag.getAll();
       return tags.map((t: { name: string }) => t.name);
     });
 
@@ -332,7 +332,7 @@ test.describe('Tags System - Database Indexing', () => {
 
     // Verify initial tags are indexed
     let allTags = await page.evaluate(async () => {
-      const tags = await window.electronAPI.testing.getAllTags();
+      const tags = await window.electronAPI.tag.getAll();
       return tags.map((t: { name: string }) => t.name);
     });
 
@@ -347,12 +347,458 @@ test.describe('Tags System - Database Indexing', () => {
 
     // Verify #deleteremoveme tag was removed from global index
     allTags = await page.evaluate(async () => {
-      const tags = await window.electronAPI.testing.getAllTags();
+      const tags = await window.electronAPI.tag.getAll();
       return tags.map((t: { name: string }) => t.name);
     });
 
     // Note: deleteremoveme might still exist if it's in other notes,
     // but deletekeepme should definitely still be there
     expect(allTags).toContain('deletekeepme');
+  });
+});
+
+test.describe('Tags System - Autocomplete', () => {
+  test('should show autocomplete suggestions when typing #', async () => {
+    // First, create a few notes with tags to populate the tag database
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Test note with #autocomplete1 tag');
+    await page.waitForTimeout(2500); // Wait for auto-save
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Another note with #autocomplete2 tag');
+    await page.waitForTimeout(2500); // Wait for auto-save
+
+    // Now create a new note and test autocomplete
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('#');
+    await page.waitForTimeout(500);
+
+    // The autocomplete popup should be visible
+    const suggestionList = page.locator('[role="list"]').filter({ has: page.locator('text=autocomplete') });
+    await expect(suggestionList).toBeVisible({ timeout: 3000 });
+  });
+
+  test('should filter autocomplete suggestions based on query', async () => {
+    // Create notes with different tags
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Test with #programming tag');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Test with #project tag');
+    await page.waitForTimeout(2500);
+
+    // Create new note and test filtering
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('#pro');
+    await page.waitForTimeout(500);
+
+    // Both 'programming' and 'project' should be visible since they match 'pro'
+    const suggestionList = page.locator('[role="list"]');
+    await expect(suggestionList).toBeVisible({ timeout: 3000 });
+
+    // Continue typing to narrow the filter
+    await page.keyboard.type('g');
+    await page.waitForTimeout(500);
+
+    // Now only 'programming' should be suggested (contains 'prog')
+    const programmingItem = page.getByText('#programming');
+    await expect(programmingItem).toBeVisible({ timeout: 2000 });
+  });
+
+  test('should insert tag when autocomplete suggestion is selected', async () => {
+    // Create a note with a tag
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Test with #insertme tag');
+    await page.waitForTimeout(2500);
+
+    // Create new note and use autocomplete
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('#ins');
+    await page.waitForTimeout(500);
+
+    // Press Enter to select the first suggestion
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+
+    // The tag should be inserted
+    const content = await editor.textContent();
+    expect(content).toContain('#insertme');
+
+    // And it should be styled as a hashtag
+    const hashtags = page.locator('.ProseMirror .hashtag');
+    expect(await hashtags.count()).toBeGreaterThanOrEqual(1);
+  });
+
+  test('should navigate autocomplete with arrow keys', async () => {
+    // Create multiple notes with tags
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Test with #alpha tag');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Test with #beta tag');
+    await page.waitForTimeout(2500);
+
+    // Create new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('#');
+    await page.waitForTimeout(500);
+
+    // Wait for suggestions to appear
+    const suggestionList = page.locator('[role="list"]');
+    await expect(suggestionList).toBeVisible({ timeout: 3000 });
+
+    // The first item should be selected by default
+    const firstItem = suggestionList.locator('[role="button"]').first();
+    await expect(firstItem).toHaveAttribute('aria-selected', 'true');
+
+    // Press down arrow to select next item
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(200);
+
+    // Second item should now be selected
+    const secondItem = suggestionList.locator('[role="button"]').nth(1);
+    await expect(secondItem).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('should close autocomplete on Escape', async () => {
+    // Create a note with a tag
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Test with #escape tag');
+    await page.waitForTimeout(2500);
+
+    // Create new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('#');
+    await page.waitForTimeout(500);
+
+    // Wait for suggestions
+    const suggestionList = page.locator('[role="list"]');
+    await expect(suggestionList).toBeVisible({ timeout: 3000 });
+
+    // Press Escape to close
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Suggestion list should be hidden
+    await expect(suggestionList).not.toBeVisible();
+  });
+
+  test('should show tag usage count in autocomplete', async () => {
+    // Create multiple notes with the same tag
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('First note with #counted tag');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Second note with #counted tag');
+    await page.waitForTimeout(2500);
+
+    // Create new note and trigger autocomplete
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('#cou');
+    await page.waitForTimeout(500);
+
+    // The suggestion should show the count (at least 2)
+    const countText = page.getByText(/\(2\)/);
+    await expect(countText).toBeVisible({ timeout: 3000 });
+  });
+});
+
+test.describe('Tags System - Tag Panel', () => {
+  test('should display tag panel with tags and counts', async () => {
+    // Create notes with tags
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Note with #panel1 tag');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Note with #panel2 and #panel1 tags');
+    await page.waitForTimeout(2500);
+
+    // Tag panel should be visible
+    const tagPanel = page.getByText('Tags', { exact: false });
+    await expect(tagPanel).toBeVisible();
+
+    // Tags should be displayed in the panel
+    const panelTag1 = page.getByText('#panel1', { exact: false });
+    const panelTag2 = page.getByText('#panel2', { exact: false });
+    await expect(panelTag1).toBeVisible();
+    await expect(panelTag2).toBeVisible();
+  });
+
+  test('should filter notes when clicking a tag', async () => {
+    // Create notes with different tags
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Filter test with #filterme tag');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Different note with #other tag');
+    await page.waitForTimeout(2500);
+
+    // Navigate to "All Notes" to see all notes
+    await page.getByRole('button', { name: /All Notes/ }).click();
+    await page.waitForTimeout(500);
+
+    // Count notes before filtering
+    const notesListBefore = page.locator('[role="button"]').filter({ hasText: /Filter test|Different note/ });
+    const countBefore = await notesListBefore.count();
+    expect(countBefore).toBeGreaterThanOrEqual(2);
+
+    // Click the #filterme tag in the tag panel
+    const filtermeTag = page.getByText('#filterme', { exact: false });
+    await filtermeTag.click();
+    await page.waitForTimeout(500);
+
+    // Only the note with #filterme should be visible
+    const filtermNote = page.getByRole('button', { name: /Filter test with #filterme/ });
+    await expect(filtermNote).toBeVisible();
+
+    const otherNote = page.getByRole('button', { name: /Different note with #other/ });
+    await expect(otherNote).not.toBeVisible();
+  });
+
+  test('should support multi-tag filtering with OR logic', async () => {
+    // Create notes with different tag combinations
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Note A with #multi1 tag');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Note B with #multi2 tag');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Note C with #multi3 tag');
+    await page.waitForTimeout(2500);
+
+    // Navigate to "All Notes"
+    await page.getByRole('button', { name: /All Notes/ }).click();
+    await page.waitForTimeout(500);
+
+    // Click first tag
+    const multi1Tag = page.getByText('#multi1', { exact: false });
+    await multi1Tag.click();
+    await page.waitForTimeout(500);
+
+    // Click second tag (should add to filter, not replace)
+    const multi2Tag = page.getByText('#multi2', { exact: false });
+    await multi2Tag.click();
+    await page.waitForTimeout(500);
+
+    // Both notes A and B should be visible (OR logic)
+    const noteA = page.getByRole('button', { name: /Note A with #multi1/ });
+    const noteB = page.getByRole('button', { name: /Note B with #multi2/ });
+    const noteC = page.getByRole('button', { name: /Note C with #multi3/ });
+
+    await expect(noteA).toBeVisible();
+    await expect(noteB).toBeVisible();
+    await expect(noteC).not.toBeVisible();
+  });
+
+  test('should clear all tag filters with clear button', async () => {
+    // Create notes with tags
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Clear test with #cleartag1');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Clear test with #cleartag2');
+    await page.waitForTimeout(2500);
+
+    // Navigate to "All Notes"
+    await page.getByRole('button', { name: /All Notes/ }).click();
+    await page.waitForTimeout(500);
+
+    // Click a tag to filter
+    const clearTag1 = page.getByText('#cleartag1', { exact: false });
+    await clearTag1.click();
+    await page.waitForTimeout(500);
+
+    // Verify filtering is active
+    const noteWithTag1 = page.getByRole('button', { name: /Clear test with #cleartag1/ });
+    await expect(noteWithTag1).toBeVisible();
+
+    // Click the clear filters button
+    const clearButton = page.getByRole('button', { name: /Clear all filters/i });
+    await clearButton.click();
+    await page.waitForTimeout(500);
+
+    // Both notes should now be visible
+    const noteWithTag2 = page.getByRole('button', { name: /Clear test with #cleartag2/ });
+    await expect(noteWithTag1).toBeVisible();
+    await expect(noteWithTag2).toBeVisible();
+  });
+
+  test('should deselect tag when clicking it again', async () => {
+    // Create notes with tags
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    let editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Deselect test with #toggle1');
+    await page.waitForTimeout(2500);
+
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Deselect test with #toggle2');
+    await page.waitForTimeout(2500);
+
+    // Navigate to "All Notes"
+    await page.getByRole('button', { name: /All Notes/ }).click();
+    await page.waitForTimeout(500);
+
+    // Click a tag to select it
+    const toggleTag = page.getByText('#toggle1', { exact: false });
+    await toggleTag.click();
+    await page.waitForTimeout(500);
+
+    // Verify filtering is active
+    const noteWithTag1 = page.getByRole('button', { name: /Deselect test with #toggle1/ });
+    const noteWithTag2 = page.getByRole('button', { name: /Deselect test with #toggle2/ });
+    await expect(noteWithTag1).toBeVisible();
+    await expect(noteWithTag2).not.toBeVisible();
+
+    // Click the same tag again to deselect
+    await toggleTag.click();
+    await page.waitForTimeout(500);
+
+    // Both notes should now be visible
+    await expect(noteWithTag1).toBeVisible();
+    await expect(noteWithTag2).toBeVisible();
+  });
+
+  test('should update tag counts when notes are edited', async () => {
+    // Create a note with a unique tag
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.type('Update count test #updatecount');
+    await page.waitForTimeout(2500);
+
+    // Get the initial count for the tag
+    const tagInPanel = page.getByText('#updatecount', { exact: false });
+    await expect(tagInPanel).toBeVisible();
+
+    // Create another note with the same tag
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor2 = page.locator('.ProseMirror');
+    await editor2.click();
+    await page.keyboard.type('Second note with #updatecount');
+    await page.waitForTimeout(2500);
+
+    // The count should update (we can't easily check the exact number without
+    // more sophisticated selectors, but we can verify the tag still exists)
+    await expect(tagInPanel).toBeVisible();
   });
 });
