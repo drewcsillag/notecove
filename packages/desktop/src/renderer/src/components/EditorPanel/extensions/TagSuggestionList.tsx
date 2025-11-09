@@ -9,7 +9,8 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Paper, List, ListItem, ListItemButton, ListItemText, Box } from '@mui/material';
 import type { SuggestionProps } from '@tiptap/suggestion';
 
-export interface TagSuggestionListProps extends SuggestionProps<{ id: string; name: string; count: number }> {
+export interface TagSuggestionListProps
+  extends SuggestionProps<{ id: string; name: string; count: number }> {
   // Props from TipTap's suggestion API
   items: { id: string; name: string; count: number }[];
   command: (props: { id: string; name: string; count: number }) => void;
@@ -88,7 +89,9 @@ export const TagSuggestionList = forwardRef<TagSuggestionListRef, TagSuggestionL
             <ListItem key={item.id} disablePadding>
               <ListItemButton
                 selected={index === selectedIndex}
-                onClick={() => selectItem(index)}
+                onClick={() => {
+                  selectItem(index);
+                }}
                 sx={{
                   py: 0.5,
                   px: 2,

@@ -42,7 +42,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Folder Panel - takes up 60% of space */}
-      <Box sx={{ flex: showTagPanel ? 6 : 1, overflow: 'auto', borderBottom: showTagPanel ? 1 : 0, borderColor: 'divider' }}>
+      <Box
+        sx={{
+          flex: showTagPanel ? 6 : 1,
+          overflow: 'auto',
+          borderBottom: showTagPanel ? 1 : 0,
+          borderColor: 'divider',
+        }}
+      >
         <FolderPanel {...folderPanelProps} />
       </Box>
 

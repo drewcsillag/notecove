@@ -390,13 +390,12 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     setSelectedFolderId('all-notes');
   }, [activeSdId]);
 
-  // Fetch notes when selected folder or active SD changes (only if not searching)
+  // Fetch notes when selected folder, active SD, or tag filters change (only if not searching)
   useEffect(() => {
     if (selectedFolderId !== null && !searchQuery.trim()) {
       void fetchNotes(selectedFolderId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFolderId, activeSdId]);
+  }, [selectedFolderId, activeSdId, selectedTags, fetchNotes]);
 
   // Trigger search when searchQuery changes (loaded from app state)
   useEffect(() => {

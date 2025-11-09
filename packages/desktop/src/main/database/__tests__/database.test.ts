@@ -209,8 +209,27 @@ describe('SqliteDatabase', () => {
     });
 
     it('should get all tags', async () => {
-      await db.createTag('tag1');
-      await db.createTag('tag2');
+      // Create a note first to associate tags with
+      const note: NoteCache = {
+        id: 'note-1' as any,
+        title: 'Test',
+        sdId: 'sd-1',
+        folderId: null,
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'test',
+        contentText: 'test',
+      };
+      await db.upsertNote(note);
+
+      const tag1 = await db.createTag('tag1');
+      const tag2 = await db.createTag('tag2');
+
+      // Associate tags with the note
+      await db.addTagToNote(note.id, tag1.id);
+      await db.addTagToNote(note.id, tag2.id);
 
       const tags = await db.getAllTags();
       expect(tags).toHaveLength(2);

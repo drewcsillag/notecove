@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Box, Typography, List, ListItem, ListItemButton, Chip, IconButton } from '@mui/material';
+import { Box, Typography, Chip, IconButton } from '@mui/material';
 import { LocalOffer as TagIcon, Clear as ClearIcon } from '@mui/icons-material';
 
 export interface TagPanelProps {
@@ -20,7 +20,7 @@ export const TagPanel: React.FC<TagPanelProps> = ({
   onTagSelect,
   onClearFilters,
 }) => {
-  const [tags, setTags] = useState<Array<{ id: string; name: string; count: number }>>([]);
+  const [tags, setTags] = useState<{ id: string; name: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,65 +122,39 @@ export const TagPanel: React.FC<TagPanelProps> = ({
         )}
       </Box>
 
-      {/* Tags List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
-        <List dense disablePadding>
-          {tags.map((tag) => {
-            const isSelected = selectedTags.includes(tag.id);
-            return (
-              <ListItem key={tag.id} disablePadding>
-                <ListItemButton
-                  selected={isSelected}
-                  onClick={() => onTagSelect(tag.id)}
-                  sx={{
-                    py: 0.75,
-                    px: 2,
-                    '&.Mui-selected': {
-                      backgroundColor: 'primary.light',
-                      '&:hover': {
-                        backgroundColor: 'primary.light',
-                      },
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      gap: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: isSelected ? 'primary.main' : 'text.primary',
-                        fontWeight: isSelected ? 600 : 400,
-                        flex: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      #{tag.name}
-                    </Typography>
-                    <Chip
-                      label={tag.count}
-                      size="small"
-                      sx={{
-                        height: 20,
-                        fontSize: '0.75rem',
-                        backgroundColor: isSelected ? 'primary.main' : 'action.hover',
-                        color: isSelected ? 'primary.contrastText' : 'text.secondary',
-                      }}
-                    />
-                  </Box>
-                </ListItemButton>
-              </ListItem>
-            );
-          })}
-        </List>
+      {/* Tags as Pills */}
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          p: 2,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 1,
+          alignContent: 'flex-start',
+        }}
+      >
+        {tags.map((tag) => {
+          const isSelected = selectedTags.includes(tag.id);
+          return (
+            <Chip
+              key={tag.id}
+              label={`#${tag.name} (${tag.count})`}
+              onClick={() => {
+                onTagSelect(tag.id);
+              }}
+              color={isSelected ? 'primary' : 'default'}
+              variant={isSelected ? 'filled' : 'outlined'}
+              sx={{
+                cursor: 'pointer',
+                fontWeight: isSelected ? 600 : 400,
+                '&:hover': {
+                  backgroundColor: isSelected ? 'primary.dark' : 'action.hover',
+                },
+              }}
+            />
+          );
+        })}
       </Box>
     </Box>
   );

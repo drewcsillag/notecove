@@ -37,12 +37,9 @@ export const Hashtag = Extension.create<HashtagOptions>({
         char: '#',
         pluginKey: new PluginKey('hashtagSuggestion'),
         command: ({ editor, range, props }) => {
-          // Insert the tag name (without #) at the current position
-          editor
-            .chain()
-            .focus()
-            .insertContentAt(range, `#${props.name}`)
-            .run();
+          // Replace the # and partial query with the full tag plus a space
+          const tagName = (props as { name: string }).name;
+          editor.chain().focus().deleteRange(range).insertContent(`#${tagName} `).run();
         },
         items: async ({ query }) => {
           try {
@@ -105,7 +102,9 @@ export const Hashtag = Extension.create<HashtagOptions>({
                 return true;
               }
 
-              return (component?.ref as TagSuggestionListRef | undefined)?.onKeyDown(props) ?? false;
+              return (
+                (component?.ref as TagSuggestionListRef | undefined)?.onKeyDown(props) ?? false
+              );
             },
 
             onExit() {

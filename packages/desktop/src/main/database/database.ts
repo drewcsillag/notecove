@@ -567,12 +567,13 @@ export class SqliteDatabase implements Database {
     return row ? { id: row.id, name: row.name } : null;
   }
 
-  async getAllTags(): Promise<Array<Tag & { count: number }>> {
+  async getAllTags(): Promise<(Tag & { count: number })[]> {
     const rows = await this.adapter.all<{ id: string; name: string; count: number }>(
       `SELECT t.id, t.name, COUNT(nt.note_id) as count
        FROM tags t
        LEFT JOIN note_tags nt ON t.id = nt.tag_id
        GROUP BY t.id, t.name
+       HAVING count > 0
        ORDER BY t.name COLLATE NOCASE`
     );
 
