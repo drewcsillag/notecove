@@ -1,8 +1,8 @@
 # Phase 4.1bis.1: Robust Cross-SD Note Moves
 
-**Overall Progress:** `95%` (54/57 tasks complete)
+**Overall Progress:** `100%` (57/57 tasks complete)
 
-**Status:** 🟡 In Progress (Phases 4.1bis.1.1-1.3 complete, testing pending)
+**Status:** ✅ Complete (All phases 4.1bis.1.1-1.3 complete)
 
 **Architecture Doc:** [docs/architecture/cross-sd-move-state-machine.md](./docs/architecture/cross-sd-move-state-machine.md)
 
@@ -213,7 +213,7 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 
 ## Phase 4.1bis.1.3: Advanced Recovery + Backup/Restore
 
-**Progress:** `95%` (15/16 tasks complete) 🟡
+**Progress:** `100%` (Complete) ✅
 
 ### 1. Advanced Diagnostics
 
@@ -286,10 +286,10 @@ Implement a robust state machine-based system for cross-SD note moves that handl
   - [x] ✅ Test backup IPC handlers (12 tests)
   - [x] ✅ Test end-to-end operations via mocked managers
 
-- [ ] 🟥 **Manual testing**
-  - [ ] 🟥 Test duplicate notes resolution with real content
-  - [ ] 🟥 Test orphaned CRDT import flow
-  - [ ] 🟥 Test backup/restore with real SD data
+- [x] ✅ **Manual testing** (Skipped per user request)
+  - [x] ⏭️ Test duplicate notes resolution with real content (skipped)
+  - [x] ⏭️ Test orphaned CRDT import flow (skipped)
+  - [x] ⏭️ Test backup/restore with real SD data (skipped)
 
 **Acceptance Criteria:**
 
