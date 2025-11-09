@@ -10,16 +10,12 @@ import { Box, Typography, Chip, IconButton } from '@mui/material';
 import { LocalOffer as TagIcon, Clear as ClearIcon } from '@mui/icons-material';
 
 export interface TagPanelProps {
-  selectedTags: string[];
+  tagFilters: Record<string, 'include' | 'exclude'>;
   onTagSelect: (tagId: string) => void;
   onClearFilters: () => void;
 }
 
-export const TagPanel: React.FC<TagPanelProps> = ({
-  selectedTags,
-  onTagSelect,
-  onClearFilters,
-}) => {
+export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onClearFilters }) => {
   const [tags, setTags] = useState<{ id: string; name: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,11 +102,15 @@ export const TagPanel: React.FC<TagPanelProps> = ({
           <Typography variant="subtitle2" fontWeight={600}>
             Tags
           </Typography>
-          {selectedTags.length > 0 && (
-            <Chip label={selectedTags.length} size="small" sx={{ height: 20, minWidth: 20 }} />
+          {Object.keys(tagFilters).length > 0 && (
+            <Chip
+              label={Object.keys(tagFilters).length}
+              size="small"
+              sx={{ height: 20, minWidth: 20 }}
+            />
           )}
         </Box>
-        {selectedTags.length > 0 && (
+        {Object.keys(tagFilters).length > 0 && (
           <IconButton
             size="small"
             onClick={onClearFilters}
@@ -135,7 +135,10 @@ export const TagPanel: React.FC<TagPanelProps> = ({
         }}
       >
         {tags.map((tag) => {
-          const isSelected = selectedTags.includes(tag.id);
+          const filterState = tagFilters[tag.id]; // undefined | 'include' | 'exclude'
+          const isInclude = filterState === 'include';
+          const isExclude = filterState === 'exclude';
+
           return (
             <Chip
               key={tag.id}
@@ -143,13 +146,17 @@ export const TagPanel: React.FC<TagPanelProps> = ({
               onClick={() => {
                 onTagSelect(tag.id);
               }}
-              color={isSelected ? 'primary' : 'default'}
-              variant={isSelected ? 'filled' : 'outlined'}
+              color={isInclude ? 'primary' : isExclude ? 'error' : 'default'}
+              variant={isInclude || isExclude ? 'filled' : 'outlined'}
               sx={{
                 cursor: 'pointer',
-                fontWeight: isSelected ? 600 : 400,
+                fontWeight: isInclude || isExclude ? 600 : 400,
                 '&:hover': {
-                  backgroundColor: isSelected ? 'primary.dark' : 'action.hover',
+                  backgroundColor: isInclude
+                    ? 'primary.dark'
+                    : isExclude
+                      ? 'error.dark'
+                      : 'action.hover',
                 },
               }}
             />

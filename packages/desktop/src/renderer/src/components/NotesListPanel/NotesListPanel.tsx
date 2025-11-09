@@ -49,14 +49,14 @@ interface NotesListPanelProps {
   selectedNoteId: string | null;
   onNoteSelect: (noteId: string | null) => void;
   activeSdId?: string;
-  selectedTags?: string[];
+  tagFilters?: Record<string, 'include' | 'exclude'>;
 }
 
 export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   selectedNoteId,
   onNoteSelect,
   activeSdId,
-  selectedTags = [],
+  tagFilters = {},
 }) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -205,25 +205,40 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           notesList = await window.electronAPI.note.list(sdId, folderId);
         }
 
-        // Filter by selected tags if any
-        if (selectedTags.length > 0) {
+        // Filter by tag filters if any (AND logic for includes, AND logic for excludes)
+        if (Object.keys(tagFilters).length > 0) {
           // Get all tags to map tag IDs to tag names
           const allTags = await window.electronAPI.tag.getAll();
           const tagIdToName = new Map(allTags.map((t) => [t.id, t.name]));
 
-          // Get selected tag names
-          const selectedTagNames = selectedTags
-            .map((tagId) => tagIdToName.get(tagId)?.toLowerCase())
-            .filter((name): name is string => name !== undefined);
+          // Separate includes and excludes
+          const includeTags: string[] = [];
+          const excludeTags: string[] = [];
+          for (const [tagId, filterType] of Object.entries(tagFilters)) {
+            const tagName = tagIdToName.get(tagId)?.toLowerCase();
+            if (tagName) {
+              if (filterType === 'include') {
+                includeTags.push(tagName);
+              } else {
+                // filterType === 'exclude'
+                excludeTags.push(tagName);
+              }
+            }
+          }
 
-          // Filter notes that have ANY of the selected tags (OR logic)
+          // Filter notes using AND logic
           notesList = notesList.filter((note) => {
             // Extract tags from note content
             const noteTags = extractTags(note.contentText);
             const noteTagsLower = noteTags.map((t) => t.toLowerCase());
 
-            // Check if note has any of the selected tags
-            return selectedTagNames.some((selectedTag) => noteTagsLower.includes(selectedTag));
+            // Check includes: note must have ALL include tags (AND logic)
+            const hasAllIncludes = includeTags.every((tag) => noteTagsLower.includes(tag));
+
+            // Check excludes: note must NOT have ANY exclude tags (AND logic - all excludes satisfied)
+            const hasNoExcludes = excludeTags.every((tag) => !noteTagsLower.includes(tag));
+
+            return hasAllIncludes && hasNoExcludes;
           });
         }
 
@@ -244,7 +259,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         setLoading(false);
       }
     },
-    [activeSdId, selectedTags]
+    [activeSdId, tagFilters]
   );
 
   // Handle note selection - delegate to parent
@@ -395,7 +410,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     if (selectedFolderId !== null && !searchQuery.trim()) {
       void fetchNotes(selectedFolderId);
     }
-  }, [selectedFolderId, activeSdId, selectedTags, fetchNotes]);
+  }, [selectedFolderId, searchQuery, fetchNotes]);
 
   // Trigger search when searchQuery changes (loaded from app state)
   useEffect(() => {

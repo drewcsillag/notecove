@@ -51,6 +51,11 @@ export const TagSuggestionList = forwardRef<TagSuggestionListRef, TagSuggestionL
 
     useImperativeHandle(ref, () => ({
       onKeyDown: ({ event }): boolean => {
+        // If there are no items, don't handle any keys (let default behavior work)
+        if (props.items.length === 0) {
+          return false;
+        }
+
         if (event.key === 'ArrowUp') {
           upHandler();
           return true;

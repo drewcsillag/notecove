@@ -25,7 +25,8 @@ function App(): React.ReactElement {
   const [activeSdId, setActiveSdId] = useState<string>('default');
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Tag filters: tagId -> 'include' | 'exclude' (omitted = neutral/no filter)
+  const [tagFilters, setTagFilters] = useState<Record<string, 'include' | 'exclude'>>({});
   const [showTagPanel, setShowTagPanel] = useState(true);
 
   // Create theme based on mode
@@ -230,21 +231,31 @@ function App(): React.ReactElement {
     void savePanelSizes();
   };
 
-  // Tag selection handlers
+  // Tag filter handlers - cycle through: neutral -> include -> exclude -> neutral
   const handleTagSelect = (tagId: string): void => {
-    setSelectedTags((prev) => {
-      if (prev.includes(tagId)) {
-        // Deselect if already selected
-        return prev.filter((id) => id !== tagId);
+    setTagFilters((prev) => {
+      const current = prev[tagId];
+      const newFilters = { ...prev };
+
+      if (!current) {
+        // neutral -> include
+        newFilters[tagId] = 'include';
+      } else if (current === 'include') {
+        // include -> exclude
+        newFilters[tagId] = 'exclude';
       } else {
-        // Add to selection
-        return [...prev, tagId];
+        // exclude -> neutral (remove from filters)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [tagId]: _, ...rest } = newFilters;
+        return rest;
       }
+
+      return newFilters;
     });
   };
 
   const handleClearTagFilters = (): void => {
-    setSelectedTags([]);
+    setTagFilters({});
   };
 
   return (
@@ -260,7 +271,7 @@ function App(): React.ReactElement {
                 }}
                 activeSdId={activeSdId}
                 onActiveSdChange={setActiveSdId}
-                selectedTags={selectedTags}
+                tagFilters={tagFilters}
                 onTagSelect={handleTagSelect}
                 onClearTagFilters={handleClearTagFilters}
                 showTagPanel={showTagPanel}
@@ -271,7 +282,7 @@ function App(): React.ReactElement {
                 selectedNoteId={selectedNoteId}
                 onNoteSelect={setSelectedNoteId}
                 activeSdId={activeSdId}
-                selectedTags={selectedTags}
+                tagFilters={tagFilters}
               />
             }
             rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
