@@ -25,6 +25,7 @@ import { UserSettings } from './UserSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { DatabaseSettings } from './DatabaseSettings';
 import { TelemetrySettings } from './TelemetrySettings';
+import { RecoverySettings } from './RecoverySettings';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -119,6 +120,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <Tab label="Appearance" {...a11yProps(2)} />
             <Tab label="Telemetry" {...a11yProps(3)} />
             <Tab label="Database" {...a11yProps(4)} />
+            <Tab label="Recovery" {...a11yProps(5)} />
           </Tabs>
         </Box>
         <TabPanel value={tabValue} index={0}>
@@ -135,6 +137,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         </TabPanel>
         <TabPanel value={tabValue} index={4}>
           <DatabaseSettings />
+        </TabPanel>
+        <TabPanel value={tabValue} index={5}>
+          <RecoverySettings />
         </TabPanel>
       </DialogContent>
       <DialogActions>

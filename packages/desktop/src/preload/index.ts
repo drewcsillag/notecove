@@ -436,6 +436,52 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }): Promise<void> => ipcRenderer.invoke('telemetry:updateSettings', settings) as Promise<void>,
   },
 
+  // Recovery operations
+  recovery: {
+    getStaleMoves: (): Promise<
+      {
+        id: string;
+        noteId: string;
+        sourceSdUuid: string;
+        targetSdUuid: string;
+        targetFolderId: string | null;
+        state: string;
+        initiatedBy: string;
+        initiatedAt: number;
+        lastModified: number;
+        sourceSdPath: string;
+        targetSdPath: string;
+        error: string | null;
+      }[]
+    > =>
+      ipcRenderer.invoke('recovery:getStaleMoves') as Promise<
+        {
+          id: string;
+          noteId: string;
+          sourceSdUuid: string;
+          targetSdUuid: string;
+          targetFolderId: string | null;
+          state: string;
+          initiatedBy: string;
+          initiatedAt: number;
+          lastModified: number;
+          sourceSdPath: string;
+          targetSdPath: string;
+          error: string | null;
+        }[]
+      >,
+    takeOverMove: (moveId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('recovery:takeOverMove', moveId) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+    cancelMove: (moveId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('recovery:cancelMove', moveId) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+  },
+
   // Menu event listeners
   menu: {
     onNewNote: (callback: () => void): (() => void) => {

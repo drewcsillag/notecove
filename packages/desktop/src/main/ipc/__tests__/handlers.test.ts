@@ -101,6 +101,9 @@ interface MockNoteMoveManager {
   executeMove: jest.Mock;
   recoverIncompleteMoves: jest.Mock;
   cleanupOldMoves: jest.Mock;
+  getStaleMoves: jest.Mock;
+  takeOverMove: jest.Mock;
+  cancelMove: jest.Mock;
 }
 
 describe('IPCHandlers - Folder CRUD', () => {
@@ -170,6 +173,9 @@ describe('IPCHandlers - Folder CRUD', () => {
       executeMove: jest.fn(),
       recoverIncompleteMoves: jest.fn(),
       cleanupOldMoves: jest.fn(),
+      getStaleMoves: jest.fn(),
+      takeOverMove: jest.fn(),
+      cancelMove: jest.fn(),
     };
 
     // Create handlers
@@ -869,6 +875,9 @@ describe('IPCHandlers - SD Management', () => {
       executeMove: jest.fn(),
       recoverIncompleteMoves: jest.fn(),
       cleanupOldMoves: jest.fn(),
+      getStaleMoves: jest.fn(),
+      takeOverMove: jest.fn(),
+      cancelMove: jest.fn(),
     };
 
     // Create handlers
@@ -1567,6 +1576,147 @@ describe('IPCHandlers - SD Management', () => {
           conflictResolution
         )
       ).rejects.toThrow('Note nonexistent not found in source SD');
+    });
+  });
+
+  describe('Recovery Handlers', () => {
+    const mockEvent = {} as any;
+
+    describe('recovery:getStaleMoves', () => {
+      it('should return stale moves from NoteMoveManager', async () => {
+        const staleMoves = [
+          {
+            id: 'move-1',
+            noteId: 'note-1',
+            sourceSdUuid: 'source-uuid',
+            targetSdUuid: 'target-uuid',
+            targetFolderId: null,
+            state: 'copying_files',
+            initiatedBy: 'other-instance',
+            initiatedAt: Date.now() - 600000, // 10 minutes ago
+            lastModified: Date.now() - 600000,
+            sourceSdPath: '/path/to/source',
+            targetSdPath: '/path/to/target',
+            error: null,
+          },
+          {
+            id: 'move-2',
+            noteId: 'note-2',
+            sourceSdUuid: 'source-uuid',
+            targetSdUuid: 'target-uuid',
+            targetFolderId: 'folder-1',
+            state: 'updating_db',
+            initiatedBy: 'crashed-instance',
+            initiatedAt: Date.now() - 900000, // 15 minutes ago
+            lastModified: Date.now() - 900000,
+            sourceSdPath: '/path/to/source',
+            targetSdPath: '/path/to/target',
+            error: 'Operation failed',
+          },
+        ];
+
+        mockNoteMoveManager.getStaleMoves.mockResolvedValue(staleMoves);
+
+        const result = await (handlers as any).handleGetStaleMoves(mockEvent);
+
+        expect(result).toEqual(staleMoves);
+        expect(mockNoteMoveManager.getStaleMoves).toHaveBeenCalled();
+      });
+
+      it('should return empty array when no stale moves', async () => {
+        mockNoteMoveManager.getStaleMoves.mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetStaleMoves(mockEvent);
+
+        expect(result).toEqual([]);
+        expect(mockNoteMoveManager.getStaleMoves).toHaveBeenCalled();
+      });
+    });
+
+    describe('recovery:takeOverMove', () => {
+      it('should successfully take over a stale move', async () => {
+        const moveId = 'move-1';
+        mockNoteMoveManager.takeOverMove.mockResolvedValue({
+          success: true,
+          moveId,
+        });
+
+        const result = await (handlers as any).handleTakeOverMove(mockEvent, moveId);
+
+        expect(result).toEqual({ success: true });
+        expect(mockNoteMoveManager.takeOverMove).toHaveBeenCalledWith(moveId);
+      });
+
+      it('should return error when takeover fails', async () => {
+        const moveId = 'move-1';
+        const errorMessage = 'Cannot access source SD';
+        mockNoteMoveManager.takeOverMove.mockResolvedValue({
+          success: false,
+          moveId,
+          error: errorMessage,
+        });
+
+        const result = await (handlers as any).handleTakeOverMove(mockEvent, moveId);
+
+        expect(result).toEqual({ success: false, error: errorMessage });
+        expect(mockNoteMoveManager.takeOverMove).toHaveBeenCalledWith(moveId);
+      });
+
+      it('should return error when move not found', async () => {
+        const moveId = 'nonexistent';
+        mockNoteMoveManager.takeOverMove.mockResolvedValue({
+          success: false,
+          moveId,
+          error: 'Move record not found',
+        });
+
+        const result = await (handlers as any).handleTakeOverMove(mockEvent, moveId);
+
+        expect(result).toEqual({ success: false, error: 'Move record not found' });
+      });
+    });
+
+    describe('recovery:cancelMove', () => {
+      it('should successfully cancel a move', async () => {
+        const moveId = 'move-1';
+        mockNoteMoveManager.cancelMove.mockResolvedValue({
+          success: true,
+          moveId,
+        });
+
+        const result = await (handlers as any).handleCancelMove(mockEvent, moveId);
+
+        expect(result).toEqual({ success: true });
+        expect(mockNoteMoveManager.cancelMove).toHaveBeenCalledWith(moveId);
+      });
+
+      it('should return error when cancel fails', async () => {
+        const moveId = 'move-1';
+        const errorMessage = 'Move is already completed';
+        mockNoteMoveManager.cancelMove.mockResolvedValue({
+          success: false,
+          moveId,
+          error: errorMessage,
+        });
+
+        const result = await (handlers as any).handleCancelMove(mockEvent, moveId);
+
+        expect(result).toEqual({ success: false, error: errorMessage });
+        expect(mockNoteMoveManager.cancelMove).toHaveBeenCalledWith(moveId);
+      });
+
+      it('should return error when move not found', async () => {
+        const moveId = 'nonexistent';
+        mockNoteMoveManager.cancelMove.mockResolvedValue({
+          success: false,
+          moveId,
+          error: 'Move record not found',
+        });
+
+        const result = await (handlers as any).handleCancelMove(mockEvent, moveId);
+
+        expect(result).toEqual({ success: false, error: 'Move record not found' });
+      });
     });
   });
 });

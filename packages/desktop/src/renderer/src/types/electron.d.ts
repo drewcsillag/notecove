@@ -176,6 +176,27 @@ declare global {
         }) => Promise<void>;
       };
 
+      recovery: {
+        getStaleMoves: () => Promise<
+          {
+            id: string;
+            noteId: string;
+            sourceSdUuid: string;
+            targetSdUuid: string;
+            targetFolderId: string | null;
+            state: string;
+            initiatedBy: string;
+            initiatedAt: number;
+            lastModified: number;
+            sourceSdPath: string;
+            targetSdPath: string;
+            error: string | null;
+          }[]
+        >;
+        takeOverMove: (moveId: string) => Promise<{ success: boolean; error?: string }>;
+        cancelMove: (moveId: string) => Promise<{ success: boolean; error?: string }>;
+      };
+
       menu: {
         onNewNote: (callback: () => void) => () => void;
         onNewFolder: (callback: () => void) => () => void;

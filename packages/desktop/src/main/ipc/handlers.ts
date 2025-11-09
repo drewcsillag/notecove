@@ -150,6 +150,11 @@ export class IPCHandlers {
     ipcMain.handle('telemetry:getSettings', this.handleGetTelemetrySettings.bind(this));
     ipcMain.handle('telemetry:updateSettings', this.handleUpdateTelemetrySettings.bind(this));
 
+    // Recovery operations
+    ipcMain.handle('recovery:getStaleMoves', this.handleGetStaleMoves.bind(this));
+    ipcMain.handle('recovery:takeOverMove', this.handleTakeOverMove.bind(this));
+    ipcMain.handle('recovery:cancelMove', this.handleCancelMove.bind(this));
+
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
       ipcMain.handle('testing:createWindow', this.handleCreateWindow.bind(this));
@@ -1731,6 +1736,9 @@ export class IPCHandlers {
     ipcMain.removeHandler('appState:set');
     ipcMain.removeHandler('config:getDatabasePath');
     ipcMain.removeHandler('config:setDatabasePath');
+    ipcMain.removeHandler('recovery:getStaleMoves');
+    ipcMain.removeHandler('recovery:takeOverMove');
+    ipcMain.removeHandler('recovery:cancelMove');
 
     if (this.createWindowFn) {
       ipcMain.removeHandler('testing:createWindow');
@@ -1782,6 +1790,53 @@ export class IPCHandlers {
     console.log(
       `[Telemetry] Settings updated: remoteMetricsEnabled=${settings.remoteMetricsEnabled}`
     );
+  }
+
+  /**
+   * Recovery: Get all stale moves (incomplete moves older than 5 minutes)
+   */
+  private async handleGetStaleMoves(
+    _event: IpcMainInvokeEvent
+  ): Promise<import('@notecove/shared').NoteMove[]> {
+    return await this.noteMoveManager.getStaleMoves();
+  }
+
+  /**
+   * Recovery: Take over a stuck move from another instance
+   */
+  private async handleTakeOverMove(
+    _event: IpcMainInvokeEvent,
+    moveId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = await this.noteMoveManager.takeOverMove(moveId);
+    if (result.error) {
+      return {
+        success: result.success,
+        error: result.error,
+      };
+    }
+    return {
+      success: result.success,
+    };
+  }
+
+  /**
+   * Recovery: Cancel a stuck move
+   */
+  private async handleCancelMove(
+    _event: IpcMainInvokeEvent,
+    moveId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = await this.noteMoveManager.cancelMove(moveId);
+    if (result.error) {
+      return {
+        success: result.success,
+        error: result.error,
+      };
+    }
+    return {
+      success: result.success,
+    };
   }
 
   // Test-only handlers

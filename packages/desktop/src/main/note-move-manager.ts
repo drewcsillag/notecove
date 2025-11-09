@@ -825,4 +825,166 @@ export class NoteMoveManager {
       );
     }
   }
+
+  /**
+   * Take over a stuck move from another instance
+   * Updates the move to claim ownership and resumes execution
+   */
+  async takeOverMove(moveId: string): Promise<MoveExecutionResult> {
+    const move = await this.getMoveRecord(moveId);
+    if (!move) {
+      return {
+        success: false,
+        moveId,
+        error: 'Move record not found',
+      };
+    }
+
+    // Verify move is not already completed
+    if (move.state === 'completed' || move.state === 'cancelled' || move.state === 'rolled_back') {
+      return {
+        success: false,
+        moveId,
+        error: `Move is already in terminal state: ${move.state}`,
+      };
+    }
+
+    // Check if both SDs are accessible
+    const sourceSd = await this.database.getStorageDirByUuid(move.sourceSdUuid);
+    const targetSd = await this.database.getStorageDirByUuid(move.targetSdUuid);
+
+    if (!sourceSd || !targetSd) {
+      return {
+        success: false,
+        moveId,
+        error: `Cannot access ${!sourceSd ? 'source' : 'target'} SD`,
+      };
+    }
+
+    // Update ownership to current instance
+    const now = Date.now();
+    await this.database.getAdapter().exec(
+      `UPDATE note_moves
+       SET initiated_by = ?, last_modified = ?
+       WHERE id = ?`,
+      [this.instanceId, now, moveId]
+    );
+
+    console.log(
+      `[NoteMoveManager] Took over move ${moveId} from ${move.initiatedBy} to ${this.instanceId}`
+    );
+
+    // Update the move record with new ownership
+    move.initiatedBy = this.instanceId;
+    move.lastModified = now;
+
+    // Update paths to current mounted paths
+    move.sourceSdPath = sourceSd.path;
+    move.targetSdPath = targetSd.path;
+
+    // Resume the move from its current state
+    try {
+      await this.resumeMoveFromState(move);
+      return {
+        success: true,
+        moveId,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[NoteMoveManager] Failed to complete taken-over move ${moveId}:`,
+        errorMessage
+      );
+      await this.rollback(move, `Takeover failed: ${errorMessage}`);
+      return {
+        success: false,
+        moveId,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Cancel a stuck move
+   * Rolls back the move and marks it as cancelled
+   */
+  async cancelMove(moveId: string): Promise<MoveExecutionResult> {
+    const move = await this.getMoveRecord(moveId);
+    if (!move) {
+      return {
+        success: false,
+        moveId,
+        error: 'Move record not found',
+      };
+    }
+
+    // Verify move is not already completed
+    if (move.state === 'completed' || move.state === 'cancelled' || move.state === 'rolled_back') {
+      return {
+        success: false,
+        moveId,
+        error: `Move is already in terminal state: ${move.state}`,
+      };
+    }
+
+    console.log(`[NoteMoveManager] Cancelling move ${moveId}`);
+
+    try {
+      // Get SD info for rollback if needed
+      const sourceSd = await this.database.getStorageDirByUuid(move.sourceSdUuid);
+      const targetSd = await this.database.getStorageDirByUuid(move.targetSdUuid);
+
+      if (sourceSd && targetSd) {
+        move.sourceSdPath = sourceSd.path;
+        move.targetSdPath = targetSd.path;
+      }
+
+      // Rollback using 'cancelled' state instead of 'rolled_back'
+      await this.cleanupFailedMove(move);
+      await this.updateMoveState(moveId, 'cancelled', 'User cancelled');
+
+      return {
+        success: true,
+        moveId,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[NoteMoveManager] Failed to cancel move ${moveId}:`, errorMessage);
+      return {
+        success: false,
+        moveId,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Cleanup a failed move (similar to rollback but without updating state)
+   */
+  private async cleanupFailedMove(move: NoteMove): Promise<void> {
+    // Clean up temporary directory if it exists
+    if (move.targetSdPath) {
+      const tempPath = this.getTempDirPath(move.targetSdPath, move.noteId);
+      if (fs.existsSync(tempPath)) {
+        await fs.promises.rm(tempPath, { recursive: true, force: true });
+        console.log(`[NoteMoveManager] Removed temp directory ${tempPath}`);
+      }
+    }
+
+    // If database was updated, revert it
+    const note = await this.database.getNote(move.noteId);
+    if (note) {
+      const targetSd = await this.database.getStorageDirByUuid(move.targetSdUuid);
+      if (targetSd && note.sdId === targetSd.id) {
+        // Note is in target SD - need to move it back to source
+        const sourceSd = await this.database.getStorageDirByUuid(move.sourceSdUuid);
+        if (sourceSd) {
+          await this.database
+            .getAdapter()
+            .exec('UPDATE notes SET sd_id = ? WHERE id = ?', [sourceSd.id, move.noteId]);
+          console.log(`[NoteMoveManager] Reverted note ${move.noteId} to source SD`);
+        }
+      }
+    }
+  }
 }

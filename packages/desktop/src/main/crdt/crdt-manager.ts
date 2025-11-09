@@ -222,7 +222,11 @@ export class CRDTManagerImpl implements CRDTManager {
         );
 
         for (const update of updates) {
-          Y.applyUpdate(doc, update);
+          try {
+            Y.applyUpdate(doc, update);
+          } catch (error) {
+            console.error(`[CRDT Manager] Failed to apply update, skipping:`, error);
+          }
         }
       }
     } catch (error) {
@@ -447,7 +451,11 @@ export class CRDTManagerImpl implements CRDTManager {
 
       // Apply all updates with 'load' origin to prevent triggering persistence
       for (const update of updates) {
-        Y.applyUpdate(folderTree.doc, update, 'load');
+        try {
+          Y.applyUpdate(folderTree.doc, update, 'load');
+        } catch (error) {
+          console.error(`[CRDT Manager] Failed to apply folder tree update, skipping:`, error);
+        }
       }
 
       // If no updates were found (new installation), create demo folders
