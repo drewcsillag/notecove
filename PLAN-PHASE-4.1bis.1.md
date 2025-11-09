@@ -213,7 +213,7 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 
 ## Phase 4.1bis.1.3: Advanced Recovery + Backup/Restore
 
-**Progress:** `80%` (12/15 tasks complete) 🟡
+**Progress:** `93%` (14/15 tasks complete) 🟡
 
 ### 1. Advanced Diagnostics
 
@@ -275,11 +275,11 @@ Implement a robust state machine-based system for cross-SD note moves that handl
 
 ### 4. Testing
 
-- [ ] 🟥 **Write unit tests**
-  - [ ] 🟥 Test duplicate detection logic
-  - [ ] 🟥 Test orphaned file detection
-  - [ ] 🟥 Test backup creation and format
-  - [ ] 🟥 Test restore process
+- [x] ✅ **Write unit tests** (Commit: 67a6f08)
+  - [x] ✅ Test duplicate detection logic (diagnostics-manager.test.ts: 5 tests)
+  - [x] ✅ Test orphaned file detection (diagnostics-manager.test.ts: 3 tests)
+  - [x] ✅ Test backup creation and format (backup-manager.test.ts: 10 tests)
+  - [x] ✅ Test restore process (backup-manager.test.ts: 3 tests)
 
 - [ ] 🟥 **Integration tests**
   - [ ] 🟥 Test end-to-end backup and restore
