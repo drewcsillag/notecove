@@ -18,6 +18,7 @@ import type { Database, NoteCache, UpdateManager } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags } from '@notecove/shared';
 import { getTelemetryManager } from '../telemetry/config';
+import type { NoteMoveManager } from '../note-move-manager';
 
 export class IPCHandlers {
   constructor(
@@ -25,6 +26,7 @@ export class IPCHandlers {
     private database: Database,
     private configManager: ConfigManager,
     private updateManager: UpdateManager,
+    private noteMoveManager: NoteMoveManager,
     private createWindowFn?: () => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
   ) {
@@ -761,6 +763,7 @@ export class IPCHandlers {
   /**
    * Move note to different Storage Directory (cross-SD move)
    * Phase 2.5.7.4: Cross-SD Drag & Drop
+   * Phase 4.1bis.1.1: State machine for atomic moves with crash recovery
    */
   private async handleMoveNoteToSD(
     _event: IpcMainInvokeEvent,
@@ -787,15 +790,85 @@ export class IPCHandlers {
       throw new Error('Note already exists in target SD');
     }
 
-    // Determine which ID to use for the new note
-    // IMPORTANT: Preserve the same UUID when moving across SDs
-    // This ensures the note maintains its identity across SDs
-    let targetNoteId: string = noteId;
-
-    // Exception: If there's a conflict and resolution is 'keepBoth', generate a new UUID
+    // Handle 'keepBoth' conflict resolution using old code path
+    // TODO: Extend NoteMoveManager to support keepBoth (generating new UUID for target)
     if (hasConflict && conflictResolution === 'keepBoth') {
-      targetNoteId = crypto.randomUUID();
+      return this.handleMoveNoteToSD_Legacy(
+        noteId,
+        sourceSdId,
+        targetSdId,
+        targetFolderId,
+        sourceNote
+      );
     }
+
+    // Handle 'replace' conflict resolution by deleting existing note first
+    if (hasConflict && conflictResolution === 'replace') {
+      // Delete the existing note from target SD
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      await (this.database as any).adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
+        noteId,
+        targetSdId,
+      ]);
+      console.log('[IPC] Deleted existing note from target SD for replace:', {
+        noteId,
+        targetSdId,
+      });
+    }
+
+    // Use NoteMoveManager state machine for atomic move with crash recovery
+    // Get SD information including UUIDs
+    const sourceSD = await this.database.getStorageDir(sourceSdId);
+    const targetSD = await this.database.getStorageDir(targetSdId);
+
+    if (!sourceSD?.uuid) {
+      throw new Error(`Source SD ${sourceSdId} not found or missing UUID`);
+    }
+    if (!targetSD?.uuid) {
+      throw new Error(`Target SD ${targetSdId} not found or missing UUID`);
+    }
+
+    // Initiate the move using state machine
+    const moveId = await this.noteMoveManager.initiateMove({
+      noteId,
+      sourceSdUuid: sourceSD.uuid,
+      targetSdUuid: targetSD.uuid,
+      targetFolderId,
+      sourceSdPath: sourceSD.path,
+      targetSdPath: targetSD.path,
+      instanceId: '', // Will be filled by NoteMoveManager
+    });
+
+    // Execute the move atomically
+    const result = await this.noteMoveManager.executeMove(moveId);
+
+    if (!result.success) {
+      throw new Error(result.error ?? 'Move failed');
+    }
+
+    // Broadcast consistent events for cross-SD moves
+    // Use note:deleted for the source and note:created for the target
+    this.broadcastToAll('note:deleted', noteId);
+    this.broadcastToAll('note:created', {
+      sdId: targetSdId,
+      noteId: noteId,
+      folderId: targetFolderId,
+    });
+  }
+
+  /**
+   * Legacy cross-SD move implementation for 'keepBoth' conflict resolution
+   * TODO: Extend NoteMoveManager to support this case
+   */
+  private async handleMoveNoteToSD_Legacy(
+    noteId: string,
+    sourceSdId: string,
+    targetSdId: string,
+    targetFolderId: string | null,
+    sourceNote: import('@notecove/shared').NoteCache
+  ): Promise<void> {
+    // Generate new UUID for the target note (keepBoth)
+    const targetNoteId: string = crypto.randomUUID();
 
     // Copy CRDT files from source SD to target SD
     await this.copyNoteCRDTFiles(noteId, sourceSdId, targetNoteId, targetSdId);
@@ -826,20 +899,8 @@ export class IPCHandlers {
         title: sourceNote.title,
       });
 
-      // Permanently delete original note from source SD
-      // deleteNote() deletes from ALL SDs, so only call it if the note IDs are different
-      // If they're the same, the note now exists in target SD, so we just delete the source SD entry
-      if (targetNoteId !== noteId) {
-        await this.database.deleteNote(noteId);
-      } else {
-        // Same ID: delete only from source SD (UUID is preserved)
-        // We access adapter directly for SD-specific deletion
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-        await (this.database as any).adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
-          noteId,
-          sourceSdId,
-        ]);
-      }
+      // Delete original note from source SD
+      await this.database.deleteNote(noteId);
       console.log('[IPC] Permanently deleted note from source SD:', {
         noteId,
         sourceSdId,
@@ -853,23 +914,6 @@ export class IPCHandlers {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       await (this.database as any).adapter.exec('ROLLBACK');
       throw err;
-    }
-
-    // After transaction commits successfully, delete CRDT files from source SD
-    // This prevents duplicate rows from being recreated if the app scans CRDT files on startup
-    if (targetNoteId === noteId) {
-      // Same ID: delete source CRDT files
-      try {
-        const sourceSD = await this.database.getStorageDir(sourceSdId);
-        if (sourceSD) {
-          const sourceNoteDir = path.join(sourceSD.path, 'notes', noteId);
-          await fs.rm(sourceNoteDir, { recursive: true, force: true });
-          console.log('[IPC] Deleted source CRDT files:', sourceNoteDir);
-        }
-      } catch (err) {
-        console.warn('[IPC] Failed to delete source CRDT files:', err);
-        // Don't throw - the database is already consistent, file cleanup failure is not critical
-      }
     }
 
     // Broadcast consistent events for cross-SD moves

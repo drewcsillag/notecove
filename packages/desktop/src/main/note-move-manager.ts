@@ -98,11 +98,7 @@ export class NoteMoveManager {
   /**
    * Update move state with validation
    */
-  async updateMoveState(
-    moveId: string,
-    newState: NoteMoveState,
-    error?: string
-  ): Promise<void> {
+  async updateMoveState(moveId: string, newState: NoteMoveState, error?: string): Promise<void> {
     const move = await this.getMoveRecord(moveId);
     if (!move) {
       throw new Error(`Move record not found: ${moveId}`);
@@ -110,9 +106,7 @@ export class NoteMoveManager {
 
     // Validate state transition
     if (!this.isValidTransition(move.state, newState)) {
-      throw new Error(
-        `Invalid state transition for move ${moveId}: ${move.state} -> ${newState}`
-      );
+      throw new Error(`Invalid state transition for move ${moveId}: ${move.state} -> ${newState}`);
     }
 
     const now = Date.now();
@@ -121,7 +115,7 @@ export class NoteMoveManager {
       `UPDATE note_moves
        SET state = ?, last_modified = ?, error = ?
        WHERE id = ?`,
-      [newState, now, error || null, moveId]
+      [newState, now, error ?? null, moveId]
     );
 
     console.log(
@@ -296,7 +290,7 @@ export class NoteMoveManager {
       [thirtyDaysAgo]
     );
 
-    const deletedCount = countResult?.count || 0;
+    const deletedCount = countResult?.count ?? 0;
 
     if (deletedCount > 0) {
       // Actually delete them
@@ -356,9 +350,7 @@ export class NoteMoveManager {
    * Recover a single incomplete move
    */
   private async recoverMove(move: NoteMove): Promise<void> {
-    console.log(
-      `[NoteMoveManager] Recovering move ${move.id} from state: ${move.state}`
-    );
+    console.log(`[NoteMoveManager] Recovering move ${move.id} from state: ${move.state}`);
 
     // Check if both SDs are accessible
     const sourceSd = await this.database.getStorageDirByUuid(move.sourceSdUuid);
@@ -382,10 +374,7 @@ export class NoteMoveManager {
       await this.resumeMoveFromState(move);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(
-        `[NoteMoveManager] Failed to recover move ${move.id}:`,
-        errorMessage
-      );
+      console.error(`[NoteMoveManager] Failed to recover move ${move.id}:`, errorMessage);
 
       // Try to rollback
       await this.rollback(move, `Recovery failed: ${errorMessage}`);
@@ -432,7 +421,7 @@ export class NoteMoveManager {
         await this.updateMoveState(move.id, 'completed');
         break;
 
-      case 'db_updated':
+      case 'db_updated': {
         // Verify DB state and continue with file finalization
         console.log(`[NoteMoveManager] Resuming move ${move.id} from db_updated state`);
         const note = await this.database.getNote(move.noteId);
@@ -447,6 +436,7 @@ export class NoteMoveManager {
         await this.cleanupSource(move);
         await this.updateMoveState(move.id, 'completed');
         break;
+      }
 
       case 'cleaning':
         // Retry file operations
@@ -601,31 +591,77 @@ export class NoteMoveManager {
       throw new Error(`Note ${move.noteId} not found in database`);
     }
 
-    // Get target SD info
+    // Get source and target SD info
+    const sourceSd = await this.database.getStorageDirByUuid(move.sourceSdUuid);
+    if (!sourceSd) {
+      throw new Error(`Source SD ${move.sourceSdUuid} not found`);
+    }
+
     const targetSd = await this.database.getStorageDirByUuid(move.targetSdUuid);
     if (!targetSd) {
       throw new Error(`Target SD ${move.targetSdUuid} not found`);
     }
 
     // Begin transaction
+    // CRITICAL: Since id is PRIMARY KEY (globally unique), we must DELETE before INSERT
+    // to avoid UNIQUE constraint violations during cross-SD moves
     await this.database.transaction(async () => {
-      // Insert note into target SD
-      await this.database.getAdapter().exec(
-        `INSERT INTO notes (id, sd_id, folder_id, title, created, modified, deleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          note.id,
-          targetSd.id,
-          move.targetFolderId,
-          note.title,
-          note.created,
-          note.modified,
-          note.deleted,
-        ]
-      );
+      // Delete note from source SD first
+      // This frees up the id for insertion into target SD
+      await this.database
+        .getAdapter()
+        .exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [move.noteId, sourceSd.id]);
 
-      // Delete note from source SD
-      await this.database.getAdapter().exec('DELETE FROM notes WHERE id = ?', [move.noteId]);
+      console.log(`[NoteMoveManager] Deleted note ${move.noteId} from source SD ${sourceSd.id}`);
+
+      // Now insert into target SD (or update if it somehow already exists from previous failed attempt)
+      const existingInTarget = await this.database
+        .getAdapter()
+        .get('SELECT id FROM notes WHERE id = ? AND sd_id = ?', [note.id, targetSd.id]);
+
+      if (existingInTarget) {
+        // Note already exists in target - this is a recovery scenario
+        // Update it instead of inserting
+        console.log(
+          `[NoteMoveManager] Note ${note.id} already exists in target SD ${targetSd.id}, updating instead`
+        );
+        await this.database.getAdapter().exec(
+          `UPDATE notes
+           SET title = ?, folder_id = ?, modified = ?, deleted = ?, pinned = ?, content_preview = ?, content_text = ?
+           WHERE id = ? AND sd_id = ?`,
+          [
+            note.title,
+            move.targetFolderId,
+            note.modified,
+            note.deleted ? 1 : 0,
+            note.pinned ? 1 : 0,
+            note.contentPreview,
+            note.contentText,
+            note.id,
+            targetSd.id,
+          ]
+        );
+      } else {
+        // Insert note into target SD
+        await this.database.getAdapter().exec(
+          `INSERT INTO notes (id, title, sd_id, folder_id, created, modified, deleted, pinned, content_preview, content_text)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            note.id,
+            note.title,
+            targetSd.id,
+            move.targetFolderId,
+            note.created,
+            note.modified,
+            note.deleted ? 1 : 0,
+            note.pinned ? 1 : 0,
+            note.contentPreview,
+            note.contentText,
+          ]
+        );
+      }
+
+      console.log(`[NoteMoveManager] Inserted note ${move.noteId} into target SD ${targetSd.id}`);
     });
 
     await this.updateMoveState(move.id, 'db_updated');
@@ -695,10 +731,9 @@ export class NoteMoveManager {
           // Note is in target SD - need to move it back to source
           const sourceSd = await this.database.getStorageDirByUuid(move.sourceSdUuid);
           if (sourceSd) {
-            await this.database.getAdapter().exec(
-              'UPDATE notes SET sd_id = ? WHERE id = ?',
-              [sourceSd.id, move.noteId]
-            );
+            await this.database
+              .getAdapter()
+              .exec('UPDATE notes SET sd_id = ? WHERE id = ?', [sourceSd.id, move.noteId]);
             console.log(`[NoteMoveManager] Reverted note ${move.noteId} to source SD`);
           }
         }
@@ -707,15 +742,12 @@ export class NoteMoveManager {
       // Mark as rolled back
       await this.updateMoveState(move.id, 'rolled_back', error);
     } catch (rollbackError) {
-      console.error(
-        `[NoteMoveManager] Rollback failed for move ${move.id}:`,
-        rollbackError
-      );
+      console.error(`[NoteMoveManager] Rollback failed for move ${move.id}:`, rollbackError);
       // Still try to mark as rolled back with both errors
       await this.updateMoveState(
         move.id,
         'rolled_back',
-        `${error} | Rollback error: ${rollbackError}`
+        `${error} | Rollback error: ${String(rollbackError)}`
       );
     }
   }

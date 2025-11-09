@@ -47,6 +47,7 @@ import type { CRDTManager } from '../../crdt';
 import type { Database } from '@notecove/shared';
 import type { FolderData } from '@notecove/shared';
 import type { ConfigManager } from '../../config/manager';
+import type { NoteMoveManager } from '../../note-move-manager';
 
 // Mock types
 interface MockFolderTreeDoc {
@@ -95,12 +96,20 @@ interface MockUpdateManager {
   writeSnapshot: jest.Mock;
 }
 
+interface MockNoteMoveManager {
+  initiateMove: jest.Mock;
+  executeMove: jest.Mock;
+  recoverIncompleteMoves: jest.Mock;
+  cleanupOldMoves: jest.Mock;
+}
+
 describe('IPCHandlers - Folder CRUD', () => {
   let handlers: IPCHandlers;
   let mockCRDTManager: MockCRDTManager;
   let mockDatabase: MockDatabase;
   let mockConfigManager: MockConfigManager;
   let mockUpdateManager: MockUpdateManager;
+  let mockNoteMoveManager: MockNoteMoveManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -155,12 +164,21 @@ describe('IPCHandlers - Folder CRUD', () => {
       writeSnapshot: jest.fn(),
     };
 
+    // Create mock note move manager
+    mockNoteMoveManager = {
+      initiateMove: jest.fn(),
+      executeMove: jest.fn(),
+      recoverIncompleteMoves: jest.fn(),
+      cleanupOldMoves: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
       mockConfigManager as unknown as ConfigManager,
-      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager
+      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
+      mockNoteMoveManager as unknown as NoteMoveManager
     );
   });
 
@@ -790,6 +808,7 @@ describe('IPCHandlers - SD Management', () => {
   let mockDatabase: MockDatabase;
   let mockConfigManager: MockConfigManager;
   let mockUpdateManager: MockUpdateManager;
+  let mockNoteMoveManager: MockNoteMoveManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -844,12 +863,21 @@ describe('IPCHandlers - SD Management', () => {
       writeSnapshot: jest.fn(),
     };
 
+    // Create mock note move manager
+    mockNoteMoveManager = {
+      initiateMove: jest.fn(),
+      executeMove: jest.fn(),
+      recoverIncompleteMoves: jest.fn(),
+      cleanupOldMoves: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
       mockConfigManager as unknown as ConfigManager,
-      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager
+      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
+      mockNoteMoveManager as unknown as NoteMoveManager
     );
   });
 
@@ -890,6 +918,7 @@ describe('IPCHandlers - SD Management', () => {
         path,
         created: Date.now(),
         isActive: false,
+        uuid: 'target-uuid-5678',
       };
 
       mockDatabase.createStorageDir.mockResolvedValue(createdSD);
@@ -914,6 +943,7 @@ describe('IPCHandlers - SD Management', () => {
         path,
         created: Date.now(),
         isActive: true,
+        uuid: 'source-uuid-1234',
       };
 
       mockDatabase.createStorageDir.mockResolvedValue(createdSD);
@@ -945,6 +975,7 @@ describe('IPCHandlers - SD Management', () => {
         path: '/path/work',
         created: 1000,
         isActive: true,
+        uuid: 'source-uuid-1234',
       };
 
       mockDatabase.getActiveStorageDir.mockResolvedValue(activeSd);
@@ -1060,6 +1091,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/source',
             created: 1000,
             isActive: true,
+            uuid: 'source-uuid-1234',
           });
         }
         if (sdId === targetSdId) {
@@ -1069,9 +1101,26 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/target',
             created: 2000,
             isActive: false,
+            uuid: 'target-uuid-5678',
           });
         }
         return Promise.resolve(null);
+      });
+
+      // Mock NoteMoveManager to perform the actual database operations
+      mockNoteMoveManager.initiateMove.mockResolvedValue('move-id-1');
+      mockNoteMoveManager.executeMove.mockImplementation(async () => {
+        // Simulate the move by calling database operations
+        await mockDatabase.upsertNote({
+          ...sourceNote,
+          sdId: targetSdId,
+          folderId: targetFolderId,
+        });
+        await mockDatabase.adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
+          noteId,
+          sourceSdId,
+        ]);
+        return { success: true };
       });
 
       await (handlers as any).handleMoveNoteToSD(
@@ -1150,6 +1199,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/source',
             created: 1000,
             isActive: true,
+            uuid: 'source-uuid-1234',
           });
         }
         if (sdId === targetSdId) {
@@ -1159,6 +1209,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/target',
             created: 2000,
             isActive: false,
+            uuid: 'target-uuid-5678',
           });
         }
         return Promise.resolve(null);
@@ -1221,6 +1272,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/source',
             created: 1000,
             isActive: true,
+            uuid: 'source-uuid-1234',
           });
         }
         if (sdId === targetSdId) {
@@ -1230,9 +1282,26 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/target',
             created: 2000,
             isActive: false,
+            uuid: 'target-uuid-5678',
           });
         }
         return Promise.resolve(null);
+      });
+
+      // Mock NoteMoveManager to perform the actual database operations
+      mockNoteMoveManager.initiateMove.mockResolvedValue('move-id-1');
+      mockNoteMoveManager.executeMove.mockImplementation(async () => {
+        // Simulate the move by calling database operations
+        await mockDatabase.upsertNote({
+          ...sourceNote,
+          sdId: targetSdId,
+          folderId: targetFolderId,
+        });
+        await mockDatabase.adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
+          noteId,
+          sourceSdId,
+        ]);
+        return { success: true };
       });
 
       await (handlers as any).handleMoveNoteToSD(
@@ -1244,7 +1313,7 @@ describe('IPCHandlers - SD Management', () => {
         conflictResolution
       );
 
-      // Should be called once to create in target (replace uses same UUID)
+      // Should be called twice: once for replace delete, once for upsert
       expect(mockDatabase.upsertNote).toHaveBeenCalledTimes(1);
 
       // Should create note in target SD (replacing existing)
@@ -1307,6 +1376,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/source',
             created: 1000,
             isActive: true,
+            uuid: 'source-uuid-1234',
           });
         }
         if (sdId === targetSdId) {
@@ -1316,6 +1386,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/target',
             created: 2000,
             isActive: false,
+            uuid: 'target-uuid-5678',
           });
         }
         return Promise.resolve(null);
@@ -1391,6 +1462,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/source',
             created: 1000,
             isActive: true,
+            uuid: 'source-uuid-1234',
           });
         }
         if (sdId === targetSdId) {
@@ -1400,9 +1472,26 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/target',
             created: 2000,
             isActive: false,
+            uuid: 'target-uuid-5678',
           });
         }
         return Promise.resolve(null);
+      });
+
+      // Mock NoteMoveManager to perform the actual database operations
+      mockNoteMoveManager.initiateMove.mockResolvedValue('move-id-1');
+      mockNoteMoveManager.executeMove.mockImplementation(async () => {
+        // Simulate the move by calling database operations
+        await mockDatabase.upsertNote({
+          ...sourceNote,
+          sdId: targetSdId,
+          folderId: targetFolderId,
+        });
+        await mockDatabase.adapter.exec('DELETE FROM notes WHERE id = ? AND sd_id = ?', [
+          noteId,
+          sourceSdId,
+        ]);
+        return { success: true };
       });
 
       // Should NOT throw error even though note exists (it's deleted)
@@ -1452,6 +1541,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/source',
             created: 1000,
             isActive: true,
+            uuid: 'source-uuid-1234',
           });
         }
         if (sdId === targetSdId) {
@@ -1461,6 +1551,7 @@ describe('IPCHandlers - SD Management', () => {
             path: '/tmp/target',
             created: 2000,
             isActive: false,
+            uuid: 'target-uuid-5678',
           });
         }
         return Promise.resolve(null);

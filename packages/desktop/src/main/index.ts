@@ -26,6 +26,7 @@ import * as Y from 'yjs';
 import { ConfigManager } from './config/manager';
 import { initializeTelemetry } from './telemetry/config';
 import { compress, decompress } from './utils/compression';
+import { NoteMoveManager } from './note-move-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
@@ -34,6 +35,7 @@ let ipcHandlers: IPCHandlers | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
 let updateManager: UpdateManager | null = null;
 let crdtManager: CRDTManager | null = null;
+let noteMoveManager: NoteMoveManager | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -1046,6 +1048,10 @@ void app.whenReady().then(async () => {
       }
     };
 
+    // Initialize NoteMoveManager for atomic cross-SD moves
+    noteMoveManager = new NoteMoveManager(database, instanceId);
+    console.log('[Init] NoteMoveManager initialized');
+
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)
     if (!configManager) {
       throw new Error('ConfigManager not initialized');
@@ -1055,6 +1061,7 @@ void app.whenReady().then(async () => {
       database,
       configManager,
       updateManager,
+      noteMoveManager,
       createWindow,
       handleNewStorageDir
     );
@@ -1105,6 +1112,12 @@ void app.whenReady().then(async () => {
         `${new Date().toISOString()} [Init] Auto-cleanup completed\n`
       );
     }
+
+    // Recover incomplete cross-SD note moves
+    console.log('[Init] Checking for incomplete note moves...');
+    await noteMoveManager.recoverIncompleteMoves();
+    await noteMoveManager.cleanupOldMoves();
+    console.log('[Init] Note move recovery completed');
 
     // Set up watchers for all other registered SDs (only if fully initialized)
     for (const sd of allSDs) {
