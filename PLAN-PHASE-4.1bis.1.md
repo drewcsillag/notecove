@@ -281,7 +281,7 @@ Implement a robust state machine-based system for cross-SD note moves that handl
   - [x] ✅ Test backup creation and format (backup-manager.test.ts: 10 tests)
   - [x] ✅ Test restore process (backup-manager.test.ts: 3 tests)
 
-- [x] ✅ **Integration tests** (Commit: TBD)
+- [x] ✅ **Integration tests** (Commit: b65a26d)
   - [x] ✅ Test diagnostics IPC handlers (12 tests)
   - [x] ✅ Test backup IPC handlers (12 tests)
   - [x] ✅ Test end-to-end operations via mocked managers
