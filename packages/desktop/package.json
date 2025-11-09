@@ -19,13 +19,13 @@
     "pretest": "pnpm rebuild:node",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "pretest:e2e": "npx @electron/rebuild -f -w better-sqlite3 && npx @electron/rebuild -f -w @mongodb-js/zstd",
+    "pretest:e2e": "pnpm exec electron-rebuild -f -w better-sqlite3 && pnpm exec electron-rebuild -f -w @mongodb-js/zstd",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "rebuild": "npx @electron/rebuild",
     "rebuild:node": "cd ../../node_modules/.pnpm/better-sqlite3@12.4.1/node_modules/better-sqlite3 && npm run build-release",
-    "rebuild:electron": "npx @electron/rebuild -f -w better-sqlite3 && npx @electron/rebuild -f -w @mongodb-js/zstd",
+    "rebuild:electron": "pnpm exec electron-rebuild -f -w better-sqlite3 && pnpm exec electron-rebuild -f -w @mongodb-js/zstd",
     "migrate:flag-byte": "tsx src/main/storage/migrate-flag-byte.ts"
   },
   "dependencies": {
@@ -71,8 +71,8 @@
     "@types/jest": "^29.5.11",
     "@types/react": "^18.2.46",
     "@types/react-dom": "^18.2.18",
-    "@typescript-eslint/eslint-plugin": "^6.18.0",
-    "@typescript-eslint/parser": "^6.18.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
     "@vitejs/plugin-react": "^4.2.1",
     "electron": "^38.4.0",
     "electron-builder": "^26.0.12",
@@ -85,7 +85,7 @@
     "playwright": "^1.56.1",
     "ts-jest": "^29.1.1",
     "tsx": "^4.20.6",
-    "typescript": "^5.3.3",
+    "typescript": "^5.9.3",
     "vite": "^5.0.10"
   }
 }

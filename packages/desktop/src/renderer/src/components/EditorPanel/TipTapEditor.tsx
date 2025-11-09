@@ -94,7 +94,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           let text = '';
           editor.state.doc.descendants((node) => {
             if (node.isText) {
-              text += node.text;
+              text += node.text ?? '';
             } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
               // Add space between blocks to preserve word boundaries
               text += ' ';
@@ -139,7 +139,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           let text = '';
           editor.state.doc.descendants((node) => {
             if (node.isText) {
-              text += node.text;
+              text += node.text ?? '';
             } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
               text += ' ';
             }
@@ -165,7 +165,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           let text = '';
           editor.state.doc.descendants((node) => {
             if (node.isText) {
-              text += node.text;
+              text += node.text ?? '';
             } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
               text += ' ';
             }

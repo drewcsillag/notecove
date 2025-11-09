@@ -68,7 +68,7 @@ export class ActivityLogger {
       const newText = existingText + line + '\n';
       const newData = new TextEncoder().encode(newText);
       await this.fs.writeFile(this.activityLogPath, newData);
-    } catch (error) {
+    } catch {
       // File doesn't exist, create it
       const newData = new TextEncoder().encode(line + '\n');
       await this.fs.writeFile(this.activityLogPath, newData);
@@ -98,7 +98,7 @@ export class ActivityLogger {
       const newContent = lines.join('\n') + '\n';
       const newData = new TextEncoder().encode(newContent);
       await this.fs.writeFile(this.activityLogPath, newData);
-    } catch (error) {
+    } catch {
       // File might not exist yet, create it
       await this.appendLine(newLine);
     }

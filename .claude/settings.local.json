@@ -159,7 +159,12 @@
       "Bash(env NODE_ENV=test timeout 120 npx tsx:*)",
       "Bash(pnpm format:write:*)",
       "Bash(xxd:*)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "Bash(../../node_modules/.bin/eslint:*)",
+      "Bash(timeout 600 pnpm ci-local:*)",
+      "Bash(pnpm exec playwright test:*)",
+      "Bash(pnpm update:*)",
+      "Bash(pnpm --filter @notecove/shared update:*)"
     ],
     "deny": [],
     "ask": []

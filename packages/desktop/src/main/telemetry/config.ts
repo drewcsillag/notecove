@@ -186,9 +186,7 @@ let globalTelemetryManager: TelemetryManager | null = null;
  * Get global telemetry manager instance
  */
 export function getTelemetryManager(): TelemetryManager {
-  if (!globalTelemetryManager) {
-    globalTelemetryManager = new TelemetryManager();
-  }
+  globalTelemetryManager ??= new TelemetryManager();
   return globalTelemetryManager;
 }
 

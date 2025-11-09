@@ -369,14 +369,14 @@ export class IPCHandlers {
           // Simple text extraction from Y.XmlFragment
           content.forEach((item) => {
             if (item instanceof Y.XmlText) {
-              contentText += item.toString() + '\n';
+              contentText += String(item.toString()) + '\n';
             } else if (item instanceof Y.XmlElement) {
               // Recursively extract text from elements
               const extractText = (elem: Y.XmlElement): string => {
                 let text = '';
                 elem.forEach((child) => {
                   if (child instanceof Y.XmlText) {
-                    text += child.toString();
+                    text += String(child.toString());
                   } else if (child instanceof Y.XmlElement) {
                     text += extractText(child);
                   }
@@ -827,7 +827,7 @@ export class IPCHandlers {
   ): Promise<void> {
     // Get source note from cache
     const sourceNote = await this.database.getNote(noteId);
-    if (!sourceNote || sourceNote.sdId !== sourceSdId) {
+    if (sourceNote?.sdId !== sourceSdId) {
       throw new Error(`Note ${noteId} not found in source SD ${sourceSdId}`);
     }
 
@@ -1104,7 +1104,7 @@ export class IPCHandlers {
     const note = await this.database.getNote(noteId);
 
     // If note doesn't exist at all, or exists in a different SD
-    if (!note || note.sdId !== targetSdId) {
+    if (note?.sdId !== targetSdId) {
       return { exists: false, isDeleted: false };
     }
 

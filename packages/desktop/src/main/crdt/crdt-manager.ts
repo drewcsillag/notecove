@@ -48,10 +48,7 @@ export class CRDTManagerImpl implements CRDTManager {
     const loadStartTime = Date.now();
 
     // If sdId not provided, try to determine it from existing updates
-    let noteSdId = sdId;
-    if (!noteSdId) {
-      noteSdId = await this.getNoteSdId(noteId);
-    }
+    const noteSdId = sdId ?? (await this.getNoteSdId(noteId));
 
     // Create new Yjs document
     const noteDoc = new NoteDoc(noteId);

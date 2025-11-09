@@ -844,7 +844,7 @@ export class UpdateManager {
 
       // Load it to get the vector clock
       return await this.readSnapshot(sdId, noteId, oldestKept.filename);
-    } catch (error) {
+    } catch {
       return null;
     }
   }

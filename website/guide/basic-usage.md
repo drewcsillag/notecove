@@ -54,13 +54,24 @@ console.log('Hello, NoteCove!')
 
 ### Tags
 
-(Coming soon)
+Add hashtags to notes for flexible organization:
 
-Add tags to notes for flexible organization:
+- Type `#tagname` anywhere in your note (must start with a letter)
+- Tags automatically appear in the Tag Panel on the left sidebar
+- Tags show note counts for easy browsing
 
-- Click the tag icon in the note toolbar
-- Type a tag name and press Enter
-- Tags appear in the sidebar for quick filtering
+**Autocomplete**: When you type `#`, existing tags appear in a dropdown menu. Use arrow keys to navigate and press Enter to insert.
+
+**Filtering Notes by Tags**:
+- Click a tag pill in the Tag Panel to filter notes
+- Tags have three states that cycle when clicked:
+  - **Gray (neutral)**: Tag is not filtering
+  - **Blue (include)**: Show only notes WITH this tag
+  - **Red (exclude)**: Show only notes WITHOUT this tag
+- Multiple tag filters use AND logic: notes must match all include tags and have none of the exclude tags
+- Click the "Clear" button to remove all tag filters
+
+**Resizable Panel**: Drag the divider between the Folder Panel and Tag Panel to adjust their size.
 
 ## Search
 

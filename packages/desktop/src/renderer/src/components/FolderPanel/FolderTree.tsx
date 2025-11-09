@@ -1090,7 +1090,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
                 <ListItemButton
                   data-testid={`folder-tree-node-${node.id}`}
                   data-active-sd={belongsToActiveSD ? 'true' : undefined}
-                  aria-label={String(node.text)}
+                  aria-label={node.text}
                   sx={{
                     pl: depth * 2,
                     backgroundColor: isDropTarget

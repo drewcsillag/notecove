@@ -18,6 +18,11 @@
   "plugins": ["@typescript-eslint", "react", "react-hooks"],
   "rules": {
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/restrict-template-expressions": [
+      "error",
+      { "allowNumber": true, "allowNullish": true }
+    ],
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": "off",
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off"
   },

@@ -27,6 +27,7 @@ export default defineConfig({
           text: 'Advanced',
           items: [
             { text: 'Sync Configuration', link: '/guide/sync-configuration' },
+            { text: 'Backup & Recovery', link: '/guide/backup-recovery' },
             { text: 'Keyboard Shortcuts', link: '/guide/keyboard-shortcuts' },
           ],
         },

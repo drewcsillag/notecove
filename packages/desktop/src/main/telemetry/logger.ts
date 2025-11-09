@@ -187,11 +187,9 @@ let globalLogger: StructuredLogger | null = null;
  * Get global logger instance
  */
 export function getLogger(): StructuredLogger {
-  if (!globalLogger) {
-    globalLogger = new StructuredLogger({
-      minLevel: process.env['NODE_ENV'] === 'production' ? LogLevel.INFO : LogLevel.DEBUG,
-    });
-  }
+  globalLogger ??= new StructuredLogger({
+    minLevel: process.env['NODE_ENV'] === 'production' ? LogLevel.INFO : LogLevel.DEBUG,
+  });
   return globalLogger;
 }
 

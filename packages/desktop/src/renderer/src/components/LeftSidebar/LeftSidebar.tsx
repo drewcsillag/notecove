@@ -71,10 +71,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = theme.palette.primary.main;
+            const target = e.currentTarget as unknown as HTMLElement;
+            target.style.backgroundColor = theme.palette.primary.main;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = theme.palette.divider;
+            const target = e.currentTarget as unknown as HTMLElement;
+            target.style.backgroundColor = theme.palette.divider;
           }}
         />
 

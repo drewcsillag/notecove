@@ -37,7 +37,7 @@ jest.mock('crypto', () => ({
 // Reset counter before each test
 beforeEach(() => {
   uuidCounter = 0;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const crypto = require('crypto');
   (crypto.randomUUID as jest.Mock).mockClear();
 });

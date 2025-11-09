@@ -188,8 +188,6 @@ let globalCRDTMetrics: CRDTMetrics | null = null;
  * Get global CRDT metrics instance
  */
 export function getCRDTMetrics(): CRDTMetrics {
-  if (!globalCRDTMetrics) {
-    globalCRDTMetrics = new CRDTMetrics();
-  }
+  globalCRDTMetrics ??= new CRDTMetrics();
   return globalCRDTMetrics;
 }
