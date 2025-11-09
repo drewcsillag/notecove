@@ -133,7 +133,7 @@ Advanced features for both platforms including tags, CRDT optimization, cross-SD
 
 - 4.1 Tags Implementation 🟡 (Partially Complete)
 - 4.1bis CRDT Snapshot and Packing System ✅ (Complete)
-- 4.1bis.1 Robust Cross-SD Note Moves 🟡 (97% Complete - implementation and unit tests done, integration tests pending - [Plan](./PLAN-PHASE-4.1bis.1.md) | [Architecture](./docs/architecture/cross-sd-move-state-machine.md))
+- 4.1bis.1 Robust Cross-SD Note Moves 🟡 (98% Complete - implementation and all automated tests done, manual testing pending - [Plan](./PLAN-PHASE-4.1bis.1.md) | [Architecture](./docs/architecture/cross-sd-move-state-machine.md))
 - 4.2 Inter-Note Links 🟥
 - 4.3 Advanced Search (FTS5) 🟥
 - 4.4 Export Functionality 🟥

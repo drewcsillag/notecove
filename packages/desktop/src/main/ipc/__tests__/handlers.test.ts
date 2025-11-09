@@ -106,6 +106,30 @@ interface MockNoteMoveManager {
   cancelMove: jest.Mock;
 }
 
+interface MockDiagnosticsManager {
+  detectDuplicateNotes: jest.Mock;
+  detectOrphanedCRDTFiles: jest.Mock;
+  detectMissingCRDTFiles: jest.Mock;
+  detectStaleMigrationLocks: jest.Mock;
+  detectOrphanedActivityLogs: jest.Mock;
+  removeStaleMigrationLock: jest.Mock;
+  cleanupOrphanedActivityLog: jest.Mock;
+  importOrphanedCRDT: jest.Mock;
+  deleteMissingCRDTEntry: jest.Mock;
+  deleteDuplicateNote: jest.Mock;
+}
+
+interface MockBackupManager {
+  createPreOperationSnapshot: jest.Mock;
+  createManualBackup: jest.Mock;
+  listBackups: jest.Mock;
+  restoreFromBackup: jest.Mock;
+  deleteBackup: jest.Mock;
+  cleanupOldSnapshots: jest.Mock;
+  setBackupDirectory: jest.Mock;
+  getBackupDirectory: jest.Mock;
+}
+
 describe('IPCHandlers - Folder CRUD', () => {
   let handlers: IPCHandlers;
   let mockCRDTManager: MockCRDTManager;
@@ -113,6 +137,8 @@ describe('IPCHandlers - Folder CRUD', () => {
   let mockConfigManager: MockConfigManager;
   let mockUpdateManager: MockUpdateManager;
   let mockNoteMoveManager: MockNoteMoveManager;
+  let mockDiagnosticsManager: MockDiagnosticsManager;
+  let mockBackupManager: MockBackupManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -178,7 +204,8 @@ describe('IPCHandlers - Folder CRUD', () => {
       cancelMove: jest.fn(),
     };
 
-    const mockDiagnosticsManager = {
+    // Create mock diagnostics manager
+    mockDiagnosticsManager = {
       detectDuplicateNotes: jest.fn(),
       detectOrphanedCRDTFiles: jest.fn(),
       detectMissingCRDTFiles: jest.fn(),
@@ -191,7 +218,8 @@ describe('IPCHandlers - Folder CRUD', () => {
       deleteDuplicateNote: jest.fn(),
     };
 
-    const mockBackupManager = {
+    // Create mock backup manager
+    mockBackupManager = {
       createPreOperationSnapshot: jest.fn(),
       createManualBackup: jest.fn(),
       listBackups: jest.fn(),
@@ -841,6 +869,8 @@ describe('IPCHandlers - SD Management', () => {
   let mockConfigManager: MockConfigManager;
   let mockUpdateManager: MockUpdateManager;
   let mockNoteMoveManager: MockNoteMoveManager;
+  let mockDiagnosticsManager: MockDiagnosticsManager;
+  let mockBackupManager: MockBackupManager;
   let mockFolderTree: MockFolderTreeDoc;
 
   beforeEach(() => {
@@ -906,7 +936,8 @@ describe('IPCHandlers - SD Management', () => {
       cancelMove: jest.fn(),
     };
 
-    const mockDiagnosticsManager = {
+    // Create mock diagnostics manager
+    mockDiagnosticsManager = {
       detectDuplicateNotes: jest.fn(),
       detectOrphanedCRDTFiles: jest.fn(),
       detectMissingCRDTFiles: jest.fn(),
@@ -919,7 +950,8 @@ describe('IPCHandlers - SD Management', () => {
       deleteDuplicateNote: jest.fn(),
     };
 
-    const mockBackupManager = {
+    // Create mock backup manager
+    mockBackupManager = {
       createPreOperationSnapshot: jest.fn(),
       createManualBackup: jest.fn(),
       listBackups: jest.fn(),
@@ -1768,6 +1800,479 @@ describe('IPCHandlers - SD Management', () => {
         const result = await (handlers as any).handleCancelMove(mockEvent, moveId);
 
         expect(result).toEqual({ success: false, error: 'Move record not found' });
+      });
+    });
+  });
+
+  describe('Diagnostics Handlers', () => {
+    const mockEvent = {} as any;
+
+    describe('diagnostics:getDuplicateNotes', () => {
+      it('should return duplicate notes from diagnostics manager', async () => {
+        const mockDuplicates = [
+          {
+            noteId: 'note-123',
+            noteTitle: 'Test Note',
+            instances: [
+              {
+                sdId: 1,
+                sdName: 'SD 1',
+                sdPath: '/path/sd1',
+                modifiedAt: '2024-01-01T00:00:00.000Z',
+                size: 1024,
+                blockCount: 10,
+                preview: 'Test content...',
+              },
+              {
+                sdId: 2,
+                sdName: 'SD 2',
+                sdPath: '/path/sd2',
+                modifiedAt: '2024-01-02T00:00:00.000Z',
+                size: 2048,
+                blockCount: 15,
+                preview: 'Different content...',
+              },
+            ],
+          },
+        ];
+
+        mockDiagnosticsManager.detectDuplicateNotes.mockResolvedValue(mockDuplicates);
+
+        const result = await (handlers as any).handleGetDuplicateNotes(mockEvent);
+
+        expect(result).toEqual(mockDuplicates);
+        expect(mockDiagnosticsManager.detectDuplicateNotes).toHaveBeenCalled();
+      });
+
+      it('should return empty array when no duplicates found', async () => {
+        mockDiagnosticsManager.detectDuplicateNotes.mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetDuplicateNotes(mockEvent);
+
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('diagnostics:getOrphanedCRDTFiles', () => {
+      it('should return orphaned CRDT files', async () => {
+        const mockOrphaned = [
+          {
+            noteId: 'orphan-123',
+            sdId: 1,
+            sdName: 'SD 1',
+            sdPath: '/path/sd1',
+            filePath: '/path/sd1/notes/orphan-123',
+            title: 'Orphaned Note',
+            preview: 'This note has no DB entry...',
+            modifiedAt: '2024-01-01T00:00:00.000Z',
+            size: 512,
+            blockCount: 5,
+          },
+        ];
+
+        mockDiagnosticsManager.detectOrphanedCRDTFiles.mockResolvedValue(mockOrphaned);
+
+        const result = await (handlers as any).handleGetOrphanedCRDTFiles(mockEvent);
+
+        expect(result).toEqual(mockOrphaned);
+        expect(mockDiagnosticsManager.detectOrphanedCRDTFiles).toHaveBeenCalled();
+      });
+    });
+
+    describe('diagnostics:getMissingCRDTFiles', () => {
+      it('should return missing CRDT files', async () => {
+        const mockMissing = [
+          {
+            noteId: 'missing-123',
+            noteTitle: 'Missing Note',
+            sdId: 1,
+            sdName: 'SD 1',
+            sdPath: '/path/sd1',
+            expectedPath: '/path/sd1/notes/missing-123',
+            lastModified: '2024-01-01T00:00:00.000Z',
+          },
+        ];
+
+        mockDiagnosticsManager.detectMissingCRDTFiles.mockResolvedValue(mockMissing);
+
+        const result = await (handlers as any).handleGetMissingCRDTFiles(mockEvent);
+
+        expect(result).toEqual(mockMissing);
+        expect(mockDiagnosticsManager.detectMissingCRDTFiles).toHaveBeenCalled();
+      });
+    });
+
+    describe('diagnostics:getStaleMigrationLocks', () => {
+      it('should return stale migration locks', async () => {
+        const mockLocks = [
+          {
+            sdId: 1,
+            sdName: 'SD 1',
+            sdPath: '/path/sd1',
+            lockPath: '/path/sd1/.migration-lock',
+            ageMinutes: 120,
+            createdAt: '2024-01-01T00:00:00.000Z',
+          },
+        ];
+
+        mockDiagnosticsManager.detectStaleMigrationLocks.mockResolvedValue(mockLocks);
+
+        const result = await (handlers as any).handleGetStaleMigrationLocks(mockEvent);
+
+        expect(result).toEqual(mockLocks);
+        expect(mockDiagnosticsManager.detectStaleMigrationLocks).toHaveBeenCalled();
+      });
+    });
+
+    describe('diagnostics:getOrphanedActivityLogs', () => {
+      it('should return orphaned activity logs', async () => {
+        const mockLogs = [
+          {
+            instanceId: 'old-instance',
+            sdId: 1,
+            sdName: 'SD 1',
+            sdPath: '/path/sd1',
+            logPath: '/path/sd1/activity/old-instance.log',
+            lastSeen: '2024-01-01T00:00:00.000Z',
+            daysSinceLastSeen: 45,
+            sizeBytes: 10240,
+          },
+        ];
+
+        mockDiagnosticsManager.detectOrphanedActivityLogs.mockResolvedValue(mockLogs);
+
+        const result = await (handlers as any).handleGetOrphanedActivityLogs(mockEvent);
+
+        expect(result).toEqual(mockLogs);
+        expect(mockDiagnosticsManager.detectOrphanedActivityLogs).toHaveBeenCalled();
+      });
+    });
+
+    describe('diagnostics:removeStaleMigrationLock', () => {
+      it('should remove stale migration lock', async () => {
+        const sdId = 1;
+        mockDiagnosticsManager.removeStaleMigrationLock.mockResolvedValue(undefined);
+
+        await (handlers as any).handleRemoveStaleMigrationLock(mockEvent, sdId);
+
+        expect(mockDiagnosticsManager.removeStaleMigrationLock).toHaveBeenCalledWith(sdId);
+      });
+    });
+
+    describe('diagnostics:cleanupOrphanedActivityLog', () => {
+      it('should cleanup orphaned activity log', async () => {
+        const sdId = 1;
+        const instanceId = 'old-instance';
+        mockDiagnosticsManager.cleanupOrphanedActivityLog.mockResolvedValue(undefined);
+
+        await (handlers as any).handleCleanupOrphanedActivityLog(mockEvent, sdId, instanceId);
+
+        expect(mockDiagnosticsManager.cleanupOrphanedActivityLog).toHaveBeenCalledWith(
+          sdId,
+          instanceId
+        );
+      });
+    });
+
+    describe('diagnostics:importOrphanedCRDT', () => {
+      it('should import orphaned CRDT', async () => {
+        const noteId = 'orphan-123';
+        const sdId = 1;
+        mockDiagnosticsManager.importOrphanedCRDT.mockResolvedValue(undefined);
+
+        await (handlers as any).handleImportOrphanedCRDT(mockEvent, noteId, sdId);
+
+        expect(mockDiagnosticsManager.importOrphanedCRDT).toHaveBeenCalledWith(noteId, sdId);
+      });
+    });
+
+    describe('diagnostics:deleteMissingCRDTEntry', () => {
+      it('should delete missing CRDT entry', async () => {
+        const noteId = 'missing-123';
+        const sdId = 1;
+        mockDiagnosticsManager.deleteMissingCRDTEntry.mockResolvedValue(undefined);
+
+        await (handlers as any).handleDeleteMissingCRDTEntry(mockEvent, noteId, sdId);
+
+        expect(mockDiagnosticsManager.deleteMissingCRDTEntry).toHaveBeenCalledWith(noteId, sdId);
+      });
+    });
+
+    describe('diagnostics:deleteDuplicateNote', () => {
+      it('should delete duplicate note', async () => {
+        const noteId = 'duplicate-123';
+        const sdId = 1;
+        mockDiagnosticsManager.deleteDuplicateNote.mockResolvedValue(undefined);
+
+        await (handlers as any).handleDeleteDuplicateNote(mockEvent, noteId, sdId);
+
+        expect(mockDiagnosticsManager.deleteDuplicateNote).toHaveBeenCalledWith(noteId, sdId);
+      });
+    });
+  });
+
+  describe('Backup Handlers', () => {
+    const mockEvent = {} as any;
+
+    describe('backup:createPreOperationSnapshot', () => {
+      it('should create pre-operation snapshot', async () => {
+        const sdId = 1;
+        const noteIds = ['note-1', 'note-2'];
+        const description = 'Before risky operation';
+        const mockBackupInfo = {
+          backupId: 'backup-123',
+          sdUuid: 'sd-uuid-123',
+          sdName: 'Test SD',
+          timestamp: Date.now(),
+          noteCount: 2,
+          folderCount: 0,
+          sizeBytes: 2048,
+          type: 'pre-operation' as const,
+          isPacked: false,
+          description,
+          backupPath: '/backups/backup-123',
+        };
+
+        mockBackupManager.createPreOperationSnapshot.mockResolvedValue(mockBackupInfo);
+
+        const result = await (handlers as any).handleCreatePreOperationSnapshot(
+          mockEvent,
+          sdId,
+          noteIds,
+          description
+        );
+
+        expect(result).toEqual(mockBackupInfo);
+        expect(mockBackupManager.createPreOperationSnapshot).toHaveBeenCalledWith(
+          sdId,
+          noteIds,
+          description
+        );
+      });
+    });
+
+    describe('backup:createManualBackup', () => {
+      it('should create manual backup without packing', async () => {
+        const sdId = 1;
+        const packAndSnapshot = false;
+        const description = 'Manual backup';
+        const mockBackupInfo = {
+          backupId: 'backup-456',
+          sdUuid: 'sd-uuid-123',
+          sdName: 'Test SD',
+          timestamp: Date.now(),
+          noteCount: 10,
+          folderCount: 3,
+          sizeBytes: 10240,
+          type: 'manual' as const,
+          isPacked: false,
+          description,
+          backupPath: '/backups/backup-456',
+        };
+
+        mockBackupManager.createManualBackup.mockResolvedValue(mockBackupInfo);
+
+        const result = await (handlers as any).handleCreateManualBackup(
+          mockEvent,
+          sdId,
+          packAndSnapshot,
+          description
+        );
+
+        expect(result).toEqual(mockBackupInfo);
+        expect(mockBackupManager.createManualBackup).toHaveBeenCalledWith(
+          sdId,
+          packAndSnapshot,
+          description
+        );
+      });
+
+      it('should create manual backup with packing', async () => {
+        const sdId = 1;
+        const packAndSnapshot = true;
+        const mockBackupInfo = {
+          backupId: 'backup-789',
+          sdUuid: 'sd-uuid-123',
+          sdName: 'Test SD',
+          timestamp: Date.now(),
+          noteCount: 10,
+          folderCount: 3,
+          sizeBytes: 5120,
+          type: 'manual' as const,
+          isPacked: true,
+          backupPath: '/backups/backup-789',
+        };
+
+        mockBackupManager.createManualBackup.mockResolvedValue(mockBackupInfo);
+
+        const result = await (handlers as any).handleCreateManualBackup(
+          mockEvent,
+          sdId,
+          packAndSnapshot
+        );
+
+        expect(result).toEqual(mockBackupInfo);
+        expect(mockBackupManager.createManualBackup).toHaveBeenCalledWith(
+          sdId,
+          packAndSnapshot,
+          undefined
+        );
+      });
+    });
+
+    describe('backup:listBackups', () => {
+      it('should list all backups', async () => {
+        const mockBackups = [
+          {
+            backupId: 'backup-1',
+            sdUuid: 'sd-uuid-1',
+            sdName: 'SD 1',
+            timestamp: Date.now() - 86400000,
+            noteCount: 5,
+            folderCount: 2,
+            sizeBytes: 5120,
+            type: 'manual' as const,
+            isPacked: false,
+            description: 'Manual backup 1',
+            backupPath: '/backups/backup-1',
+          },
+          {
+            backupId: 'backup-2',
+            sdUuid: 'sd-uuid-2',
+            sdName: 'SD 2',
+            timestamp: Date.now() - 3600000,
+            noteCount: 2,
+            folderCount: 0,
+            sizeBytes: 1024,
+            type: 'pre-operation' as const,
+            isPacked: false,
+            description: 'Before move operation',
+            backupPath: '/backups/backup-2',
+          },
+        ];
+
+        mockBackupManager.listBackups.mockResolvedValue(mockBackups);
+
+        const result = await (handlers as any).handleListBackups(mockEvent);
+
+        expect(result).toEqual(mockBackups);
+        expect(mockBackupManager.listBackups).toHaveBeenCalled();
+      });
+
+      it('should return empty array when no backups exist', async () => {
+        mockBackupManager.listBackups.mockResolvedValue([]);
+
+        const result = await (handlers as any).handleListBackups(mockEvent);
+
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('backup:restoreFromBackup', () => {
+      it('should restore backup as new SD', async () => {
+        const backupId = 'backup-123';
+        const targetPath = '/restore/path';
+        const registerAsNew = true;
+        const mockRestoreResult = {
+          sdId: '2',
+          sdPath: targetPath,
+        };
+
+        mockBackupManager.restoreFromBackup.mockResolvedValue(mockRestoreResult);
+
+        const result = await (handlers as any).handleRestoreFromBackup(
+          mockEvent,
+          backupId,
+          targetPath,
+          registerAsNew
+        );
+
+        expect(result).toEqual(mockRestoreResult);
+        expect(mockBackupManager.restoreFromBackup).toHaveBeenCalledWith(
+          backupId,
+          targetPath,
+          registerAsNew
+        );
+      });
+
+      it('should restore backup as original SD', async () => {
+        const backupId = 'backup-456';
+        const targetPath = '/original/path';
+        const registerAsNew = false;
+        const mockRestoreResult = {
+          sdId: '1',
+          sdPath: targetPath,
+        };
+
+        mockBackupManager.restoreFromBackup.mockResolvedValue(mockRestoreResult);
+
+        const result = await (handlers as any).handleRestoreFromBackup(
+          mockEvent,
+          backupId,
+          targetPath,
+          registerAsNew
+        );
+
+        expect(result).toEqual(mockRestoreResult);
+        expect(mockBackupManager.restoreFromBackup).toHaveBeenCalledWith(
+          backupId,
+          targetPath,
+          registerAsNew
+        );
+      });
+    });
+
+    describe('backup:deleteBackup', () => {
+      it('should delete backup', async () => {
+        const backupId = 'backup-123';
+        mockBackupManager.deleteBackup.mockResolvedValue(undefined);
+
+        await (handlers as any).handleDeleteBackup(mockEvent, backupId);
+
+        expect(mockBackupManager.deleteBackup).toHaveBeenCalledWith(backupId);
+      });
+    });
+
+    describe('backup:cleanupOldSnapshots', () => {
+      it('should cleanup old snapshots and return count', async () => {
+        const deletedCount = 5;
+        mockBackupManager.cleanupOldSnapshots.mockResolvedValue(deletedCount);
+
+        const result = await (handlers as any).handleCleanupOldSnapshots(mockEvent);
+
+        expect(result).toBe(deletedCount);
+        expect(mockBackupManager.cleanupOldSnapshots).toHaveBeenCalled();
+      });
+
+      it('should return zero when no snapshots deleted', async () => {
+        mockBackupManager.cleanupOldSnapshots.mockResolvedValue(0);
+
+        const result = await (handlers as any).handleCleanupOldSnapshots(mockEvent);
+
+        expect(result).toBe(0);
+      });
+    });
+
+    describe('backup:setBackupDirectory', () => {
+      it('should set backup directory', async () => {
+        const customPath = '/custom/backup/path';
+        mockBackupManager.setBackupDirectory.mockReturnValue(undefined);
+
+        await (handlers as any).handleSetBackupDirectory(mockEvent, customPath);
+
+        expect(mockBackupManager.setBackupDirectory).toHaveBeenCalledWith(customPath);
+      });
+    });
+
+    describe('backup:getBackupDirectory', () => {
+      it('should get current backup directory', async () => {
+        const backupDir = '/current/backup/path';
+        mockBackupManager.getBackupDirectory.mockReturnValue(backupDir);
+
+        const result = await (handlers as any).handleGetBackupDirectory(mockEvent);
+
+        expect(result).toBe(backupDir);
+        expect(mockBackupManager.getBackupDirectory).toHaveBeenCalled();
       });
     });
   });
