@@ -20,6 +20,7 @@ import { extractTags } from '@notecove/shared';
 import { getTelemetryManager } from '../telemetry/config';
 import type { NoteMoveManager } from '../note-move-manager';
 import type { DiagnosticsManager } from '../diagnostics-manager';
+import type { BackupManager } from '../backup-manager';
 
 export class IPCHandlers {
   constructor(
@@ -29,6 +30,7 @@ export class IPCHandlers {
     private updateManager: UpdateManager,
     private noteMoveManager: NoteMoveManager,
     private diagnosticsManager: DiagnosticsManager,
+    private backupManager: BackupManager,
     private createWindowFn?: () => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
   ) {
@@ -183,6 +185,16 @@ export class IPCHandlers {
       this.handleDeleteMissingCRDTEntry.bind(this)
     );
     ipcMain.handle('diagnostics:deleteDuplicateNote', this.handleDeleteDuplicateNote.bind(this));
+
+    // Backup and restore operations
+    ipcMain.handle('backup:createPreOperationSnapshot', this.handleCreatePreOperationSnapshot.bind(this));
+    ipcMain.handle('backup:createManualBackup', this.handleCreateManualBackup.bind(this));
+    ipcMain.handle('backup:listBackups', this.handleListBackups.bind(this));
+    ipcMain.handle('backup:restoreFromBackup', this.handleRestoreFromBackup.bind(this));
+    ipcMain.handle('backup:deleteBackup', this.handleDeleteBackup.bind(this));
+    ipcMain.handle('backup:cleanupOldSnapshots', this.handleCleanupOldSnapshots.bind(this));
+    ipcMain.handle('backup:setBackupDirectory', this.handleSetBackupDirectory.bind(this));
+    ipcMain.handle('backup:getBackupDirectory', this.handleGetBackupDirectory.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -1965,6 +1977,85 @@ export class IPCHandlers {
     sdId: number
   ): Promise<void> {
     await this.diagnosticsManager.deleteDuplicateNote(noteId, sdId);
+  }
+
+  /**
+   * Backup: Create pre-operation snapshot (fast, minimal backup of affected notes)
+   */
+  private async handleCreatePreOperationSnapshot(
+    _event: IpcMainInvokeEvent,
+    sdId: number,
+    noteIds: string[],
+    description: string
+  ): Promise<import('../backup-manager').BackupInfo> {
+    return await this.backupManager.createPreOperationSnapshot(sdId, noteIds, description);
+  }
+
+  /**
+   * Backup: Create manual backup (full SD backup)
+   */
+  private async handleCreateManualBackup(
+    _event: IpcMainInvokeEvent,
+    sdId: number,
+    packAndSnapshot: boolean,
+    description?: string
+  ): Promise<import('../backup-manager').BackupInfo> {
+    return await this.backupManager.createManualBackup(sdId, packAndSnapshot, description);
+  }
+
+  /**
+   * Backup: List all available backups
+   */
+  private async handleListBackups(
+    _event: IpcMainInvokeEvent
+  ): Promise<import('../backup-manager').BackupInfo[]> {
+    return await this.backupManager.listBackups();
+  }
+
+  /**
+   * Backup: Restore SD from backup
+   */
+  private async handleRestoreFromBackup(
+    _event: IpcMainInvokeEvent,
+    backupId: string,
+    targetPath: string,
+    registerAsNew: boolean
+  ): Promise<{ sdId: number; sdPath: string }> {
+    return await this.backupManager.restoreFromBackup(backupId, targetPath, registerAsNew);
+  }
+
+  /**
+   * Backup: Delete a backup
+   */
+  private async handleDeleteBackup(
+    _event: IpcMainInvokeEvent,
+    backupId: string
+  ): Promise<void> {
+    await this.backupManager.deleteBackup(backupId);
+  }
+
+  /**
+   * Backup: Clean up old pre-operation snapshots
+   */
+  private async handleCleanupOldSnapshots(_event: IpcMainInvokeEvent): Promise<number> {
+    return await this.backupManager.cleanupOldSnapshots();
+  }
+
+  /**
+   * Backup: Set custom backup directory
+   */
+  private async handleSetBackupDirectory(
+    _event: IpcMainInvokeEvent,
+    customPath: string
+  ): Promise<void> {
+    this.backupManager.setBackupDirectory(customPath);
+  }
+
+  /**
+   * Backup: Get current backup directory
+   */
+  private async handleGetBackupDirectory(_event: IpcMainInvokeEvent): Promise<string> {
+    return this.backupManager.getBackupDirectory();
   }
 
   // Test-only handlers

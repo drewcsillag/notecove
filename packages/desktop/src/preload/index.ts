@@ -624,6 +624,117 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('diagnostics:deleteDuplicateNote', noteId, sdId) as Promise<void>,
   },
 
+  // Backup and restore operations
+  backup: {
+    createPreOperationSnapshot: (
+      sdId: number,
+      noteIds: string[],
+      description: string
+    ): Promise<{
+      backupId: string;
+      sdUuid: string;
+      sdName: string;
+      timestamp: number;
+      noteCount: number;
+      folderCount: number;
+      sizeBytes: number;
+      type: 'manual' | 'pre-operation';
+      isPacked: boolean;
+      description?: string;
+      backupPath: string;
+    }> =>
+      ipcRenderer.invoke('backup:createPreOperationSnapshot', sdId, noteIds, description) as Promise<{
+        backupId: string;
+        sdUuid: string;
+        sdName: string;
+        timestamp: number;
+        noteCount: number;
+        folderCount: number;
+        sizeBytes: number;
+        type: 'manual' | 'pre-operation';
+        isPacked: boolean;
+        description?: string;
+        backupPath: string;
+      }>,
+    createManualBackup: (
+      sdId: number,
+      packAndSnapshot: boolean,
+      description?: string
+    ): Promise<{
+      backupId: string;
+      sdUuid: string;
+      sdName: string;
+      timestamp: number;
+      noteCount: number;
+      folderCount: number;
+      sizeBytes: number;
+      type: 'manual' | 'pre-operation';
+      isPacked: boolean;
+      description?: string;
+      backupPath: string;
+    }> =>
+      ipcRenderer.invoke('backup:createManualBackup', sdId, packAndSnapshot, description) as Promise<{
+        backupId: string;
+        sdUuid: string;
+        sdName: string;
+        timestamp: number;
+        noteCount: number;
+        folderCount: number;
+        sizeBytes: number;
+        type: 'manual' | 'pre-operation';
+        isPacked: boolean;
+        description?: string;
+        backupPath: string;
+      }>,
+    listBackups: (): Promise<
+      {
+        backupId: string;
+        sdUuid: string;
+        sdName: string;
+        timestamp: number;
+        noteCount: number;
+        folderCount: number;
+        sizeBytes: number;
+        type: 'manual' | 'pre-operation';
+        isPacked: boolean;
+        description?: string;
+        backupPath: string;
+      }[]
+    > =>
+      ipcRenderer.invoke('backup:listBackups') as Promise<
+        {
+          backupId: string;
+          sdUuid: string;
+          sdName: string;
+          timestamp: number;
+          noteCount: number;
+          folderCount: number;
+          sizeBytes: number;
+          type: 'manual' | 'pre-operation';
+          isPacked: boolean;
+          description?: string;
+          backupPath: string;
+        }[]
+      >,
+    restoreFromBackup: (
+      backupId: string,
+      targetPath: string,
+      registerAsNew: boolean
+    ): Promise<{ sdId: number; sdPath: string }> =>
+      ipcRenderer.invoke('backup:restoreFromBackup', backupId, targetPath, registerAsNew) as Promise<{
+        sdId: number;
+        sdPath: string;
+      }>,
+    deleteBackup: (backupId: string): Promise<void> =>
+      ipcRenderer.invoke('backup:deleteBackup', backupId) as Promise<void>,
+    cleanupOldSnapshots: (): Promise<number> =>
+      ipcRenderer.invoke('backup:cleanupOldSnapshots') as Promise<number>,
+    setBackupDirectory: (customPath: string): Promise<void> =>
+      ipcRenderer.invoke('backup:setBackupDirectory', customPath) as Promise<void>,
+    getBackupDirectory: (): Promise<string> =>
+      ipcRenderer.invoke('backup:getBackupDirectory') as Promise<string>,
+  },
+
   // Menu event listeners
   menu: {
     onNewNote: (callback: () => void): (() => void) => {

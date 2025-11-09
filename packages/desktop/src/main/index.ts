@@ -28,6 +28,7 @@ import { initializeTelemetry } from './telemetry/config';
 import { compress, decompress } from './utils/compression';
 import { NoteMoveManager } from './note-move-manager';
 import { DiagnosticsManager } from './diagnostics-manager';
+import { BackupManager } from './backup-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
@@ -38,6 +39,7 @@ let updateManager: UpdateManager | null = null;
 let crdtManager: CRDTManager | null = null;
 let noteMoveManager: NoteMoveManager | null = null;
 let diagnosticsManager: DiagnosticsManager | null = null;
+let backupManager: BackupManager | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -1058,6 +1060,11 @@ void app.whenReady().then(async () => {
     diagnosticsManager = new DiagnosticsManager(database);
     console.log('[Init] DiagnosticsManager initialized');
 
+    // Initialize BackupManager for backup and restore operations
+    const userDataPath = app.getPath('userData');
+    backupManager = new BackupManager(database, userDataPath);
+    console.log('[Init] BackupManager initialized');
+
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)
     if (!configManager) {
       throw new Error('ConfigManager not initialized');
@@ -1069,6 +1076,7 @@ void app.whenReady().then(async () => {
       updateManager,
       noteMoveManager,
       diagnosticsManager,
+      backupManager,
       createWindow,
       handleNewStorageDir
     );

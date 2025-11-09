@@ -267,6 +267,67 @@ declare global {
         deleteDuplicateNote: (noteId: string, sdId: number) => Promise<void>;
       };
 
+      backup: {
+        createPreOperationSnapshot: (
+          sdId: number,
+          noteIds: string[],
+          description: string
+        ) => Promise<{
+          backupId: string;
+          sdUuid: string;
+          sdName: string;
+          timestamp: number;
+          noteCount: number;
+          folderCount: number;
+          sizeBytes: number;
+          type: 'manual' | 'pre-operation';
+          isPacked: boolean;
+          description?: string;
+          backupPath: string;
+        }>;
+        createManualBackup: (
+          sdId: number,
+          packAndSnapshot: boolean,
+          description?: string
+        ) => Promise<{
+          backupId: string;
+          sdUuid: string;
+          sdName: string;
+          timestamp: number;
+          noteCount: number;
+          folderCount: number;
+          sizeBytes: number;
+          type: 'manual' | 'pre-operation';
+          isPacked: boolean;
+          description?: string;
+          backupPath: string;
+        }>;
+        listBackups: () => Promise<
+          {
+            backupId: string;
+            sdUuid: string;
+            sdName: string;
+            timestamp: number;
+            noteCount: number;
+            folderCount: number;
+            sizeBytes: number;
+            type: 'manual' | 'pre-operation';
+            isPacked: boolean;
+            description?: string;
+            backupPath: string;
+          }[]
+        >;
+        restoreFromBackup: (
+          backupId: string,
+          targetPath: string,
+          registerAsNew: boolean
+        ) => Promise<{ sdId: number; sdPath: string }>;
+        deleteBackup: (backupId: string) => Promise<void>;
+        cleanupOldSnapshots: () => Promise<number>;
+        setBackupDirectory: (customPath: string) => Promise<void>;
+        getBackupDirectory: () => Promise<string>;
+      };
+
       menu: {
         onNewNote: (callback: () => void) => () => void;
         onNewFolder: (callback: () => void) => () => void;

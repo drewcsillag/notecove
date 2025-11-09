@@ -191,6 +191,17 @@ describe('IPCHandlers - Folder CRUD', () => {
       deleteDuplicateNote: jest.fn(),
     };
 
+    const mockBackupManager = {
+      createPreOperationSnapshot: jest.fn(),
+      createManualBackup: jest.fn(),
+      listBackups: jest.fn(),
+      restoreFromBackup: jest.fn(),
+      deleteBackup: jest.fn(),
+      cleanupOldSnapshots: jest.fn(),
+      setBackupDirectory: jest.fn(),
+      getBackupDirectory: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
@@ -198,7 +209,8 @@ describe('IPCHandlers - Folder CRUD', () => {
       mockConfigManager as unknown as ConfigManager,
       mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
       mockNoteMoveManager as unknown as NoteMoveManager,
-      mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager
+      mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager,
+      mockBackupManager as unknown as import('../../backup-manager').BackupManager
     );
   });
 
@@ -907,6 +919,17 @@ describe('IPCHandlers - SD Management', () => {
       deleteDuplicateNote: jest.fn(),
     };
 
+    const mockBackupManager = {
+      createPreOperationSnapshot: jest.fn(),
+      createManualBackup: jest.fn(),
+      listBackups: jest.fn(),
+      restoreFromBackup: jest.fn(),
+      deleteBackup: jest.fn(),
+      cleanupOldSnapshots: jest.fn(),
+      setBackupDirectory: jest.fn(),
+      getBackupDirectory: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
@@ -914,7 +937,8 @@ describe('IPCHandlers - SD Management', () => {
       mockConfigManager as unknown as ConfigManager,
       mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
       mockNoteMoveManager as unknown as NoteMoveManager,
-      mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager
+      mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager,
+      mockBackupManager as unknown as import('../../backup-manager').BackupManager
     );
   });
 
