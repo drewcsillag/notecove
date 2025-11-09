@@ -627,7 +627,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Backup and restore operations
   backup: {
     createPreOperationSnapshot: (
-      sdId: number,
+      sdId: string,
       noteIds: string[],
       description: string
     ): Promise<{
@@ -643,7 +643,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       description?: string;
       backupPath: string;
     }> =>
-      ipcRenderer.invoke('backup:createPreOperationSnapshot', sdId, noteIds, description) as Promise<{
+      ipcRenderer.invoke(
+        'backup:createPreOperationSnapshot',
+        sdId,
+        noteIds,
+        description
+      ) as Promise<{
         backupId: string;
         sdUuid: string;
         sdName: string;
@@ -657,7 +662,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         backupPath: string;
       }>,
     createManualBackup: (
-      sdId: number,
+      sdId: string,
       packAndSnapshot: boolean,
       description?: string
     ): Promise<{
@@ -673,7 +678,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       description?: string;
       backupPath: string;
     }> =>
-      ipcRenderer.invoke('backup:createManualBackup', sdId, packAndSnapshot, description) as Promise<{
+      ipcRenderer.invoke(
+        'backup:createManualBackup',
+        sdId,
+        packAndSnapshot,
+        description
+      ) as Promise<{
         backupId: string;
         sdUuid: string;
         sdName: string;
@@ -720,9 +730,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       backupId: string,
       targetPath: string,
       registerAsNew: boolean
-    ): Promise<{ sdId: number; sdPath: string }> =>
-      ipcRenderer.invoke('backup:restoreFromBackup', backupId, targetPath, registerAsNew) as Promise<{
-        sdId: number;
+    ): Promise<{ sdId: string; sdPath: string }> =>
+      ipcRenderer.invoke(
+        'backup:restoreFromBackup',
+        backupId,
+        targetPath,
+        registerAsNew
+      ) as Promise<{
+        sdId: string;
         sdPath: string;
       }>,
     deleteBackup: (backupId: string): Promise<void> =>

@@ -1,7 +1,6 @@
 import type { Database } from '@notecove/shared';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as tar from 'tar';
 import * as crypto from 'crypto';
 
 export interface BackupMetadata {
@@ -26,10 +25,10 @@ export class BackupManager {
 
   constructor(
     private readonly database: Database,
-    private readonly userDataPath: string,
-    customBackupPath?: string,
+    userDataPath: string,
+    customBackupPath?: string
   ) {
-    this.backupDir = customBackupPath || path.join(userDataPath, '.backups');
+    this.backupDir = customBackupPath ?? path.join(userDataPath, '.backups');
     this.ensureBackupDirectory();
   }
 
@@ -47,9 +46,9 @@ export class BackupManager {
    * Create a pre-operation snapshot (fast, as-is backup of affected notes only)
    */
   async createPreOperationSnapshot(
-    sdId: number,
+    sdId: string,
     noteIds: string[],
-    description: string,
+    description: string
   ): Promise<BackupInfo> {
     const sd = await this.database.getStorageDir(sdId);
     if (!sd) {
@@ -87,7 +86,7 @@ export class BackupManager {
     // Save metadata
     const metadata: BackupMetadata = {
       backupId,
-      sdUuid: sd.uuid,
+      sdUuid: sd.uuid ?? '',
       sdName: sd.name,
       timestamp,
       noteCount: noteIds.length,
@@ -98,13 +97,10 @@ export class BackupManager {
       description,
     };
 
-    fs.writeFileSync(
-      path.join(backupPath, 'metadata.json'),
-      JSON.stringify(metadata, null, 2),
-    );
+    fs.writeFileSync(path.join(backupPath, 'metadata.json'), JSON.stringify(metadata, null, 2));
 
     console.log(
-      `[BackupManager] Created pre-operation snapshot: ${backupId} (${noteIds.length} notes, ${this.formatBytes(totalSize)})`,
+      `[BackupManager] Created pre-operation snapshot: ${backupId} (${noteIds.length} notes, ${this.formatBytes(totalSize)})`
     );
 
     return {
@@ -117,9 +113,9 @@ export class BackupManager {
    * Create a manual backup (full SD backup, optionally packed)
    */
   async createManualBackup(
-    sdId: number,
-    packAndSnapshot: boolean = false,
-    description?: string,
+    sdId: string,
+    packAndSnapshot = false,
+    description?: string
   ): Promise<BackupInfo> {
     const sd = await this.database.getStorageDir(sdId);
     if (!sd) {
@@ -135,7 +131,7 @@ export class BackupManager {
 
     // Get note and folder counts
     const noteCount = await this.countNotes(sdId);
-    const folderCount = await this.countFolders(sdId);
+    const folderCount = this.countFolders(sdId);
 
     let totalSize = 0;
 
@@ -169,7 +165,7 @@ export class BackupManager {
     // Save metadata
     const metadata: BackupMetadata = {
       backupId,
-      sdUuid: sd.uuid,
+      sdUuid: sd.uuid ?? '',
       sdName: sd.name,
       timestamp,
       noteCount,
@@ -177,16 +173,13 @@ export class BackupManager {
       sizeBytes: totalSize,
       type: 'manual',
       isPacked: packAndSnapshot,
-      description,
+      ...(description !== undefined && { description }),
     };
 
-    fs.writeFileSync(
-      path.join(backupPath, 'metadata.json'),
-      JSON.stringify(metadata, null, 2),
-    );
+    fs.writeFileSync(path.join(backupPath, 'metadata.json'), JSON.stringify(metadata, null, 2));
 
     console.log(
-      `[BackupManager] Created manual backup: ${backupId} (${noteCount} notes, ${folderCount} folders, ${this.formatBytes(totalSize)})`,
+      `[BackupManager] Created manual backup: ${backupId} (${noteCount} notes, ${folderCount} folders, ${this.formatBytes(totalSize)})`
     );
 
     return {
@@ -198,7 +191,7 @@ export class BackupManager {
   /**
    * List all available backups
    */
-  async listBackups(): Promise<BackupInfo[]> {
+  listBackups(): BackupInfo[] {
     const backups: BackupInfo[] = [];
 
     if (!fs.existsSync(this.backupDir)) {
@@ -213,19 +206,14 @@ export class BackupManager {
 
       if (fs.existsSync(metadataPath)) {
         try {
-          const metadata = JSON.parse(
-            fs.readFileSync(metadataPath, 'utf-8'),
-          ) as BackupMetadata;
+          const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8')) as BackupMetadata;
 
           backups.push({
             ...metadata,
             backupPath,
           });
         } catch (error) {
-          console.error(
-            `[BackupManager] Failed to read metadata for backup ${entry}:`,
-            error,
-          );
+          console.error(`[BackupManager] Failed to read metadata for backup ${entry}:`, error);
         }
       }
     }
@@ -240,9 +228,9 @@ export class BackupManager {
   async restoreFromBackup(
     backupId: string,
     targetPath: string,
-    registerAsNew: boolean = false,
-  ): Promise<{ sdId: number; sdPath: string }> {
-    const backups = await this.listBackups();
+    registerAsNew = false
+  ): Promise<{ sdId: string; sdPath: string }> {
+    const backups = this.listBackups();
     const backup = backups.find((b) => b.backupId === backupId);
 
     if (!backup) {
@@ -257,9 +245,7 @@ export class BackupManager {
     // Check if target path is empty
     const targetContents = fs.readdirSync(targetPath);
     if (targetContents.length > 0) {
-      throw new Error(
-        `Target path ${targetPath} is not empty. Please choose an empty directory.`,
-      );
+      throw new Error(`Target path ${targetPath} is not empty. Please choose an empty directory.`);
     }
 
     // Copy database
@@ -287,23 +273,17 @@ export class BackupManager {
     fs.writeFileSync(sdIdPath, sdUuid);
 
     // Register SD in database
-    const sdId = await this.database.createStorageDir(
-      backup.sdName,
-      targetPath,
-      sdUuid,
-    );
+    const sd = await this.database.createStorageDir(sdUuid, backup.sdName, targetPath);
 
-    console.log(
-      `[BackupManager] Restored backup ${backupId} to ${targetPath} (SD ID: ${sdId})`,
-    );
+    console.log(`[BackupManager] Restored backup ${backupId} to ${targetPath} (SD ID: ${sd.id})`);
 
-    return { sdId, sdPath: targetPath };
+    return { sdId: sd.id, sdPath: targetPath };
   }
 
   /**
    * Delete a backup
    */
-  async deleteBackup(backupId: string): Promise<void> {
+  deleteBackup(backupId: string): void {
     const backupPath = path.join(this.backupDir, backupId);
 
     if (!fs.existsSync(backupPath)) {
@@ -317,23 +297,21 @@ export class BackupManager {
   /**
    * Clean up old pre-operation snapshots (older than 7 days)
    */
-  async cleanupOldSnapshots(): Promise<number> {
-    const backups = await this.listBackups();
+  cleanupOldSnapshots(): number {
+    const backups = this.listBackups();
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
     let deletedCount = 0;
 
     for (const backup of backups) {
       if (backup.type === 'pre-operation' && backup.timestamp < sevenDaysAgo) {
-        await this.deleteBackup(backup.backupId);
+        this.deleteBackup(backup.backupId);
         deletedCount++;
       }
     }
 
     if (deletedCount > 0) {
-      console.log(
-        `[BackupManager] Cleaned up ${deletedCount} old pre-operation snapshots`,
-      );
+      console.log(`[BackupManager] Cleaned up ${deletedCount} old pre-operation snapshots`);
     }
 
     return deletedCount;
@@ -394,21 +372,18 @@ export class BackupManager {
   /**
    * Helper: Count notes in SD
    */
-  private async countNotes(sdId: number): Promise<number> {
-    const result = await this.database
-      .getAdapter()
-      .get<{ count: number }>(
-        'SELECT COUNT(*) as count FROM notes WHERE sd_id = ? AND deleted = 0',
-        [sdId],
-      );
+  private async countNotes(sdId: string): Promise<number> {
+    const result = await this.database.getAdapter().get<{
+      count: number;
+    }>('SELECT COUNT(*) as count FROM notes WHERE sd_id = ? AND deleted = 0', [sdId]);
 
-    return result?.count || 0;
+    return result?.count ?? 0;
   }
 
   /**
    * Helper: Count folders in SD
    */
-  private async countFolders(sdId: number): Promise<number> {
+  private countFolders(_sdId: string): number {
     // TODO: Implement folder counting
     // For now, return 0
     return 0;

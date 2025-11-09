@@ -187,7 +187,10 @@ export class IPCHandlers {
     ipcMain.handle('diagnostics:deleteDuplicateNote', this.handleDeleteDuplicateNote.bind(this));
 
     // Backup and restore operations
-    ipcMain.handle('backup:createPreOperationSnapshot', this.handleCreatePreOperationSnapshot.bind(this));
+    ipcMain.handle(
+      'backup:createPreOperationSnapshot',
+      this.handleCreatePreOperationSnapshot.bind(this)
+    );
     ipcMain.handle('backup:createManualBackup', this.handleCreateManualBackup.bind(this));
     ipcMain.handle('backup:listBackups', this.handleListBackups.bind(this));
     ipcMain.handle('backup:restoreFromBackup', this.handleRestoreFromBackup.bind(this));
@@ -1984,7 +1987,7 @@ export class IPCHandlers {
    */
   private async handleCreatePreOperationSnapshot(
     _event: IpcMainInvokeEvent,
-    sdId: number,
+    sdId: string,
     noteIds: string[],
     description: string
   ): Promise<import('../backup-manager').BackupInfo> {
@@ -1996,7 +1999,7 @@ export class IPCHandlers {
    */
   private async handleCreateManualBackup(
     _event: IpcMainInvokeEvent,
-    sdId: number,
+    sdId: string,
     packAndSnapshot: boolean,
     description?: string
   ): Promise<import('../backup-manager').BackupInfo> {
@@ -2006,10 +2009,8 @@ export class IPCHandlers {
   /**
    * Backup: List all available backups
    */
-  private async handleListBackups(
-    _event: IpcMainInvokeEvent
-  ): Promise<import('../backup-manager').BackupInfo[]> {
-    return await this.backupManager.listBackups();
+  private handleListBackups(_event: IpcMainInvokeEvent): import('../backup-manager').BackupInfo[] {
+    return this.backupManager.listBackups();
   }
 
   /**
@@ -2020,25 +2021,22 @@ export class IPCHandlers {
     backupId: string,
     targetPath: string,
     registerAsNew: boolean
-  ): Promise<{ sdId: number; sdPath: string }> {
+  ): Promise<{ sdId: string; sdPath: string }> {
     return await this.backupManager.restoreFromBackup(backupId, targetPath, registerAsNew);
   }
 
   /**
    * Backup: Delete a backup
    */
-  private async handleDeleteBackup(
-    _event: IpcMainInvokeEvent,
-    backupId: string
-  ): Promise<void> {
-    await this.backupManager.deleteBackup(backupId);
+  private handleDeleteBackup(_event: IpcMainInvokeEvent, backupId: string): void {
+    this.backupManager.deleteBackup(backupId);
   }
 
   /**
    * Backup: Clean up old pre-operation snapshots
    */
-  private async handleCleanupOldSnapshots(_event: IpcMainInvokeEvent): Promise<number> {
-    return await this.backupManager.cleanupOldSnapshots();
+  private handleCleanupOldSnapshots(_event: IpcMainInvokeEvent): number {
+    return this.backupManager.cleanupOldSnapshots();
   }
 
   /**
