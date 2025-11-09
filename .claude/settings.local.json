@@ -153,7 +153,10 @@
       "Bash(npm run build:*)",
       "Bash(pnpm test:e2e:multi-sd:*)",
       "Bash(timeout 5 grep:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(NODE_ENV=test timeout 120 npx tsx:*)",
+      "Bash(NODE_ENV=test timeout 120 npx ts-node:*)",
+      "Bash(env NODE_ENV=test timeout 120 npx tsx:*)"
     ],
     "deny": [],
     "ask": []
