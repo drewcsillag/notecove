@@ -45,12 +45,6 @@ interface TestResult {
   warnings: string[];
 }
 
-interface MoveTestNote {
-  id: string;
-  sdId: string;
-  path: string;
-}
-
 /**
  * Create a test database with multiple SDs
  */
@@ -189,7 +183,8 @@ async function scenarioConcurrentMoves(context: TestContext): Promise<TestResult
 
     // Verify notes are in correct locations
     for (let i = 0; i < 5; i++) {
-      const noteId = noteIds[i]!;
+      const noteId = noteIds[i];
+      if (!noteId) continue;
       const note = await database.getNote(noteId);
       if (note?.sdId !== sd2Id) {
         errors.push(`Note ${noteId} not in SD2 after move`);
@@ -201,7 +196,8 @@ async function scenarioConcurrentMoves(context: TestContext): Promise<TestResult
     }
 
     for (let i = 5; i < 10; i++) {
-      const noteId = noteIds[i]!;
+      const noteId = noteIds[i];
+      if (!noteId) continue;
       const note = await database.getNote(noteId);
       if (note?.sdId !== sd3Id) {
         errors.push(`Note ${noteId} not in SD3 after move`);
@@ -243,7 +239,13 @@ async function scenarioInterruptedMoves(context: TestContext): Promise<TestResul
   const warnings: string[] = [];
   const details: string[] = [];
 
-  const states: NoteMoveState[] = ['initiated', 'copying', 'files_copied', 'db_updated', 'cleaning'];
+  const states: NoteMoveState[] = [
+    'initiated',
+    'copying',
+    'files_copied',
+    'db_updated',
+    'cleaning',
+  ];
 
   for (const state of states) {
     const testDir = join(context.testDir, `interrupted-${state}`);
@@ -253,7 +255,13 @@ async function scenarioInterruptedMoves(context: TestContext): Promise<TestResul
 
     try {
       const noteId = `note-for-${state}`;
-      await createTestNote(database, sd1Id, context.sd1Path, noteId, `Note interrupted at ${state}`);
+      await createTestNote(
+        database,
+        sd1Id,
+        context.sd1Path,
+        noteId,
+        `Note interrupted at ${state}`
+      );
 
       const manager1 = new NoteMoveManager(database, 'instance-1');
 
@@ -322,7 +330,7 @@ async function scenarioMissingSD(context: TestContext): Promise<TestResult> {
   const testDir = join(context.testDir, 'missing-sd');
   await mkdir(testDir, { recursive: true });
 
-  const { database, sd1Id, sd2Id } = await createTestDatabase(testDir, context);
+  const { database, sd1Id } = await createTestDatabase(testDir, context);
 
   try {
     const noteId = 'note-missing-sd';
@@ -396,7 +404,7 @@ async function scenarioMissingSD(context: TestContext): Promise<TestResult> {
  */
 async function main() {
   const args = process.argv.slice(2);
-  const scenarioName = args.find((arg) => arg.startsWith('--scenario='))?.split('=')[1] || 'all';
+  const scenarioName = args.find((arg) => arg.startsWith('--scenario='))?.split('=')[1] ?? 'all';
 
   console.log('='.repeat(80));
   console.log('Cross-SD Move Fuzz Test');
@@ -439,10 +447,9 @@ async function main() {
     },
   };
 
-  const results: Array<{ scenario: string; result: TestResult }> = [];
+  const results: { scenario: string; result: TestResult }[] = [];
 
-  const scenariosToRun =
-    scenarioName === 'all' ? Object.keys(scenarios) : [scenarioName];
+  const scenariosToRun = scenarioName === 'all' ? Object.keys(scenarios) : [scenarioName];
 
   for (const name of scenariosToRun) {
     const scenario = scenarios[name];
