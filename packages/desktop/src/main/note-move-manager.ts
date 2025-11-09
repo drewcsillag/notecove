@@ -405,10 +405,13 @@ export class NoteMoveManager {
             await fs.promises.rm(tempPath, { recursive: true, force: true });
           }
         }
-        await this.copyFilesToTemp(move);
+        // Call performFileCopy directly (already in 'copying' state, don't transition again)
+        await this.performFileCopy(move);
+        await this.updateMoveState(move.id, 'files_copied');
         await this.updateDatabase(move);
         await this.renameToFinal(move);
-        await this.cleanupSource(move);
+        await this.updateMoveState(move.id, 'cleaning');
+        await this.performSourceCleanup(move);
         await this.updateMoveState(move.id, 'completed');
         break;
 
@@ -450,7 +453,8 @@ export class NoteMoveManager {
             await this.renameToFinal(move);
           }
         }
-        await this.cleanupSource(move);
+        // Call performSourceCleanup directly (already in 'cleaning' state, don't transition again)
+        await this.performSourceCleanup(move);
         await this.updateMoveState(move.id, 'completed');
         break;
 
@@ -478,6 +482,30 @@ export class NoteMoveManager {
    * Implements state machine with rollback on failure
    */
   async executeMove(moveId: string): Promise<MoveExecutionResult> {
+    return this.executeMoveToState(moveId, 'completed');
+  }
+
+  /**
+   * Execute move operation up to a specific state (for testing controlled interruption)
+   * @param moveId - The move record ID
+   * @param stopAtState - The state to stop at (move will end in this state)
+   * @returns MoveExecutionResult indicating success/failure
+   *
+   * This method executes a move from 'initiated' state up to (and including) the specified state.
+   * Used for testing crash recovery by simulating interruption at specific points.
+   *
+   * Examples:
+   * - stopAtState='initiated': Returns immediately, move stays in 'initiated'
+   * - stopAtState='copying': Transitions to 'copying', then returns (files may be partially copied)
+   * - stopAtState='files_copied': Completes file copying, move ends in 'files_copied'
+   * - stopAtState='db_updated': Completes DB update, move ends in 'db_updated'
+   * - stopAtState='cleaning': Transitions to 'cleaning', then returns
+   * - stopAtState='completed': Executes full move (same as executeMove)
+   */
+  async executeMoveToState(
+    moveId: string,
+    stopAtState: NoteMoveState
+  ): Promise<MoveExecutionResult> {
     const move = await this.getMoveRecord(moveId);
     if (!move) {
       return {
@@ -487,22 +515,52 @@ export class NoteMoveManager {
       };
     }
 
-    console.log(`[NoteMoveManager] Executing move ${moveId} for note ${move.noteId}`);
+    if (move.state !== 'initiated') {
+      return {
+        success: false,
+        moveId,
+        error: `executeMoveToState expects move to be in 'initiated' state, but found: ${move.state}`,
+      };
+    }
+
+    console.log(
+      `[NoteMoveManager] Executing move ${moveId} for note ${move.noteId} (stop at: ${stopAtState})`
+    );
 
     try {
-      // Step 1: Create temporary directory and copy files
-      await this.copyFilesToTemp(move);
+      // Return immediately if stopping at initiated
+      if (stopAtState === 'initiated') {
+        return { success: true, moveId };
+      }
 
-      // Step 2: Update database (transaction: insert + delete)
+      // Step 1: Start copying files (transitions to 'copying')
+      await this.updateMoveState(moveId, 'copying');
+      if (stopAtState === 'copying') {
+        return { success: true, moveId };
+      }
+
+      // Complete the file copy (transitions to 'files_copied')
+      await this.performFileCopy(move);
+      await this.updateMoveState(moveId, 'files_copied');
+      if (stopAtState === 'files_copied') {
+        return { success: true, moveId };
+      }
+
+      // Step 2: Update database (transitions to 'db_updated')
       await this.updateDatabase(move);
+      if (stopAtState === 'db_updated') {
+        return { success: true, moveId };
+      }
 
-      // Step 3: Atomic rename from temp to final location
+      // Step 3: Rename temp to final (transitions to 'cleaning')
       await this.renameToFinal(move);
+      await this.updateMoveState(moveId, 'cleaning');
+      if (stopAtState === 'cleaning') {
+        return { success: true, moveId };
+      }
 
-      // Step 4: Clean up source files
-      await this.cleanupSource(move);
-
-      // Mark as completed
+      // Step 4: Clean up source files (transitions to 'completed')
+      await this.performSourceCleanup(move);
       await this.updateMoveState(moveId, 'completed');
 
       console.log(`[NoteMoveManager] Move ${moveId} completed successfully`);
@@ -527,11 +585,10 @@ export class NoteMoveManager {
   }
 
   /**
-   * Step 1: Copy CRDT files to temporary directory
+   * Perform actual file copy operation (without state transitions)
+   * Used by executeMoveToState for controlled interruption testing
    */
-  private async copyFilesToTemp(move: NoteMove): Promise<void> {
-    await this.updateMoveState(move.id, 'copying');
-
+  private async performFileCopy(move: NoteMove): Promise<void> {
     if (!move.sourceSdPath || !move.targetSdPath) {
       throw new Error('Source or target SD path is missing');
     }
@@ -557,8 +614,17 @@ export class NoteMoveManager {
       }
     }
 
-    await this.updateMoveState(move.id, 'files_copied');
     console.log(`[NoteMoveManager] Copied files for move ${move.id} to ${tempPath}`);
+  }
+
+  /**
+   * Step 1: Copy CRDT files to temporary directory
+   * Used by recovery logic - includes state transitions
+   */
+  private async copyFilesToTemp(move: NoteMove): Promise<void> {
+    await this.updateMoveState(move.id, 'copying');
+    await this.performFileCopy(move);
+    await this.updateMoveState(move.id, 'files_copied');
   }
 
   /**
@@ -689,11 +755,10 @@ export class NoteMoveManager {
   }
 
   /**
-   * Step 4: Clean up source files
+   * Perform actual source cleanup (without state transitions)
+   * Used by executeMoveToState for controlled interruption testing
    */
-  private async cleanupSource(move: NoteMove): Promise<void> {
-    await this.updateMoveState(move.id, 'cleaning');
-
+  private async performSourceCleanup(move: NoteMove): Promise<void> {
     if (!move.sourceSdPath) {
       throw new Error('Source SD path is missing');
     }
@@ -704,6 +769,15 @@ export class NoteMoveManager {
     await fs.promises.rm(sourcePath, { recursive: true, force: true });
 
     console.log(`[NoteMoveManager] Cleaned up source files for move ${move.id}`);
+  }
+
+  /**
+   * Step 4: Clean up source files
+   * Used by recovery logic - includes state transitions
+   */
+  private async cleanupSource(move: NoteMove): Promise<void> {
+    await this.updateMoveState(move.id, 'cleaning');
+    await this.performSourceCleanup(move);
   }
 
   /**

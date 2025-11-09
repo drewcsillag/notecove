@@ -151,7 +151,9 @@
       "Bash(env NODE_ENV=test timeout 240 npx playwright test:*)",
       "Bash(pnpm --filter @notecove/shared add:*)",
       "Bash(npm run build:*)",
-      "Bash(pnpm test:e2e:multi-sd:*)"
+      "Bash(pnpm test:e2e:multi-sd:*)",
+      "Bash(timeout 5 grep:*)",
+      "Bash(xargs cat:*)"
     ],
     "deny": [],
     "ask": []
