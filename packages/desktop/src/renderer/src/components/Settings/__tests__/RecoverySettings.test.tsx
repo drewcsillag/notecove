@@ -30,7 +30,11 @@ describe('RecoverySettings', () => {
 
   describe('Loading and Display', () => {
     it('should show loading state initially', () => {
-      mockElectronAPI.recovery.getStaleMoves.mockReturnValue(new Promise(() => {})); // Never resolves
+      mockElectronAPI.recovery.getStaleMoves.mockReturnValue(
+        new Promise(() => {
+          /* never resolves */
+        })
+      );
 
       render(<RecoverySettings />);
 
@@ -44,7 +48,9 @@ describe('RecoverySettings', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No Issues Detected')).toBeInTheDocument();
-        expect(screen.getByText('All move operations are completing normally.')).toBeInTheDocument();
+        expect(
+          screen.getByText('All move operations are completing normally.')
+        ).toBeInTheDocument();
       });
 
       expect(mockElectronAPI.recovery.getStaleMoves).toHaveBeenCalled();
@@ -74,9 +80,7 @@ describe('RecoverySettings', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Stuck Operations Detected')).toBeInTheDocument();
-        expect(
-          screen.getByText(/Found 1 incomplete move operation/)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Found 1 incomplete move operation/)).toBeInTheDocument();
       });
 
       // Check if note ID is displayed
@@ -126,9 +130,7 @@ describe('RecoverySettings', () => {
       render(<RecoverySettings />);
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/Found 2 incomplete move operations/)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Found 2 incomplete move operations/)).toBeInTheDocument();
       });
 
       expect(screen.getByText(/Note: note-1/)).toBeInTheDocument();

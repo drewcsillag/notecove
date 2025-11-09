@@ -19,6 +19,7 @@ import type { ConfigManager } from '../config/manager';
 import { extractTags } from '@notecove/shared';
 import { getTelemetryManager } from '../telemetry/config';
 import type { NoteMoveManager } from '../note-move-manager';
+import type { DiagnosticsManager } from '../diagnostics-manager';
 
 export class IPCHandlers {
   constructor(
@@ -27,6 +28,7 @@ export class IPCHandlers {
     private configManager: ConfigManager,
     private updateManager: UpdateManager,
     private noteMoveManager: NoteMoveManager,
+    private diagnosticsManager: DiagnosticsManager,
     private createWindowFn?: () => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
   ) {
@@ -154,6 +156,33 @@ export class IPCHandlers {
     ipcMain.handle('recovery:getStaleMoves', this.handleGetStaleMoves.bind(this));
     ipcMain.handle('recovery:takeOverMove', this.handleTakeOverMove.bind(this));
     ipcMain.handle('recovery:cancelMove', this.handleCancelMove.bind(this));
+
+    // Diagnostics operations
+    ipcMain.handle('diagnostics:getDuplicateNotes', this.handleGetDuplicateNotes.bind(this));
+    ipcMain.handle('diagnostics:getOrphanedCRDTFiles', this.handleGetOrphanedCRDTFiles.bind(this));
+    ipcMain.handle('diagnostics:getMissingCRDTFiles', this.handleGetMissingCRDTFiles.bind(this));
+    ipcMain.handle(
+      'diagnostics:getStaleMigrationLocks',
+      this.handleGetStaleMigrationLocks.bind(this)
+    );
+    ipcMain.handle(
+      'diagnostics:getOrphanedActivityLogs',
+      this.handleGetOrphanedActivityLogs.bind(this)
+    );
+    ipcMain.handle(
+      'diagnostics:removeStaleMigrationLock',
+      this.handleRemoveStaleMigrationLock.bind(this)
+    );
+    ipcMain.handle(
+      'diagnostics:cleanupOrphanedActivityLog',
+      this.handleCleanupOrphanedActivityLog.bind(this)
+    );
+    ipcMain.handle('diagnostics:importOrphanedCRDT', this.handleImportOrphanedCRDT.bind(this));
+    ipcMain.handle(
+      'diagnostics:deleteMissingCRDTEntry',
+      this.handleDeleteMissingCRDTEntry.bind(this)
+    );
+    ipcMain.handle('diagnostics:deleteDuplicateNote', this.handleDeleteDuplicateNote.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -1837,6 +1866,105 @@ export class IPCHandlers {
     return {
       success: result.success,
     };
+  }
+
+  /**
+   * Diagnostics: Get duplicate notes (same ID in multiple SDs)
+   */
+  private async handleGetDuplicateNotes(
+    _event: IpcMainInvokeEvent
+  ): Promise<import('../diagnostics-manager').DuplicateNote[]> {
+    return await this.diagnosticsManager.detectDuplicateNotes();
+  }
+
+  /**
+   * Diagnostics: Get orphaned CRDT files (filesystem files without database entries)
+   */
+  private async handleGetOrphanedCRDTFiles(
+    _event: IpcMainInvokeEvent
+  ): Promise<import('../diagnostics-manager').OrphanedCRDTFile[]> {
+    return await this.diagnosticsManager.detectOrphanedCRDTFiles();
+  }
+
+  /**
+   * Diagnostics: Get missing CRDT files (database entries without filesystem files)
+   */
+  private async handleGetMissingCRDTFiles(
+    _event: IpcMainInvokeEvent
+  ): Promise<import('../diagnostics-manager').MissingCRDTFile[]> {
+    return await this.diagnosticsManager.detectMissingCRDTFiles();
+  }
+
+  /**
+   * Diagnostics: Get stale migration locks (older than 1 hour)
+   */
+  private async handleGetStaleMigrationLocks(
+    _event: IpcMainInvokeEvent
+  ): Promise<import('../diagnostics-manager').StaleMigrationLock[]> {
+    return await this.diagnosticsManager.detectStaleMigrationLocks();
+  }
+
+  /**
+   * Diagnostics: Get orphaned activity logs (instances not seen in 30+ days)
+   */
+  private async handleGetOrphanedActivityLogs(
+    _event: IpcMainInvokeEvent
+  ): Promise<import('../diagnostics-manager').OrphanedActivityLog[]> {
+    return await this.diagnosticsManager.detectOrphanedActivityLogs();
+  }
+
+  /**
+   * Diagnostics: Remove a stale migration lock
+   */
+  private async handleRemoveStaleMigrationLock(
+    _event: IpcMainInvokeEvent,
+    sdId: number
+  ): Promise<void> {
+    await this.diagnosticsManager.removeStaleMigrationLock(sdId);
+  }
+
+  /**
+   * Diagnostics: Clean up an orphaned activity log
+   */
+  private async handleCleanupOrphanedActivityLog(
+    _event: IpcMainInvokeEvent,
+    sdId: number,
+    instanceId: string
+  ): Promise<void> {
+    await this.diagnosticsManager.cleanupOrphanedActivityLog(sdId, instanceId);
+  }
+
+  /**
+   * Diagnostics: Import an orphaned CRDT file to the database
+   */
+  private async handleImportOrphanedCRDT(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    sdId: number
+  ): Promise<void> {
+    await this.diagnosticsManager.importOrphanedCRDT(noteId, sdId);
+  }
+
+  /**
+   * Diagnostics: Delete a database entry for a missing CRDT file
+   */
+  private async handleDeleteMissingCRDTEntry(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    sdId: number
+  ): Promise<void> {
+    await this.diagnosticsManager.deleteMissingCRDTEntry(noteId, sdId);
+  }
+
+  /**
+   * Diagnostics: Delete one instance of a duplicate note
+   */
+  private async handleDeleteDuplicateNote(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    sdId: number
+  ): Promise<void> {
+    await this.diagnosticsManager.deleteDuplicateNote(noteId, sdId);
   }
 
   // Test-only handlers

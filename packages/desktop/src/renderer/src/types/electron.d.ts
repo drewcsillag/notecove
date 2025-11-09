@@ -197,6 +197,76 @@ declare global {
         cancelMove: (moveId: string) => Promise<{ success: boolean; error?: string }>;
       };
 
+      diagnostics: {
+        getDuplicateNotes: () => Promise<
+          {
+            noteId: string;
+            noteTitle: string;
+            instances: {
+              sdId: number;
+              sdName: string;
+              sdPath: string;
+              modifiedAt: string;
+              size: number;
+              blockCount: number;
+              preview: string;
+            }[];
+          }[]
+        >;
+        getOrphanedCRDTFiles: () => Promise<
+          {
+            noteId: string;
+            sdId: number;
+            sdName: string;
+            sdPath: string;
+            filePath: string;
+            title: string;
+            preview: string;
+            modifiedAt: string;
+            size: number;
+            blockCount: number;
+          }[]
+        >;
+        getMissingCRDTFiles: () => Promise<
+          {
+            noteId: string;
+            noteTitle: string;
+            sdId: number;
+            sdName: string;
+            sdPath: string;
+            expectedPath: string;
+            lastModified: string;
+          }[]
+        >;
+        getStaleMigrationLocks: () => Promise<
+          {
+            sdId: number;
+            sdName: string;
+            sdPath: string;
+            lockPath: string;
+            ageMinutes: number;
+            createdAt: string;
+          }[]
+        >;
+        getOrphanedActivityLogs: () => Promise<
+          {
+            instanceId: string;
+            sdId: number;
+            sdName: string;
+            sdPath: string;
+            logPath: string;
+            lastSeen: string;
+            daysSinceLastSeen: number;
+            sizeBytes: number;
+          }[]
+        >;
+        removeStaleMigrationLock: (sdId: number) => Promise<void>;
+        cleanupOrphanedActivityLog: (sdId: number, instanceId: string) => Promise<void>;
+        importOrphanedCRDT: (noteId: string, sdId: number) => Promise<void>;
+        deleteMissingCRDTEntry: (noteId: string, sdId: number) => Promise<void>;
+        deleteDuplicateNote: (noteId: string, sdId: number) => Promise<void>;
+      };
+
       menu: {
         onNewNote: (callback: () => void) => () => void;
         onNewFolder: (callback: () => void) => () => void;

@@ -156,7 +156,10 @@
       "Bash(xargs cat:*)",
       "Bash(NODE_ENV=test timeout 120 npx tsx:*)",
       "Bash(NODE_ENV=test timeout 120 npx ts-node:*)",
-      "Bash(env NODE_ENV=test timeout 120 npx tsx:*)"
+      "Bash(env NODE_ENV=test timeout 120 npx tsx:*)",
+      "Bash(pnpm format:write:*)",
+      "Bash(xxd:*)",
+      "Bash(wait)"
     ],
     "deny": [],
     "ask": []

@@ -178,13 +178,27 @@ describe('IPCHandlers - Folder CRUD', () => {
       cancelMove: jest.fn(),
     };
 
+    const mockDiagnosticsManager = {
+      detectDuplicateNotes: jest.fn(),
+      detectOrphanedCRDTFiles: jest.fn(),
+      detectMissingCRDTFiles: jest.fn(),
+      detectStaleMigrationLocks: jest.fn(),
+      detectOrphanedActivityLogs: jest.fn(),
+      removeStaleMigrationLock: jest.fn(),
+      cleanupOrphanedActivityLog: jest.fn(),
+      importOrphanedCRDT: jest.fn(),
+      deleteMissingCRDTEntry: jest.fn(),
+      deleteDuplicateNote: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
       mockConfigManager as unknown as ConfigManager,
       mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
-      mockNoteMoveManager as unknown as NoteMoveManager
+      mockNoteMoveManager as unknown as NoteMoveManager,
+      mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager
     );
   });
 
@@ -880,13 +894,27 @@ describe('IPCHandlers - SD Management', () => {
       cancelMove: jest.fn(),
     };
 
+    const mockDiagnosticsManager = {
+      detectDuplicateNotes: jest.fn(),
+      detectOrphanedCRDTFiles: jest.fn(),
+      detectMissingCRDTFiles: jest.fn(),
+      detectStaleMigrationLocks: jest.fn(),
+      detectOrphanedActivityLogs: jest.fn(),
+      removeStaleMigrationLock: jest.fn(),
+      cleanupOrphanedActivityLog: jest.fn(),
+      importOrphanedCRDT: jest.fn(),
+      deleteMissingCRDTEntry: jest.fn(),
+      deleteDuplicateNote: jest.fn(),
+    };
+
     // Create handlers
     handlers = new IPCHandlers(
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
       mockConfigManager as unknown as ConfigManager,
       mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
-      mockNoteMoveManager as unknown as NoteMoveManager
+      mockNoteMoveManager as unknown as NoteMoveManager,
+      mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager
     );
   });
 

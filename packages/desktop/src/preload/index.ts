@@ -482,6 +482,148 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }>,
   },
 
+  // Diagnostics operations
+  diagnostics: {
+    getDuplicateNotes: (): Promise<
+      {
+        noteId: string;
+        noteTitle: string;
+        instances: {
+          sdId: number;
+          sdName: string;
+          sdPath: string;
+          modifiedAt: string;
+          size: number;
+          blockCount: number;
+          preview: string;
+        }[];
+      }[]
+    > =>
+      ipcRenderer.invoke('diagnostics:getDuplicateNotes') as Promise<
+        {
+          noteId: string;
+          noteTitle: string;
+          instances: {
+            sdId: number;
+            sdName: string;
+            sdPath: string;
+            modifiedAt: string;
+            size: number;
+            blockCount: number;
+            preview: string;
+          }[];
+        }[]
+      >,
+    getOrphanedCRDTFiles: (): Promise<
+      {
+        noteId: string;
+        sdId: number;
+        sdName: string;
+        sdPath: string;
+        filePath: string;
+        title: string;
+        preview: string;
+        modifiedAt: string;
+        size: number;
+        blockCount: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('diagnostics:getOrphanedCRDTFiles') as Promise<
+        {
+          noteId: string;
+          sdId: number;
+          sdName: string;
+          sdPath: string;
+          filePath: string;
+          title: string;
+          preview: string;
+          modifiedAt: string;
+          size: number;
+          blockCount: number;
+        }[]
+      >,
+    getMissingCRDTFiles: (): Promise<
+      {
+        noteId: string;
+        noteTitle: string;
+        sdId: number;
+        sdName: string;
+        sdPath: string;
+        expectedPath: string;
+        lastModified: string;
+      }[]
+    > =>
+      ipcRenderer.invoke('diagnostics:getMissingCRDTFiles') as Promise<
+        {
+          noteId: string;
+          noteTitle: string;
+          sdId: number;
+          sdName: string;
+          sdPath: string;
+          expectedPath: string;
+          lastModified: string;
+        }[]
+      >,
+    getStaleMigrationLocks: (): Promise<
+      {
+        sdId: number;
+        sdName: string;
+        sdPath: string;
+        lockPath: string;
+        ageMinutes: number;
+        createdAt: string;
+      }[]
+    > =>
+      ipcRenderer.invoke('diagnostics:getStaleMigrationLocks') as Promise<
+        {
+          sdId: number;
+          sdName: string;
+          sdPath: string;
+          lockPath: string;
+          ageMinutes: number;
+          createdAt: string;
+        }[]
+      >,
+    getOrphanedActivityLogs: (): Promise<
+      {
+        instanceId: string;
+        sdId: number;
+        sdName: string;
+        sdPath: string;
+        logPath: string;
+        lastSeen: string;
+        daysSinceLastSeen: number;
+        sizeBytes: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('diagnostics:getOrphanedActivityLogs') as Promise<
+        {
+          instanceId: string;
+          sdId: number;
+          sdName: string;
+          sdPath: string;
+          logPath: string;
+          lastSeen: string;
+          daysSinceLastSeen: number;
+          sizeBytes: number;
+        }[]
+      >,
+    removeStaleMigrationLock: (sdId: number): Promise<void> =>
+      ipcRenderer.invoke('diagnostics:removeStaleMigrationLock', sdId) as Promise<void>,
+    cleanupOrphanedActivityLog: (sdId: number, instanceId: string): Promise<void> =>
+      ipcRenderer.invoke(
+        'diagnostics:cleanupOrphanedActivityLog',
+        sdId,
+        instanceId
+      ) as Promise<void>,
+    importOrphanedCRDT: (noteId: string, sdId: number): Promise<void> =>
+      ipcRenderer.invoke('diagnostics:importOrphanedCRDT', noteId, sdId) as Promise<void>,
+    deleteMissingCRDTEntry: (noteId: string, sdId: number): Promise<void> =>
+      ipcRenderer.invoke('diagnostics:deleteMissingCRDTEntry', noteId, sdId) as Promise<void>,
+    deleteDuplicateNote: (noteId: string, sdId: number): Promise<void> =>
+      ipcRenderer.invoke('diagnostics:deleteDuplicateNote', noteId, sdId) as Promise<void>,
+  },
+
   // Menu event listeners
   menu: {
     onNewNote: (callback: () => void): (() => void) => {
