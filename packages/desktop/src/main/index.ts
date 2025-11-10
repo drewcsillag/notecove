@@ -1015,15 +1015,30 @@ void app.whenReady().then(async () => {
           const notesDir = join(sdPath, 'notes');
           const noteDirectories = await fsAdapter.listFiles(notesDir);
           let loadedCount = 0;
-          const totalNotes = noteDirectories.filter(
-            (id) => !id.startsWith('.') && id && id !== 'undefined'
-          ).length;
+
+          // Filter to count only valid note IDs (same logic as loading loop)
+          const isValidNoteId = (id: string): boolean => {
+            return (
+              !id.startsWith('.') &&
+              id &&
+              id !== 'undefined' &&
+              id !== 'Icon' &&
+              !id.includes('\r') &&
+              id !== 'desktop.ini' &&
+              id !== 'Thumbs.db' &&
+              !/\s\(\d+\)$/.test(id) &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+            );
+          };
+
+          const totalNotes = noteDirectories.filter(isValidNoteId).length;
 
           sendProgress(6, 6, `Loading ${totalNotes} notes and indexing tags...`);
 
           for (const noteId of noteDirectories) {
-            // Skip special files (like .DS_Store)
-            if (noteId.startsWith('.') || !noteId || noteId === 'undefined') {
+            // Skip invalid note IDs and system files
+            if (!isValidNoteId(noteId)) {
+              console.log(`[Init] Skipping invalid/system file: ${noteId}`);
               continue;
             }
 
