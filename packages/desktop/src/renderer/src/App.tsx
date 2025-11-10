@@ -13,6 +13,7 @@ import { LeftSidebar } from './components/LeftSidebar/LeftSidebar';
 import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
 import { EditorPanel } from './components/EditorPanel/EditorPanel';
 import { SettingsDialog } from './components/Settings/SettingsDialog';
+import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgressDialog';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
@@ -28,6 +29,14 @@ function App(): React.ReactElement {
   // Tag filters: tagId -> 'include' | 'exclude' (omitted = neutral/no filter)
   const [tagFilters, setTagFilters] = useState<Record<string, 'include' | 'exclude'>>({});
   const [showTagPanel, setShowTagPanel] = useState(true);
+  // SD initialization progress
+  const [sdInitProgress, setSDInitProgress] = useState<{
+    open: boolean;
+    step: number;
+    total: number;
+    message: string;
+    error?: string;
+  }>({ open: false, step: 0, total: 6, message: '' });
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
@@ -36,6 +45,39 @@ function App(): React.ReactElement {
   useEffect(() => {
     console.log('[App] activeSdId changed to:', activeSdId);
   }, [activeSdId]);
+
+  // Listen for SD initialization progress
+  useEffect(() => {
+    const unsubscribeProgress = window.electronAPI.sd.onInitProgress((data) => {
+      setSDInitProgress({
+        open: true,
+        step: data.step,
+        total: data.total,
+        message: data.message,
+      });
+    });
+
+    const unsubscribeComplete = window.electronAPI.sd.onInitComplete(() => {
+      setSDInitProgress({ open: false, step: 0, total: 6, message: '' });
+    });
+
+    const unsubscribeError = window.electronAPI.sd.onInitError((data) => {
+      setSDInitProgress((prev) => ({
+        ...prev,
+        error: data.error,
+      }));
+      // Auto-close after 3 seconds on error
+      setTimeout(() => {
+        setSDInitProgress({ open: false, step: 0, total: 6, message: '' });
+      }, 3000);
+    });
+
+    return () => {
+      unsubscribeProgress();
+      unsubscribeComplete();
+      unsubscribeError();
+    };
+  }, []);
 
   // Load saved panel sizes on mount
   useEffect(() => {
@@ -300,6 +342,13 @@ function App(): React.ReactElement {
             onThemeChange={setThemeMode}
           />
         )}
+        <SDInitProgressDialog
+          open={sdInitProgress.open}
+          step={sdInitProgress.step}
+          total={sdInitProgress.total}
+          message={sdInitProgress.message}
+          error={sdInitProgress.error}
+        />
       </DndProvider>
     </ThemeProvider>
   );

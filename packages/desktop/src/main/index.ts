@@ -958,10 +958,18 @@ void app.whenReady().then(async () => {
         throw new Error('CRDTManager not initialized');
       }
 
+      // Helper to broadcast progress to all windows
+      const sendProgress = (step: number, total: number, message: string) => {
+        BrowserWindow.getAllWindows().forEach((window) => {
+          window.webContents.send('sd:init-progress', { sdId, step, total, message });
+        });
+      };
+
       try {
         console.log(`[Init] ===== Initializing new SD: ${sdId} at ${sdPath} =====`);
 
         // 1. Create SD config and initialize structure
+        sendProgress(1, 6, 'Creating storage directory structure...');
         console.log(`[Init] Step 1: Creating SD structure`);
         const sdConfig = { id: sdId, path: sdPath, label: '' };
         const newSdStructure = new SyncDirectoryStructure(fsAdapter, sdConfig);
@@ -969,22 +977,26 @@ void app.whenReady().then(async () => {
         console.log(`[Init] Step 1: SD structure created successfully`);
 
         // 2. Ensure activity directory exists (required for watchers)
+        sendProgress(2, 6, 'Setting up activity tracking...');
         const activityDir = join(sdPath, '.activity');
         console.log(`[Init] Step 2: Creating activity directory at ${activityDir}`);
         await fsAdapter.mkdir(activityDir);
         console.log(`[Init] Step 2: Activity directory created successfully`);
 
         // 3. Register with UpdateManager
+        sendProgress(3, 6, 'Registering storage directory...');
         console.log(`[Init] Step 3: Registering with UpdateManager`);
         updateManager.registerSD(sdId, sdPath);
         console.log(`[Init] Step 3: Registered with UpdateManager`);
 
         // 4. Load folder tree for this SD
+        sendProgress(4, 6, 'Loading folder structure...');
         console.log(`[Init] Step 4: Loading folder tree`);
         crdtManager.loadFolderTree(sdId);
         console.log(`[Init] Step 4: Folder tree loaded`);
 
         // 5. Set up watchers for this SD
+        sendProgress(5, 6, 'Setting up file watchers...');
         console.log(`[Init] Step 5: Setting up watchers`);
         await setupSDWatchers(
           sdId,
@@ -1003,6 +1015,11 @@ void app.whenReady().then(async () => {
           const notesDir = join(sdPath, 'notes');
           const noteDirectories = await fsAdapter.listFiles(notesDir);
           let loadedCount = 0;
+          const totalNotes = noteDirectories.filter(
+            (id) => !id.startsWith('.') && id && id !== 'undefined'
+          ).length;
+
+          sendProgress(6, 6, `Loading ${totalNotes} notes and indexing tags...`);
 
           for (const noteId of noteDirectories) {
             // Skip special files (like .DS_Store)
@@ -1082,9 +1099,20 @@ void app.whenReady().then(async () => {
           console.error(`[Init] Failed to scan for existing notes:`, error);
         }
 
+        // Send completion
+        BrowserWindow.getAllWindows().forEach((window) => {
+          window.webContents.send('sd:init-complete', { sdId });
+        });
+
         console.log(`[Init] ===== Successfully initialized new SD: ${sdId} =====`);
       } catch (error) {
         console.error(`[Init] ERROR initializing new SD ${sdId}:`, error);
+
+        // Send error
+        BrowserWindow.getAllWindows().forEach((window) => {
+          window.webContents.send('sd:init-error', { sdId, error: error instanceof Error ? error.message : 'Unknown error' });
+        });
+
         throw error;
       }
     };

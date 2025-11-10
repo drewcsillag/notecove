@@ -394,6 +394,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('sd:updated', listener);
       };
     },
+    onInitProgress: (
+      callback: (data: { sdId: string; step: number; total: number; message: string }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { sdId: string; step: number; total: number; message: string }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('sd:init-progress', listener);
+      return () => {
+        ipcRenderer.removeListener('sd:init-progress', listener);
+      };
+    },
+    onInitComplete: (callback: (data: { sdId: string }) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { sdId: string }): void => {
+        callback(data);
+      };
+      ipcRenderer.on('sd:init-complete', listener);
+      return () => {
+        ipcRenderer.removeListener('sd:init-complete', listener);
+      };
+    },
+    onInitError: (callback: (data: { sdId: string; error: string }) => void): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { sdId: string; error: string }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('sd:init-error', listener);
+      return () => {
+        ipcRenderer.removeListener('sd:init-error', listener);
+      };
+    },
   },
 
   // Sync operations

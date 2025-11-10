@@ -156,6 +156,11 @@ declare global {
         getCloudStoragePaths: () => Promise<Record<string, string>>;
         onOpenSettings: (callback: () => void) => () => void;
         onUpdated: (callback: (data: { operation: string; sdId: string }) => void) => () => void;
+        onInitProgress: (
+          callback: (data: { sdId: string; step: number; total: number; message: string }) => void
+        ) => () => void;
+        onInitComplete: (callback: (data: { sdId: string }) => void) => () => void;
+        onInitError: (callback: (data: { sdId: string; error: string }) => void) => () => void;
       };
 
       sync: {
