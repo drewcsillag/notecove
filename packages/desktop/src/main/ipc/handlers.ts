@@ -616,6 +616,12 @@ export class IPCHandlers {
       await this.database.deleteNote(noteId);
       logMsg(`[permanentlyDeleteNote] Deleted note ${noteId} from database`);
 
+      // If this is the default welcome note, mark it as permanently deleted so it won't be recreated
+      if (noteId === 'default-note') {
+        await this.database.setState('defaultNoteDeleted', 'true');
+        logMsg(`[permanentlyDeleteNote] Marked default note as permanently deleted`);
+      }
+
       // Broadcast permanent delete event to all windows
       this.broadcastToAll('note:permanentDeleted', noteId);
       logMsg(`[permanentlyDeleteNote] Broadcast permanentDeleted event for note ${noteId}`);

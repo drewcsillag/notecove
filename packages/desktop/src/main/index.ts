@@ -297,6 +297,23 @@ async function ensureDefaultNote(
     return;
   }
 
+  // Check if user has permanently deleted the default note
+  const defaultNoteDeleted = await db.getState('defaultNoteDeleted');
+  if (defaultNoteDeleted === 'true') {
+    console.log(
+      '[ensureDefaultNote] Default note was permanently deleted by user, not recreating'
+    );
+    // If other notes exist, select the first one
+    if (existingNotes.length > 0) {
+      const firstNote = existingNotes[0];
+      if (firstNote) {
+        console.log('[ensureDefaultNote] Selecting first available note:', firstNote.id);
+        await db.setState('selectedNoteId', firstNote.id);
+      }
+    }
+    return;
+  }
+
   // Check if any other notes exist
   if (existingNotes.length > 0) {
     // Other notes exist, select the first one
@@ -1058,7 +1075,7 @@ void app.whenReady().then(async () => {
                 const folderId = crdtMetadata?.folderId ?? null;
                 const title = extractTitleFromDoc(doc, 'content');
 
-                // Extract text content for tag indexing
+                // Extract text content for tag indexing and caching
                 const content = doc.getXmlFragment('content');
                 let contentText = '';
                 content.forEach((item) => {
@@ -1079,6 +1096,11 @@ void app.whenReady().then(async () => {
                   }
                 });
 
+                // Generate content preview (first 200 chars after title)
+                const lines = contentText.split('\n');
+                const contentAfterTitle = lines.slice(1).join('\n').trim();
+                const contentPreview = contentAfterTitle.substring(0, 200);
+
                 await database.upsertNote({
                   id: noteId,
                   title,
@@ -1088,8 +1110,8 @@ void app.whenReady().then(async () => {
                   modified: crdtMetadata?.modified ?? Date.now(),
                   deleted: crdtMetadata?.deleted ?? false,
                   pinned: false,
-                  contentPreview: '',
-                  contentText: '',
+                  contentPreview,
+                  contentText,
                 });
 
                 // Extract and index tags
