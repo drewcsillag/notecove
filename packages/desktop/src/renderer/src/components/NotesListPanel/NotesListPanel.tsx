@@ -720,11 +720,22 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     if (!noteToPermanentDelete) return;
 
     try {
-      await window.electronAPI.note.permanentDelete(noteToPermanentDelete);
-      console.log('[NotesListPanel] Note permanently deleted:', noteToPermanentDelete);
+      // If multi-select is active, delete all selected notes
+      const notesToDelete =
+        selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [noteToPermanentDelete];
+
+      // Delete all notes
+      await Promise.all(
+        notesToDelete.map((id) => window.electronAPI.note.permanentDelete(id))
+      );
+
+      console.log('[NotesListPanel] Notes permanently deleted:', notesToDelete);
+
+      // Clear multi-select
+      setSelectedNoteIds(new Set());
 
       // If we just deleted the selected note, clear selection
-      if (selectedNoteId === noteToPermanentDelete) {
+      if (selectedNoteId && notesToDelete.includes(selectedNoteId)) {
         onNoteSelect('');
       }
 
@@ -740,6 +751,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     }
   }, [
     noteToPermanentDelete,
+    selectedNoteIds,
     handleCancelPermanentDelete,
     selectedNoteId,
     onNoteSelect,
@@ -1261,11 +1273,16 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
       {/* Permanent Delete Confirmation Dialog */}
       <Dialog open={permanentDeleteDialogOpen} onClose={handleCancelPermanentDelete}>
-        <DialogTitle>Permanently Delete Note?</DialogTitle>
+        <DialogTitle>
+          {selectedNoteIds.size > 0
+            ? `Permanently Delete ${selectedNoteIds.size} Notes?`
+            : 'Permanently Delete Note?'}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This action cannot be undone. The note and all its content will be permanently deleted
-            from disk.
+            {selectedNoteIds.size > 0
+              ? `This action cannot be undone. These ${selectedNoteIds.size} notes and all their content will be permanently deleted from disk.`
+              : 'This action cannot be undone. The note and all its content will be permanently deleted from disk.'}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

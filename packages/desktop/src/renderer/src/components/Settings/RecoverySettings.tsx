@@ -70,7 +70,7 @@ interface Backup {
   timestamp: number;
   noteCount: number;
   folderCount: number;
-  size: number;
+  sizeBytes: number;
   isPacked: boolean;
   description?: string;
   backupPath: string;
@@ -103,12 +103,17 @@ export const RecoverySettings: React.FC = () => {
   const [selectedSd, setSelectedSd] = useState<string>('');
   const [backupDescription, setBackupDescription] = useState('');
   const [packAndSnapshot, setPackAndSnapshot] = useState(false);
+  const [customBackupPath, setCustomBackupPath] = useState<string>('');
   const [restoreDialog, setRestoreDialog] = useState<{
     open: boolean;
     backup: Backup | null;
   }>({ open: false, backup: null });
   const [restorePath, setRestorePath] = useState('');
   const [registerAsNew, setRegisterAsNew] = useState(true);
+  const [customRestoreDialog, setCustomRestoreDialog] = useState(false);
+  const [customBackupLocation, setCustomBackupLocation] = useState('');
+  const [customRestoreTarget, setCustomRestoreTarget] = useState('');
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   const loadStaleMoves = async () => {
     try {
@@ -140,7 +145,7 @@ export const RecoverySettings: React.FC = () => {
     try {
       const sds = await window.electronAPI.sd.list();
       setStorageDirs(sds);
-      if (sds.length > 0 && !selectedSd) {
+      if (sds.length > 0 && !selectedSd && sds[0]) {
         setSelectedSd(sds[0].id);
       }
     } catch (err) {
@@ -219,6 +224,17 @@ export const RecoverySettings: React.FC = () => {
     }
   };
 
+  const handleSelectBackupPath = async () => {
+    try {
+      const path = await window.electronAPI.sd.selectPath();
+      if (path) {
+        setCustomBackupPath(path);
+      }
+    } catch (err) {
+      console.error('Failed to select backup path:', err);
+    }
+  };
+
   const handleCreateBackup = async () => {
     if (!selectedSd) return;
 
@@ -227,12 +243,14 @@ export const RecoverySettings: React.FC = () => {
       await window.electronAPI.backup.createManualBackup(
         selectedSd,
         packAndSnapshot,
-        backupDescription || undefined
+        backupDescription || undefined,
+        customBackupPath || undefined
       );
       await loadBackups();
       setCreateBackupDialog(false);
       setBackupDescription('');
       setPackAndSnapshot(false);
+      setCustomBackupPath('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create backup');
     } finally {
@@ -244,6 +262,7 @@ export const RecoverySettings: React.FC = () => {
     if (!restoreDialog.backup || !restorePath) return;
 
     setProcessing(true);
+    setRestoreError(null); // Clear any previous errors
     try {
       await window.electronAPI.backup.restoreFromBackup(
         restoreDialog.backup.backupId,
@@ -255,7 +274,7 @@ export const RecoverySettings: React.FC = () => {
       setRestorePath('');
       setRegisterAsNew(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to restore backup');
+      setRestoreError(err instanceof Error ? err.message : 'Failed to restore backup');
     } finally {
       setProcessing(false);
     }
@@ -277,15 +296,60 @@ export const RecoverySettings: React.FC = () => {
 
   const handleSelectPath = async () => {
     try {
-      const result = await window.electronAPI.dialog.showOpenDialog({
-        properties: ['openDirectory', 'createDirectory'],
-        title: 'Select Restore Location',
-      });
-      if (!result.canceled && result.filePaths.length > 0) {
-        setRestorePath(result.filePaths[0]);
+      const path = await window.electronAPI.sd.selectPath();
+      if (path) {
+        setRestorePath(path);
       }
     } catch (err) {
       console.error('Failed to select path:', err);
+    }
+  };
+
+  const handleSelectCustomBackupLocation = async () => {
+    try {
+      const path = await window.electronAPI.sd.selectPath();
+      if (path) {
+        setCustomBackupLocation(path);
+      }
+    } catch (err) {
+      console.error('Failed to select backup location:', err);
+    }
+  };
+
+  const handleSelectCustomRestoreTarget = async () => {
+    try {
+      const path = await window.electronAPI.sd.selectPath();
+      if (path) {
+        setCustomRestoreTarget(path);
+      }
+    } catch (err) {
+      console.error('Failed to select restore target:', err);
+    }
+  };
+
+  const handleRestoreFromCustomLocation = async () => {
+    if (!customBackupLocation || !customRestoreTarget) return;
+
+    setProcessing(true);
+    setRestoreError(null); // Clear any previous errors
+    try {
+      // Call restore with the full backup path
+      await window.electronAPI.backup.restoreFromCustomPath(
+        customBackupLocation,
+        customRestoreTarget,
+        registerAsNew
+      );
+      await loadStorageDirs();
+      setCustomRestoreDialog(false);
+      setCustomBackupLocation('');
+      setCustomRestoreTarget('');
+      setRegisterAsNew(true);
+    } catch (err) {
+      setRestoreError(
+        err instanceof Error ? err.message : 'Failed to restore from custom location'
+      );
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -419,16 +483,27 @@ export const RecoverySettings: React.FC = () => {
 
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="subtitle2">Available Backups ({backups.length})</Typography>
-        <Button
-          variant="contained"
-          startIcon={<BackupIcon />}
-          onClick={() => {
-            setCreateBackupDialog(true);
-          }}
-          disabled={storageDirs.length === 0}
-        >
-          Create Backup
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button
+            variant="outlined"
+            startIcon={<FolderIcon />}
+            onClick={() => {
+              setCustomRestoreDialog(true);
+            }}
+          >
+            Restore from Custom Location
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<BackupIcon />}
+            onClick={() => {
+              setCreateBackupDialog(true);
+            }}
+            disabled={storageDirs.length === 0}
+          >
+            Create Backup
+          </Button>
+        </Box>
       </Box>
 
       {backupsLoading ? (
@@ -458,12 +533,10 @@ export const RecoverySettings: React.FC = () => {
                   <TableCell>{backup.sdName}</TableCell>
                   <TableCell>{formatDate(backup.timestamp)}</TableCell>
                   <TableCell align="right">{backup.noteCount}</TableCell>
-                  <TableCell align="right">{formatSize(backup.size)}</TableCell>
+                  <TableCell align="right">{formatSize(backup.sizeBytes)}</TableCell>
                   <TableCell>
-                    {backup.description || <em>No description</em>}
-                    {backup.isPacked && (
-                      <Chip label="Packed" size="small" sx={{ ml: 1 }} />
-                    )}
+                    {backup.description ?? <em>No description</em>}
+                    {backup.isPacked && <Chip label="Packed" size="small" sx={{ ml: 1 }} />}
                   </TableCell>
                   <TableCell align="right">
                     <IconButton
@@ -527,7 +600,7 @@ export const RecoverySettings: React.FC = () => {
 
       <Tabs
         value={activeTab}
-        onChange={(_e, newValue) => {
+        onChange={(_e, newValue: number) => {
           setActiveTab(newValue);
         }}
         sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
@@ -651,7 +724,46 @@ export const RecoverySettings: React.FC = () => {
               label="Pack and snapshot (optimizes size, takes longer)"
             />
 
-            <Alert severity="info" sx={{ mt: 2 }}>
+            <Box sx={{ mt: 2, mb: 2 }}>
+              <Typography variant="body2" gutterBottom>
+                Backup Location (optional)
+              </Typography>
+              <Box display="flex" gap={1} alignItems="center">
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={customBackupPath}
+                  placeholder="Default: User Data/.backups"
+                  disabled
+                  variant="outlined"
+                />
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    void handleSelectBackupPath();
+                  }}
+                  size="small"
+                  disabled={processing}
+                >
+                  Choose
+                </Button>
+                {customBackupPath && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setCustomBackupPath('');
+                    }}
+                    size="small"
+                    disabled={processing}
+                    color="secondary"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </Box>
+            </Box>
+
+            <Alert severity="info">
               This will create a complete backup of the selected Storage Directory including all
               notes, folders, and settings.
             </Alert>
@@ -684,6 +796,8 @@ export const RecoverySettings: React.FC = () => {
         onClose={() => {
           if (!processing) {
             setRestoreDialog({ open: false, backup: null });
+            setRestorePath('');
+            setRestoreError(null);
           }
         }}
         maxWidth="sm"
@@ -691,6 +805,17 @@ export const RecoverySettings: React.FC = () => {
       >
         <DialogTitle>Restore Backup</DialogTitle>
         <DialogContent>
+          {restoreError && (
+            <Alert
+              severity="error"
+              onClose={() => {
+                setRestoreError(null);
+              }}
+              sx={{ mb: 2, mt: 1 }}
+            >
+              {restoreError}
+            </Alert>
+          )}
           {restoreDialog.backup && (
             <Box sx={{ pt: 1 }}>
               <Typography variant="body2" gutterBottom>
@@ -730,12 +855,13 @@ export const RecoverySettings: React.FC = () => {
                     }}
                   />
                 }
-                label="Register as new Storage Directory"
+                label='Register as new Storage Directory (name will be "[Original Name] (Restored)")'
               />
 
-              <Alert severity="warning" sx={{ mt: 2 }}>
+              <Alert severity="info" sx={{ mt: 2 }}>
                 This will extract the backup to the specified location. If &quot;Register as
-                new&quot; is checked, it will be added to NoteCove as a new Storage Directory.
+                new&quot; is checked, it will be added with a different name to avoid conflicts with
+                existing storage directories.
               </Alert>
             </Box>
           )}
@@ -745,6 +871,7 @@ export const RecoverySettings: React.FC = () => {
             onClick={() => {
               setRestoreDialog({ open: false, backup: null });
               setRestorePath('');
+              setRestoreError(null);
             }}
             disabled={processing}
           >
@@ -756,6 +883,134 @@ export const RecoverySettings: React.FC = () => {
             }}
             variant="contained"
             disabled={processing || !restorePath}
+          >
+            {processing ? <CircularProgress size={20} /> : 'Restore'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Restore from Custom Location Dialog */}
+      <Dialog
+        open={customRestoreDialog}
+        onClose={() => {
+          if (!processing) {
+            setCustomRestoreDialog(false);
+            setCustomBackupLocation('');
+            setCustomRestoreTarget('');
+            setRestoreError(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Restore from Custom Location</DialogTitle>
+        <DialogContent>
+          {restoreError && (
+            <Alert
+              severity="error"
+              onClose={() => {
+                setRestoreError(null);
+              }}
+              sx={{ mb: 2, mt: 1 }}
+            >
+              {restoreError}
+            </Alert>
+          )}
+          <Box sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Select a backup directory that was saved to a custom location and specify where to
+              restore it.
+            </Typography>
+
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" gutterBottom>
+                <strong>Backup Location:</strong>
+              </Typography>
+              <Box display="flex" gap={1} alignItems="center">
+                <TextField
+                  fullWidth
+                  value={customBackupLocation}
+                  onChange={(e) => {
+                    setCustomBackupLocation(e.target.value);
+                  }}
+                  placeholder="/path/to/backup-directory"
+                  size="small"
+                />
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    void handleSelectCustomBackupLocation();
+                  }}
+                  startIcon={<FolderIcon />}
+                >
+                  Choose
+                </Button>
+              </Box>
+            </Box>
+
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" gutterBottom>
+                <strong>Restore To:</strong>
+              </Typography>
+              <Box display="flex" gap={1} alignItems="center">
+                <TextField
+                  fullWidth
+                  value={customRestoreTarget}
+                  onChange={(e) => {
+                    setCustomRestoreTarget(e.target.value);
+                  }}
+                  placeholder="/path/to/restore/location"
+                  size="small"
+                />
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    void handleSelectCustomRestoreTarget();
+                  }}
+                  startIcon={<FolderIcon />}
+                >
+                  Choose
+                </Button>
+              </Box>
+            </Box>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={registerAsNew}
+                  onChange={(e) => {
+                    setRegisterAsNew(e.target.checked);
+                  }}
+                />
+              }
+              label='Register as new Storage Directory (name will be "[Original Name] (Restored)")'
+            />
+
+            <Alert severity="info" sx={{ mt: 2 }}>
+              The backup directory should be the folder containing database.db, notes/, and folders/
+              subdirectories (e.g., backup-1234567890-abc123). &quot;Register as new&quot; is
+              recommended to avoid conflicts with existing storage directories.
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setCustomRestoreDialog(false);
+              setCustomBackupLocation('');
+              setCustomRestoreTarget('');
+              setRestoreError(null);
+            }}
+            disabled={processing}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              void handleRestoreFromCustomLocation();
+            }}
+            variant="contained"
+            disabled={processing || !customBackupLocation || !customRestoreTarget}
           >
             {processing ? <CircularProgress size={20} /> : 'Restore'}
           </Button>

@@ -19,8 +19,10 @@ Create complete backups of your Storage Directories for safekeeping:
 7. Click **Create**
 
 **Backup Contents**:
+
 - All notes (database + CRDT files)
 - Folder structure and organization
+- Tags and tag associations
 - Storage Directory metadata
 - Settings and configuration
 
@@ -56,8 +58,10 @@ Recover your data from a previous backup:
 7. Click **Restore**
 
 **After Restore**:
+
 - The restored Storage Directory is automatically registered in NoteCove
 - All notes and folders from the backup are available immediately
+- Tags are automatically extracted and indexed from note content
 - If restored as new, you'll have both the original and restored SDs
 
 ## Recovery & Diagnostics
@@ -71,6 +75,7 @@ The Recovery tab provides tools to detect and fix data inconsistencies:
 **Detection**: Operations older than 5 minutes are flagged
 
 **Actions**:
+
 - **View Details**: See move state, source/target SDs, note info
 - **Take Over**: Resume the operation from this instance
 - **Cancel**: Roll back and clean up
@@ -84,6 +89,7 @@ The Recovery tab provides tools to detect and fix data inconsistencies:
 **Causes**: Rare edge cases in multi-instance synchronization
 
 **Actions**:
+
 - **View Both Copies**: See content preview and metadata side-by-side
 - **Delete Duplicate**: Keep one copy, remove the other
 
@@ -94,6 +100,7 @@ The Recovery tab provides tools to detect and fix data inconsistencies:
 **Causes**: Incomplete operations, manual file system changes
 
 **Actions**:
+
 - **Preview Content**: See what the note contains
 - **Import to SD**: Re-add the note to NoteCove's database
 
@@ -104,6 +111,7 @@ The Recovery tab provides tools to detect and fix data inconsistencies:
 **Causes**: Accidental deletion, file system corruption
 
 **Actions**:
+
 - **Delete Entry**: Clean up the orphaned database record
 
 ### Stale Migration Locks
@@ -113,6 +121,7 @@ The Recovery tab provides tools to detect and fix data inconsistencies:
 **Causes**: App crash during database migration
 
 **Actions**:
+
 - **Remove Lock**: Allows migrations to proceed again
 
 ### Orphaned Activity Logs
@@ -122,6 +131,7 @@ The Recovery tab provides tools to detect and fix data inconsistencies:
 **Causes**: Old installations, retired devices
 
 **Actions**:
+
 - **Clean Up**: Remove old logs to free disk space
 
 ## Best Practices
@@ -155,6 +165,7 @@ The Recovery tab provides tools to detect and fix data inconsistencies:
 ### "Cannot restore: target exists"
 
 The destination folder already contains a Storage Directory. Either:
+
 - Choose a different destination folder
 - Delete the existing SD first
 - Use "Restore as New" to create alongside it
@@ -173,9 +184,72 @@ Compare both copies using "View Both Copies". Keep the one with the latest chang
 
 ## Advanced Topics
 
+### Database Doctor Tool
+
+The `db-doctor` tool helps diagnose and repair database integrity issues, particularly orphaned data from deleted Storage Directories.
+
+**Location**: `tools/db-doctor.js` in the NoteCove repository
+
+**When to Use**:
+- You're getting "duplicate note" errors when restoring backups
+- Notes from deleted Storage Directories are still appearing
+- You suspect database corruption after crashes or forced quits
+
+**Basic Usage**:
+
+```bash
+# Check for issues (read-only)
+node tools/db-doctor.js /path/to/notecove.db
+
+# Check and automatically fix issues
+node tools/db-doctor.js /path/to/notecove.db --fix
+```
+
+**Common Database Paths**:
+
+- **macOS**: `~/Library/Application Support/@notecove/desktop/notecove.db`
+- **Linux**: `~/.config/@notecove/desktop/notecove.db`
+- **Windows**: `%APPDATA%\@notecove\desktop\notecove.db`
+
+**What It Checks**:
+
+1. **Orphaned Notes**: Notes from Storage Directories that no longer exist
+2. **Orphaned Folders**: Folders from deleted Storage Directories
+3. **Orphaned Tag Associations**: Tag links for deleted notes
+4. **Unused Tags**: Tags with no notes (cleaned up automatically)
+
+**Example Output**:
+
+```
+🔍 Database Doctor
+
+Database: /Users/you/Library/Application Support/@notecove/desktop/notecove.db
+Mode: CHECK ONLY
+
+📝 Checking for orphaned notes...
+❌ Found 3 orphaned note(s):
+   - abc123... "Old Note" (sd_id: deleted-sd, created: 2024-01-15)
+   Run with --fix to remove these orphaned notes
+
+📁 Checking for orphaned folders...
+✅ No orphaned folders found
+
+🏷️  Checking for orphaned tag associations...
+✅ No orphaned tag associations found
+
+============================================================
+⚠️  Issues found. Run with --fix to repair.
+```
+
+**Safety Notes**:
+- Always backup your database before running with `--fix`
+- The tool only removes data from SDs that no longer exist
+- NoteCove automatically runs this cleanup on startup (as of v0.2.0)
+
 ### Backup File Format
 
 Backups use a directory structure:
+
 ```
 backup-{timestamp}/
   metadata.json         # Backup metadata

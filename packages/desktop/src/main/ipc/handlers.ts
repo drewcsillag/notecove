@@ -197,6 +197,7 @@ export class IPCHandlers {
     ipcMain.handle('backup:createManualBackup', this.handleCreateManualBackup.bind(this));
     ipcMain.handle('backup:listBackups', this.handleListBackups.bind(this));
     ipcMain.handle('backup:restoreFromBackup', this.handleRestoreFromBackup.bind(this));
+    ipcMain.handle('backup:restoreFromCustomPath', this.handleRestoreFromCustomPath.bind(this));
     ipcMain.handle('backup:deleteBackup', this.handleDeleteBackup.bind(this));
     ipcMain.handle('backup:cleanupOldSnapshots', this.handleCleanupOldSnapshots.bind(this));
     ipcMain.handle('backup:setBackupDirectory', this.handleSetBackupDirectory.bind(this));
@@ -2005,9 +2006,15 @@ export class IPCHandlers {
     _event: IpcMainInvokeEvent,
     sdId: string,
     packAndSnapshot: boolean,
-    description?: string
+    description?: string,
+    customBackupPath?: string
   ): Promise<import('../backup-manager').BackupInfo> {
-    return await this.backupManager.createManualBackup(sdId, packAndSnapshot, description);
+    return await this.backupManager.createManualBackup(
+      sdId,
+      packAndSnapshot,
+      description,
+      customBackupPath
+    );
   }
 
   /**
@@ -2027,6 +2034,18 @@ export class IPCHandlers {
     registerAsNew: boolean
   ): Promise<{ sdId: string; sdPath: string }> {
     return await this.backupManager.restoreFromBackup(backupId, targetPath, registerAsNew);
+  }
+
+  /**
+   * Backup: Restore SD from custom backup path
+   */
+  private async handleRestoreFromCustomPath(
+    _event: IpcMainInvokeEvent,
+    backupPath: string,
+    targetPath: string,
+    registerAsNew: boolean
+  ): Promise<{ sdId: string; sdPath: string }> {
+    return await this.backupManager.restoreFromCustomPath(backupPath, targetPath, registerAsNew);
   }
 
   /**

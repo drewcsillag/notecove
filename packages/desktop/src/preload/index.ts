@@ -670,7 +670,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createManualBackup: (
       sdId: string,
       packAndSnapshot: boolean,
-      description?: string
+      description?: string,
+      customBackupPath?: string
     ): Promise<{
       backupId: string;
       sdUuid: string;
@@ -688,7 +689,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         'backup:createManualBackup',
         sdId,
         packAndSnapshot,
-        description
+        description,
+        customBackupPath
       ) as Promise<{
         backupId: string;
         sdUuid: string;
@@ -740,6 +742,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke(
         'backup:restoreFromBackup',
         backupId,
+        targetPath,
+        registerAsNew
+      ) as Promise<{
+        sdId: string;
+        sdPath: string;
+      }>,
+    restoreFromCustomPath: (
+      backupPath: string,
+      targetPath: string,
+      registerAsNew: boolean
+    ): Promise<{ sdId: string; sdPath: string }> =>
+      ipcRenderer.invoke(
+        'backup:restoreFromCustomPath',
+        backupPath,
         targetPath,
         registerAsNew
       ) as Promise<{

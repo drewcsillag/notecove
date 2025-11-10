@@ -15,6 +15,10 @@ import { exit } from 'process';
 const fastMode = process.argv.includes('--fast');
 
 const checks = [
+  {
+    name: 'Cleanup',
+    cmd: 'find . -name "*.log" -type f -delete && rm -rf packages/*/coverage packages/*/.nyc_output',
+  },
   { name: 'Format Check', cmd: 'pnpm format:check' },
   { name: 'Lint', cmd: 'pnpm lint' },
   { name: 'Type Check', cmd: 'pnpm typecheck' },

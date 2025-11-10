@@ -304,6 +304,11 @@ export interface StorageDirOperations {
    * Delete a storage directory
    */
   deleteStorageDir(id: string): Promise<void>;
+
+  /**
+   * Update the path of a storage directory
+   */
+  updateStorageDirPath(id: string, newPath: string): Promise<void>;
 }
 
 /**

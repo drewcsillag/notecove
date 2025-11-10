@@ -804,7 +804,73 @@ export class SqliteDatabase implements Database {
   }
 
   async deleteStorageDir(id: string): Promise<void> {
+    // Delete all notes from this SD
+    await this.adapter.exec('DELETE FROM notes WHERE sd_id = ?', [id]);
+
+    // Delete all folders from this SD
+    await this.adapter.exec('DELETE FROM folders WHERE sd_id = ?', [id]);
+
+    // Delete the SD itself
     await this.adapter.exec('DELETE FROM storage_dirs WHERE id = ?', [id]);
+  }
+
+  /**
+   * Clean up orphaned data (notes/folders/tags from deleted SDs)
+   * This should be called on startup to ensure database integrity
+   */
+  async cleanupOrphanedData(): Promise<{
+    notesDeleted: number;
+    foldersDeleted: number;
+    tagAssociationsDeleted: number;
+    unusedTagsDeleted: number;
+  }> {
+    console.log('[Database] Cleaning up orphaned data...');
+
+    // Delete orphaned notes (notes from SDs that no longer exist)
+    const notesResult = await this.adapter.exec(
+      'DELETE FROM notes WHERE sd_id NOT IN (SELECT id FROM storage_dirs)'
+    );
+
+    // Delete orphaned folders
+    const foldersResult = await this.adapter.exec(
+      'DELETE FROM folders WHERE sd_id NOT IN (SELECT id FROM storage_dirs)'
+    );
+
+    // Delete orphaned tag associations (tags for notes that no longer exist)
+    const tagAssociationsResult = await this.adapter.exec(
+      'DELETE FROM note_tags WHERE note_id NOT IN (SELECT id FROM notes)'
+    );
+
+    // Delete unused tags (tags with no note associations)
+    const unusedTagsResult = await this.adapter.exec(
+      'DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM note_tags)'
+    );
+
+    const result = {
+      notesDeleted: notesResult?.changes ?? 0,
+      foldersDeleted: foldersResult?.changes ?? 0,
+      tagAssociationsDeleted: tagAssociationsResult?.changes ?? 0,
+      unusedTagsDeleted: unusedTagsResult?.changes ?? 0,
+    };
+
+    if (
+      result.notesDeleted > 0 ||
+      result.foldersDeleted > 0 ||
+      result.tagAssociationsDeleted > 0 ||
+      result.unusedTagsDeleted > 0
+    ) {
+      console.log(
+        `[Database] Cleaned up ${result.notesDeleted} orphaned note(s), ${result.foldersDeleted} orphaned folder(s), ${result.tagAssociationsDeleted} orphaned tag association(s), ${result.unusedTagsDeleted} unused tag(s)`
+      );
+    } else {
+      console.log('[Database] No orphaned data found');
+    }
+
+    return result;
+  }
+
+  async updateStorageDirPath(id: string, newPath: string): Promise<void> {
+    await this.adapter.exec('UPDATE storage_dirs SET path = ? WHERE id = ?', [newPath, id]);
   }
 
   private mapStorageDirRow(row: {

@@ -738,7 +738,15 @@ test.describe('Tags System - Tag Panel', () => {
     let editor = page.locator('.ProseMirror');
     await editor.click();
     await page.keyboard.type('Note A: #multi1 #multi2');
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(3000);
+
+    // Wait for #multi1 tag to appear in the tag panel
+    await expect(
+      page
+        .locator('[role="button"]')
+        .filter({ hasText: /^#multi1 \(/ })
+        .first()
+    ).toBeVisible({ timeout: 5000 });
 
     await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
@@ -746,7 +754,15 @@ test.describe('Tags System - Tag Panel', () => {
     editor = page.locator('.ProseMirror');
     await editor.click();
     await page.keyboard.type('Note B: #multi2 only');
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(3000);
+
+    // Wait for #multi2 count to update
+    await expect(
+      page
+        .locator('[role="button"]')
+        .filter({ hasText: /^#multi2 \(2\)/ })
+        .first()
+    ).toBeVisible({ timeout: 5000 });
 
     await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
@@ -754,21 +770,51 @@ test.describe('Tags System - Tag Panel', () => {
     editor = page.locator('.ProseMirror');
     await editor.click();
     await page.keyboard.type('Note C: #multi3');
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(3000);
+
+    // Wait for #multi3 tag to appear in the tag panel
+    await expect(
+      page
+        .locator('[role="button"]')
+        .filter({ hasText: /^#multi3 \(/ })
+        .first()
+    ).toBeVisible({ timeout: 5000 });
 
     // Navigate to "All Notes" and wait for the list to update
     await page.getByRole('button', { name: /All Notes/ }).click();
 
-    // Wait for the notes list to show our new notes (there might be other notes from previous tests)
-    await page.waitForTimeout(1500);
+    // Clear any active tag filters from previous tests
+    const clearButton = page.getByRole('button', { name: /Clear all filters/i });
+    if (await clearButton.isVisible()) {
+      await clearButton.click();
+      await page.waitForTimeout(1000);
+    }
 
-    // Verify notes were created by checking they're visible in the list
+    // Wait for the notes list to fully load - look for a reasonable number of notes
+    // We created 3 notes, plus there may be notes from previous tests
+    await page.waitForTimeout(3000);
+
+    // First click on one of the notes we created to ensure they're loaded
+    await page.getByRole('button', { name: /Note A: #multi1 #multi2/ }).click({ timeout: 10000 });
+    await page.waitForTimeout(500);
+
+    // Now verify all notes are visible in the list by scrolling and looking for them
     await expect(page.getByRole('button', { name: /Note A: #multi1 #multi2/ })).toBeVisible({
       timeout: 5000,
     });
+
+    // Click to ensure Note B is visible
+    await page.getByRole('button', { name: /Note B: #multi2 only/ }).click({ timeout: 10000 });
+    await page.waitForTimeout(500);
+
     await expect(page.getByRole('button', { name: /Note B: #multi2 only/ })).toBeVisible({
       timeout: 5000,
     });
+
+    // Click to ensure Note C is visible
+    await page.getByRole('button', { name: /Note C: #multi3/ }).click({ timeout: 10000 });
+    await page.waitForTimeout(500);
+
     await expect(page.getByRole('button', { name: /Note C: #multi3/ })).toBeVisible({
       timeout: 5000,
     });
@@ -826,6 +872,17 @@ test.describe('Tags System - Tag Panel', () => {
   });
 
   test('should clear all tag filters with clear button', async () => {
+    // Navigate to "All Notes" and clear any existing filters first
+    await page.getByRole('button', { name: /All Notes/ }).click();
+    await page.waitForTimeout(500);
+
+    // Clear any active tag filters from previous tests
+    const clearFiltersBtn = page.getByRole('button', { name: /Clear all filters/i });
+    if (await clearFiltersBtn.isVisible()) {
+      await clearFiltersBtn.click();
+      await page.waitForTimeout(1000);
+    }
+
     // Create notes with tags
     await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
@@ -843,7 +900,7 @@ test.describe('Tags System - Tag Panel', () => {
     await page.keyboard.type('Clear test with #cleartag2');
     await page.waitForTimeout(2500);
 
-    // Navigate to "All Notes"
+    // Navigate to "All Notes" again
     await page.getByRole('button', { name: /All Notes/ }).click();
     await page.waitForTimeout(500);
 

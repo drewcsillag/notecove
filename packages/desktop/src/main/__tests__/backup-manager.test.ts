@@ -52,7 +52,10 @@ describe('BackupManager', () => {
     mockDatabase = {
       getAdapter: jest.fn(() => mockAdapter),
       getStorageDir: jest.fn(),
+      getStorageDirByUuid: jest.fn(() => Promise.resolve(null)), // No conflicts by default
       createStorageDir: jest.fn(),
+      getNote: jest.fn(() => Promise.resolve(null)), // No conflicts by default
+      getFolder: jest.fn(() => Promise.resolve(null)), // No conflicts by default
     } as any;
 
     backupManager = new BackupManager(mockDatabase, userDataPath);
@@ -158,7 +161,7 @@ describe('BackupManager', () => {
       const sdPath = join(testDir, 'sd1');
       const notesDir = join(sdPath, 'notes');
       const folderTreeDir = join(sdPath, 'folder-tree');
-      const dbPath = join(sdPath, 'notecove.db');
+      const dbPath = join(userDataPath, 'notecove.db');
 
       // Create mock SD structure
       await mkdir(join(notesDir, 'note-1'), { recursive: true });
@@ -194,7 +197,7 @@ describe('BackupManager', () => {
 
     it('should set isPacked flag when packAndSnapshot is true', async () => {
       const sdPath = join(testDir, 'sd1');
-      const dbPath = join(sdPath, 'notecove.db');
+      const dbPath = join(userDataPath, 'notecove.db');
 
       await mkdir(sdPath, { recursive: true });
       await writeFile(dbPath, 'mock-db');

@@ -161,7 +161,10 @@ function createWindow(): void {
   });
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow?.show();
+    // Don't show window in test mode (headless E2E tests)
+    if (process.env['NODE_ENV'] !== 'test') {
+      mainWindow?.show();
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -883,6 +886,9 @@ void app.whenReady().then(async () => {
     // Initialize database
     database = await initializeDatabase();
 
+    // Clean up orphaned data from deleted SDs
+    await database.cleanupOrphanedData();
+
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] Database ready, initializing CRDT manager...');
     }
@@ -1020,6 +1026,27 @@ void app.whenReady().then(async () => {
                 const folderId = crdtMetadata?.folderId ?? null;
                 const title = extractTitleFromDoc(doc, 'content');
 
+                // Extract text content for tag indexing
+                const content = doc.getXmlFragment('content');
+                let contentText = '';
+                content.forEach((item) => {
+                  if (item instanceof Y.XmlText) {
+                    contentText += item.toString() + '\n';
+                  } else if (item instanceof Y.XmlElement) {
+                    const extractText = (el: Y.XmlElement | Y.XmlText): string => {
+                      if (el instanceof Y.XmlText) {
+                        return el.toString();
+                      }
+                      let text = '';
+                      el.forEach((child) => {
+                        text += extractText(child as Y.XmlElement | Y.XmlText);
+                      });
+                      return text;
+                    };
+                    contentText += extractText(item) + '\n';
+                  }
+                });
+
                 await database.upsertNote({
                   id: noteId,
                   title,
@@ -1032,6 +1059,16 @@ void app.whenReady().then(async () => {
                   contentPreview: '',
                   contentText: '',
                 });
+
+                // Extract and index tags
+                const tags = extractTags(contentText);
+                for (const tagName of tags) {
+                  let tag = await database.getTagByName(tagName);
+                  if (!tag) {
+                    tag = await database.createTag(tagName);
+                  }
+                  await database.addTagToNote(noteId, tag.id);
+                }
 
                 loadedCount++;
               }
@@ -1062,7 +1099,7 @@ void app.whenReady().then(async () => {
 
     // Initialize BackupManager for backup and restore operations
     const userDataPath = app.getPath('userData');
-    backupManager = new BackupManager(database, userDataPath);
+    backupManager = new BackupManager(database, userDataPath, undefined, handleNewStorageDir);
     console.log('[Init] BackupManager initialized');
 
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)

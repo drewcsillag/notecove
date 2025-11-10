@@ -63,6 +63,7 @@ Add hashtags to notes for flexible organization:
 **Autocomplete**: When you type `#`, existing tags appear in a dropdown menu. Use arrow keys to navigate and press Enter to insert.
 
 **Filtering Notes by Tags**:
+
 - Click a tag pill in the Tag Panel to filter notes
 - Tags have three states that cycle when clicked:
   - **Gray (neutral)**: Tag is not filtering

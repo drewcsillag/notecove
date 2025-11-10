@@ -2083,7 +2083,8 @@ describe('IPCHandlers - SD Management', () => {
         expect(mockBackupManager.createManualBackup).toHaveBeenCalledWith(
           sdId,
           packAndSnapshot,
-          description
+          description,
+          undefined
         );
       });
 
@@ -2115,6 +2116,7 @@ describe('IPCHandlers - SD Management', () => {
         expect(mockBackupManager.createManualBackup).toHaveBeenCalledWith(
           sdId,
           packAndSnapshot,
+          undefined,
           undefined
         );
       });

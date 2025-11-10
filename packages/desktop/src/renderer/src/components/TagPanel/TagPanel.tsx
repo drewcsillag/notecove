@@ -44,12 +44,20 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
   useEffect(() => {
     // When tags are updated (via note edits), refresh the list
     // This will be triggered by the note:updated event which updates tags
-    const unsubscribe = window.electronAPI.note.onUpdated(() => {
+    const unsubscribeNote = window.electronAPI.note.onUpdated(() => {
+      void loadTags();
+    });
+
+    // When Storage Directories are created/deleted, refresh tags
+    // Deleting an SD removes all its notes and orphaned tags
+    // Creating/restoring an SD may add new tags
+    const unsubscribeSD = window.electronAPI.sd.onUpdated(() => {
       void loadTags();
     });
 
     return () => {
-      unsubscribe();
+      unsubscribeNote();
+      unsubscribeSD();
     };
   }, [loadTags]);
 

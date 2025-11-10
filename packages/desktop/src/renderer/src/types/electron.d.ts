@@ -290,9 +290,10 @@ declare global {
           backupPath: string;
         }>;
         createManualBackup: (
-          sdId: number,
+          sdId: string,
           packAndSnapshot: boolean,
-          description?: string
+          description?: string,
+          customBackupPath?: string
         ) => Promise<{
           backupId: string;
           sdUuid: string;
@@ -326,6 +327,11 @@ declare global {
           targetPath: string,
           registerAsNew: boolean
         ) => Promise<{ sdId: number; sdPath: string }>;
+        restoreFromCustomPath: (
+          backupPath: string,
+          targetPath: string,
+          registerAsNew: boolean
+        ) => Promise<{ sdId: string; sdPath: string }>;
         deleteBackup: (backupId: string) => Promise<void>;
         cleanupOldSnapshots: () => Promise<number>;
         setBackupDirectory: (customPath: string) => Promise<void>;

@@ -303,9 +303,11 @@ Hybrid three-tier system:
 
 ---
 
-### 4.1bis.1 Robust Cross-SD Note Moves 🟥
+### 4.1bis.1 Robust Cross-SD Note Moves ✅
 
-**Status:** To Do
+**Status:** COMPLETE (2025-11-09)
+
+**Implementation:** See commits in [PLAN-PHASE-4.1bis.1.md](./PLAN-PHASE-4.1bis.1.md)
 
 **Detailed Plan:** See [PLAN-PHASE-4.1bis.1.md](./PLAN-PHASE-4.1bis.1.md) for implementation details.
 

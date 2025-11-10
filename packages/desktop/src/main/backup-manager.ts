@@ -22,13 +22,20 @@ export interface BackupInfo extends BackupMetadata {
 
 export class BackupManager {
   private backupDir: string;
+  private userDataPath: string;
+  private onNewStorageDir?: (sdId: string, sdPath: string) => Promise<void>;
 
   constructor(
     private readonly database: Database,
     userDataPath: string,
-    customBackupPath?: string
+    customBackupPath?: string,
+    onNewStorageDir?: (sdId: string, sdPath: string) => Promise<void>
   ) {
+    this.userDataPath = userDataPath;
     this.backupDir = customBackupPath ?? path.join(userDataPath, '.backups');
+    if (onNewStorageDir) {
+      this.onNewStorageDir = onNewStorageDir;
+    }
     this.ensureBackupDirectory();
   }
 
@@ -40,6 +47,79 @@ export class BackupManager {
       fs.mkdirSync(this.backupDir, { recursive: true });
       console.log(`[BackupManager] Created backup directory: ${this.backupDir}`);
     }
+  }
+
+  /**
+   * Check for duplicate note/folder UUIDs in currently loaded SDs
+   */
+  private async checkForDuplicates(backupPath: string): Promise<{
+    hasConflicts: boolean;
+    duplicateNotes: string[];
+    duplicateFolders: string[];
+    conflictingSds: { id: string; name: string; path: string }[];
+  }> {
+    const duplicateNotes: string[] = [];
+    const duplicateFolders: string[] = [];
+    const conflictingSdIds = new Set<string>();
+
+    // Scan backup's notes directory
+    const notesDir = path.join(backupPath, 'notes');
+    if (fs.existsSync(notesDir)) {
+      const noteIds = fs.readdirSync(notesDir).filter((id) => !id.startsWith('.'));
+
+      for (const noteId of noteIds) {
+        // Skip the default welcome note - every SD has one with the same UUID
+        if (noteId === 'default-note') {
+          continue;
+        }
+
+        // Check if this note ID already exists in the database
+        const existingNote = await this.database.getNote(noteId);
+        if (existingNote) {
+          // Verify the SD still exists (skip orphaned notes from deleted SDs)
+          const sd = await this.database.getStorageDir(existingNote.sdId);
+          if (sd) {
+            duplicateNotes.push(noteId);
+            conflictingSdIds.add(existingNote.sdId);
+          }
+        }
+      }
+    }
+
+    // Scan backup's folders directory
+    const foldersDir = path.join(backupPath, 'folders');
+    if (fs.existsSync(foldersDir)) {
+      const folderIds = fs.readdirSync(foldersDir).filter((id) => !id.startsWith('.'));
+
+      for (const folderId of folderIds) {
+        // Check if this folder ID already exists in the database
+        const existingFolder = await this.database.getFolder(folderId);
+        if (existingFolder) {
+          // Verify the SD still exists (skip orphaned folders from deleted SDs)
+          const sd = await this.database.getStorageDir(existingFolder.sdId);
+          if (sd) {
+            duplicateFolders.push(folderId);
+            conflictingSdIds.add(existingFolder.sdId);
+          }
+        }
+      }
+    }
+
+    // Get info about conflicting SDs
+    const conflictingSds = [];
+    for (const sdId of conflictingSdIds) {
+      const sd = await this.database.getStorageDir(sdId);
+      if (sd) {
+        conflictingSds.push({ id: sd.id, name: sd.name, path: sd.path });
+      }
+    }
+
+    return {
+      hasConflicts: duplicateNotes.length > 0 || duplicateFolders.length > 0,
+      duplicateNotes,
+      duplicateFolders,
+      conflictingSds,
+    };
   }
 
   /**
@@ -115,7 +195,8 @@ export class BackupManager {
   async createManualBackup(
     sdId: string,
     packAndSnapshot = false,
-    description?: string
+    description?: string,
+    customBackupPath?: string
   ): Promise<BackupInfo> {
     const sd = await this.database.getStorageDir(sdId);
     if (!sd) {
@@ -124,10 +205,29 @@ export class BackupManager {
 
     const backupId = this.generateBackupId();
     const timestamp = Date.now();
-    const backupPath = path.join(this.backupDir, backupId);
+    const backupRoot = customBackupPath ?? this.backupDir;
+    const backupPath = path.join(backupRoot, backupId);
 
-    // Create backup directory
-    fs.mkdirSync(backupPath, { recursive: true });
+    console.log(`[BackupManager] Creating backup for SD ${sd.name}`);
+    console.log(`[BackupManager] Backup root: ${backupRoot}`);
+    console.log(`[BackupManager] Backup path: ${backupPath}`);
+    console.log(`[BackupManager] Source SD path: ${sd.path}`);
+
+    // Ensure backup path exists (this will create all parent directories too)
+    console.log(`[BackupManager] Creating backup directory: ${backupPath}`);
+    try {
+      fs.mkdirSync(backupPath, { recursive: true });
+      console.log(`[BackupManager] Successfully created backup directory`);
+
+      // Verify it exists
+      if (!fs.existsSync(backupPath)) {
+        throw new Error(`Backup directory was created but does not exist: ${backupPath}`);
+      }
+      console.log(`[BackupManager] Verified backup directory exists`);
+    } catch (error) {
+      console.error(`[BackupManager] Failed to create backup directory:`, error);
+      throw error;
+    }
 
     // Get note and folder counts
     const noteCount = await this.countNotes(sdId);
@@ -141,9 +241,30 @@ export class BackupManager {
       console.log('[BackupManager] Pack and snapshot not yet implemented, copying as-is');
     }
 
-    // Copy database file
+    // Copy database file (from user data directory, not SD path)
+    const dbSourcePath = path.join(this.userDataPath, 'notecove.db');
     const dbBackupPath = path.join(backupPath, 'database.db');
-    fs.copyFileSync(path.join(sd.path, 'notecove.db'), dbBackupPath);
+
+    console.log(`[BackupManager] Copying database from ${dbSourcePath} to ${dbBackupPath}`);
+
+    // Verify source exists
+    if (!fs.existsSync(dbSourcePath)) {
+      throw new Error(`Source database file does not exist: ${dbSourcePath}`);
+    }
+
+    // Verify destination directory exists
+    if (!fs.existsSync(backupPath)) {
+      throw new Error(`Backup directory does not exist: ${backupPath}`);
+    }
+
+    try {
+      fs.copyFileSync(dbSourcePath, dbBackupPath);
+      console.log(`[BackupManager] Successfully copied database file`);
+    } catch (error) {
+      console.error(`[BackupManager] Failed to copy database file:`, error);
+      throw error;
+    }
+
     totalSize += fs.statSync(dbBackupPath).size;
 
     // Copy all CRDT files
@@ -154,12 +275,36 @@ export class BackupManager {
       totalSize += this.getDirectorySize(notesBackupDir);
     }
 
+    // Copy folders directory
+    const foldersSource = path.join(sd.path, 'folders');
+    const foldersBackup = path.join(backupPath, 'folders');
+    if (fs.existsSync(foldersSource)) {
+      this.copyDirectory(foldersSource, foldersBackup);
+      totalSize += this.getDirectorySize(foldersBackup);
+    }
+
     // Copy folder tree
     const folderTreeSource = path.join(sd.path, 'folder-tree');
     const folderTreeBackup = path.join(backupPath, 'folder-tree');
     if (fs.existsSync(folderTreeSource)) {
       this.copyDirectory(folderTreeSource, folderTreeBackup);
       totalSize += this.getDirectorySize(folderTreeBackup);
+    }
+
+    // Copy activity directory (if exists)
+    const activitySource = path.join(sd.path, '.activity');
+    const activityBackup = path.join(backupPath, '.activity');
+    if (fs.existsSync(activitySource)) {
+      this.copyDirectory(activitySource, activityBackup);
+      totalSize += this.getDirectorySize(activityBackup);
+    }
+
+    // Copy SD_VERSION file (if exists)
+    const versionSource = path.join(sd.path, 'SD_VERSION');
+    const versionBackup = path.join(backupPath, 'SD_VERSION');
+    if (fs.existsSync(versionSource)) {
+      fs.copyFileSync(versionSource, versionBackup);
+      totalSize += fs.statSync(versionBackup).size;
     }
 
     // Save metadata
@@ -237,6 +382,32 @@ export class BackupManager {
       throw new Error(`Backup ${backupId} not found`);
     }
 
+    // Check for duplicate SD UUID if not registering as new
+    if (!registerAsNew) {
+      const existingSd = await this.database.getStorageDirByUuid(backup.sdUuid);
+      if (existingSd) {
+        throw new Error(
+          `Cannot restore: A storage directory with UUID "${backup.sdUuid}" already exists (name: "${existingSd.name}", path: "${existingSd.path}"). ` +
+            `Please unload that storage directory first, or check "Register as new SD" to restore as a separate copy.`
+        );
+      }
+    }
+
+    // Check for duplicate notes and folders
+    const duplicateCheck = await this.checkForDuplicates(backup.backupPath);
+    if (duplicateCheck.hasConflicts) {
+      const sdNames = Array.from(new Set(duplicateCheck.conflictingSds.map((sd) => sd.name))).join(
+        ', '
+      );
+      const noteCount = duplicateCheck.duplicateNotes.length;
+      const folderCount = duplicateCheck.duplicateFolders.length;
+
+      let errorMsg = `Cannot restore: Found ${noteCount} duplicate note(s) and ${folderCount} duplicate folder(s) that already exist in the following storage director${duplicateCheck.conflictingSds.length > 1 ? 'ies' : 'y'}: ${sdNames}.\n\n`;
+      errorMsg += `Please unload the conflicting storage director${duplicateCheck.conflictingSds.length > 1 ? 'ies' : 'y'} before restoring this backup.`;
+
+      throw new Error(errorMsg);
+    }
+
     // Ensure target path exists
     if (!fs.existsSync(targetPath)) {
       fs.mkdirSync(targetPath, { recursive: true });
@@ -260,6 +431,13 @@ export class BackupManager {
       this.copyDirectory(notesSourceDir, notesTargetDir);
     }
 
+    // Copy folders
+    const foldersSource = path.join(backup.backupPath, 'folders');
+    const foldersTarget = path.join(targetPath, 'folders');
+    if (fs.existsSync(foldersSource)) {
+      this.copyDirectory(foldersSource, foldersTarget);
+    }
+
     // Copy folder tree
     const folderTreeSource = path.join(backup.backupPath, 'folder-tree');
     const folderTreeTarget = path.join(targetPath, 'folder-tree');
@@ -267,15 +445,238 @@ export class BackupManager {
       this.copyDirectory(folderTreeSource, folderTreeTarget);
     }
 
+    // Copy activity directory (if exists)
+    const activitySource = path.join(backup.backupPath, '.activity');
+    const activityTarget = path.join(targetPath, '.activity');
+    if (fs.existsSync(activitySource)) {
+      this.copyDirectory(activitySource, activityTarget);
+    }
+
+    // Copy SD_VERSION file (if exists)
+    const versionSource = path.join(backup.backupPath, 'SD_VERSION');
+    const versionTarget = path.join(targetPath, 'SD_VERSION');
+    if (fs.existsSync(versionSource)) {
+      fs.copyFileSync(versionSource, versionTarget);
+    }
+
     // Create SD_ID file (restore original UUID or generate new one)
     const sdIdPath = path.join(targetPath, 'SD_ID');
     const sdUuid = registerAsNew ? crypto.randomUUID() : backup.sdUuid;
     fs.writeFileSync(sdIdPath, sdUuid);
 
+    // Determine the SD name (add suffix if registering as new to avoid name conflicts)
+    const sdName = registerAsNew ? `${backup.sdName} (Restored)` : backup.sdName;
+
     // Register SD in database
-    const sd = await this.database.createStorageDir(sdUuid, backup.sdName, targetPath);
+    let sd;
+    try {
+      sd = await this.database.createStorageDir(sdUuid, sdName, targetPath);
+    } catch (error) {
+      // Check if this is a UNIQUE constraint error
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        // Find which SD has the conflicting name or path
+        const allSDs = await this.database.getAllStorageDirs();
+        const conflictingSD = allSDs.find(
+          (existingSd) => existingSd.name === sdName || existingSd.path === targetPath
+        );
+
+        if (conflictingSD) {
+          if (conflictingSD.name === sdName) {
+            throw new Error(
+              `A storage directory with the name "${sdName}" already exists at "${conflictingSD.path}". ` +
+                `Please unload that storage directory first, or choose "Register as new SD" to restore with a different name.`
+            );
+          } else if (conflictingSD.path === targetPath) {
+            throw new Error(
+              `A storage directory named "${conflictingSD.name}" is already registered at path "${targetPath}". ` +
+                `Please unload that storage directory first, or choose a different restore location.`
+            );
+          }
+        }
+        // If we couldn't find the conflicting SD, throw a generic error
+        throw new Error(
+          `Cannot register storage directory: A storage directory with the same name or path already exists. ` +
+            `Please unload any existing storage directories with the name "${sdName}" or path "${targetPath}" first.`
+        );
+      }
+      // Re-throw other errors
+      throw error;
+    }
 
     console.log(`[BackupManager] Restored backup ${backupId} to ${targetPath} (SD ID: ${sd.id})`);
+
+    // Initialize the restored SD (load notes into cache, set up watchers, etc.)
+    if (this.onNewStorageDir) {
+      console.log(`[BackupManager] Initializing restored SD: ${sd.id}`);
+      await this.onNewStorageDir(sd.id, targetPath);
+      console.log(`[BackupManager] SD initialization complete`);
+    }
+
+    return { sdId: sd.id, sdPath: targetPath };
+  }
+
+  /**
+   * Restore SD from a custom backup path (not in the managed backups directory)
+   */
+  async restoreFromCustomPath(
+    backupPath: string,
+    targetPath: string,
+    registerAsNew = false
+  ): Promise<{ sdId: string; sdPath: string }> {
+    // Verify backup path exists
+    if (!fs.existsSync(backupPath)) {
+      throw new Error(`Backup path does not exist: ${backupPath}`);
+    }
+
+    // Read metadata to get backup info
+    const metadataPath = path.join(backupPath, 'metadata.json');
+    if (!fs.existsSync(metadataPath)) {
+      throw new Error(`Invalid backup: metadata.json not found in ${backupPath}`);
+    }
+
+    let backup: BackupMetadata;
+    try {
+      backup = JSON.parse(fs.readFileSync(metadataPath, 'utf-8')) as BackupMetadata;
+    } catch (error) {
+      throw new Error(
+        `Failed to read backup metadata: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    // Check for duplicate SD UUID if not registering as new
+    if (!registerAsNew) {
+      const existingSd = await this.database.getStorageDirByUuid(backup.sdUuid);
+      if (existingSd) {
+        throw new Error(
+          `Cannot restore: A storage directory with UUID "${backup.sdUuid}" already exists (name: "${existingSd.name}", path: "${existingSd.path}"). ` +
+            `Please unload that storage directory first, or check "Register as new SD" to restore as a separate copy.`
+        );
+      }
+    }
+
+    // Check for duplicate notes and folders
+    const duplicateCheck = await this.checkForDuplicates(backupPath);
+    if (duplicateCheck.hasConflicts) {
+      const sdNames = Array.from(new Set(duplicateCheck.conflictingSds.map((sd) => sd.name))).join(
+        ', '
+      );
+      const noteCount = duplicateCheck.duplicateNotes.length;
+      const folderCount = duplicateCheck.duplicateFolders.length;
+
+      let errorMsg = `Cannot restore: Found ${noteCount} duplicate note(s) and ${folderCount} duplicate folder(s) that already exist in the following storage director${duplicateCheck.conflictingSds.length > 1 ? 'ies' : 'y'}: ${sdNames}.\n\n`;
+      errorMsg += `Please unload the conflicting storage director${duplicateCheck.conflictingSds.length > 1 ? 'ies' : 'y'} before restoring this backup.`;
+
+      throw new Error(errorMsg);
+    }
+
+    // Ensure target path exists
+    if (!fs.existsSync(targetPath)) {
+      fs.mkdirSync(targetPath, { recursive: true });
+    }
+
+    // Check if target path is empty
+    const targetContents = fs.readdirSync(targetPath);
+    if (targetContents.length > 0) {
+      throw new Error(`Target path ${targetPath} is not empty. Please choose an empty directory.`);
+    }
+
+    // Copy database
+    const dbSourcePath = path.join(backupPath, 'database.db');
+    const dbTargetPath = path.join(targetPath, 'notecove.db');
+    if (!fs.existsSync(dbSourcePath)) {
+      throw new Error(`Backup is missing database.db file`);
+    }
+    fs.copyFileSync(dbSourcePath, dbTargetPath);
+
+    // Copy notes
+    const notesSourceDir = path.join(backupPath, 'notes');
+    const notesTargetDir = path.join(targetPath, 'notes');
+    if (fs.existsSync(notesSourceDir)) {
+      this.copyDirectory(notesSourceDir, notesTargetDir);
+    }
+
+    // Copy folders
+    const foldersSource = path.join(backupPath, 'folders');
+    const foldersTarget = path.join(targetPath, 'folders');
+    if (fs.existsSync(foldersSource)) {
+      this.copyDirectory(foldersSource, foldersTarget);
+    }
+
+    // Copy folder tree
+    const folderTreeSource = path.join(backupPath, 'folder-tree');
+    const folderTreeTarget = path.join(targetPath, 'folder-tree');
+    if (fs.existsSync(folderTreeSource)) {
+      this.copyDirectory(folderTreeSource, folderTreeTarget);
+    }
+
+    // Copy activity directory (if exists)
+    const activitySource = path.join(backupPath, '.activity');
+    const activityTarget = path.join(targetPath, '.activity');
+    if (fs.existsSync(activitySource)) {
+      this.copyDirectory(activitySource, activityTarget);
+    }
+
+    // Copy SD_VERSION file (if exists)
+    const versionSource = path.join(backupPath, 'SD_VERSION');
+    const versionTarget = path.join(targetPath, 'SD_VERSION');
+    if (fs.existsSync(versionSource)) {
+      fs.copyFileSync(versionSource, versionTarget);
+    }
+
+    // Create SD_ID file (restore original UUID or generate new one)
+    const sdIdPath = path.join(targetPath, 'SD_ID');
+    const sdUuid = registerAsNew ? crypto.randomUUID() : backup.sdUuid;
+    fs.writeFileSync(sdIdPath, sdUuid);
+
+    // Determine the SD name (add suffix if registering as new to avoid name conflicts)
+    const sdName = registerAsNew ? `${backup.sdName} (Restored)` : backup.sdName;
+
+    // Register SD in database
+    let sd;
+    try {
+      sd = await this.database.createStorageDir(sdUuid, sdName, targetPath);
+    } catch (error) {
+      // Check if this is a UNIQUE constraint error
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        // Find which SD has the conflicting name or path
+        const allSDs = await this.database.getAllStorageDirs();
+        const conflictingSD = allSDs.find(
+          (existingSd) => existingSd.name === sdName || existingSd.path === targetPath
+        );
+
+        if (conflictingSD) {
+          if (conflictingSD.name === sdName) {
+            throw new Error(
+              `A storage directory with the name "${sdName}" already exists at "${conflictingSD.path}". ` +
+                `Please unload that storage directory first, or choose "Register as new SD" to restore with a different name.`
+            );
+          } else if (conflictingSD.path === targetPath) {
+            throw new Error(
+              `A storage directory named "${conflictingSD.name}" is already registered at path "${targetPath}". ` +
+                `Please unload that storage directory first, or choose a different restore location.`
+            );
+          }
+        }
+        // If we couldn't find the conflicting SD, throw a generic error
+        throw new Error(
+          `Cannot register storage directory: A storage directory with the same name or path already exists. ` +
+            `Please unload any existing storage directories with the name "${sdName}" or path "${targetPath}" first.`
+        );
+      }
+      // Re-throw other errors
+      throw error;
+    }
+
+    console.log(
+      `[BackupManager] Restored custom backup from ${backupPath} to ${targetPath} (SD ID: ${sd.id})`
+    );
+
+    // Initialize the restored SD (load notes into cache, set up watchers, etc.)
+    if (this.onNewStorageDir) {
+      console.log(`[BackupManager] Initializing restored SD: ${sd.id}`);
+      await this.onNewStorageDir(sd.id, targetPath);
+      console.log(`[BackupManager] SD initialization complete`);
+    }
 
     return { sdId: sd.id, sdPath: targetPath };
   }
