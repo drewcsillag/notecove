@@ -1093,6 +1093,8 @@ export const FolderTree: FC<FolderTreeProps> = ({
                   aria-label={node.text}
                   sx={{
                     pl: depth * 2,
+                    py: 0.5, // Reduce vertical padding
+                    minHeight: 32, // Set a compact minimum height
                     backgroundColor: isDropTarget
                       ? 'primary.light'
                       : isSelected
