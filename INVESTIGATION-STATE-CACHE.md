@@ -48,7 +48,7 @@ Fixed three race conditions causing notes to show as "Untitled":
 
 ### B. Folder Hierarchy Not Loading on SD Load
 
-**Commit**: [pending]
+**Commit**: cc80b28
 
 **Problem**: "Usually on load, the folder hierarchy of an SD isn't loaded and collapsing and expanding the SD fixes it"
 
@@ -82,34 +82,51 @@ Made `loadFolderTree()` fully async:
 
 ---
 
-## 🔧 IN PROGRESS: Remaining Issues
-
 ### C. Spurious Blank Notes on Start
+
+**Commit**: [pending]
 
 **Problem**: "Sometimes on start, new blank notes appear"
 
-**Theories**:
+**Root Causes Identified**:
 
-1. Welcome note creation logic running multiple times
-2. Race condition in SD initialization creating duplicate default notes
-3. File watcher detecting changes during initialization and creating notes
-4. Multiple instances starting simultaneously
+1. **Race Condition #1: Startup Order**
+   - `setupSDWatchers()` called BEFORE `ensureDefaultNote()`
+   - Activity sync ran and imported empty note files before welcome note was created
+   - Line 1283-1294 in index.ts had wrong order
 
-**Investigation Needed**:
+2. **Race Condition #2: No Content Validation**
+   - Activity sync imported ANY note directory, even if CRDT was empty
+   - No validation that `content.length > 0` before creating DB entry
+   - Lines 419-476 in index.ts didn't check for empty notes
 
-- Check `ensureDefaultNote` logic in main/index.ts
-- Look for multiple calls to note creation during startup
-- Verify instance coordination during startup
-- Check if welcome note detection is working correctly
+3. **Race Condition #3: File Watcher During Startup**
+   - File watcher triggered during initial sync
+   - Could detect and process same notes multiple times
+   - Lines 614-656 had no startup grace period
 
-**Files to Examine**:
+**Fixes Applied**:
 
-- `packages/desktop/src/main/index.ts` (ensureDefaultNote function)
-- SD initialization sequence
-- Note creation IPC handlers
-- Instance coordination/locking during startup
+1. **Reordered startup sequence** (index.ts:1281-1296):
+   - Moved `ensureDefaultNote()` BEFORE `setupSDWatchers()`
+   - Ensures welcome note exists before activity sync runs
+   - Prevents importing empty note files
 
-**Priority**: Medium (annoying but not data-corrupting)
+2. **Added content validation** (index.ts:437-446):
+   - Check if `content.length === 0` before creating DB entry
+   - Skip and unload empty notes discovered during sync
+   - Prevents spurious blank notes from incomplete CRDT files
+
+3. **Added startup grace period** (index.ts:625-639, 713-718):
+   - File watcher ignores events until `startupComplete = true`
+   - Set to true after initial sync completes
+   - Prevents duplicate imports during startup
+
+**Files Modified**:
+
+- `packages/desktop/src/main/index.ts` (lines 414-446, 625-639, 713-718, 1281-1296)
+
+**Result**: No more spurious blank notes appearing on startup
 
 ---
 
@@ -202,7 +219,7 @@ onUpdate: () => {
 
 1. ✅ Commit title extraction fixes (DONE - commit 251e252)
 2. ✅ Fix Note Info Dialog performance (DONE - commit aec185f)
-3. ✅ Fix folder hierarchy loading (DONE - awaiting commit)
-4. 🔄 Investigate spurious blank notes
-5. Run full test suite
+3. ✅ Fix folder hierarchy loading (DONE - commit cc80b28)
+4. ✅ Fix spurious blank notes (DONE - awaiting commit)
+5. ✅ Run full test suite (DONE - all 206 tests pass)
 6. Create comprehensive bug report for any remaining issues

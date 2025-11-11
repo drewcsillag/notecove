@@ -433,6 +433,18 @@ async function setupSDWatchers(
 
           // Extract text content for caching
           const content = doc.getXmlFragment('content');
+
+          // Skip empty notes to prevent importing blank/incomplete notes
+          // This prevents spurious blank notes appearing on startup
+          if (content.length === 0) {
+            console.log(
+              `[ActivitySync] Skipping empty note ${noteId} - no content in CRDT document`
+            );
+            // Unload the note since we're not importing it
+            await crdtManager.unloadNote(noteId);
+            return;
+          }
+
           let contentText = '';
           content.forEach((item) => {
             if (item instanceof Y.XmlText) {
@@ -610,10 +622,21 @@ async function setupSDWatchers(
 
   sdFileWatchers.set(sdId, folderWatcher);
 
-  // Set up activity watcher
+  // Set up activity watcher with startup grace period
+  let startupComplete = false;
   const activityWatcher = new NodeFileWatcher();
   await activityWatcher.watch(activityDir, (event) => {
     console.log(`[ActivityWatcher ${sdId}] Detected activity log change:`, event.filename);
+
+    // Ignore events during startup to prevent duplicate imports
+    // The initial sync (line 663) handles startup properly
+    if (!startupComplete) {
+      console.log(
+        `[ActivityWatcher ${sdId}] Ignoring event during startup grace period:`,
+        event.filename
+      );
+      return;
+    }
 
     // Ignore directory creation events and our own log file
     if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
@@ -687,6 +710,11 @@ async function setupSDWatchers(
     }
   } catch (error) {
     console.error(`[Init] Failed to perform initial sync for SD: ${sdId}:`, error);
+  } finally {
+    // Mark startup as complete to allow file watcher to process subsequent changes
+    // This prevents race conditions where file watcher triggers during initial sync
+    startupComplete = true;
+    console.log(`[Init] Startup grace period ended for SD: ${sdId}`);
   }
 
   console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
@@ -1278,8 +1306,13 @@ void app.whenReady().then(async () => {
       );
     }
 
-    // Set up watchers for default SD BEFORE ensureDefaultNote
-    // This ensures activity logger is registered before any CRDT updates
+    // Create default note if none exists
+    // IMPORTANT: Do this BEFORE setupSDWatchers to prevent race condition where
+    // activity sync imports empty note files before welcome note is created
+    await ensureDefaultNote(database, crdtManager, storageDir);
+
+    // Set up watchers for default SD AFTER ensureDefaultNote
+    // This ensures the welcome note is created before activity sync runs
     await setupSDWatchers(
       'default',
       storageDir,
@@ -1289,9 +1322,6 @@ void app.whenReady().then(async () => {
       crdtManager,
       database
     );
-
-    // Create default note if none exists
-    await ensureDefaultNote(database, crdtManager, storageDir);
     if (process.env['NODE_ENV'] === 'test') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await fs.appendFile(
