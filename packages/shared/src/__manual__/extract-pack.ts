@@ -21,6 +21,32 @@ interface PackData {
   updates: PackUpdate[];
 }
 
+// Function to extract text from Yjs document
+function extractText(doc: Y.Doc): string {
+  const content = doc.getXmlFragment('content');
+  let text = '';
+
+  content.forEach((item) => {
+    if (item instanceof Y.XmlText) {
+      text += item.toString() + '\n';
+    } else if (item instanceof Y.XmlElement) {
+      const extractFromElement = (el: Y.XmlElement | Y.XmlText): string => {
+        if (el instanceof Y.XmlText) {
+          return String(el.toString());
+        }
+        let result = '';
+        el.forEach((child: unknown) => {
+          result += extractFromElement(child as Y.XmlElement | Y.XmlText);
+        });
+        return result;
+      };
+      text += extractFromElement(item) + '\n';
+    }
+  });
+
+  return text.trim();
+}
+
 async function main() {
   const packFile = process.argv[2];
   if (!packFile) {
@@ -33,38 +59,12 @@ async function main() {
     console.log(`Read pack file: ${fileData.length} bytes`);
 
     // Parse the JSON
-    const pack: PackData = JSON.parse(fileData);
+    const pack = JSON.parse(fileData) as PackData;
 
     console.log(`Instance ID: ${pack.instanceId}`);
     console.log(`Note ID: ${pack.noteId}`);
     console.log(`Sequence range: ${pack.sequenceRange[0]}-${pack.sequenceRange[1]}`);
     console.log(`Total updates in pack: ${pack.updates.length}`);
-
-    // Function to extract text from Yjs document
-    function extractText(doc: Y.Doc): string {
-      const content = doc.getXmlFragment('content');
-      let text = '';
-
-      content.forEach(item => {
-        if (item instanceof Y.XmlText) {
-          text += item.toString() + '\n';
-        } else if (item instanceof Y.XmlElement) {
-          const extractFromElement = (el: Y.XmlElement | Y.XmlText): string => {
-            if (el instanceof Y.XmlText) {
-              return el.toString();
-            }
-            let result = '';
-            el.forEach((child: unknown) => {
-              result += extractFromElement(child as Y.XmlElement | Y.XmlText);
-            });
-            return result;
-          };
-          text += extractFromElement(item) + '\n';
-        }
-      });
-
-      return text.trim();
-    }
 
     // Create a new doc and apply updates sequentially
     const doc = new Y.Doc();
@@ -91,7 +91,10 @@ async function main() {
 
         lastText = currentText;
       } catch (error) {
-        console.error(`\nError applying update ${i + 1} (seq ${update.seq}):`, (error as Error).message);
+        console.error(
+          `\nError applying update ${i + 1} (seq ${update.seq}):`,
+          (error as Error).message
+        );
       }
     }
 

@@ -60,7 +60,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         noteId={selectedNoteId}
         readOnly={isNoteDeleted}
         isNewlyCreated={isNewlyCreated}
-        onNoteLoaded={onNoteLoaded}
+        {...(onNoteLoaded && { onNoteLoaded })}
         onTitleChange={(noteId: string, title: string, contentText: string) => {
           void handleTitleChange(noteId, title, contentText);
         }}

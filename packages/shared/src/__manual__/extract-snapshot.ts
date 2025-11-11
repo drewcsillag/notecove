@@ -8,10 +8,38 @@ import * as fs from 'fs/promises';
 import * as Y from 'yjs';
 import { decodeSnapshotFile } from '../crdt/snapshot-format';
 
+// Function to extract text from Yjs document
+function extractText(doc: Y.Doc): string {
+  const content = doc.getXmlFragment('content');
+  let text = '';
+
+  content.forEach((item) => {
+    if (item instanceof Y.XmlText) {
+      text += item.toString() + '\n';
+    } else if (item instanceof Y.XmlElement) {
+      const extractFromElement = (el: Y.XmlElement | Y.XmlText): string => {
+        if (el instanceof Y.XmlText) {
+          return String(el.toString());
+        }
+        let result = '';
+        el.forEach((child: unknown) => {
+          result += extractFromElement(child as Y.XmlElement | Y.XmlText);
+        });
+        return result;
+      };
+      text += extractFromElement(item) + '\n';
+    }
+  });
+
+  return text.trim();
+}
+
 async function main() {
   const snapshotFile = process.argv[2];
   if (!snapshotFile) {
-    console.error('Usage: NODE_ENV=test node dist/cjs/__manual__/extract-snapshot.js <snapshot-file>');
+    console.error(
+      'Usage: NODE_ENV=test node dist/cjs/__manual__/extract-snapshot.js <snapshot-file>'
+    );
     process.exit(1);
   }
 
@@ -30,32 +58,6 @@ async function main() {
     // Apply the document state to a Yjs doc
     const doc = new Y.Doc();
     Y.applyUpdate(doc, snapshot.documentState);
-
-    // Function to extract text from Yjs document
-    function extractText(doc: Y.Doc): string {
-      const content = doc.getXmlFragment('content');
-      let text = '';
-
-      content.forEach(item => {
-        if (item instanceof Y.XmlText) {
-          text += item.toString() + '\n';
-        } else if (item instanceof Y.XmlElement) {
-          const extractFromElement = (el: Y.XmlElement | Y.XmlText): string => {
-            if (el instanceof Y.XmlText) {
-              return el.toString();
-            }
-            let result = '';
-            el.forEach((child: unknown) => {
-              result += extractFromElement(child as Y.XmlElement | Y.XmlText);
-            });
-            return result;
-          };
-          text += extractFromElement(item) + '\n';
-        }
-      });
-
-      return text.trim();
-    }
 
     const text = extractText(doc);
 

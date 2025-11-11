@@ -8,10 +8,38 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as Y from 'yjs';
 
+// Function to extract text from Yjs document
+function extractText(doc: Y.Doc): string {
+  const content = doc.getXmlFragment('content');
+  let text = '';
+
+  content.forEach((item) => {
+    if (item instanceof Y.XmlText) {
+      text += item.toString() + '\n';
+    } else if (item instanceof Y.XmlElement) {
+      const extractFromElement = (el: Y.XmlElement | Y.XmlText): string => {
+        if (el instanceof Y.XmlText) {
+          return String(el.toString());
+        }
+        let result = '';
+        el.forEach((child: unknown) => {
+          result += extractFromElement(child as Y.XmlElement | Y.XmlText);
+        });
+        return result;
+      };
+      text += extractFromElement(item) + '\n';
+    }
+  });
+
+  return text.trim();
+}
+
 async function main() {
   const noteDir = process.argv[2];
   if (!noteDir) {
-    console.error('Usage: NODE_ENV=test node dist/cjs/__manual__/replay-note-updates.js <note-directory>');
+    console.error(
+      'Usage: NODE_ENV=test node dist/cjs/__manual__/replay-note-updates.js <note-directory>'
+    );
     process.exit(1);
   }
 
@@ -20,8 +48,8 @@ async function main() {
   // Read all update files
   const allFiles = await fs.readdir(updatesDir);
   const files = allFiles
-    .filter(f => f.endsWith('.yjson'))
-    .map(f => {
+    .filter((f) => f.endsWith('.yjson'))
+    .map((f) => {
       // Parse filename: instanceId_noteId_timestamp-sequence.yjson
       const match = f.match(/_(\d+)-(\d+)\.yjson$/);
       if (!match) return null;
@@ -36,32 +64,6 @@ async function main() {
     .sort((a, b) => a.sequence - b.sequence);
 
   console.log(`Found ${files.length} update files\n`);
-
-  // Function to extract text from Yjs document
-  function extractText(doc: Y.Doc): string {
-    const content = doc.getXmlFragment('content');
-    let text = '';
-
-    content.forEach(item => {
-      if (item instanceof Y.XmlText) {
-        text += item.toString() + '\n';
-      } else if (item instanceof Y.XmlElement) {
-        const extractFromElement = (el: Y.XmlElement | Y.XmlText): string => {
-          if (el instanceof Y.XmlText) {
-            return el.toString();
-          }
-          let result = '';
-          el.forEach((child: unknown) => {
-            result += extractFromElement(child as Y.XmlElement | Y.XmlText);
-          });
-          return result;
-        };
-        text += extractFromElement(item) + '\n';
-      }
-    });
-
-    return text.trim();
-  }
 
   // Replay updates
   const doc = new Y.Doc();

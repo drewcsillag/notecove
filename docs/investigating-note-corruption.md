@@ -18,11 +18,13 @@ notes/
 ## File Formats
 
 ### Update Files (.yjson)
+
 - **Format**: `0x01` prefix byte + binary Yjs update
 - **Naming**: `{instanceId}_{noteId}_{timestamp}-{sequence}.yjson`
 - **Purpose**: Individual CRDT operations (insertions, deletions, metadata changes)
 
 ### Pack Files (.yjson.zst)
+
 - **Format**: `0x01` prefix byte + zstd-compressed JSON
 - **Naming**: `{instanceId}_pack_{start}-{end}.yjson.zst`
 - **JSON Structure**:
@@ -39,6 +41,7 @@ notes/
   ```
 
 ### Snapshot Files (.yjson.zst)
+
 - **Format**: `0x01` prefix byte + zstd-compressed JSON
 - **Naming**: `snapshot_{totalChanges}_{instanceId}.yjson.zst`
 - **JSON Structure**:
@@ -62,6 +65,7 @@ Three manual diagnostic scripts are available in `packages/shared/src/__manual__
 Replays all update files sequentially to show document state at each point.
 
 **Usage**:
+
 ```bash
 pnpm --filter @notecove/shared build
 NODE_ENV=test node packages/shared/dist/cjs/__manual__/replay-note-updates.js \
@@ -75,6 +79,7 @@ NODE_ENV=test node packages/shared/dist/cjs/__manual__/replay-note-updates.js \
 Extracts content from a snapshot file.
 
 **Usage**:
+
 ```bash
 # First decompress the snapshot (skipping 0x01 prefix):
 dd bs=1 skip=1 if=snapshot_file.yjson.zst | zstd -d -c > /tmp/snapshot.yjson
@@ -91,6 +96,7 @@ NODE_ENV=test node packages/shared/dist/cjs/__manual__/extract-snapshot.js \
 Extracts content from a pack file, showing progression through updates.
 
 **Usage**:
+
 ```bash
 # First decompress the pack (skipping 0x01 prefix):
 dd bs=1 skip=1 if=pack_file.yjson.zst | zstd -d -c > /tmp/pack.yjson
@@ -119,6 +125,7 @@ ls -lh "$NOTE_DIR/updates/" | awk '{print $5}' | sort | uniq -c
 ```
 
 **What to look for**:
+
 - Unusually small files (< 20 bytes) may be metadata-only
 - Multiple instance IDs indicate different devices/sessions
 - Gaps in sequence numbers
@@ -138,6 +145,7 @@ NODE_ENV=test node packages/shared/dist/cjs/__manual__/extract-snapshot.js \
 ```
 
 **What to look for**:
+
 - If snapshot shows empty content, data loss occurred before this point
 - Check `totalChanges` to see how many updates were included
 - Check `timestamp` to see when snapshot was created
@@ -159,6 +167,7 @@ done
 ```
 
 **What to look for**:
+
 - Pack files are often the best source for recovery
 - They consolidate multiple updates and may have been written before corruption
 - Check sequence ranges to understand timeline
@@ -182,6 +191,7 @@ tail -20 /tmp/replay.log
 ```
 
 **What to look for**:
+
 - Decode errors indicate file corruption (check if you forgot to skip 0x01 prefix)
 - Large deletions may indicate intentional or accidental content removal
 - Empty content throughout indicates note never had text
@@ -196,6 +206,7 @@ hexdump -C "$NOTE_DIR/updates/some-file.yjson" | head -20
 ```
 
 **Expected structure**:
+
 ```
 00000000  01 01 XX XX XX ...  |........|
           ↑  ↑
@@ -204,6 +215,7 @@ hexdump -C "$NOTE_DIR/updates/some-file.yjson" | head -20
 ```
 
 **Warning signs**:
+
 - Missing 0x01 prefix (incomplete write)
 - Repeated patterns (corruption)
 - File size doesn't match expected update size
@@ -213,12 +225,14 @@ hexdump -C "$NOTE_DIR/updates/some-file.yjson" | head -20
 ### Scenario 1: "Note had content, now it's empty"
 
 **Investigation**:
+
 1. Check latest snapshot - is it empty?
 2. Replay updates - look for large deletions
 3. Check pack files for older content
 4. Look for updates from other instance IDs (different devices)
 
 **Possible causes**:
+
 - Content was deleted (intentional or accidental)
 - Sync conflict resulted in empty state winning
 - Application bug caused deletion
@@ -226,12 +240,14 @@ hexdump -C "$NOTE_DIR/updates/some-file.yjson" | head -20
 ### Scenario 2: "All update files appear corrupted"
 
 **Investigation**:
+
 1. Verify you're skipping the 0x01 prefix byte
 2. Check pack files - they may be intact
 3. Check snapshots - they may have older content
 4. Look for backups (Time Machine, cloud sync)
 
 **Possible causes**:
+
 - Forgot to skip 0x01 prefix when decoding
 - Disk corruption
 - File system issues
@@ -240,11 +256,13 @@ hexdump -C "$NOTE_DIR/updates/some-file.yjson" | head -20
 ### Scenario 3: "Content exists in pack but not in updates"
 
 **Investigation**:
+
 1. Check sequence numbers in pack vs individual updates
 2. Verify pack content can be extracted
 3. Check if individual updates are metadata-only
 
 **Possible causes**:
+
 - This is normal! Pack files consolidate updates
 - Individual updates may only contain metadata changes
 - Content updates were packed and consolidated
@@ -305,12 +323,14 @@ The `decodeUpdateFile` function should handle the 0x01 prefix internally.
 **Symptoms**: Note appeared to have content, then became empty.
 
 **Investigation Results**:
+
 1. ✅ 81 update files - all decoded successfully after skipping 0x01 prefix
 2. ✅ Updates contained only metadata, no text content
 3. ✅ Snapshot at sequence 77 - empty document
 4. ✅ Pack file (sequences 1-24) - **contained recoverable content**
 
 **Recovered Content**:
+
 ```
 Note wher
 
@@ -318,6 +338,7 @@ Note wher
 ```
 
 **Timeline**:
+
 - Sequences 1-24: Content added ("Note wher..." + UUID)
 - Sequences 25-77: Only metadata updates (no content changes)
 - Snapshot at 77: Captured empty state
@@ -334,6 +355,7 @@ Note wher
 **Cause**: Not skipping the 0x01 prefix byte before passing to Yjs.
 
 **Fix**:
+
 ```typescript
 const fileData = await fs.readFile(updatePath);
 const updateData = fileData.slice(1); // Skip first byte
@@ -345,6 +367,7 @@ Y.applyUpdate(doc, updateData);
 **Cause**: File is truncated or corrupted, or 0x01 prefix not skipped.
 
 **Fix**:
+
 1. Verify file has 0x01 prefix and skip it
 2. Check file size - should be > 1 byte
 3. Try pack files instead
@@ -354,6 +377,7 @@ Y.applyUpdate(doc, updateData);
 **Cause**: Trying to decompress with 0x01 prefix included.
 
 **Fix**:
+
 ```bash
 dd bs=1 skip=1 if=file.yjson.zst | zstd -d -c > output.yjson
 ```
@@ -361,11 +385,13 @@ dd bs=1 skip=1 if=file.yjson.zst | zstd -d -c > output.yjson
 ### All content shows as "(empty)"
 
 **Possible causes**:
+
 1. Note genuinely never had content
 2. Content was deleted in a later update
 3. Looking at wrong fragment (should be 'content', not other fragments)
 
 **Verify**:
+
 - Check pack files for earlier content
 - Look for deletion operations in update replay
 - Examine other instance IDs
@@ -379,11 +405,13 @@ dd bs=1 skip=1 if=file.yjson.zst | zstd -d -c > output.yjson
 ## Tools Reference
 
 All investigation scripts are in `packages/shared/src/__manual__/`:
+
 - `replay-note-updates.ts` - Replay all updates sequentially
 - `extract-snapshot.ts` - Extract content from snapshots
 - `extract-pack.ts` - Extract content from pack files
 
 Build before use:
+
 ```bash
 pnpm --filter @notecove/shared build
 ```

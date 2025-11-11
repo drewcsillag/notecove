@@ -1409,6 +1409,15 @@ app.on('will-quit', (event) => {
 
   console.log('[App] Starting graceful shutdown...');
 
+  // In test mode, add a timeout to force quit if cleanup hangs
+  const isTestMode = process.env['NODE_ENV'] === 'test';
+  if (isTestMode) {
+    setTimeout(() => {
+      console.warn('[App] Shutdown timeout reached in test mode, forcing quit');
+      app.quit();
+    }, 3000); // 3 second timeout in test mode
+  }
+
   // Perform async cleanup
   void (async () => {
     try {

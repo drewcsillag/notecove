@@ -14,7 +14,7 @@ let electronApp: ElectronApplication;
 let page: Page;
 let testUserDataDir: string;
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   // Use absolute path to ensure correct resolution
   const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
 
@@ -40,10 +40,18 @@ test.beforeAll(async () => {
 
   // Get the first window
   page = await electronApp.firstWindow();
-}, 60000); // Also increase beforeAll timeout
+}, 60000); // Also increase beforeEach timeout
 
-test.afterAll(async () => {
-  await electronApp.close();
+test.afterEach(async () => {
+  // Close with a shorter timeout to prevent hanging
+  try {
+    await Promise.race([
+      electronApp.close(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Close timeout')), 5000)),
+    ]);
+  } catch (err) {
+    console.error('[E2E] Error closing app:', err);
+  }
 
   // Clean up the temporary user data directory
   try {
@@ -64,7 +72,7 @@ test.describe('NoteCove Desktop App', () => {
 
   test('should display the folder panel', async () => {
     // Wait for folder panel content to load
-    await page.waitForSelector('text=Folders');
+    await page.waitForSelector('text=Folders', { timeout: 10000 });
 
     // Check for folder panel title
     const title = await page.locator('text=Folders').first();
@@ -78,6 +86,9 @@ test.describe('NoteCove Desktop App', () => {
   });
 
   test('should display the editor panel', async () => {
+    // Wait for React to render and TipTap to initialize
+    await page.waitForSelector('.ProseMirror', { timeout: 10000 });
+
     // Check for TipTap editor (look for ProseMirror container)
     const editor = await page.locator('.ProseMirror').first();
     await expect(editor).toBeVisible();

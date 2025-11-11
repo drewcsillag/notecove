@@ -171,7 +171,11 @@
       "Bash(pnpm --filter @notecove/desktop run typecheck:*)",
       "Bash(pnpm eslint:*)",
       "Bash(pnpm tsc:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(env NODE_ENV=test timeout 20 npx playwright test:*)",
+      "Bash(env NODE_ENV=test timeout 60 npx playwright test:*)",
+      "Bash(env NODE_ENV=* timeout * npx playwright test*)",
+      "Bash(timeout * npx playwright test*)"
     ],
     "deny": [],
     "ask": []
