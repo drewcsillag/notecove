@@ -67,11 +67,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     onUpdate: ({ editor }) => {
       // Don't extract title while loading a note
       if (isLoadingNoteRef.current) {
+        console.log('[TipTapEditor] onUpdate fired but loading flag is set, skipping');
         return;
       }
 
       // Don't extract title if no note is selected
       if (!noteIdRef.current) {
+        console.log('[TipTapEditor] onUpdate fired but no noteId, skipping');
         return;
       }
 
@@ -84,6 +86,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       const firstLine = editor.state.doc.firstChild;
       if (firstLine && onTitleChange) {
         const titleText = firstLine.textContent.trim();
+        console.log(
+          `[TipTapEditor] onUpdate extracting title for note ${noteIdRef.current}: "${titleText}"`
+        );
 
         // Clear existing timer
         if (titleUpdateTimerRef.current) {
@@ -108,6 +113,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             return true;
           });
 
+          console.log(
+            `[TipTapEditor] Sending title update for note ${capturedNoteId}: "${titleText || 'Untitled'}"`
+          );
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           onTitleChange?.(capturedNoteId, titleText || 'Untitled', text.trim());
         }, 300);
