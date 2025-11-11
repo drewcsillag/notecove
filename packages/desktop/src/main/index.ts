@@ -300,9 +300,7 @@ async function ensureDefaultNote(
   // Check if user has permanently deleted the default note
   const defaultNoteDeleted = await db.getState('defaultNoteDeleted');
   if (defaultNoteDeleted === 'true') {
-    console.log(
-      '[ensureDefaultNote] Default note was permanently deleted by user, not recreating'
-    );
+    console.log('[ensureDefaultNote] Default note was permanently deleted by user, not recreating');
     // If other notes exist, select the first one
     if (existingNotes.length > 0) {
       const firstNote = existingNotes[0];
@@ -433,6 +431,33 @@ async function setupSDWatchers(
           const crdtMetadata = noteDoc?.getMetadata();
           const folderId = crdtMetadata?.folderId ?? null;
 
+          // Extract text content for caching
+          const content = doc.getXmlFragment('content');
+          let contentText = '';
+          content.forEach((item) => {
+            if (item instanceof Y.XmlText) {
+              contentText += String(item.toString()) + '\n';
+            } else if (item instanceof Y.XmlElement) {
+              const extractText = (el: Y.XmlElement | Y.XmlText): string => {
+                if (el instanceof Y.XmlText) {
+                  return String(el.toString());
+                }
+                let text = '';
+                el.forEach((child: unknown) => {
+                  const childElement = child as Y.XmlElement | Y.XmlText;
+                  text += extractText(childElement);
+                });
+                return text;
+              };
+              contentText += extractText(item) + '\n';
+            }
+          });
+
+          // Generate content preview (first 200 chars after title)
+          const lines = contentText.split('\n');
+          const contentAfterTitle = lines.slice(1).join('\n').trim();
+          const contentPreview = contentAfterTitle.substring(0, 200);
+
           await db.upsertNote({
             id: noteId,
             title: extractTitleFromDoc(doc, 'content'),
@@ -442,8 +467,8 @@ async function setupSDWatchers(
             modified: crdtMetadata?.modified ?? Date.now(),
             deleted: crdtMetadata?.deleted ?? false,
             pinned: false,
-            contentPreview: '',
-            contentText: '',
+            contentPreview,
+            contentText,
           });
 
           // Broadcast to all windows
@@ -461,6 +486,38 @@ async function setupSDWatchers(
             const crdtMetadata = noteDoc?.getMetadata();
             const newTitle = extractTitleFromDoc(doc, 'content');
 
+            // Extract content if not already cached
+            let contentText = existingNote.contentText;
+            let contentPreview = existingNote.contentPreview;
+
+            if (!contentText) {
+              const content = doc.getXmlFragment('content');
+              contentText = '';
+              content.forEach((item) => {
+                if (item instanceof Y.XmlText) {
+                  contentText += String(item.toString()) + '\n';
+                } else if (item instanceof Y.XmlElement) {
+                  const extractText = (el: Y.XmlElement | Y.XmlText): string => {
+                    if (el instanceof Y.XmlText) {
+                      return String(el.toString());
+                    }
+                    let text = '';
+                    el.forEach((child: unknown) => {
+                      const childElement = child as Y.XmlElement | Y.XmlText;
+                      text += extractText(childElement);
+                    });
+                    return text;
+                  };
+                  contentText += extractText(item) + '\n';
+                }
+              });
+
+              // Generate content preview
+              const lines = contentText.split('\n');
+              const contentAfterTitle = lines.slice(1).join('\n').trim();
+              contentPreview = contentAfterTitle.substring(0, 200);
+            }
+
             await db.upsertNote({
               id: noteId,
               title: newTitle,
@@ -470,8 +527,8 @@ async function setupSDWatchers(
               modified: crdtMetadata?.modified ?? Date.now(),
               deleted: crdtMetadata?.deleted ?? false,
               pinned: false,
-              contentPreview: existingNote.contentPreview,
-              contentText: existingNote.contentText,
+              contentPreview,
+              contentText,
             });
 
             // Broadcast title update to all windows
@@ -904,7 +961,16 @@ void app.whenReady().then(async () => {
     database = await initializeDatabase();
 
     // Clean up orphaned data from deleted SDs
-    await database.cleanupOrphanedData();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    const cleanupPromise = database.cleanupOrphanedData();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    cleanupPromise
+      .then(() => {
+        console.log('[Database] Orphaned data cleanup completed');
+      })
+      .catch((error: unknown) => {
+        console.error('[Database] Failed to cleanup orphaned data:', error);
+      });
 
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] Database ready, initializing CRDT manager...');
@@ -1037,7 +1103,7 @@ void app.whenReady().then(async () => {
           const isValidNoteId = (id: string): boolean => {
             return (
               !id.startsWith('.') &&
-              id &&
+              id.length > 0 &&
               id !== 'undefined' &&
               id !== 'Icon' &&
               !id.includes('\r') &&
@@ -1080,15 +1146,17 @@ void app.whenReady().then(async () => {
                 let contentText = '';
                 content.forEach((item) => {
                   if (item instanceof Y.XmlText) {
-                    contentText += item.toString() + '\n';
+                    const textStr = String(item.toString());
+                    contentText += textStr + '\n';
                   } else if (item instanceof Y.XmlElement) {
                     const extractText = (el: Y.XmlElement | Y.XmlText): string => {
                       if (el instanceof Y.XmlText) {
-                        return el.toString();
+                        return String(el.toString());
                       }
                       let text = '';
-                      el.forEach((child) => {
-                        text += extractText(child as Y.XmlElement | Y.XmlText);
+                      el.forEach((child: unknown) => {
+                        const childElement = child as Y.XmlElement | Y.XmlText;
+                        text += extractText(childElement);
                       });
                       return text;
                     };
@@ -1117,10 +1185,8 @@ void app.whenReady().then(async () => {
                 // Extract and index tags
                 const tags = extractTags(contentText);
                 for (const tagName of tags) {
-                  let tag = await database.getTagByName(tagName);
-                  if (!tag) {
-                    tag = await database.createTag(tagName);
-                  }
+                  const tag =
+                    (await database.getTagByName(tagName)) ?? (await database.createTag(tagName));
                   await database.addTagToNote(noteId, tag.id);
                 }
 
@@ -1147,7 +1213,10 @@ void app.whenReady().then(async () => {
 
         // Send error
         BrowserWindow.getAllWindows().forEach((window) => {
-          window.webContents.send('sd:init-error', { sdId, error: error instanceof Error ? error.message : 'Unknown error' });
+          window.webContents.send('sd:init-error', {
+            sdId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
         });
 
         throw error;
