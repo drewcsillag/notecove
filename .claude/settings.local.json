@@ -170,7 +170,8 @@
       "Bash(env NODE_ENV=test timeout 180 pnpm:*)",
       "Bash(pnpm --filter @notecove/desktop run typecheck:*)",
       "Bash(pnpm eslint:*)",
-      "Bash(pnpm tsc:*)"
+      "Bash(pnpm tsc:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

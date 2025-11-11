@@ -247,6 +247,23 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         console.log(`[TipTapEditor] Applied state to yDoc`);
 
         isLoadingNoteRef.current = false;
+
+        // Check if this is a new empty note and set up initial formatting
+        // A note is considered empty if it only has default placeholder text or is truly empty
+        const isEmpty =
+          editor.isEmpty ||
+          editor.state.doc.textContent === 'Start typing...' ||
+          editor.state.doc.textContent.trim() === '';
+
+        if (isEmpty) {
+          // For new notes, focus the editor and set H1 formatting
+          console.log(`[TipTapEditor] Setting up new note with H1 formatting`);
+
+          // Clear any default content and set H1 format
+          editor.commands.setContent('');
+          editor.commands.setHeading({ level: 1 });
+          editor.commands.focus();
+        }
       } catch (error) {
         console.error(`Failed to load note ${noteId}:`, error);
         isLoadingNoteRef.current = false;
