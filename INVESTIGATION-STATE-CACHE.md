@@ -84,7 +84,7 @@ Made `loadFolderTree()` fully async:
 
 ### C. Spurious Blank Notes on Start
 
-**Commit**: [pending]
+**Commit**: 3cf2838
 
 **Problem**: "Sometimes on start, new blank notes appear"
 
@@ -220,6 +220,13 @@ onUpdate: () => {
 1. ✅ Commit title extraction fixes (DONE - commit 251e252)
 2. ✅ Fix Note Info Dialog performance (DONE - commit aec185f)
 3. ✅ Fix folder hierarchy loading (DONE - commit cc80b28)
-4. ✅ Fix spurious blank notes (DONE - awaiting commit)
+4. ✅ Fix spurious blank notes (DONE - commit 3cf2838)
 5. ✅ Run full test suite (DONE - all 206 tests pass)
-6. Create comprehensive bug report for any remaining issues
+
+## All Reported Issues Resolved! ✅
+
+All six reported issues have been investigated and fixed:
+- ✅ Title extraction race conditions
+- ✅ Note Info Dialog performance
+- ✅ Folder hierarchy loading
+- ✅ Spurious blank notes on startup
