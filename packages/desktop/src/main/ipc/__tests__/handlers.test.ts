@@ -158,7 +158,7 @@ describe('IPCHandlers - Folder CRUD', () => {
       loadNote: jest.fn(),
       unloadNote: jest.fn(),
       applyUpdate: jest.fn(),
-      loadFolderTree: jest.fn().mockReturnValue(mockFolderTree),
+      loadFolderTree: jest.fn().mockResolvedValue(mockFolderTree),
     };
 
     // Create mock database
@@ -890,7 +890,7 @@ describe('IPCHandlers - SD Management', () => {
       loadNote: jest.fn(),
       unloadNote: jest.fn(),
       applyUpdate: jest.fn(),
-      loadFolderTree: jest.fn().mockReturnValue(mockFolderTree),
+      loadFolderTree: jest.fn().mockResolvedValue(mockFolderTree),
     };
 
     // Create mock database

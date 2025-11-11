@@ -422,9 +422,9 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
-   * Load folder tree for an SD (synchronous, but loads from disk asynchronously in background)
+   * Load folder tree for an SD (async - waits for data to load from disk)
    */
-  loadFolderTree(sdId: string): FolderTreeDoc {
+  async loadFolderTree(sdId: string): Promise<FolderTreeDoc> {
     const existing = this.folderTrees.get(sdId);
     if (existing) {
       return existing;
@@ -442,23 +442,11 @@ export class CRDTManagerImpl implements CRDTManager {
 
     this.folderTrees.set(sdId, folderTree);
 
-    // Load updates from disk (this will trigger the update listener, but we need
-    // to temporarily disable it to avoid saving the loaded updates back to disk)
-    this.loadFolderTreeUpdatesSync(sdId, folderTree);
+    // Load updates from disk and wait for completion before returning
+    // This ensures the folder tree is fully populated when returned to the caller
+    await this.loadFolderTreeUpdates(sdId, folderTree);
 
     return folderTree;
-  }
-
-  /**
-   * Synchronously load folder tree updates from disk
-   */
-  private loadFolderTreeUpdatesSync(sdId: string, folderTree: FolderTreeDoc): void {
-    // Use setImmediate to load updates asynchronously but immediately
-    setImmediate(() => {
-      this.loadFolderTreeUpdates(sdId, folderTree).catch((err) => {
-        console.error(`Failed to load folder tree updates for ${sdId}:`, err);
-      });
-    });
   }
 
   /**

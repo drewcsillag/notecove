@@ -62,9 +62,9 @@ export interface CRDTManager {
   /**
    * Load a folder tree document for an SD
    * @param sdId Sync Directory ID
-   * @returns The FolderTreeDoc instance
+   * @returns Promise resolving to the FolderTreeDoc instance
    */
-  loadFolderTree(sdId: string): import('@notecove/shared').FolderTreeDoc;
+  loadFolderTree(sdId: string): Promise<import('@notecove/shared').FolderTreeDoc>;
 
   /**
    * Get the loaded folder tree for an SD

@@ -1038,7 +1038,7 @@ void app.whenReady().then(async () => {
 
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
-    crdtManager.loadFolderTree('default');
+    await crdtManager.loadFolderTree('default');
 
     // Handler for when new SD is created (for IPC)
     const handleNewStorageDir = async (sdId: string, sdPath: string): Promise<void> => {
@@ -1091,7 +1091,7 @@ void app.whenReady().then(async () => {
         // 4. Load folder tree for this SD
         sendProgress(4, 6, 'Loading folder structure...');
         console.log(`[Init] Step 4: Loading folder tree`);
-        crdtManager.loadFolderTree(sdId);
+        await crdtManager.loadFolderTree(sdId);
         console.log(`[Init] Step 4: Folder tree loaded`);
 
         // 5. Set up watchers for this SD

@@ -1271,7 +1271,7 @@ export class IPCHandlers {
     _event: IpcMainInvokeEvent,
     sdId: string
   ): Promise<import('@notecove/shared').FolderData[]> {
-    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folderTree = await this.crdtManager.loadFolderTree(sdId);
     return folderTree.getActiveFolders();
   }
 
@@ -1289,15 +1289,17 @@ export class IPCHandlers {
     // Get all Storage Directories
     const sds = await this.database.getAllStorageDirs();
 
-    // Fetch folders from each SD
-    const allFolders = sds.map((sd) => {
-      const folderTree = this.crdtManager.loadFolderTree(sd.id);
-      return {
-        sdId: sd.id,
-        sdName: sd.name,
-        folders: folderTree.getActiveFolders(),
-      };
-    });
+    // Fetch folders from each SD in parallel, waiting for data to load
+    const allFolders = await Promise.all(
+      sds.map(async (sd) => {
+        const folderTree = await this.crdtManager.loadFolderTree(sd.id);
+        return {
+          sdId: sd.id,
+          sdName: sd.name,
+          folders: folderTree.getActiveFolders(),
+        };
+      })
+    );
 
     return allFolders;
   }
@@ -1307,7 +1309,7 @@ export class IPCHandlers {
     sdId: string,
     folderId: string
   ): Promise<import('@notecove/shared').FolderData | null> {
-    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folderTree = await this.crdtManager.loadFolderTree(sdId);
     return folderTree.getFolder(folderId);
   }
 
@@ -1325,7 +1327,7 @@ export class IPCHandlers {
     const trimmedName = name.trim();
 
     // Check for name conflicts with siblings
-    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folderTree = await this.crdtManager.loadFolderTree(sdId);
     const siblings =
       parentId === null ? folderTree.getRootFolders() : folderTree.getChildFolders(parentId);
 
@@ -1383,7 +1385,7 @@ export class IPCHandlers {
     }
 
     const trimmedName = newName.trim();
-    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folderTree = await this.crdtManager.loadFolderTree(sdId);
     const folder = folderTree.getFolder(folderId);
 
     if (!folder) {
@@ -1422,7 +1424,7 @@ export class IPCHandlers {
     sdId: string,
     folderId: string
   ): Promise<void> {
-    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folderTree = await this.crdtManager.loadFolderTree(sdId);
     const folder = folderTree.getFolder(folderId);
 
     if (!folder) {
@@ -1448,7 +1450,7 @@ export class IPCHandlers {
     folderId: string,
     newParentId: string | null
   ): Promise<void> {
-    const folderTree = this.crdtManager.loadFolderTree(sdId);
+    const folderTree = await this.crdtManager.loadFolderTree(sdId);
     const folder = folderTree.getFolder(folderId);
 
     if (!folder) {
@@ -2189,30 +2191,30 @@ export class IPCHandlers {
       const content = doc.getXmlFragment('content');
 
       content.forEach((item) => {
-      if (item instanceof Y.XmlText) {
-        contentText += String(item.toString()) + '\n';
-        if (String(item.toString()).trim()) {
-          paragraphCount++;
-        }
-      } else if (item instanceof Y.XmlElement) {
-        const extractText = (el: Y.XmlElement | Y.XmlText): string => {
-          if (el instanceof Y.XmlText) {
-            return String(el.toString());
+        if (item instanceof Y.XmlText) {
+          contentText += String(item.toString()) + '\n';
+          if (String(item.toString()).trim()) {
+            paragraphCount++;
           }
-          let text = '';
-          el.forEach((child: unknown) => {
-            const childElement = child as Y.XmlElement | Y.XmlText;
-            text += extractText(childElement);
-          });
-          return text;
-        };
-        const elemText = extractText(item);
-        contentText += elemText + '\n';
-        if (elemText.trim()) {
-          paragraphCount++;
+        } else if (item instanceof Y.XmlElement) {
+          const extractText = (el: Y.XmlElement | Y.XmlText): string => {
+            if (el instanceof Y.XmlText) {
+              return String(el.toString());
+            }
+            let text = '';
+            el.forEach((child: unknown) => {
+              const childElement = child as Y.XmlElement | Y.XmlText;
+              text += extractText(childElement);
+            });
+            return text;
+          };
+          const elemText = extractText(item);
+          contentText += elemText + '\n';
+          if (elemText.trim()) {
+            paragraphCount++;
+          }
         }
-      }
-    });
+      });
 
       // Calculate word count and character count
       characterCount = contentText.length;
