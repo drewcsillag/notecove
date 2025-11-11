@@ -264,6 +264,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
+  // History operations
+  history: {
+    getTimeline: (noteId: string) =>
+      ipcRenderer.invoke('history:getTimeline', noteId),
+    getStats: (noteId: string) =>
+      ipcRenderer.invoke('history:getStats', noteId),
+    reconstructAt: (noteId: string, point: { timestamp: number; updateIndex?: number }) =>
+      ipcRenderer.invoke('history:reconstructAt', noteId, point),
+    getSessionPreview: (noteId: string, sessionId: string) =>
+      ipcRenderer.invoke('history:getSessionPreview', noteId, sessionId),
+  },
+
   // Tag operations
   tag: {
     getAll: (): Promise<{ id: string; name: string; count: number }[]> =>

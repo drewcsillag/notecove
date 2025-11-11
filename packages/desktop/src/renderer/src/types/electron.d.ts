@@ -115,6 +115,40 @@ declare global {
         ) => () => void;
       };
 
+      history: {
+        getTimeline: (noteId: string) => Promise<
+          {
+            id: string;
+            startTime: number;
+            endTime: number;
+            updateCount: number;
+            instanceIds: string[];
+            updates: Array<{
+              instanceId: string;
+              timestamp: number;
+              sequence: number;
+              data: Uint8Array;
+            }>;
+          }[]
+        >;
+        getStats: (noteId: string) => Promise<{
+          totalUpdates: number;
+          totalSessions: number;
+          firstEdit: number | null;
+          lastEdit: number | null;
+          instanceCount: number;
+          instances: string[];
+        }>;
+        reconstructAt: (
+          noteId: string,
+          point: { timestamp: number; updateIndex?: number }
+        ) => Promise<Uint8Array>;
+        getSessionPreview: (
+          noteId: string,
+          sessionId: string
+        ) => Promise<{ firstPreview: string; lastPreview: string }>;
+      };
+
       tag: {
         getAll: () => Promise<{ id: string; name: string; count: number }[]>;
       };

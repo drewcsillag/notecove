@@ -29,11 +29,30 @@ export async function compress(data: Uint8Array): Promise<Uint8Array> {
 
 /**
  * Decompress data using zstd
- * @param data - Compressed data
+ *
+ * Handles the status/version byte prefix used in pack and snapshot files:
+ * - Byte 0: 0x00 (being written) or 0x01 (complete)
+ * - Bytes 1+: zstd compressed data OR plain uncompressed data
+ *
+ * @param data - Compressed data (with optional status byte prefix)
  * @returns Decompressed data
  */
 export async function decompress(data: Uint8Array): Promise<Uint8Array> {
-  const buffer = Buffer.from(data);
+  // Check if first byte is a status byte (0x00 or 0x01)
+  let dataToDecompress = data;
+
+  if (data.length > 0 && (data[0] === 0x00 || data[0] === 0x01)) {
+    // Check if byte 1 starts with zstd magic number (need at least 5 bytes total)
+    if (data.length >= 5 && data[1] === 0x28 && data[2] === 0xb5 && data[3] === 0x2f && data[4] === 0xfd) {
+      // Compressed: strip status byte before decompressing
+      dataToDecompress = data.slice(1);
+    } else {
+      // Uncompressed with status byte: just strip the status byte and return
+      return data.slice(1);
+    }
+  }
+
+  const buffer = Buffer.from(dataToDecompress);
   const decompressed = await zstd.decompress(buffer);
   return new Uint8Array(decompressed);
 }
@@ -42,12 +61,28 @@ export async function decompress(data: Uint8Array): Promise<Uint8Array> {
  * Try to decompress data, fallback to returning original if it fails
  * Useful for backward compatibility with uncompressed files
  *
- * @param data - Potentially compressed data
+ * Handles the status/version byte prefix used in pack and snapshot files.
+ *
+ * @param data - Potentially compressed data (with optional status byte prefix)
  * @returns Decompressed data or original if decompression fails
  */
 export async function decompressWithFallback(data: Uint8Array): Promise<Uint8Array> {
   try {
-    const buffer = Buffer.from(data);
+    // Check if first byte is a status byte (0x00 or 0x01)
+    let dataToDecompress = data;
+
+    if (data.length > 0 && (data[0] === 0x00 || data[0] === 0x01)) {
+      // Check if byte 1 starts with zstd magic number (need at least 5 bytes total)
+      if (data.length >= 5 && data[1] === 0x28 && data[2] === 0xb5 && data[3] === 0x2f && data[4] === 0xfd) {
+        // Compressed: strip status byte before decompressing
+        dataToDecompress = data.slice(1);
+      } else {
+        // Uncompressed with status byte: just strip the status byte and return
+        return data.slice(1);
+      }
+    }
+
+    const buffer = Buffer.from(dataToDecompress);
     const decompressed = await zstd.decompress(buffer);
     return new Uint8Array(decompressed);
   } catch (error) {

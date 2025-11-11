@@ -21,6 +21,16 @@
       "require": "./dist/cjs/storage/versioning/types.js",
       "import": "./dist/esm/storage/versioning/types.js",
       "types": "./dist/esm/storage/versioning/types.d.ts"
+    },
+    "./storage/update-manager": {
+      "require": "./dist/cjs/storage/update-manager.js",
+      "import": "./dist/esm/storage/update-manager.js",
+      "types": "./dist/esm/storage/update-manager.d.ts"
+    },
+    "./history": {
+      "require": "./dist/cjs/history/index.js",
+      "import": "./dist/esm/history/index.js",
+      "types": "./dist/esm/history/index.d.ts"
     }
   },
   "scripts": {

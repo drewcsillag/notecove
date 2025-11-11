@@ -17,6 +17,12 @@ import type { NoteMetadata } from './types';
 import type { Database, NoteCache, UpdateManager } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags } from '@notecove/shared';
+import {
+  TimelineBuilder,
+  StateReconstructor,
+  type ActivitySession,
+  type ReconstructionPoint,
+} from '@notecove/shared/history';
 import { getTelemetryManager } from '../telemetry/config';
 import type { NoteMoveManager } from '../note-move-manager';
 import type { DiagnosticsManager } from '../diagnostics-manager';
@@ -124,6 +130,12 @@ export class IPCHandlers {
     ipcMain.handle('note:createSnapshot', this.handleCreateSnapshot.bind(this));
     ipcMain.handle('note:checkExistsInSD', this.handleCheckNoteExistsInSD.bind(this));
     ipcMain.handle('note:getInfo', this.handleGetNoteInfo.bind(this));
+
+    // History operations
+    ipcMain.handle('history:getTimeline', this.handleGetTimeline.bind(this));
+    ipcMain.handle('history:getStats', this.handleGetHistoryStats.bind(this));
+    ipcMain.handle('history:reconstructAt', this.handleReconstructAt.bind(this));
+    ipcMain.handle('history:getSessionPreview', this.handleGetSessionPreview.bind(this));
 
     // Tag operations
     ipcMain.handle('tag:getAll', this.handleGetAllTags.bind(this));
@@ -2343,5 +2355,115 @@ export class IPCHandlers {
   ): Promise<NoteCache | null> {
     const note = await this.database.getNote(noteId);
     return note;
+  }
+
+  // ============================================================================
+  // History Handlers
+  // ============================================================================
+
+  /**
+   * Get timeline of editing sessions for a note
+   */
+  private async handleGetTimeline(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<ActivitySession[]> {
+    // Get note metadata to find which SD it belongs to
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note not found: ${noteId}`);
+    }
+
+    const timelineBuilder = new TimelineBuilder(this.updateManager);
+    const timeline = await timelineBuilder.buildTimeline(note.sdId, noteId);
+
+    return timeline;
+  }
+
+  /**
+   * Get history statistics for a note
+   */
+  private async handleGetHistoryStats(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<{
+    totalUpdates: number;
+    totalSessions: number;
+    firstEdit: number | null;
+    lastEdit: number | null;
+    instanceCount: number;
+    instances: string[];
+  }> {
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note not found: ${noteId}`);
+    }
+
+    const timelineBuilder = new TimelineBuilder(this.updateManager);
+    const stats = await timelineBuilder.getHistoryStats(note.sdId, noteId);
+
+    return stats;
+  }
+
+  /**
+   * Reconstruct document state at a specific point in time
+   */
+  private async handleReconstructAt(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    point: ReconstructionPoint
+  ): Promise<Uint8Array> {
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note not found: ${noteId}`);
+    }
+
+    const timelineBuilder = new TimelineBuilder(this.updateManager);
+    const stateReconstructor = new StateReconstructor(this.updateManager);
+
+    // Build timeline to get all updates
+    const timeline = await timelineBuilder.buildTimeline(note.sdId, noteId);
+    const allUpdates = timeline.flatMap((session) => session.updates);
+
+    // Reconstruct at the specified point
+    const doc = await stateReconstructor.reconstructAt(note.sdId, noteId, allUpdates, point);
+
+    // Return the document state as Yjs update
+    return Y.encodeStateAsUpdate(doc);
+  }
+
+  /**
+   * Get preview text for first and last state of a session
+   */
+  private async handleGetSessionPreview(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    sessionId: string
+  ): Promise<{ firstPreview: string; lastPreview: string }> {
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      throw new Error(`Note not found: ${noteId}`);
+    }
+
+    const timelineBuilder = new TimelineBuilder(this.updateManager);
+    const stateReconstructor = new StateReconstructor(this.updateManager);
+
+    // Build timeline to find the session
+    const timeline = await timelineBuilder.buildTimeline(note.sdId, noteId);
+    const session = timeline.find((s) => s.id === sessionId);
+
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    const allUpdates = timeline.flatMap((s) => s.updates);
+    const preview = await stateReconstructor.getSessionPreview(
+      note.sdId,
+      noteId,
+      session,
+      allUpdates
+    );
+
+    return preview;
   }
 }
