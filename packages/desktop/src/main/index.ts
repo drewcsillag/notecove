@@ -458,9 +458,13 @@ async function setupSDWatchers(
           const contentAfterTitle = lines.slice(1).join('\n').trim();
           const contentPreview = contentAfterTitle.substring(0, 200);
 
+          // Extract title and strip any HTML/XML tags
+          let newNoteTitle = extractTitleFromDoc(doc, 'content');
+          newNoteTitle = newNoteTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
+
           await db.upsertNote({
             id: noteId,
-            title: extractTitleFromDoc(doc, 'content'),
+            title: newNoteTitle,
             sdId: sdIdFromSync,
             folderId,
             created: crdtMetadata?.created ?? Date.now(),
@@ -484,7 +488,9 @@ async function setupSDWatchers(
           const doc = crdtManager.getDocument(noteId);
           if (doc) {
             const crdtMetadata = noteDoc?.getMetadata();
-            const newTitle = extractTitleFromDoc(doc, 'content');
+            // Extract title and strip any HTML/XML tags
+            let newTitle = extractTitleFromDoc(doc, 'content');
+            newTitle = newTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
             // Extract content if not already cached
             let contentText = existingNote.contentText;
@@ -1139,7 +1145,10 @@ void app.whenReady().then(async () => {
               if (doc) {
                 const crdtMetadata = noteDoc?.getMetadata();
                 const folderId = crdtMetadata?.folderId ?? null;
-                const title = extractTitleFromDoc(doc, 'content');
+                // Extract title and strip any HTML/XML tags that might be present
+                let title = extractTitleFromDoc(doc, 'content');
+                // Strip HTML/XML tags from title
+                title = title.replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
                 // Extract text content for tag indexing and caching
                 const content = doc.getXmlFragment('content');
