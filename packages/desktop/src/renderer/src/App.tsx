@@ -347,7 +347,7 @@ function App(): React.ReactElement {
           step={sdInitProgress.step}
           total={sdInitProgress.total}
           message={sdInitProgress.message}
-          error={sdInitProgress.error}
+          {...(sdInitProgress.error ? { error: sdInitProgress.error } : {})}
         />
       </DndProvider>
     </ThemeProvider>

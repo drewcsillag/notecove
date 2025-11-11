@@ -3,6 +3,7 @@
 ## Problem Summary
 
 When attempting to restore a backup, users were getting false duplicate warnings like:
+
 ```
 Error: Cannot restore: Found 2 duplicate note(s) and 0 duplicate folder(s)
 that already exist in the following storage directory: .
@@ -17,6 +18,7 @@ The database contained **orphaned notes and folders** from Storage Directories t
 ### Example from Investigation
 
 Database state:
+
 - **Current SDs**: `restoreit` and `Restore2` (two empty SDs)
 - **Orphaned notes in database**:
   - "Controlled crash idea" with `sd_id = "default"` (no such SD exists!)
@@ -58,6 +60,7 @@ This prevents false positives from orphaned data.
 ### 2. Added Automatic Cleanup (database.ts)
 
 Added `cleanupOrphanedData()` method that removes:
+
 - Notes from SDs that no longer exist
 - Folders from SDs that no longer exist
 - Tag associations for deleted notes
@@ -110,6 +113,7 @@ node tools/db-doctor.js /path/to/notecove.db --fix
 ```
 
 The tool checks for:
+
 - Orphaned notes (notes from deleted SDs)
 - Orphaned folders (folders from deleted SDs)
 - Orphaned tag associations (tags for deleted notes)
@@ -119,6 +123,7 @@ The tool checks for:
 Tested on the problematic database from `/tmp/nc-instance-X/`:
 
 **Before fix**:
+
 ```
 ❌ Found 3 orphaned note(s):
    - eb9bece5... "Controlled crash idea" (sd_id: default)
@@ -129,6 +134,7 @@ Tested on the problematic database from `/tmp/nc-instance-X/`:
 ```
 
 **After running db-doctor --fix**:
+
 ```
 ✅ No orphaned notes found
 ✅ No orphaned folders found
@@ -143,6 +149,7 @@ After fixing the orphaned data issue, discovered that tags weren't being indexed
 ### Root Cause
 
 During SD initialization (`handleNewStorageDir` in `index.ts`), notes were being loaded from disk and inserted into the database, but:
+
 - Content text was not being extracted from CRDT documents
 - Tags were not being extracted from content
 - Tag indexing was skipped entirely
@@ -150,6 +157,7 @@ During SD initialization (`handleNewStorageDir` in `index.ts`), notes were being
 ### Solution
 
 Updated SD initialization to:
+
 1. Extract full content text from CRDT Y.Doc
 2. Extract tags using `extractTags()` from shared package
 3. Create or get tag entries in database
@@ -169,11 +177,13 @@ After fixing the orphaned data and tag restoration issues, discovered that delet
 ### Solution
 
 **UI Fix** (`TagPanel.tsx`):
+
 - Added listener for `sd:updated` events
 - TagPanel now refreshes when SDs are created, deleted, or activated
 - This triggers a re-query which filters out tags with 0 notes
 
 **Database Fix** (`database.ts`):
+
 - Updated `cleanupOrphanedData()` to also delete unused tags
 - Added cleanup: `DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM note_tags)`
 - Updated db-doctor tool to check for and clean unused tags
@@ -206,6 +216,7 @@ After fixing the orphaned data and tag restoration issues, discovered that delet
 ## User Impact
 
 **Before**:
+
 - Users would see cryptic errors when trying to restore backups, with no clear way to resolve them
 - Tags from restored notes wouldn't appear in the tags panel
 - Tag filtering wouldn't work for restored notes
@@ -213,6 +224,7 @@ After fixing the orphaned data and tag restoration issues, discovered that delet
 - Tags panel wouldn't update until app restart
 
 **After**:
+
 - Database automatically cleaned on startup (including unused tags)
 - Duplicate checking ignores orphaned data
 - Tags automatically extracted and indexed during restore

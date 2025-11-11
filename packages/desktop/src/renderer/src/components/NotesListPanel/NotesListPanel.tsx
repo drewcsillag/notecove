@@ -725,9 +725,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [noteToPermanentDelete];
 
       // Delete all notes
-      await Promise.all(
-        notesToDelete.map((id) => window.electronAPI.note.permanentDelete(id))
-      );
+      await Promise.all(notesToDelete.map((id) => window.electronAPI.note.permanentDelete(id)));
 
       console.log('[NotesListPanel] Notes permanently deleted:', notesToDelete);
 

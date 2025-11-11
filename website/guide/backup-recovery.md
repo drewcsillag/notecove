@@ -191,6 +191,7 @@ The `db-doctor` tool helps diagnose and repair database integrity issues, partic
 **Location**: `tools/db-doctor.js` in the NoteCove repository
 
 **When to Use**:
+
 - You're getting "duplicate note" errors when restoring backups
 - Notes from deleted Storage Directories are still appearing
 - You suspect database corruption after crashes or forced quits
@@ -242,6 +243,7 @@ Mode: CHECK ONLY
 ```
 
 **Safety Notes**:
+
 - Always backup your database before running with `--fix`
 - The tool only removes data from SDs that no longer exist
 - NoteCove automatically runs this cleanup on startup (as of v0.2.0)

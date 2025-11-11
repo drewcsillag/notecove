@@ -70,22 +70,38 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
 
     // Create first note with bold text
     await page.evaluate(async () => {
-      const noteId = await window.electronAPI.note.create('default', null, '<p><strong>Bold Title</strong></p><p>Some content</p>');
+      const noteId = await window.electronAPI.note.create(
+        'default',
+        null,
+        '<p><strong>Bold Title</strong></p><p>Some content</p>'
+      );
       await window.electronAPI.note.updateTitle(noteId, 'Bold Title', 'Bold Title\nSome content');
     });
     await page.waitForTimeout(500);
 
     // Create second note with italic and link
     await page.evaluate(async () => {
-      const noteId = await window.electronAPI.note.create('default', null, '<p><em>Italic</em> and <a href="#">Link</a></p>');
+      const noteId = await window.electronAPI.note.create(
+        'default',
+        null,
+        '<p><em>Italic</em> and <a href="#">Link</a></p>'
+      );
       await window.electronAPI.note.updateTitle(noteId, 'Italic and Link', 'Italic and Link');
     });
     await page.waitForTimeout(500);
 
     // Create third note with heading
     await page.evaluate(async () => {
-      const noteId = await window.electronAPI.note.create('default', null, '<h1>Heading Title</h1><p>Content here</p>');
-      await window.electronAPI.note.updateTitle(noteId, 'Heading Title', 'Heading Title\nContent here');
+      const noteId = await window.electronAPI.note.create(
+        'default',
+        null,
+        '<h1>Heading Title</h1><p>Content here</p>'
+      );
+      await window.electronAPI.note.updateTitle(
+        noteId,
+        'Heading Title',
+        'Heading Title\nContent here'
+      );
     });
     await page.waitForTimeout(500);
 
@@ -97,7 +113,7 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
     await electronApp.close();
 
     // Small delay before relaunching
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Debug: List files in test SD
     const { readdirSync, readFileSync } = await import('fs');
@@ -176,7 +192,7 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
     console.log(`${E2E_LOG_PREFIX} Finding the newly added SD`);
     const newSdId = await page.evaluate(async () => {
       const sds = await window.electronAPI.sd.list();
-      const newSd = sds.find(sd => sd.name === 'Existing SD');
+      const newSd = sds.find((sd) => sd.name === 'Existing SD');
       return newSd?.id;
     });
     console.log(`${E2E_LOG_PREFIX} New SD ID:`, newSdId);
@@ -195,13 +211,22 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
 
     // Check each note's title and content
     for (const note of allNotes) {
-      console.log(`${E2E_LOG_PREFIX}   Note:`, { id: note.id, title: note.title, contentText: note.contentText?.substring(0, 100) });
+      console.log(`${E2E_LOG_PREFIX}   Note:`, {
+        id: note.id,
+        title: note.title,
+        contentText: note.contentText?.substring(0, 100),
+      });
 
       // Check if title or contentText contains HTML tags
       const hasHtmlInTitle = /<[^>]+>/.test(note.title);
       const hasHtmlInContent = /<[^>]+>/.test(note.contentText || '');
       if (hasHtmlInTitle || hasHtmlInContent) {
-        console.log(`${E2E_LOG_PREFIX}   ⚠️  HTML tags found! hasHtmlInTitle:`, hasHtmlInTitle, 'hasHtmlInContent:', hasHtmlInContent);
+        console.log(
+          `${E2E_LOG_PREFIX}   ⚠️  HTML tags found! hasHtmlInTitle:`,
+          hasHtmlInTitle,
+          'hasHtmlInContent:',
+          hasHtmlInContent
+        );
       }
     }
 
@@ -218,7 +243,7 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
       // Get all text content from the note item (includes title, preview, date)
       const fullText = await noteItem.textContent();
       // Extract first line as title (before the preview and date)
-      const lines = fullText?.split('\n').filter(line => line.trim()) ?? [];
+      const lines = fullText?.split('\n').filter((line) => line.trim()) ?? [];
       const titleText = lines[0]?.trim() ?? '';
 
       console.log(`${E2E_LOG_PREFIX} Note ${i + 1} title: "${titleText}"`);

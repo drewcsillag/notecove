@@ -70,8 +70,10 @@ const orphanedNotes = sqliteQuery(`
 if (orphanedNotes.length > 0) {
   hasIssues = true;
   console.log(`❌ Found ${orphanedNotes.length} orphaned note(s):`);
-  orphanedNotes.forEach(note => {
-    console.log(`   - ${note.id} "${note.title}" (sd_id: ${note.sd_id}, created: ${new Date(note.created).toISOString()})`);
+  orphanedNotes.forEach((note) => {
+    console.log(
+      `   - ${note.id} "${note.title}" (sd_id: ${note.sd_id}, created: ${new Date(note.created).toISOString()})`
+    );
   });
 
   if (fix) {
@@ -96,7 +98,7 @@ const orphanedFolders = sqliteQuery(`
 if (orphanedFolders.length > 0) {
   hasIssues = true;
   console.log(`❌ Found ${orphanedFolders.length} orphaned folder(s):`);
-  orphanedFolders.forEach(folder => {
+  orphanedFolders.forEach((folder) => {
     console.log(`   - ${folder.id} "${folder.name}" (sd_id: ${folder.sd_id})`);
   });
 
@@ -145,7 +147,7 @@ const unusedTags = sqliteQuery(`
 if (unusedTags.length > 0) {
   hasIssues = true;
   console.log(`❌ Found ${unusedTags.length} unused tag(s):`);
-  unusedTags.forEach(tag => {
+  unusedTags.forEach((tag) => {
     console.log(`   - ${tag.id} "${tag.name}"`);
   });
 

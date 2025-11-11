@@ -167,7 +167,10 @@
       "Bash(pnpm --filter @notecove/shared update:*)",
       "Bash(env NODE_ENV=test timeout 90 npx playwright test:*)",
       "Bash(env NODE_ENV=test timeout 90 pnpm:*)",
-      "Bash(env NODE_ENV=test timeout 180 pnpm:*)"
+      "Bash(env NODE_ENV=test timeout 180 pnpm:*)",
+      "Bash(pnpm --filter @notecove/desktop run typecheck:*)",
+      "Bash(pnpm eslint:*)",
+      "Bash(pnpm tsc:*)"
     ],
     "deny": [],
     "ask": []

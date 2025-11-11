@@ -58,6 +58,15 @@ const mockElectronAPI = {
     onOpenSettings: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    onInitProgress: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onInitComplete: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onInitError: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   sync: {
     onProgress: jest.fn(),

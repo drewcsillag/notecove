@@ -50,6 +50,15 @@ export class BetterSqliteAdapter implements DatabaseAdapter {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
+  async run(sql: string, params: unknown[] = []): Promise<{ changes: number }> {
+    this.ensureInitialized();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const stmt = this.db!.prepare(sql);
+    const result = stmt.run(...params);
+    return { changes: result.changes };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
   async get<T>(sql: string, params: unknown[] = []): Promise<T | null> {
     this.ensureInitialized();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

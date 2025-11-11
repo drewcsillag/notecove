@@ -826,31 +826,41 @@ export class SqliteDatabase implements Database {
   }> {
     console.log('[Database] Cleaning up orphaned data...');
 
+    // Cast adapter to a type with run() method
+    const adapter = this.adapter as DatabaseAdapter & {
+      run(sql: string, params?: unknown[]): Promise<{ changes: number }>;
+    };
+
     // Delete orphaned notes (notes from SDs that no longer exist)
-    const notesResult = await this.adapter.exec(
+    const notesResult = await adapter.run(
       'DELETE FROM notes WHERE sd_id NOT IN (SELECT id FROM storage_dirs)'
     );
 
     // Delete orphaned folders
-    const foldersResult = await this.adapter.exec(
+    const foldersResult = await adapter.run(
       'DELETE FROM folders WHERE sd_id NOT IN (SELECT id FROM storage_dirs)'
     );
 
     // Delete orphaned tag associations (tags for notes that no longer exist)
-    const tagAssociationsResult = await this.adapter.exec(
+    const tagAssociationsResult = await adapter.run(
       'DELETE FROM note_tags WHERE note_id NOT IN (SELECT id FROM notes)'
     );
 
     // Delete unused tags (tags with no note associations)
-    const unusedTagsResult = await this.adapter.exec(
+    const unusedTagsResult = await adapter.run(
       'DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM note_tags)'
     );
 
+    const notesDeleted = notesResult.changes;
+    const foldersDeleted = foldersResult.changes;
+    const tagAssociationsDeleted = tagAssociationsResult.changes;
+    const unusedTagsDeleted = unusedTagsResult.changes;
+
     const result = {
-      notesDeleted: notesResult?.changes ?? 0,
-      foldersDeleted: foldersResult?.changes ?? 0,
-      tagAssociationsDeleted: tagAssociationsResult?.changes ?? 0,
-      unusedTagsDeleted: unusedTagsResult?.changes ?? 0,
+      notesDeleted,
+      foldersDeleted,
+      tagAssociationsDeleted,
+      unusedTagsDeleted,
     };
 
     if (

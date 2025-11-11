@@ -22,6 +22,8 @@ export class CRDTManagerImpl implements CRDTManager {
   private snapshotCheckTimer: NodeJS.Timeout | undefined;
   private packingTimer: NodeJS.Timeout | undefined;
   private gcTimer: NodeJS.Timeout | undefined;
+  // Track pending update writes for graceful shutdown
+  private pendingUpdates = new Set<Promise<void>>();
 
   constructor(
     private updateManager: UpdateManager,
@@ -247,9 +249,17 @@ export class CRDTManagerImpl implements CRDTManager {
 
     // Set up update listener to write changes to disk
     doc.on('update', (update: Uint8Array) => {
-      this.handleUpdate(noteId, update).catch((error: Error) => {
-        console.error(`Failed to handle update for note ${noteId}:`, error);
-      });
+      const updatePromise = this.handleUpdate(noteId, update)
+        .catch((error: Error) => {
+          console.error(`Failed to handle update for note ${noteId}:`, error);
+        })
+        .finally(() => {
+          // Remove from pending set when complete
+          this.pendingUpdates.delete(updatePromise);
+        });
+
+      // Track this update for graceful shutdown
+      this.pendingUpdates.add(updatePromise);
     });
 
     // Check if we should create a snapshot immediately after loading
@@ -303,7 +313,20 @@ export class CRDTManagerImpl implements CRDTManager {
     state.lastModified = Date.now();
 
     // Write update to disk (Y.applyUpdate doesn't trigger the 'update' event)
-    await this.handleUpdate(noteId, update);
+    const updatePromise = this.handleUpdate(noteId, update)
+      .catch((error: Error) => {
+        console.error(`Failed to handle update for note ${noteId}:`, error);
+        throw error; // Re-throw to propagate error to caller
+      })
+      .finally(() => {
+        // Remove from pending set when complete
+        this.pendingUpdates.delete(updatePromise);
+      });
+
+    // Track this update for graceful shutdown
+    this.pendingUpdates.add(updatePromise);
+
+    await updatePromise;
     console.log(`[CRDT Manager] Update written to disk for note ${noteId}`);
   }
 
@@ -1030,6 +1053,27 @@ export class CRDTManagerImpl implements CRDTManager {
       // Silent failure - don't interrupt normal operation
       console.error(`[CRDT Manager] Failed to record file counts for note ${noteId}:`, error);
     }
+  }
+
+  /**
+   * Flush all pending updates to disk
+   * Should be called before destroy() during graceful shutdown
+   */
+  async flush(): Promise<void> {
+    const pendingCount = this.pendingUpdates.size;
+    if (pendingCount === 0) {
+      console.log('[CRDT Manager] No pending updates to flush');
+      return;
+    }
+
+    console.log(`[CRDT Manager] Flushing ${pendingCount} pending updates...`);
+    const startTime = Date.now();
+
+    // Wait for all pending update writes to complete
+    await Promise.all(Array.from(this.pendingUpdates));
+
+    const duration = Date.now() - startTime;
+    console.log(`[CRDT Manager] Flushed all pending updates in ${duration}ms`);
   }
 
   /**

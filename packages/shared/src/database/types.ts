@@ -37,6 +37,11 @@ export interface DatabaseAdapter {
   exec(sql: string, params?: unknown[]): Promise<void>;
 
   /**
+   * Run a query that returns the number of changes (INSERT, UPDATE, DELETE)
+   */
+  run(sql: string, params?: unknown[]): Promise<{ changes: number }>;
+
+  /**
    * Run a query that returns a single row
    */
   get<T>(sql: string, params?: unknown[]): Promise<T | null>;
@@ -375,4 +380,14 @@ export interface Database
    * Run operations in a transaction
    */
   transaction<T>(fn: () => Promise<T>): Promise<T>;
+
+  /**
+   * Clean up orphaned data (notes, folders, tags from deleted SDs)
+   */
+  cleanupOrphanedData(): Promise<{
+    notesDeleted: number;
+    foldersDeleted: number;
+    tagAssociationsDeleted: number;
+    unusedTagsDeleted: number;
+  }>;
 }

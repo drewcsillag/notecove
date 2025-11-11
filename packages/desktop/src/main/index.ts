@@ -1384,37 +1384,77 @@ void app.on('window-all-closed', () => {
 });
 
 // Clean up on app quit
-// Note: We handle cleanup synchronously to avoid race conditions during quit
+// Note: We use will-quit with async cleanup to ensure CRDT updates are flushed
 let isQuitting = false;
 
-app.on('before-quit', () => {
-  if (isQuitting) return;
+app.on('will-quit', (event) => {
+  if (isQuitting) {
+    // Already cleaned up, allow quit to proceed
+    return;
+  }
+
+  // Prevent quit until cleanup is done
+  event.preventDefault();
   isQuitting = true;
 
-  try {
-    if (ipcHandlers) {
-      ipcHandlers.destroy();
+  console.log('[App] Starting graceful shutdown...');
+
+  // Perform async cleanup
+  void (async () => {
+    try {
+      // 1. Flush all pending CRDT updates to disk
+      const manager = crdtManager;
+      if (manager) {
+        console.log('[App] Flushing pending CRDT updates...');
+        await manager.flush();
+        console.log('[App] CRDT updates flushed successfully');
+
+        // 2. Destroy CRDT manager
+        console.log('[App] Destroying CRDT manager...');
+        manager.destroy();
+      }
+
+      // 3. Destroy IPC handlers
+      if (ipcHandlers) {
+        console.log('[App] Destroying IPC handlers...');
+        ipcHandlers.destroy();
+      }
+
+      // 4. Clean up all SD file watchers
+      console.log('[App] Cleaning up file watchers...');
+      for (const watcher of sdFileWatchers.values()) {
+        await watcher.unwatch();
+      }
+      sdFileWatchers.clear();
+
+      // 5. Clean up all SD activity watchers
+      console.log('[App] Cleaning up activity watchers...');
+      for (const watcher of sdActivityWatchers.values()) {
+        await watcher.unwatch();
+      }
+      sdActivityWatchers.clear();
+      sdActivitySyncs.clear();
+
+      // 6. Clear compaction interval
+      if (compactionInterval) {
+        clearInterval(compactionInterval);
+      }
+
+      // 7. Close database
+      if (database) {
+        console.log('[App] Closing database...');
+        await database.close();
+        console.log('[App] Database closed successfully');
+      }
+
+      console.log('[App] Graceful shutdown complete');
+
+      // Now allow the app to quit
+      app.quit();
+    } catch (error: unknown) {
+      console.error('[App] Error during graceful shutdown:', error);
+      // Still quit even if cleanup fails
+      app.quit();
     }
-    // Clean up all SD file watchers
-    for (const watcher of sdFileWatchers.values()) {
-      void watcher.unwatch();
-    }
-    sdFileWatchers.clear();
-    // Clean up all SD activity watchers
-    for (const watcher of sdActivityWatchers.values()) {
-      void watcher.unwatch();
-    }
-    sdActivityWatchers.clear();
-    sdActivitySyncs.clear();
-    if (compactionInterval) {
-      clearInterval(compactionInterval);
-    }
-    // Note: Database cleanup is async, but we can't await here
-    // The database will be closed when the process exits
-    if (database) {
-      void database.close();
-    }
-  } catch (error) {
-    console.error('Error during cleanup:', error);
-  }
+  })();
 });

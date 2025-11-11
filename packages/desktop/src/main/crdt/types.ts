@@ -91,4 +91,17 @@ export interface CRDTManager {
    * @returns Array of note IDs
    */
   getLoadedNotes(): string[];
+
+  /**
+   * Flush all pending updates to disk
+   * Should be called before shutdown to ensure all writes complete
+   * @returns Promise that resolves when all pending updates are written
+   */
+  flush(): Promise<void>;
+
+  /**
+   * Clean up all documents and resources
+   * Should be called after flush() during graceful shutdown
+   */
+  destroy(): void;
 }
