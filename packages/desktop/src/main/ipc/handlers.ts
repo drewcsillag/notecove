@@ -2175,24 +2175,20 @@ export class IPCHandlers {
     const tagRecords = await this.database.getTagsForNote(noteId);
     const tags = tagRecords.map((t) => t.name);
 
-    // Load note if not already loaded
-    const wasLoaded = !!this.crdtManager.getDocument(noteId);
-    if (!wasLoaded) {
-      await this.crdtManager.loadNote(noteId, note.sdId);
-    }
-
-    // Get CRDT document
+    // Check if note is already loaded - don't load it just for statistics
+    // This avoids expensive CRDT loading for notes that aren't currently open
     const doc = this.crdtManager.getDocument(noteId);
-    if (!doc) {
-      return null;
-    }
 
-    // Extract content for statistics
-    const content = doc.getXmlFragment('content');
+    // Extract content for statistics (only if note is already loaded)
     let contentText = '';
     let paragraphCount = 0;
+    let characterCount = 0;
+    let wordCount = 0;
 
-    content.forEach((item) => {
+    if (doc) {
+      const content = doc.getXmlFragment('content');
+
+      content.forEach((item) => {
       if (item instanceof Y.XmlText) {
         contentText += String(item.toString()) + '\n';
         if (String(item.toString()).trim()) {
@@ -2218,73 +2214,84 @@ export class IPCHandlers {
       }
     });
 
-    // Calculate word count and character count
-    const characterCount = contentText.length;
-    const wordCount = contentText
-      .trim()
-      .split(/\s+/)
-      .filter((word) => word.length > 0).length;
+      // Calculate word count and character count
+      characterCount = contentText.length;
+      wordCount = contentText
+        .trim()
+        .split(/\s+/)
+        .filter((word) => word.length > 0).length;
+    }
 
     // Get vector clock (NoteCove's tracking of updates from other instances)
     // Build it as if we were writing a snapshot - from all update files on disk
     const vectorClock = await this.updateManager.buildVectorClock(note.sdId, noteId);
 
-    // Get document state and create hash
-    const documentState = Y.encodeStateAsUpdate(doc);
-    const documentHash = crypto
-      .createHash('sha256')
-      .update(documentState)
-      .digest('hex')
-      .substring(0, 16);
+    // Get document state and create hash (only if note is loaded)
+    const documentHash = doc
+      ? crypto
+          .createHash('sha256')
+          .update(Y.encodeStateAsUpdate(doc))
+          .digest('hex')
+          .substring(0, 16)
+      : '';
 
     // Get note directory path and calculate total size of all CRDT files
     const noteDir = path.join(sd.path, 'notes', noteId);
     const noteDirPath = noteDir;
 
     // Calculate total size of all update files, packs, and snapshots
-    let totalFileSize = 0;
-    const snapshots = await this.updateManager.listSnapshotFiles(note.sdId, noteId);
-    const packs = await this.updateManager.listPackFiles(note.sdId, noteId);
-    const updates = await this.updateManager.listNoteUpdateFiles(note.sdId, noteId);
+    // Use parallel stat calls for better performance
+    const [snapshots, packs, updates] = await Promise.all([
+      this.updateManager.listSnapshotFiles(note.sdId, noteId),
+      this.updateManager.listPackFiles(note.sdId, noteId),
+      this.updateManager.listNoteUpdateFiles(note.sdId, noteId),
+    ]);
 
     // Get update count (number of update files on disk)
     const crdtUpdateCount = updates.length;
-
-    // Sum up file sizes
-    for (const snapshot of snapshots) {
-      try {
-        const snapshotPath = path.join(noteDir, 'snapshots', snapshot.filename);
-        const stats = await fs.stat(snapshotPath);
-        totalFileSize += stats.size;
-      } catch {
-        // Ignore if file doesn't exist
-      }
-    }
-    for (const pack of packs) {
-      try {
-        const packPath = path.join(noteDir, 'packs', pack.filename);
-        const stats = await fs.stat(packPath);
-        totalFileSize += stats.size;
-      } catch {
-        // Ignore if file doesn't exist
-      }
-    }
-    for (const update of updates) {
-      try {
-        const stats = await fs.stat(update.path);
-        totalFileSize += stats.size;
-      } catch {
-        // Ignore if file doesn't exist
-      }
-    }
-
     const snapshotCount = snapshots.length;
     const packCount = packs.length;
 
-    // Unload if we loaded it
-    if (!wasLoaded) {
-      await this.crdtManager.unloadNote(noteId);
-    }
+    // Sum up file sizes in parallel for better performance
+    const snapshotSizes = await Promise.all(
+      snapshots.map(async (snapshot) => {
+        try {
+          const snapshotPath = path.join(noteDir, 'snapshots', snapshot.filename);
+          const stats = await fs.stat(snapshotPath);
+          return stats.size;
+        } catch {
+          return 0;
+        }
+      })
+    );
+
+    const packSizes = await Promise.all(
+      packs.map(async (pack) => {
+        try {
+          const packPath = path.join(noteDir, 'packs', pack.filename);
+          const stats = await fs.stat(packPath);
+          return stats.size;
+        } catch {
+          return 0;
+        }
+      })
+    );
+
+    const updateSizes = await Promise.all(
+      updates.map(async (update) => {
+        try {
+          const stats = await fs.stat(update.path);
+          return stats.size;
+        } catch {
+          return 0;
+        }
+      })
+    );
+
+    const totalFileSize =
+      snapshotSizes.reduce((sum, size) => sum + size, 0) +
+      packSizes.reduce((sum, size) => sum + size, 0) +
+      updateSizes.reduce((sum, size) => sum + size, 0);
 
     return {
       id: noteId,
