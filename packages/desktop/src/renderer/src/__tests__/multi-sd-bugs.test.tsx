@@ -95,6 +95,7 @@ const mockElectronAPI = {
     onToggleTagsPanel: jest.fn(() => () => {}),
     onAbout: jest.fn(() => () => {}),
     onCreateSnapshot: jest.fn(() => () => {}),
+    onNoteInfo: jest.fn(() => () => {}),
   },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */

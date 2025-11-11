@@ -127,6 +127,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
         exists: boolean;
         isDeleted: boolean;
       }>,
+    getInfo: (noteId: string) =>
+      ipcRenderer.invoke('note:getInfo', noteId) as Promise<{
+        id: string;
+        title: string;
+        sdId: string;
+        sdName: string;
+        sdPath: string;
+        folderId: string | null;
+        folderName: string | null;
+        folderPath: string | null;
+        created: number;
+        modified: number;
+        tags: string[];
+        characterCount: number;
+        wordCount: number;
+        paragraphCount: number;
+        vectorClock: Record<string, number>;
+        documentHash: string;
+        crdtUpdateCount: number;
+        noteDirPath: string;
+        totalFileSize: number;
+        snapshotCount: number;
+        packCount: number;
+        deleted: boolean;
+        pinned: boolean;
+        contentPreview: string;
+      } | null>,
 
     // Event listeners
     onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
@@ -879,6 +906,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:createSnapshot', listener);
       return () => {
         ipcRenderer.removeListener('menu:createSnapshot', listener);
+      };
+    },
+    onNoteInfo: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:noteInfo', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:noteInfo', listener);
       };
     },
     onAbout: (callback: () => void): (() => void) => {

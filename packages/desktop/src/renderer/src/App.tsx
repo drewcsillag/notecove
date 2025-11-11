@@ -14,6 +14,7 @@ import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
 import { EditorPanel } from './components/EditorPanel/EditorPanel';
 import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgressDialog';
+import { NoteInfoDialog } from './components/NoteInfoDialog';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
@@ -23,6 +24,7 @@ function App(): React.ReactElement {
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [noteInfoOpen, setNoteInfoOpen] = useState(false);
   const [activeSdId, setActiveSdId] = useState<string>('default');
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
@@ -247,6 +249,15 @@ function App(): React.ReactElement {
       }
     });
 
+    // Note Info
+    const cleanupNoteInfo = window.electronAPI.menu.onNoteInfo(() => {
+      if (selectedNoteId) {
+        setNoteInfoOpen(true);
+      } else {
+        console.log('[Menu] No note selected for Note Info');
+      }
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -257,6 +268,7 @@ function App(): React.ReactElement {
       cleanupToggleTagsPanel();
       cleanupAbout();
       cleanupCreateSnapshot();
+      cleanupNoteInfo();
     };
   }, [selectedNoteId]);
 
@@ -342,6 +354,13 @@ function App(): React.ReactElement {
             onThemeChange={setThemeMode}
           />
         )}
+        <NoteInfoDialog
+          open={noteInfoOpen}
+          noteId={selectedNoteId}
+          onClose={() => {
+            setNoteInfoOpen(false);
+          }}
+        />
         <SDInitProgressDialog
           open={sdInitProgress.open}
           step={sdInitProgress.step}

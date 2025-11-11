@@ -123,6 +123,7 @@ export class IPCHandlers {
     ipcMain.handle('note:getDeletedNoteCount', this.handleGetDeletedNoteCount.bind(this));
     ipcMain.handle('note:createSnapshot', this.handleCreateSnapshot.bind(this));
     ipcMain.handle('note:checkExistsInSD', this.handleCheckNoteExistsInSD.bind(this));
+    ipcMain.handle('note:getInfo', this.handleGetNoteInfo.bind(this));
 
     // Tag operations
     ipcMain.handle('tag:getAll', this.handleGetAllTags.bind(this));
@@ -2092,6 +2093,225 @@ export class IPCHandlers {
     _event: IpcMainInvokeEvent
   ): Promise<{ id: string; name: string; count: number }[]> {
     return await this.database.getAllTags();
+  }
+
+  /**
+   * Note: Get comprehensive note information for debugging and diagnostics
+   */
+  private async handleGetNoteInfo(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<{
+    // Basic info
+    id: string;
+    title: string;
+    sdId: string;
+    sdName: string;
+    sdPath: string;
+    folderId: string | null;
+    folderName: string | null;
+    folderPath: string | null;
+
+    // Timestamps
+    created: number;
+    modified: number;
+
+    // Tags
+    tags: string[];
+
+    // Document statistics
+    characterCount: number;
+    wordCount: number;
+    paragraphCount: number;
+
+    // CRDT info
+    vectorClock: Record<string, number>; // Maps instance ID to highest sequence number
+    documentHash: string; // SHA-256 hash of document state (first 16 chars)
+    crdtUpdateCount: number; // Number of updates in the document
+    noteDirPath: string; // Path to note directory
+    totalFileSize: number; // Total size of all CRDT files (updates + packs + snapshots)
+    snapshotCount: number; // Number of snapshot files
+    packCount: number; // Number of pack files
+
+    // Advanced info
+    deleted: boolean;
+    pinned: boolean;
+    contentPreview: string;
+  } | null> {
+    // Get note from database
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      return null;
+    }
+
+    // Get SD info
+    const sd = await this.database.getStorageDir(note.sdId);
+    if (!sd) {
+      return null;
+    }
+
+    // Get folder info if note is in a folder
+    let folderName: string | null = null;
+    let folderPath: string | null = null;
+    if (note.folderId) {
+      const folder = await this.database.getFolder(note.folderId);
+      if (folder) {
+        folderName = folder.name;
+
+        // Build full folder path by traversing up the hierarchy
+        const pathParts: string[] = [folder.name];
+        let currentFolder = folder;
+        while (currentFolder.parentId) {
+          const parentFolder = await this.database.getFolder(currentFolder.parentId);
+          if (!parentFolder) break;
+          pathParts.unshift(parentFolder.name);
+          currentFolder = parentFolder;
+        }
+        folderPath = pathParts.join(' / ');
+      }
+    }
+
+    // Get tags
+    const tagRecords = await this.database.getTagsForNote(noteId);
+    const tags = tagRecords.map((t) => t.name);
+
+    // Load note if not already loaded
+    const wasLoaded = !!this.crdtManager.getDocument(noteId);
+    if (!wasLoaded) {
+      await this.crdtManager.loadNote(noteId, note.sdId);
+    }
+
+    // Get CRDT document
+    const doc = this.crdtManager.getDocument(noteId);
+    if (!doc) {
+      return null;
+    }
+
+    // Extract content for statistics
+    const content = doc.getXmlFragment('content');
+    let contentText = '';
+    let paragraphCount = 0;
+
+    content.forEach((item) => {
+      if (item instanceof Y.XmlText) {
+        contentText += String(item.toString()) + '\n';
+        if (String(item.toString()).trim()) {
+          paragraphCount++;
+        }
+      } else if (item instanceof Y.XmlElement) {
+        const extractText = (el: Y.XmlElement | Y.XmlText): string => {
+          if (el instanceof Y.XmlText) {
+            return String(el.toString());
+          }
+          let text = '';
+          el.forEach((child: unknown) => {
+            const childElement = child as Y.XmlElement | Y.XmlText;
+            text += extractText(childElement);
+          });
+          return text;
+        };
+        const elemText = extractText(item);
+        contentText += elemText + '\n';
+        if (elemText.trim()) {
+          paragraphCount++;
+        }
+      }
+    });
+
+    // Calculate word count and character count
+    const characterCount = contentText.length;
+    const wordCount = contentText
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
+
+    // Get vector clock (NoteCove's tracking of updates from other instances)
+    // Build it as if we were writing a snapshot - from all update files on disk
+    const vectorClock = await this.updateManager.buildVectorClock(note.sdId, noteId);
+
+    // Get document state and create hash
+    const documentState = Y.encodeStateAsUpdate(doc);
+    const documentHash = crypto
+      .createHash('sha256')
+      .update(documentState)
+      .digest('hex')
+      .substring(0, 16);
+
+    // Get note directory path and calculate total size of all CRDT files
+    const noteDir = path.join(sd.path, 'notes', noteId);
+    const noteDirPath = noteDir;
+
+    // Calculate total size of all update files, packs, and snapshots
+    let totalFileSize = 0;
+    const snapshots = await this.updateManager.listSnapshotFiles(note.sdId, noteId);
+    const packs = await this.updateManager.listPackFiles(note.sdId, noteId);
+    const updates = await this.updateManager.listNoteUpdateFiles(note.sdId, noteId);
+
+    // Get update count (number of update files on disk)
+    const crdtUpdateCount = updates.length;
+
+    // Sum up file sizes
+    for (const snapshot of snapshots) {
+      try {
+        const snapshotPath = path.join(noteDir, 'snapshots', snapshot.filename);
+        const stats = await fs.stat(snapshotPath);
+        totalFileSize += stats.size;
+      } catch {
+        // Ignore if file doesn't exist
+      }
+    }
+    for (const pack of packs) {
+      try {
+        const packPath = path.join(noteDir, 'packs', pack.filename);
+        const stats = await fs.stat(packPath);
+        totalFileSize += stats.size;
+      } catch {
+        // Ignore if file doesn't exist
+      }
+    }
+    for (const update of updates) {
+      try {
+        const stats = await fs.stat(update.path);
+        totalFileSize += stats.size;
+      } catch {
+        // Ignore if file doesn't exist
+      }
+    }
+
+    const snapshotCount = snapshots.length;
+    const packCount = packs.length;
+
+    // Unload if we loaded it
+    if (!wasLoaded) {
+      await this.crdtManager.unloadNote(noteId);
+    }
+
+    return {
+      id: noteId,
+      title: note.title,
+      sdId: note.sdId,
+      sdName: sd.name,
+      sdPath: sd.path,
+      folderId: note.folderId,
+      folderName,
+      folderPath,
+      created: note.created,
+      modified: note.modified,
+      tags,
+      characterCount,
+      wordCount,
+      paragraphCount,
+      vectorClock,
+      documentHash,
+      crdtUpdateCount,
+      noteDirPath,
+      totalFileSize,
+      snapshotCount,
+      packCount,
+      deleted: note.deleted,
+      pinned: note.pinned,
+      contentPreview: note.contentPreview,
+    };
   }
 
   // Test-only handlers

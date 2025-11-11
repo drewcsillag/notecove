@@ -870,6 +870,16 @@ function createMenu(): void {
       label: 'Tools',
       submenu: [
         {
+          label: 'Note Info',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:noteInfo');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'Create Snapshot',
           click: () => {
             if (mainWindow) {
