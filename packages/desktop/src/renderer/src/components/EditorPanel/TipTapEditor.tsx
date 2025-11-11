@@ -32,7 +32,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
-  const isLoadingNoteRef = useRef(false);
+  // Start with loading=true to prevent title extraction before note loads
+  const isLoadingNoteRef = useRef(true);
   const noteIdRef = useRef<string | null>(noteId);
   const titleUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
@@ -54,7 +55,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         fragment: yDoc.getXmlFragment('content'),
       }),
     ],
-    content: '<p>Start typing...</p>',
+    // Don't set initial content - let Yjs/Collaboration handle it from loaded state
+    // Setting content here causes onUpdate to fire before note loads
     editable: !readOnly,
     editorProps: {
       attributes: {
@@ -250,8 +252,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         Y.applyUpdate(yDoc, state, 'load');
         console.log(`[TipTapEditor] Applied state to yDoc`);
 
-        isLoadingNoteRef.current = false;
-
         // Check if this is a newly created note and set up initial formatting
         // Only apply H1 formatting to notes that were just created, not existing empty notes
         if (isNewlyCreated) {
@@ -262,6 +262,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           editor.commands.setHeading({ level: 1 });
           editor.commands.focus();
         }
+
+        // IMPORTANT: Clear loading flag AFTER all content manipulation to prevent
+        // spurious title updates from setContent/setHeading operations
+        isLoadingNoteRef.current = false;
 
         // Notify parent that note has been loaded
         onNoteLoaded?.();
