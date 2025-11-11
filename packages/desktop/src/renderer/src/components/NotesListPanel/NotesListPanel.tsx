@@ -48,6 +48,7 @@ interface Note {
 interface NotesListPanelProps {
   selectedNoteId: string | null;
   onNoteSelect: (noteId: string | null) => void;
+  onNoteCreated?: (noteId: string) => void;
   activeSdId?: string;
   tagFilters?: Record<string, 'include' | 'exclude'>;
 }
@@ -55,6 +56,7 @@ interface NotesListPanelProps {
 export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   selectedNoteId,
   onNoteSelect,
+  onNoteCreated,
   activeSdId,
   tagFilters = {},
 }) => {
@@ -378,6 +380,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         folderId ?? '',
         ''
       );
+
+      // Notify parent that a new note was created (for initial formatting)
+      onNoteCreated?.(noteId);
 
       // Select the newly created note
       handleNoteSelect(noteId);

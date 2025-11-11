@@ -37,6 +37,10 @@ nc2/
 └── PLAN.md          # Implementation plan
 ```
 
+## Documentation
+
+- [Investigating Note Corruption](./docs/investigating-note-corruption.md) - Guide for diagnosing and recovering from corrupted or missing note content
+
 ## Development
 
 ### Prerequisites

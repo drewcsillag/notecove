@@ -18,12 +18,16 @@ import { Hashtag } from './extensions/Hashtag';
 export interface TipTapEditorProps {
   noteId: string | null;
   readOnly?: boolean;
+  isNewlyCreated?: boolean;
+  onNoteLoaded?: () => void;
   onTitleChange?: (noteId: string, title: string, contentText: string) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   noteId,
   readOnly = false,
+  isNewlyCreated = false,
+  onNoteLoaded,
   onTitleChange,
 }) => {
   const theme = useTheme();
@@ -248,22 +252,19 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
         isLoadingNoteRef.current = false;
 
-        // Check if this is a new empty note and set up initial formatting
-        // A note is considered empty if it only has default placeholder text or is truly empty
-        const isEmpty =
-          editor.isEmpty ||
-          editor.state.doc.textContent === 'Start typing...' ||
-          editor.state.doc.textContent.trim() === '';
+        // Check if this is a newly created note and set up initial formatting
+        // Only apply H1 formatting to notes that were just created, not existing empty notes
+        if (isNewlyCreated) {
+          console.log(`[TipTapEditor] Setting up newly created note with H1 formatting`);
 
-        if (isEmpty) {
-          // For new notes, focus the editor and set H1 formatting
-          console.log(`[TipTapEditor] Setting up new note with H1 formatting`);
-
-          // Clear any default content and set H1 format
+          // For new notes, clear any default content and set H1 format
           editor.commands.setContent('');
           editor.commands.setHeading({ level: 1 });
           editor.commands.focus();
         }
+
+        // Notify parent that note has been loaded
+        onNoteLoaded?.();
       } catch (error) {
         console.error(`Failed to load note ${noteId}:`, error);
         isLoadingNoteRef.current = false;
@@ -382,7 +383,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }}
     >
       <EditorToolbar editor={editor} />
-      <Box sx={{ flex: 1, overflow: 'auto', padding: 2 }}>
+      <Box
+        sx={{ flex: 1, overflow: 'auto', padding: 2, cursor: 'text' }}
+        onClick={(e) => {
+          // Only handle clicks on the Box itself (empty space), not on the editor content
+          if (e.target === e.currentTarget && editor) {
+            // Focus the editor and move cursor to the end
+            editor.commands.focus('end');
+          }
+        }}
+      >
         <EditorContent editor={editor} />
       </Box>
     </Box>

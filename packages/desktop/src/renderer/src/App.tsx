@@ -31,6 +31,8 @@ function App(): React.ReactElement {
   // Tag filters: tagId -> 'include' | 'exclude' (omitted = neutral/no filter)
   const [tagFilters, setTagFilters] = useState<Record<string, 'include' | 'exclude'>>({});
   const [showTagPanel, setShowTagPanel] = useState(true);
+  // Track newly created notes (to apply initial formatting)
+  const [newlyCreatedNoteId, setNewlyCreatedNoteId] = useState<string | null>(null);
   // SD initialization progress
   const [sdInitProgress, setSDInitProgress] = useState<{
     open: boolean;
@@ -335,11 +337,23 @@ function App(): React.ReactElement {
               <NotesListPanel
                 selectedNoteId={selectedNoteId}
                 onNoteSelect={setSelectedNoteId}
+                onNoteCreated={setNewlyCreatedNoteId}
                 activeSdId={activeSdId}
                 tagFilters={tagFilters}
               />
             }
-            rightPanel={<EditorPanel selectedNoteId={selectedNoteId} />}
+            rightPanel={
+              <EditorPanel
+                selectedNoteId={selectedNoteId}
+                isNewlyCreated={selectedNoteId === newlyCreatedNoteId}
+                onNoteLoaded={() => {
+                  // Clear the newly created flag once the note has been loaded
+                  if (newlyCreatedNoteId === selectedNoteId) {
+                    setNewlyCreatedNoteId(null);
+                  }
+                }}
+              />
+            }
             onLayoutChange={handleLayoutChange}
             initialSizes={initialPanelSizes}
           />

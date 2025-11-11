@@ -10,9 +10,15 @@ import { TipTapEditor } from './TipTapEditor';
 
 interface EditorPanelProps {
   selectedNoteId: string | null;
+  isNewlyCreated?: boolean;
+  onNoteLoaded?: () => void;
 }
 
-export const EditorPanel: React.FC<EditorPanelProps> = ({ selectedNoteId }) => {
+export const EditorPanel: React.FC<EditorPanelProps> = ({
+  selectedNoteId,
+  isNewlyCreated = false,
+  onNoteLoaded,
+}) => {
   const [isNoteDeleted, setIsNoteDeleted] = useState(false);
 
   // Check if the selected note is deleted
@@ -53,6 +59,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ selectedNoteId }) => {
         key={selectedNoteId}
         noteId={selectedNoteId}
         readOnly={isNoteDeleted}
+        isNewlyCreated={isNewlyCreated}
+        onNoteLoaded={onNoteLoaded}
         onTitleChange={(noteId: string, title: string, contentText: string) => {
           void handleTitleChange(noteId, title, contentText);
         }}
