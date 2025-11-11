@@ -223,10 +223,76 @@ onUpdate: () => {
 4. ✅ Fix spurious blank notes (DONE - commit 3cf2838)
 5. ✅ Run full test suite (DONE - all 206 tests pass)
 
+### D. ⚠️ CRITICAL: Unmount Cleanup Data Corruption Bug
+
+**Commit**: [Pending]
+
+**Problem**: Notes being corrupted to "Untitled" with empty content when clicking rapidly between notes. **User reported actual data loss** - a note being completely emptied out.
+
+**Root Cause - THE ACTUAL BUG**:
+
+The fixes in commit 251e252 addressed the editor initialization race conditions, but **missed the unmount cleanup path**. When React uses `key={selectedNoteId}` in EditorPanel.tsx:59, changing notes completely unmounts the old TipTapEditor and creates a new one. The unmount cleanup effect (lines 172-198) was extracting and saving content **WITHOUT checking the loading flag**.
+
+**Bug Flow**:
+
+```
+1. User clicks "Note B" (currently viewing "Note A")
+2. EditorPanel sees key changed from noteId-A to noteId-B
+3. React UNMOUNTS TipTapEditor for Note A
+4. Unmount cleanup effect fires (line 173-198)
+5. Extracts from editor.state.doc (which might be empty/still loading)
+6. NO loading flag check! (unlike onUpdate and deselection effects)
+7. Calls onTitleChange(noteId-A, "Untitled", "")
+8. ⚠️ DATA CORRUPTION: Saves empty content to Note A, erasing it!
+9. React then MOUNTS new TipTapEditor for Note B
+```
+
+**Why Previous Fix Didn't Catch This**:
+
+- The note deselection useEffect (lines 126-169) HAS the loading flag check
+- BUT this code path never runs when switching notes!
+- React's `key={noteId}` forces complete unmount/mount cycle
+- Deselection useEffect only runs on same component instance
+- Unmount cleanup runs on component destruction
+- Unmount cleanup had NO loading flag check
+
+**Fix Applied** (TipTapEditor.tsx:176):
+
+Changed unmount cleanup from:
+
+```typescript
+if (noteId && editor && onTitleChange) {
+```
+
+To:
+
+```typescript
+if (noteId && editor && onTitleChange && !isLoadingNoteRef.current) {
+```
+
+Added console logging to track when unmount happens during loading.
+
+**Test Added**: `e2e/note-switching.spec.ts` - "should not corrupt note content on rapid note switching (unmount race condition)"
+
+- Creates 3 notes with specific content
+- Rapidly switches between them with 200ms delays
+- Verifies no notes are corrupted to "Untitled" or empty
+- Verifies all content preserved after rapid switching
+
+**Files Modified**:
+
+- `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx` (lines 176, 189-197)
+- `packages/desktop/e2e/note-switching.spec.ts` (added new test)
+
+**Result**: No more data corruption when switching notes. Loading flag now protects ALL save paths: onUpdate, deselection, AND unmount.
+
+---
+
 ## All Reported Issues Resolved! ✅
 
 All six reported issues have been investigated and fixed:
-- ✅ Title extraction race conditions
+
+- ✅ Title extraction race conditions (commits 251e252 + [pending])
 - ✅ Note Info Dialog performance
 - ✅ Folder hierarchy loading
 - ✅ Spurious blank notes on startup

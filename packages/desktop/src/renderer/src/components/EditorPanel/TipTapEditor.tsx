@@ -172,7 +172,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   useEffect(() => {
     return () => {
       // Save current editor content before unmounting
-      if (noteId && editor && onTitleChange) {
+      // IMPORTANT: Only save if note was fully loaded to prevent data corruption
+      if (noteId && editor && onTitleChange && !isLoadingNoteRef.current) {
         const firstLine = editor.state.doc.firstChild;
         if (firstLine) {
           const titleText = firstLine.textContent.trim();
@@ -185,8 +186,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             }
             return true;
           });
+          console.log(
+            `[TipTapEditor] Unmount: Saving note ${noteId} with title: "${titleText || 'Untitled'}"`
+          );
           onTitleChange(noteId, titleText || 'Untitled', text.trim());
         }
+      } else if (noteId && isLoadingNoteRef.current) {
+        console.log(
+          `[TipTapEditor] Unmount: Skipping save for note ${noteId} - still loading (preventing data corruption)`
+        );
       }
 
       if (titleUpdateTimerRef.current) {

@@ -130,6 +130,87 @@ test.describe('Note Switching', () => {
 
     console.log('[Test] Content persistence test passed');
   });
+
+  test('should not corrupt note content on rapid note switching (unmount race condition)', async () => {
+    console.log('[Test] Starting rapid switching/unmount race condition test');
+
+    // Create first note with specific content
+    const createButton = window1.getByTitle('Create note');
+    await createButton.click();
+    await window1.waitForTimeout(500);
+
+    const editor = window1.locator('.ProseMirror');
+    await editor.click();
+    const note1Content = 'Note One Title\nThis is important content that must not be lost';
+    await editor.fill(note1Content);
+    await window1.waitForTimeout(1000);
+
+    // Create second note
+    await createButton.click();
+    await window1.waitForTimeout(500);
+    await editor.click();
+    const note2Content = 'Note Two Title\nSecond note content';
+    await editor.fill(note2Content);
+    await window1.waitForTimeout(1000);
+
+    // Create third note
+    await createButton.click();
+    await window1.waitForTimeout(500);
+    await editor.click();
+    await editor.fill('Note Three Title\nThird note');
+    await window1.waitForTimeout(1000);
+
+    // Rapidly switch between notes to trigger potential unmount race condition
+    // This tests the fix for the bug where unmounting the editor before note finishes
+    // loading would extract empty content and save "Untitled" + empty text
+    const middlePanel = window1.locator('#middle-panel');
+
+    // Click note 1
+    const note1Button = middlePanel.locator('text=Note One Title').first();
+    await note1Button.click();
+    await window1.waitForTimeout(200); // Short delay to stress test
+
+    // Quickly click note 2 (triggers unmount of note 1 editor)
+    const note2Button = middlePanel.locator('text=Note Two Title').first();
+    await note2Button.click();
+    await window1.waitForTimeout(200);
+
+    // Quickly click note 3 (triggers unmount of note 2 editor)
+    const note3Button = middlePanel.locator('text=Note Three Title').first();
+    await note3Button.click();
+    await window1.waitForTimeout(200);
+
+    // Quickly click back to note 1 (triggers unmount of note 3 editor)
+    await note1Button.click();
+    await window1.waitForTimeout(1000);
+
+    // Verify note 1 content is NOT corrupted to "Untitled" or empty
+    // This verifies the unmount cleanup effect respects the loading flag
+    const editorContent = await editor.textContent();
+    expect(editorContent).toContain('Note One Title');
+    expect(editorContent).toContain('This is important content that must not be lost');
+
+    // Verify title in notes list is NOT "Untitled"
+    await expect(note1Button).toBeVisible();
+    const note1Text = await note1Button.textContent();
+    expect(note1Text).toContain('Note One Title');
+    expect(note1Text).not.toContain('Untitled');
+
+    // Check all three notes preserved their content
+    await note2Button.click();
+    await window1.waitForTimeout(500);
+    const content2 = await editor.textContent();
+    expect(content2).toContain('Note Two Title');
+    expect(content2).toContain('Second note content');
+
+    await note3Button.click();
+    await window1.waitForTimeout(500);
+    const content3 = await editor.textContent();
+    expect(content3).toContain('Note Three Title');
+    expect(content3).toContain('Third note');
+
+    console.log('[Test] Rapid switching/unmount race condition test passed');
+  });
 });
 
 test.describe('Note Switching - Multi-Window', () => {
