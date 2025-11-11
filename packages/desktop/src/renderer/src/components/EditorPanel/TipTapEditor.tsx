@@ -318,9 +318,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         '& .ProseMirror': {
           minHeight: '100%',
           outline: 'none',
-          '& > *': {
-            marginBottom: 1,
-          },
           '& h1': {
             fontSize: '2em',
             fontWeight: 600,
@@ -340,7 +337,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             marginBottom: 0.5,
           },
           '& p': {
-            marginBottom: 1,
+            marginBottom: 0,
+            marginTop: 0,
           },
           '& ul, & ol': {
             paddingLeft: 2,
