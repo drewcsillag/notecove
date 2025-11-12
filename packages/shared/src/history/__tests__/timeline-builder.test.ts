@@ -2,11 +2,6 @@
  * Tests for TimelineBuilder
  */
 
-// Mock uuid before importing anything else
-jest.mock('uuid', () => ({
-  v4: () => 'mock-uuid-1234',
-}));
-
 import { TimelineBuilder } from '../timeline-builder';
 import type { UpdateManager } from '../../storage/update-manager';
 
@@ -44,14 +39,14 @@ describe('TimelineBuilder', () => {
           path: '/path/inst1_1000-1.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 1000
+          timestamp: 1000,
         },
         {
           filename: 'inst1_2000-2.yjson',
           path: '/path/inst1_2000-2.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 2000
+          timestamp: 2000,
         },
         // Gap > 5 minutes
         {
@@ -59,7 +54,7 @@ describe('TimelineBuilder', () => {
           path: '/path/inst1_400000-3.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 400000
+          timestamp: 400000,
         },
       ]);
 
@@ -110,21 +105,21 @@ describe('TimelineBuilder', () => {
           path: '/path/inst1_1000-1.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 1000
+          timestamp: 1000,
         },
         {
           filename: 'inst2_2000-1.yjson',
           path: '/path/inst2_2000-1.yjson',
           instanceId: 'inst2',
           documentId: 'note1',
-          timestamp: 2000
+          timestamp: 2000,
         },
         {
           filename: 'inst1_3000-2.yjson',
           path: '/path/inst1_3000-2.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 3000
+          timestamp: 3000,
         },
       ]);
 
@@ -172,7 +167,7 @@ describe('TimelineBuilder', () => {
           path: '/path/inst1_1000-1.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 1000
+          timestamp: 1000,
         },
       ]);
 
@@ -212,21 +207,21 @@ describe('TimelineBuilder', () => {
           path: '/path/inst1_1000-1.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 1000
+          timestamp: 1000,
         },
         {
           filename: 'inst2_2000-1.yjson',
           path: '/path/inst2_2000-1.yjson',
           instanceId: 'inst2',
           documentId: 'note1',
-          timestamp: 2000
+          timestamp: 2000,
         },
         {
           filename: 'inst1_400000-2.yjson',
           path: '/path/inst1_400000-2.yjson',
           instanceId: 'inst1',
           documentId: 'note1',
-          timestamp: 400000
+          timestamp: 400000,
         },
       ]);
 

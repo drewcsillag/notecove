@@ -5,19 +5,24 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, Drawer } from '@mui/material';
 import { TipTapEditor } from './TipTapEditor';
+import { HistoryPanel } from '../HistoryPanel/HistoryPanel';
 
 interface EditorPanelProps {
   selectedNoteId: string | null;
   isNewlyCreated?: boolean;
   onNoteLoaded?: () => void;
+  showHistoryPanel?: boolean;
+  onHistoryPanelClose?: () => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({
   selectedNoteId,
   isNewlyCreated = false,
   onNoteLoaded,
+  showHistoryPanel = false,
+  onHistoryPanelClose,
 }) => {
   const [isNoteDeleted, setIsNoteDeleted] = useState(false);
 
@@ -53,7 +58,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   );
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Use key to force recreation of editor when switching notes */}
       <TipTapEditor
         key={selectedNoteId}
@@ -65,6 +70,32 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
           void handleTitleChange(noteId, title, contentText);
         }}
       />
+
+      {/* History Panel Drawer */}
+      <Drawer
+        anchor="right"
+        open={showHistoryPanel}
+        onClose={onHistoryPanelClose}
+        variant="temporary"
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 600,
+            maxWidth: '90vw',
+          },
+        }}
+      >
+        {showHistoryPanel && selectedNoteId && (
+          <HistoryPanel
+            selectedNoteId={selectedNoteId}
+            onClose={
+              onHistoryPanelClose ??
+              (() => {
+                // Empty fallback
+              })
+            }
+          />
+        )}
+      </Drawer>
     </Box>
   );
 };

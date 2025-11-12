@@ -25,6 +25,7 @@ function App(): React.ReactElement {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noteInfoOpen, setNoteInfoOpen] = useState(false);
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [activeSdId, setActiveSdId] = useState<string>('default');
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
@@ -152,6 +153,7 @@ function App(): React.ReactElement {
   }, []);
 
   // Keyboard shortcut: Cmd+, or Ctrl+, to open Settings
+  // Keyboard shortcut: Cmd+Y or Ctrl+Y to toggle History
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       // Check for Cmd+, (macOS) or Ctrl+, (Windows/Linux)
@@ -159,13 +161,20 @@ function App(): React.ReactElement {
         event.preventDefault();
         setSettingsOpen(true);
       }
+      // Check for Cmd+Y (macOS) or Ctrl+Y (Windows/Linux) to toggle History
+      if (event.key === 'y' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        if (selectedNoteId) {
+          setHistoryPanelOpen((prev) => !prev);
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [selectedNoteId]);
 
   // Listen for menu command to open Settings
   useEffect(() => {
@@ -260,6 +269,15 @@ function App(): React.ReactElement {
       }
     });
 
+    // View History
+    const cleanupViewHistory = window.electronAPI.menu.onViewHistory(() => {
+      if (selectedNoteId) {
+        setHistoryPanelOpen(true);
+      } else {
+        console.log('[Menu] No note selected for View History');
+      }
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -271,6 +289,7 @@ function App(): React.ReactElement {
       cleanupAbout();
       cleanupCreateSnapshot();
       cleanupNoteInfo();
+      cleanupViewHistory();
     };
   }, [selectedNoteId]);
 
@@ -351,6 +370,10 @@ function App(): React.ReactElement {
                   if (newlyCreatedNoteId === selectedNoteId) {
                     setNewlyCreatedNoteId(null);
                   }
+                }}
+                showHistoryPanel={historyPanelOpen}
+                onHistoryPanelClose={() => {
+                  setHistoryPanelOpen(false);
                 }}
               />
             }

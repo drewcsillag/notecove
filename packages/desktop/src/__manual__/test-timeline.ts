@@ -25,7 +25,9 @@ async function main() {
 
   if (!notePath) {
     console.error('Usage: tsx src/__manual__/test-timeline.ts <note-path>');
-    console.error('Example: tsx src/__manual__/test-timeline.ts "/Users/drew/My Drive/.../notes/abc123..."');
+    console.error(
+      'Example: tsx src/__manual__/test-timeline.ts "/Users/drew/My Drive/.../notes/abc123..."'
+    );
     process.exit(1);
   }
 
@@ -54,7 +56,9 @@ async function main() {
   console.log('\n📊 History Statistics:');
   console.log(`  Total updates: ${stats.totalUpdates}`);
   console.log(`  Total sessions: ${stats.totalSessions}`);
-  console.log(`  First edit: ${stats.firstEdit ? new Date(stats.firstEdit).toLocaleString() : 'N/A'}`);
+  console.log(
+    `  First edit: ${stats.firstEdit ? new Date(stats.firstEdit).toLocaleString() : 'N/A'}`
+  );
   console.log(`  Last edit: ${stats.lastEdit ? new Date(stats.lastEdit).toLocaleString() : 'N/A'}`);
   console.log(`  Devices/instances: ${stats.instanceCount}`);
   stats.instances.forEach((id, idx) => {
@@ -77,14 +81,24 @@ async function main() {
     console.log(`  Time: ${startTime} → ${endTime}`);
     console.log(`  Duration: ${duration} minutes`);
     console.log(`  Updates: ${session.updateCount}`);
-    console.log(`  Devices: ${session.instanceIds.map(id => id.substring(0, 20) + '...').join(', ')}`);
+    console.log(
+      `  Devices: ${session.instanceIds.map((id) => id.substring(0, 20) + '...').join(', ')}`
+    );
 
     // Show sample of updates in this session
     if (session.updates.length > 0) {
       const firstUpdate = session.updates[0];
       const lastUpdate = session.updates[session.updates.length - 1];
-      console.log(`  First update: seq ${firstUpdate.sequence} from ${firstUpdate.instanceId.substring(0, 20)}...`);
-      console.log(`  Last update: seq ${lastUpdate.sequence} from ${lastUpdate.instanceId.substring(0, 20)}...`);
+      if (firstUpdate) {
+        console.log(
+          `  First update: seq ${firstUpdate.sequence} from ${firstUpdate.instanceId.substring(0, 20)}...`
+        );
+      }
+      if (lastUpdate) {
+        console.log(
+          `  Last update: seq ${lastUpdate.sequence} from ${lastUpdate.instanceId.substring(0, 20)}...`
+        );
+      }
     }
     console.log('');
   });

@@ -8,7 +8,6 @@
 
 import type { UUID } from '../types';
 import type { UpdateManager } from '../storage/update-manager';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Single update in note history with metadata
@@ -163,9 +162,12 @@ export class TimelineBuilder {
           sessions.push(currentSession);
         }
 
-        // Start new session
+        // Start new session with deterministic ID
+        // Session ID is based on first update's timestamp and instance ID
+        // This ensures sessions have stable IDs across multiple timeline builds
+        const sessionId = `${update.timestamp}-${update.instanceId}`;
         currentSession = {
-          id: uuidv4(),
+          id: sessionId,
           startTime: update.timestamp,
           endTime: update.timestamp,
           updateCount: 1,

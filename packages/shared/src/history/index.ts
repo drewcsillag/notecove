@@ -14,8 +14,4 @@ export {
   DEFAULT_SESSION_CONFIG,
 } from './timeline-builder';
 
-export {
-  StateReconstructor,
-  type ReconstructionPoint,
-  type Keyframe,
-} from './state-reconstructor';
+export { StateReconstructor, type ReconstructionPoint, type Keyframe } from './state-reconstructor';

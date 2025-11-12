@@ -123,12 +123,12 @@ declare global {
             endTime: number;
             updateCount: number;
             instanceIds: string[];
-            updates: Array<{
+            updates: {
               instanceId: string;
               timestamp: number;
               sequence: number;
               data: Uint8Array;
-            }>;
+            }[];
           }[]
         >;
         getStats: (noteId: string) => Promise<{
@@ -412,6 +412,7 @@ declare global {
         onToggleFolderPanel: (callback: () => void) => () => void;
         onToggleTagsPanel: (callback: () => void) => () => void;
         onCreateSnapshot: (callback: () => void) => () => void;
+        onViewHistory: (callback: () => void) => () => void;
         onNoteInfo: (callback: () => void) => () => void;
         onAbout: (callback: () => void) => () => void;
       };

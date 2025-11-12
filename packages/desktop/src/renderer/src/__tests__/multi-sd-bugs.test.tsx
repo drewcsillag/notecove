@@ -96,6 +96,7 @@ const mockElectronAPI = {
     onAbout: jest.fn(() => () => {}),
     onCreateSnapshot: jest.fn(() => () => {}),
     onNoteInfo: jest.fn(() => () => {}),
+    onViewHistory: jest.fn(() => () => {}),
   },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */

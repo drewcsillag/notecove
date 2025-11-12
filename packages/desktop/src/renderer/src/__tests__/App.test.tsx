@@ -106,6 +106,9 @@ const mockElectronAPI = {
     onNoteInfo: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    onViewHistory: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
 };
 

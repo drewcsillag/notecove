@@ -915,6 +915,15 @@ function createMenu(): void {
             }
           },
         },
+        {
+          label: 'View History',
+          accelerator: 'CmdOrCtrl+Shift+H',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:viewHistory');
+            }
+          },
+        },
       ],
     },
     {

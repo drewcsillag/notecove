@@ -266,10 +266,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // History operations
   history: {
-    getTimeline: (noteId: string) =>
-      ipcRenderer.invoke('history:getTimeline', noteId),
-    getStats: (noteId: string) =>
-      ipcRenderer.invoke('history:getStats', noteId),
+    getTimeline: (noteId: string) => ipcRenderer.invoke('history:getTimeline', noteId),
+    getStats: (noteId: string) => ipcRenderer.invoke('history:getStats', noteId),
     reconstructAt: (noteId: string, point: { timestamp: number; updateIndex?: number }) =>
       ipcRenderer.invoke('history:reconstructAt', noteId, point),
     getSessionPreview: (noteId: string, sessionId: string) =>
@@ -918,6 +916,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:createSnapshot', listener);
       return () => {
         ipcRenderer.removeListener('menu:createSnapshot', listener);
+      };
+    },
+    onViewHistory: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:viewHistory', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:viewHistory', listener);
       };
     },
     onNoteInfo: (callback: () => void): (() => void) => {

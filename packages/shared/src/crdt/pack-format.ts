@@ -161,8 +161,20 @@ export async function decodePackFile(
   data: Uint8Array,
   decompress?: (data: Uint8Array) => Promise<Uint8Array>
 ): Promise<PackData> {
-  // Apply decompression if provided
-  const decompressed = decompress ? await decompress(data) : data;
+  // Check if data is actually compressed by looking for zstd magic number or status byte + zstd magic
+  // zstd magic: 0x28, 0xB5, 0x2F, 0xFD
+  const isCompressed =
+    data.length >= 4 &&
+    ((data[0] === 0x28 && data[1] === 0xb5 && data[2] === 0x2f && data[3] === 0xfd) || // Direct zstd
+      (data.length >= 5 &&
+        (data[0] === 0x00 || data[0] === 0x01) && // Status byte
+        data[1] === 0x28 &&
+        data[2] === 0xb5 &&
+        data[3] === 0x2f &&
+        data[4] === 0xfd)); // Status byte + zstd
+
+  // Apply decompression only if data is compressed and decompress function is provided
+  const decompressed = decompress && isCompressed ? await decompress(data) : data;
 
   const json = new TextDecoder().decode(decompressed);
   const parsed = JSON.parse(json) as {

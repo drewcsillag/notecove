@@ -328,7 +328,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       // Tell main process we're done with this note
       void window.electronAPI.note.unload(noteId);
     };
-  }, [noteId, editor, yDoc]);
+  }, [noteId, editor, yDoc, isNewlyCreated, onNoteLoaded]);
 
   return (
     <Box

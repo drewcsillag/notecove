@@ -43,7 +43,13 @@ export async function decompress(data: Uint8Array): Promise<Uint8Array> {
 
   if (data.length > 0 && (data[0] === 0x00 || data[0] === 0x01)) {
     // Check if byte 1 starts with zstd magic number (need at least 5 bytes total)
-    if (data.length >= 5 && data[1] === 0x28 && data[2] === 0xb5 && data[3] === 0x2f && data[4] === 0xfd) {
+    if (
+      data.length >= 5 &&
+      data[1] === 0x28 &&
+      data[2] === 0xb5 &&
+      data[3] === 0x2f &&
+      data[4] === 0xfd
+    ) {
       // Compressed: strip status byte before decompressing
       dataToDecompress = data.slice(1);
     } else {
@@ -52,9 +58,22 @@ export async function decompress(data: Uint8Array): Promise<Uint8Array> {
     }
   }
 
-  const buffer = Buffer.from(dataToDecompress);
-  const decompressed = await zstd.decompress(buffer);
-  return new Uint8Array(decompressed);
+  try {
+    const buffer = Buffer.from(dataToDecompress);
+    const decompressed = await zstd.decompress(buffer);
+    return new Uint8Array(decompressed);
+  } catch (error) {
+    // Log detailed error information
+    console.error('[Compression] Decompression failed:', error);
+    console.error('[Compression] Data length:', data.length);
+    console.error(
+      '[Compression] First 20 bytes:',
+      Array.from(data.slice(0, 20))
+        .map((b) => '0x' + b.toString(16).padStart(2, '0'))
+        .join(' ')
+    );
+    throw error;
+  }
 }
 
 /**
@@ -73,7 +92,13 @@ export async function decompressWithFallback(data: Uint8Array): Promise<Uint8Arr
 
     if (data.length > 0 && (data[0] === 0x00 || data[0] === 0x01)) {
       // Check if byte 1 starts with zstd magic number (need at least 5 bytes total)
-      if (data.length >= 5 && data[1] === 0x28 && data[2] === 0xb5 && data[3] === 0x2f && data[4] === 0xfd) {
+      if (
+        data.length >= 5 &&
+        data[1] === 0x28 &&
+        data[2] === 0xb5 &&
+        data[3] === 0x2f &&
+        data[4] === 0xfd
+      ) {
         // Compressed: strip status byte before decompressing
         dataToDecompress = data.slice(1);
       } else {

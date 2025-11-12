@@ -53,21 +53,20 @@ export class StateReconstructor {
     const doc = new Y.Doc();
 
     // Find best snapshot before target time
-    const { snapshot, snapshotClock } = await this.findBestSnapshot(sdId, noteId, point.timestamp);
+    const { snapshot, snapshotClock } = await this.findBestSnapshot(
+      sdId,
+      noteId,
+      point.timestamp,
+      allUpdates
+    );
 
     if (snapshot) {
       // Apply snapshot state as base
       Y.applyUpdate(doc, snapshot.documentState);
-      console.log(
-        `[StateReconstructor] Applied snapshot with ${snapshot.totalChanges} changes as base`
-      );
     }
 
-    // Filter updates to apply
-    // Only apply updates that:
-    // 1. Occurred after the snapshot (use vector clock)
-    // 2. Occurred before or at target time
-    const updatesToApply = allUpdates.filter((update) => {
+    // Filter updates that occurred before or at target time
+    const updatesUpToTarget = allUpdates.filter((update) => {
       // Check if update is after snapshot
       if (snapshotClock && !shouldApplyUpdate(snapshotClock, update.instanceId, update.sequence)) {
         return false;
@@ -78,20 +77,15 @@ export class StateReconstructor {
         return false;
       }
 
-      // If specific update index provided, only apply up to that index
-      if (point.updateIndex !== undefined) {
-        const updateIdx = allUpdates.indexOf(update);
-        if (updateIdx > point.updateIndex) {
-          return false;
-        }
-      }
-
       return true;
     });
 
-    console.log(
-      `[StateReconstructor] Applying ${updatesToApply.length} updates to reach target time`
-    );
+    // If updateIndex provided, it's relative to the filtered updates at target time
+    // Apply only up to that index
+    let updatesToApply = updatesUpToTarget;
+    if (point.updateIndex !== undefined) {
+      updatesToApply = updatesUpToTarget.slice(0, point.updateIndex + 1);
+    }
 
     // Apply updates in chronological order
     for (const update of updatesToApply) {
@@ -223,11 +217,15 @@ export class StateReconstructor {
    * Note: Since snapshot metadata doesn't include timestamp, we need to
    * read snapshots to check their timestamps. For performance, we sort
    * by totalChanges and check in descending order.
+   *
+   * IMPORTANT: A snapshot can only be used if ALL its updates occurred before targetTime.
+   * We check this by comparing the snapshot's vector clock against updates at targetTime.
    */
   private async findBestSnapshot(
     sdId: UUID,
     noteId: UUID,
-    targetTime: number
+    targetTime: number,
+    allUpdates: HistoryUpdate[]
   ): Promise<{
     snapshot: { documentState: Uint8Array; totalChanges: number } | null;
     snapshotClock: VectorClock | null;
@@ -247,16 +245,68 @@ export class StateReconstructor {
       for (const snapshot of sortedSnapshots) {
         const snapshotData = await this.updateManager.readSnapshot(sdId, noteId, snapshot.filename);
 
-        // Check if this snapshot is before target time
-        if (snapshotData.timestamp <= targetTime) {
-          return {
-            snapshot: {
-              documentState: snapshotData.documentState,
-              totalChanges: snapshotData.totalChanges,
-            },
-            snapshotClock: snapshotData.maxSequences,
-          };
+        // CRITICAL: Check if snapshot is for the correct note!
+        if (snapshotData.noteId !== noteId) {
+          continue;
         }
+
+        // Check if snapshot file was created before target time
+        if (snapshotData.timestamp > targetTime) {
+          continue;
+        }
+
+        // CRITICAL: Verify that all updates in the snapshot occurred before targetTime
+        // by checking if any update referenced by the snapshot's vector clock has a
+        // timestamp after the target time.
+        let snapshotIsValid = true;
+
+        for (const [instanceId, maxSeq] of Object.entries(snapshotData.maxSequences)) {
+          // Find all updates from this instance in allUpdates
+          const instanceUpdates = allUpdates.filter((u) => u.instanceId === instanceId);
+
+          // Find the highest sequence number we have for this instance
+          const maxSeqInAllUpdates = instanceUpdates.reduce(
+            (max, u) => Math.max(max, u.sequence),
+            -1
+          );
+
+          // If snapshot references sequences we don't have, snapshot is invalid
+          // This means the snapshot contains updates that aren't in our update list
+          if (maxSeq > maxSeqInAllUpdates && instanceUpdates.length > 0) {
+            snapshotIsValid = false;
+            break;
+          }
+
+          // If we have NO updates from this instance but snapshot does, reject it
+          if (instanceUpdates.length === 0) {
+            snapshotIsValid = false;
+            break;
+          }
+
+          // Check if any of the updates up to maxSeq have timestamps after target time
+          const updatesUpToMaxSeq = instanceUpdates.filter((u) => u.sequence <= maxSeq);
+          for (const update of updatesUpToMaxSeq) {
+            if (update.timestamp > targetTime) {
+              snapshotIsValid = false;
+              break;
+            }
+          }
+
+          if (!snapshotIsValid) break;
+        }
+
+        if (!snapshotIsValid) {
+          continue;
+        }
+
+        // This snapshot is valid - all its updates occurred before target time
+        return {
+          snapshot: {
+            documentState: snapshotData.documentState,
+            totalChanges: snapshotData.totalChanges,
+          },
+          snapshotClock: snapshotData.maxSequences,
+        };
       }
 
       // No snapshot found before target time

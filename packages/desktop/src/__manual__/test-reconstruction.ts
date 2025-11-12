@@ -23,7 +23,7 @@ async function main() {
 
   // Get note path from command line
   const notePath = process.argv[2];
-  const sessionIndex = parseInt(process.argv[3] || '0', 10);
+  const sessionIndex = parseInt(process.argv[3] ?? '0', 10);
 
   if (!notePath) {
     console.error('Usage: tsx src/__manual__/test-reconstruction.ts <note-path> [session-index]');
@@ -64,12 +64,22 @@ async function main() {
   }
 
   const session = timeline[sessionIndex];
+  if (!session) {
+    console.error(`Session ${sessionIndex} not found`);
+    process.exit(1);
+  }
   console.log(`📅 Session #${sessionIndex + 1}:`);
   console.log(`  ID: ${session.id}`);
-  console.log(`  Time: ${new Date(session.startTime).toLocaleString()} → ${new Date(session.endTime).toLocaleString()}`);
-  console.log(`  Duration: ${((session.endTime - session.startTime) / 1000 / 60).toFixed(1)} minutes`);
+  console.log(
+    `  Time: ${new Date(session.startTime).toLocaleString()} → ${new Date(session.endTime).toLocaleString()}`
+  );
+  console.log(
+    `  Duration: ${((session.endTime - session.startTime) / 1000 / 60).toFixed(1)} minutes`
+  );
   console.log(`  Updates: ${session.updateCount}`);
-  console.log(`  Devices: ${session.instanceIds.map((id) => id.substring(0, 20) + '...').join(', ')}\n`);
+  console.log(
+    `  Devices: ${session.instanceIds.map((id) => id.substring(0, 20) + '...').join(', ')}\n`
+  );
 
   // Collect all updates for reconstruction
   console.log('Collecting all updates for reconstruction...');

@@ -397,7 +397,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     } finally {
       setCreating(false);
     }
-  }, [creating, selectedFolderId, handleNoteSelect, fetchNotes, activeSdId]);
+  }, [creating, selectedFolderId, handleNoteSelect, fetchNotes, activeSdId, onNoteCreated]);
 
   // Load selected folder and search query on mount
   useEffect(() => {

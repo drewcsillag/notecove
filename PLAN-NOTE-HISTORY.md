@@ -7,21 +7,25 @@ Enable users to view and restore any previous version of a note from the complet
 ## Design Decisions
 
 ### Activity Sessions (Coarse-grained Navigation)
+
 - **Hybrid approach**: New session after 5min idle OR every 100+ edits
 - Groups fine-grained CRDT updates into user-meaningful chunks
 - Example: "Today 2:30-2:45 PM (47 changes)"
 
 ### Scrubbing Within Sessions (Fine-grained Navigation)
+
 - **Keyframe sampling**: Pre-generate previews at evenly-spaced points
 - Default: Sample every 10th update within a session
 - Provides smooth scrubbing without reconstructing every single update
 
 ### Caching Strategy
+
 - **In-memory only** for MVP (with abstraction for future disk caching)
 - Cache interface: `HistoryCache` with `.get(noteId, pointInTime)` and `.set(...)`
 - Easy to swap implementation later (disk, IndexedDB, etc.)
 
 ### User Snapshots
+
 - **Named snapshots**: User can create bookmarks like "Before major rewrite"
 - **Auto-sessions**: Automatic detection continues as baseline
 - Named snapshots show prominently at top of timeline
@@ -49,7 +53,7 @@ interface ActivitySession {
   updates: HistoryUpdate[];
   // For display
   firstPreview?: string; // First 100 chars of doc at session start
-  lastPreview?: string;  // First 100 chars of doc at session end
+  lastPreview?: string; // First 100 chars of doc at session end
 }
 
 interface UserSnapshot {
@@ -73,13 +77,12 @@ class TimelineBuilder {
   }>;
 
   // Session detection logic
-  private groupIntoSessions(
-    updates: HistoryUpdate[]
-  ): ActivitySession[];
+  private groupIntoSessions(updates: HistoryUpdate[]): ActivitySession[];
 }
 ```
 
 **Logic**:
+
 1. Read all updates from packs and individual update files
 2. Sort by timestamp
 3. Group into sessions:
@@ -125,6 +128,7 @@ class StateReconstructor {
 ```
 
 **Logic**:
+
 1. Find best snapshot before target time
 2. Load snapshot state into new Y.Doc
 3. Apply updates chronologically until target reached
@@ -153,11 +157,7 @@ class UserSnapshotManager {
   async deleteSnapshot(sdId: string, noteId: string, snapshotId: string): Promise<void>;
 
   // Get document state at snapshot
-  async reconstructSnapshot(
-    sdId: string,
-    noteId: string,
-    snapshot: UserSnapshot
-  ): Promise<Y.Doc>;
+  async reconstructSnapshot(sdId: string, noteId: string, snapshot: UserSnapshot): Promise<Y.Doc>;
 }
 ```
 
@@ -215,9 +215,12 @@ ipcMain.handle('note:getSessionKeyframes', async (event, noteId: string, session
 });
 
 // User snapshot management
-ipcMain.handle('note:createSnapshot', async (event, noteId: string, name: string, description?: string) => {
-  return await snapshotManager.createSnapshot(sdId, noteId, name, description);
-});
+ipcMain.handle(
+  'note:createSnapshot',
+  async (event, noteId: string, name: string, description?: string) => {
+    return await snapshotManager.createSnapshot(sdId, noteId, name, description);
+  }
+);
 
 ipcMain.handle('note:listSnapshots', async (event, noteId: string) => {
   return await snapshotManager.listSnapshots(sdId, noteId);
@@ -228,24 +231,22 @@ ipcMain.handle('note:deleteSnapshot', async (event, noteId: string, snapshotId: 
 });
 
 // Restore from history (create new note OR replace current)
-ipcMain.handle('note:restoreFromHistory', async (
-  event,
-  noteId: string,
-  point: ReconstructionPoint,
-  mode: 'replace' | 'new'
-) => {
-  const doc = await stateReconstructor.reconstructAt(sdId, noteId, point, updateManager);
+ipcMain.handle(
+  'note:restoreFromHistory',
+  async (event, noteId: string, point: ReconstructionPoint, mode: 'replace' | 'new') => {
+    const doc = await stateReconstructor.reconstructAt(sdId, noteId, point, updateManager);
 
-  if (mode === 'new') {
-    // Create new note with this content
-    const newNoteId = await createNote(doc);
-    return { mode: 'new', noteId: newNoteId };
-  } else {
-    // Replace current note (but save current as auto-snapshot first)
-    await replaceNoteContent(noteId, doc);
-    return { mode: 'replace', noteId };
+    if (mode === 'new') {
+      // Create new note with this content
+      const newNoteId = await createNote(doc);
+      return { mode: 'new', noteId: newNoteId };
+    } else {
+      // Replace current note (but save current as auto-snapshot first)
+      await replaceNoteContent(noteId, doc);
+      return { mode: 'replace', noteId };
+    }
   }
-});
+);
 ```
 
 ## Phase 2: Frontend UI
@@ -371,6 +372,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({ session, n
 ### 2.3 Integration Points
 
 **Add to**:
+
 1. **Context menu** (`NoteContextMenu.tsx`): "View History" menu item
 2. **Tools menu** (`MenuBar.tsx`): "Note History" option
 3. **Keyboard shortcut**: Cmd+Shift+H to open history for selected note
@@ -383,6 +385,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({ session, n
 **New file**: `packages/shared/src/history/__tests__/timeline-builder.test.ts`
 
 Test cases:
+
 - Session detection with 5min gaps
 - Session detection with 100+ updates
 - Handling notes with no history
@@ -392,6 +395,7 @@ Test cases:
 **New file**: `packages/shared/src/history/__tests__/state-reconstructor.test.ts`
 
 Test cases:
+
 - Reconstruct from snapshot + updates
 - Reconstruct from updates only (no snapshot)
 - Keyframe generation
@@ -402,6 +406,7 @@ Test cases:
 **New file**: `packages/desktop/e2e/note-history.spec.ts`
 
 Test cases:
+
 - Open history panel via context menu
 - View timeline with sessions
 - Create named snapshot
@@ -471,11 +476,13 @@ Test cases:
 ### Instance/Device Color Coding
 
 Each instance ID gets assigned a consistent color. Timeline UI shows:
+
 - Session cards with colored left border indicating which instance made changes
 - Legend at top showing: "Instance-ABC (this device)" in blue, "Instance-XYZ" in green, etc.
 - When multiple instances contributed to a session, show striped/gradient border
 
 **Implementation**: `packages/desktop/src/renderer/src/utils/instance-colors.ts`
+
 - Generate consistent color from instance ID hash
 - Material UI color palette for good contrast
 
@@ -495,12 +502,14 @@ interface HistorySearchResult {
 ```
 
 Search algorithm:
+
 1. Reconstruct document at each session boundary (or keyframe)
 2. Search text content for query
 3. Return matches with context
 4. UI highlights matching sessions in timeline
 
 **Note**: Could be slow for notes with many sessions. Consider:
+
 - Incremental search (abort if too slow)
 - Progress indicator
 - Option to search only recent history (last 30 days)
@@ -510,6 +519,7 @@ Search algorithm:
 **UI**: Export button in HistoryPanel with format dropdown
 
 **Backend methods**:
+
 ```typescript
 exportHistoryAsMarkdown(noteId: string): string
 exportHistoryAsHTML(noteId: string): string
@@ -517,32 +527,39 @@ exportHistoryAsJSON(noteId: string): object
 ```
 
 **Markdown format example**:
+
 ```markdown
 # History of "My Note Title"
 
 ## Session 1: Nov 11, 2025 2:30-2:45 PM (47 changes)
+
 Instance: Desktop-ABC
 
 ### Changes
+
 - Added section on CRDTs
 - Fixed typos in introduction
 - ...
 
 ## Session 2: Nov 11, 2025 11:20-11:35 AM (23 changes)
+
 Instance: Laptop-XYZ
 
 ### Changes
+
 - Updated examples
 - ...
 ```
 
 **HTML format**: Rich HTML with:
+
 - Expandable/collapsible sessions
 - Inline diffs with color coding
 - Interactive timeline visualization
 - Print-friendly CSS
 
 **JSON format**: Complete structured data:
+
 ```json
 {
   "noteId": "...",
