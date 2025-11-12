@@ -5,6 +5,7 @@
   "description": "Cross-platform notes application with offline-first CRDT synchronization",
   "author": "NoteCove Contributors",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@10.19.0",
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
@@ -28,7 +29,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "prettier": "^3.1.0",
-    "turbo": "^1.11.0",
+    "turbo": "^2.6.1",
     "typescript": "^5.3.3"
   }
 }
