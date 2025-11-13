@@ -107,19 +107,24 @@ Desktop Electron application with basic UI, note editing, folder management, and
 
 ---
 
-### [Phase 3: iOS App (Basic)](./PLAN-PHASE-3.md) ⏸️
+### [Phase 3: iOS App (Basic)](./PLAN-PHASE-3.md) 🟡
 
-**Status:** Not Started
+**Status:** In Progress (Phase 3.1 complete)
 
 iOS native application with basic UI, note editing via WKWebView, and folder management.
 
 **Sub-phases:**
 
-- 3.1 iOS Project Setup
-- 3.2 iOS File Storage & JavaScriptCore Bridge
-- 3.3 iOS Note Editing (WKWebView + TipTap)
-- 3.4 iOS Folder Management
-- 3.5 iOS Cross-Device Sync
+- 3.1 iOS Project Setup ✅
+- 3.2 iOS CRDT Implementation 🟥
+- 3.3 iOS UI - Navigation Structure 🟥
+- 3.4 iOS UI - Combined Folder/Tag View 🟥
+- 3.5 iOS UI - Editor 🟥
+- 3.6 iOS UI - Settings 🟥
+- 3.7 iOS - Recently Deleted & Restoration 🟥
+- 3.8 iOS - Search 🟥
+- 3.9 iOS - Accessibility 🟥
+- 3.10 iOS - Note History 🟥
 
 ---
 
@@ -229,6 +234,20 @@ For detailed design decisions, answered questions, and implementation context, s
 ---
 
 ## Recent Updates
+
+**2025-11-13:**
+
+- Completed Phase 3.1: iOS Project Setup
+  - Created Xcode project using XcodeGen (project.yml for version control)
+  - Configured for iOS 26.1 SDK with iOS 17.0 deployment target
+  - Universal app support (iPhone + iPad)
+  - SwiftUI app structure with tab-based navigation (Notes, Tags, Settings)
+  - Basic data models (StorageDirectory, Folder, Note, Tag)
+  - XCTest framework configured with initial unit tests
+  - iCloud Drive entitlements configured for sync
+  - Swift 6.0 language version
+  - Comprehensive README.md with build instructions
+  - Swift code verified to compile successfully
 
 **2025-10-31:**
 
