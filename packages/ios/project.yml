@@ -20,6 +20,12 @@ targets:
     sources:
       - path: Sources
         createIntermediateGroups: true
+        excludes:
+          - "Resources/**"
+
+    resources:
+      - path: Sources/Resources
+        type: folder
 
     info:
       path: Sources/Info.plist

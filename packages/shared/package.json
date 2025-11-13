@@ -34,9 +34,10 @@
     }
   },
   "scripts": {
-    "build": "pnpm build:esm && pnpm build:cjs",
+    "build": "pnpm build:esm && pnpm build:cjs && pnpm build:ios",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:ios": "node scripts/build-ios-bundle.js",
     "dev": "tsc --watch",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
@@ -55,6 +56,7 @@
     "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
+    "esbuild": "^0.27.0",
     "eslint": "^8.56.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",
