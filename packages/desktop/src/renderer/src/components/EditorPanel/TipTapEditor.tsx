@@ -10,10 +10,12 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import Underline from '@tiptap/extension-underline';
+import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
 import { Box, useTheme } from '@mui/material';
 import * as Y from 'yjs';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
+import { SearchPanel } from './SearchPanel';
 
 export interface TipTapEditorProps {
   noteId: string | null;
@@ -21,6 +23,8 @@ export interface TipTapEditorProps {
   isNewlyCreated?: boolean;
   onNoteLoaded?: () => void;
   onTitleChange?: (noteId: string, title: string, contentText: string) => void;
+  showSearchPanel?: boolean;
+  onSearchPanelClose?: () => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -29,6 +33,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   isNewlyCreated = false,
   onNoteLoaded,
   onTitleChange,
+  showSearchPanel = false,
+  onSearchPanelClose,
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
@@ -48,6 +54,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       Underline,
       // Add Hashtag extension for #tag support
       Hashtag,
+      // Add SearchAndReplace extension for in-note search
+      SearchAndReplace,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
@@ -336,6 +344,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        position: 'relative',
         '& .ProseMirror': {
           minHeight: '100%',
           outline: 'none',
@@ -399,6 +408,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               textDecoration: 'underline',
             },
           },
+          // Search result highlighting
+          '& .search-result': {
+            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 235, 59, 0.3)' : 'rgba(255, 235, 59, 0.5)',
+            borderRadius: '2px',
+          },
+          '& .search-result-current': {
+            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 152, 0, 0.5)' : 'rgba(255, 152, 0, 0.7)',
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: '1px',
+          },
         },
       }}
     >
@@ -415,6 +434,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       >
         <EditorContent editor={editor} />
       </Box>
+      {showSearchPanel && onSearchPanelClose && (
+        <SearchPanel editor={editor} onClose={onSearchPanelClose} />
+      )}
     </Box>
   );
 };

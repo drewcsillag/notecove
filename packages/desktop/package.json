@@ -44,6 +44,7 @@
     "@opentelemetry/sdk-metrics": "^2.2.0",
     "@opentelemetry/sdk-node": "^0.207.0",
     "@opentelemetry/semantic-conventions": "^1.37.0",
+    "@sereneinserenade/tiptap-search-and-replace": "^0.1.1",
     "@tiptap/extension-collaboration": "^2.26.4",
     "@tiptap/extension-underline": "^2.26.4",
     "@tiptap/pm": "^2.26.4",

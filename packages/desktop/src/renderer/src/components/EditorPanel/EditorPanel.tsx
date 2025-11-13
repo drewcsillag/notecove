@@ -15,6 +15,8 @@ interface EditorPanelProps {
   onNoteLoaded?: () => void;
   showHistoryPanel?: boolean;
   onHistoryPanelClose?: () => void;
+  showSearchPanel?: boolean;
+  onSearchPanelClose?: () => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({
@@ -23,6 +25,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   onNoteLoaded,
   showHistoryPanel = false,
   onHistoryPanelClose,
+  showSearchPanel = false,
+  onSearchPanelClose,
 }) => {
   const [isNoteDeleted, setIsNoteDeleted] = useState(false);
 
@@ -69,6 +73,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         onTitleChange={(noteId: string, title: string, contentText: string) => {
           void handleTitleChange(noteId, title, contentText);
         }}
+        showSearchPanel={showSearchPanel}
+        onSearchPanelClose={onSearchPanelClose}
       />
 
       {/* History Panel Drawer */}

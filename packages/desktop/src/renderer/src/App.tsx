@@ -26,6 +26,7 @@ function App(): React.ReactElement {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noteInfoOpen, setNoteInfoOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [activeSdId, setActiveSdId] = useState<string>('default');
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
@@ -152,8 +153,10 @@ function App(): React.ReactElement {
     void loadDefaultNote();
   }, []);
 
-  // Keyboard shortcut: Cmd+, or Ctrl+, to open Settings
-  // Keyboard shortcut: Cmd+Y or Ctrl+Y to toggle History
+  // Keyboard shortcuts:
+  // - Cmd+, or Ctrl+, to open Settings
+  // - Cmd+Y or Ctrl+Y to toggle History
+  // - Shift+Cmd+F or Shift+Ctrl+F to toggle Search
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       // Check for Cmd+, (macOS) or Ctrl+, (Windows/Linux)
@@ -166,6 +169,13 @@ function App(): React.ReactElement {
         event.preventDefault();
         if (selectedNoteId) {
           setHistoryPanelOpen((prev) => !prev);
+        }
+      }
+      // Check for Shift+Cmd+F (macOS) or Shift+Ctrl+F (Windows/Linux) to toggle Search
+      if (event.key === 'f' && event.shiftKey && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        if (selectedNoteId) {
+          setSearchPanelOpen((prev) => !prev);
         }
       }
     };
@@ -210,10 +220,13 @@ function App(): React.ReactElement {
       searchInput?.focus();
     });
 
-    // Find in Note (not implemented yet - TipTap doesn't have search built in)
+    // Find in Note
     const cleanupFindInNote = window.electronAPI.menu.onFindInNote(() => {
-      console.log('[Menu] Find in Note - not yet implemented');
-      // TODO: Implement in-editor search when TipTap search extension is added
+      if (selectedNoteId) {
+        setSearchPanelOpen(true);
+      } else {
+        console.log('[Menu] No note selected for Find in Note');
+      }
     });
 
     // Toggle Dark Mode
@@ -374,6 +387,10 @@ function App(): React.ReactElement {
                 showHistoryPanel={historyPanelOpen}
                 onHistoryPanelClose={() => {
                   setHistoryPanelOpen(false);
+                }}
+                showSearchPanel={searchPanelOpen}
+                onSearchPanelClose={() => {
+                  setSearchPanelOpen(false);
                 }}
               />
             }
