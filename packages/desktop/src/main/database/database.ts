@@ -148,6 +148,7 @@ export class SqliteDatabase implements Database {
     await this.adapter.exec(SCHEMA_SQL.tags);
     await this.adapter.exec(SCHEMA_SQL.noteTags);
     await this.adapter.exec(SCHEMA_SQL.noteLinks);
+    await this.adapter.exec(SCHEMA_SQL.checkboxes);
     await this.adapter.exec(SCHEMA_SQL.users);
     await this.adapter.exec(SCHEMA_SQL.appState);
   }

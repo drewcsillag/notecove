@@ -16,6 +16,7 @@ import * as Y from 'yjs';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
+import { TriStateCheckbox } from './extensions/TriStateCheckbox';
 import { SearchPanel } from './SearchPanel';
 
 export interface TipTapEditorProps {
@@ -50,11 +51,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const editor = useEditor({
     extensions: [
       // Use StarterKit but exclude History (Collaboration provides its own)
+      // and TaskList/TaskItem (using tri-state versions instead)
       StarterKit.configure({
         history: false, // Collaboration extension handles undo/redo
       }),
       // Add Underline extension (not in StarterKit)
       Underline,
+      // Add tri-state checkbox extension (inline checkboxes)
+      TriStateCheckbox,
       // Add Hashtag extension for #tag support
       Hashtag,
       // Add InterNoteLink extension for [[note-id]] support
@@ -474,6 +478,58 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               theme.palette.mode === 'dark' ? 'rgba(255, 152, 0, 0.5)' : 'rgba(255, 152, 0, 0.7)',
             outline: `2px solid ${theme.palette.primary.main}`,
             outlineOffset: '1px',
+          },
+          // Tri-state checkbox styling (inline)
+          '& span[data-type="tri-state-checkbox"]': {
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            verticalAlign: 'middle',
+            marginRight: '4px',
+            cursor: 'pointer',
+            userSelect: 'none',
+          },
+          // Custom checkbox styling for all states
+          '& .tri-state-checkbox': {
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '18px',
+            height: '18px',
+            marginRight: '6px',
+            border: `2px solid ${theme.palette.text.secondary}`,
+            borderRadius: '3px',
+            cursor: 'pointer',
+            flexShrink: 0,
+            // Checked state (white checkmark on green background)
+            '&[data-checked="checked"]': {
+              backgroundColor: theme.palette.success.main,
+              borderColor: theme.palette.success.main,
+              '& .tri-state-checkbox-content': {
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 700,
+                lineHeight: 1,
+              },
+            },
+            // Nope state (white N on red background)
+            '&[data-checked="nope"]': {
+              backgroundColor: theme.palette.error.main,
+              borderColor: theme.palette.error.main,
+              '& .tri-state-checkbox-content': {
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 700,
+                lineHeight: 1,
+              },
+            },
+            // Unchecked state
+            '&[data-checked="unchecked"]': {
+              backgroundColor: 'transparent',
+              '& .tri-state-checkbox-content': {
+                display: 'none',
+              },
+            },
           },
         },
       }}

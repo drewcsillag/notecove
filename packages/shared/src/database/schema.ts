@@ -61,6 +61,20 @@ export interface NoteLink {
 }
 
 /**
+ * Checkbox (Task) entry
+ * Represents a tri-state checkbox from a note
+ */
+export interface Checkbox {
+  id: UUID; // Unique ID for this checkbox
+  noteId: UUID; // Note containing the checkbox
+  state: 'unchecked' | 'checked' | 'nope'; // Checkbox state
+  text: string; // Text content after the checkbox
+  position: number; // Position in note (for ordering)
+  created: number; // Timestamp when checkbox was created
+  modified: number; // Timestamp when checkbox state was last changed
+}
+
+/**
  * User information
  */
 export interface User {
@@ -165,12 +179,13 @@ export interface SearchResult {
  * - v2: Added pinned field to notes table
  * - v3: Added uuid to storage_dirs, added note_moves table
  * - v4: Added note_links table for inter-note links
+ * - v5: Added checkboxes table for tri-state task tracking
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
- * - User data tables (tags, note_tags, note_links, app_state): Migrate with version-specific logic
+ * - User data tables (tags, note_tags, note_links, checkboxes, app_state): Migrate with version-specific logic
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * SQL schema definitions
@@ -289,6 +304,27 @@ export const SCHEMA_SQL = {
 
     CREATE INDEX IF NOT EXISTS idx_note_links_source ON note_links(source_note_id);
     CREATE INDEX IF NOT EXISTS idx_note_links_target ON note_links(target_note_id);
+  `,
+
+  /**
+   * Checkboxes table
+   * Tracks tri-state checkboxes/tasks from notes
+   */
+  checkboxes: `
+    CREATE TABLE IF NOT EXISTS checkboxes (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      state TEXT NOT NULL CHECK(state IN ('unchecked', 'checked', 'nope')),
+      text TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      created INTEGER NOT NULL,
+      modified INTEGER NOT NULL,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_checkboxes_note_id ON checkboxes(note_id);
+    CREATE INDEX IF NOT EXISTS idx_checkboxes_state ON checkboxes(state);
+    CREATE INDEX IF NOT EXISTS idx_checkboxes_modified ON checkboxes(modified);
   `,
 
   /**

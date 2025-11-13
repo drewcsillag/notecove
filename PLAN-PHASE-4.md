@@ -449,25 +449,62 @@ Three-phase implementation:
 
 ---
 
-### 4.5 Tri-State Checkboxes 🟥
+### 4.5 Tri-State Checkboxes 🟡
 
-**Status:** To Do (Post-MVP)
+**Status:** Core Implementation Complete (2025-11-13)
+
+**Implementation:** Inline checkbox extension with full markdown support
 
 **Tasks:**
 
-- [ ] 🟥 Implement tri-state checkbox in TipTap
-  - Markdown: `- [ ]` (todo), `- [x]` (done), `- [N]` (NOPE)
-  - Visual: empty checkbox, checked checkbox, red checkbox with "N"
-  - Interaction: click to cycle through states
-  - Works in bullet and numbered lists
-- [ ] 🟥 Store checkbox state in CRDT
-- [ ] 🟥 Index todos in SQLite for querying
+- [x] ✅ Create TriStateCheckbox extension (inline node)
+  - Three states: `unchecked`, `checked`, `nope`
+  - Inline node (works anywhere: in text, lists, paragraphs)
+  - Custom node view with click-to-cycle behavior
+  - Visual styling: empty checkbox, white checkmark on green, white N on red
+  - State stored in CRDT (Yjs document)
+- [x] ✅ Implement markdown input rules
+  - `[] ` creates unchecked checkbox (inline, anywhere in text)
+  - `[x] ` creates checked checkbox
+  - `[n] ` creates nope checkbox
+  - Works in bullet lists: `- [] text`
+  - Works in numbered lists: `1. [] text`
+  - Works between words: `FOOOOO [] BAAAARRR`
+- [x] ✅ Add CSS styling
+  - Inline checkbox layout
+  - NOPE state: white N on red background
+  - CHECKED state: white checkmark on green background
+  - UNCHECKED state: empty box with border
+  - Theme-integrated colors
+- [x] ✅ Write E2E tests
+  - 7 comprehensive tests covering all scenarios
+  - All tests passing
+- [x] ✅ Add toolbar button for inserting checkboxes
+  - Checkbox icon button in toolbar
+  - Inserts unchecked checkbox at cursor position
+  - Command: `editor.chain().focus().insertTriStateCheckbox().run()`
+- [x] ✅ SQLite schema for checkbox indexing
+  - Added `Checkbox` interface to database schema
+  - Added `checkboxes` table with indexes on note_id, state, modified
+  - Schema version incremented to v5
+  - Table structure ready for future "All Tasks" feature (iOS app)
+  - Note: Extraction logic will be added when implementing "All Tasks" virtual folder
 
 **Acceptance Criteria:**
 
-- Checkboxes render correctly
-- Can cycle through states
-- State syncs across instances
+- ✅ Extensions compile and load without errors
+- ✅ State syncs across instances (via CRDT)
+- ✅ Markdown input creates checkboxes inline
+- ✅ Can cycle through states via clicking
+- ✅ Checkboxes render correctly with proper colors
+- ✅ Works in lists and inline text
+- ✅ All E2E tests passing (7/7)
+
+**Files:**
+
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/TriStateCheckbox.ts`
+- `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx` (CSS styling)
+- `packages/desktop/e2e/tri-state-checkboxes.spec.ts` (7 tests, all passing)
 
 ---
 

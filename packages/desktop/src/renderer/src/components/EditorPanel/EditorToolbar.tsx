@@ -18,6 +18,7 @@ import {
   HorizontalRule,
   Undo,
   Redo,
+  CheckBoxOutlineBlank,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
 
@@ -135,6 +136,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
           color={editor.isActive('orderedList') ? 'primary' : 'default'}
         >
           <FormatListNumbered fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Insert Checkbox">
+        <IconButton
+          size="small"
+          onClick={() => editor.chain().focus().insertTriStateCheckbox().run()}
+        >
+          <CheckBoxOutlineBlank fontSize="small" />
         </IconButton>
       </Tooltip>
 
