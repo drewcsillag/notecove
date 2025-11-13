@@ -26,6 +26,11 @@ export interface SearchPanelProps {
   onClose: () => void;
 }
 
+interface SearchAndReplaceStorage {
+  results: unknown[];
+  resultIndex: number;
+}
+
 export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [replaceTerm, setReplaceTerm] = useState('');
@@ -47,11 +52,12 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
     editor.commands.setCaseSensitive(caseSensitive);
 
     // Get search results
-    const results = editor.storage.searchAndReplace?.results || [];
+    const storage = editor.storage['searchAndReplace'] as SearchAndReplaceStorage | undefined;
+    const results = storage?.results ?? [];
     setTotalMatches(results.length);
 
     // Get current result index
-    const resultIndex = editor.storage.searchAndReplace?.resultIndex ?? 0;
+    const resultIndex = storage?.resultIndex ?? 0;
     setCurrentMatch(resultIndex >= 0 && results.length > 0 ? resultIndex + 1 : 0);
 
     // Scroll to first match when search term changes
@@ -89,8 +95,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
     editor.commands.nextSearchResult();
 
     // Update current match index
-    const resultIndex = editor.storage.searchAndReplace?.resultIndex ?? 0;
-    const results = editor.storage.searchAndReplace?.results || [];
+    const storage = editor.storage['searchAndReplace'] as SearchAndReplaceStorage | undefined;
+    const resultIndex = storage?.resultIndex ?? 0;
+    const results = storage?.results ?? [];
     setCurrentMatch(resultIndex >= 0 && results.length > 0 ? resultIndex + 1 : 0);
 
     // Scroll to the new current match
@@ -102,8 +109,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
     editor.commands.previousSearchResult();
 
     // Update current match index
-    const resultIndex = editor.storage.searchAndReplace?.resultIndex ?? 0;
-    const results = editor.storage.searchAndReplace?.results || [];
+    const storage = editor.storage['searchAndReplace'] as SearchAndReplaceStorage | undefined;
+    const resultIndex = storage?.resultIndex ?? 0;
+    const results = storage?.results ?? [];
     setCurrentMatch(resultIndex >= 0 && results.length > 0 ? resultIndex + 1 : 0);
 
     // Scroll to the new current match
@@ -281,7 +289,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
               <Checkbox
                 size="small"
                 checked={showReplace}
-                onChange={(e) => setShowReplace(e.target.checked)}
+                onChange={(e) => {
+                  setShowReplace(e.target.checked);
+                }}
               />
             }
             label={<Typography variant="caption">Replace</Typography>}

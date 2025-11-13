@@ -74,7 +74,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
           void handleTitleChange(noteId, title, contentText);
         }}
         showSearchPanel={showSearchPanel}
-        onSearchPanelClose={onSearchPanelClose}
+        {...(onSearchPanelClose && { onSearchPanelClose })}
       />
 
       {/* History Panel Drawer */}

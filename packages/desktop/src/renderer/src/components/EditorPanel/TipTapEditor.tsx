@@ -410,11 +410,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           },
           // Search result highlighting
           '& .search-result': {
-            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 235, 59, 0.3)' : 'rgba(255, 235, 59, 0.5)',
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(255, 235, 59, 0.3)' : 'rgba(255, 235, 59, 0.5)',
             borderRadius: '2px',
           },
           '& .search-result-current': {
-            backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 152, 0, 0.5)' : 'rgba(255, 152, 0, 0.7)',
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(255, 152, 0, 0.5)' : 'rgba(255, 152, 0, 0.7)',
             outline: `2px solid ${theme.palette.primary.main}`,
             outlineOffset: '1px',
           },
