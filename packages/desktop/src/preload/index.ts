@@ -280,6 +280,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('tag:getAll') as Promise<{ id: string; name: string; count: number }[]>,
   },
 
+  // Link operations
+  link: {
+    getBacklinks: (noteId: string): Promise<NoteCache[]> =>
+      ipcRenderer.invoke('link:getBacklinks', noteId) as Promise<NoteCache[]>,
+    searchNotesForAutocomplete: (
+      query: string
+    ): Promise<
+      {
+        id: string;
+        title: string;
+        sdId: string;
+        folderId: string | null;
+        folderPath: string;
+        created: number;
+        modified: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('link:searchNotesForAutocomplete', query) as Promise<
+        {
+          id: string;
+          title: string;
+          sdId: string;
+          folderId: string | null;
+          folderPath: string;
+          created: number;
+          modified: number;
+        }[]
+      >,
+  },
+
   // Folder operations
   folder: {
     list: (
@@ -949,7 +979,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Testing operations (only available if main process registered handler)
   testing: {
-    createWindow: (): Promise<void> => ipcRenderer.invoke('testing:createWindow') as Promise<void>,
+    createWindow: (options?: { noteId?: string; minimal?: boolean }): Promise<void> =>
+      ipcRenderer.invoke('testing:createWindow', options) as Promise<void>,
     // Test-only: Set note timestamp (only available in NODE_ENV=test)
     setNoteTimestamp: (noteId: string, timestamp: number): Promise<void> =>
       ipcRenderer.invoke('test:setNoteTimestamp', noteId, timestamp) as Promise<void>,

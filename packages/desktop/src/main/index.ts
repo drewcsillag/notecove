@@ -145,10 +145,10 @@ async function reindexTagsForNotes(
   console.log(`[TagSync] Completed tag reindexing for ${noteIds.size} notes`);
 }
 
-function createWindow(): void {
+function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
   // Create the browser window
-  mainWindow = new BrowserWindow({
-    width: 1200,
+  const newWindow = new BrowserWindow({
+    width: options?.minimal ? 800 : 1200,
     height: 800,
     show: false,
     autoHideMenuBar: false,
@@ -160,32 +160,51 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.on('ready-to-show', () => {
+  newWindow.on('ready-to-show', () => {
     // Don't show window in test mode (headless E2E tests)
     if (process.env['NODE_ENV'] !== 'test') {
-      mainWindow?.show();
+      newWindow.show();
     }
   });
 
-  mainWindow.on('closed', () => {
-    if (mainWindow) {
-      const index = allWindows.indexOf(mainWindow);
-      if (index > -1) {
-        allWindows.splice(index, 1);
-      }
+  newWindow.on('closed', () => {
+    const index = allWindows.indexOf(newWindow);
+    if (index > -1) {
+      allWindows.splice(index, 1);
     }
-    mainWindow = null;
+    // Only set mainWindow to null if this was the main window
+    if (mainWindow === newWindow) {
+      mainWindow = null;
+    }
   });
 
   // Track window
-  allWindows.push(mainWindow);
+  allWindows.push(newWindow);
+
+  // If this is the first window, set it as main
+  mainWindow ??= newWindow;
+
+  // Build URL with parameters
+  let url: string;
+  const params = new URLSearchParams();
+  if (options?.noteId) {
+    params.set('noteId', options.noteId);
+  }
+  if (options?.minimal) {
+    params.set('minimal', 'true');
+  }
+
+  const queryString = params.toString();
+  const hash = queryString ? `?${queryString}` : '';
 
   // Load the renderer
   // In test mode, always use the built files, not the dev server
   if (process.env['NODE_ENV'] === 'test' || !is.dev || !process.env['ELECTRON_RENDERER_URL']) {
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    url = join(__dirname, '../renderer/index.html') + hash;
+    void newWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: queryString });
   } else {
-    void mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+    url = process.env['ELECTRON_RENDERER_URL'] + hash;
+    void newWindow.loadURL(url);
   }
 }
 

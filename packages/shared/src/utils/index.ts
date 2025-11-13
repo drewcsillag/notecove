@@ -3,3 +3,4 @@
  */
 
 export * from './tag-extractor';
+export * from './link-extractor';

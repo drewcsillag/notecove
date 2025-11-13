@@ -344,37 +344,51 @@ Three-phase implementation:
 
 ---
 
-### 4.2 Inter-Note Links 🟥
+### 4.2 Inter-Note Links ✅
 
-**Status:** To Do (Post-MVP)
+**Status:** Complete
 
 **Tasks:**
 
-- [ ] 🟥 Implement inter-note link syntax: `[[title]]`
+- [x] ✅ Implement inter-note link syntax: `[[title]]`
   - Theme-dependent color (different from tags, complementary to blue)
   - Store as note IDs internally
-  - Display as titles (computed on render)
-- [ ] 🟥 Implement link autocomplete
+  - Display as titles (computed on render via widget decorations)
+  - Title cache with invalidation on note load
+- [x] ✅ Implement link autocomplete
   - Trigger on `[[`
-  - Show notes matching typed text (substring)
-  - Show duplicates with differentiators (SD, folder, date)
+  - Show notes matching typed text (FTS5 search with title prioritization)
+  - Show duplicates with differentiators (folder path + modification date)
   - Insert link as `[[note-id]]` with display title
-- [ ] 🟥 Implement link click behavior
-  - Single click: navigate to note in editor
-  - Double click: open note in new window
-- [ ] 🟥 Implement broken link handling
+- [x] ✅ Implement link click behavior
+  - Single click: navigate to note in editor (300ms delay to detect double-click)
+  - Double click: open note in new minimal window (editor only, no sidebars)
+  - Proper click/double-click discrimination via timeout clearing
+- [x] ✅ Implement broken link handling
   - If target note deleted: show as invalid (strikethrough, red)
   - Don't remove link (allows restoration)
-- [ ] 🟥 Implement link updating
-  - When target note title changes, update display automatically
+  - Broken link detection via note existence check
+- [x] ✅ Implement link updating
+  - When target note title changes, links display updated title on note load
+  - Title cache cleared when loading notes to fetch fresh titles
   - Links stored as IDs, so no actual update needed in content
+
+**Implementation Details:**
+
+- **Extension**: `InterNoteLink.ts` - TipTap extension with ProseMirror plugin
+- **Decoration**: Widget decorations replace `[[note-id]]` with styled spans showing titles
+- **Autocomplete**: `LinkSuggestionList.tsx` - Material-UI dropdown with FTS5 search
+- **Minimal Window**: URL parameters (`noteId` + `minimal`) trigger editor-only layout in `App.tsx`
+- **Click Handling**: Timeout-based discrimination prevents single-click when double-clicking
+- **Title Cache**: Module-level Map with `clearNoteTitleCache()` for invalidation
 
 **Acceptance Criteria:**
 
-- Can create inter-note links
-- Autocomplete works
-- Links navigate correctly
-- Broken links show as invalid
+- ✅ Can create inter-note links
+- ✅ Autocomplete works with duplicate differentiation
+- ✅ Links navigate correctly (single-click in same window, double-click in new window)
+- ✅ Broken links show as invalid with red strikethrough
+- ✅ Link titles update when target note titles change
 
 ---
 

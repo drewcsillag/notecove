@@ -52,6 +52,15 @@ export interface NoteTag {
 }
 
 /**
+ * Inter-Note Link
+ * Represents a link from one note to another
+ */
+export interface NoteLink {
+  sourceNoteId: UUID; // Note containing the link
+  targetNoteId: UUID; // Note being linked to
+}
+
+/**
  * User information
  */
 export interface User {
@@ -155,12 +164,13 @@ export interface SearchResult {
  * - v1: Initial schema
  * - v2: Added pinned field to notes table
  * - v3: Added uuid to storage_dirs, added note_moves table
+ * - v4: Added note_links table for inter-note links
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
- * - User data tables (tags, note_tags, app_state): Migrate with version-specific logic
+ * - User data tables (tags, note_tags, note_links, app_state): Migrate with version-specific logic
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * SQL schema definitions
@@ -262,6 +272,23 @@ export const SCHEMA_SQL = {
 
     CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
     CREATE INDEX IF NOT EXISTS idx_note_tags_tag_id ON note_tags(tag_id);
+  `,
+
+  /**
+   * Inter-Note Links table
+   * Tracks links from one note to another
+   */
+  noteLinks: `
+    CREATE TABLE IF NOT EXISTS note_links (
+      source_note_id TEXT NOT NULL,
+      target_note_id TEXT NOT NULL,
+      PRIMARY KEY (source_note_id, target_note_id),
+      FOREIGN KEY (source_note_id) REFERENCES notes(id) ON DELETE CASCADE,
+      FOREIGN KEY (target_note_id) REFERENCES notes(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_note_links_source ON note_links(source_note_id);
+    CREATE INDEX IF NOT EXISTS idx_note_links_target ON note_links(target_note_id);
   `,
 
   /**

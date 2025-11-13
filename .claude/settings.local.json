@@ -1,15 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(prettier:*)",
-      "Bash(pnpm --filter @notecove/shared typecheck:*)",
-      "Bash(NODE_ENV=test npx tsx:*)",
-      "Bash(env NODE_ENV=test npx tsx:*)",
-      "Bash(npx tsx:*)",
-      "Bash(pnpm exec prettier:*)",
-      "Bash(pnpm clean-test-artifacts:*)",
-      "Bash(npx @turbo/codemod@latest update:*)",
-      "Bash(pnpm search:*)"
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Implement inter-note links with Wiki-style syntax\n\nImplements Phase 4.2 - Inter-Note Links with full functionality:\n\n**Core Features:**\n- Wiki-style [[note-id]] syntax for linking between notes\n- FTS5-powered autocomplete with title prioritization  \n- Duplicate title differentiation (folder path + date)\n- Single-click: navigate in same window (300ms delay)\n- Double-click: open in new minimal window (editor only)\n- Broken link detection with red strikethrough styling\n- Title cache with automatic invalidation on note load\n\n**Technical Implementation:**\n- InterNoteLink TipTap extension with ProseMirror plugin\n- Widget decorations for rendering note titles\n- LinkSuggestionList component for autocomplete UI\n- Minimal window mode via URL parameters\n- Timeout-based click discrimination\n- Module-level title cache with clearNoteTitleCache()\n\n**Database Changes:**\n- Added links table for bidirectional link tracking\n- Link extraction utilities (link-extractor)\n- Backlinks API support\n\n**Bug Fixes:**\n- Fixed Shift+Cmd+F keyboard shortcut (uppercase ''F'' handling)\n- Fixed lint and type errors in window creation code\n\n**Tests:**\n- 9 comprehensive E2E tests covering all functionality\n- Unit tests for link extraction utilities\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

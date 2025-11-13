@@ -14,9 +14,9 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
-import type { Database, NoteCache, UpdateManager } from '@notecove/shared';
+import type { Database, NoteCache, UpdateManager, UUID } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
-import { extractTags } from '@notecove/shared';
+import { extractTags, extractLinks } from '@notecove/shared';
 import {
   TimelineBuilder,
   StateReconstructor,
@@ -37,7 +37,7 @@ export class IPCHandlers {
     private noteMoveManager: NoteMoveManager,
     private diagnosticsManager: DiagnosticsManager,
     private backupManager: BackupManager,
-    private createWindowFn?: () => void,
+    private createWindowFn?: (options?: { noteId?: string; minimal?: boolean }) => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
   ) {
     this.registerHandlers();
@@ -139,6 +139,13 @@ export class IPCHandlers {
 
     // Tag operations
     ipcMain.handle('tag:getAll', this.handleGetAllTags.bind(this));
+
+    // Link operations
+    ipcMain.handle('link:getBacklinks', this.handleGetBacklinks.bind(this));
+    ipcMain.handle(
+      'link:searchNotesForAutocomplete',
+      this.handleSearchNotesForAutocomplete.bind(this)
+    );
 
     // Folder operations
     ipcMain.handle('folder:list', this.handleListFolders.bind(this));
@@ -436,11 +443,48 @@ export class IPCHandlers {
             console.log(`[IPC] Adding tag ${tag.name} to note ${noteId}`);
             await this.database.addTagToNote(noteId, tag.id);
           }
+
+          // Extract and update inter-note links
+          const links = extractLinks(contentText);
+          console.log(
+            `[IPC] Reindexing ${links.length} inter-note links after CRDT update for note ${noteId}`
+          );
+
+          // Get existing links for this note
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+          const existingLinks: UUID[] = await this.database.getLinksFromNote(noteId);
+          const existingLinksSet = new Set<UUID>(existingLinks);
+
+          // Build a set of new link IDs for O(1) lookup
+          const newLinksSet = new Set<UUID>(links);
+
+          // Determine which links to remove
+          const linksToRemove: UUID[] = existingLinks.filter((linkId) => !newLinksSet.has(linkId));
+
+          // Determine which links to add
+          const linksToAdd: UUID[] = links.filter((linkId) => !existingLinksSet.has(linkId));
+
+          // Process removals
+          for (const linkId of linksToRemove) {
+            console.log(`[IPC] Removing link ${noteId} -> ${linkId}`);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            await this.database.removeLink(noteId, linkId);
+          }
+
+          // Process additions
+          for (const linkId of linksToAdd) {
+            console.log(`[IPC] Adding link ${noteId} -> ${linkId}`);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            await this.database.addLink(noteId, linkId);
+          }
         }
       }
     } catch (err) {
-      console.error(`[IPC] Failed to reindex tags after CRDT update for note ${noteId}:`, err);
-      // Don't throw - tag indexing failure should not prevent update broadcast
+      console.error(
+        `[IPC] Failed to reindex tags/links after CRDT update for note ${noteId}:`,
+        err
+      );
+      // Don't throw - tag/link indexing failure should not prevent update broadcast
     }
 
     // Broadcast update to all other windows
@@ -1209,9 +1253,43 @@ export class IPCHandlers {
         }
 
         console.log(`[IPC] Tags updated successfully for note ${noteId}`);
+
+        // Extract and update inter-note links
+        const links = extractLinks(contentText);
+        console.log(`[IPC] Extracted ${links.length} inter-note links from note ${noteId}`);
+
+        // Get existing links for this note
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+        const existingLinks: UUID[] = await this.database.getLinksFromNote(noteId);
+        const existingLinksSet = new Set<UUID>(existingLinks);
+
+        // Build a set of new link IDs for O(1) lookup
+        const newLinksSet = new Set<UUID>(links);
+
+        // Determine which links to remove
+        const linksToRemove: UUID[] = existingLinks.filter((linkId) => !newLinksSet.has(linkId));
+
+        // Determine which links to add
+        const linksToAdd: UUID[] = links.filter((linkId) => !existingLinksSet.has(linkId));
+
+        // Process removals
+        for (const linkId of linksToRemove) {
+          console.log(`[IPC] Removing link ${noteId} -> ${linkId}`);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          await this.database.removeLink(noteId, linkId);
+        }
+
+        // Process additions
+        for (const linkId of linksToAdd) {
+          console.log(`[IPC] Adding link ${noteId} -> ${linkId}`);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          await this.database.addLink(noteId, linkId);
+        }
+
+        console.log(`[IPC] Links updated successfully for note ${noteId}`);
       } catch (err) {
-        console.error(`[IPC] Failed to update tags for note ${noteId}:`, err);
-        // Don't throw - tag indexing failure should not prevent note update
+        console.error(`[IPC] Failed to update tags/links for note ${noteId}:`, err);
+        // Don't throw - tag/link indexing failure should not prevent note update
       }
     }
 
@@ -1692,9 +1770,12 @@ export class IPCHandlers {
   /**
    * Testing: Create a new window
    */
-  private async handleCreateWindow(_event: IpcMainInvokeEvent): Promise<void> {
+  private async handleCreateWindow(
+    _event: IpcMainInvokeEvent,
+    options?: { noteId?: string; minimal?: boolean }
+  ): Promise<void> {
     if (this.createWindowFn) {
-      this.createWindowFn();
+      this.createWindowFn(options);
     }
   }
 
@@ -1791,6 +1872,8 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:updateTitle');
     ipcMain.removeHandler('note:list');
     ipcMain.removeHandler('tag:getAll');
+    ipcMain.removeHandler('link:getBacklinks');
+    ipcMain.removeHandler('link:searchNotesForAutocomplete');
     ipcMain.removeHandler('folder:list');
     ipcMain.removeHandler('folder:listAll');
     ipcMain.removeHandler('folder:get');
@@ -2107,6 +2190,92 @@ export class IPCHandlers {
     _event: IpcMainInvokeEvent
   ): Promise<{ id: string; name: string; count: number }[]> {
     return await this.database.getAllTags();
+  }
+
+  /**
+   * Link: Get backlinks for a note
+   */
+  private async handleGetBacklinks(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<NoteCache[]> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
+    return await this.database.getBacklinks(noteId);
+  }
+
+  /**
+   * Link: Search notes for autocomplete
+   * Returns notes matching the query (title or content substring match)
+   */
+  private async handleSearchNotesForAutocomplete(
+    _event: IpcMainInvokeEvent,
+    query: string
+  ): Promise<
+    {
+      id: string;
+      title: string;
+      sdId: string;
+      folderId: string | null;
+      folderPath: string;
+      created: number;
+      modified: number;
+    }[]
+  > {
+    // For autocomplete, we want simple prefix matching on titles
+    // FTS5's prefix search has issues, so we'll use simple string matching
+    const allNotes = await this.database.getActiveNotes();
+
+    let notes: NoteCache[];
+    if (query.trim() === '') {
+      // Empty query: return all notes
+      notes = allNotes;
+    } else {
+      // Filter notes by title prefix (case-insensitive)
+      const lowerQuery = query.toLowerCase();
+      notes = allNotes.filter((note) => note.title.toLowerCase().includes(lowerQuery));
+    }
+
+    // Remove deleted notes and deduplicate
+    const combinedMap = new Map<string, NoteCache>();
+    notes.forEach((note) => {
+      if (!note.deleted) {
+        combinedMap.set(note.id, note);
+      }
+    });
+
+    const results = Array.from(combinedMap.values());
+
+    // Get folder paths for each note
+    const resultsWithPaths = await Promise.all(
+      results.map(async (note) => {
+        let folderPath = '';
+        if (note.folderId) {
+          try {
+            const folder = await this.database.getFolder(note.folderId);
+            if (folder) {
+              // For now, just use the folder name
+              // TODO: Build full folder path by traversing parent folders
+              folderPath = folder.name;
+            }
+          } catch (err) {
+            console.error(`Failed to get folder path for note ${note.id}:`, err);
+          }
+        }
+
+        return {
+          id: note.id,
+          title: note.title,
+          sdId: note.sdId,
+          folderId: note.folderId,
+          folderPath,
+          created: note.created,
+          modified: note.modified,
+        };
+      })
+    );
+
+    // Sort by modified date (most recent first)
+    return resultsWithPaths.sort((a, b) => b.modified - a.modified).slice(0, 50);
   }
 
   /**

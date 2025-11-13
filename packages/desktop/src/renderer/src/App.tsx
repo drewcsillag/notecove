@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { CssBaseline, ThemeProvider, type PaletteMode } from '@mui/material';
+import { CssBaseline, ThemeProvider, Box, type PaletteMode } from '@mui/material';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { createAppTheme } from './theme';
@@ -43,9 +43,40 @@ function App(): React.ReactElement {
     message: string;
     error?: string;
   }>({ open: false, step: 0, total: 6, message: '' });
+  // Minimal mode (for linked note windows)
+  const [minimalMode, setMinimalMode] = useState(false);
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+
+  // Parse URL parameters on mount (for minimal window mode with specific noteId)
+  useEffect(() => {
+    try {
+      // Try to parse from query string first, then from hash
+      const searchParams = new URLSearchParams(window.location.search);
+      let noteIdParam = searchParams.get('noteId');
+      let minimalParam = searchParams.get('minimal');
+
+      // If not in search, try hash (for file:// protocol)
+      if (!noteIdParam && !minimalParam && window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        noteIdParam = hashParams.get('noteId');
+        minimalParam = hashParams.get('minimal');
+      }
+
+      if (noteIdParam) {
+        console.log('[App] Opening note from URL parameter:', noteIdParam);
+        setSelectedNoteId(noteIdParam);
+      }
+
+      if (minimalParam === 'true') {
+        console.log('[App] Enabling minimal mode from URL parameter');
+        setMinimalMode(true);
+      }
+    } catch (error) {
+      console.error('[App] Error parsing URL parameters:', error);
+    }
+  }, []);
 
   // Debug: Log when activeSdId changes
   useEffect(() => {
@@ -172,7 +203,8 @@ function App(): React.ReactElement {
         }
       }
       // Check for Shift+Cmd+F (macOS) or Shift+Ctrl+F (Windows/Linux) to toggle Search
-      if (event.key === 'f' && event.shiftKey && (event.metaKey || event.ctrlKey)) {
+      // Note: When Shift is pressed, event.key is uppercase 'F', not lowercase 'f'
+      if (event.key.toLowerCase() === 'f' && event.shiftKey && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         if (selectedNoteId) {
           setSearchPanelOpen((prev) => !prev);
@@ -346,6 +378,43 @@ function App(): React.ReactElement {
     setTagFilters({});
   };
 
+  // Render minimal layout (just editor, no sidebars)
+  if (minimalMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <DndProvider backend={HTML5Backend}>
+          <Box
+            sx={{
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <EditorPanel
+              selectedNoteId={selectedNoteId}
+              isNewlyCreated={false}
+              onNoteLoaded={() => {
+                // No-op in minimal mode
+              }}
+              showHistoryPanel={historyPanelOpen}
+              onHistoryPanelClose={() => {
+                setHistoryPanelOpen(false);
+              }}
+              showSearchPanel={searchPanelOpen}
+              onSearchPanelClose={() => {
+                setSearchPanelOpen(false);
+              }}
+              onNavigateToNote={setSelectedNoteId}
+            />
+          </Box>
+        </DndProvider>
+      </ThemeProvider>
+    );
+  }
+
+  // Render full layout (with sidebars)
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -392,6 +461,7 @@ function App(): React.ReactElement {
                 onSearchPanelClose={() => {
                   setSearchPanelOpen(false);
                 }}
+                onNavigateToNote={setSelectedNoteId}
               />
             }
             onLayoutChange={handleLayoutChange}

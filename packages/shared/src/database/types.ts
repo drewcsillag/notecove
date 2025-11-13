@@ -227,6 +227,36 @@ export interface TagOperations {
 }
 
 /**
+ * Inter-note link operations
+ */
+export interface LinkOperations {
+  /**
+   * Add a link from one note to another
+   */
+  addLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<void>;
+
+  /**
+   * Remove a link from one note to another
+   */
+  removeLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<void>;
+
+  /**
+   * Get all links from a note (outgoing links)
+   */
+  getLinksFromNote(sourceNoteId: UUID): Promise<UUID[]>;
+
+  /**
+   * Get all links to a note (incoming links/backlinks)
+   */
+  getLinksToNote(targetNoteId: UUID): Promise<UUID[]>;
+
+  /**
+   * Get all notes that link to a specific note (with full note details)
+   */
+  getBacklinks(targetNoteId: UUID): Promise<NoteCache[]>;
+}
+
+/**
  * App state operations
  */
 export interface AppStateOperations {
@@ -357,6 +387,7 @@ export interface Database
   extends NoteCacheOperations,
     FolderCacheOperations,
     TagOperations,
+    LinkOperations,
     AppStateOperations,
     UserOperations,
     StorageDirOperations,

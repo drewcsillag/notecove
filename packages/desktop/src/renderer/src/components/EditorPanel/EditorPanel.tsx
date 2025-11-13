@@ -17,6 +17,7 @@ interface EditorPanelProps {
   onHistoryPanelClose?: () => void;
   showSearchPanel?: boolean;
   onSearchPanelClose?: () => void;
+  onNavigateToNote?: (noteId: string) => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({
@@ -27,6 +28,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   onHistoryPanelClose,
   showSearchPanel = false,
   onSearchPanelClose,
+  onNavigateToNote,
 }) => {
   const [isNoteDeleted, setIsNoteDeleted] = useState(false);
 
@@ -69,6 +71,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         noteId={selectedNoteId}
         readOnly={isNoteDeleted}
         isNewlyCreated={isNewlyCreated}
+        {...(onNavigateToNote && { onNavigateToNote })}
         {...(onNoteLoaded && { onNoteLoaded })}
         onTitleChange={(noteId: string, title: string, contentText: string) => {
           void handleTitleChange(noteId, title, contentText);

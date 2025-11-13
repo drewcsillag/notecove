@@ -153,6 +153,34 @@ declare global {
         getAll: () => Promise<{ id: string; name: string; count: number }[]>;
       };
 
+      link: {
+        getBacklinks: (noteId: string) => Promise<
+          {
+            id: string;
+            title: string;
+            sdId: string;
+            folderId: string | null;
+            created: number;
+            modified: number;
+            deleted: boolean;
+            pinned: boolean;
+            contentPreview: string;
+            contentText: string;
+          }[]
+        >;
+        searchNotesForAutocomplete: (query: string) => Promise<
+          {
+            id: string;
+            title: string;
+            sdId: string;
+            folderId: string | null;
+            folderPath: string;
+            created: number;
+            modified: number;
+          }[]
+        >;
+      };
+
       folder: {
         list: (sdId: string) => Promise<
           {
@@ -418,7 +446,7 @@ declare global {
       };
 
       testing: {
-        createWindow: () => Promise<void>;
+        createWindow: (options?: { noteId?: string; minimal?: boolean }) => Promise<void>;
         setNoteTimestamp: (noteId: string, timestamp: number) => Promise<void>;
       };
     };

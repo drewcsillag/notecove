@@ -15,6 +15,7 @@ import { Box, useTheme } from '@mui/material';
 import * as Y from 'yjs';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
+import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { SearchPanel } from './SearchPanel';
 
 export interface TipTapEditorProps {
@@ -25,6 +26,7 @@ export interface TipTapEditorProps {
   onTitleChange?: (noteId: string, title: string, contentText: string) => void;
   showSearchPanel?: boolean;
   onSearchPanelClose?: () => void;
+  onNavigateToNote?: (noteId: string) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -35,6 +37,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   onTitleChange,
   showSearchPanel = false,
   onSearchPanelClose,
+  onNavigateToNote,
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
@@ -54,6 +57,31 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       Underline,
       // Add Hashtag extension for #tag support
       Hashtag,
+      // Add InterNoteLink extension for [[note-id]] support
+      InterNoteLink.configure({
+        onLinkClick: (linkNoteId: string) => {
+          // Single click: Navigate to note in same window
+          console.log('[InterNoteLink] Single click on note:', linkNoteId);
+          if (onNavigateToNote) {
+            onNavigateToNote(linkNoteId);
+          }
+        },
+        onLinkDoubleClick: (linkNoteId: string) => {
+          // Double click: Open note in new window (minimal layout)
+          console.log('[InterNoteLink] Double click on note:', linkNoteId);
+          void window.electronAPI.testing
+            .createWindow({
+              noteId: linkNoteId,
+              minimal: true,
+            })
+            .then(() => {
+              console.log('[InterNoteLink] New window created for note:', linkNoteId);
+            })
+            .catch((err) => {
+              console.error('[InterNoteLink] Failed to create new window:', err);
+            });
+        },
+      }),
       // Add SearchAndReplace extension for in-note search
       SearchAndReplace,
       // Collaboration extension binds TipTap to Yjs
@@ -259,6 +287,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         isLoadingNoteRef.current = true;
         console.log(`[TipTapEditor] Loading note ${noteId}`);
 
+        // Clear the title cache to ensure we fetch fresh titles
+        clearNoteTitleCache();
+
         // Tell main process to load this note
         await window.electronAPI.note.load(noteId);
 
@@ -407,6 +438,30 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             '&:hover': {
               textDecoration: 'underline',
             },
+          },
+          // Inter-note link styling (complementary to tags - use secondary color)
+          '& .inter-note-link': {
+            color: theme.palette.secondary.main,
+            fontWeight: 500,
+            cursor: 'pointer',
+            textDecoration: 'none',
+            borderBottom: `1px dotted ${theme.palette.secondary.main}`,
+            '&:hover': {
+              textDecoration: 'underline',
+              borderBottomStyle: 'solid',
+            },
+          },
+          // Broken inter-note link styling (note doesn't exist or is deleted)
+          '& .inter-note-link-broken': {
+            color: theme.palette.error.main,
+            fontWeight: 500,
+            cursor: 'not-allowed',
+            textDecoration: 'line-through',
+            borderBottom: `1px dotted ${theme.palette.error.main}`,
+          },
+          // Hide the original [[note-id]] text when displaying title
+          '& .inter-note-link-hidden': {
+            display: 'none',
           },
           // Search result highlighting
           '& .search-result': {
