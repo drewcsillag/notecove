@@ -92,7 +92,7 @@ targets:
         SWIFT_COMPILATION_MODE: wholemodule
 
     dependencies:
-      - framework: JavaScriptCore.framework
+      - sdk: JavaScriptCore.framework
       - sdk: Foundation.framework
       - sdk: SwiftUI.framework
       - sdk: Combine.framework
