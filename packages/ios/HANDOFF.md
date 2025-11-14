@@ -1,11 +1,12 @@
 # iOS Development Session Handoff
 
 **Date**: 2025-11-13
-**Branch**: `feature/phase-3.2.3-storage-integration`
-**Previous Commits on Main**:
-- `49ef4c4` - "Merge branch 'feature/phase-3.2.2-file-io'"
-- `5c4a91c` - "feat: Implement Phase 3.2.2 - iOS File I/O Layer"
-- `2341cc4` - "feat: Add iOS local CI script"
+**Branch**: `main` (all phases merged)
+**Recent Commits on Main**:
+- `15c9f4d` - "Merge branch 'feature/phase-3.2.4-database'"
+- `5188d30` - "feat: Implement Phase 3.2.4 - iOS SQLite/GRDB Database Layer"
+- `e2e746d` - "Merge branch 'feature/phase-3.2.3-storage-integration'"
+- `a250354` - "feat: Implement Phase 3.2.3 - iOS Storage Integration"
 
 ---
 
@@ -344,6 +345,119 @@ NoteCoveTests: 4 tests (0.466s)
   - Added Phase 3.2.3 completion status
   - Updated test count (45 tests total)
 
+### Phase 3.2.4 - SQLite/GRDB Database Layer ✅ COMPLETE
+
+**Status**: Fully working with all 23 tests passing ✅
+
+#### Completed Tasks
+
+1. **GRDB Integration**
+   - Added GRDB 6.29.3 dependency via Swift Package Manager
+   - Updated `project.yml` with package dependency
+   - Integrated with both NoteCove app and test targets
+
+2. **Database Schema (Schema.swift)**
+   - Location: `packages/ios/Sources/Database/Schema.swift` (224 lines)
+   - Complete schema with migrations system
+   - Tables:
+     - `storage_directories` - Storage directory metadata
+     - `notes` - Note metadata (title, dates, folder, soft delete status)
+     - `notes_fts` - FTS5 virtual table for full-text search
+     - `folders` - Hierarchical folder structure with parent relationships
+     - `tags` - Tags with optional hex colors
+     - `note_tags` - Many-to-many note-tag relationships
+   - Indexes for common queries (folder, storage directory, deleted status, modified date)
+   - Proper cascading deletes for relationships
+   - Record structs with Codable/FetchableRecord/PersistableRecord conformance
+   - CodingKeys enums for snake_case database column mapping
+
+3. **DatabaseManager (DatabaseManager.swift)**
+   - Location: `packages/ios/Sources/Database/DatabaseManager.swift` (370 lines)
+   - Full CRUD operations for all entities:
+     - Storage Directories: upsert, get, list
+     - Notes: insert, update, soft delete, permanent delete, restore, list
+     - Folders: insert, update, delete, get, list with hierarchy support
+     - Tags: insert, update, delete, get, list
+     - Note-Tag Relationships: add, remove, query by note/tag
+   - FTS5 Search:
+     - `indexNoteContent()` - Index title and content
+     - `searchNotes()` - Full-text search with ranking
+   - Soft delete support with `deletedAt` timestamps
+   - Recently deleted notes tracking
+   - Transaction support for atomic operations
+   - In-memory database support for testing
+
+4. **DatabaseManagerTests**
+   - Location: `packages/ios/Tests/Database/DatabaseManagerTests.swift` (379 lines)
+   - 23 comprehensive tests:
+     - testUpsertStorageDirectory
+     - testListStorageDirectories
+     - testInsertNote, testUpdateNote
+     - testSoftDeleteNote, testRestoreNote, testPermanentlyDeleteNote
+     - testListNotes, testListDeletedNotes
+     - testIndexNoteContent, testSearchNotes
+     - testInsertFolder, testUpdateFolder, testDeleteFolder, testListFolders
+     - testInsertTag, testUpdateTag, testDeleteTag, testListTags
+     - testAddTagToNote, testRemoveTagFromNote, testGetNotesWithTag
+     - testTransaction
+   - Uses in-memory database for fast, isolated tests
+   - Full coverage of all DatabaseManager functionality
+
+5. **CI Script Improvements**
+   - Fixed bug in `ci-local.sh` that was falsely reporting success
+   - Now uses `PIPESTATUS[0]` to capture actual xcodebuild exit code
+   - Properly fails when tests fail
+
+#### Test Results
+
+```
+✅ All Tests: 68/68 passed (0.768 seconds)
+
+CRDTBridgeTests: 7 tests (0.052s)
+FileIOManagerTests: 21 tests (0.034s)
+StorageIntegrationTests: 13 tests (0.094s)
+DatabaseManagerTests: 23 tests (0.118s) ← NEW
+NoteCoveTests: 4 tests (0.471s)
+```
+
+#### Files Created
+
+**Swift:**
+- `packages/ios/Sources/Database/Schema.swift` (224 lines)
+  - Database schema with migrations
+  - All table definitions with indexes
+  - Record structs for all entities
+- `packages/ios/Sources/Database/DatabaseManager.swift` (370 lines)
+  - Complete database manager
+  - Full CRUD for all entities
+  - FTS5 search implementation
+  - Transaction support
+
+**Tests:**
+- `packages/ios/Tests/Database/DatabaseManagerTests.swift` (379 lines)
+  - 23 comprehensive database tests
+  - Full coverage of all operations
+
+#### Files Modified
+
+- `packages/ios/project.yml`
+  - Added GRDB package dependency
+  - Added dependency to both app and test targets
+- `packages/ios/scripts/ci-local.sh`
+  - Fixed test failure detection using PIPESTATUS
+- `packages/ios/README.md`
+  - Added Database Layer section with usage examples
+  - Updated project structure to show Database directory
+  - Updated test count (68 tests total)
+  - Updated Phase 3 status to 3.2.4 completion
+
+#### Fixes Applied by CI Runner
+
+During CI execution, the following issues were automatically fixed:
+- Added `Codable` conformance to `NoteSearchResult` struct
+- Changed `Schema.migrate()` parameter from `Database` to `some DatabaseWriter`
+- Added `CodingKeys` enum to `StorageDirectoryRecord` for proper column mapping
+
 ### Git Status
 
 **Branch**: `main` (merged from `feature/phase-3-ios-app`)
@@ -401,208 +515,235 @@ a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
    - 13 integration tests passing
    - Full Swift ↔ JavaScript file I/O working
 
-6. **Testing**
-   - 45 total tests (7 CRDT + 21 FileIO + 13 Integration + 4 NoteCove)
+6. **Database Layer**
+   - GRDB integrated with full schema
+   - DatabaseManager with all CRUD operations
+   - FTS5 full-text search working
+   - 23 comprehensive database tests
+   - Soft deletes and tag relationships
+
+7. **Testing**
+   - 68 total tests (7 CRDT + 21 FileIO + 13 Integration + 23 Database + 4 NoteCove)
    - All tests passing with iOS simulator
    - iOS CI script for automated validation
+   - CI properly detects test failures
 
 ### What's Not Yet Implemented
 
-1. **SQLite/GRDB** (Phase 3.2.4 - Next)
-   - Database schema implementation
-   - FTS5 search indexing
-   - Tag indexing
-   - Note metadata caching
-
-3. **File Watching** (Phase 3.2.5)
-   - FileManager notifications
+1. **File Watching** (Phase 3.2.5 - Next)
+   - FileManager notifications for local file changes
    - iCloud Drive sync monitoring
    - Debouncing rapid changes
+   - Integration with database updates
 
-4. **UI Implementation** (Phase 3.3+)
+2. **UI Implementation** (Phase 3.3+)
    - Notes list view
    - Editor (WKWebView + TipTap)
    - Folder navigation
    - Tags view
    - Settings
+   - Search interface
 
 ---
 
-## Next Steps: Phase 3.2.4 - SQLite/GRDB
+## Next Steps: Phase 3.2.5 - File Watching
 
 ### Overview
 
-Connect the FileIOManager to the CRDT bridge, exposing file operations to JavaScript. This allows the shared CRDT logic to persist notes to the iOS file system.
+Implement file system monitoring to detect changes to `.yjson` files, enabling real-time sync with external changes (iCloud Drive, Dropbox, manual edits). When files change, update the database and notify the UI.
 
 ### Architecture
 
 ```
-Swift UI → CRDTBridge → JavaScriptCore (CRDT logic)
-              ↓                ↓
-         FileIOManager → File System (.yjson files)
+File System (.yjson files)
+    ↓
+FileManager Notifications → FileWatchManager
+    ↓                              ↓
+Parse changed files         Update DatabaseManager
+    ↓                              ↓
+Load via CRDTBridge         Update FTS5 index
+    ↓                              ↓
+Extract metadata            Notify UI (Combine publishers)
 ```
 
 ### Implementation Plan
 
-#### 1. Expose FileIOManager to JavaScript
+#### 1. FileWatchManager
 
-**Update**: `packages/ios/Sources/CRDT/CRDTBridge.swift`
+**Create**: `packages/ios/Sources/Storage/FileWatchManager.swift`
 
-Add FileIOManager instance and expose methods to JavaScript:
+Monitor file system changes:
 
 ```swift
-class CRDTBridge {
-    private let fileIO = FileIOManager()
+class FileWatchManager {
+    private var dispatchSource: DispatchSourceFileSystemObject?
+    private let queue = DispatchQueue(label: "com.notecove.filewatcher")
 
-    // In setupContext():
-
-    // Expose file read
-    context.setObject({ [weak self] (path: String) -> JSValue in
-        guard let self = self else { return JSValue() }
-        do {
-            let data = try self.fileIO.readFile(at: path)
-            let base64 = data.base64EncodedString()
-            return JSValue(object: base64, in: self.context)
-        } catch {
-            return JSValue(object: nil, in: self.context)
-        }
-    }, forKeyedSubscript: "_swiftReadFile" as NSString)
-
-    // Expose file write
-    context.setObject({ [weak self] (path: String, base64Data: String) -> Bool in
-        guard let self = self else { return false }
-        guard let data = Data(base64Encoded: base64Data) else { return false }
-        do {
-            try self.fileIO.atomicWrite(data: data, to: path)
-            return true
-        } catch {
-            return false
-        }
-    }, forKeyedSubscript: "_swiftWriteFile" as NSString)
-
-    // Expose list files
-    context.setObject({ [weak self] (directory: String, pattern: String?) -> JSValue in
-        guard let self = self else { return JSValue() }
-        do {
-            let files = try self.fileIO.listFiles(in: directory, matching: pattern)
-            return JSValue(object: files, in: self.context)
-        } catch {
-            return JSValue(object: [], in: self.context)
-        }
-    }, forKeyedSubscript: "_swiftListFiles" as NSString)
+    func watchDirectory(path: String, onChange: @escaping () -> Void)
+    func stopWatching()
 }
 ```
 
-#### 2. Update TypeScript Bridge Code
+**Features:**
+- Use `DispatchSource.makeFileSystemObjectSource()` for directory monitoring
+- Monitor `DISPATCH_VNODE_WRITE` and `DISPATCH_VNODE_EXTEND` events
+- Debounce rapid changes (500ms window)
+- Support multiple storage directories
 
-**Update**: `packages/shared/src/ios-bridge.ts`
+#### 2. Change Detection and Processing
 
-Add file I/O wrappers that call the Swift functions:
+**Create**: `packages/ios/Sources/Storage/FileChangeProcessor.swift`
 
-```typescript
-// File I/O functions exposed from Swift
-declare global {
-  function _swiftReadFile(path: string): string | null;
-  function _swiftWriteFile(path: string, base64Data: string): boolean;
-  function _swiftListFiles(directory: string, pattern?: string): string[];
-}
+Process file changes and update database:
 
-export async function readFile(path: string): Promise<Uint8Array | null> {
-  const base64 = _swiftReadFile(path);
-  if (!base64) return null;
+```swift
+class FileChangeProcessor {
+    private let db: DatabaseManager
+    private let bridge: CRDTBridge
+    private let fileIO: FileIOManager
 
-  // Convert base64 to Uint8Array
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-export async function writeFile(path: string, data: Uint8Array): Promise<boolean> {
-  // Convert Uint8Array to base64
-  let binaryString = '';
-  for (let i = 0; i < data.length; i++) {
-    binaryString += String.fromCharCode(data[i]);
-  }
-  const base64 = btoa(binaryString);
-
-  return _swiftWriteFile(path, base64);
-}
-
-export async function listFiles(directory: string, pattern?: string): Promise<string[]> {
-  return _swiftListFiles(directory, pattern);
+    func processChangedFiles(in directory: String) async throws
+    func updateNoteFromFile(noteId: String, storageId: String) async throws
+    func indexNoteContent(noteId: String) async throws
 }
 ```
 
-#### 3. Integration Tests
+**Logic:**
+1. List all `.yjson` files in changed directory
+2. For each note, load CRDT updates via bridge
+3. Extract title and content
+4. Update database metadata
+5. Update FTS5 index
 
-**Create**: `packages/ios/Tests/Storage/StorageIntegrationTests.swift`
+#### 3. iCloud Integration
+
+**Update**: `packages/ios/Sources/NoteCove.entitlements`
+
+Enable iCloud Drive:
+
+```xml
+<key>com.apple.developer.icloud-container-identifiers</key>
+<array>
+    <string>iCloud.com.notecove.app</string>
+</array>
+<key>com.apple.developer.ubiquity-container-identifiers</key>
+<array>
+    <string>iCloud.com.notecove.app</string>
+</array>
+```
+
+**Create**: `packages/ios/Sources/Storage/iCloudManager.swift`
+
+```swift
+class iCloudManager {
+    func getContainerURL() -> URL?
+    func isICloudAvailable() -> Bool
+    func watchICloudChanges(onChange: @escaping () -> Void)
+}
+```
+
+#### 4. Debouncing
+
+**Create**: `packages/ios/Sources/Utilities/Debouncer.swift`
+
+```swift
+class Debouncer {
+    private var workItem: DispatchWorkItem?
+    private let delay: TimeInterval
+
+    init(delay: TimeInterval)
+
+    func debounce(_ action: @escaping () -> Void)
+    func cancel()
+}
+```
+
+**Usage:**
+- Debounce file system events (500ms)
+- Prevent multiple updates for rapid file changes
+- Cancel pending updates when new changes arrive
+
+#### 5. Integration with UI
+
+**Update**: `packages/ios/Sources/Storage/StorageCoordinator.swift`
+
+Central coordinator for storage operations:
+
+```swift
+@MainActor
+class StorageCoordinator: ObservableObject {
+    @Published var storageDirectories: [StorageDirectory] = []
+    @Published var recentlyUpdatedNotes: Set<String> = []
+
+    private let db: DatabaseManager
+    private let fileWatch: FileWatchManager
+    private let changeProcessor: FileChangeProcessor
+
+    func startWatching(storageId: String)
+    func stopWatching(storageId: String)
+    func handleFileChange(in directory: String)
+}
+```
+
+#### 6. Tests
+
+**Create**: `packages/ios/Tests/Storage/FileWatchManagerTests.swift`
 
 Tests to write:
-- `testReadFileViaJavaScript()` - Verify JS can read files
-- `testWriteFileViaJavaScript()` - Verify JS can write files
-- `testListFilesViaJavaScript()` - Verify JS can list files
-- `testRoundTripViaJavaScript()` - Write then read the same file
-- `testAtomicWriteViaJavaScript()` - Verify atomic behavior from JS
-- `testErrorHandling()` - Verify errors are handled gracefully
+- `testWatchDirectory()` - Verify watching starts successfully
+- `testDetectFileCreation()` - Detect when files are created
+- `testDetectFileModification()` - Detect when files are modified
+- `testDebouncing()` - Verify rapid changes are debounced
+- `testStopWatching()` - Verify cleanup works correctly
 
-#### 4. Storage Directory Management
+**Create**: `packages/ios/Tests/Storage/FileChangeProcessorTests.swift`
 
-**Create**: `packages/ios/Sources/Storage/StorageDirectoryManager.swift`
-
-Manages storage directory paths:
-
-```swift
-class StorageDirectoryManager {
-    func getStorageDirectoryPath(id: String) -> String
-    func getNotesDirectory(storageId: String) -> String
-    func getFolderTreePath(storageId: String) -> String
-    func ensureDirectoriesExist(storageId: String) throws
-}
-```
-
-#### 5. Update CRDT Bridge to Use Storage Paths
-
-Update the bridge to use proper storage paths instead of hardcoded paths.
+Tests to write:
+- `testProcessSingleNoteChange()` - Process one changed note
+- `testProcessMultipleChanges()` - Process multiple notes
+- `testUpdateDatabase()` - Verify database updates correctly
+- `testUpdateFTS5()` - Verify search index updates
+- `testExtractMetadata()` - Verify title extraction
 
 ### Acceptance Criteria
 
-- [ ] FileIOManager exposed to JavaScript via CRDTBridge
-- [ ] TypeScript wrappers for file I/O operations
-- [ ] All integration tests passing (6+ tests)
-- [ ] Storage directory management implemented
-- [ ] Can create, read, and list `.yjson` files from JavaScript
-- [ ] Error handling works across Swift/JS boundary
+- [ ] FileWatchManager implemented with directory monitoring
+- [ ] Debouncing works correctly (500ms window)
+- [ ] File changes trigger database updates
+- [ ] FTS5 index updated when notes change
+- [ ] iCloud Drive support configured (entitlements)
+- [ ] All tests passing (10+ new tests)
 - [ ] CI tests pass (`pnpm --filter @notecove/ios ci-local`)
 - [ ] Documentation updated
 
 ### Design Considerations
 
-1. **Data Encoding**
-   - Use Base64 for binary data transfer between Swift and JavaScript
-   - Efficient encoding/decoding on both sides
+1. **Performance**
+   - Only process files that actually changed (use modification dates)
+   - Batch database updates where possible
+   - Use background queue for file processing
 
-2. **Error Handling**
-   - Swift errors should be communicated to JavaScript
-   - Consider returning error objects instead of null/false
+2. **Reliability**
+   - Handle partial file writes (use modification time + size checks)
+   - Gracefully handle corrupted files
+   - Log errors without crashing
 
-3. **Async Operations**
-   - File I/O is synchronous for now
-   - Future: consider async operations for large files
+3. **Battery Life**
+   - Don't poll, use event-driven notifications
+   - Debounce rapid changes to reduce processing
+   - Suspend watching when app is backgrounded
 
-4. **Storage Paths**
-   - Use app's Documents directory for user data
-   - Support iCloud container paths for sync
-   - Validate all paths before operations
+4. **iCloud Sync**
+   - Detect iCloud availability before enabling
+   - Handle iCloud container URL changes
+   - Support both local and iCloud storage directories
 
 ### Documentation to Update
 
 After implementation:
-- [ ] Update `packages/ios/README.md` with integration details
-- [ ] Update `docs/ios/jscore-bridge.md` with file I/O API
-- [ ] Add inline documentation to new methods
+- [ ] Update `packages/ios/README.md` with file watching details
+- [ ] Update architecture docs with sync flow
+- [ ] Add inline documentation to new classes
 - [ ] Update HANDOFF.md with completion status
 
 ---
@@ -708,13 +849,16 @@ xcodebuild test \
 
 ## Session End Notes
 
-- Phase 3.2.3 (Storage Integration) is complete on branch `feature/phase-3.2.3-storage-integration`
-- FileIOManager fully exposed to JavaScript via CRDTBridge
-- TypeScript file I/O wrappers implemented (readFile, writeFile, deleteFile, listFiles, etc.)
-- StorageDirectoryManager for path management
-- All 45 tests passing (7 CRDT + 21 FileIO + 13 Integration + 4 NoteCove) ✅
-- CI infrastructure verified and working
-- Documentation updated (README.md and HANDOFF.md)
-- Full Swift ↔ JavaScript file I/O integration working
-- Ready to proceed with Phase 3.2.4 (SQLite/GRDB) after merge
+- Phase 3.2.4 (SQLite/GRDB Database Layer) is **COMPLETE** and merged to `main` ✅
+- Complete database layer with GRDB 6.29.3 integrated
+- Database schema with 6 tables (storage_directories, notes, folders, tags, note_tags, notes_fts)
+- DatabaseManager with full CRUD operations for all entities
+- FTS5 full-text search implementation working
+- Soft delete support with deletedAt timestamps
+- Many-to-many tag relationships
+- All 68 tests passing (7 CRDT + 21 FileIO + 13 Integration + 23 Database + 4 NoteCove) ✅
+- CI infrastructure working correctly with proper test failure detection
+- Documentation fully updated (README.md, HANDOFF.md)
+- Storage stack complete: File I/O → Storage Integration → Database Layer
+- Ready to proceed with Phase 3.2.5 (File Watching)
 - No blocking issues
