@@ -23,7 +23,13 @@ var NoteCoveBridgeModule = (() => {
   // src/ios-bridge.ts
   var ios_bridge_exports = {};
   __export(ios_bridge_exports, {
-    default: () => ios_bridge_default
+    createDirectory: () => createDirectory,
+    default: () => ios_bridge_default,
+    deleteFile: () => deleteFile,
+    fileExists: () => fileExists,
+    listFiles: () => listFiles,
+    readFile: () => readFile,
+    writeFile: () => writeFile
   });
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/map.js
@@ -7995,6 +8001,29 @@ var NoteCoveBridgeModule = (() => {
       binaryString += String.fromCharCode(bytes[i]);
     }
     return btoa(binaryString);
+  }
+  function readFile(path) {
+    const base64 = _swiftReadFile(path);
+    if (!base64) {
+      return null;
+    }
+    return base64ToUint8Array(base64);
+  }
+  function writeFile(path, data) {
+    const base64 = uint8ArrayToBase64(data);
+    return _swiftWriteFile(path, base64);
+  }
+  function deleteFile(path) {
+    return _swiftDeleteFile(path);
+  }
+  function listFiles(directory, pattern) {
+    return _swiftListFiles(directory, pattern ?? null);
+  }
+  function fileExists(path) {
+    return _swiftFileExists(path);
+  }
+  function createDirectory(path) {
+    return _swiftCreateDirectory(path);
   }
   var bridge = {
     // ==================== Note Operations ====================

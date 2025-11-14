@@ -1,10 +1,11 @@
 # iOS Development Session Handoff
 
 **Date**: 2025-11-13
-**Branch**: `feature/phase-3.2.2-file-io`
+**Branch**: `feature/phase-3.2.3-storage-integration`
 **Previous Commits on Main**:
+- `49ef4c4` - "Merge branch 'feature/phase-3.2.2-file-io'"
+- `5c4a91c` - "feat: Implement Phase 3.2.2 - iOS File I/O Layer"
 - `2341cc4` - "feat: Add iOS local CI script"
-- `a4c378b` - "fix: Complete iOS JavaScriptCore bridge with working tests"
 
 ---
 
@@ -231,6 +232,118 @@ Total iOS Tests: 32/32 passing ✅
   - Updated Phase 3 status to reflect Phase 3.2.2 completion
   - Updated test count (32 tests total)
 
+### Phase 3.2.3 - Storage Integration ✅ COMPLETE
+
+**Status**: Fully working with all 13 tests passing ✅
+
+#### Completed Tasks
+
+1. **Exposed FileIOManager to JavaScript**
+   - Location: `packages/ios/Sources/CRDT/CRDTBridge.swift` (lines 167-263)
+   - Added `setupFileIO()` method in CRDTBridge
+   - Exposed 6 file operations to JavaScript:
+     - `_swiftReadFile(path)` - Returns base64-encoded data or null
+     - `_swiftWriteFile(path, base64Data)` - Atomic write, returns boolean
+     - `_swiftDeleteFile(path)` - Delete file, returns boolean
+     - `_swiftListFiles(directory, pattern)` - List files with optional glob pattern
+     - `_swiftFileExists(path)` - Check file existence
+     - `_swiftCreateDirectory(path)` - Create directory with intermediates
+
+2. **TypeScript File I/O Wrappers**
+   - Location: `packages/shared/src/ios-bridge.ts` (lines 102-163)
+   - Added global type declarations for Swift functions
+   - Implemented wrapper functions:
+     - `readFile(path)` - Returns Uint8Array or null
+     - `writeFile(path, data)` - Takes Uint8Array, returns boolean
+     - `deleteFile(path)` - Returns boolean
+     - `listFiles(directory, pattern?)` - Returns string array
+     - `fileExists(path)` - Returns boolean
+     - `createDirectory(path)` - Returns boolean
+   - All wrappers handle base64 encoding/decoding automatically
+
+3. **StorageDirectoryManager**
+   - Location: `packages/ios/Sources/Storage/StorageDirectoryManager.swift`
+   - Provides consistent path management for storage
+   - Path helpers:
+     - `getDocumentsDirectory()` - App's documents directory
+     - `getNoteCoveDataDirectory()` - NoteCove data root
+     - `getStorageDirectoryPath(id)` - Storage directory path
+     - `getNotesDirectory(storageId)` - Notes subdirectory
+     - `getNoteDirectory(storageId, noteId)` - Individual note directory
+     - `getFolderTreePath(storageId)` - Folder tree file path
+   - Directory creation:
+     - `ensureDirectoriesExist(storageId)` - Create all required dirs
+     - `ensureNoteDirectoryExists(storageId, noteId)` - Create note dir
+   - Listing:
+     - `listStorageDirectories()` - List all storage directories
+     - `storageDirectoryExists(id)` - Check if storage dir exists
+
+4. **StorageIntegrationTests**
+   - Location: `packages/ios/Tests/Storage/StorageIntegrationTests.swift`
+   - 13 comprehensive integration tests:
+     - testWriteFileViaJavaScript
+     - testWriteFileCreatesParentDirectories
+     - testReadFileViaJavaScript
+     - testReadNonExistentFileReturnsNull
+     - testRoundTripViaJavaScript
+     - testListFilesViaJavaScript
+     - testListFilesWithPatternViaJavaScript
+     - testDeleteFileViaJavaScript
+     - testDeleteNonExistentFileReturnsFalse
+     - testFileExistsViaJavaScript
+     - testCreateDirectoryViaJavaScript
+     - testCreateNestedDirectoryViaJavaScript
+     - testStorageDirectoryManagerPaths
+
+5. **Testing Infrastructure Improvements**
+   - Added `getContextForTesting()` method to CRDTBridge (DEBUG only)
+   - Tests use proper testing API instead of reflection
+   - All tests marked with `@MainActor` for proper actor isolation
+
+#### Test Results
+
+```
+✅ All Tests: 45/45 passed (0.648 seconds)
+
+CRDTBridgeTests: 7 tests (0.051s)
+FileIOManagerTests: 21 tests (0.035s)
+StorageIntegrationTests: 13 tests (0.096s)
+NoteCoveTests: 4 tests (0.466s)
+```
+
+#### Files Created/Modified
+
+**Swift:**
+- `packages/ios/Sources/CRDT/CRDTBridge.swift` - Modified
+  - Added FileIOManager instance
+  - Added `setupFileIO()` method (97 lines)
+  - Added `getContextForTesting()` for tests
+- `packages/ios/Sources/Storage/StorageDirectoryManager.swift` - New (145 lines)
+  - Complete path management system
+  - Directory creation utilities
+  - Storage directory listing
+
+**TypeScript:**
+- `packages/shared/src/ios-bridge.ts` - Modified
+  - Added Swift function declarations
+  - Added 6 file I/O wrapper functions (62 lines)
+
+**Tests:**
+- `packages/ios/Tests/Storage/StorageIntegrationTests.swift` - New (268 lines)
+  - 13 integration tests
+  - Full Swift ↔ JavaScript file I/O coverage
+
+#### Documentation Updates
+
+**Updated Files:**
+- `packages/ios/README.md`
+  - Updated CRDT Bridge Integration section (now complete)
+  - Added Storage Directory Management section with examples
+  - Updated project structure to show StorageDirectoryManager
+  - Updated test structure to show StorageIntegrationTests
+  - Added Phase 3.2.3 completion status
+  - Updated test count (45 tests total)
+
 ### Git Status
 
 **Branch**: `main` (merged from `feature/phase-3-ios-app`)
@@ -276,19 +389,26 @@ a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
    - JavaScript bundling via esbuild
    - iOS CI script for automated testing
 
-4. **Testing**
-   - 11 unit tests covering CRDT bridge functionality
+4. **File I/O Layer**
+   - FileIOManager with atomic writes, pattern matching
+   - 21 comprehensive file operation tests
+   - All operations working correctly
+
+5. **Storage Integration**
+   - FileIOManager fully exposed to JavaScript
+   - TypeScript file I/O wrappers
+   - StorageDirectoryManager for path management
+   - 13 integration tests passing
+   - Full Swift ↔ JavaScript file I/O working
+
+6. **Testing**
+   - 45 total tests (7 CRDT + 21 FileIO + 13 Integration + 4 NoteCove)
    - All tests passing with iOS simulator
+   - iOS CI script for automated validation
 
 ### What's Not Yet Implemented
 
-1. **Storage Integration** (Phase 3.2.3 - Next)
-   - Exposing FileIOManager to JavaScript via CRDTBridge
-   - Connecting File I/O operations to CRDT logic
-   - Storage directory management
-   - Integration tests
-
-2. **SQLite/GRDB** (Phase 3.2.4)
+1. **SQLite/GRDB** (Phase 3.2.4 - Next)
    - Database schema implementation
    - FTS5 search indexing
    - Tag indexing
@@ -308,7 +428,7 @@ a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
 
 ---
 
-## Next Steps: Phase 3.2.3 - Storage Integration
+## Next Steps: Phase 3.2.4 - SQLite/GRDB
 
 ### Overview
 
@@ -588,10 +708,13 @@ xcodebuild test \
 
 ## Session End Notes
 
-- Phase 3.2.2 (File I/O Layer) is complete on branch `feature/phase-3.2.2-file-io`
-- FileIOManager fully implemented with atomic writes, pattern matching, and comprehensive error handling
-- All 32 tests passing (7 CRDT + 21 FileIO + 4 NoteCove) ✅
+- Phase 3.2.3 (Storage Integration) is complete on branch `feature/phase-3.2.3-storage-integration`
+- FileIOManager fully exposed to JavaScript via CRDTBridge
+- TypeScript file I/O wrappers implemented (readFile, writeFile, deleteFile, listFiles, etc.)
+- StorageDirectoryManager for path management
+- All 45 tests passing (7 CRDT + 21 FileIO + 13 Integration + 4 NoteCove) ✅
 - CI infrastructure verified and working
 - Documentation updated (README.md and HANDOFF.md)
-- Ready to proceed with Phase 3.2.3 (Storage Integration) after merge
+- Full Swift ↔ JavaScript file I/O integration working
+- Ready to proceed with Phase 3.2.4 (SQLite/GRDB) after merge
 - No blocking issues

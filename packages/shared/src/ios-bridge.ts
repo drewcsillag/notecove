@@ -67,6 +67,14 @@ declare global {
   interface Window {
     NoteCoveBridge: NoteCoveBridge;
   }
+
+  // File I/O functions exposed from Swift
+  function _swiftReadFile(path: string): string | null;
+  function _swiftWriteFile(path: string, base64Data: string): boolean;
+  function _swiftDeleteFile(path: string): boolean;
+  function _swiftListFiles(directory: string, pattern: string | null): string[];
+  function _swiftFileExists(path: string): boolean;
+  function _swiftCreateDirectory(path: string): boolean;
 }
 
 // Storage for open documents
@@ -89,6 +97,69 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
     binaryString += String.fromCharCode(bytes[i]);
   }
   return btoa(binaryString);
+}
+
+// ==================== File I/O Wrappers ====================
+
+/**
+ * Read a file from the file system
+ * @param path Absolute path to the file
+ * @returns File contents as Uint8Array, or null if file doesn't exist
+ */
+export function readFile(path: string): Uint8Array | null {
+  const base64 = _swiftReadFile(path);
+  if (!base64) {
+    return null;
+  }
+  return base64ToUint8Array(base64);
+}
+
+/**
+ * Write a file to the file system (atomic write)
+ * @param path Absolute path to the file
+ * @param data File contents
+ * @returns true on success, false on failure
+ */
+export function writeFile(path: string, data: Uint8Array): boolean {
+  const base64 = uint8ArrayToBase64(data);
+  return _swiftWriteFile(path, base64);
+}
+
+/**
+ * Delete a file from the file system
+ * @param path Absolute path to the file
+ * @returns true on success, false on failure
+ */
+export function deleteFile(path: string): boolean {
+  return _swiftDeleteFile(path);
+}
+
+/**
+ * List files in a directory, optionally filtered by pattern
+ * @param directory Absolute path to the directory
+ * @param pattern Optional glob pattern (e.g., "*.yjson")
+ * @returns Array of absolute file paths
+ */
+export function listFiles(directory: string, pattern?: string): string[] {
+  return _swiftListFiles(directory, pattern ?? null);
+}
+
+/**
+ * Check if a file exists
+ * @param path Absolute path to check
+ * @returns true if file exists, false otherwise
+ */
+export function fileExists(path: string): boolean {
+  return _swiftFileExists(path);
+}
+
+/**
+ * Create a directory (with intermediate directories)
+ * @param path Absolute path to the directory
+ * @returns true on success, false on failure
+ */
+export function createDirectory(path: string): boolean {
+  return _swiftCreateDirectory(path);
 }
 
 // Create the bridge object

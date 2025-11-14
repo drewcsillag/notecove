@@ -47,12 +47,47 @@ let yjsonFiles = try fileIO.listFiles(in: "/path/to/directory", matching: "*.yjs
 
 ### CRDT Bridge Integration
 
-The FileIOManager will be exposed to JavaScript via the CRDTBridge, allowing the shared CRDT logic to read/write `.yjson` files directly:
+The FileIOManager is fully integrated with the CRDTBridge, exposing file operations to JavaScript. The shared CRDT logic can now read/write `.yjson` files directly.
+
+**Swift Side** (`CRDTBridge.swift`):
+```swift
+// File I/O functions exposed to JavaScript:
+- _swiftReadFile(path) -> base64 string or null
+- _swiftWriteFile(path, base64Data) -> boolean
+- _swiftDeleteFile(path) -> boolean
+- _swiftListFiles(directory, pattern) -> array of paths
+- _swiftFileExists(path) -> boolean
+- _swiftCreateDirectory(path) -> boolean
+```
+
+**JavaScript Side** (`ios-bridge.ts`):
+```typescript
+import { readFile, writeFile, listFiles } from './ios-bridge';
+
+// Read a .yjson file
+const data = readFile('/path/to/note/update-001.yjson');
+
+// Write atomically
+const success = writeFile('/path/to/note/update-002.yjson', updateData);
+
+// List all update files
+const files = listFiles('/path/to/note', '*.yjson');
+```
+
+### Storage Directory Management
+
+The `StorageDirectoryManager` provides consistent path management:
 
 ```swift
-// In CRDTBridge.swift (future integration)
-context.setObject(fileIO.readFile, forKeyedSubscript: "swiftReadFile")
-context.setObject(fileIO.writeFile, forKeyedSubscript: "swiftWriteFile")
+let manager = StorageDirectoryManager()
+
+// Get storage directory paths
+let sdPath = manager.getStorageDirectoryPath(id: "sd-123")
+let notesDir = manager.getNotesDirectory(storageId: "sd-123")
+let noteDir = manager.getNoteDirectory(storageId: "sd-123", noteId: "note-456")
+
+// Ensure directories exist
+try manager.ensureDirectoriesExist(storageId: "sd-123")
 ```
 
 ### Storage Format
@@ -83,8 +118,9 @@ packages/ios/
 │   ├── Models.swift        # Data models
 │   ├── CRDT/               # JavaScriptCore bridge
 │   │   └── CRDTBridge.swift
-│   ├── Storage/            # File I/O layer
-│   │   └── FileIOManager.swift
+│   ├── Storage/            # File I/O and storage management
+│   │   ├── FileIOManager.swift
+│   │   └── StorageDirectoryManager.swift
 │   ├── Resources/          # JavaScript bundles
 │   │   └── notecove-bridge.js
 │   ├── Assets.xcassets/    # Images, colors, etc.
@@ -94,7 +130,8 @@ packages/ios/
 │   ├── NoteCoveTests.swift
 │   ├── CRDTBridgeTests.swift
 │   └── Storage/
-│       └── FileIOManagerTests.swift
+│       ├── FileIOManagerTests.swift
+│       └── StorageIntegrationTests.swift
 └── scripts/                 # Build and CI scripts
     └── ci-local.sh
 ```
@@ -264,7 +301,7 @@ All tests must pass before merging to main.
 
 See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 
-**Current Status**: Phase 3.2.2 (File I/O Layer) - Complete ✅
+**Current Status**: Phase 3.2.3 (Storage Integration) - Complete ✅
 
 ### Completed
 
@@ -291,9 +328,15 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ All 21 FileIOManager tests passing
 - ✅ iOS CI infrastructure
 
+**Phase 3.2.3: Storage Integration** ✅
+- ✅ FileIOManager exposed to JavaScript via CRDTBridge
+- ✅ TypeScript file I/O wrappers (readFile, writeFile, etc.)
+- ✅ StorageDirectoryManager for path management
+- ✅ All 13 StorageIntegrationTests passing
+- ✅ Full Swift ↔ JavaScript file I/O integration
+
 ### Next Steps
 
-- Phase 3.2.3: Storage Integration (connect FileIO to CRDT bridge)
 - Phase 3.2.4: SQLite/GRDB (database schema, FTS5 search, indexing)
 - Phase 3.2.5: File Watching (FileManager notifications, iCloud sync)
 - Phase 3.3: Navigation Structure (SD list → folder list → note list → editor)
@@ -310,9 +353,10 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 Unit tests are written using XCTest and located in the `Tests/` directory.
 
 **Current Test Coverage**:
-- 32 tests total (all passing ✅)
+- 45 tests total (all passing ✅)
 - CRDTBridgeTests: 7 tests
 - FileIOManagerTests: 21 tests
+- StorageIntegrationTests: 13 tests
 - NoteCoveTests: 4 tests
 
 Run tests from Xcode (Cmd+U) or from the command line:

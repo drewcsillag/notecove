@@ -36,6 +36,9 @@ class CRDTBridge {
     /// Reference to the NoteCoveBridge JavaScript object
     private var bridgeObject: JSValue?
 
+    /// File I/O manager for storage operations
+    private let fileIO = FileIOManager()
+
     // MARK: - Lifecycle
 
     init() {
@@ -150,12 +153,113 @@ class CRDTBridge {
         };
         """)
 
+        // Set up file I/O functions
+        setupFileIO()
+
         // Load the bundled JavaScript
         do {
             try loadBundledJavaScript()
         } catch {
             print("ERROR: Failed to load bundled JavaScript: \(error)")
         }
+    }
+
+    /// Set up file I/O functions exposed to JavaScript
+    private func setupFileIO() {
+        guard let ctx = context else { return }
+
+        // Expose readFile to JavaScript
+        // Returns base64-encoded file contents, or null if file doesn't exist
+        let readFile: @convention(block) (String) -> JSValue = { [weak self] path in
+            guard let self = self, let ctx = self.context else {
+                return JSValue(nullIn: ctx)
+            }
+
+            do {
+                let data = try self.fileIO.readFile(at: path)
+                let base64 = data.base64EncodedString()
+                return JSValue(object: base64, in: ctx)
+            } catch {
+                // Return null on error (file not found, permission denied, etc.)
+                return JSValue(nullIn: ctx)
+            }
+        }
+        ctx.setObject(readFile, forKeyedSubscript: "_swiftReadFile" as NSString)
+
+        // Expose writeFile to JavaScript
+        // Takes path and base64-encoded data, returns true on success, false on failure
+        let writeFile: @convention(block) (String, String) -> Bool = { [weak self] path, base64Data in
+            guard let self = self else { return false }
+
+            guard let data = Data(base64Encoded: base64Data) else {
+                print("ERROR: Invalid base64 data in writeFile")
+                return false
+            }
+
+            do {
+                try self.fileIO.atomicWrite(data: data, to: path)
+                return true
+            } catch {
+                print("ERROR: Failed to write file at \(path): \(error)")
+                return false
+            }
+        }
+        ctx.setObject(writeFile, forKeyedSubscript: "_swiftWriteFile" as NSString)
+
+        // Expose deleteFile to JavaScript
+        // Returns true on success, false on failure
+        let deleteFile: @convention(block) (String) -> Bool = { [weak self] path in
+            guard let self = self else { return false }
+
+            do {
+                try self.fileIO.deleteFile(at: path)
+                return true
+            } catch {
+                print("ERROR: Failed to delete file at \(path): \(error)")
+                return false
+            }
+        }
+        ctx.setObject(deleteFile, forKeyedSubscript: "_swiftDeleteFile" as NSString)
+
+        // Expose listFiles to JavaScript
+        // Returns array of file paths, or empty array on error
+        let listFiles: @convention(block) (String, String?) -> JSValue = { [weak self] directory, pattern in
+            guard let self = self, let ctx = self.context else {
+                return JSValue(object: [], in: ctx)
+            }
+
+            do {
+                let files = try self.fileIO.listFiles(in: directory, matching: pattern)
+                return JSValue(object: files, in: ctx)
+            } catch {
+                print("ERROR: Failed to list files in \(directory): \(error)")
+                return JSValue(object: [], in: ctx)
+            }
+        }
+        ctx.setObject(listFiles, forKeyedSubscript: "_swiftListFiles" as NSString)
+
+        // Expose fileExists to JavaScript
+        // Returns true if file exists, false otherwise
+        let fileExists: @convention(block) (String) -> Bool = { [weak self] path in
+            guard let self = self else { return false }
+            return self.fileIO.fileExists(at: path)
+        }
+        ctx.setObject(fileExists, forKeyedSubscript: "_swiftFileExists" as NSString)
+
+        // Expose createDirectory to JavaScript
+        // Returns true on success, false on failure
+        let createDirectory: @convention(block) (String) -> Bool = { [weak self] path in
+            guard let self = self else { return false }
+
+            do {
+                try self.fileIO.createDirectory(at: path)
+                return true
+            } catch {
+                print("ERROR: Failed to create directory at \(path): \(error)")
+                return false
+            }
+        }
+        ctx.setObject(createDirectory, forKeyedSubscript: "_swiftCreateDirectory" as NSString)
     }
 
     /// Load the bundled JavaScript file from the app bundle
@@ -368,4 +472,14 @@ class CRDTBridge {
         let result = bridge.invokeMethod("getOpenDocumentCount", withArguments: [])
         return Int(result?.toInt32() ?? 0)
     }
+
+    // MARK: - Testing Support
+
+    #if DEBUG
+    /// Get the JSContext for testing purposes only
+    /// - Returns: The underlying JSContext if available
+    func getContextForTesting() -> JSContext? {
+        return context
+    }
+    #endif
 }
