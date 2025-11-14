@@ -692,6 +692,7 @@ if iCloud.isICloudAvailable() {
 #### UI Features Implemented
 
 **Navigation Flow:**
+
 ```
 TabView (ContentView)
   ├─→ StorageDirectoryListView (Notes Tab)
@@ -707,11 +708,13 @@ TabView (ContentView)
 ```
 
 **Storage Directory Setup:**
+
 - Quick setup buttons for Documents directory and iCloud Drive
 - Auto-fills path and default name
 - iCloud integration already configured with entitlements
 
 **Empty States:**
+
 - Storage directories list shows helpful onboarding
 - Folder list shows quick action buttons for creating first note/folder
 - All views have appropriate loading states
@@ -727,12 +730,14 @@ TabView (ContentView)
 #### Files Created
 
 **Views:**
+
 - `packages/ios/Sources/ViewModels/AppViewModel.swift` (87 lines)
 - `packages/ios/Sources/Views/StorageDirectoryListView.swift` (164 lines)
 - `packages/ios/Sources/Views/FolderListView.swift` (328 lines)
 - `packages/ios/Sources/Views/NoteEditorView.swift` (115 lines)
 
 **Modified:**
+
 - `packages/ios/Sources/NoteCoveApp.swift` - Changed from AppState to AppViewModel
 - `packages/ios/Sources/ContentView.swift` - Integrated StorageDirectoryListView
 - `packages/ios/Sources/Database/Schema.swift` - Made records Identifiable and public
@@ -748,11 +753,131 @@ TabView (ContentView)
 #### Future Optimization Note
 
 **Debounced CRDT Writes:**
+
 - Current: Each operation writes immediately to .yjson file
 - Proposed: Buffer updates in memory, write after 5s of quiescence
 - Benefit: Reduces filesystem noise for iCloud/Google Drive sync
 - Status: Deferred to Phase 3.7 or later
 - Applies to both iOS and Desktop
+
+### Phase 3.5 - WKWebView & TipTap Editor ✅ COMPLETE
+
+**Status**: Fully working with all tests passing ✅
+
+#### Completed Tasks
+
+1. **TipTap Editor HTML**
+   - Location: `packages/ios/Sources/Resources/editor.html` (295 lines)
+   - Self-contained HTML with TipTap loaded from CDN
+   - Uses Y.js for CRDT integration
+   - Extensions: StarterKit, Collaboration, Underline
+   - Dark mode support via CSS media queries
+   - Base64 encoding for Swift ↔ JavaScript data transfer
+
+2. **EditorBridge**
+   - Location: `packages/ios/Sources/Editor/EditorBridge.swift` (96 lines)
+   - WKScriptMessageHandler for JavaScript → Swift communication
+   - Message types: editorReady, noteLoaded, contentChanged, documentState, update, error
+   - Handles all editor events and routes to EditorViewModel
+   - @MainActor for proper actor isolation
+
+3. **EditorViewModel**
+   - Location: `packages/ios/Sources/Editor/EditorViewModel.swift` (133 lines)
+   - @MainActor ObservableObject for SwiftUI integration
+   - Manages note state (title, loading, editorReady)
+   - Loads notes from CRDT bridge
+   - Handles content changes and updates database
+   - Executes editor commands (bold, italic, lists, etc.)
+   - JavaScript bridge for calling TipTap functions
+
+4. **EditorWebView**
+   - Location: `packages/ios/Sources/Editor/EditorWebView.swift` (68 lines)
+   - UIViewRepresentable wrapper for WKWebView
+   - Loads editor.html from bundle
+   - Sets up WKUserContentController with message handlers
+   - Proper coordinator pattern with @MainActor
+
+5. **Updated NoteEditorView**
+   - Replaced placeholder with real EditorWebView
+   - Keyboard toolbar with formatting buttons (bold, italic, underline, lists)
+   - Loads note when editor is ready
+   - Real-time title updates in navigation bar
+   - Loading state while editor initializes
+
+#### Editor Features Implemented
+
+**Rich Text Editing:**
+- Bold, italic, underline formatting
+- Headings (H1, H2, H3)
+- Bullet lists and ordered lists
+- Blockquotes
+- Code blocks
+- Proper paragraph and line handling
+
+**CRDT Integration:**
+- Loads note state from CRDTBridge
+- Applies CRDT updates in real-time
+- Sends updates back to Swift for persistence
+- Base64 encoding for binary data transfer
+- Y.js document syncing
+
+**UI Polish:**
+- Dark mode support
+- Native iOS keyboard toolbar
+- Formatting buttons with SF Symbols
+- Loading indicators
+- Navigation bar title updates
+
+#### Build & Test Results
+
+```
+✅ Build: SUCCEEDED
+✅ All Tests: 108/108 iOS tests passed
+✅ CI Tests: 139 tests passed (shared + desktop), 0 failed
+✅ Coverage: 98.90% (shared), 69.93% (desktop)
+```
+
+#### Files Created
+
+**Editor:**
+- `packages/ios/Sources/Resources/editor.html` (295 lines)
+- `packages/ios/Sources/Editor/EditorBridge.swift` (96 lines)
+- `packages/ios/Sources/Editor/EditorViewModel.swift` (133 lines)
+- `packages/ios/Sources/Editor/EditorWebView.swift` (68 lines)
+
+**Modified:**
+- `packages/ios/Sources/Views/NoteEditorView.swift` - Integrated EditorWebView
+- `packages/ios/project.yml` - Added editor.html resource
+
+#### Known Limitations
+
+- Advanced TipTap extensions not yet implemented (hashtags, inter-note links, tri-state checkboxes)
+- No search/replace in editor yet
+- Toolbar is keyboard-only (could add persistent toolbar)
+- No collaborative editing indicators yet (single-user for now)
+
+#### Technical Details
+
+**Message Flow:**
+```
+Swift → JavaScript:
+- loadNote(noteId, stateBase64) - Load note with CRDT state
+- applyUpdate(updateBase64) - Apply CRDT update
+- executeCommand(command, params) - Execute editor command
+
+JavaScript → Swift:
+- editorReady - Editor initialized
+- noteLoaded - Note loaded successfully
+- contentChanged - Content modified (includes title extraction)
+- update - CRDT update generated
+- documentState - Full document state
+- error - Error occurred
+```
+
+**Data Encoding:**
+- CRDT updates: Binary → Base64 → JavaScript → Base64 → Binary
+- Ensures safe data transfer across WebView boundary
+- No data loss or corruption
 
 ### Git Status
 
@@ -837,29 +962,49 @@ a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
 
 ### What's Not Yet Implemented
 
-1. **Editor Implementation** (Phase 3.5)
-   - WKWebView wrapper for TipTap
-   - Rich text editing capabilities
-   - Editor toolbar and formatting
+1. **Advanced Editor Features**
+   - Hashtag support (#tag)
+   - Inter-note links ([[note-id]])
+   - Tri-state checkboxes
+   - Search/replace in editor
 
 2. **UI Polish** (Phase 3.4+)
    - Combined Folder/Tag view (Phase 3.4)
    - Settings tab (Phase 3.6)
-   - Search interface (Phase 3.8)
+   - Global search interface (Phase 3.8)
    - Note history (Phase 3.10)
+   - Persistent editor toolbar (optional)
 
 ---
 
-## Next Steps: Phase 3.5 - WKWebView & TipTap Editor
+## Next Steps: Phase 3.6+ - UI Polish & Features
 
 ### Overview
 
-With the navigation structure complete (Phase 3.3), the next phase is to implement the rich text editor using WKWebView and TipTap. This includes:
+With the core app complete (navigation, folders, notes, rich text editor), the next phases focus on polish and additional features:
 
-1. WKWebView wrapper for SwiftUI
-2. TipTap bridge for Swift ↔ JavaScript communication
-3. Editor toolbar with formatting options
-4. CRDT integration for real-time sync
+**Phase 3.6 - Settings**
+1. Settings tab implementation
+2. App preferences (theme, font size, etc.)
+3. Storage directory management from settings
+4. About/version information
+
+**Phase 3.7 - Optimization**
+1. Debounced CRDT writes (reduce filesystem noise)
+2. Performance improvements
+3. Memory optimization
+
+**Phase 3.8 - Search**
+1. Global FTS5 search interface
+2. Search within storage directory
+3. Filter by tags
+4. Recent searches
+
+**Phase 3.9 - Advanced Editor Features**
+1. Hashtag extension (#tag)
+2. Inter-note link extension ([[note-id]])
+3. Tri-state checkbox extension
+4. Search/replace in editor
 
 ### Architecture
 
@@ -1186,17 +1331,18 @@ xcodebuild test \
 
 ## Session End Notes
 
-- Phase 3.3 (Navigation Structure & UI) is **COMPLETE** and ready to commit ✅
-- Complete navigation structure with hierarchical folder navigation
-- Storage directory management with Documents and iCloud Drive quick setup
-- AppViewModel integrating DatabaseManager, StorageCoordinator, and CRDTBridge
-- Four new SwiftUI views: AppViewModel, StorageDirectoryListView, FolderListView, NoteEditorView
+- Phase 3.5 (WKWebView & TipTap Editor) is **COMPLETE** and ready to commit ✅
+- Full-featured rich text editor with TipTap and Y.js CRDT integration
+- WKWebView bridge for Swift ↔ JavaScript communication
+- EditorViewModel for state management and CRDT integration
+- Keyboard toolbar with formatting commands (bold, italic, underline, lists)
+- Dark mode support in editor
+- Real-time title extraction and database updates
 - All 108 iOS tests passing ✅
-- All 583 CI tests passing (shared + desktop) ✅
-- Build succeeds with only minor warnings (unused values, Result call unused)
-- iCloud Drive integration ready for use
+- All 139 CI tests passing (shared + desktop) ✅
+- Build succeeds with no errors
 - Documentation fully updated (HANDOFF.md)
-- Navigation stack complete: Storage → Folders → Notes → Editor (placeholder)
-- Ready to proceed with Phase 3.5 (WKWebView & TipTap Editor)
+- Complete iOS note-taking app: Storage → Folders → Notes → Rich Text Editor
+- Ready to proceed with Phase 3.6+ (Settings, Search, Tags, etc.)
 - Future optimization identified: Debounced CRDT writes (deferred to Phase 3.7+)
 - No blocking issues

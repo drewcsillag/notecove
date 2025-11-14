@@ -13,90 +13,92 @@ struct NoteEditorView: View {
     let noteId: String
     let storageId: String
 
-    @State private var note: NoteRecord?
-    @State private var isLoading = false
-    @State private var title = ""
+    @StateObject private var editorViewModel: EditorViewModel
+
+    init(viewModel: AppViewModel, noteId: String, storageId: String) {
+        self.viewModel = viewModel
+        self.noteId = noteId
+        self.storageId = storageId
+
+        // Initialize editor view model
+        _editorViewModel = StateObject(wrappedValue: EditorViewModel(
+            noteId: noteId,
+            storageId: storageId,
+            bridge: viewModel.bridge,
+            database: viewModel.database
+        ))
+    }
 
     var body: some View {
-        VStack {
-            if isLoading {
+        VStack(spacing: 0) {
+            if editorViewModel.isLoading {
                 ProgressView("Loading note...")
-            } else if let note = note {
-                // Title editor
-                TextField("Note Title", text: $title)
-                    .font(.title)
-                    .padding()
-                    .onChange(of: title) { _, newValue in
-                        Task {
-                            await updateNoteTitle(newValue)
-                        }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Rich text editor
+                EditorWebView(viewModel: editorViewModel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .navigationTitle(editorViewModel.noteTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Button {
+                    Task {
+                        await editorViewModel.executeCommand("toggleBold")
                     }
-
-                Divider()
-
-                // TODO: Add WKWebView + TipTap editor here
-                // For now, show a placeholder
-                VStack {
-                    Image(systemName: "doc.richtext")
-                        .font(.system(size: 60))
-                        .foregroundColor(.secondary)
-
-                    Text("Editor Coming Soon")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-
-                    Text("WKWebView + TipTap integration will be added in the next step")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding()
+                } label: {
+                    Image(systemName: "bold")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Button {
+                    Task {
+                        await editorViewModel.executeCommand("toggleItalic")
+                    }
+                } label: {
+                    Image(systemName: "italic")
+                }
+
+                Button {
+                    Task {
+                        await editorViewModel.executeCommand("toggleUnderline")
+                    }
+                } label: {
+                    Image(systemName: "underline")
+                }
 
                 Spacer()
-            } else {
-                Text("Note not found")
-                    .foregroundColor(.secondary)
+
+                Button {
+                    Task {
+                        await editorViewModel.executeCommand("toggleBulletList")
+                    }
+                } label: {
+                    Image(systemName: "list.bullet")
+                }
+
+                Button {
+                    Task {
+                        await editorViewModel.executeCommand("toggleOrderedList")
+                    }
+                } label: {
+                    Image(systemName: "list.number")
+                }
             }
         }
-        .navigationTitle(title.isEmpty ? "Untitled" : title)
-        .navigationBarTitleDisplayMode(.inline)
         .task {
-            await loadNote()
-        }
-    }
-
-    private func loadNote() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            let notes = try viewModel.database.listNotes(
-                in: storageId,
-                folderId: nil,
-                includeDeleted: true
-            )
-            note = notes.first { $0.id == noteId }
-
-            if let note = note {
-                title = note.title
+            // Load note when view appears
+            if editorViewModel.editorReady {
+                await editorViewModel.loadNote()
             }
-        } catch {
-            print("[NoteEditorView] Error loading note: \(error)")
         }
-    }
-
-    private func updateNoteTitle(_ newTitle: String) async {
-        guard let note = note else { return }
-
-        do {
-            try viewModel.database.updateNote(
-                id: note.id,
-                title: newTitle,
-                folderId: note.folderId
-            )
-        } catch {
-            print("[NoteEditorView] Error updating title: \(error)")
+        .onChange(of: editorViewModel.editorReady) { _, isReady in
+            if isReady {
+                Task {
+                    await editorViewModel.loadNote()
+                }
+            }
         }
     }
 }

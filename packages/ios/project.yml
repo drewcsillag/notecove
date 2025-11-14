@@ -30,6 +30,7 @@ targets:
 
     resources:
       - Sources/Resources/notecove-bridge.js
+      - Sources/Resources/editor.html
 
     preBuildScripts:
       - name: "Copy JS Bundle"
