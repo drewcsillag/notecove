@@ -1,8 +1,10 @@
 # iOS Development Session Handoff
 
 **Date**: 2025-11-13
-**Branch**: `main`
-**Last Commit**: `2341cc4` - "feat: Add iOS local CI script"
+**Branch**: `feature/phase-3.2.2-file-io`
+**Previous Commits on Main**:
+- `2341cc4` - "feat: Add iOS local CI script"
+- `a4c378b` - "fix: Complete iOS JavaScriptCore bridge with working tests"
 
 ---
 
@@ -126,6 +128,109 @@ pnpm --filter @notecove/ios ci-local
 ✅ All iOS CI checks passed! Safe to merge.
 ```
 
+### Phase 3.2.2 - File I/O Layer ✅ COMPLETE
+
+**Status**: Fully working with all 21 tests passing ✅
+
+#### Completed Tasks
+
+1. **Created FileIOManager Class**
+   - Location: `packages/ios/Sources/Storage/FileIOManager.swift`
+   - Comprehensive file system operations
+   - Thread-safe with proper error handling
+
+2. **Implemented Core File Operations**
+   - `readFile(at:)` - Read file data with error handling
+   - `writeFile(data:to:)` - Write with automatic parent directory creation
+   - `deleteFile(at:)` - Safe file deletion
+   - `fileExists(at:)` - Check file existence
+
+3. **Implemented Directory Operations**
+   - `createDirectory(at:)` - Recursive directory creation
+   - `listFiles(in:matching:)` - List files with glob pattern support
+   - Pattern matching supports `*` (any chars) and `?` (single char)
+   - Automatically filters out subdirectories
+
+4. **Implemented Atomic Writes**
+   - `atomicWrite(data:to:)` - Write-to-temp-then-move pattern
+   - No partial writes on failure
+   - Automatic temp file cleanup
+   - Uses `FileManager.replaceItemAt()` for atomic replacement
+
+5. **Error Handling**
+   - Custom `FileIOError` enum with detailed error cases:
+     - `fileNotFound(String)`
+     - `permissionDenied(String)`
+     - `diskFull`
+     - `invalidPath(String)`
+     - `atomicWriteFailed(String)`
+     - `directoryCreationFailed(String)`
+     - `deleteFailed(String)`
+
+6. **Comprehensive Test Suite**
+   - Location: `packages/ios/Tests/Storage/FileIOManagerTests.swift`
+   - 21 tests covering all functionality:
+     - Basic file operations (read, write, delete)
+     - Overwrite scenarios
+     - Parent directory auto-creation
+     - Directory operations (create, recursive)
+     - File listing with and without patterns
+     - Pattern matching (wildcards)
+     - Atomic write behavior
+     - Error cases (file not found, etc.)
+
+#### Test Results
+
+```
+✅ FileIOManagerTests: 21/21 passed
+   - testReadFile
+   - testReadFileNotFound
+   - testWriteFile
+   - testWriteFileOverwrite
+   - testWriteFileCreatesParentDirectory
+   - testDeleteFile
+   - testDeleteFileNotFound
+   - testFileExists
+   - testFileDoesNotExist
+   - testCreateDirectory
+   - testCreateDirectoryRecursive
+   - testListFiles
+   - testListFilesWithPattern
+   - testListFilesIgnoresDirectories
+   - testListFilesInNonExistentDirectory
+   - testAtomicWrite
+   - testAtomicWriteOverwrite
+   - testAtomicWriteCreatesParentDirectory
+   - testAtomicWriteNoPartialWrites
+   - testPatternMatchingStar
+   - testPatternMatchingQuestion
+
+Total iOS Tests: 32/32 passing ✅
+(7 CRDT + 21 FileIO + 4 NoteCove)
+```
+
+#### Files Created
+
+**Swift:**
+- `packages/ios/Sources/Storage/FileIOManager.swift` (273 lines)
+  - FileIOError enum
+  - FileIOManager class with all operations
+  - Pattern matching helper
+
+**Tests:**
+- `packages/ios/Tests/Storage/FileIOManagerTests.swift` (372 lines)
+  - 21 comprehensive test cases
+  - Full coverage of all FileIOManager functionality
+
+#### Documentation Updates
+
+**Updated Files:**
+- `packages/ios/README.md`
+  - Added Storage section with FileIOManager documentation
+  - Updated project structure to show Storage directory
+  - Updated Phase 3 status to reflect Phase 3.2.2 completion
+  - Updated test count (32 tests total)
+
 ### Git Status
 
 **Branch**: `main` (merged from `feature/phase-3-ios-app`)
@@ -177,28 +282,24 @@ a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
 
 ### What's Not Yet Implemented
 
-1. **File I/O Layer** (Phase 3.2.2 - Next)
-   - Swift file operations for reading/writing `.yjson` files
-   - Atomic write support
-   - Directory management
-   - Pattern matching for file listing
-
-2. **Storage Integration** (Phase 3.2.3)
-   - Connecting File I/O to CRDT bridge
+1. **Storage Integration** (Phase 3.2.3 - Next)
+   - Exposing FileIOManager to JavaScript via CRDTBridge
+   - Connecting File I/O operations to CRDT logic
    - Storage directory management
+   - Integration tests
 
-3. **SQLite/GRDB** (Phase 3.2.4)
+2. **SQLite/GRDB** (Phase 3.2.4)
    - Database schema implementation
    - FTS5 search indexing
    - Tag indexing
    - Note metadata caching
 
-4. **File Watching** (Phase 3.2.5)
+3. **File Watching** (Phase 3.2.5)
    - FileManager notifications
    - iCloud Drive sync monitoring
    - Debouncing rapid changes
 
-5. **UI Implementation** (Phase 3.3+)
+4. **UI Implementation** (Phase 3.3+)
    - Notes list view
    - Editor (WKWebView + TipTap)
    - Folder navigation
@@ -207,150 +308,181 @@ a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
 
 ---
 
-## Next Steps: Phase 3.2.2 - File I/O Layer
+## Next Steps: Phase 3.2.3 - Storage Integration
 
 ### Overview
 
-Implement Swift layer for file system operations. This is the bridge between the CRDT logic (JavaScript) and the actual file system (Swift).
+Connect the FileIOManager to the CRDT bridge, exposing file operations to JavaScript. This allows the shared CRDT logic to persist notes to the iOS file system.
 
 ### Architecture
 
 ```
 Swift UI → CRDTBridge → JavaScriptCore (CRDT logic)
-              ↓
+              ↓                ↓
          FileIOManager → File System (.yjson files)
 ```
 
 ### Implementation Plan
 
-#### 1. Create FileIOManager Class
+#### 1. Expose FileIOManager to JavaScript
 
-**File**: `packages/ios/Sources/Storage/FileIOManager.swift`
+**Update**: `packages/ios/Sources/CRDT/CRDTBridge.swift`
 
-**Core Methods:**
+Add FileIOManager instance and expose methods to JavaScript:
+
 ```swift
-class FileIOManager {
-    // Basic file operations
-    func readFile(at path: String) throws -> Data
-    func writeFile(data: Data, to path: String) throws
-    func deleteFile(at path: String) throws
-    func fileExists(at path: String) -> Bool
+class CRDTBridge {
+    private let fileIO = FileIOManager()
 
-    // Directory operations
-    func createDirectory(at path: String) throws
-    func listFiles(in directory: String, matching pattern: String) throws -> [String]
+    // In setupContext():
 
-    // Atomic writes (write to temp, then move)
-    func atomicWrite(data: Data, to path: String) throws
+    // Expose file read
+    context.setObject({ [weak self] (path: String) -> JSValue in
+        guard let self = self else { return JSValue() }
+        do {
+            let data = try self.fileIO.readFile(at: path)
+            let base64 = data.base64EncodedString()
+            return JSValue(object: base64, in: self.context)
+        } catch {
+            return JSValue(object: nil, in: self.context)
+        }
+    }, forKeyedSubscript: "_swiftReadFile" as NSString)
+
+    // Expose file write
+    context.setObject({ [weak self] (path: String, base64Data: String) -> Bool in
+        guard let self = self else { return false }
+        guard let data = Data(base64Encoded: base64Data) else { return false }
+        do {
+            try self.fileIO.atomicWrite(data: data, to: path)
+            return true
+        } catch {
+            return false
+        }
+    }, forKeyedSubscript: "_swiftWriteFile" as NSString)
+
+    // Expose list files
+    context.setObject({ [weak self] (directory: String, pattern: String?) -> JSValue in
+        guard let self = self else { return JSValue() }
+        do {
+            let files = try self.fileIO.listFiles(in: directory, matching: pattern)
+            return JSValue(object: files, in: self.context)
+        } catch {
+            return JSValue(object: [], in: self.context)
+        }
+    }, forKeyedSubscript: "_swiftListFiles" as NSString)
 }
 ```
 
-#### 2. Error Handling
+#### 2. Update TypeScript Bridge Code
 
-Define custom errors:
-```swift
-enum FileIOError: Error {
-    case fileNotFound(String)
-    case permissionDenied(String)
-    case diskFull
-    case invalidPath(String)
-    case atomicWriteFailed(String)
+**Update**: `packages/shared/src/ios-bridge.ts`
+
+Add file I/O wrappers that call the Swift functions:
+
+```typescript
+// File I/O functions exposed from Swift
+declare global {
+  function _swiftReadFile(path: string): string | null;
+  function _swiftWriteFile(path: string, base64Data: string): boolean;
+  function _swiftListFiles(directory: string, pattern?: string): string[];
+}
+
+export async function readFile(path: string): Promise<Uint8Array | null> {
+  const base64 = _swiftReadFile(path);
+  if (!base64) return null;
+
+  // Convert base64 to Uint8Array
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export async function writeFile(path: string, data: Uint8Array): Promise<boolean> {
+  // Convert Uint8Array to base64
+  let binaryString = '';
+  for (let i = 0; i < data.length; i++) {
+    binaryString += String.fromCharCode(data[i]);
+  }
+  const base64 = btoa(binaryString);
+
+  return _swiftWriteFile(path, base64);
+}
+
+export async function listFiles(directory: string, pattern?: string): Promise<string[]> {
+  return _swiftListFiles(directory, pattern);
 }
 ```
 
-#### 3. Testing Strategy (TDD)
+#### 3. Integration Tests
 
-**File**: `packages/ios/Tests/Storage/FileIOManagerTests.swift`
+**Create**: `packages/ios/Tests/Storage/StorageIntegrationTests.swift`
 
 Tests to write:
-- `testReadFile()` - Read existing file
-- `testReadFileNotFound()` - Handle missing file
-- `testWriteFile()` - Write new file
-- `testWriteFileOverwrite()` - Overwrite existing file
-- `testDeleteFile()` - Delete file
-- `testDeleteFileNotFound()` - Handle missing file
-- `testCreateDirectory()` - Create directory
-- `testCreateDirectoryRecursive()` - Create nested directories
-- `testListFiles()` - List all files in directory
-- `testListFilesWithPattern()` - Filter by pattern (e.g., "*.yjson")
-- `testAtomicWrite()` - Verify atomic write behavior
-- `testAtomicWriteFailureRollback()` - Ensure no partial writes
+- `testReadFileViaJavaScript()` - Verify JS can read files
+- `testWriteFileViaJavaScript()` - Verify JS can write files
+- `testListFilesViaJavaScript()` - Verify JS can list files
+- `testRoundTripViaJavaScript()` - Write then read the same file
+- `testAtomicWriteViaJavaScript()` - Verify atomic behavior from JS
+- `testErrorHandling()` - Verify errors are handled gracefully
 
-#### 4. Integration with CRDTBridge
+#### 4. Storage Directory Management
 
-Once FileIOManager is working, expose it to JavaScript:
+**Create**: `packages/ios/Sources/Storage/StorageDirectoryManager.swift`
+
+Manages storage directory paths:
+
 ```swift
-// In CRDTBridge.swift
-let fileIO = FileIOManager()
-
-// Expose to JavaScript
-context.setObject(fileIO.readFile, forKeyedSubscript: "swiftReadFile")
-context.setObject(fileIO.writeFile, forKeyedSubscript: "swiftWriteFile")
+class StorageDirectoryManager {
+    func getStorageDirectoryPath(id: String) -> String
+    func getNotesDirectory(storageId: String) -> String
+    func getFolderTreePath(storageId: String) -> String
+    func ensureDirectoriesExist(storageId: String) throws
+}
 ```
 
-#### 5. Project Configuration Updates
+#### 5. Update CRDT Bridge to Use Storage Paths
 
-**Update `project.yml`:**
-```yaml
-targets:
-  NoteCove:
-    sources:
-      - path: Sources
-        # ... existing configuration ...
-      - path: Sources/Storage  # Add new directory
-```
-
-**Create directory structure:**
-```bash
-mkdir -p packages/ios/Sources/Storage
-mkdir -p packages/ios/Tests/Storage
-```
+Update the bridge to use proper storage paths instead of hardcoded paths.
 
 ### Acceptance Criteria
 
-- [ ] FileIOManager class created with all core methods
-- [ ] All unit tests passing (10+ tests)
-- [ ] Atomic writes work correctly (no partial writes on failure)
-- [ ] Pattern matching works for file listing (e.g., "*.yjson")
-- [ ] Error handling covers all edge cases
-- [ ] Integration tests with CRDTBridge (can read/write via JS)
+- [ ] FileIOManager exposed to JavaScript via CRDTBridge
+- [ ] TypeScript wrappers for file I/O operations
+- [ ] All integration tests passing (6+ tests)
+- [ ] Storage directory management implemented
+- [ ] Can create, read, and list `.yjson` files from JavaScript
+- [ ] Error handling works across Swift/JS boundary
 - [ ] CI tests pass (`pnpm --filter @notecove/ios ci-local`)
+- [ ] Documentation updated
 
 ### Design Considerations
 
-1. **iCloud Drive Support**
-   - Use `FileManager.default.url(forUbiquityContainerIdentifier:)`
-   - Handle sync delays gracefully
-   - Document limitations in README
+1. **Data Encoding**
+   - Use Base64 for binary data transfer between Swift and JavaScript
+   - Efficient encoding/decoding on both sides
 
-2. **Atomic Writes**
-   - Write to temporary file first
-   - Use `FileManager.replaceItemAt()` for atomic move
-   - Clean up temp files on failure
+2. **Error Handling**
+   - Swift errors should be communicated to JavaScript
+   - Consider returning error objects instead of null/false
 
-3. **Thread Safety**
-   - Mark as `@MainActor` if needed
-   - Use `DispatchQueue` for background I/O if needed
+3. **Async Operations**
+   - File I/O is synchronous for now
+   - Future: consider async operations for large files
 
-4. **Path Handling**
-   - Use `URL` instead of `String` for paths internally
-   - Validate paths before operations
-   - Handle relative vs absolute paths
-
-### Reference Implementation
-
-Look at desktop implementation for guidance:
-- `packages/desktop/src/main/storage/file-io.ts`
-- Update file format (`*.yjson`)
-- Sequence numbering
-- Pack format
+4. **Storage Paths**
+   - Use app's Documents directory for user data
+   - Support iCloud container paths for sync
+   - Validate all paths before operations
 
 ### Documentation to Update
 
 After implementation:
-- [ ] Update `packages/ios/README.md` with Storage section
-- [ ] Update `docs/ios/jscore-bridge.md` with FileIO integration
-- [ ] Add inline documentation to FileIOManager methods
+- [ ] Update `packages/ios/README.md` with integration details
+- [ ] Update `docs/ios/jscore-bridge.md` with file I/O API
+- [ ] Add inline documentation to new methods
 - [ ] Update HANDOFF.md with completion status
 
 ---
@@ -456,9 +588,10 @@ xcodebuild test \
 
 ## Session End Notes
 
-- All work has been merged to `main` branch
-- iOS CRDT bridge is fully functional and tested
-- CI infrastructure is in place
-- Ready to proceed with Phase 3.2.2 (File I/O Layer)
+- Phase 3.2.2 (File I/O Layer) is complete on branch `feature/phase-3.2.2-file-io`
+- FileIOManager fully implemented with atomic writes, pattern matching, and comprehensive error handling
+- All 32 tests passing (7 CRDT + 21 FileIO + 4 NoteCove) ✅
+- CI infrastructure verified and working
+- Documentation updated (README.md and HANDOFF.md)
+- Ready to proceed with Phase 3.2.3 (Storage Integration) after merge
 - No blocking issues
-- All tests passing (11/11) ✅

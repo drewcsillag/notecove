@@ -14,6 +14,56 @@ The iOS app shares CRDT logic with the desktop app via JavaScriptCore bridge, wh
 - **Storage**: SQLite via GRDB + file-based CRDT
 - **Sync**: File system watchers (iCloud Drive, Dropbox, etc.)
 
+## Storage
+
+The iOS app implements a layered storage architecture:
+
+### File I/O Layer (`FileIOManager`)
+
+Handles all file system operations with support for:
+
+- **Basic Operations**: Read, write, delete files
+- **Atomic Writes**: Write-to-temp-then-move pattern ensures no partial writes
+- **Directory Management**: Create directories with intermediate path support
+- **Pattern Matching**: List files with glob patterns (e.g., `*.yjson`)
+- **Error Handling**: Comprehensive error types for file operations
+
+**Location**: `packages/ios/Sources/Storage/FileIOManager.swift`
+
+**Usage Example**:
+```swift
+let fileIO = FileIOManager()
+
+// Write a file atomically
+let data = "Hello".data(using: .utf8)!
+try fileIO.atomicWrite(data: data, to: "/path/to/file.yjson")
+
+// Read a file
+let contents = try fileIO.readFile(at: "/path/to/file.yjson")
+
+// List .yjson files
+let yjsonFiles = try fileIO.listFiles(in: "/path/to/directory", matching: "*.yjson")
+```
+
+### CRDT Bridge Integration
+
+The FileIOManager will be exposed to JavaScript via the CRDTBridge, allowing the shared CRDT logic to read/write `.yjson` files directly:
+
+```swift
+// In CRDTBridge.swift (future integration)
+context.setObject(fileIO.readFile, forKeyedSubscript: "swiftReadFile")
+context.setObject(fileIO.writeFile, forKeyedSubscript: "swiftWriteFile")
+```
+
+### Storage Format
+
+Notes are stored as `.yjson` files containing Yjs CRDT updates:
+- Update files: Sequential CRDT updates
+- Snapshot files: Periodic full state snapshots
+- Pack files: Compacted update sequences
+
+For more details, see the [JavaScriptCore Bridge Architecture](../../docs/ios/jscore-bridge.md).
+
 ## Requirements
 
 - iOS 17.0+
@@ -31,11 +81,22 @@ packages/ios/
 │   ├── NoteCoveApp.swift   # App entry point
 │   ├── ContentView.swift   # Main UI
 │   ├── Models.swift        # Data models
+│   ├── CRDT/               # JavaScriptCore bridge
+│   │   └── CRDTBridge.swift
+│   ├── Storage/            # File I/O layer
+│   │   └── FileIOManager.swift
+│   ├── Resources/          # JavaScript bundles
+│   │   └── notecove-bridge.js
 │   ├── Assets.xcassets/    # Images, colors, etc.
 │   ├── Info.plist          # App configuration
 │   └── NoteCove.entitlements # App capabilities (iCloud, etc.)
-└── Tests/                   # XCTest unit tests
-    └── NoteCoveTests.swift
+├── Tests/                   # XCTest unit tests
+│   ├── NoteCoveTests.swift
+│   ├── CRDTBridgeTests.swift
+│   └── Storage/
+│       └── FileIOManagerTests.swift
+└── scripts/                 # Build and CI scripts
+    └── ci-local.sh
 ```
 
 ## Quick Start
@@ -203,10 +264,11 @@ All tests must pass before merging to main.
 
 See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 
-**Current Status**: Phase 3.1 (iOS Project Setup) - Complete ✅
+**Current Status**: Phase 3.2.2 (File I/O Layer) - Complete ✅
 
 ### Completed
 
+**Phase 3.1: iOS Project Setup** ✅
 - ✅ Xcode project created and configured
 - ✅ SwiftUI app structure
 - ✅ Basic models (StorageDirectory, Folder, Note, Tag)
@@ -214,9 +276,26 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ Universal app (iPhone + iPad)
 - ✅ iOS 17.0+ target
 
+**Phase 3.2.1: JavaScriptCore CRDT Bridge** ✅
+- ✅ JavaScriptCore bridge with CRDT operations
+- ✅ JavaScript bundle integration (240KB)
+- ✅ Polyfills (crypto.getRandomValues, global, atob/btoa)
+- ✅ All 11 CRDT bridge tests passing
+
+**Phase 3.2.2: File I/O Layer** ✅
+- ✅ FileIOManager with full file operations
+- ✅ Atomic write support (no partial writes)
+- ✅ Directory management with recursive creation
+- ✅ Pattern matching for file listing (glob support)
+- ✅ Comprehensive error handling
+- ✅ All 21 FileIOManager tests passing
+- ✅ iOS CI infrastructure
+
 ### Next Steps
 
-- Phase 3.2: iOS CRDT Implementation (JavaScriptCore bridge)
+- Phase 3.2.3: Storage Integration (connect FileIO to CRDT bridge)
+- Phase 3.2.4: SQLite/GRDB (database schema, FTS5 search, indexing)
+- Phase 3.2.5: File Watching (FileManager notifications, iCloud sync)
 - Phase 3.3: Navigation Structure (SD list → folder list → note list → editor)
 - Phase 3.4: Combined Folder/Tag View
 - Phase 3.5: Editor (WKWebView + TipTap)
@@ -230,10 +309,22 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 
 Unit tests are written using XCTest and located in the `Tests/` directory.
 
+**Current Test Coverage**:
+- 32 tests total (all passing ✅)
+- CRDTBridgeTests: 7 tests
+- FileIOManagerTests: 21 tests
+- NoteCoveTests: 4 tests
+
 Run tests from Xcode (Cmd+U) or from the command line:
 
 ```bash
 xcodebuild test -project NoteCove.xcodeproj -scheme NoteCove -destination 'platform=iOS Simulator,name=iPhone 16'
+```
+
+Or use the iOS CI script:
+
+```bash
+pnpm --filter @notecove/ios ci-local
 ```
 
 ## License
