@@ -31,6 +31,7 @@ Handles all file system operations with support for:
 **Location**: `packages/ios/Sources/Storage/FileIOManager.swift`
 
 **Usage Example**:
+
 ```swift
 let fileIO = FileIOManager()
 
@@ -50,6 +51,7 @@ let yjsonFiles = try fileIO.listFiles(in: "/path/to/directory", matching: "*.yjs
 The FileIOManager is fully integrated with the CRDTBridge, exposing file operations to JavaScript. The shared CRDT logic can now read/write `.yjson` files directly.
 
 **Swift Side** (`CRDTBridge.swift`):
+
 ```swift
 // File I/O functions exposed to JavaScript:
 - _swiftReadFile(path) -> base64 string or null
@@ -61,6 +63,7 @@ The FileIOManager is fully integrated with the CRDTBridge, exposing file operati
 ```
 
 **JavaScript Side** (`ios-bridge.ts`):
+
 ```typescript
 import { readFile, writeFile, listFiles } from './ios-bridge';
 
@@ -95,6 +98,7 @@ try manager.ensureDirectoriesExist(storageId: "sd-123")
 The `DatabaseManager` provides SQLite database operations via GRDB:
 
 **Features:**
+
 - **Metadata Storage**: Notes, folders, tags, storage directories
 - **Full-Text Search**: FTS5-powered search across note content
 - **Relationships**: Many-to-many note-tag relationships
@@ -104,6 +108,7 @@ The `DatabaseManager` provides SQLite database operations via GRDB:
 **Location**: `packages/ios/Sources/Database/DatabaseManager.swift`
 
 **Usage Example**:
+
 ```swift
 // Initialize database
 let dbURL = URL(fileURLWithPath: "/path/to/database.sqlite")
@@ -129,6 +134,7 @@ let notes = try db.listNotes(in: "sd-1", folderId: "folder-1")
 ```
 
 **Database Schema:**
+
 - `storage_directories` - Storage directory metadata
 - `notes` - Note metadata (title, dates, folder, deleted status)
 - `notes_fts` - FTS5 virtual table for full-text search
@@ -141,6 +147,7 @@ let notes = try db.listNotes(in: "sd-1", folderId: "folder-1")
 The `FileWatchManager` monitors directories for file system changes, enabling real-time sync with external changes from iCloud Drive, Dropbox, or manual edits.
 
 **Features:**
+
 - **Directory Monitoring**: Uses `DispatchSource` for efficient, event-driven file watching
 - **Debouncing**: Configurable debounce interval (default 500ms) to handle rapid changes
 - **Battery Efficient**: Event-driven, no polling
@@ -149,6 +156,7 @@ The `FileWatchManager` monitors directories for file system changes, enabling re
 **Location**: `packages/ios/Sources/Storage/FileWatchManager.swift`
 
 **Usage Example**:
+
 ```swift
 let watcher = FileWatchManager()
 
@@ -173,6 +181,7 @@ The `FileChangeProcessor` processes file system changes and updates the database
 **Location**: `packages/ios/Sources/Storage/FileChangeProcessor.swift`
 
 **Usage Example**:
+
 ```swift
 let processor = FileChangeProcessor(db: db, bridge: bridge, fileIO: fileIO)
 
@@ -188,6 +197,7 @@ try await processor.updateNoteFromFile(noteId: "note-456", storageId: "sd-123")
 The `iCloudManager` provides iCloud Drive integration:
 
 **Features:**
+
 - Check iCloud availability
 - Access iCloud container
 - Monitor iCloud sync changes
@@ -196,6 +206,7 @@ The `iCloudManager` provides iCloud Drive integration:
 **Location**: `packages/ios/Sources/Storage/iCloudManager.swift`
 
 **Usage Example**:
+
 ```swift
 let iCloud = iCloudManager()
 
@@ -218,6 +229,7 @@ if iCloud.isICloudAvailable() {
 The `StorageCoordinator` ties together file watching, change processing, and database updates:
 
 **Features:**
+
 - Manages multiple storage directories
 - Coordinates file watching and database updates
 - Publishes changes via Combine for UI observation
@@ -226,6 +238,7 @@ The `StorageCoordinator` ties together file watching, change processing, and dat
 **Location**: `packages/ios/Sources/Storage/StorageCoordinator.swift`
 
 **Usage Example**:
+
 ```swift
 @MainActor
 let coordinator = StorageCoordinator(db: db)
@@ -246,6 +259,7 @@ coordinator.$recentlyUpdatedNotes
 ### Utilities
 
 **Debouncer** (`packages/ios/Sources/Utilities/Debouncer.swift`):
+
 ```swift
 let debouncer = Debouncer(delay: 0.5)
 
@@ -260,6 +274,7 @@ for i in 1...100 {
 ### Storage Format
 
 Notes are stored as `.yjson` files containing Yjs CRDT updates:
+
 - Update files: Sequential CRDT updates
 - Snapshot files: Periodic full state snapshots
 - Pack files: Compacted update sequences
@@ -490,6 +505,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 ### Completed
 
 **Phase 3.1: iOS Project Setup** ✅
+
 - ✅ Xcode project created and configured
 - ✅ SwiftUI app structure
 - ✅ Basic models (StorageDirectory, Folder, Note, Tag)
@@ -498,12 +514,14 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ iOS 17.0+ target
 
 **Phase 3.2.1: JavaScriptCore CRDT Bridge** ✅
+
 - ✅ JavaScriptCore bridge with CRDT operations
 - ✅ JavaScript bundle integration (240KB)
 - ✅ Polyfills (crypto.getRandomValues, global, atob/btoa)
 - ✅ All 11 CRDT bridge tests passing
 
 **Phase 3.2.2: File I/O Layer** ✅
+
 - ✅ FileIOManager with full file operations
 - ✅ Atomic write support (no partial writes)
 - ✅ Directory management with recursive creation
@@ -513,6 +531,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ iOS CI infrastructure
 
 **Phase 3.2.3: Storage Integration** ✅
+
 - ✅ FileIOManager exposed to JavaScript via CRDTBridge
 - ✅ TypeScript file I/O wrappers (readFile, writeFile, etc.)
 - ✅ StorageDirectoryManager for path management
@@ -520,6 +539,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ Full Swift ↔ JavaScript file I/O integration
 
 **Phase 3.2.4: SQLite/GRDB Database** ✅
+
 - ✅ GRDB dependency integrated via Swift Package Manager
 - ✅ Database schema with migrations (notes, folders, tags, relationships)
 - ✅ DatabaseManager with full CRUD operations
@@ -529,6 +549,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ All 23 DatabaseManagerTests passing
 
 **Phase 3.2.5: File Watching** ✅
+
 - ✅ FileWatchManager with DispatchSource directory monitoring
 - ✅ Debouncer utility for handling rapid changes (500ms default)
 - ✅ FileChangeProcessor for database updates from file changes
@@ -538,6 +559,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ Real-time sync with external changes (iCloud, Dropbox, manual edits)
 
 ### Next Steps
+
 - Phase 3.3: Navigation Structure (SD list → folder list → note list → editor)
 - Phase 3.4: Combined Folder/Tag View
 - Phase 3.5: Editor (WKWebView + TipTap)
@@ -552,6 +574,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 Unit tests are written using XCTest and located in the `Tests/` directory.
 
 **Current Test Coverage**:
+
 - 108 tests total (all passing ✅)
 - CRDTBridgeTests: 7 tests
 - FileIOManagerTests: 21 tests

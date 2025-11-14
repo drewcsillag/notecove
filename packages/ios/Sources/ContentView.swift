@@ -9,11 +9,11 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var appState: AppState
+    @ObservedObject var viewModel: AppViewModel
 
     var body: some View {
         TabView {
-            NotesTab()
+            StorageDirectoryListView(viewModel: viewModel)
                 .tabItem {
                     Label("Notes", systemImage: "note.text")
                 }
@@ -32,21 +32,6 @@ struct ContentView: View {
 }
 
 // MARK: - Placeholder Tab Views
-
-struct NotesTab: View {
-    var body: some View {
-        NavigationView {
-            VStack {
-                Text("Notes Tab")
-                    .font(.largeTitle)
-                Text("Phase 3.3 - Navigation Structure")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .navigationTitle("Notes")
-        }
-    }
-}
 
 struct TagsTab: View {
     var body: some View {
@@ -79,6 +64,7 @@ struct SettingsTab: View {
 }
 
 #Preview {
-    ContentView()
-        .environmentObject(AppState())
+    let db = try! DatabaseManager.inMemory()
+    let viewModel = try! AppViewModel(database: db)
+    return ContentView(viewModel: viewModel)
 }

@@ -106,12 +106,12 @@ public class FileChangeProcessor {
 
         // Load the note document via the bridge
         // First, check if it's already open
-        let openCount = await bridge.getOpenDocumentCount()
+        let openCount = bridge.getOpenDocumentCount()
         print("[FileChangeProcessor] Currently \(openCount) documents open")
 
         // Create or reopen the note
         do {
-            try await bridge.createNote(noteId: noteId)
+            try bridge.createNote(noteId: noteId)
         } catch {
             // Note might already be open, which is fine
             print("[FileChangeProcessor] Note already open or error creating: \(error)")
@@ -131,7 +131,7 @@ public class FileChangeProcessor {
 
             // Apply the update to the note
             do {
-                try await bridge.applyUpdate(noteId: noteId, updateData: updateData)
+                try bridge.applyUpdate(noteId: noteId, updateData: updateData)
             } catch {
                 print("[FileChangeProcessor] Error applying update from \(fileName): \(error)")
                 // Continue with other updates
@@ -139,8 +139,8 @@ public class FileChangeProcessor {
         }
 
         // Extract metadata from the document
-        let state = try await bridge.getDocumentState(noteId: noteId)
-        let title = try await bridge.extractTitle(stateData: state)
+        let state = try bridge.getDocumentState(noteId: noteId)
+        let title = try bridge.extractTitle(stateData: state)
         print("[FileChangeProcessor] Extracted title: \(title)")
 
         // Get the content for indexing

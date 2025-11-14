@@ -100,7 +100,7 @@ struct Schema {
 // MARK: - Model Records
 
 /// Storage Directory record
-public struct StorageDirectoryRecord: Codable, FetchableRecord, PersistableRecord {
+public struct StorageDirectoryRecord: Identifiable, Codable, FetchableRecord, PersistableRecord {
     public static let databaseTableName = "storage_directories"
 
     public var id: String
@@ -119,18 +119,18 @@ public struct StorageDirectoryRecord: Codable, FetchableRecord, PersistableRecor
 }
 
 /// Note metadata record
-struct NoteRecord: Codable, FetchableRecord, PersistableRecord {
-    static let databaseTableName = "notes"
+public struct NoteRecord: Identifiable, Codable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "notes"
 
-    var id: String
-    var storageDirectoryId: String
-    var folderId: String?
-    var title: String
-    var createdAt: Date
-    var modifiedAt: Date
-    var deletedAt: Date?
+    public var id: String
+    public var storageDirectoryId: String
+    public var folderId: String?
+    public var title: String
+    public var createdAt: Date
+    public var modifiedAt: Date
+    public var deletedAt: Date?
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case id
         case storageDirectoryId = "storage_directory_id"
         case folderId = "folder_id"
@@ -157,17 +157,17 @@ struct NoteSearchResult: Codable, FetchableRecord {
 }
 
 /// Folder record
-struct FolderRecord: Codable, FetchableRecord, PersistableRecord {
-    static let databaseTableName = "folders"
+public struct FolderRecord: Identifiable, Codable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "folders"
 
-    var id: String
-    var storageDirectoryId: String
-    var parentId: String?
-    var name: String
-    var createdAt: Date
-    var modifiedAt: Date
+    public var id: String
+    public var storageDirectoryId: String
+    public var parentId: String?
+    public var name: String
+    public var createdAt: Date
+    public var modifiedAt: Date
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case id
         case storageDirectoryId = "storage_directory_id"
         case parentId = "parent_id"
