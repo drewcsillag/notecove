@@ -1,258 +1,464 @@
 # iOS Development Session Handoff
 
 **Date**: 2025-11-13
-**Branch**: `feature/phase-3-ios-app`
-**Last Commit**: `bf5b255` - "feat: Implement Phase 3.2.1 - iOS JavaScriptCore CRDT bridge"
+**Branch**: `main`
+**Last Commit**: `2341cc4` - "feat: Add iOS local CI script"
 
 ---
 
 ## What We Accomplished
 
-### Phase 3.1 - iOS Project Setup ✅ COMPLETE
+### Phase 3.2.1 - iOS JavaScriptCore CRDT Bridge ✅ COMPLETE
 
-- Created Xcode project using XcodeGen (`project.yml`)
-- Configured for iOS 26.1 SDK, iOS 17.0 deployment target
-- Universal app (iPhone + iPad)
-- SwiftUI app structure with tab navigation
-- Basic models (StorageDirectory, Folder, Note, Tag)
-- XCTest framework configured
-- **Status**: Fully working, committed
+**Status**: Fully working with all 11 tests passing ✅
 
-### Phase 3.2.1 - JavaScriptCore Bridge ⚠️ CODE COMPLETE, TESTING BLOCKED
+#### Completed Tasks
 
-#### What's Working:
+1. **Fixed JavaScript Bundle Resource Issue**
+   - Used `preBuildScripts` in `project.yml` to copy JS bundle
+   - Bundle successfully loads at runtime
+   - Location: `packages/ios/Sources/Resources/notecove-bridge.js` (240KB)
 
-1. **JavaScript Bundling** (`packages/shared`)
-   - Created `src/ios-bridge.ts` - exposes CRDT APIs to JavaScriptCore
-   - Added esbuild for bundling TypeScript → single JS file
-   - Created `scripts/build-ios-bundle.js` build script
-   - Bundle size: 240KB (includes Yjs)
-   - Location: `packages/shared/dist/ios/notecove-bridge.js`
-   - Also copied to: `packages/ios/Sources/Resources/notecove-bridge.js`
+2. **Added JavaScriptCore Polyfills**
+   - **crypto.getRandomValues()**: Required by Yjs for random number generation
+     - Implemented in Swift with `UInt8.random()`
+     - Exposed to JS as `_swiftGetRandomValues`
+   - **global object**: JavaScriptCore has no window/global by default
+     - Added `var global = this;` to expose global scope
+   - **atob/btoa**: Base64 encoding (already implemented)
 
-2. **Swift Bridge** (`packages/ios/Sources/CRDT/CRDTBridge.swift`)
-   - Loads JavaScript bundle in JavaScriptCore
-   - `@MainActor` for thread safety
-   - Implements data marshaling (Swift Data ↔ JS base64)
-   - Includes atob/btoa polyfills (JSCore doesn't have them)
-   - Complete API:
-     - Note ops: `createNote`, `applyUpdate`, `getDocumentState`, `extractTitle`, `closeNote`
-     - Folder tree ops: `createFolderTree`, `loadFolderTree`, `getFolderTreeState`, `closeFolderTree`
-     - Memory: `clearDocumentCache`, `getOpenDocumentCount`
-   - Comprehensive error handling
+3. **Fixed iOS Bridge API Compatibility**
+   - Updated `NoteDoc` constructor calls (removed non-existent `initializeStructure()`)
+   - Updated `FolderTreeDoc` constructor calls (same issue)
+   - Fixed `extractTitle()` to create temp Y.Doc and extract from XmlFragment
+   - Fixed function signatures for `generateUpdateFilename()` and other utilities
 
-3. **Tests** (`packages/ios/Tests/CRDTBridgeTests.swift`)
-   - 7 unit tests written
-   - Cover all major operations
-   - `@MainActor` on test class (fixed concurrency issues)
+4. **Lint and Type Fixes**
+   - Fixed TypeScript type errors in `ios-bridge.ts`
+   - Updated type names: `UpdateFileMetadata`, `SnapshotFileMetadata`, `PackFileMetadata`
+   - Fixed global type declarations
+   - All code passes `pnpm ci-local` (format, lint, typecheck, tests)
 
-4. **Recent Fixes**:
-   - Fixed `deinit` error (can't call `@MainActor` methods from deinit)
-   - Fixed `toInt32()` return type conversion
-   - Added debug logging to show bundle contents
+#### Test Results
+
+```
+✅ CRDTBridgeTests: 7/7 passed
+   - testBridgeInitialization
+   - testCreateNote
+   - testExtractTitle
+   - testCloseNote
+   - testCreateFolderTree
+   - testClearDocumentCache
+   - testGetOpenDocumentCount
+
+✅ NoteCoveTests: 4/4 passed
+   - testAppStateInitialization
+   - testNoteModel
+   - testPerformanceExample
+   - testStorageDirectoryModel
+
+Total: 11/11 tests passing ✅
+```
+
+#### Files Modified
+
+**Swift:**
+- `packages/ios/Sources/CRDT/CRDTBridge.swift`
+  - Added crypto polyfill (lines 77-146)
+  - Added global object setup (line 79)
+  - Cleaned up debug logging
+
+**TypeScript:**
+- `packages/shared/src/ios-bridge.ts`
+  - Fixed NoteDoc/FolderTreeDoc API calls
+  - Fixed extractTitle implementation
+  - Updated function signatures
+  - Fixed lint errors
+
+**Build Artifacts:**
+- `packages/ios/Sources/Resources/notecove-bridge.js` - Rebuilt (240.31 KB)
+
+### iOS CI Infrastructure ✅ COMPLETE
+
+**Status**: Fully working, similar to desktop CI
+
+#### Created Files
+
+1. **`packages/ios/scripts/ci-local.sh`** (executable)
+   - Finds available iOS simulator automatically
+   - Rebuilds JavaScript bundle from `packages/shared`
+   - Copies bundle to iOS resources
+   - Regenerates Xcode project with XcodeGen
+   - Builds iOS app
+   - Runs all 11 unit tests
+   - Exits with proper status codes
+
+2. **`packages/ios/package.json`**
+   - Defines `ci-local` script
+
+3. **Updated `packages/ios/README.md`**
+   - Added CI/CD section with usage instructions
+
+#### Usage
+
+```bash
+# From repo root
+pnpm --filter @notecove/ios ci-local
+
+# Or from packages/ios
+./scripts/ci-local.sh
+```
+
+#### Test Output Example
+
+```
+🚀 Running iOS local CI checks...
+📱 Using iPhone simulator: 94377897-91F4-494C-9FA6-3B94ED2908DF
+📦 Rebuilding JavaScript bundle...
+✅ JavaScript bundle rebuilt
+📋 Copying bundle to iOS resources...
+✅ Bundle copied
+🔨 Regenerating Xcode project...
+✅ Xcode project regenerated
+🏗️  Building iOS app...
+✅ Build succeeded
+🧪 Running iOS tests...
+✅ All iOS CI checks passed! Safe to merge.
+```
+
+### Git Status
+
+**Branch**: `main` (merged from `feature/phase-3-ios-app`)
+
+**Recent Commits on Main:**
+```
+2341cc4 feat: Add iOS local CI script
+a4c378b fix: Complete iOS JavaScriptCore bridge with working tests
+565a6d3 docs: Add session handoff document for iOS development
+bf5b255 feat: Implement Phase 3.2.1 - iOS JavaScriptCore CRDT bridge
+c4aae2e docs: Add iOS JavaScriptCore bridge architecture design
+d87fea4 fix: Correct JavaScriptCore framework dependency type
+2b70921 docs: Enhance iOS README with detailed setup instructions
+a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
+```
+
+**Files in Working Tree:**
+- `.claude/settings.local.json` - Modified (not committed, local settings)
 
 ---
 
-## Current Blocker: JavaScript Bundle Not Copying to App
+## Current State
 
-**The Problem**:
-The `notecove-bridge.js` file exists at `packages/ios/Sources/Resources/notecove-bridge.js` but is NOT being copied into the built app bundle during compilation.
+### What's Working
 
-**Evidence**:
+1. **iOS App Skeleton**
+   - SwiftUI structure with tab navigation
+   - Basic models (StorageDirectory, Folder, Note, Tag)
+   - Asset catalog with AppIcon
+   - Universal (iPhone + iPad)
+
+2. **JavaScriptCore Bridge**
+   - Fully functional with all polyfills
+   - Loads 240KB JavaScript bundle
+   - Marshals data between Swift and JavaScript
+   - All CRDT operations exposed:
+     - createNote, applyUpdate, getDocumentState, extractTitle, closeNote
+     - createFolderTree, loadFolderTree, getFolderTreeState, closeFolderTree
+     - clearDocumentCache, getOpenDocumentCount
+
+3. **Build System**
+   - XcodeGen project generation from `project.yml`
+   - JavaScript bundling via esbuild
+   - iOS CI script for automated testing
+
+4. **Testing**
+   - 11 unit tests covering CRDT bridge functionality
+   - All tests passing with iOS simulator
+
+### What's Not Yet Implemented
+
+1. **File I/O Layer** (Phase 3.2.2 - Next)
+   - Swift file operations for reading/writing `.yjson` files
+   - Atomic write support
+   - Directory management
+   - Pattern matching for file listing
+
+2. **Storage Integration** (Phase 3.2.3)
+   - Connecting File I/O to CRDT bridge
+   - Storage directory management
+
+3. **SQLite/GRDB** (Phase 3.2.4)
+   - Database schema implementation
+   - FTS5 search indexing
+   - Tag indexing
+   - Note metadata caching
+
+4. **File Watching** (Phase 3.2.5)
+   - FileManager notifications
+   - iCloud Drive sync monitoring
+   - Debouncing rapid changes
+
+5. **UI Implementation** (Phase 3.3+)
+   - Notes list view
+   - Editor (WKWebView + TipTap)
+   - Folder navigation
+   - Tags view
+   - Settings
+
+---
+
+## Next Steps: Phase 3.2.2 - File I/O Layer
+
+### Overview
+
+Implement Swift layer for file system operations. This is the bridge between the CRDT logic (JavaScript) and the actual file system (Swift).
+
+### Architecture
 
 ```
-DEBUG: Bundle contents: ["_CodeSignature", "NoteCove", "PlugIns", "NoteCove.debug.dylib", "__preview.dylib", "Frameworks", "Info.plist", "PkgInfo"]
+Swift UI → CRDTBridge → JavaScriptCore (CRDT logic)
+              ↓
+         FileIOManager → File System (.yjson files)
 ```
 
-Notice: No `notecove-bridge.js` file present.
+### Implementation Plan
 
-**Expected**:
-Should see `notecove-bridge.js` in the app bundle's root directory.
+#### 1. Create FileIOManager Class
 
-**Symptom**:
-All 7 CRDTBridge tests fail with error `bridgeNotInitialized` because `Bundle.main.path(forResource: "notecove-bridge", ofType: "js")` returns `nil`.
+**File**: `packages/ios/Sources/Storage/FileIOManager.swift`
 
-**What We've Tried** (all in `project.yml`):
+**Core Methods:**
+```swift
+class FileIOManager {
+    // Basic file operations
+    func readFile(at path: String) throws -> Data
+    func writeFile(data: Data, to path: String) throws
+    func deleteFile(at path: String) throws
+    func fileExists(at path: String) -> Bool
 
-1. ❌ `resources: - path: Sources/Resources, type: folder`
-2. ❌ `resources: - Sources/Resources`
-3. ❌ `resources: - Sources/Resources/notecove-bridge.js`
-4. ❌ `resources: - path: Sources/Resources/notecove-bridge.js, buildPhase: resources`
-5. ⏳ `preBuildScripts` with manual `cp` command (currently testing, may work)
+    // Directory operations
+    func createDirectory(at path: String) throws
+    func listFiles(in directory: String, matching pattern: String) throws -> [String]
 
-**Current `project.yml` Resource Configuration** (lines 26-32):
+    // Atomic writes (write to temp, then move)
+    func atomicWrite(data: Data, to path: String) throws
+}
+```
 
+#### 2. Error Handling
+
+Define custom errors:
+```swift
+enum FileIOError: Error {
+    case fileNotFound(String)
+    case permissionDenied(String)
+    case diskFull
+    case invalidPath(String)
+    case atomicWriteFailed(String)
+}
+```
+
+#### 3. Testing Strategy (TDD)
+
+**File**: `packages/ios/Tests/Storage/FileIOManagerTests.swift`
+
+Tests to write:
+- `testReadFile()` - Read existing file
+- `testReadFileNotFound()` - Handle missing file
+- `testWriteFile()` - Write new file
+- `testWriteFileOverwrite()` - Overwrite existing file
+- `testDeleteFile()` - Delete file
+- `testDeleteFileNotFound()` - Handle missing file
+- `testCreateDirectory()` - Create directory
+- `testCreateDirectoryRecursive()` - Create nested directories
+- `testListFiles()` - List all files in directory
+- `testListFilesWithPattern()` - Filter by pattern (e.g., "*.yjson")
+- `testAtomicWrite()` - Verify atomic write behavior
+- `testAtomicWriteFailureRollback()` - Ensure no partial writes
+
+#### 4. Integration with CRDTBridge
+
+Once FileIOManager is working, expose it to JavaScript:
+```swift
+// In CRDTBridge.swift
+let fileIO = FileIOManager()
+
+// Expose to JavaScript
+context.setObject(fileIO.readFile, forKeyedSubscript: "swiftReadFile")
+context.setObject(fileIO.writeFile, forKeyedSubscript: "swiftWriteFile")
+```
+
+#### 5. Project Configuration Updates
+
+**Update `project.yml`:**
 ```yaml
-resources:
-  - Sources/Resources/notecove-bridge.js
-
-preBuildScripts:
-  - name: 'Copy JS Bundle'
-    script: |
-      cp "${PROJECT_DIR}/Sources/Resources/notecove-bridge.js" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/notecove-bridge.js"
+targets:
+  NoteCove:
+    sources:
+      - path: Sources
+        # ... existing configuration ...
+      - path: Sources/Storage  # Add new directory
 ```
 
----
-
-## Files Modified But Not Committed
-
-**Need to commit these fixes**:
-
-- `packages/ios/Sources/CRDT/CRDTBridge.swift` (deinit fix, Int cast fix, debug logging)
-- `packages/ios/Tests/CRDTBridgeTests.swift` (@MainActor fixes)
-- `packages/ios/project.yml` (resource configuration attempts)
-
----
-
-## Options for Next Session
-
-Please restate these options to the user and ask them to choose:
-
-### Option A: Continue Debugging Resource Issue
-
-**What**: Keep trying different XcodeGen configurations until the JS bundle copies correctly.
-
-**Why Choose This**:
-
-- Proper solution that works with XcodeGen
-- Reproducible builds
-- No manual steps
-
-**Time Estimate**: Could take 2-10 more iterations (30-90 minutes)
-
-**Next Steps**:
-
-1. Check if `preBuildScripts` approach worked (it was building when session ended)
-2. If not, try `postBuildScripts` instead
-3. If not, try adding to `Copy Bundle Resources` build phase explicitly
-4. If not, investigate XcodeGen documentation for resource handling
-5. Last resort: Document manual Xcode configuration steps
-
----
-
-### Option B: Manual Xcode Fix + Move Forward
-
-**What**: Manually add the JS file in Xcode GUI, document the manual step, continue with Phase 3.2.2.
-
-**Why Choose This**:
-
-- Unblocks testing immediately
-- Can continue iOS development
-- Can fix XcodeGen config later
-
-**Downsides**:
-
-- Manual step in build process (not ideal)
-- `.xcodeproj` needs to be committed (we gitignore it normally)
-
-**Next Steps**:
-
-1. Open `NoteCove.xcodeproj` in Xcode
-2. Manually drag `Sources/Resources/notecove-bridge.js` into project
-3. Ensure it's added to "Copy Bundle Resources" build phase
-4. Run tests - should pass
-5. Continue with Phase 3.2.2 (File I/O layer)
-
----
-
-### Option C: Create iOS CI Script First, Debug Later
-
-**What**: Create the iOS CI script now (even though tests fail), commit all work, document the resource issue.
-
-**Why Choose This**:
-
-- User originally asked for iOS CI script
-- Can test CI infrastructure
-- Documents the problem clearly
-
-**Downsides**:
-
-- CI will fail until resource issue is fixed
-- Not ideal for TDD workflow
-
-**Next Steps**:
-
-1. Create `packages/ios/scripts/ci-local.sh` (similar to desktop)
-2. Commit all current work with clear "KNOWN ISSUE" note
-3. Return to fix resource issue later
-
----
-
-## Quick Reference
-
-### Running iOS Tests Manually
-
+**Create directory structure:**
 ```bash
-cd /Users/drew/devel/nc2/packages/ios
-xcodegen generate
-xcodebuild test -project NoteCove.xcodeproj \
-  -scheme NoteCove \
-  -destination 'platform=iOS Simulator,id=DC9D7688-6AF0-4FB9-B863-04A0340804B0'
+mkdir -p packages/ios/Sources/Storage
+mkdir -p packages/ios/Tests/Storage
 ```
 
-### Rebuilding JavaScript Bundle
+### Acceptance Criteria
 
-```bash
-cd /Users/drew/devel/nc2/packages/shared
-pnpm build:ios
-# Output: packages/shared/dist/ios/notecove-bridge.js (240KB)
-```
+- [ ] FileIOManager class created with all core methods
+- [ ] All unit tests passing (10+ tests)
+- [ ] Atomic writes work correctly (no partial writes on failure)
+- [ ] Pattern matching works for file listing (e.g., "*.yjson")
+- [ ] Error handling covers all edge cases
+- [ ] Integration tests with CRDTBridge (can read/write via JS)
+- [ ] CI tests pass (`pnpm --filter @notecove/ios ci-local`)
 
-### Key File Locations
+### Design Considerations
 
+1. **iCloud Drive Support**
+   - Use `FileManager.default.url(forUbiquityContainerIdentifier:)`
+   - Handle sync delays gracefully
+   - Document limitations in README
+
+2. **Atomic Writes**
+   - Write to temporary file first
+   - Use `FileManager.replaceItemAt()` for atomic move
+   - Clean up temp files on failure
+
+3. **Thread Safety**
+   - Mark as `@MainActor` if needed
+   - Use `DispatchQueue` for background I/O if needed
+
+4. **Path Handling**
+   - Use `URL` instead of `String` for paths internally
+   - Validate paths before operations
+   - Handle relative vs absolute paths
+
+### Reference Implementation
+
+Look at desktop implementation for guidance:
+- `packages/desktop/src/main/storage/file-io.ts`
+- Update file format (`*.yjson`)
+- Sequence numbering
+- Pack format
+
+### Documentation to Update
+
+After implementation:
+- [ ] Update `packages/ios/README.md` with Storage section
+- [ ] Update `docs/ios/jscore-bridge.md` with FileIO integration
+- [ ] Add inline documentation to FileIOManager methods
+- [ ] Update HANDOFF.md with completion status
+
+---
+
+## Key File Locations
+
+### iOS Package
 - **Xcode project config**: `packages/ios/project.yml`
+- **Swift source**: `packages/ios/Sources/`
+- **Tests**: `packages/ios/Tests/`
+- **CI script**: `packages/ios/scripts/ci-local.sh`
+- **README**: `packages/ios/README.md`
+
+### CRDT Bridge
 - **Swift bridge**: `packages/ios/Sources/CRDT/CRDTBridge.swift`
 - **Bridge tests**: `packages/ios/Tests/CRDTBridgeTests.swift`
 - **JS bundle source**: `packages/shared/dist/ios/notecove-bridge.js`
-- **JS bundle in iOS**: `packages/ios/Sources/Resources/notecove-bridge.js`
 - **JS bridge entry**: `packages/shared/src/ios-bridge.ts`
 - **Bundle build script**: `packages/shared/scripts/build-ios-bundle.js`
 
-### Simulator Device ID
+### Documentation
+- **Architecture**: `docs/ios/jscore-bridge.md`
+- **Phase plan**: `PLAN-PHASE-3.md`
+- **This handoff**: `packages/ios/HANDOFF.md`
 
-```
-iPhone 17: DC9D7688-6AF0-4FB9-B863-04A0340804B0
-```
-
----
-
-## Background Process
-
-**There's a background process still running**:
-
+### iOS Simulator
 ```bash
-# Kill it if needed:
-# Process ID: fa2489
-# Command: xcodebuild -downloadAllPlatforms
+# List available simulators
+xcrun simctl list devices available | grep iPhone
+
+# Currently using (from CI):
+iPhone 17 Pro: 94377897-91F4-494C-9FA6-3B94ED2908DF
 ```
 
-This is downloading iOS simulator runtimes. Can be killed safely if needed.
+---
+
+## Running Tests
+
+### Full iOS CI
+```bash
+# From repo root
+pnpm --filter @notecove/ios ci-local
+```
+
+### Manual Testing
+```bash
+cd packages/ios
+xcodegen generate
+xcodebuild test \
+  -project NoteCove.xcodeproj \
+  -scheme NoteCove \
+  -destination 'platform=iOS Simulator,id=94377897-91F4-494C-9FA6-3B94ED2908DF'
+```
+
+### Building in Xcode
+1. Open `packages/ios/NoteCove.xcodeproj` in Xcode
+2. Select iPhone simulator from scheme selector
+3. Press Cmd+R to build and run
+4. Press Cmd+U to run tests
 
 ---
 
-## User's Original Request
+## Common Issues & Solutions
 
-> "are the tests passing? We'll want a similar script for ios's CI (eventually we'll want an omnibus one to cover both, but separate for now) to make sure we don't break things as we go."
+### "JavaScript bundle not found"
+- Run `cd packages/shared && pnpm build:ios`
+- Copy bundle: `cp packages/shared/dist/ios/notecove-bridge.js packages/ios/Sources/Resources/`
+- Regenerate project: `cd packages/ios && xcodegen generate`
 
-**What the user wants**:
+### "No such module" errors
+- Clean build folder in Xcode (Cmd+Shift+K)
+- Regenerate project: `xcodegen generate`
+- Restart Xcode
 
-1. iOS tests passing ✅ (blocked by resource issue)
-2. iOS CI script similar to desktop's `pnpm ci-local` ⏸️ (not created yet)
-3. Eventually: Unified CI for desktop + iOS ⏸️ (future)
+### Tests fail with crypto errors
+- Check that crypto polyfill is in `CRDTBridge.swift` (lines 77-146)
+- Verify global object setup is present (line 79)
+- Check JavaScript bundle is up to date
+
+### CI script can't find simulator
+- Install iOS Simulator via Xcode > Settings > Platforms
+- List available: `xcrun simctl list devices available`
+- Update simulator ID in script if needed
 
 ---
 
-## Recommendation
+## Development Environment
 
-I recommend **Option A** first (try the `preBuildScripts` fix that was building when session ended), and if that doesn't work within 1-2 more attempts, switch to **Option B** to unblock progress.
+### Required Software
+- Xcode 26.1.1+ (iOS 26.1 SDK)
+- XcodeGen (via Homebrew)
+- Node.js (for pnpm and esbuild)
+- pnpm
 
-The resource issue is annoying but solvable. Once tests pass, creating the iOS CI script is trivial (5 minutes).
+### Swift Version
+- Swift 6.0
+
+### iOS Target
+- Deployment target: iOS 17.0
+- SDK: iOS 26.1
 
 ---
 
-## Session End State
+## Session End Notes
 
-- **Git status**: Clean except for uncommitted fixes mentioned above
-- **Tests status**: 4/11 passing (NoteCoveTests pass, CRDTBridgeTests fail due to missing JS)
-- **Build status**: Compiles successfully, resource copying issue only
-- **Xcode**: May still be open showing the project
+- All work has been merged to `main` branch
+- iOS CRDT bridge is fully functional and tested
+- CI infrastructure is in place
+- Ready to proceed with Phase 3.2.2 (File I/O Layer)
+- No blocking issues
+- All tests passing (11/11) ✅
