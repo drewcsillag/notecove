@@ -78,13 +78,12 @@ xcodebuild test \
   -project NoteCove.xcodeproj \
   -scheme NoteCove \
   -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-  2>&1 | grep -E "(Test Suite|Test Case|Executed|passed|failed)" || {
-    echo -e "${RED}❌ Tests failed${NC}"
-    exit 1
-  }
+  2>&1 | grep -E "(Test Suite|Test Case|Executed|passed|failed)"
 
-# Check if tests passed
-if [ $? -eq 0 ]; then
+# Check the xcodebuild exit status (from PIPESTATUS[0])
+TEST_EXIT_CODE=${PIPESTATUS[0]}
+
+if [ $TEST_EXIT_CODE -eq 0 ]; then
   echo -e "\n${GREEN}✅ All iOS CI checks passed! Safe to merge.${NC}\n"
   exit 0
 else

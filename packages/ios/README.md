@@ -90,6 +90,52 @@ let noteDir = manager.getNoteDirectory(storageId: "sd-123", noteId: "note-456")
 try manager.ensureDirectoriesExist(storageId: "sd-123")
 ```
 
+### Database Layer (`DatabaseManager`)
+
+The `DatabaseManager` provides SQLite database operations via GRDB:
+
+**Features:**
+- **Metadata Storage**: Notes, folders, tags, storage directories
+- **Full-Text Search**: FTS5-powered search across note content
+- **Relationships**: Many-to-many note-tag relationships
+- **Soft Deletes**: Recently deleted notes tracking
+- **Migrations**: Automatic schema versioning and migrations
+
+**Location**: `packages/ios/Sources/Database/DatabaseManager.swift`
+
+**Usage Example**:
+```swift
+// Initialize database
+let dbURL = URL(fileURLWithPath: "/path/to/database.sqlite")
+let db = try DatabaseManager(at: dbURL)
+
+// Insert a note
+try db.insertNote(
+    id: "note-123",
+    storageDirectoryId: "sd-1",
+    folderId: nil,
+    title: "My Note"
+)
+
+// Full-text search
+let results = try db.searchNotes(query: "Swift programming", in: "sd-1")
+
+// Tag operations
+try db.insertTag(id: "tag-1", storageDirectoryId: "sd-1", name: "important", color: "#FF0000")
+try db.addTagToNote(noteId: "note-123", tagId: "tag-1")
+
+// List notes in a folder
+let notes = try db.listNotes(in: "sd-1", folderId: "folder-1")
+```
+
+**Database Schema:**
+- `storage_directories` - Storage directory metadata
+- `notes` - Note metadata (title, dates, folder, deleted status)
+- `notes_fts` - FTS5 virtual table for full-text search
+- `folders` - Folder hierarchy
+- `tags` - Tags with optional colors
+- `note_tags` - Many-to-many note-tag relationships
+
 ### Storage Format
 
 Notes are stored as `.yjson` files containing Yjs CRDT updates:
@@ -121,6 +167,9 @@ packages/ios/
 │   ├── Storage/            # File I/O and storage management
 │   │   ├── FileIOManager.swift
 │   │   └── StorageDirectoryManager.swift
+│   ├── Database/           # SQLite database layer (GRDB)
+│   │   ├── Schema.swift
+│   │   └── DatabaseManager.swift
 │   ├── Resources/          # JavaScript bundles
 │   │   └── notecove-bridge.js
 │   ├── Assets.xcassets/    # Images, colors, etc.
@@ -129,9 +178,11 @@ packages/ios/
 ├── Tests/                   # XCTest unit tests
 │   ├── NoteCoveTests.swift
 │   ├── CRDTBridgeTests.swift
-│   └── Storage/
-│       ├── FileIOManagerTests.swift
-│       └── StorageIntegrationTests.swift
+│   ├── Storage/
+│   │   ├── FileIOManagerTests.swift
+│   │   └── StorageIntegrationTests.swift
+│   └── Database/
+│       └── DatabaseManagerTests.swift
 └── scripts/                 # Build and CI scripts
     └── ci-local.sh
 ```
@@ -301,7 +352,7 @@ All tests must pass before merging to main.
 
 See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 
-**Current Status**: Phase 3.2.3 (Storage Integration) - Complete ✅
+**Current Status**: Phase 3.2.4 (SQLite/GRDB Database) - Complete ✅
 
 ### Completed
 
@@ -335,9 +386,16 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ All 13 StorageIntegrationTests passing
 - ✅ Full Swift ↔ JavaScript file I/O integration
 
-### Next Steps
+**Phase 3.2.4: SQLite/GRDB Database** ✅
+- ✅ GRDB dependency integrated via Swift Package Manager
+- ✅ Database schema with migrations (notes, folders, tags, relationships)
+- ✅ DatabaseManager with full CRUD operations
+- ✅ FTS5 full-text search implementation
+- ✅ Soft deletes and recently deleted tracking
+- ✅ Tag management with many-to-many relationships
+- ✅ All 23 DatabaseManagerTests passing
 
-- Phase 3.2.4: SQLite/GRDB (database schema, FTS5 search, indexing)
+### Next Steps
 - Phase 3.2.5: File Watching (FileManager notifications, iCloud sync)
 - Phase 3.3: Navigation Structure (SD list → folder list → note list → editor)
 - Phase 3.4: Combined Folder/Tag View
@@ -353,10 +411,11 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 Unit tests are written using XCTest and located in the `Tests/` directory.
 
 **Current Test Coverage**:
-- 45 tests total (all passing ✅)
+- 68 tests total (all passing ✅)
 - CRDTBridgeTests: 7 tests
 - FileIOManagerTests: 21 tests
 - StorageIntegrationTests: 13 tests
+- DatabaseManagerTests: 23 tests
 - NoteCoveTests: 4 tests
 
 Run tests from Xcode (Cmd+U) or from the command line:
