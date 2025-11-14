@@ -9,29 +9,26 @@
 import XCTest
 @testable import NoteCove
 
+@MainActor
 final class CRDTBridgeTests: XCTestCase {
 
     var bridge: CRDTBridge!
 
-    @MainActor
     override func setUpWithError() throws {
         try super.setUpWithError()
         bridge = CRDTBridge()
     }
 
-    @MainActor
     override func tearDownWithError() throws {
         bridge = nil
         try super.tearDownWithError()
     }
 
-    @MainActor
     func testBridgeInitialization() throws {
         // Bridge should initialize without error
         XCTAssertNotNil(bridge, "Bridge should be initialized")
     }
 
-    @MainActor
     func testCreateNote() throws {
         let noteId = "test-note-1"
 
@@ -43,7 +40,6 @@ final class CRDTBridgeTests: XCTestCase {
         XCTAssertGreaterThan(state.count, 0, "Document state should not be empty")
     }
 
-    @MainActor
     func testExtractTitle() throws {
         let noteId = "test-note-2"
 
@@ -58,7 +54,6 @@ final class CRDTBridgeTests: XCTestCase {
         XCTAssertEqual(title, "Untitled", "New note should have 'Untitled' as title")
     }
 
-    @MainActor
     func testCloseNote() throws {
         let noteId = "test-note-3"
 
@@ -69,7 +64,6 @@ final class CRDTBridgeTests: XCTestCase {
         XCTAssertNoThrow(bridge.closeNote(noteId: noteId))
     }
 
-    @MainActor
     func testCreateFolderTree() throws {
         let sdId = "test-sd-1"
 
@@ -81,7 +75,6 @@ final class CRDTBridgeTests: XCTestCase {
         XCTAssertGreaterThan(state.count, 0, "Folder tree state should not be empty")
     }
 
-    @MainActor
     func testGetOpenDocumentCount() throws {
         // Initially should be 0
         XCTAssertEqual(bridge.getOpenDocumentCount(), 0)
@@ -103,7 +96,6 @@ final class CRDTBridgeTests: XCTestCase {
         XCTAssertEqual(bridge.getOpenDocumentCount(), 0)
     }
 
-    @MainActor
     func testClearDocumentCache() throws {
         // Create some documents
         try bridge.createNote(noteId: "test-1")

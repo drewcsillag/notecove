@@ -43,7 +43,8 @@ class CRDTBridge {
     }
 
     deinit {
-        cleanup()
+        // Cleanup happens automatically when context is deallocated
+        // Cannot call @MainActor methods from deinit
     }
 
     // MARK: - Setup
@@ -136,6 +137,13 @@ class CRDTBridge {
 
         // Find the JavaScript bundle in the app's resources
         guard let bundlePath = Bundle.main.path(forResource: "notecove-bridge", ofType: "js") else {
+            // Debug: List all resources in bundle
+            if let resourcePath = Bundle.main.resourcePath {
+                print("DEBUG: Bundle resource path: \(resourcePath)")
+                if let contents = try? FileManager.default.contentsOfDirectory(atPath: resourcePath) {
+                    print("DEBUG: Bundle contents: \(contents)")
+                }
+            }
             throw CRDTBridgeError.javascriptLoadFailed("JavaScript bundle not found in app resources")
         }
 
@@ -336,6 +344,6 @@ class CRDTBridge {
     func getOpenDocumentCount() -> Int {
         guard let bridge = bridgeObject else { return 0 }
         let result = bridge.invokeMethod("getOpenDocumentCount", withArguments: [])
-        return result?.toInt32() ?? 0
+        return Int(result?.toInt32() ?? 0)
     }
 }

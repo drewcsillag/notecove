@@ -21,11 +21,15 @@ targets:
       - path: Sources
         createIntermediateGroups: true
         excludes:
-          - "Resources/**"
+          - "**/*.js"
 
     resources:
-      - path: Sources/Resources
-        type: folder
+      - Sources/Resources/notecove-bridge.js
+
+    preBuildScripts:
+      - name: "Copy JS Bundle"
+        script: |
+          cp "${PROJECT_DIR}/Sources/Resources/notecove-bridge.js" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/notecove-bridge.js"
 
     info:
       path: Sources/Info.plist
