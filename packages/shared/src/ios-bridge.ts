@@ -18,6 +18,7 @@ import {
   generateUpdateFilename,
   parseSnapshotFilename,
   parsePackFilename,
+  UpdateType,
   type UpdateFileMetadata,
   type SnapshotFileMetadata,
   type PackFileMetadata,
@@ -40,7 +41,13 @@ interface NoteCoveBridge {
 
   // File name parsing utilities
   parseUpdateFilename(filename: string): UpdateFileMetadata | null;
-  generateUpdateFilename(instanceId: string, timestamp: number, seq: number): string;
+  generateUpdateFilename(
+    type: UpdateType,
+    instanceId: string,
+    documentId: string,
+    timestamp?: number,
+    sequence?: number
+  ): string;
   parseSnapshotFilename(filename: string): SnapshotFileMetadata | null;
   parsePackFilename(filename: string): PackFileMetadata | null;
 
@@ -55,6 +62,8 @@ interface NoteCoveBridge {
 
 // Initialize the global bridge object
 declare global {
+  // eslint-disable-next-line no-var
+  var NoteCoveBridge: NoteCoveBridge | undefined;
   interface Window {
     NoteCoveBridge: NoteCoveBridge;
   }
@@ -91,11 +100,11 @@ const bridge: NoteCoveBridge = {
       throw new Error(`Note ${noteId} is already open`);
     }
 
-    const doc = new Y.Doc();
-    const noteDoc = new NoteDoc(doc);
-    noteDoc.initializeStructure();
+    const noteDoc = new NoteDoc(noteId);
+    // Note: We don't call initializeNote() here because we don't have metadata yet
+    // The note structure will be initialized when first edited
 
-    openNotes.set(noteId, doc);
+    openNotes.set(noteId, noteDoc.doc);
   },
 
   applyUpdate(noteId: string, updateBase64: string): void {
@@ -120,7 +129,14 @@ const bridge: NoteCoveBridge = {
 
   extractTitle(stateBase64: string): string {
     const stateBytes = base64ToUint8Array(stateBase64);
-    return extractTitleFromFragment(stateBytes);
+    // Create a temporary doc to decode the state
+    const tempDoc = new Y.Doc();
+    Y.applyUpdate(tempDoc, stateBytes);
+    // Extract the fragment and get the title
+    const fragment = tempDoc.getXmlFragment('content');
+    const title = extractTitleFromFragment(fragment);
+    tempDoc.destroy();
+    return title;
   },
 
   closeNote(noteId: string): void {
@@ -140,11 +156,8 @@ const bridge: NoteCoveBridge = {
       throw new Error(`Folder tree for SD ${sdId} is already open`);
     }
 
-    const doc = new Y.Doc();
-    const folderTree = new FolderTreeDoc(doc);
-    folderTree.initializeStructure();
-
-    openFolderTrees.set(sdId, doc);
+    const folderTree = new FolderTreeDoc(sdId);
+    openFolderTrees.set(sdId, folderTree.doc);
   },
 
   loadFolderTree(sdId: string, stateBase64: string): void {
@@ -152,11 +165,11 @@ const bridge: NoteCoveBridge = {
       throw new Error(`Folder tree for SD ${sdId} is already open`);
     }
 
-    const doc = new Y.Doc();
+    const folderTree = new FolderTreeDoc(sdId);
     const stateBytes = base64ToUint8Array(stateBase64);
-    Y.applyUpdate(doc, stateBytes);
+    Y.applyUpdate(folderTree.doc, stateBytes);
 
-    openFolderTrees.set(sdId, doc);
+    openFolderTrees.set(sdId, folderTree.doc);
   },
 
   getFolderTreeState(sdId: string): string {
@@ -181,19 +194,25 @@ const bridge: NoteCoveBridge = {
 
   // ==================== File Name Utilities ====================
 
-  parseUpdateFilename(filename: string): UpdateFileInfo | null {
+  parseUpdateFilename(filename: string): UpdateFileMetadata | null {
     return parseUpdateFilename(filename);
   },
 
-  generateUpdateFilename(instanceId: string, timestamp: number, seq: number): string {
-    return generateUpdateFilename(instanceId, timestamp, seq);
+  generateUpdateFilename(
+    type: UpdateType,
+    instanceId: string,
+    documentId: string,
+    timestamp?: number,
+    sequence?: number
+  ): string {
+    return generateUpdateFilename(type, instanceId, documentId, timestamp, sequence);
   },
 
-  parseSnapshotFilename(filename: string): SnapshotFileInfo | null {
+  parseSnapshotFilename(filename: string): SnapshotFileMetadata | null {
     return parseSnapshotFilename(filename);
   },
 
-  parsePackFilename(filename: string): PackFileInfo | null {
+  parsePackFilename(filename: string): PackFileMetadata | null {
     return parsePackFilename(filename);
   },
 
@@ -201,13 +220,13 @@ const bridge: NoteCoveBridge = {
 
   clearDocumentCache(): void {
     // Close all open notes
-    for (const [noteId, doc] of openNotes) {
+    for (const doc of openNotes.values()) {
       doc.destroy();
     }
     openNotes.clear();
 
     // Close all open folder trees
-    for (const [sdId, doc] of openFolderTrees) {
+    for (const doc of openFolderTrees.values()) {
       doc.destroy();
     }
     openFolderTrees.clear();
@@ -223,12 +242,8 @@ const bridge: NoteCoveBridge = {
 };
 
 // Expose to global scope
-if (typeof window !== 'undefined') {
-  window.NoteCoveBridge = bridge;
-} else if (typeof global !== 'undefined') {
-  // For JavaScriptCore, 'global' is the global object
-  (global as any).NoteCoveBridge = bridge;
-}
+// For JavaScriptCore and other environments, use globalThis
+globalThis.NoteCoveBridge = bridge;
 
 // Export for testing
 export default bridge;

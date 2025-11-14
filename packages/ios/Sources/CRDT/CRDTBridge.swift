@@ -74,7 +74,26 @@ class CRDTBridge {
         }
         ctx.setObject(consoleLog, forKeyedSubscript: "consoleLog" as NSString)
 
-        // Evaluate polyfill for atob/btoa (base64 encoding)
+        // Set up global object (JavaScriptCore doesn't have window or global by default)
+        // The bundled JavaScript expects to find 'global' to attach NoteCoveBridge
+        ctx.evaluateScript("var global = this;");
+
+        // Set up getRandomValues for crypto polyfill
+        let getRandomValues: @convention(block) (JSValue) -> JSValue = { array in
+            guard let length = array.objectForKeyedSubscript("length")?.toInt32() else {
+                return array
+            }
+
+            for i in 0..<length {
+                let randomValue = UInt8.random(in: 0...255)
+                array.setObject(randomValue, atIndexedSubscript: Int(i))
+            }
+
+            return array
+        }
+        ctx.setObject(getRandomValues, forKeyedSubscript: "_swiftGetRandomValues" as NSString)
+
+        // Evaluate polyfills for atob/btoa (base64 encoding) and crypto
         // JavaScriptCore doesn't have these by default
         ctx.evaluateScript("""
         var atob = function(base64) {
@@ -119,6 +138,16 @@ class CRDTBridge {
 
             return output;
         };
+
+        // Crypto polyfill for JavaScriptCore
+        var crypto = {
+            getRandomValues: function(array) {
+                return _swiftGetRandomValues(array);
+            },
+            subtle: {
+                // Minimal stub for crypto.subtle (not used by Yjs for critical operations)
+            }
+        };
         """)
 
         // Load the bundled JavaScript
@@ -137,13 +166,6 @@ class CRDTBridge {
 
         // Find the JavaScript bundle in the app's resources
         guard let bundlePath = Bundle.main.path(forResource: "notecove-bridge", ofType: "js") else {
-            // Debug: List all resources in bundle
-            if let resourcePath = Bundle.main.resourcePath {
-                print("DEBUG: Bundle resource path: \(resourcePath)")
-                if let contents = try? FileManager.default.contentsOfDirectory(atPath: resourcePath) {
-                    print("DEBUG: Bundle contents: \(contents)")
-                }
-            }
             throw CRDTBridgeError.javascriptLoadFailed("JavaScript bundle not found in app resources")
         }
 

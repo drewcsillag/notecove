@@ -43,16 +43,19 @@ packages/ios/
 ### First Time Setup
 
 1. **Install XcodeGen** (if not already installed):
+
    ```bash
    brew install xcodegen
    ```
 
 2. **Navigate to the iOS package**:
+
    ```bash
    cd packages/ios
    ```
 
 3. **Generate the Xcode project**:
+
    ```bash
    xcodegen generate
    ```
@@ -102,6 +105,7 @@ When you first open the project in Xcode, you'll need to set up code signing:
 ### What You'll See
 
 The current app (Phase 3.1) is a skeleton with:
+
 - ✅ Tab bar navigation (Notes, Tags, Settings)
 - ✅ Basic SwiftUI views
 - ✅ Placeholder text indicating future implementation
@@ -147,22 +151,26 @@ xcodebuild test \
 ## Troubleshooting
 
 ### "No such module" errors
+
 - Make sure you've generated the project with `xcodegen generate`
 - Clean the build folder: **Product** > **Clean Build Folder** (Cmd+Shift+K)
 - Restart Xcode
 
 ### Code signing errors
+
 - Ensure you're signed in to Xcode with your Apple ID (**Xcode** > **Settings** > **Accounts**)
 - Make sure "Automatically manage signing" is checked
 - Select your team in the Team dropdown
 - If using a free account, note that apps expire after 7 days
 
 ### Simulator not available
+
 - Go to **Xcode** > **Settings** > **Platforms**
 - Ensure iOS platform is installed
 - Download additional simulators if needed
 
 ### Command-line builds fail
+
 - Use Xcode GUI for building (more reliable)
 - Command-line builds are documented but may need simulator runtime configuration
 
@@ -173,6 +181,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 **Current Status**: Phase 3.1 (iOS Project Setup) - Complete ✅
 
 ### Completed
+
 - ✅ Xcode project created and configured
 - ✅ SwiftUI app structure
 - ✅ Basic models (StorageDirectory, Folder, Note, Tag)
@@ -181,6 +190,7 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ iOS 17.0+ target
 
 ### Next Steps
+
 - Phase 3.2: iOS CRDT Implementation (JavaScriptCore bridge)
 - Phase 3.3: Navigation Structure (SD list → folder list → note list → editor)
 - Phase 3.4: Combined Folder/Tag View

@@ -8002,10 +8002,8 @@ var NoteCoveBridgeModule = (() => {
       if (openNotes.has(noteId)) {
         throw new Error(`Note ${noteId} is already open`);
       }
-      const doc2 = new Doc();
-      const noteDoc = new NoteDoc(doc2);
-      noteDoc.initializeStructure();
-      openNotes.set(noteId, doc2);
+      const noteDoc = new NoteDoc(noteId);
+      openNotes.set(noteId, noteDoc.doc);
     },
     applyUpdate(noteId, updateBase64) {
       const doc2 = openNotes.get(noteId);
@@ -8025,7 +8023,12 @@ var NoteCoveBridgeModule = (() => {
     },
     extractTitle(stateBase64) {
       const stateBytes = base64ToUint8Array(stateBase64);
-      return extractTitleFromFragment(stateBytes);
+      const tempDoc = new Doc();
+      applyUpdate(tempDoc, stateBytes);
+      const fragment = tempDoc.getXmlFragment("content");
+      const title = extractTitleFromFragment(fragment);
+      tempDoc.destroy();
+      return title;
     },
     closeNote(noteId) {
       const doc2 = openNotes.get(noteId);
@@ -8040,19 +8043,17 @@ var NoteCoveBridgeModule = (() => {
       if (openFolderTrees.has(sdId)) {
         throw new Error(`Folder tree for SD ${sdId} is already open`);
       }
-      const doc2 = new Doc();
-      const folderTree = new FolderTreeDoc(doc2);
-      folderTree.initializeStructure();
-      openFolderTrees.set(sdId, doc2);
+      const folderTree = new FolderTreeDoc(sdId);
+      openFolderTrees.set(sdId, folderTree.doc);
     },
     loadFolderTree(sdId, stateBase64) {
       if (openFolderTrees.has(sdId)) {
         throw new Error(`Folder tree for SD ${sdId} is already open`);
       }
-      const doc2 = new Doc();
+      const folderTree = new FolderTreeDoc(sdId);
       const stateBytes = base64ToUint8Array(stateBase64);
-      applyUpdate(doc2, stateBytes);
-      openFolderTrees.set(sdId, doc2);
+      applyUpdate(folderTree.doc, stateBytes);
+      openFolderTrees.set(sdId, folderTree.doc);
     },
     getFolderTreeState(sdId) {
       const doc2 = openFolderTrees.get(sdId);
@@ -8074,8 +8075,8 @@ var NoteCoveBridgeModule = (() => {
     parseUpdateFilename(filename) {
       return parseUpdateFilename(filename);
     },
-    generateUpdateFilename(instanceId, timestamp, seq) {
-      return generateUpdateFilename(instanceId, timestamp, seq);
+    generateUpdateFilename(type, instanceId, documentId, timestamp, sequence) {
+      return generateUpdateFilename(type, instanceId, documentId, timestamp, sequence);
     },
     parseSnapshotFilename(filename) {
       return parseSnapshotFilename(filename);
@@ -8085,11 +8086,11 @@ var NoteCoveBridgeModule = (() => {
     },
     // ==================== Memory Management ====================
     clearDocumentCache() {
-      for (const [noteId, doc2] of openNotes) {
+      for (const doc2 of openNotes.values()) {
         doc2.destroy();
       }
       openNotes.clear();
-      for (const [sdId, doc2] of openFolderTrees) {
+      for (const doc2 of openFolderTrees.values()) {
         doc2.destroy();
       }
       openFolderTrees.clear();
@@ -8101,11 +8102,7 @@ var NoteCoveBridgeModule = (() => {
     _openNotes: openNotes,
     _openFolderTrees: openFolderTrees
   };
-  if (typeof window !== "undefined") {
-    window.NoteCoveBridge = bridge;
-  } else if (typeof global !== "undefined") {
-    global.NoteCoveBridge = bridge;
-  }
+  globalThis.NoteCoveBridge = bridge;
   var ios_bridge_default = bridge;
   return __toCommonJS(ios_bridge_exports);
 })();

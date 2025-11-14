@@ -67,6 +67,7 @@ The iOS app reuses the TypeScript CRDT logic from `packages/shared` via JavaScri
 **Purpose**: Main coordinator between Swift and JavaScript layers.
 
 **Responsibilities**:
+
 - Initialize and manage JSContext
 - Load bundled JavaScript code
 - Expose Swift functions to JavaScript (via JSExport protocol)
@@ -74,6 +75,7 @@ The iOS app reuses the TypeScript CRDT logic from `packages/shared` via JavaScri
 - Handle errors from JavaScript execution
 
 **Key APIs**:
+
 ```swift
 class CRDTBridge {
     // Lifecycle
@@ -105,6 +107,7 @@ class CRDTBridge {
 **Purpose**: Handle all file system operations.
 
 **Responsibilities**:
+
 - Read/write .yjson files
 - Create/delete directories
 - Manage storage directory paths
@@ -112,6 +115,7 @@ class CRDTBridge {
 - Atomic file operations
 
 **Key APIs**:
+
 ```swift
 class FileIOManager {
     func readFile(at path: String) throws -> Data
@@ -128,12 +132,14 @@ class FileIOManager {
 **Purpose**: Detect changes to CRDT files from other instances.
 
 **Responsibilities**:
+
 - Monitor storage directories for changes
 - Debounce rapid changes
 - Handle iCloud Drive sync delays
 - Notify observers of relevant changes
 
 **Implementation**:
+
 - Use `FileManager` notifications
 - `NSMetadataQuery` for iCloud Drive monitoring
 - Combine publishers for reactive updates
@@ -143,12 +149,14 @@ class FileIOManager {
 **Purpose**: Local cache and search index.
 
 **Responsibilities**:
+
 - Same schema as desktop (from `packages/shared/src/database/schema.ts`)
 - FTS5 full-text search
 - Tag indexing
 - Note metadata caching
 
 **Integration**:
+
 - Use GRDB Swift library
 - Translate TypeScript schema to Swift models
 - Expose to SwiftUI views via Combine publishers
@@ -158,6 +166,7 @@ class FileIOManager {
 **Purpose**: Run shared CRDT logic in JavaScriptCore.
 
 **Creation Process**:
+
 1. Bundle `packages/shared` with esbuild (or similar)
 2. Output single `.js` file
 3. Include Yjs and dependencies
@@ -165,6 +174,7 @@ class FileIOManager {
 5. Load at runtime via `JSContext.evaluateScript()`
 
 **Requirements**:
+
 - No Node.js-specific APIs
 - No DOM/browser APIs
 - Pure computation only (no I/O)
@@ -192,15 +202,15 @@ let data = Data(base64Encoded: base64)!
 
 ### Type Mappings
 
-| Swift Type | JavaScript Type | Notes |
-|------------|----------------|-------|
-| `String` | `string` | Direct mapping |
-| `Int`, `Double` | `number` | Direct mapping |
-| `Bool` | `boolean` | Direct mapping |
-| `Data` (binary) | `string` (base64) | Base64 encode/decode |
-| `[String: Any]` | `Object` | JSON-compatible dict |
-| `[Any]` | `Array` | JSON-compatible array |
-| `Date` | `number` (timestamp) | Unix milliseconds |
+| Swift Type      | JavaScript Type      | Notes                 |
+| --------------- | -------------------- | --------------------- |
+| `String`        | `string`             | Direct mapping        |
+| `Int`, `Double` | `number`             | Direct mapping        |
+| `Bool`          | `boolean`            | Direct mapping        |
+| `Data` (binary) | `string` (base64)    | Base64 encode/decode  |
+| `[String: Any]` | `Object`             | JSON-compatible dict  |
+| `[Any]`         | `Array`              | JSON-compatible array |
+| `Date`          | `number` (timestamp) | Unix milliseconds     |
 
 ## JavaScript Bundle Structure
 
@@ -371,6 +381,7 @@ func validateNoteId(_ noteId: String) throws {
 
 **Pros**: Native performance, no JS overhead
 **Cons**:
+
 - Reimplement Yjs in Swift (~10K+ lines)
 - Maintain compatibility with desktop
 - High risk of divergence
@@ -381,6 +392,7 @@ func validateNoteId(_ noteId: String) throws {
 
 **Pros**: Code sharing with potential web version
 **Cons**:
+
 - Overkill for notes app
 - Larger bundle size
 - Less native feel
@@ -392,6 +404,7 @@ func validateNoteId(_ noteId: String) throws {
 
 **Pros**: Fast, portable
 **Cons**:
+
 - No WebAssembly runtime on iOS (yet)
 - Would need to compile TypeScript to Wasm
 - Ecosystem immaturity
