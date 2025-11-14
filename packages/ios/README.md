@@ -136,6 +136,127 @@ let notes = try db.listNotes(in: "sd-1", folderId: "folder-1")
 - `tags` - Tags with optional colors
 - `note_tags` - Many-to-many note-tag relationships
 
+### File Watching (`FileWatchManager`)
+
+The `FileWatchManager` monitors directories for file system changes, enabling real-time sync with external changes from iCloud Drive, Dropbox, or manual edits.
+
+**Features:**
+- **Directory Monitoring**: Uses `DispatchSource` for efficient, event-driven file watching
+- **Debouncing**: Configurable debounce interval (default 500ms) to handle rapid changes
+- **Battery Efficient**: Event-driven, no polling
+- **Thread Safe**: Runs on background queue
+
+**Location**: `packages/ios/Sources/Storage/FileWatchManager.swift`
+
+**Usage Example**:
+```swift
+let watcher = FileWatchManager()
+
+// Start watching a directory
+watcher.watchDirectory(path: "/path/to/notes", debounceInterval: 0.5) {
+    print("Files changed, refresh database")
+}
+
+// Stop watching
+watcher.stopWatching()
+```
+
+### File Change Processing (`FileChangeProcessor`)
+
+The `FileChangeProcessor` processes file system changes and updates the database:
+
+1. Loads CRDT updates from `.yjson` files
+2. Extracts metadata (title, content)
+3. Updates the database
+4. Updates the FTS5 search index
+
+**Location**: `packages/ios/Sources/Storage/FileChangeProcessor.swift`
+
+**Usage Example**:
+```swift
+let processor = FileChangeProcessor(db: db, bridge: bridge, fileIO: fileIO)
+
+// Process all changed files in a directory
+try await processor.processChangedFiles(in: "/path/to/notes", storageId: "sd-123")
+
+// Process a single note
+try await processor.updateNoteFromFile(noteId: "note-456", storageId: "sd-123")
+```
+
+### iCloud Integration (`iCloudManager`)
+
+The `iCloudManager` provides iCloud Drive integration:
+
+**Features:**
+- Check iCloud availability
+- Access iCloud container
+- Monitor iCloud sync changes
+- Get Documents directory within iCloud
+
+**Location**: `packages/ios/Sources/Storage/iCloudManager.swift`
+
+**Usage Example**:
+```swift
+let iCloud = iCloudManager()
+
+// Check if iCloud is available
+if iCloud.isICloudAvailable() {
+    // Get the iCloud container URL
+    if let containerURL = iCloud.getContainerURL() {
+        print("iCloud container: \(containerURL)")
+
+        // Watch for iCloud changes
+        iCloud.watchICloudChanges {
+            print("iCloud files changed")
+        }
+    }
+}
+```
+
+### Storage Coordinator (`StorageCoordinator`)
+
+The `StorageCoordinator` ties together file watching, change processing, and database updates:
+
+**Features:**
+- Manages multiple storage directories
+- Coordinates file watching and database updates
+- Publishes changes via Combine for UI observation
+- Tracks recently updated notes
+
+**Location**: `packages/ios/Sources/Storage/StorageCoordinator.swift`
+
+**Usage Example**:
+```swift
+@MainActor
+let coordinator = StorageCoordinator(db: db)
+
+// Load storage directories from database
+await coordinator.loadStorageDirectories()
+
+// Start watching a storage directory
+await coordinator.startWatching(storageId: "sd-123")
+
+// Observe changes in SwiftUI
+coordinator.$recentlyUpdatedNotes
+    .sink { notes in
+        print("Notes updated: \(notes)")
+    }
+```
+
+### Utilities
+
+**Debouncer** (`packages/ios/Sources/Utilities/Debouncer.swift`):
+```swift
+let debouncer = Debouncer(delay: 0.5)
+
+// Rapid calls only execute the last one
+for i in 1...100 {
+    debouncer.debounce {
+        print("Processing \(i)") // Only prints once for i=100
+    }
+}
+```
+
 ### Storage Format
 
 Notes are stored as `.yjson` files containing Yjs CRDT updates:
@@ -166,10 +287,16 @@ packages/ios/
 │   │   └── CRDTBridge.swift
 │   ├── Storage/            # File I/O and storage management
 │   │   ├── FileIOManager.swift
-│   │   └── StorageDirectoryManager.swift
+│   │   ├── StorageDirectoryManager.swift
+│   │   ├── FileWatchManager.swift
+│   │   ├── FileChangeProcessor.swift
+│   │   ├── iCloudManager.swift
+│   │   └── StorageCoordinator.swift
 │   ├── Database/           # SQLite database layer (GRDB)
 │   │   ├── Schema.swift
 │   │   └── DatabaseManager.swift
+│   ├── Utilities/          # Utility classes
+│   │   └── Debouncer.swift
 │   ├── Resources/          # JavaScript bundles
 │   │   └── notecove-bridge.js
 │   ├── Assets.xcassets/    # Images, colors, etc.
@@ -180,9 +307,15 @@ packages/ios/
 │   ├── CRDTBridgeTests.swift
 │   ├── Storage/
 │   │   ├── FileIOManagerTests.swift
-│   │   └── StorageIntegrationTests.swift
-│   └── Database/
-│       └── DatabaseManagerTests.swift
+│   │   ├── StorageIntegrationTests.swift
+│   │   ├── FileWatchManagerTests.swift
+│   │   ├── FileChangeProcessorTests.swift
+│   │   ├── iCloudManagerTests.swift
+│   │   └── StorageCoordinatorTests.swift
+│   ├── Database/
+│   │   └── DatabaseManagerTests.swift
+│   └── Utilities/
+│       └── DebouncerTests.swift
 └── scripts/                 # Build and CI scripts
     └── ci-local.sh
 ```
@@ -352,7 +485,7 @@ All tests must pass before merging to main.
 
 See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 
-**Current Status**: Phase 3.2.4 (SQLite/GRDB Database) - Complete ✅
+**Current Status**: Phase 3.2.5 (File Watching) - Complete ✅
 
 ### Completed
 
@@ -395,8 +528,16 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 - ✅ Tag management with many-to-many relationships
 - ✅ All 23 DatabaseManagerTests passing
 
+**Phase 3.2.5: File Watching** ✅
+- ✅ FileWatchManager with DispatchSource directory monitoring
+- ✅ Debouncer utility for handling rapid changes (500ms default)
+- ✅ FileChangeProcessor for database updates from file changes
+- ✅ iCloudManager for iCloud Drive integration
+- ✅ StorageCoordinator tying together watching, processing, and database
+- ✅ All 40 new tests passing (8 FileWatchManager + 8 FileChangeProcessor + 8 iCloudManager + 9 StorageCoordinator + 7 Debouncer)
+- ✅ Real-time sync with external changes (iCloud, Dropbox, manual edits)
+
 ### Next Steps
-- Phase 3.2.5: File Watching (FileManager notifications, iCloud sync)
 - Phase 3.3: Navigation Structure (SD list → folder list → note list → editor)
 - Phase 3.4: Combined Folder/Tag View
 - Phase 3.5: Editor (WKWebView + TipTap)
@@ -411,11 +552,16 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 Unit tests are written using XCTest and located in the `Tests/` directory.
 
 **Current Test Coverage**:
-- 68 tests total (all passing ✅)
+- 108 tests total (all passing ✅)
 - CRDTBridgeTests: 7 tests
 - FileIOManagerTests: 21 tests
 - StorageIntegrationTests: 13 tests
 - DatabaseManagerTests: 23 tests
+- FileWatchManagerTests: 8 tests
+- FileChangeProcessorTests: 8 tests
+- iCloudManagerTests: 8 tests
+- StorageCoordinatorTests: 9 tests
+- DebouncerTests: 7 tests
 - NoteCoveTests: 4 tests
 
 Run tests from Xcode (Cmd+U) or from the command line:

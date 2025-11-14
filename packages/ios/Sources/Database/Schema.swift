@@ -100,16 +100,16 @@ struct Schema {
 // MARK: - Model Records
 
 /// Storage Directory record
-struct StorageDirectoryRecord: Codable, FetchableRecord, PersistableRecord {
-    static let databaseTableName = "storage_directories"
+public struct StorageDirectoryRecord: Codable, FetchableRecord, PersistableRecord {
+    public static let databaseTableName = "storage_directories"
 
-    var id: String
-    var name: String
-    var path: String
-    var createdAt: Date
-    var modifiedAt: Date
+    public var id: String
+    public var name: String
+    public var path: String
+    public var createdAt: Date
+    public var modifiedAt: Date
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case id
         case name
         case path

@@ -3,7 +3,7 @@ import GRDB
 
 /// Database manager for NoteCove
 /// Handles all database operations including CRUD, search, and transactions
-class DatabaseManager {
+public class DatabaseManager {
     private let dbQueue: DatabaseQueue
 
     // MARK: - Initialization
@@ -11,7 +11,7 @@ class DatabaseManager {
     /// Initialize with a database URL
     /// - Parameter url: URL to the database file (will be created if it doesn't exist)
     /// - Throws: Database errors if initialization fails
-    init(at url: URL) throws {
+    public init(at url: URL) throws {
         // Create parent directory if needed
         let parentDir = url.deletingLastPathComponent()
         if !FileManager.default.fileExists(atPath: parentDir.path) {
@@ -27,7 +27,7 @@ class DatabaseManager {
 
     /// Initialize with an in-memory database (for testing)
     /// - Throws: Database errors if initialization fails
-    static func inMemory() throws -> DatabaseManager {
+    public static func inMemory() throws -> DatabaseManager {
         let dbQueue = try DatabaseQueue()
         let manager = DatabaseManager(queue: dbQueue)
         try Schema.migrate(dbQueue)
@@ -63,14 +63,14 @@ class DatabaseManager {
     }
 
     /// Get a storage directory by ID
-    func getStorageDirectory(id: String) throws -> StorageDirectoryRecord? {
+    public func getStorageDirectory(id: String) throws -> StorageDirectoryRecord? {
         return try dbQueue.read { db in
             try StorageDirectoryRecord.fetchOne(db, key: id)
         }
     }
 
     /// List all storage directories
-    func listStorageDirectories() throws -> [StorageDirectoryRecord] {
+    public func listStorageDirectories() throws -> [StorageDirectoryRecord] {
         return try dbQueue.read { db in
             try StorageDirectoryRecord.fetchAll(db)
         }

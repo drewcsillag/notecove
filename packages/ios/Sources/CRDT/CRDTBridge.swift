@@ -27,7 +27,7 @@ enum CRDTBridgeError: Error {
 ///
 /// Thread Safety: All operations must be called on the main thread/actor.
 @MainActor
-class CRDTBridge {
+public class CRDTBridge {
     // MARK: - Properties
 
     /// The JavaScript context running our bundled code
@@ -41,7 +41,7 @@ class CRDTBridge {
 
     // MARK: - Lifecycle
 
-    init() {
+    public init() {
         setupContext()
     }
 

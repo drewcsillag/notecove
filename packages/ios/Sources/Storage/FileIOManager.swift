@@ -13,11 +13,11 @@ enum FileIOError: Error, Equatable {
 
 /// Manages file system operations for NoteCove storage
 /// Provides atomic writes, directory management, and pattern-based file listing
-class FileIOManager {
+public class FileIOManager {
     private let fileManager: FileManager
 
     /// Initialize with a custom FileManager (mainly for testing)
-    init(fileManager: FileManager = .default) {
+    public init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
 
