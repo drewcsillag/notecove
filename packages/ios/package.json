@@ -1,0 +1,9 @@
+{
+  "name": "@notecove/ios",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NoteCove iOS application",
+  "scripts": {
+    "ci-local": "./scripts/ci-local.sh"
+  }
+}

@@ -148,6 +148,31 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
+## CI/CD
+
+### Running Local CI
+
+Before committing iOS changes, run the local CI script to ensure all tests pass:
+
+```bash
+# From repo root
+pnpm --filter @notecove/ios ci-local
+
+# Or from packages/ios
+./scripts/ci-local.sh
+```
+
+The CI script will:
+
+1. Find an available iOS simulator
+2. Rebuild the JavaScript bundle from `packages/shared`
+3. Copy the bundle to iOS resources
+4. Regenerate the Xcode project with XcodeGen
+5. Build the iOS app
+6. Run all unit tests
+
+All tests must pass before merging to main.
+
 ## Troubleshooting
 
 ### "No such module" errors
