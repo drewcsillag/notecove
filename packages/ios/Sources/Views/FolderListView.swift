@@ -17,9 +17,8 @@ struct FolderListView: View {
     @State private var notes: [NoteRecord] = []
     @State private var isLoading = false
     @State private var showingAddFolderSheet = false
-    @State private var showingAddNoteSheet = false
     @State private var newFolderName = ""
-    @State private var newNoteTitle = ""
+    @State private var navigationPath: String? = nil
 
     var body: some View {
         Group {
@@ -36,27 +35,40 @@ struct FolderListView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
-                        showingAddNoteSheet = true
+                        Task {
+                            await createNote()
+                        }
                     } label: {
                         Label("New Note", systemImage: "doc.badge.plus")
                     }
+                    .accessibilityIdentifier("newNoteButton")
 
                     Button {
                         showingAddFolderSheet = true
                     } label: {
                         Label("New Folder", systemImage: "folder.badge.plus")
                     }
+                    .accessibilityIdentifier("newFolderButton")
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityIdentifier("addMenuButton")
             }
         }
         .sheet(isPresented: $showingAddFolderSheet) {
             addFolderSheet
         }
-        .sheet(isPresented: $showingAddNoteSheet) {
-            addNoteSheet
-        }
+        .background(
+            NavigationLink(
+                destination: navigationPath.map { noteId in
+                    NoteEditorView(viewModel: viewModel, noteId: noteId, storageId: storageId)
+                },
+                tag: navigationPath ?? "",
+                selection: $navigationPath
+            ) {
+                EmptyView()
+            }
+        )
         .task {
             await loadContent()
         }
@@ -90,7 +102,9 @@ struct FolderListView: View {
 
             HStack(spacing: 16) {
                 Button {
-                    showingAddNoteSheet = true
+                    Task {
+                        await createNote()
+                    }
                 } label: {
                     Label("New Note", systemImage: "doc.badge.plus")
                 }
@@ -174,35 +188,6 @@ struct FolderListView: View {
         }
     }
 
-    private var addNoteSheet: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Note Title", text: $newNoteTitle)
-                }
-            }
-            .navigationTitle("New Note")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showingAddNoteSheet = false
-                        newNoteTitle = ""
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        Task {
-                            await createNote()
-                        }
-                    }
-                    .disabled(newNoteTitle.isEmpty)
-                }
-            }
-        }
-    }
-
     private func loadContent() async {
         isLoading = true
         defer { isLoading = false }
@@ -248,18 +233,20 @@ struct FolderListView: View {
         do {
             let noteId = UUID().uuidString
 
+            // Create note with "Untitled" - title will be extracted from CRDT content when user types
             try viewModel.database.insertNote(
                 id: noteId,
                 storageDirectoryId: storageId,
                 folderId: parentFolderId,
-                title: newNoteTitle
+                title: "Untitled"
             )
 
             // Create the note in the CRDT bridge
             try viewModel.bridge.createNote(noteId: noteId)
 
-            showingAddNoteSheet = false
-            newNoteTitle = ""
+            // Navigate to the editor
+            navigationPath = noteId
+
             await loadContent()
         } catch {
             print("[FolderListView] Error creating note: \(error)")

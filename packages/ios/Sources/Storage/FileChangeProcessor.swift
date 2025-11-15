@@ -96,11 +96,23 @@ public class FileChangeProcessor {
             throw FileChangeProcessorError.noteDirectoryNotFound(noteId)
         }
 
-        // List all .yjson files in the note directory
-        let yjsonFiles = try fileIO.listFiles(in: notePath, matching: "*.yjson")
+        // List all .yjson files in the note's updates directory
+        let updatesPath = URL(fileURLWithPath: notePath)
+            .appendingPathComponent("updates")
+            .path
+
+        // Check if updates directory exists
+        isDirectory = false
+        guard FileManager.default.fileExists(atPath: updatesPath, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            print("[FileChangeProcessor] No updates directory found for note: \(noteId)")
+            return
+        }
+
+        let yjsonFiles = try fileIO.listFiles(in: updatesPath, matching: "*.yjson")
 
         guard !yjsonFiles.isEmpty else {
-            print("[FileChangeProcessor] No .yjson files found for note: \(noteId)")
+            print("[FileChangeProcessor] No .yjson files found in updates directory for note: \(noteId)")
             return
         }
 
@@ -119,7 +131,7 @@ public class FileChangeProcessor {
 
         // Apply updates from the files (in sorted order)
         for fileName in yjsonFiles.sorted() {
-            let filePath = URL(fileURLWithPath: notePath)
+            let filePath = URL(fileURLWithPath: updatesPath)
                 .appendingPathComponent(fileName)
                 .path
 

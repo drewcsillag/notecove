@@ -33,6 +33,7 @@ struct StorageDirectoryListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityIdentifier("addStorageButton")
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
@@ -84,8 +85,10 @@ struct StorageDirectoryListView: View {
             Form {
                 Section {
                     TextField("Name", text: $newSDName)
+                        .accessibilityIdentifier("storageNameField")
                     TextField("Path", text: $newSDPath)
                         .autocapitalization(.none)
+                        .accessibilityIdentifier("storagePathField")
 
                     Button("Use Documents Directory") {
                         if let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path {
@@ -96,6 +99,7 @@ struct StorageDirectoryListView: View {
                         }
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityIdentifier("useDocumentsButton")
 
                     Button("Use iCloud Drive") {
                         let iCloudMgr = iCloudManager()
@@ -107,6 +111,7 @@ struct StorageDirectoryListView: View {
                         }
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityIdentifier("useICloudButton")
                 } header: {
                     Text("Storage Directory Details")
                 } footer: {
@@ -130,6 +135,7 @@ struct StorageDirectoryListView: View {
                         }
                     }
                     .disabled(newSDName.isEmpty || newSDPath.isEmpty)
+                    .accessibilityIdentifier("addStorageConfirmButton")
                 }
             }
         }

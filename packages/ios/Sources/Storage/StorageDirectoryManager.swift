@@ -54,6 +54,46 @@ class StorageDirectoryManager {
         return "\(notesDir)/\(noteId)"
     }
 
+    /// Get the path for a note's updates directory
+    /// - Parameters:
+    ///   - storageId: The storage directory ID
+    ///   - noteId: The note ID
+    /// - Returns: Absolute path to the note's updates directory
+    func getNoteUpdatesDirectory(storageId: String, noteId: String) -> String {
+        let noteDir = getNoteDirectory(storageId: storageId, noteId: noteId)
+        return "\(noteDir)/updates"
+    }
+
+    /// Get the path for a note's snapshots directory
+    /// - Parameters:
+    ///   - storageId: The storage directory ID
+    ///   - noteId: The note ID
+    /// - Returns: Absolute path to the note's snapshots directory
+    func getNoteSnapshotsDirectory(storageId: String, noteId: String) -> String {
+        let noteDir = getNoteDirectory(storageId: storageId, noteId: noteId)
+        return "\(noteDir)/snapshots"
+    }
+
+    /// Get the path for a note's packs directory
+    /// - Parameters:
+    ///   - storageId: The storage directory ID
+    ///   - noteId: The note ID
+    /// - Returns: Absolute path to the note's packs directory
+    func getNotePacksDirectory(storageId: String, noteId: String) -> String {
+        let noteDir = getNoteDirectory(storageId: storageId, noteId: noteId)
+        return "\(noteDir)/packs"
+    }
+
+    /// Get the path for a note's metadata directory
+    /// - Parameters:
+    ///   - storageId: The storage directory ID
+    ///   - noteId: The note ID
+    /// - Returns: Absolute path to the note's meta directory
+    func getNoteMetaDirectory(storageId: String, noteId: String) -> String {
+        let noteDir = getNoteDirectory(storageId: storageId, noteId: noteId)
+        return "\(noteDir)/meta"
+    }
+
     /// Get the folder tree file path for a storage directory
     /// - Parameter storageId: The storage directory ID
     /// - Returns: Absolute path to the folder-tree.yjson file
@@ -90,7 +130,8 @@ class StorageDirectoryManager {
         }
     }
 
-    /// Ensure a specific note's directory exists
+    /// Ensure a specific note's directory exists with all subdirectories
+    /// Creates: noteId/, noteId/updates/, noteId/snapshots/, noteId/packs/, noteId/meta/
     /// - Parameters:
     ///   - storageId: The storage directory ID
     ///   - noteId: The note ID
@@ -99,11 +140,33 @@ class StorageDirectoryManager {
         // First ensure parent directories exist
         try ensureDirectoriesExist(storageId: storageId)
 
-        // Then create note directory
-        let noteDir = getNoteDirectory(storageId: storageId, noteId: noteId)
         let fileIO = FileIOManager(fileManager: fileManager)
+
+        // Create note root directory
+        let noteDir = getNoteDirectory(storageId: storageId, noteId: noteId)
         if !fileIO.fileExists(at: noteDir) {
             try fileIO.createDirectory(at: noteDir)
+        }
+
+        // Create subdirectories (matching desktop structure)
+        let updatesDir = getNoteUpdatesDirectory(storageId: storageId, noteId: noteId)
+        if !fileIO.fileExists(at: updatesDir) {
+            try fileIO.createDirectory(at: updatesDir)
+        }
+
+        let snapshotsDir = getNoteSnapshotsDirectory(storageId: storageId, noteId: noteId)
+        if !fileIO.fileExists(at: snapshotsDir) {
+            try fileIO.createDirectory(at: snapshotsDir)
+        }
+
+        let packsDir = getNotePacksDirectory(storageId: storageId, noteId: noteId)
+        if !fileIO.fileExists(at: packsDir) {
+            try fileIO.createDirectory(at: packsDir)
+        }
+
+        let metaDir = getNoteMetaDirectory(storageId: storageId, noteId: noteId)
+        if !fileIO.fileExists(at: metaDir) {
+            try fileIO.createDirectory(at: metaDir)
         }
     }
 

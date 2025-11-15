@@ -24,6 +24,18 @@ const checks = [
   { name: 'Type Check', cmd: 'pnpm typecheck' },
   { name: 'Build', cmd: 'pnpm build' },
   {
+    name: 'iOS: Generate Xcode Project',
+    cmd: 'cd packages/ios && xcodegen generate',
+  },
+  {
+    name: 'iOS: Build',
+    cmd: 'cd packages/ios && xcodebuild -scheme NoteCove -destination "platform=iOS Simulator,name=iPhone 17" build',
+  },
+  {
+    name: 'iOS: UI Tests',
+    cmd: 'cd packages/ios && xcodebuild test -scheme NoteCove -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:NoteCoveUITests',
+  },
+  {
     name: 'Rebuild for Node.js',
     cmd: 'cd packages/desktop && pnpm rebuild better-sqlite3',
   },

@@ -24,6 +24,8 @@ class EditorViewModel: ObservableObject {
     private let database: DatabaseManager
     private weak var webView: WKWebView?
     private let fileIO = FileIOManager()
+    private let sdManager = StorageDirectoryManager()
+    private let updateFileManager = UpdateFileManager()
 
     // Debounce timer for tag extraction
     private var tagExtractionTask: Task<Void, Never>?
@@ -45,21 +47,25 @@ class EditorViewModel: ObservableObject {
         // when the bridge is deallocated.
     }
 
-    /// Get the file path for the note's CRDT state
-    private func getNoteStatePath() throws -> String {
-        // Get storage directory from database
+    /// Get the storage directory path from database
+    private func getStoragePath() throws -> String {
         guard let storage = try database.getStorageDirectory(id: storageId) else {
             throw NSError(domain: "EditorViewModel", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "Storage directory not found: \(storageId)"])
         }
+        return storage.path
+    }
 
-        // Create notes directory if needed
-        let notesDir = "\(storage.path)/notes"
-        if !fileIO.fileExists(at: notesDir) {
-            try fileIO.createDirectory(at: notesDir)
-        }
+    /// Initialize note directory structure and sequence counter
+    private func initializeNoteStructure() throws {
+        let storagePath = try getStoragePath()
 
-        return "\(notesDir)/\(noteId).yjs"
+        // Ensure note directory structure exists
+        try sdManager.ensureNoteDirectoryExists(storageId: storagePath, noteId: noteId)
+
+        // Initialize sequence counter by scanning existing update files
+        let updatesDir = sdManager.getNoteUpdatesDirectory(storageId: storagePath, noteId: noteId)
+        try updateFileManager.initializeSequence(for: noteId, updatesDirectory: updatesDir, fileIO: fileIO)
     }
 
     /// Set the web view reference
@@ -72,25 +78,33 @@ class EditorViewModel: ObservableObject {
         isLoading = true
 
         do {
+            // Initialize note directory structure and sequence counter
+            try initializeNoteStructure()
+
             // First, create/open the note in the CRDT bridge
             try bridge.createNote(noteId: noteId)
             print("[EditorViewModel] Created/opened note in CRDT bridge: \(noteId)")
 
-            // Try to load existing state from disk
-            let statePath = try getNoteStatePath()
-            var stateData: Data?
+            // Load all existing update files from the updates/ directory
+            let storagePath = try getStoragePath()
+            let updatesDir = sdManager.getNoteUpdatesDirectory(storageId: storagePath, noteId: noteId)
 
-            if fileIO.fileExists(at: statePath) {
-                stateData = try fileIO.readFile(at: statePath)
-                print("[EditorViewModel] Loaded note state from disk: \(stateData!.count) bytes")
+            if fileIO.fileExists(at: updatesDir) {
+                let updateFiles = try fileIO.listFiles(in: updatesDir, matching: "*.yjson").sorted()
 
-                // Apply the saved state to the CRDT bridge
-                try bridge.applyUpdate(noteId: noteId, updateData: stateData!)
+                print("[EditorViewModel] Found \(updateFiles.count) update files for note: \(noteId)")
+
+                // Apply each update file in order
+                for filename in updateFiles {
+                    let filePath = "\(updatesDir)/\(filename)"
+                    let updateData = try fileIO.readFile(at: filePath)
+                    try bridge.applyUpdate(noteId: noteId, updateData: updateData)
+                }
             } else {
-                print("[EditorViewModel] No existing state file, starting with empty note")
+                print("[EditorViewModel] No updates directory, starting with empty note")
             }
 
-            // Get the current CRDT state (either loaded or empty)
+            // Get the current CRDT state (merged from all updates)
             let state = try bridge.getDocumentState(noteId: noteId)
 
             // Convert to base64 for JavaScript
@@ -107,6 +121,7 @@ class EditorViewModel: ObservableObject {
             print("[EditorViewModel] Error loading note: \(error)")
             // Try to create note and load empty
             do {
+                try initializeNoteStructure()
                 try bridge.createNote(noteId: noteId)
                 await callJavaScript(function: "loadNote", args: [noteId, ""])
             } catch {
@@ -138,13 +153,20 @@ class EditorViewModel: ObservableObject {
             // Apply update to CRDT bridge
             try bridge.applyUpdate(noteId: noteId, updateData: updateData)
 
-            // Get updated state
-            let state = try bridge.getDocumentState(noteId: noteId)
+            // Write update to disk as a new update file
+            let storagePath = try getStoragePath()
+            let updatesDir = sdManager.getNoteUpdatesDirectory(storageId: storagePath, noteId: noteId)
 
-            // Save state to disk
-            let statePath = try getNoteStatePath()
-            try fileIO.atomicWrite(data: state, to: statePath)
-            print("[EditorViewModel] Saved note state to disk: \(state.count) bytes")
+            // Generate filename with instance ID, note ID, timestamp, and sequence number
+            let filename = updateFileManager.generateUpdateFilename(noteId: noteId)
+            let filePath = "\(updatesDir)/\(filename)"
+
+            // Write the update file
+            try fileIO.atomicWrite(data: updateData, to: filePath)
+            print("[EditorViewModel] Saved update to: \(filename)")
+
+            // Get updated state for title extraction
+            let state = try bridge.getDocumentState(noteId: noteId)
 
             // Extract and update title (immediate, users expect live updates)
             let title = try bridge.extractTitle(stateData: state)
