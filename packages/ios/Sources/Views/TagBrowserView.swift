@@ -141,14 +141,12 @@ struct AllTagsView: View {
     enum TagFilterState {
         case none      // Tag not selected
         case and       // Must have this tag (blue)
-        case or        // Can have this tag (green)
         case not       // Must NOT have this tag (red)
 
         var color: Color {
             switch self {
             case .none: return .gray
             case .and: return .blue
-            case .or: return .green
             case .not: return .red
             }
         }
@@ -157,7 +155,6 @@ struct AllTagsView: View {
             switch self {
             case .none: return "circle"
             case .and: return "checkmark.circle.fill"
-            case .or: return "plus.circle.fill"
             case .not: return "xmark.circle.fill"
             }
         }
@@ -165,8 +162,7 @@ struct AllTagsView: View {
         mutating func cycle() {
             switch self {
             case .none: self = .and
-            case .and: self = .or
-            case .or: self = .not
+            case .and: self = .not
             case .not: self = .none
             }
         }
@@ -195,9 +191,6 @@ struct AllTagsView: View {
                 Label("AND", systemImage: "checkmark.circle.fill")
                     .foregroundColor(.blue)
                     .font(.caption)
-                Label("OR", systemImage: "plus.circle.fill")
-                    .foregroundColor(.green)
-                    .font(.caption)
                 Label("NOT", systemImage: "xmark.circle.fill")
                     .foregroundColor(.red)
                     .font(.caption)
@@ -218,50 +211,113 @@ struct AllTagsView: View {
                 // No tags match search
                 ContentUnavailableView.search(text: searchText)
             } else {
-                List {
-                    // Tags section
-                    Section("Tags") {
-                        ForEach(filteredTags) { tag in
-                            TagFilterRow(
-                                tag: tag,
-                                state: tagStates[tag.id] ?? .none,
-                                onTap: {
-                                    var state = tagStates[tag.id] ?? .none
-                                    state.cycle()
-                                    tagStates[tag.id] = state
-                                    filterNotes()
-                                }
-                            )
-                        }
-                    }
+                VStack(spacing: 0) {
+                    // Tags section - scrollable with max height
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Section header
+                        Text("Tags")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(.systemGray6))
 
-                    // Filtered notes section
-                    if hasActiveFilters {
-                        Section("Filtered Notes (\(filteredNotes.count))") {
-                            if filteredNotes.isEmpty {
-                                Text("No notes match the selected tags")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
-                            } else {
-                                ForEach(filteredNotes) { note in
-                                    NavigationLink(destination: NoteEditorView(
-                                        viewModel: viewModel,
-                                        noteId: note.id,
-                                        storageId: note.storageDirectoryId
-                                    )) {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(note.title)
-                                            Text(note.modifiedAt, style: .relative)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
+                        // Scrollable tags list
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(filteredTags) { tag in
+                                    TagFilterRow(
+                                        tag: tag,
+                                        state: tagStates[tag.id] ?? .none,
+                                        onTap: {
+                                            var state = tagStates[tag.id] ?? .none
+                                            state.cycle()
+                                            tagStates[tag.id] = state
+                                            filterNotes()
                                         }
-                                    }
+                                    )
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    Divider()
+                                        .padding(.leading, 16)
                                 }
                             }
                         }
+                        .frame(maxHeight: 300) // Limit tags list height
+                        .background(Color(.systemBackground))
+                    }
+
+                    Divider()
+                        .background(Color(.systemGray3))
+
+                    // Filtered notes section - always visible
+                    if hasActiveFilters {
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Section header
+                            HStack {
+                                Text("Filtered Notes")
+                                    .font(.headline)
+                                Spacer()
+                                Text("\(filteredNotes.count)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color(.systemGray6))
+
+                            // Notes list
+                            if filteredNotes.isEmpty {
+                                VStack {
+                                    Text("No notes match the selected tags")
+                                        .foregroundColor(.secondary)
+                                        .font(.callout)
+                                        .padding()
+                                    Spacer()
+                                }
+                                .frame(maxWidth: .infinity)
+                            } else {
+                                List {
+                                    ForEach(filteredNotes) { note in
+                                        NavigationLink(destination: NoteEditorView(
+                                            viewModel: viewModel,
+                                            noteId: note.id,
+                                            storageId: note.storageDirectoryId
+                                        )) {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(note.title)
+                                                Text(note.modifiedAt, style: .relative)
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+                                }
+                                .listStyle(.plain)
+                            }
+                        }
+                    } else {
+                        // Prompt to select tags
+                        VStack {
+                            Image(systemName: "hand.tap")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                                .padding()
+                            Text("Tap tags above to filter notes")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            Text("Use AND (blue) to require tags\nUse NOT (red) to exclude tags")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 4)
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
                     }
                 }
-                .listStyle(.insetGrouped)
             }
         }
         .task {
@@ -299,11 +355,10 @@ struct AllTagsView: View {
 
     private func filterNotes() {
         let andTags = Set(tagStates.filter({ $0.value == .and }).map({ $0.key }))
-        let orTags = Set(tagStates.filter({ $0.value == .or }).map({ $0.key }))
         let notTags = Set(tagStates.filter({ $0.value == .not }).map({ $0.key }))
 
         // If no filters active, clear results
-        guard !andTags.isEmpty || !orTags.isEmpty || !notTags.isEmpty else {
+        guard !andTags.isEmpty || !notTags.isEmpty else {
             filteredNotes = []
             return
         }
@@ -339,11 +394,6 @@ struct AllTagsView: View {
 
                     // AND logic: note must have ALL AND tags
                     if !andTags.isEmpty && !andTags.isSubset(of: noteTagIds) {
-                        continue
-                    }
-
-                    // OR logic: note must have at least ONE OR tag (if OR tags specified)
-                    if !orTags.isEmpty && orTags.isDisjoint(with: noteTagIds) {
                         continue
                     }
 

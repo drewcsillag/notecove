@@ -3585,7 +3585,10 @@ var NoteCoveBridgeModule = (() => {
      * @return {AbstractType<any>|null}
      */
     get parent() {
-      return this._item ? /** @type {AbstractType<any>} */ this._item.parent : null;
+      return this._item
+        ? /** @type {AbstractType<any>} */
+          this._item.parent
+        : null;
     }
     /**
      * Integrate this type into the Yjs instance.
@@ -4138,7 +4141,10 @@ var NoteCoveBridgeModule = (() => {
       arr.insert(
         0,
         this.toArray().map((el) =>
-          el instanceof AbstractType ? /** @type {typeof el} */ el.clone() : el
+          el instanceof AbstractType
+            ? /** @type {typeof el} */
+              el.clone()
+            : el
         )
       );
       return arr;
@@ -4366,7 +4372,10 @@ var NoteCoveBridgeModule = (() => {
       this.forEach((value, key) => {
         map2.set(
           key,
-          value instanceof AbstractType ? /** @type {typeof value} */ value.clone() : value
+          value instanceof AbstractType
+            ? /** @type {typeof value} */
+              value.clone()
+            : value
         );
       });
       return map2;
@@ -7620,11 +7629,9 @@ var NoteCoveBridgeModule = (() => {
         );
         if (
           /** @type {AbstractType<any>} */
-          (
-            this.parent._item !== null &&
-              /** @type {AbstractType<any>} */
-              this.parent._item.deleted
-          ) ||
+          (this.parent._item !== null &&
+            /** @type {AbstractType<any>} */
+            this.parent._item.deleted) ||
           (this.parentSub !== null && this.right !== null)
         ) {
           this.delete(transaction);
@@ -8403,6 +8410,33 @@ var NoteCoveBridgeModule = (() => {
       const title = extractTitleFromFragment(fragment);
       tempDoc.destroy();
       return title;
+    },
+    extractContent(stateBase64) {
+      const stateBytes = base64ToUint8Array(stateBase64);
+      const tempDoc = new Doc();
+      applyUpdate(tempDoc, stateBytes);
+      const fragment = tempDoc.getXmlFragment('content');
+      let contentText = '';
+      const extractText = (elem) => {
+        let text2 = '';
+        elem.forEach((child) => {
+          if (child instanceof YXmlText) {
+            text2 += String(child.toString());
+          } else if (child instanceof YXmlElement) {
+            text2 += extractText(child);
+          }
+        });
+        return text2;
+      };
+      fragment.forEach((item) => {
+        if (item instanceof YXmlText) {
+          contentText += String(item.toString()) + '\n';
+        } else if (item instanceof YXmlElement) {
+          contentText += extractText(item) + '\n';
+        }
+      });
+      tempDoc.destroy();
+      return contentText;
     },
     closeNote(noteId) {
       const doc2 = openNotes.get(noteId);

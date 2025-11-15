@@ -54,6 +54,24 @@ final class CRDTBridgeTests: XCTestCase {
         XCTAssertEqual(title, "Untitled", "New note should have 'Untitled' as title")
     }
 
+    func testExtractContent() throws {
+        let noteId = "test-note-extract-content"
+
+        // Create a note
+        try bridge.createNote(noteId: noteId)
+
+        // Get its state
+        let state = try bridge.getDocumentState(noteId: noteId)
+
+        // Extract content (should not throw for a new note, even if empty)
+        let content = try bridge.extractContent(stateData: state)
+        XCTAssertNotNil(content, "Content extraction should return a string")
+
+        // For a new note, content may be empty or contain only the default structure
+        // We just verify it doesn't crash and returns a string
+        XCTAssertTrue(content is String, "Extracted content should be a string")
+    }
+
     func testCloseNote() throws {
         let noteId = "test-note-3"
 

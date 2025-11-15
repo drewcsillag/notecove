@@ -355,10 +355,15 @@ public class DatabaseManager {
         }
     }
 
-    /// List all tags in a storage directory
+    /// List all tags in a storage directory that have at least one note
     func listTags(in storageDirectoryId: String) throws -> [TagRecord] {
         return try dbQueue.read { db in
-            let sql = "SELECT * FROM tags WHERE storage_directory_id = ? ORDER BY name ASC"
+            let sql = """
+                SELECT DISTINCT t.* FROM tags t
+                INNER JOIN note_tags nt ON t.id = nt.tag_id
+                WHERE t.storage_directory_id = ?
+                ORDER BY t.name ASC
+            """
             return try TagRecord.fetchAll(db, sql: sql, arguments: [storageDirectoryId])
         }
     }

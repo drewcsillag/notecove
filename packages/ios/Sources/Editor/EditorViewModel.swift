@@ -25,6 +25,10 @@ class EditorViewModel: ObservableObject {
     private weak var webView: WKWebView?
     private let fileIO = FileIOManager()
 
+    // Debounce timer for tag extraction
+    private var tagExtractionTask: Task<Void, Never>?
+    private let tagExtractionDelay: TimeInterval = 1.5 // Wait 1.5 seconds after last keystroke
+
     init(noteId: String, storageId: String, bridge: CRDTBridge, database: DatabaseManager) {
         print("[EditorViewModel] Initializing for note: \(noteId)")
         self.noteId = noteId
@@ -142,15 +146,31 @@ class EditorViewModel: ObservableObject {
             try fileIO.atomicWrite(data: state, to: statePath)
             print("[EditorViewModel] Saved note state to disk: \(state.count) bytes")
 
-            // Extract and update title
+            // Extract and update title (immediate, users expect live updates)
             let title = try bridge.extractTitle(stateData: state)
             await handleContentChanged(noteId: noteId, title: title, isEmpty: title.isEmpty)
 
-            // Extract and index tags
-            let content = try bridge.extractContent(stateData: state)
-            let tags = TagExtractor.extractTags(from: content)
-            try database.reindexTags(for: noteId, in: storageId, tags: tags)
-            print("[EditorViewModel] Re-indexed \(tags.count) tags for note: \(noteId)")
+            // Debounce tag extraction to avoid indexing partial tags while typing
+            tagExtractionTask?.cancel()
+            tagExtractionTask = Task { [weak self] in
+                guard let self = self else { return }
+
+                // Wait for the debounce delay
+                try? await Task.sleep(nanoseconds: UInt64(self.tagExtractionDelay * 1_000_000_000))
+
+                // Check if task was cancelled
+                guard !Task.isCancelled else { return }
+
+                // Extract and index tags
+                do {
+                    let content = try self.bridge.extractContent(stateData: state)
+                    let tags = TagExtractor.extractTags(from: content)
+                    try self.database.reindexTags(for: self.noteId, in: self.storageId, tags: tags)
+                    print("[EditorViewModel] Re-indexed \(tags.count) tags for note: \(self.noteId)")
+                } catch {
+                    print("[EditorViewModel] Error extracting tags: \(error)")
+                }
+            }
 
         } catch {
             print("[EditorViewModel] Error handling update: \(error)")
