@@ -84,8 +84,8 @@ Suggest tooling that might be applicable where I've not considered it.
 If I ask you to make a change, and you start doing it, NEVER start rolling back the change without asking me and explaining in detail what the problem is.
 
 When you complete a phase (or subphase), tell me you're done before proceeding so I can look and make a git commit, or I can approve and you can commit after I say ok.
-- We use bd (beads) for issue tracking instead of Markdown TODOs or external tools.
 
+- We use bd (beads) for issue tracking instead of Markdown TODOs or external tools.
 
 ### Landing the Plane
 
@@ -198,6 +198,3 @@ This installs:
 Without the pre-push hook, you can have database changes committed locally but stale JSONL pushed to remote, causing multi-workspace divergence. The hooks guarantee DB ↔ JSONL consistency.
 
 **Note:** Hooks are embedded in the bd binary and work for all bd users (not just source repo users).
-
-
-

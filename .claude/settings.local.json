@@ -48,7 +48,14 @@
       "Bash(bd sync:*)",
       "Bash(bd import:*)",
       "Bash(git stash:*)",
-      "Bash(git remote prune:*)"
+      "Bash(git remote prune:*)",
+      "Bash(bd show:*)",
+      "Bash(node /Users/drew/devel/notecove/packages/shared/scripts/build-editor-bundle.js:*)",
+      "Bash(pnpm format:*)",
+      "Bash(git pull:*)",
+      "Bash(bd export:*)",
+      "Bash(.beads/issues.jsonl)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []

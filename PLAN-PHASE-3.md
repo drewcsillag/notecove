@@ -3,6 +3,7 @@
 **Overall Status:** In Progress (6 of 10 subphases complete)
 
 **Completed Subphases:**
+
 - ✅ 3.1: iOS Project Setup
 - ✅ 3.2: iOS CRDT Implementation (subphases 3.2.1-3.2.5)
 - ✅ 3.3: iOS UI - Navigation Structure
@@ -10,6 +11,7 @@
 - ✅ 3.5: iOS UI - Editor (WKWebView + TipTap)
 
 **Remaining Subphases:**
+
 - 🟥 3.6: iOS UI - Settings
 - 🟥 3.7: iOS - Recently Deleted & Restoration
 - 🟥 3.8: iOS - Search

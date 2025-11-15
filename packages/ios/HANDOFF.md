@@ -807,6 +807,7 @@ TabView (ContentView)
 #### Editor Features Implemented
 
 **Rich Text Editing:**
+
 - Bold, italic, underline formatting
 - Headings (H1, H2, H3)
 - Bullet lists and ordered lists
@@ -815,6 +816,7 @@ TabView (ContentView)
 - Proper paragraph and line handling
 
 **CRDT Integration:**
+
 - Loads note state from CRDTBridge
 - Applies CRDT updates in real-time
 - Sends updates back to Swift for persistence
@@ -822,6 +824,7 @@ TabView (ContentView)
 - Y.js document syncing
 
 **UI Polish:**
+
 - Dark mode support
 - Native iOS keyboard toolbar
 - Formatting buttons with SF Symbols
@@ -840,12 +843,14 @@ TabView (ContentView)
 #### Files Created
 
 **Editor:**
+
 - `packages/ios/Sources/Resources/editor.html` (295 lines)
 - `packages/ios/Sources/Editor/EditorBridge.swift` (96 lines)
 - `packages/ios/Sources/Editor/EditorViewModel.swift` (133 lines)
 - `packages/ios/Sources/Editor/EditorWebView.swift` (68 lines)
 
 **Modified:**
+
 - `packages/ios/Sources/Views/NoteEditorView.swift` - Integrated EditorWebView
 - `packages/ios/project.yml` - Added editor.html resource
 
@@ -859,6 +864,7 @@ TabView (ContentView)
 #### Technical Details
 
 **Message Flow:**
+
 ```
 Swift → JavaScript:
 - loadNote(noteId, stateBase64) - Load note with CRDT state
@@ -875,6 +881,7 @@ JavaScript → Swift:
 ```
 
 **Data Encoding:**
+
 - CRDT updates: Binary → Base64 → JavaScript → Base64 → Binary
 - Ensures safe data transfer across WebView boundary
 - No data loss or corruption
@@ -984,23 +991,27 @@ a1efd47 feat: Complete Phase 3.1 - iOS Project Setup
 With the core app complete (navigation, folders, notes, rich text editor), the next phases focus on polish and additional features:
 
 **Phase 3.6 - Settings**
+
 1. Settings tab implementation
 2. App preferences (theme, font size, etc.)
 3. Storage directory management from settings
 4. About/version information
 
 **Phase 3.7 - Optimization**
+
 1. Debounced CRDT writes (reduce filesystem noise)
 2. Performance improvements
 3. Memory optimization
 
 **Phase 3.8 - Search**
+
 1. Global FTS5 search interface
 2. Search within storage directory
 3. Filter by tags
 4. Recent searches
 
 **Phase 3.9 - Advanced Editor Features**
+
 1. Hashtag extension (#tag)
 2. Inter-note link extension ([[note-id]])
 3. Tri-state checkbox extension
