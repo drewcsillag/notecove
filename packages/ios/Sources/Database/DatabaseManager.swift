@@ -273,7 +273,7 @@ public class DatabaseManager {
 
     /// Delete a folder (and all its contents)
     func deleteFolder(id: String) throws {
-        try dbQueue.write { db in
+        _ = try dbQueue.write { db in
             try FolderRecord.deleteOne(db, key: id)
             // Cascade delete will handle notes and subfolders
         }
@@ -342,7 +342,7 @@ public class DatabaseManager {
 
     /// Delete a tag
     func deleteTag(id: String) throws {
-        try dbQueue.write { db in
+        _ = try dbQueue.write { db in
             try TagRecord.deleteOne(db, key: id)
             // Cascade delete will handle note_tags relationships
         }

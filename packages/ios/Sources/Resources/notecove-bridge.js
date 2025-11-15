@@ -1,24 +1,30 @@
-"use strict";
+'use strict';
 var NoteCoveBridgeModule = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __defNormalProp = (obj, key, value) =>
+    key in obj
+      ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value })
+      : (obj[key] = value);
   var __export = (target, all2) => {
-    for (var name in all2)
-      __defProp(target, name, { get: all2[name], enumerable: true });
+    for (var name in all2) __defProp(target, name, { get: all2[name], enumerable: true });
   };
   var __copyProps = (to, from2, except, desc) => {
-    if (from2 && typeof from2 === "object" || typeof from2 === "function") {
+    if ((from2 && typeof from2 === 'object') || typeof from2 === 'function') {
       for (let key of __getOwnPropNames(from2))
         if (!__hasOwnProp.call(to, key) && key !== except)
-          __defProp(to, key, { get: () => from2[key], enumerable: !(desc = __getOwnPropDesc(from2, key)) || desc.enumerable });
+          __defProp(to, key, {
+            get: () => from2[key],
+            enumerable: !(desc = __getOwnPropDesc(from2, key)) || desc.enumerable,
+          });
     }
     return to;
   };
-  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-  var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, '__esModule', { value: true }), mod);
+  var __publicField = (obj, key, value) =>
+    __defNormalProp(obj, typeof key !== 'symbol' ? key + '' : key, value);
 
   // src/ios-bridge.ts
   var ios_bridge_exports = {};
@@ -29,7 +35,7 @@ var NoteCoveBridgeModule = (() => {
     fileExists: () => fileExists,
     listFiles: () => listFiles,
     readFile: () => readFile,
-    writeFile: () => writeFile
+    writeFile: () => writeFile,
   });
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/map.js
@@ -44,7 +50,7 @@ var NoteCoveBridgeModule = (() => {
   var setIfUndefined = (map2, key, createT) => {
     let set = map2.get(key);
     if (set === void 0) {
-      map2.set(key, set = createT());
+      map2.set(key, (set = createT()));
     }
     return set;
   };
@@ -151,10 +157,10 @@ var NoteCoveBridgeModule = (() => {
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/math.js
   var floor = Math.floor;
   var abs = Math.abs;
-  var min = (a, b) => a < b ? a : b;
-  var max = (a, b) => a > b ? a : b;
+  var min = (a, b) => (a < b ? a : b);
+  var max = (a, b) => (a > b ? a : b);
   var isNaN2 = Number.isNaN;
-  var isNegativeZero = (n) => n !== 0 ? n < 0 : 1 / n < 0;
+  var isNegativeZero = (n) => (n !== 0 ? n < 0 : 1 / n < 0);
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/binary.js
   var BIT1 = 1;
@@ -202,7 +208,8 @@ var NoteCoveBridgeModule = (() => {
   var MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
   var MIN_SAFE_INTEGER = Number.MIN_SAFE_INTEGER;
   var LOWEST_INT32 = 1 << 31;
-  var isInteger = Number.isInteger || ((num) => typeof num === "number" && isFinite(num) && floor(num) === num);
+  var isInteger =
+    Number.isInteger || ((num) => typeof num === 'number' && isFinite(num) && floor(num) === num);
   var isNaN3 = Number.isNaN;
   var parseInt2 = Number.parseInt;
 
@@ -212,26 +219,28 @@ var NoteCoveBridgeModule = (() => {
   var MAX_UTF16_CHARACTER = fromCharCode(65535);
   var toLowerCase = (s) => s.toLowerCase();
   var trimLeftRegex = /^\s*/g;
-  var trimLeft = (s) => s.replace(trimLeftRegex, "");
+  var trimLeft = (s) => s.replace(trimLeftRegex, '');
   var fromCamelCaseRegex = /([A-Z])/g;
-  var fromCamelCase = (s, separator) => trimLeft(s.replace(fromCamelCaseRegex, (match) => `${separator}${toLowerCase(match)}`));
+  var fromCamelCase = (s, separator) =>
+    trimLeft(s.replace(fromCamelCaseRegex, (match) => `${separator}${toLowerCase(match)}`));
   var _encodeUtf8Polyfill = (str) => {
     const encodedString = unescape(encodeURIComponent(str));
     const len = encodedString.length;
     const buf = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
-      buf[i] = /** @type {number} */
-      encodedString.codePointAt(i);
+      buf[i] = /** @type {number} */ encodedString.codePointAt(i);
     }
     return buf;
   };
-  var utf8TextEncoder = (
+  var utf8TextEncoder =
     /** @type {TextEncoder} */
-    typeof TextEncoder !== "undefined" ? new TextEncoder() : null
-  );
+    typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
   var _encodeUtf8Native = (str) => utf8TextEncoder.encode(str);
   var encodeUtf8 = utf8TextEncoder ? _encodeUtf8Native : _encodeUtf8Polyfill;
-  var utf8TextDecoder = typeof TextDecoder === "undefined" ? null : new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  var utf8TextDecoder =
+    typeof TextDecoder === 'undefined'
+      ? null
+      : new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
   if (utf8TextDecoder && utf8TextDecoder.decode(new Uint8Array()).length === 1) {
     utf8TextDecoder = null;
   }
@@ -283,7 +292,7 @@ var NoteCoveBridgeModule = (() => {
   var writeUint8 = write;
   var writeVarUint = (encoder, num) => {
     while (num > BITS7) {
-      write(encoder, BIT8 | BITS7 & num);
+      write(encoder, BIT8 | (BITS7 & num));
       num = floor(num / 128);
     }
     write(encoder, BITS7 & num);
@@ -293,10 +302,10 @@ var NoteCoveBridgeModule = (() => {
     if (isNegative) {
       num = -num;
     }
-    write(encoder, (num > BITS6 ? BIT8 : 0) | (isNegative ? BIT7 : 0) | BITS6 & num);
+    write(encoder, (num > BITS6 ? BIT8 : 0) | (isNegative ? BIT7 : 0) | (BITS6 & num));
     num = floor(num / 64);
     while (num > 0) {
-      write(encoder, (num > BITS7 ? BIT8 : 0) | BITS7 & num);
+      write(encoder, (num > BITS7 ? BIT8 : 0) | (BITS7 & num));
       num = floor(num / 128);
     }
   };
@@ -325,8 +334,10 @@ var NoteCoveBridgeModule = (() => {
       );
     }
   };
-  var writeVarString = utf8TextEncoder && /** @type {any} */
-  utf8TextEncoder.encodeInto ? _writeVarStringNative : _writeVarStringPolyfill;
+  var writeVarString =
+    utf8TextEncoder && /** @type {any} */ utf8TextEncoder.encodeInto
+      ? _writeVarStringNative
+      : _writeVarStringPolyfill;
   var writeUint8Array = (encoder, uint8Array) => {
     const bufferLen = encoder.cbuf.length;
     const cpos = encoder.cpos;
@@ -353,10 +364,9 @@ var NoteCoveBridgeModule = (() => {
   };
   var writeFloat32 = (encoder, num) => writeOnDataView(encoder, 4).setFloat32(0, num, false);
   var writeFloat64 = (encoder, num) => writeOnDataView(encoder, 8).setFloat64(0, num, false);
-  var writeBigInt64 = (encoder, num) => (
+  var writeBigInt64 = (encoder, num) =>
     /** @type {any} */
-    writeOnDataView(encoder, 8).setBigInt64(0, num, false)
-  );
+    writeOnDataView(encoder, 8).setBigInt64(0, num, false);
   var floatTestBed = new DataView(new ArrayBuffer(4));
   var isFloat32 = (num) => {
     floatTestBed.setFloat32(0, num);
@@ -364,11 +374,11 @@ var NoteCoveBridgeModule = (() => {
   };
   var writeAny = (encoder, data) => {
     switch (typeof data) {
-      case "string":
+      case 'string':
         write(encoder, 119);
         writeVarString(encoder, data);
         break;
-      case "number":
+      case 'number':
         if (isInteger(data) && abs(data) <= BITS31) {
           write(encoder, 125);
           writeVarInt(encoder, data);
@@ -380,11 +390,11 @@ var NoteCoveBridgeModule = (() => {
           writeFloat64(encoder, data);
         }
         break;
-      case "bigint":
+      case 'bigint':
         write(encoder, 122);
         writeBigInt64(encoder, data);
         break;
-      case "object":
+      case 'object':
         if (data === null) {
           write(encoder, 126);
         } else if (isArray(data)) {
@@ -407,7 +417,7 @@ var NoteCoveBridgeModule = (() => {
           }
         }
         break;
-      case "boolean":
+      case 'boolean':
         write(encoder, data ? 120 : 121);
         break;
       default:
@@ -519,7 +529,7 @@ var NoteCoveBridgeModule = (() => {
   var StringEncoder = class {
     constructor() {
       this.sarr = [];
-      this.s = "";
+      this.s = '';
       this.lensE = new UintOptRleEncoder();
     }
     /**
@@ -529,15 +539,15 @@ var NoteCoveBridgeModule = (() => {
       this.s += string;
       if (this.s.length > 19) {
         this.sarr.push(this.s);
-        this.s = "";
+        this.s = '';
       }
       this.lensE.write(string.length);
     }
     toUint8Array() {
       const encoder = new Encoder();
       this.sarr.push(this.s);
-      this.s = "";
-      writeVarString(encoder, this.sarr.join(""));
+      this.s = '';
+      writeVarString(encoder, this.sarr.join(''));
       writeUint8Array(encoder, this.lensE.toUint8Array());
       return toUint8Array(encoder);
     }
@@ -546,15 +556,15 @@ var NoteCoveBridgeModule = (() => {
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/error.js
   var create3 = (s) => new Error(s);
   var methodUnimplemented = () => {
-    throw create3("Method unimplemented");
+    throw create3('Method unimplemented');
   };
   var unexpectedCase = () => {
-    throw create3("Unexpected case");
+    throw create3('Unexpected case');
   };
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/decoding.js
-  var errorUnexpectedEndOfArray = create3("Unexpected end of array");
-  var errorIntegerOutOfRange = create3("Integer out of Range");
+  var errorUnexpectedEndOfArray = create3('Unexpected end of array');
+  var errorIntegerOutOfRange = create3('Integer out of Range');
   var Decoder = class {
     /**
      * @param {Uint8Array} uint8Array Binary data to decode
@@ -615,7 +625,7 @@ var NoteCoveBridgeModule = (() => {
   var _readVarStringPolyfill = (decoder) => {
     let remainingLen = readVarUint(decoder);
     if (remainingLen === 0) {
-      return "";
+      return '';
     } else {
       let encodedString = String.fromCodePoint(readUint8(decoder));
       if (--remainingLen < 100) {
@@ -638,10 +648,9 @@ var NoteCoveBridgeModule = (() => {
       return decodeURIComponent(escape(encodedString));
     }
   };
-  var _readVarStringNative = (decoder) => (
+  var _readVarStringNative = (decoder) =>
     /** @type any */
-    utf8TextDecoder.decode(readVarUint8Array(decoder))
-  );
+    utf8TextDecoder.decode(readVarUint8Array(decoder));
   var readVarString = utf8TextDecoder ? _readVarStringNative : _readVarStringPolyfill;
   var readFromDataView = (decoder, len) => {
     const dv = new DataView(decoder.arr.buffer, decoder.arr.byteOffset + decoder.pos, len);
@@ -650,10 +659,9 @@ var NoteCoveBridgeModule = (() => {
   };
   var readFloat32 = (decoder) => readFromDataView(decoder, 4).getFloat32(0, false);
   var readFloat64 = (decoder) => readFromDataView(decoder, 8).getFloat64(0, false);
-  var readBigInt64 = (decoder) => (
+  var readBigInt64 = (decoder) =>
     /** @type {any} */
-    readFromDataView(decoder, 8).getBigInt64(0, false)
-  );
+    readFromDataView(decoder, 8).getBigInt64(0, false);
   var readAnyLookupTable = [
     (decoder) => void 0,
     // CASE 127: undefined
@@ -690,7 +698,7 @@ var NoteCoveBridgeModule = (() => {
       }
       return arr;
     },
-    readVarUint8Array
+    readVarUint8Array,
     // CASE 116: Uint8Array
   ];
   var readAny = (decoder) => readAnyLookupTable[127 - readUint8(decoder)](decoder);
@@ -801,25 +809,25 @@ var NoteCoveBridgeModule = (() => {
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/random.js
   var uint32 = () => getRandomValues(new Uint32Array(1))[0];
-  var uuidv4Template = "10000000-1000-4000-8000" + -1e11;
-  var uuidv4 = () => uuidv4Template.replace(
-    /[018]/g,
-    /** @param {number} c */
-    (c) => (c ^ uint32() & 15 >> c / 4).toString(16)
-  );
+  var uuidv4Template = '10000000-1000-4000-8000' + -1e11;
+  var uuidv4 = () =>
+    uuidv4Template.replace(
+      /[018]/g,
+      /** @param {number} c */
+      (c) => (c ^ (uint32() & (15 >> (c / 4)))).toString(16)
+    );
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/time.js
   var getUnixTime = Date.now;
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/promise.js
-  var create4 = (f) => (
+  var create4 = (f) =>
     /** @type {Promise<T>} */
-    new Promise(f)
-  );
+    new Promise(f);
   var all = Promise.all.bind(Promise);
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/conditions.js
-  var undefinedToNull = (v) => v === void 0 ? null : v;
+  var undefinedToNull = (v) => (v === void 0 ? null : v);
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/storage.js
   var VarStoragePolyfill = class {
@@ -843,12 +851,11 @@ var NoteCoveBridgeModule = (() => {
   var _localStorage = new VarStoragePolyfill();
   var usePolyfill = true;
   try {
-    if (typeof localStorage !== "undefined" && localStorage) {
+    if (typeof localStorage !== 'undefined' && localStorage) {
       _localStorage = localStorage;
       usePolyfill = false;
     }
-  } catch (e) {
-  }
+  } catch (e) {}
   var varStorage = _localStorage;
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/object.js
@@ -875,12 +882,15 @@ var NoteCoveBridgeModule = (() => {
     return true;
   };
   var hasProperty = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-  var equalFlat = (a, b) => a === b || size(a) === size(b) && every(a, (val, key) => (val !== void 0 || hasProperty(b, key)) && b[key] === val);
+  var equalFlat = (a, b) =>
+    a === b ||
+    (size(a) === size(b) &&
+      every(a, (val, key) => (val !== void 0 || hasProperty(b, key)) && b[key] === val));
   var freeze = Object.freeze;
   var deepFreeze = (o) => {
     for (const key in o) {
       const c = o[key];
-      if (typeof c === "object" || typeof c === "function") {
+      if (typeof c === 'object' || typeof c === 'function') {
         deepFreeze(o[key]);
       }
     }
@@ -903,8 +913,13 @@ var NoteCoveBridgeModule = (() => {
   var isOneOf = (value, options) => options.includes(value);
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/environment.js
-  var isNode = typeof process !== "undefined" && process.release && /node|io\.js/.test(process.release.name) && Object.prototype.toString.call(typeof process !== "undefined" ? process : 0) === "[object process]";
-  var isMac = typeof navigator !== "undefined" ? /Mac/.test(navigator.platform) : false;
+  var isNode =
+    typeof process !== 'undefined' &&
+    process.release &&
+    /node|io\.js/.test(process.release.name) &&
+    Object.prototype.toString.call(typeof process !== 'undefined' ? process : 0) ===
+      '[object process]';
+  var isMac = typeof navigator !== 'undefined' ? /Mac/.test(navigator.platform) : false;
   var params;
   var args = [];
   var computeParams = () => {
@@ -915,9 +930,9 @@ var NoteCoveBridgeModule = (() => {
         let currParamName = null;
         for (let i = 0; i < pargs.length; i++) {
           const parg = pargs[i];
-          if (parg[0] === "-") {
+          if (parg[0] === '-') {
             if (currParamName !== null) {
-              params.set(currParamName, "");
+              params.set(currParamName, '');
             }
             currParamName = parg;
           } else {
@@ -930,17 +945,20 @@ var NoteCoveBridgeModule = (() => {
           }
         }
         if (currParamName !== null) {
-          params.set(currParamName, "");
+          params.set(currParamName, '');
         }
-      } else if (typeof location === "object") {
+      } else if (typeof location === 'object') {
         params = create();
-        (location.search || "?").slice(1).split("&").forEach((kv) => {
-          if (kv.length !== 0) {
-            const [key, value] = kv.split("=");
-            params.set(`--${fromCamelCase(key, "-")}`, value);
-            params.set(`-${fromCamelCase(key, "-")}`, value);
-          }
-        });
+        (location.search || '?')
+          .slice(1)
+          .split('&')
+          .forEach((kv) => {
+            if (kv.length !== 0) {
+              const [key, value] = kv.split('=');
+              params.set(`--${fromCamelCase(key, '-')}`, value);
+              params.set(`-${fromCamelCase(key, '-')}`, value);
+            }
+          });
       } else {
         params = create();
       }
@@ -948,12 +966,22 @@ var NoteCoveBridgeModule = (() => {
     return params;
   };
   var hasParam = (name) => computeParams().has(name);
-  var getVariable = (name) => isNode ? undefinedToNull(process.env[name.toUpperCase().replaceAll("-", "_")]) : undefinedToNull(varStorage.getItem(name));
-  var hasConf = (name) => hasParam("--" + name) || getVariable(name) !== null;
-  var production = hasConf("production");
-  var forceColor = isNode && isOneOf(process.env.FORCE_COLOR, ["true", "1", "2"]);
-  var supportsColor = forceColor || !hasParam("--no-colors") && // @todo deprecate --no-colors
-  !hasConf("no-color") && (!isNode || process.stdout.isTTY) && (!isNode || hasParam("--color") || getVariable("COLORTERM") !== null || (getVariable("TERM") || "").includes("color"));
+  var getVariable = (name) =>
+    isNode
+      ? undefinedToNull(process.env[name.toUpperCase().replaceAll('-', '_')])
+      : undefinedToNull(varStorage.getItem(name));
+  var hasConf = (name) => hasParam('--' + name) || getVariable(name) !== null;
+  var production = hasConf('production');
+  var forceColor = isNode && isOneOf(process.env.FORCE_COLOR, ['true', '1', '2']);
+  var supportsColor =
+    forceColor ||
+    (!hasParam('--no-colors') && // @todo deprecate --no-colors
+      !hasConf('no-color') &&
+      (!isNode || process.stdout.isTTY) &&
+      (!isNode ||
+        hasParam('--color') ||
+        getVariable('COLORTERM') !== null ||
+        (getVariable('TERM') || '').includes('color')));
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/buffer.js
   var createUint8ArrayFromLen = (len) => new Uint8Array(len);
@@ -977,15 +1005,13 @@ var NoteCoveBridgeModule = (() => {
   var create5 = (left, right) => new Pair(left, right);
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dom.js
-  var doc = (
+  var doc =
     /** @type {Document} */
-    typeof document !== "undefined" ? document : {}
-  );
-  var domParser = (
+    typeof document !== 'undefined' ? document : {};
+  var domParser =
     /** @type {DOMParser} */
-    typeof DOMParser !== "undefined" ? new DOMParser() : null
-  );
-  var mapToStyleString = (m) => map(m, (value, key) => `${key}:${value};`).join("");
+    typeof DOMParser !== 'undefined' ? new DOMParser() : null;
+  var mapToStyleString = (m) => map(m, (value, key) => `${key}:${value};`).join('');
   var ELEMENT_NODE = doc.ELEMENT_NODE;
   var TEXT_NODE = doc.TEXT_NODE;
   var CDATA_SECTION_NODE = doc.CDATA_SECTION_NODE;
@@ -1009,9 +1035,10 @@ var NoteCoveBridgeModule = (() => {
   var UNCOLOR = create6();
   var computeNoColorLoggingArgs = (args2) => {
     if (args2.length === 1 && args2[0]?.constructor === Function) {
-      args2 = /** @type {Array<string|Symbol|Object|number>} */
-      /** @type {[function]} */
-      args2[0]();
+      args2 =
+        /** @type {Array<string|Symbol|Object|number>} */
+        /** @type {[function]} */
+        args2[0]();
     }
     const strBuilder = [];
     const logArgs = [];
@@ -1027,7 +1054,7 @@ var NoteCoveBridgeModule = (() => {
       }
     }
     if (i > 0) {
-      logArgs.push(strBuilder.join(""));
+      logArgs.push(strBuilder.join(''));
     }
     for (; i < args2.length; i++) {
       const arg = args2[i];
@@ -1041,22 +1068,23 @@ var NoteCoveBridgeModule = (() => {
 
   // ../../node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/logging.js
   var _browserStyleMap = {
-    [BOLD]: create5("font-weight", "bold"),
-    [UNBOLD]: create5("font-weight", "normal"),
-    [BLUE]: create5("color", "blue"),
-    [GREEN]: create5("color", "green"),
-    [GREY]: create5("color", "grey"),
-    [RED]: create5("color", "red"),
-    [PURPLE]: create5("color", "purple"),
-    [ORANGE]: create5("color", "orange"),
+    [BOLD]: create5('font-weight', 'bold'),
+    [UNBOLD]: create5('font-weight', 'normal'),
+    [BLUE]: create5('color', 'blue'),
+    [GREEN]: create5('color', 'green'),
+    [GREY]: create5('color', 'grey'),
+    [RED]: create5('color', 'red'),
+    [PURPLE]: create5('color', 'purple'),
+    [ORANGE]: create5('color', 'orange'),
     // not well supported in chrome when debugging node with inspector - TODO: deprecate
-    [UNCOLOR]: create5("color", "black")
+    [UNCOLOR]: create5('color', 'black'),
   };
   var computeBrowserLoggingArgs = (args2) => {
     if (args2.length === 1 && args2[0]?.constructor === Function) {
-      args2 = /** @type {Array<string|Symbol|Object|number>} */
-      /** @type {[function]} */
-      args2[0]();
+      args2 =
+        /** @type {Array<string|Symbol|Object|number>} */
+        /** @type {[function]} */
+        args2[0]();
     }
     const strBuilder = [];
     const styles = [];
@@ -1075,7 +1103,7 @@ var NoteCoveBridgeModule = (() => {
         if (arg.constructor === String || arg.constructor === Number) {
           const style2 = mapToStyleString(currentStyle);
           if (i > 0 || style2.length > 0) {
-            strBuilder.push("%c" + arg);
+            strBuilder.push('%c' + arg);
             styles.push(style2);
           } else {
             strBuilder.push(arg);
@@ -1087,7 +1115,7 @@ var NoteCoveBridgeModule = (() => {
     }
     if (i > 0) {
       logArgs = styles;
-      logArgs.unshift(strBuilder.join(""));
+      logArgs.unshift(strBuilder.join(''));
     }
     for (; i < args2.length; i++) {
       const arg = args2[i];
@@ -1118,19 +1146,21 @@ var NoteCoveBridgeModule = (() => {
       return this;
     },
     // @ts-ignore
-    next
+    next,
   });
-  var iteratorFilter = (iterator, filter) => createIterator(() => {
-    let res;
-    do {
-      res = iterator.next();
-    } while (!res.done && !filter(res.value));
-    return res;
-  });
-  var iteratorMap = (iterator, fmap) => createIterator(() => {
-    const { done, value } = iterator.next();
-    return { done, value: done ? void 0 : fmap(value) };
-  });
+  var iteratorFilter = (iterator, filter) =>
+    createIterator(() => {
+      let res;
+      do {
+        res = iterator.next();
+      } while (!res.done && !filter(res.value));
+      return res;
+    });
+  var iteratorMap = (iterator, fmap) =>
+    createIterator(() => {
+      const { done, value } = iterator.next();
+      return { done, value: done ? void 0 : fmap(value) };
+    });
 
   // ../../node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.mjs
   var DeleteItem = class {
@@ -1148,19 +1178,23 @@ var NoteCoveBridgeModule = (() => {
       this.clients = /* @__PURE__ */ new Map();
     }
   };
-  var iterateDeletedStructs = (transaction, ds, f) => ds.clients.forEach((deletes, clientid) => {
-    const structs = (
-      /** @type {Array<GC|Item>} */
-      transaction.doc.store.clients.get(clientid)
-    );
-    if (structs != null) {
-      const lastStruct = structs[structs.length - 1];
-      const clockState = lastStruct.id.clock + lastStruct.length;
-      for (let i = 0, del = deletes[i]; i < deletes.length && del.clock < clockState; del = deletes[++i]) {
-        iterateStructs(transaction, structs, del.clock, del.len, f);
+  var iterateDeletedStructs = (transaction, ds, f) =>
+    ds.clients.forEach((deletes, clientid) => {
+      const structs =
+        /** @type {Array<GC|Item>} */
+        transaction.doc.store.clients.get(clientid);
+      if (structs != null) {
+        const lastStruct = structs[structs.length - 1];
+        const clockState = lastStruct.id.clock + lastStruct.length;
+        for (
+          let i = 0, del = deletes[i];
+          i < deletes.length && del.clock < clockState;
+          del = deletes[++i]
+        ) {
+          iterateStructs(transaction, structs, del.clock, del.len, f);
+        }
       }
-    }
-  });
+    });
   var findIndexDS = (dis, clock) => {
     let left = 0;
     let right = dis.length - 1;
@@ -1219,10 +1253,10 @@ var NoteCoveBridgeModule = (() => {
     return merged;
   };
   var addToDeleteSet = (ds, client, clock, length2) => {
-    setIfUndefined(ds.clients, client, () => (
+    setIfUndefined(ds.clients, client, () =>
       /** @type {Array<DeleteItem>} */
       []
-    )).push(new DeleteItem(clock, length2));
+    ).push(new DeleteItem(clock, length2));
   };
   var createDeleteSet = () => new DeleteSet();
   var createDeleteSetFromStructStore = (ss) => {
@@ -1235,7 +1269,11 @@ var NoteCoveBridgeModule = (() => {
           const clock = struct.id.clock;
           let len = struct.length;
           if (i + 1 < structs.length) {
-            for (let next = structs[i + 1]; i + 1 < structs.length && next.deleted; next = structs[++i + 1]) {
+            for (
+              let next = structs[i + 1];
+              i + 1 < structs.length && next.deleted;
+              next = structs[++i + 1]
+            ) {
               len += next.length;
             }
           }
@@ -1250,17 +1288,19 @@ var NoteCoveBridgeModule = (() => {
   };
   var writeDeleteSet = (encoder, ds) => {
     writeVarUint(encoder.restEncoder, ds.clients.size);
-    from(ds.clients.entries()).sort((a, b) => b[0] - a[0]).forEach(([client, dsitems]) => {
-      encoder.resetDsCurVal();
-      writeVarUint(encoder.restEncoder, client);
-      const len = dsitems.length;
-      writeVarUint(encoder.restEncoder, len);
-      for (let i = 0; i < len; i++) {
-        const item = dsitems[i];
-        encoder.writeDsClock(item.clock);
-        encoder.writeDsLen(item.len);
-      }
-    });
+    from(ds.clients.entries())
+      .sort((a, b) => b[0] - a[0])
+      .forEach(([client, dsitems]) => {
+        encoder.resetDsCurVal();
+        writeVarUint(encoder.restEncoder, client);
+        const len = dsitems.length;
+        writeVarUint(encoder.restEncoder, len);
+        for (let i = 0; i < len; i++) {
+          const item = dsitems[i];
+          encoder.writeDsClock(item.clock);
+          encoder.writeDsLen(item.len);
+        }
+      });
   };
   var readDeleteSet = (decoder) => {
     const ds = new DeleteSet();
@@ -1270,10 +1310,10 @@ var NoteCoveBridgeModule = (() => {
       const client = readVarUint(decoder.restDecoder);
       const numberOfDeletes = readVarUint(decoder.restDecoder);
       if (numberOfDeletes > 0) {
-        const dsField = setIfUndefined(ds.clients, client, () => (
+        const dsField = setIfUndefined(ds.clients, client, () =>
           /** @type {Array<DeleteItem>} */
           []
-        ));
+        );
         for (let i2 = 0; i2 < numberOfDeletes; i2++) {
           dsField.push(new DeleteItem(decoder.readDsClock(), decoder.readDsLen()));
         }
@@ -1308,7 +1348,11 @@ var NoteCoveBridgeModule = (() => {
             if (struct.id.clock < clockEnd) {
               if (!struct.deleted) {
                 if (clockEnd < struct.id.clock + struct.length) {
-                  structs.splice(index, 0, splitItem(transaction, struct, clockEnd - struct.id.clock));
+                  structs.splice(
+                    index,
+                    0,
+                    splitItem(transaction, struct, clockEnd - struct.id.clock)
+                  );
                 }
                 struct.delete(transaction);
               }
@@ -1334,7 +1378,15 @@ var NoteCoveBridgeModule = (() => {
     /**
      * @param {DocOpts} opts configuration
      */
-    constructor({ guid = uuidv4(), collectionid = null, gc = true, gcFilter = () => true, meta = null, autoLoad = false, shouldLoad = true } = {}) {
+    constructor({
+      guid = uuidv4(),
+      collectionid = null,
+      gc = true,
+      gcFilter = () => true,
+      meta = null,
+      autoLoad = false,
+      shouldLoad = true,
+    } = {}) {
       super();
       this.gc = gc;
       this.gcFilter = gcFilter;
@@ -1354,27 +1406,28 @@ var NoteCoveBridgeModule = (() => {
       this.isSynced = false;
       this.isDestroyed = false;
       this.whenLoaded = create4((resolve) => {
-        this.on("load", () => {
+        this.on('load', () => {
           this.isLoaded = true;
           resolve(this);
         });
       });
-      const provideSyncedPromise = () => create4((resolve) => {
-        const eventHandler = (isSynced) => {
-          if (isSynced === void 0 || isSynced === true) {
-            this.off("sync", eventHandler);
-            resolve();
-          }
-        };
-        this.on("sync", eventHandler);
-      });
-      this.on("sync", (isSynced) => {
+      const provideSyncedPromise = () =>
+        create4((resolve) => {
+          const eventHandler = (isSynced) => {
+            if (isSynced === void 0 || isSynced === true) {
+              this.off('sync', eventHandler);
+              resolve();
+            }
+          };
+          this.on('sync', eventHandler);
+        });
+      this.on('sync', (isSynced) => {
         if (isSynced === false && this.isSynced) {
           this.whenSynced = provideSyncedPromise();
         }
         this.isSynced = isSynced === void 0 || isSynced === true;
         if (this.isSynced && !this.isLoaded) {
-          this.emit("load", [this]);
+          this.emit('load', [this]);
         }
       });
       this.whenSynced = provideSyncedPromise();
@@ -1450,10 +1503,11 @@ var NoteCoveBridgeModule = (() => {
      *
      * @public
      */
-    get(name, TypeConstructor = (
+    get(
+      name,
       /** @type {any} */
-      AbstractType
-    )) {
+      TypeConstructor = AbstractType
+    ) {
       const type = setIfUndefined(this.share, name, () => {
         const t = new TypeConstructor();
         t._integrate(this, null);
@@ -1484,7 +1538,9 @@ var NoteCoveBridgeModule = (() => {
             t
           );
         } else {
-          throw new Error(`Type with the name ${name} has already been defined with a different constructor`);
+          throw new Error(
+            `Type with the name ${name} has already been defined with a different constructor`
+          );
         }
       }
       return (
@@ -1499,7 +1555,7 @@ var NoteCoveBridgeModule = (() => {
      *
      * @public
      */
-    getArray(name = "") {
+    getArray(name = '') {
       return (
         /** @type {YArray<T>} */
         this.get(name, YArray)
@@ -1511,7 +1567,7 @@ var NoteCoveBridgeModule = (() => {
      *
      * @public
      */
-    getText(name = "") {
+    getText(name = '') {
       return this.get(name, YText);
     }
     /**
@@ -1521,7 +1577,7 @@ var NoteCoveBridgeModule = (() => {
      *
      * @public
      */
-    getMap(name = "") {
+    getMap(name = '') {
       return (
         /** @type {YMap<T>} */
         this.get(name, YMap)
@@ -1533,7 +1589,7 @@ var NoteCoveBridgeModule = (() => {
      *
      * @public
      */
-    getXmlElement(name = "") {
+    getXmlElement(name = '') {
       return (
         /** @type {YXmlElement<{[key:string]:string}>} */
         this.get(name, YXmlElement)
@@ -1545,7 +1601,7 @@ var NoteCoveBridgeModule = (() => {
      *
      * @public
      */
-    getXmlFragment(name = "") {
+    getXmlFragment(name = '') {
       return this.get(name, YXmlFragment);
     }
     /**
@@ -1572,10 +1628,9 @@ var NoteCoveBridgeModule = (() => {
       const item = this._item;
       if (item !== null) {
         this._item = null;
-        const content = (
+        const content =
           /** @type {ContentDoc} */
-          item.content
-        );
+          item.content;
         content.doc = new _Doc({ guid: this.guid, ...content.opts, shouldLoad: false });
         content.doc._item = item;
         transact(
@@ -1592,8 +1647,8 @@ var NoteCoveBridgeModule = (() => {
           true
         );
       }
-      this.emit("destroyed", [true]);
-      this.emit("destroy", [this]);
+      this.emit('destroyed', [true]);
+      this.emit('destroy', [this]);
       super.destroy();
     }
   };
@@ -1604,8 +1659,7 @@ var NoteCoveBridgeModule = (() => {
     constructor(decoder) {
       this.restDecoder = decoder;
     }
-    resetDsCurVal() {
-    }
+    resetDsCurVal() {}
     /**
      * @return {number}
      */
@@ -1840,8 +1894,7 @@ var NoteCoveBridgeModule = (() => {
     toUint8Array() {
       return toUint8Array(this.restEncoder);
     }
-    resetDsCurVal() {
-    }
+    resetDsCurVal() {}
     /**
      * @param {number} clock
      */
@@ -2111,15 +2164,17 @@ var NoteCoveBridgeModule = (() => {
       }
     });
     writeVarUint(encoder.restEncoder, sm.size);
-    from(sm.entries()).sort((a, b) => b[0] - a[0]).forEach(([client, clock]) => {
-      writeStructs(
-        encoder,
-        /** @type {Array<GC|Item>} */
-        store.clients.get(client),
-        client,
-        clock
-      );
-    });
+    from(sm.entries())
+      .sort((a, b) => b[0] - a[0])
+      .forEach(([client, clock]) => {
+        writeStructs(
+          encoder,
+          /** @type {Array<GC|Item>} */
+          store.clients.get(client),
+          client,
+          clock
+        );
+      });
   };
   var readClientsStructRefs = (decoder, doc2) => {
     const clientRefs = create();
@@ -2157,7 +2212,11 @@ var NoteCoveBridgeModule = (() => {
               // right
               (info & BIT7) === BIT7 ? decoder.readRightID() : null,
               // right origin
-              cantCopyParentInfo ? decoder.readParentInfo() ? doc2.get(decoder.readString()) : decoder.readLeftID() : null,
+              cantCopyParentInfo
+                ? decoder.readParentInfo()
+                  ? doc2.get(decoder.readString())
+                  : decoder.readLeftID()
+                : null,
               // parent
               cantCopyParentInfo && (info & BIT6) === BIT6 ? decoder.readString() : null,
               // parentSub
@@ -2182,15 +2241,15 @@ var NoteCoveBridgeModule = (() => {
       if (clientsStructRefsIds.length === 0) {
         return null;
       }
-      let nextStructsTarget = (
+      let nextStructsTarget =
         /** @type {{i:number,refs:Array<GC|Item>}} */
-        clientsStructRefs.get(clientsStructRefsIds[clientsStructRefsIds.length - 1])
-      );
+        clientsStructRefs.get(clientsStructRefsIds[clientsStructRefsIds.length - 1]);
       while (nextStructsTarget.refs.length === nextStructsTarget.i) {
         clientsStructRefsIds.pop();
         if (clientsStructRefsIds.length > 0) {
-          nextStructsTarget = /** @type {{i:number,refs:Array<GC|Item>}} */
-          clientsStructRefs.get(clientsStructRefsIds[clientsStructRefsIds.length - 1]);
+          nextStructsTarget =
+            /** @type {{i:number,refs:Array<GC|Item>}} */
+            clientsStructRefs.get(clientsStructRefsIds[clientsStructRefsIds.length - 1]);
         } else {
           return null;
         }
@@ -2209,13 +2268,12 @@ var NoteCoveBridgeModule = (() => {
         missingSV.set(client, clock);
       }
     };
-    let stackHead = (
+    let stackHead =
       /** @type {any} */
       curStructsTarget.refs[
         /** @type {any} */
         curStructsTarget.i++
-      ]
-    );
+      ];
     const state = /* @__PURE__ */ new Map();
     const addStackToRestSS = () => {
       for (const item of stack) {
@@ -2236,7 +2294,9 @@ var NoteCoveBridgeModule = (() => {
     };
     while (true) {
       if (stackHead.constructor !== Skip) {
-        const localClock = setIfUndefined(state, stackHead.id.client, () => getState(store, stackHead.id.client));
+        const localClock = setIfUndefined(state, stackHead.id.client, () =>
+          getState(store, stackHead.id.client)
+        );
         const offset = localClock - stackHead.id.clock;
         if (offset < 0) {
           stack.push(stackHead);
@@ -2268,18 +2328,15 @@ var NoteCoveBridgeModule = (() => {
         }
       }
       if (stack.length > 0) {
-        stackHead = /** @type {GC|Item} */
-        stack.pop();
+        stackHead = /** @type {GC|Item} */ stack.pop();
       } else if (curStructsTarget !== null && curStructsTarget.i < curStructsTarget.refs.length) {
-        stackHead = /** @type {GC|Item} */
-        curStructsTarget.refs[curStructsTarget.i++];
+        stackHead = /** @type {GC|Item} */ curStructsTarget.refs[curStructsTarget.i++];
       } else {
         curStructsTarget = getNextStructTarget();
         if (curStructsTarget === null) {
           break;
         } else {
-          stackHead = /** @type {GC|Item} */
-          curStructsTarget.refs[curStructsTarget.i++];
+          stackHead = /** @type {GC|Item} */ curStructsTarget.refs[curStructsTarget.i++];
         }
       }
     }
@@ -2291,66 +2348,82 @@ var NoteCoveBridgeModule = (() => {
     }
     return null;
   };
-  var writeStructsFromTransaction = (encoder, transaction) => writeClientsStructs(encoder, transaction.doc.store, transaction.beforeState);
-  var readUpdateV2 = (decoder, ydoc, transactionOrigin, structDecoder = new UpdateDecoderV2(decoder)) => transact(ydoc, (transaction) => {
-    transaction.local = false;
-    let retry = false;
-    const doc2 = transaction.doc;
-    const store = doc2.store;
-    const ss = readClientsStructRefs(structDecoder, doc2);
-    const restStructs = integrateStructs(transaction, store, ss);
-    const pending = store.pendingStructs;
-    if (pending) {
-      for (const [client, clock] of pending.missing) {
-        if (clock < getState(store, client)) {
-          retry = true;
-          break;
-        }
-      }
-      if (restStructs) {
-        for (const [client, clock] of restStructs.missing) {
-          const mclock = pending.missing.get(client);
-          if (mclock == null || mclock > clock) {
-            pending.missing.set(client, clock);
+  var writeStructsFromTransaction = (encoder, transaction) =>
+    writeClientsStructs(encoder, transaction.doc.store, transaction.beforeState);
+  var readUpdateV2 = (
+    decoder,
+    ydoc,
+    transactionOrigin,
+    structDecoder = new UpdateDecoderV2(decoder)
+  ) =>
+    transact(
+      ydoc,
+      (transaction) => {
+        transaction.local = false;
+        let retry = false;
+        const doc2 = transaction.doc;
+        const store = doc2.store;
+        const ss = readClientsStructRefs(structDecoder, doc2);
+        const restStructs = integrateStructs(transaction, store, ss);
+        const pending = store.pendingStructs;
+        if (pending) {
+          for (const [client, clock] of pending.missing) {
+            if (clock < getState(store, client)) {
+              retry = true;
+              break;
+            }
           }
+          if (restStructs) {
+            for (const [client, clock] of restStructs.missing) {
+              const mclock = pending.missing.get(client);
+              if (mclock == null || mclock > clock) {
+                pending.missing.set(client, clock);
+              }
+            }
+            pending.update = mergeUpdatesV2([pending.update, restStructs.update]);
+          }
+        } else {
+          store.pendingStructs = restStructs;
         }
-        pending.update = mergeUpdatesV2([pending.update, restStructs.update]);
-      }
-    } else {
-      store.pendingStructs = restStructs;
-    }
-    const dsRest = readAndApplyDeleteSet(structDecoder, transaction, store);
-    if (store.pendingDs) {
-      const pendingDSUpdate = new UpdateDecoderV2(createDecoder(store.pendingDs));
-      readVarUint(pendingDSUpdate.restDecoder);
-      const dsRest2 = readAndApplyDeleteSet(pendingDSUpdate, transaction, store);
-      if (dsRest && dsRest2) {
-        store.pendingDs = mergeUpdatesV2([dsRest, dsRest2]);
-      } else {
-        store.pendingDs = dsRest || dsRest2;
-      }
-    } else {
-      store.pendingDs = dsRest;
-    }
-    if (retry) {
-      const update = (
-        /** @type {{update: Uint8Array}} */
-        store.pendingStructs.update
-      );
-      store.pendingStructs = null;
-      applyUpdateV2(transaction.doc, update);
-    }
-  }, transactionOrigin, false);
+        const dsRest = readAndApplyDeleteSet(structDecoder, transaction, store);
+        if (store.pendingDs) {
+          const pendingDSUpdate = new UpdateDecoderV2(createDecoder(store.pendingDs));
+          readVarUint(pendingDSUpdate.restDecoder);
+          const dsRest2 = readAndApplyDeleteSet(pendingDSUpdate, transaction, store);
+          if (dsRest && dsRest2) {
+            store.pendingDs = mergeUpdatesV2([dsRest, dsRest2]);
+          } else {
+            store.pendingDs = dsRest || dsRest2;
+          }
+        } else {
+          store.pendingDs = dsRest;
+        }
+        if (retry) {
+          const update =
+            /** @type {{update: Uint8Array}} */
+            store.pendingStructs.update;
+          store.pendingStructs = null;
+          applyUpdateV2(transaction.doc, update);
+        }
+      },
+      transactionOrigin,
+      false
+    );
   var applyUpdateV2 = (ydoc, update, transactionOrigin, YDecoder = UpdateDecoderV2) => {
     const decoder = createDecoder(update);
     readUpdateV2(decoder, ydoc, transactionOrigin, new YDecoder(decoder));
   };
-  var applyUpdate = (ydoc, update, transactionOrigin) => applyUpdateV2(ydoc, update, transactionOrigin, UpdateDecoderV1);
+  var applyUpdate = (ydoc, update, transactionOrigin) =>
+    applyUpdateV2(ydoc, update, transactionOrigin, UpdateDecoderV1);
   var writeStateAsUpdate = (encoder, doc2, targetStateVector = /* @__PURE__ */ new Map()) => {
     writeClientsStructs(encoder, doc2.store, targetStateVector);
     writeDeleteSet(encoder, createDeleteSetFromStructStore(doc2.store));
   };
-  var encodeStateAsUpdateV2 = (doc2, encodedTargetStateVector = new Uint8Array([0]), encoder = new UpdateEncoderV2()) => {
+  var encodeStateAsUpdateV2 = (
+    doc2,
+    encodedTargetStateVector = new Uint8Array([0]),
+    encoder = new UpdateEncoderV2()
+  ) => {
     const targetStateVector = decodeStateVector(encodedTargetStateVector);
     writeStateAsUpdate(encoder, doc2, targetStateVector);
     const updates = [encoder.toUint8Array()];
@@ -2362,14 +2435,17 @@ var NoteCoveBridgeModule = (() => {
     }
     if (updates.length > 1) {
       if (encoder.constructor === UpdateEncoderV1) {
-        return mergeUpdates(updates.map((update, i) => i === 0 ? update : convertUpdateFormatV2ToV1(update)));
+        return mergeUpdates(
+          updates.map((update, i) => (i === 0 ? update : convertUpdateFormatV2ToV1(update)))
+        );
       } else if (encoder.constructor === UpdateEncoderV2) {
         return mergeUpdatesV2(updates);
       }
     }
     return updates[0];
   };
-  var encodeStateAsUpdate = (doc2, encodedTargetStateVector) => encodeStateAsUpdateV2(doc2, encodedTargetStateVector, new UpdateEncoderV1());
+  var encodeStateAsUpdate = (doc2, encodedTargetStateVector) =>
+    encodeStateAsUpdateV2(doc2, encodedTargetStateVector, new UpdateEncoderV1());
   var readStateVector = (decoder) => {
     const ss = /* @__PURE__ */ new Map();
     const ssLength = readVarUint(decoder.restDecoder);
@@ -2380,7 +2456,8 @@ var NoteCoveBridgeModule = (() => {
     }
     return ss;
   };
-  var decodeStateVector = (decodedState) => readStateVector(new DSDecoderV1(createDecoder(decodedState)));
+  var decodeStateVector = (decodedState) =>
+    readStateVector(new DSDecoderV1(createDecoder(decodedState)));
   var EventHandler = class {
     constructor() {
       this.l = [];
@@ -2396,7 +2473,8 @@ var NoteCoveBridgeModule = (() => {
       console.error("[yjs] Tried to remove event handler that doesn't exist.");
     }
   };
-  var callEventHandlerListeners = (eventHandler, arg0, arg1) => callAll(eventHandler.l, [arg0, arg1]);
+  var callEventHandlerListeners = (eventHandler, arg0, arg1) =>
+    callAll(eventHandler.l, [arg0, arg1]);
   var ID = class {
     /**
      * @param {number} client client id
@@ -2407,7 +2485,8 @@ var NoteCoveBridgeModule = (() => {
       this.clock = clock;
     }
   };
-  var compareIDs = (a, b) => a === b || a !== null && b !== null && a.client === b.client && a.clock === b.clock;
+  var compareIDs = (a, b) =>
+    a === b || (a !== null && b !== null && a.client === b.client && a.clock === b.clock);
   var createID = (client, clock) => new ID(client, clock);
   var findRootTypeKey = (type) => {
     for (const [key, value] of type.doc.share.entries()) {
@@ -2429,7 +2508,12 @@ var NoteCoveBridgeModule = (() => {
   };
   var createSnapshot = (ds, sm) => new Snapshot(ds, sm);
   var emptySnapshot = createSnapshot(createDeleteSet(), /* @__PURE__ */ new Map());
-  var isVisible = (item, snapshot) => snapshot === void 0 ? !item.deleted : snapshot.sv.has(item.id.client) && (snapshot.sv.get(item.id.client) || 0) > item.id.clock && !isDeleted(snapshot.ds, item.id);
+  var isVisible = (item, snapshot) =>
+    snapshot === void 0
+      ? !item.deleted
+      : snapshot.sv.has(item.id.client) &&
+        (snapshot.sv.get(item.id.client) || 0) > item.id.clock &&
+        !isDeleted(snapshot.ds, item.id);
   var splitSnapshotAffectedStructs = (transaction, snapshot) => {
     const meta = setIfUndefined(transaction.meta, splitSnapshotAffectedStructs, create2);
     const store = transaction.doc.store;
@@ -2439,8 +2523,7 @@ var NoteCoveBridgeModule = (() => {
           getItemCleanStart(transaction, createID(client, clock));
         }
       });
-      iterateDeletedStructs(transaction, snapshot.ds, (_item) => {
-      });
+      iterateDeletedStructs(transaction, snapshot.ds, (_item) => {});
       meta.add(snapshot);
     }
   };
@@ -2488,7 +2571,7 @@ var NoteCoveBridgeModule = (() => {
     if (midclock === clock) {
       return right;
     }
-    let midindex = floor(clock / (midclock + mid.length - 1) * right);
+    let midindex = floor((clock / (midclock + mid.length - 1)) * right);
     while (left <= right) {
       mid = structs[midindex];
       midclock = mid.id.clock;
@@ -2508,10 +2591,9 @@ var NoteCoveBridgeModule = (() => {
     const structs = store.clients.get(id2.client);
     return structs[findIndexSS(structs, id2.clock)];
   };
-  var getItem = (
+  var getItem =
     /** @type {function(StructStore,ID):Item} */
-    find
-  );
+    find;
   var findIndexCleanStart = (transaction, structs, clock) => {
     const index = findIndexSS(structs, clock);
     const struct = structs[index];
@@ -2522,10 +2604,9 @@ var NoteCoveBridgeModule = (() => {
     return index;
   };
   var getItemCleanStart = (transaction, id2) => {
-    const structs = (
+    const structs =
       /** @type {Array<Item>} */
-      transaction.doc.store.clients.get(id2.client)
-    );
+      transaction.doc.store.clients.get(id2.client);
     return structs[findIndexCleanStart(transaction, structs, id2.clock)];
   };
   var getItemCleanEnd = (transaction, store, id2) => {
@@ -2538,10 +2619,9 @@ var NoteCoveBridgeModule = (() => {
     return struct;
   };
   var replaceStruct = (store, struct, newStruct) => {
-    const structs = (
+    const structs =
       /** @type {Array<GC|Item>} */
-      store.clients.get(struct.id.client)
-    );
+      store.clients.get(struct.id.client);
     structs[findIndexSS(structs, struct.id.clock)] = newStruct;
   };
   var iterateStructs = (transaction, structs, clockStart, len, f) => {
@@ -2583,7 +2663,10 @@ var NoteCoveBridgeModule = (() => {
     }
   };
   var writeUpdateMessageFromTransaction = (encoder, transaction) => {
-    if (transaction.deleteSet.clients.size === 0 && !any(transaction.afterState, (clock, client) => transaction.beforeState.get(client) !== clock)) {
+    if (
+      transaction.deleteSet.clients.size === 0 &&
+      !any(transaction.afterState, (clock, client) => transaction.beforeState.get(client) !== clock)
+    ) {
       return false;
     }
     sortAndMergeDeleteSet(transaction.deleteSet);
@@ -2593,7 +2676,10 @@ var NoteCoveBridgeModule = (() => {
   };
   var addChangedTypeToTransaction = (transaction, type, parentSub) => {
     const item = type._item;
-    if (item === null || item.id.clock < (transaction.beforeState.get(item.id.client) || 0) && !item.deleted) {
+    if (
+      item === null ||
+      (item.id.clock < (transaction.beforeState.get(item.id.client) || 0) && !item.deleted)
+    ) {
       setIfUndefined(transaction.changed, type, create2).add(parentSub);
     }
   };
@@ -2604,8 +2690,12 @@ var NoteCoveBridgeModule = (() => {
     for (; i > 0; right = left, left = structs[--i - 1]) {
       if (left.deleted === right.deleted && left.constructor === right.constructor) {
         if (left.mergeWith(right)) {
-          if (right instanceof Item && right.parentSub !== null && /** @type {AbstractType<any>} */
-          right.parent._map.get(right.parentSub) === right) {
+          if (
+            right instanceof Item &&
+            right.parentSub !== null &&
+            /** @type {AbstractType<any>} */
+            right.parent._map.get(right.parentSub) === right
+          ) {
             right.parent._map.set(
               right.parentSub,
               /** @type {Item} */
@@ -2625,14 +2715,17 @@ var NoteCoveBridgeModule = (() => {
   };
   var tryGcDeleteSet = (ds, store, gcFilter) => {
     for (const [client, deleteItems] of ds.clients.entries()) {
-      const structs = (
+      const structs =
         /** @type {Array<GC|Item>} */
-        store.clients.get(client)
-      );
+        store.clients.get(client);
       for (let di = deleteItems.length - 1; di >= 0; di--) {
         const deleteItem = deleteItems[di];
         const endDeleteItemClock = deleteItem.clock + deleteItem.len;
-        for (let si = findIndexSS(structs, deleteItem.clock), struct = structs[si]; si < structs.length && struct.id.clock < endDeleteItemClock; struct = structs[++si]) {
+        for (
+          let si = findIndexSS(structs, deleteItem.clock), struct = structs[si];
+          si < structs.length && struct.id.clock < endDeleteItemClock;
+          struct = structs[++si]
+        ) {
           const struct2 = structs[si];
           if (deleteItem.clock + deleteItem.len <= struct2.id.clock) {
             break;
@@ -2646,14 +2739,20 @@ var NoteCoveBridgeModule = (() => {
   };
   var tryMergeDeleteSet = (ds, store) => {
     ds.clients.forEach((deleteItems, client) => {
-      const structs = (
+      const structs =
         /** @type {Array<GC|Item>} */
-        store.clients.get(client)
-      );
+        store.clients.get(client);
       for (let di = deleteItems.length - 1; di >= 0; di--) {
         const deleteItem = deleteItems[di];
-        const mostRightIndexToCheck = min(structs.length - 1, 1 + findIndexSS(structs, deleteItem.clock + deleteItem.len - 1));
-        for (let si = mostRightIndexToCheck, struct = structs[si]; si > 0 && struct.id.clock >= deleteItem.clock; struct = structs[si]) {
+        const mostRightIndexToCheck = min(
+          structs.length - 1,
+          1 + findIndexSS(structs, deleteItem.clock + deleteItem.len - 1)
+        );
+        for (
+          let si = mostRightIndexToCheck, struct = structs[si];
+          si > 0 && struct.id.clock >= deleteItem.clock;
+          struct = structs[si]
+        ) {
           si -= 1 + tryToMergeWithLefts(structs, si);
         }
       }
@@ -2669,10 +2768,10 @@ var NoteCoveBridgeModule = (() => {
       try {
         sortAndMergeDeleteSet(ds);
         transaction.afterState = getStateVector(transaction.doc.store);
-        doc2.emit("beforeObserverCalls", [transaction, doc2]);
+        doc2.emit('beforeObserverCalls', [transaction, doc2]);
         const fs = [];
-        transaction.changed.forEach(
-          (subs, itemtype) => fs.push(() => {
+        transaction.changed.forEach((subs, itemtype) =>
+          fs.push(() => {
             if (itemtype._item === null || !itemtype._item.deleted) {
               itemtype._callObserver(transaction, subs);
             }
@@ -2693,7 +2792,7 @@ var NoteCoveBridgeModule = (() => {
             }
           });
         });
-        fs.push(() => doc2.emit("afterTransaction", [transaction, doc2]));
+        fs.push(() => doc2.emit('afterTransaction', [transaction, doc2]));
         callAll(fs, []);
         if (transaction._needFormattingCleanup) {
           cleanupYTextAfterTransaction(transaction);
@@ -2706,10 +2805,9 @@ var NoteCoveBridgeModule = (() => {
         transaction.afterState.forEach((clock, client) => {
           const beforeClock = transaction.beforeState.get(client) || 0;
           if (beforeClock !== clock) {
-            const structs = (
+            const structs =
               /** @type {Array<GC|Item>} */
-              store.clients.get(client)
-            );
+              store.clients.get(client);
             const firstChangePos = max(findIndexSS(structs, beforeClock), 1);
             for (let i2 = structs.length - 1; i2 >= firstChangePos; ) {
               i2 -= 1 + tryToMergeWithLefts(structs, i2);
@@ -2718,10 +2816,9 @@ var NoteCoveBridgeModule = (() => {
         });
         for (let i2 = mergeStructs.length - 1; i2 >= 0; i2--) {
           const { client, clock } = mergeStructs[i2].id;
-          const structs = (
+          const structs =
             /** @type {Array<GC|Item>} */
-            store.clients.get(client)
-          );
+            store.clients.get(client);
           const replacedStructPos = findIndexSS(structs, clock);
           if (replacedStructPos + 1 < structs.length) {
             if (tryToMergeWithLefts(structs, replacedStructPos + 1) > 1) {
@@ -2732,23 +2829,33 @@ var NoteCoveBridgeModule = (() => {
             tryToMergeWithLefts(structs, replacedStructPos);
           }
         }
-        if (!transaction.local && transaction.afterState.get(doc2.clientID) !== transaction.beforeState.get(doc2.clientID)) {
-          print(ORANGE, BOLD, "[yjs] ", UNBOLD, RED, "Changed the client-id because another client seems to be using it.");
+        if (
+          !transaction.local &&
+          transaction.afterState.get(doc2.clientID) !== transaction.beforeState.get(doc2.clientID)
+        ) {
+          print(
+            ORANGE,
+            BOLD,
+            '[yjs] ',
+            UNBOLD,
+            RED,
+            'Changed the client-id because another client seems to be using it.'
+          );
           doc2.clientID = generateNewClientId();
         }
-        doc2.emit("afterTransactionCleanup", [transaction, doc2]);
-        if (doc2._observers.has("update")) {
+        doc2.emit('afterTransactionCleanup', [transaction, doc2]);
+        if (doc2._observers.has('update')) {
           const encoder = new UpdateEncoderV1();
           const hasContent2 = writeUpdateMessageFromTransaction(encoder, transaction);
           if (hasContent2) {
-            doc2.emit("update", [encoder.toUint8Array(), transaction.origin, doc2, transaction]);
+            doc2.emit('update', [encoder.toUint8Array(), transaction.origin, doc2, transaction]);
           }
         }
-        if (doc2._observers.has("updateV2")) {
+        if (doc2._observers.has('updateV2')) {
           const encoder = new UpdateEncoderV2();
           const hasContent2 = writeUpdateMessageFromTransaction(encoder, transaction);
           if (hasContent2) {
-            doc2.emit("updateV2", [encoder.toUint8Array(), transaction.origin, doc2, transaction]);
+            doc2.emit('updateV2', [encoder.toUint8Array(), transaction.origin, doc2, transaction]);
           }
         }
         const { subdocsAdded, subdocsLoaded, subdocsRemoved } = transaction;
@@ -2761,12 +2868,16 @@ var NoteCoveBridgeModule = (() => {
             doc2.subdocs.add(subdoc);
           });
           subdocsRemoved.forEach((subdoc) => doc2.subdocs.delete(subdoc));
-          doc2.emit("subdocs", [{ loaded: subdocsLoaded, added: subdocsAdded, removed: subdocsRemoved }, doc2, transaction]);
+          doc2.emit('subdocs', [
+            { loaded: subdocsLoaded, added: subdocsAdded, removed: subdocsRemoved },
+            doc2,
+            transaction,
+          ]);
           subdocsRemoved.forEach((subdoc) => subdoc.destroy());
         }
         if (transactionCleanups.length <= i + 1) {
           doc2._transactionCleanups = [];
-          doc2.emit("afterAllTransactions", [doc2, transactionCleanups]);
+          doc2.emit('afterAllTransactions', [doc2, transactionCleanups]);
         } else {
           cleanupTransactions(transactionCleanups, i + 1);
         }
@@ -2782,9 +2893,9 @@ var NoteCoveBridgeModule = (() => {
       doc2._transaction = new Transaction(doc2, origin, local);
       transactionCleanups.push(doc2._transaction);
       if (transactionCleanups.length === 1) {
-        doc2.emit("beforeAllTransactions", [doc2]);
+        doc2.emit('beforeAllTransactions', [doc2]);
       }
-      doc2.emit("beforeTransaction", [doc2._transaction, doc2]);
+      doc2.emit('beforeTransaction', [doc2._transaction, doc2]);
     }
     try {
       result = f(doc2._transaction);
@@ -2824,7 +2935,11 @@ var NoteCoveBridgeModule = (() => {
             (info & BIT7) === BIT7 ? decoder.readRightID() : null,
             // right origin
             // @ts-ignore Force writing a string here.
-            cantCopyParentInfo ? decoder.readParentInfo() ? decoder.readString() : decoder.readLeftID() : null,
+            cantCopyParentInfo
+              ? decoder.readParentInfo()
+                ? decoder.readString()
+                : decoder.readLeftID()
+              : null,
             // parent
             cantCopyParentInfo && (info & BIT6) === BIT6 ? decoder.readString() : null,
             // parentSub
@@ -2884,10 +2999,9 @@ var NoteCoveBridgeModule = (() => {
       const { client, clock } = left.id;
       return new Skip(createID(client, clock + diff), left.length - diff);
     } else {
-      const leftItem = (
+      const leftItem =
         /** @type {Item} */
-        left
-      );
+        left;
       const { client, clock } = leftItem.id;
       return new Item(
         createID(client, clock + diff),
@@ -2918,7 +3032,11 @@ var NoteCoveBridgeModule = (() => {
           if (dec1.curr.id.client === dec2.curr.id.client) {
             const clockDiff = dec1.curr.id.clock - dec2.curr.id.clock;
             if (clockDiff === 0) {
-              return dec1.curr.constructor === dec2.curr.constructor ? 0 : dec1.curr.constructor === Skip ? 1 : -1;
+              return dec1.curr.constructor === dec2.curr.constructor
+                ? 0
+                : dec1.curr.constructor === Skip
+                  ? 1
+                  : -1;
             } else {
               return clockDiff;
             }
@@ -2931,23 +3049,27 @@ var NoteCoveBridgeModule = (() => {
         break;
       }
       const currDecoder = lazyStructDecoders[0];
-      const firstClient = (
+      const firstClient =
         /** @type {Item | GC} */
-        currDecoder.curr.id.client
-      );
+        currDecoder.curr.id.client;
       if (currWrite !== null) {
-        let curr = (
+        let curr =
           /** @type {Item | GC | null} */
-          currDecoder.curr
-        );
+          currDecoder.curr;
         let iterated = false;
-        while (curr !== null && curr.id.clock + curr.length <= currWrite.struct.id.clock + currWrite.struct.length && curr.id.client >= currWrite.struct.id.client) {
+        while (
+          curr !== null &&
+          curr.id.clock + curr.length <= currWrite.struct.id.clock + currWrite.struct.length &&
+          curr.id.client >= currWrite.struct.id.client
+        ) {
           curr = currDecoder.next();
           iterated = true;
         }
-        if (curr === null || // current decoder is empty
-        curr.id.client !== firstClient || // check whether there is another decoder that has has updates from `firstClient`
-        iterated && curr.id.clock > currWrite.struct.id.clock + currWrite.struct.length) {
+        if (
+          curr === null || // current decoder is empty
+          curr.id.client !== firstClient || // check whether there is another decoder that has has updates from `firstClient`
+          (iterated && curr.id.clock > currWrite.struct.id.clock + currWrite.struct.length)
+        ) {
           continue;
         }
         if (firstClient !== currWrite.struct.id.client) {
@@ -2961,7 +3083,10 @@ var NoteCoveBridgeModule = (() => {
             } else {
               writeStructToLazyStructWriter(lazyStructEncoder, currWrite.struct, currWrite.offset);
               const diff = curr.id.clock - currWrite.struct.id.clock - currWrite.struct.length;
-              const struct = new Skip(createID(firstClient, currWrite.struct.id.clock + currWrite.struct.length), diff);
+              const struct = new Skip(
+                createID(firstClient, currWrite.struct.id.clock + currWrite.struct.length),
+                diff
+              );
               currWrite = { struct, offset: 0 };
             }
           } else {
@@ -2973,10 +3098,12 @@ var NoteCoveBridgeModule = (() => {
                 curr = sliceStruct(curr, diff);
               }
             }
-            if (!currWrite.struct.mergeWith(
-              /** @type {any} */
-              curr
-            )) {
+            if (
+              !currWrite.struct.mergeWith(
+                /** @type {any} */
+                curr
+              )
+            ) {
               writeStructToLazyStructWriter(lazyStructEncoder, currWrite.struct, currWrite.offset);
               currWrite = { struct: curr, offset: 0 };
               currDecoder.next();
@@ -2984,13 +3111,22 @@ var NoteCoveBridgeModule = (() => {
           }
         }
       } else {
-        currWrite = { struct: (
-          /** @type {Item | GC} */
-          currDecoder.curr
-        ), offset: 0 };
+        currWrite = {
+          struct:
+            /** @type {Item | GC} */
+            currDecoder.curr,
+          offset: 0,
+        };
         currDecoder.next();
       }
-      for (let next = currDecoder.curr; next !== null && next.id.client === firstClient && next.id.clock === currWrite.struct.id.clock + currWrite.struct.length && next.constructor !== Skip; next = currDecoder.next()) {
+      for (
+        let next = currDecoder.curr;
+        next !== null &&
+        next.id.client === firstClient &&
+        next.id.clock === currWrite.struct.id.clock + currWrite.struct.length &&
+        next.constructor !== Skip;
+        next = currDecoder.next()
+      ) {
         writeStructToLazyStructWriter(lazyStructEncoder, currWrite.struct, currWrite.offset);
         currWrite = { struct: next, offset: 0 };
       }
@@ -3027,7 +3163,11 @@ var NoteCoveBridgeModule = (() => {
           reader.next();
         }
       } else {
-        while (reader.curr && reader.curr.id.client === currClient && reader.curr.id.clock + reader.curr.length <= svClock) {
+        while (
+          reader.curr &&
+          reader.curr.id.client === currClient &&
+          reader.curr.id.clock + reader.curr.length <= svClock
+        ) {
           reader.next();
         }
       }
@@ -3039,7 +3179,10 @@ var NoteCoveBridgeModule = (() => {
   };
   var flushLazyStructWriter = (lazyWriter) => {
     if (lazyWriter.written > 0) {
-      lazyWriter.clientStructs.push({ written: lazyWriter.written, restEncoder: toUint8Array(lazyWriter.encoder.restEncoder) });
+      lazyWriter.clientStructs.push({
+        written: lazyWriter.written,
+        restEncoder: toUint8Array(lazyWriter.encoder.restEncoder),
+      });
       lazyWriter.encoder.restEncoder = createEncoder();
       lazyWriter.written = 0;
     }
@@ -3079,8 +3222,9 @@ var NoteCoveBridgeModule = (() => {
     writeDeleteSet(updateEncoder, ds);
     return updateEncoder.toUint8Array();
   };
-  var convertUpdateFormatV2ToV1 = (update) => convertUpdateFormat(update, id, UpdateDecoderV2, UpdateEncoderV1);
-  var errorComputeChanges = "You must not compute changes after the event-handler fired.";
+  var convertUpdateFormatV2ToV1 = (update) =>
+    convertUpdateFormat(update, id, UpdateDecoderV2, UpdateEncoderV1);
+  var errorComputeChanges = 'You must not compute changes after the event-handler fired.';
   var YEvent = class {
     /**
      * @param {T} target The changed type.
@@ -3132,16 +3276,14 @@ var NoteCoveBridgeModule = (() => {
         }
         const keys2 = /* @__PURE__ */ new Map();
         const target = this.target;
-        const changed = (
+        const changed =
           /** @type Set<string|null> */
-          this.transaction.changed.get(target)
-        );
+          this.transaction.changed.get(target);
         changed.forEach((key) => {
           if (key !== null) {
-            const item = (
+            const item =
               /** @type {Item} */
-              target._map.get(key)
-            );
+              target._map.get(key);
             let action;
             let oldValue;
             if (this.adds(item)) {
@@ -3151,23 +3293,23 @@ var NoteCoveBridgeModule = (() => {
               }
               if (this.deletes(item)) {
                 if (prev !== null && this.deletes(prev)) {
-                  action = "delete";
+                  action = 'delete';
                   oldValue = last(prev.content.getContent());
                 } else {
                   return;
                 }
               } else {
                 if (prev !== null && this.deletes(prev)) {
-                  action = "update";
+                  action = 'update';
                   oldValue = last(prev.content.getContent());
                 } else {
-                  action = "add";
+                  action = 'add';
                   oldValue = void 0;
                 }
               }
             } else {
               if (this.deletes(item)) {
-                action = "delete";
+                action = 'delete';
                 oldValue = last(
                   /** @type {Item} */
                   item.content.getContent()
@@ -3227,12 +3369,11 @@ var NoteCoveBridgeModule = (() => {
           added,
           deleted,
           delta,
-          keys: this.keys
+          keys: this.keys,
         };
-        const changed = (
+        const changed =
           /** @type Set<string|null> */
-          this.transaction.changed.get(target)
-        );
+          this.transaction.changed.get(target);
         if (changed.has(null)) {
           let lastOp = null;
           const packOp = () => {
@@ -3286,10 +3427,9 @@ var NoteCoveBridgeModule = (() => {
         path.unshift(child._item.parentSub);
       } else {
         let i = 0;
-        let c = (
+        let c =
           /** @type {AbstractType<any>} */
-          child._item.parent._start
-        );
+          child._item.parent._start;
         while (c !== child._item && c !== null) {
           if (!c.deleted && c.countable) {
             i += c.length;
@@ -3298,13 +3438,12 @@ var NoteCoveBridgeModule = (() => {
         }
         path.unshift(i);
       }
-      child = /** @type {AbstractType<any>} */
-      child._item.parent;
+      child = /** @type {AbstractType<any>} */ child._item.parent;
     }
     return path;
   };
   var warnPrematureAccess = () => {
-    warn("Invalid access: Add Yjs type to a document before reading data.");
+    warn('Invalid access: Add Yjs type to a document before reading data.');
   };
   var maxSearchMarker = 80;
   var globalSearchMarkerTimestamp = 0;
@@ -3332,7 +3471,7 @@ var NoteCoveBridgeModule = (() => {
   };
   var markPosition = (searchMarker, p, index) => {
     if (searchMarker.length >= maxSearchMarker) {
-      const marker = searchMarker.reduce((a, b) => a.timestamp < b.timestamp ? a : b);
+      const marker = searchMarker.reduce((a, b) => (a.timestamp < b.timestamp ? a : b));
       overwriteMarker(marker, p, index);
       return marker;
     } else {
@@ -3345,7 +3484,12 @@ var NoteCoveBridgeModule = (() => {
     if (yarray._start === null || index === 0 || yarray._searchMarker === null) {
       return null;
     }
-    const marker = yarray._searchMarker.length === 0 ? null : yarray._searchMarker.reduce((a, b) => abs(index - a.index) < abs(index - b.index) ? a : b);
+    const marker =
+      yarray._searchMarker.length === 0
+        ? null
+        : yarray._searchMarker.reduce((a, b) =>
+            abs(index - a.index) < abs(index - b.index) ? a : b
+          );
     let p = yarray._start;
     let pindex = 0;
     if (marker !== null) {
@@ -3368,14 +3512,22 @@ var NoteCoveBridgeModule = (() => {
         pindex -= p.length;
       }
     }
-    while (p.left !== null && p.left.id.client === p.id.client && p.left.id.clock + p.left.length === p.id.clock) {
+    while (
+      p.left !== null &&
+      p.left.id.client === p.id.client &&
+      p.left.id.clock + p.left.length === p.id.clock
+    ) {
       p = p.left;
       if (!p.deleted && p.countable) {
         pindex -= p.length;
       }
     }
-    if (marker !== null && abs(marker.index - pindex) < /** @type {YText|YArray<any>} */
-    p.parent.length / maxSearchMarker) {
+    if (
+      marker !== null &&
+      abs(marker.index - pindex) <
+        /** @type {YText|YArray<any>} */
+        p.parent.length / maxSearchMarker
+    ) {
       overwriteMarker(marker, p, pindex);
       return marker;
     } else {
@@ -3401,7 +3553,7 @@ var NoteCoveBridgeModule = (() => {
         m.p = p;
         p.marker = true;
       }
-      if (index < m.index || len > 0 && index === m.index) {
+      if (index < m.index || (len > 0 && index === m.index)) {
         m.index = max(index, m.index + len);
       }
     }
@@ -3414,8 +3566,7 @@ var NoteCoveBridgeModule = (() => {
       if (type._item === null) {
         break;
       }
-      type = /** @type {AbstractType<any>} */
-      type._item.parent;
+      type = /** @type {AbstractType<any>} */ type._item.parent;
     }
     callEventHandlerListeners(changedType._eH, event, transaction);
   };
@@ -3434,10 +3585,7 @@ var NoteCoveBridgeModule = (() => {
      * @return {AbstractType<any>|null}
      */
     get parent() {
-      return this._item ? (
-        /** @type {AbstractType<any>} */
-        this._item.parent
-      ) : null;
+      return this._item ? /** @type {AbstractType<any>} */ this._item.parent : null;
     }
     /**
      * Integrate this type into the Yjs instance.
@@ -3472,8 +3620,7 @@ var NoteCoveBridgeModule = (() => {
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} _encoder
      */
-    _write(_encoder) {
-    }
+    _write(_encoder) {}
     /**
      * The first non-deleted item
      */
@@ -3532,8 +3679,7 @@ var NoteCoveBridgeModule = (() => {
      * @abstract
      * @return {any}
      */
-    toJSON() {
-    }
+    toJSON() {}
   };
   var typeListSlice = (type, start, end) => {
     type.doc ?? warnPrematureAccess();
@@ -3615,7 +3761,7 @@ var NoteCoveBridgeModule = (() => {
           if (n === null) {
             return {
               done: true,
-              value: void 0
+              value: void 0,
             };
           }
           currentContent = n.content.getContent();
@@ -3628,9 +3774,9 @@ var NoteCoveBridgeModule = (() => {
         }
         return {
           done: false,
-          value
+          value,
         };
-      }
+      },
     };
   };
   var typeListGet = (type, index) => {
@@ -3659,7 +3805,16 @@ var NoteCoveBridgeModule = (() => {
     let jsonContent = [];
     const packJsonContent = () => {
       if (jsonContent.length > 0) {
-        left = new Item(createID(ownClientId, getState(store, ownClientId)), left, left && left.lastId, right, right && right.id, parent, null, new ContentAny(jsonContent));
+        left = new Item(
+          createID(ownClientId, getState(store, ownClientId)),
+          left,
+          left && left.lastId,
+          right,
+          right && right.id,
+          parent,
+          null,
+          new ContentAny(jsonContent)
+        );
         left.integrate(transaction, 0);
         jsonContent = [];
       }
@@ -3681,25 +3836,54 @@ var NoteCoveBridgeModule = (() => {
             switch (c.constructor) {
               case Uint8Array:
               case ArrayBuffer:
-                left = new Item(createID(ownClientId, getState(store, ownClientId)), left, left && left.lastId, right, right && right.id, parent, null, new ContentBinary(new Uint8Array(
-                  /** @type {Uint8Array} */
-                  c
-                )));
+                left = new Item(
+                  createID(ownClientId, getState(store, ownClientId)),
+                  left,
+                  left && left.lastId,
+                  right,
+                  right && right.id,
+                  parent,
+                  null,
+                  new ContentBinary(
+                    new Uint8Array(
+                      /** @type {Uint8Array} */
+                      c
+                    )
+                  )
+                );
                 left.integrate(transaction, 0);
                 break;
               case Doc:
-                left = new Item(createID(ownClientId, getState(store, ownClientId)), left, left && left.lastId, right, right && right.id, parent, null, new ContentDoc(
-                  /** @type {Doc} */
-                  c
-                ));
+                left = new Item(
+                  createID(ownClientId, getState(store, ownClientId)),
+                  left,
+                  left && left.lastId,
+                  right,
+                  right && right.id,
+                  parent,
+                  null,
+                  new ContentDoc(
+                    /** @type {Doc} */
+                    c
+                  )
+                );
                 left.integrate(transaction, 0);
                 break;
               default:
                 if (c instanceof AbstractType) {
-                  left = new Item(createID(ownClientId, getState(store, ownClientId)), left, left && left.lastId, right, right && right.id, parent, null, new ContentType(c));
+                  left = new Item(
+                    createID(ownClientId, getState(store, ownClientId)),
+                    left,
+                    left && left.lastId,
+                    right,
+                    right && right.id,
+                    parent,
+                    null,
+                    new ContentType(c)
+                  );
                   left.integrate(transaction, 0);
                 } else {
-                  throw new Error("Unexpected content type in insert operation");
+                  throw new Error('Unexpected content type in insert operation');
                 }
             }
         }
@@ -3707,7 +3891,7 @@ var NoteCoveBridgeModule = (() => {
     });
     packJsonContent();
   };
-  var lengthExceeded = () => create3("Length exceeded!");
+  var lengthExceeded = () => create3('Length exceeded!');
   var typeListInsertGenerics = (transaction, parent, index, content) => {
     if (index > parent._length) {
       throw lengthExceeded();
@@ -3746,7 +3930,10 @@ var NoteCoveBridgeModule = (() => {
     return typeListInsertGenericsAfter(transaction, parent, n, content);
   };
   var typeListPushGenerics = (transaction, parent, content) => {
-    const marker = (parent._searchMarker || []).reduce((maxMarker, currMarker) => currMarker.index > maxMarker.index ? currMarker : maxMarker, { index: 0, p: parent._start });
+    const marker = (parent._searchMarker || []).reduce(
+      (maxMarker, currMarker) => (currMarker.index > maxMarker.index ? currMarker : maxMarker),
+      { index: 0, p: parent._start }
+    );
     let n = marker.p;
     if (n) {
       while (n.right) {
@@ -3837,11 +4024,20 @@ var NoteCoveBridgeModule = (() => {
           if (value instanceof AbstractType) {
             content = new ContentType(value);
           } else {
-            throw new Error("Unexpected content type");
+            throw new Error('Unexpected content type');
           }
       }
     }
-    new Item(createID(ownClientId, getState(doc2.store, ownClientId)), left, left && left.lastId, null, null, parent, key, content).integrate(transaction, 0);
+    new Item(
+      createID(ownClientId, getState(doc2.store, ownClientId)),
+      left,
+      left && left.lastId,
+      null,
+      null,
+      parent,
+      key,
+      content
+    ).integrate(transaction, 0);
   };
   var typeMapGet = (parent, key) => {
     parent.doc ?? warnPrematureAccess();
@@ -3867,7 +4063,10 @@ var NoteCoveBridgeModule = (() => {
     const res = {};
     parent._map.forEach((value, key) => {
       let v = value;
-      while (v !== null && (!snapshot.sv.has(v.id.client) || v.id.clock >= (snapshot.sv.get(v.id.client) || 0))) {
+      while (
+        v !== null &&
+        (!snapshot.sv.has(v.id.client) || v.id.clock >= (snapshot.sv.get(v.id.client) || 0))
+      ) {
         v = v.left;
       }
       if (v !== null && isVisible(v, snapshot)) {
@@ -3884,8 +4083,7 @@ var NoteCoveBridgeModule = (() => {
       (entry) => !entry[1].deleted
     );
   };
-  var YArrayEvent = class extends YEvent {
-  };
+  var YArrayEvent = class extends YEvent {};
   var YArray = class _YArray extends AbstractType {
     constructor() {
       super();
@@ -3937,12 +4135,12 @@ var NoteCoveBridgeModule = (() => {
      */
     clone() {
       const arr = new _YArray();
-      arr.insert(0, this.toArray().map(
-        (el) => el instanceof AbstractType ? (
-          /** @type {typeof el} */
-          el.clone()
-        ) : el
-      ));
+      arr.insert(
+        0,
+        this.toArray().map((el) =>
+          el instanceof AbstractType ? /** @type {typeof el} */ el.clone() : el
+        )
+      );
       return arr;
     }
     get length() {
@@ -4068,7 +4266,7 @@ var NoteCoveBridgeModule = (() => {
      * @return {Array<any>}
      */
     toJSON() {
-      return this.map((c) => c instanceof AbstractType ? c.toJSON() : c);
+      return this.map((c) => (c instanceof AbstractType ? c.toJSON() : c));
     }
     /**
      * Returns an Array with the result of calling a provided function on every
@@ -4166,10 +4364,10 @@ var NoteCoveBridgeModule = (() => {
     clone() {
       const map2 = new _YMap();
       this.forEach((value, key) => {
-        map2.set(key, value instanceof AbstractType ? (
-          /** @type {typeof value} */
-          value.clone()
-        ) : value);
+        map2.set(
+          key,
+          value instanceof AbstractType ? /** @type {typeof value} */ value.clone() : value
+        );
       });
       return map2;
     }
@@ -4239,10 +4437,9 @@ var NoteCoveBridgeModule = (() => {
       return iteratorMap(
         createMapIterator(this),
         /** @param {any} v */
-        (v) => (
+        (v) =>
           /** @type {any} */
           [v[0], v[1].content.getContent()[v[1].length - 1]]
-        )
       );
     }
     /**
@@ -4331,7 +4528,7 @@ var NoteCoveBridgeModule = (() => {
     clear() {
       if (this.doc !== null) {
         transact(this.doc, (transaction) => {
-          this.forEach(function(_value, key, map2) {
+          this.forEach(function (_value, key, map2) {
             typeMapDelete(transaction, map2, key);
           });
         });
@@ -4347,7 +4544,8 @@ var NoteCoveBridgeModule = (() => {
     }
   };
   var readYMap = (_decoder) => new YMap();
-  var equalAttrs = (a, b) => a === b || typeof a === "object" && typeof b === "object" && a && b && equalFlat(a, b);
+  var equalAttrs = (a, b) =>
+    a === b || (typeof a === 'object' && typeof b === 'object' && a && b && equalFlat(a, b));
   var ItemTextListPosition = class {
     /**
      * @param {Item|null} left
@@ -4403,7 +4601,10 @@ var NoteCoveBridgeModule = (() => {
         default:
           if (!pos.right.deleted) {
             if (count < pos.right.length) {
-              getItemCleanStart(transaction, createID(pos.right.id.client, pos.right.id.clock + count));
+              getItemCleanStart(
+                transaction,
+                createID(pos.right.id.client, pos.right.id.clock + count)
+              );
             }
             pos.index += pos.right.length;
             count -= pos.right.length;
@@ -4419,7 +4620,12 @@ var NoteCoveBridgeModule = (() => {
     const currentAttributes = /* @__PURE__ */ new Map();
     const marker = useSearchMarker ? findMarker(parent, index) : null;
     if (marker) {
-      const pos = new ItemTextListPosition(marker.p.left, marker.p, marker.index, currentAttributes);
+      const pos = new ItemTextListPosition(
+        marker.p.left,
+        marker.p,
+        marker.index,
+        currentAttributes
+      );
       return findNextPosition(transaction, pos, index - marker.index);
     } else {
       const pos = new ItemTextListPosition(null, parent._start, 0, currentAttributes);
@@ -4427,14 +4633,19 @@ var NoteCoveBridgeModule = (() => {
     }
   };
   var insertNegatedAttributes = (transaction, parent, currPos, negatedAttributes) => {
-    while (currPos.right !== null && (currPos.right.deleted === true || currPos.right.content.constructor === ContentFormat && equalAttrs(
-      negatedAttributes.get(
-        /** @type {ContentFormat} */
-        currPos.right.content.key
-      ),
-      /** @type {ContentFormat} */
-      currPos.right.content.value
-    ))) {
+    while (
+      currPos.right !== null &&
+      (currPos.right.deleted === true ||
+        (currPos.right.content.constructor === ContentFormat &&
+          equalAttrs(
+            negatedAttributes.get(
+              /** @type {ContentFormat} */
+              currPos.right.content.key
+            ),
+            /** @type {ContentFormat} */
+            currPos.right.content.value
+          )))
+    ) {
       if (!currPos.right.deleted) {
         negatedAttributes.delete(
           /** @type {ContentFormat} */
@@ -4448,7 +4659,16 @@ var NoteCoveBridgeModule = (() => {
     negatedAttributes.forEach((val, key) => {
       const left = currPos.left;
       const right = currPos.right;
-      const nextFormat = new Item(createID(ownClientId, getState(doc2.store, ownClientId)), left, left && left.lastId, right, right && right.id, parent, null, new ContentFormat(key, val));
+      const nextFormat = new Item(
+        createID(ownClientId, getState(doc2.store, ownClientId)),
+        left,
+        left && left.lastId,
+        right,
+        right && right.id,
+        parent,
+        null,
+        new ContentFormat(key, val)
+      );
       nextFormat.integrate(transaction, 0);
       currPos.right = nextFormat;
       currPos.forward();
@@ -4466,14 +4686,18 @@ var NoteCoveBridgeModule = (() => {
     while (true) {
       if (currPos.right === null) {
         break;
-      } else if (currPos.right.deleted || currPos.right.content.constructor === ContentFormat && equalAttrs(
-        attributes[
-          /** @type {ContentFormat} */
-          currPos.right.content.key
-        ] ?? null,
-        /** @type {ContentFormat} */
-        currPos.right.content.value
-      )) ;
+      } else if (
+        currPos.right.deleted ||
+        (currPos.right.content.constructor === ContentFormat &&
+          equalAttrs(
+            attributes[
+              /** @type {ContentFormat} */
+              currPos.right.content.key
+            ] ?? null,
+            /** @type {ContentFormat} */
+            currPos.right.content.value
+          ))
+      );
       else {
         break;
       }
@@ -4490,7 +4714,16 @@ var NoteCoveBridgeModule = (() => {
       if (!equalAttrs(currentVal, val)) {
         negatedAttributes.set(key, currentVal);
         const { left, right } = currPos;
-        currPos.right = new Item(createID(ownClientId, getState(doc2.store, ownClientId)), left, left && left.lastId, right, right && right.id, parent, null, new ContentFormat(key, val));
+        currPos.right = new Item(
+          createID(ownClientId, getState(doc2.store, ownClientId)),
+          left,
+          left && left.lastId,
+          right,
+          right && right.id,
+          parent,
+          null,
+          new ContentFormat(key, val)
+        );
         currPos.right.integrate(transaction, 0);
         currPos.forward();
       }
@@ -4507,15 +4740,29 @@ var NoteCoveBridgeModule = (() => {
     const ownClientId = doc2.clientID;
     minimizeAttributeChanges(currPos, attributes);
     const negatedAttributes = insertAttributes(transaction, parent, currPos, attributes);
-    const content = text2.constructor === String ? new ContentString(
-      /** @type {string} */
-      text2
-    ) : text2 instanceof AbstractType ? new ContentType(text2) : new ContentEmbed(text2);
+    const content =
+      text2.constructor === String
+        ? new ContentString(
+            /** @type {string} */
+            text2
+          )
+        : text2 instanceof AbstractType
+          ? new ContentType(text2)
+          : new ContentEmbed(text2);
     let { left, right, index } = currPos;
     if (parent._searchMarker) {
       updateMarkerChanges(parent._searchMarker, currPos.index, content.getLength());
     }
-    right = new Item(createID(ownClientId, getState(doc2.store, ownClientId)), left, left && left.lastId, right, right && right.id, parent, null, content);
+    right = new Item(
+      createID(ownClientId, getState(doc2.store, ownClientId)),
+      left,
+      left && left.lastId,
+      right,
+      right && right.id,
+      parent,
+      null,
+      content
+    );
     right.integrate(transaction, 0);
     currPos.right = right;
     currPos.index = index;
@@ -4527,14 +4774,18 @@ var NoteCoveBridgeModule = (() => {
     const ownClientId = doc2.clientID;
     minimizeAttributeChanges(currPos, attributes);
     const negatedAttributes = insertAttributes(transaction, parent, currPos, attributes);
-    iterationLoop: while (currPos.right !== null && (length2 > 0 || negatedAttributes.size > 0 && (currPos.right.deleted || currPos.right.content.constructor === ContentFormat))) {
+    iterationLoop: while (
+      currPos.right !== null &&
+      (length2 > 0 ||
+        (negatedAttributes.size > 0 &&
+          (currPos.right.deleted || currPos.right.content.constructor === ContentFormat)))
+    ) {
       if (!currPos.right.deleted) {
         switch (currPos.right.content.constructor) {
           case ContentFormat: {
-            const { key, value } = (
+            const { key, value } =
               /** @type {ContentFormat} */
-              currPos.right.content
-            );
+              currPos.right.content;
             const attr = attributes[key];
             if (attr !== void 0) {
               if (equalAttrs(attr, value)) {
@@ -4553,7 +4804,10 @@ var NoteCoveBridgeModule = (() => {
           }
           default:
             if (length2 < currPos.right.length) {
-              getItemCleanStart(transaction, createID(currPos.right.id.client, currPos.right.id.clock + length2));
+              getItemCleanStart(
+                transaction,
+                createID(currPos.right.id.client, currPos.right.id.clock + length2)
+              );
             }
             length2 -= currPos.right.length;
             break;
@@ -4562,11 +4816,20 @@ var NoteCoveBridgeModule = (() => {
       currPos.forward();
     }
     if (length2 > 0) {
-      let newlines = "";
+      let newlines = '';
       for (; length2 > 0; length2--) {
-        newlines += "\n";
+        newlines += '\n';
       }
-      currPos.right = new Item(createID(ownClientId, getState(doc2.store, ownClientId)), currPos.left, currPos.left && currPos.left.lastId, currPos.right, currPos.right && currPos.right.id, parent, null, new ContentString(newlines));
+      currPos.right = new Item(
+        createID(ownClientId, getState(doc2.store, ownClientId)),
+        currPos.left,
+        currPos.left && currPos.left.lastId,
+        currPos.right,
+        currPos.right && currPos.right.id,
+        parent,
+        null,
+        new ContentString(newlines)
+      );
       currPos.right.integrate(transaction, 0);
       currPos.forward();
     }
@@ -4577,10 +4840,9 @@ var NoteCoveBridgeModule = (() => {
     const endFormats = create();
     while (end && (!end.countable || end.deleted)) {
       if (!end.deleted && end.content.constructor === ContentFormat) {
-        const cf = (
+        const cf =
           /** @type {ContentFormat} */
-          end.content
-        );
+          end.content;
         endFormats.set(cf.key, cf);
       }
       end = end.right;
@@ -4595,15 +4857,18 @@ var NoteCoveBridgeModule = (() => {
         const content = start.content;
         switch (content.constructor) {
           case ContentFormat: {
-            const { key, value } = (
+            const { key, value } =
               /** @type {ContentFormat} */
-              content
-            );
+              content;
             const startAttrValue = startAttributes.get(key) ?? null;
             if (endFormats.get(key) !== content || startAttrValue === value) {
               start.delete(transaction);
               cleanups++;
-              if (!reachedCurr && (currAttributes.get(key) ?? null) === value && startAttrValue !== value) {
+              if (
+                !reachedCurr &&
+                (currAttributes.get(key) ?? null) === value &&
+                startAttrValue !== value
+              ) {
                 if (startAttrValue === null) {
                   currAttributes.delete(key);
                 } else {
@@ -4622,8 +4887,7 @@ var NoteCoveBridgeModule = (() => {
           }
         }
       }
-      start = /** @type {Item} */
-      start.right;
+      start = /** @type {Item} */ start.right;
     }
     return cleanups;
   };
@@ -4634,10 +4898,9 @@ var NoteCoveBridgeModule = (() => {
     const attrs = /* @__PURE__ */ new Set();
     while (item && (item.deleted || !item.countable)) {
       if (!item.deleted && item.content.constructor === ContentFormat) {
-        const key = (
+        const key =
           /** @type {ContentFormat} */
-          item.content.key
-        );
+          item.content.key;
         if (attrs.has(key)) {
           item.delete(transaction);
         } else {
@@ -4653,10 +4916,9 @@ var NoteCoveBridgeModule = (() => {
       /** @type {Doc} */
       type.doc,
       (transaction) => {
-        let start = (
+        let start =
           /** @type {Item} */
-          type._start
-        );
+          type._start;
         let end = type._start;
         let startAttributes = create();
         const currentAttributes = copy(startAttributes);
@@ -4671,7 +4933,13 @@ var NoteCoveBridgeModule = (() => {
                 );
                 break;
               default:
-                res += cleanupFormattingGap(transaction, start, end, startAttributes, currentAttributes);
+                res += cleanupFormattingGap(
+                  transaction,
+                  start,
+                  end,
+                  startAttributes,
+                  currentAttributes
+                );
                 startAttributes = copy(currentAttributes);
                 start = end;
                 break;
@@ -4698,8 +4966,12 @@ var NoteCoveBridgeModule = (() => {
         clock,
         afterClock,
         (item) => {
-          if (!item.deleted && /** @type {Item} */
-          item.content.constructor === ContentFormat && item.constructor !== GC) {
+          if (
+            !item.deleted &&
+            /** @type {Item} */
+            item.content.constructor === ContentFormat &&
+            item.constructor !== GC
+          ) {
             needFullCleanup.add(
               /** @type {any} */
               item.parent
@@ -4710,17 +4982,19 @@ var NoteCoveBridgeModule = (() => {
     }
     transact(doc2, (t) => {
       iterateDeletedStructs(transaction, transaction.deleteSet, (item) => {
-        if (item instanceof GC || !/** @type {YText} */
-        item.parent._hasFormatting || needFullCleanup.has(
-          /** @type {YText} */
-          item.parent
-        )) {
+        if (
+          item instanceof GC ||
+          !(/** @type {YText} */ item.parent._hasFormatting) ||
+          needFullCleanup.has(
+            /** @type {YText} */
+            item.parent
+          )
+        ) {
           return;
         }
-        const parent = (
+        const parent =
           /** @type {YText} */
-          item.parent
-        );
+          item.parent;
         if (item.content.constructor === ContentFormat) {
           needFullCleanup.add(parent);
         } else {
@@ -4743,7 +5017,10 @@ var NoteCoveBridgeModule = (() => {
           case ContentEmbed:
           case ContentString:
             if (length2 < currPos.right.length) {
-              getItemCleanStart(transaction, createID(currPos.right.id.client, currPos.right.id.clock + length2));
+              getItemCleanStart(
+                transaction,
+                createID(currPos.right.id.client, currPos.right.id.clock + length2)
+              );
             }
             length2 -= currPos.right.length;
             currPos.right.delete(transaction);
@@ -4753,13 +5030,18 @@ var NoteCoveBridgeModule = (() => {
       currPos.forward();
     }
     if (start) {
-      cleanupFormattingGap(transaction, start, currPos.right, startAttrs, currPos.currentAttributes);
+      cleanupFormattingGap(
+        transaction,
+        start,
+        currPos.right,
+        startAttrs,
+        currPos.currentAttributes
+      );
     }
-    const parent = (
+    const parent =
       /** @type {AbstractType<any>} */
       /** @type {Item} */
-      (currPos.left || currPos.right).parent
-    );
+      (currPos.left || currPos.right).parent;
     if (parent._searchMarker) {
       updateMarkerChanges(parent._searchMarker, currPos.index, -startLength + length2);
     }
@@ -4792,7 +5074,7 @@ var NoteCoveBridgeModule = (() => {
           keys: this.keys,
           delta: this.delta,
           added: /* @__PURE__ */ new Set(),
-          deleted: /* @__PURE__ */ new Set()
+          deleted: /* @__PURE__ */ new Set(),
         };
         this._changes = changes;
       }
@@ -4811,10 +5093,9 @@ var NoteCoveBridgeModule = (() => {
      */
     get delta() {
       if (this._delta === null) {
-        const y = (
+        const y =
           /** @type {Doc} */
-          this.target.doc
-        );
+          this.target.doc;
         const delta = [];
         transact(y, (transaction) => {
           const currentAttributes = /* @__PURE__ */ new Map();
@@ -4822,21 +5103,21 @@ var NoteCoveBridgeModule = (() => {
           let item = this.target._start;
           let action = null;
           const attributes = {};
-          let insert = "";
+          let insert = '';
           let retain = 0;
           let deleteLen = 0;
           const addOp = () => {
             if (action !== null) {
               let op = null;
               switch (action) {
-                case "delete":
+                case 'delete':
                   if (deleteLen > 0) {
                     op = { delete: deleteLen };
                   }
                   deleteLen = 0;
                   break;
-                case "insert":
-                  if (typeof insert === "object" || insert.length > 0) {
+                case 'insert':
+                  if (typeof insert === 'object' || insert.length > 0) {
                     op = { insert };
                     if (currentAttributes.size > 0) {
                       op.attributes = {};
@@ -4847,9 +5128,9 @@ var NoteCoveBridgeModule = (() => {
                       });
                     }
                   }
-                  insert = "";
+                  insert = '';
                   break;
-                case "retain":
+                case 'retain':
                   if (retain > 0) {
                     op = { retain };
                     if (!isEmpty(attributes)) {
@@ -4870,20 +5151,20 @@ var NoteCoveBridgeModule = (() => {
                 if (this.adds(item)) {
                   if (!this.deletes(item)) {
                     addOp();
-                    action = "insert";
+                    action = 'insert';
                     insert = item.content.getContent()[0];
                     addOp();
                   }
                 } else if (this.deletes(item)) {
-                  if (action !== "delete") {
+                  if (action !== 'delete') {
                     addOp();
-                    action = "delete";
+                    action = 'delete';
                   }
                   deleteLen += 1;
                 } else if (!item.deleted) {
-                  if (action !== "retain") {
+                  if (action !== 'retain') {
                     addOp();
-                    action = "retain";
+                    action = 'retain';
                   }
                   retain += 1;
                 }
@@ -4891,37 +5172,35 @@ var NoteCoveBridgeModule = (() => {
               case ContentString:
                 if (this.adds(item)) {
                   if (!this.deletes(item)) {
-                    if (action !== "insert") {
+                    if (action !== 'insert') {
                       addOp();
-                      action = "insert";
+                      action = 'insert';
                     }
-                    insert += /** @type {ContentString} */
-                    item.content.str;
+                    insert += /** @type {ContentString} */ item.content.str;
                   }
                 } else if (this.deletes(item)) {
-                  if (action !== "delete") {
+                  if (action !== 'delete') {
                     addOp();
-                    action = "delete";
+                    action = 'delete';
                   }
                   deleteLen += item.length;
                 } else if (!item.deleted) {
-                  if (action !== "retain") {
+                  if (action !== 'retain') {
                     addOp();
-                    action = "retain";
+                    action = 'retain';
                   }
                   retain += item.length;
                 }
                 break;
               case ContentFormat: {
-                const { key, value } = (
+                const { key, value } =
                   /** @type {ContentFormat} */
-                  item.content
-                );
+                  item.content;
                 if (this.adds(item)) {
                   if (!this.deletes(item)) {
                     const curVal = currentAttributes.get(key) ?? null;
                     if (!equalAttrs(curVal, value)) {
-                      if (action === "retain") {
+                      if (action === 'retain') {
                         addOp();
                       }
                       if (equalAttrs(value, oldAttributes.get(key) ?? null)) {
@@ -4937,7 +5216,7 @@ var NoteCoveBridgeModule = (() => {
                   oldAttributes.set(key, value);
                   const curVal = currentAttributes.get(key) ?? null;
                   if (!equalAttrs(curVal, value)) {
-                    if (action === "retain") {
+                    if (action === 'retain') {
                       addOp();
                     }
                     attributes[key] = curVal;
@@ -4947,7 +5226,7 @@ var NoteCoveBridgeModule = (() => {
                   const attr = attributes[key];
                   if (attr !== void 0) {
                     if (!equalAttrs(attr, value)) {
-                      if (action === "retain") {
+                      if (action === 'retain') {
                         addOp();
                       }
                       if (value === null) {
@@ -4961,7 +5240,7 @@ var NoteCoveBridgeModule = (() => {
                   }
                 }
                 if (!item.deleted) {
-                  if (action === "insert") {
+                  if (action === 'insert') {
                     addOp();
                   }
                   updateCurrentAttributes(
@@ -5061,12 +5340,11 @@ var NoteCoveBridgeModule = (() => {
      */
     toString() {
       this.doc ?? warnPrematureAccess();
-      let str = "";
+      let str = '';
       let n = this._start;
       while (n !== null) {
         if (!n.deleted && n.countable && n.content.constructor === ContentString) {
-          str += /** @type {ContentString} */
-          n.content.str;
+          str += /** @type {ContentString} */ n.content.str;
         }
         n = n.right;
       }
@@ -5098,8 +5376,15 @@ var NoteCoveBridgeModule = (() => {
           for (let i = 0; i < delta.length; i++) {
             const op = delta[i];
             if (op.insert !== void 0) {
-              const ins = !sanitize && typeof op.insert === "string" && i === delta.length - 1 && currPos.right === null && op.insert.slice(-1) === "\n" ? op.insert.slice(0, -1) : op.insert;
-              if (typeof ins !== "string" || ins.length > 0) {
+              const ins =
+                !sanitize &&
+                typeof op.insert === 'string' &&
+                i === delta.length - 1 &&
+                currPos.right === null &&
+                op.insert.slice(-1) === '\n'
+                  ? op.insert.slice(0, -1)
+                  : op.insert;
+              if (typeof ins !== 'string' || ins.length > 0) {
                 insertText(transaction, this, currPos, ins, op.attributes || {});
               }
             } else if (op.retain !== void 0) {
@@ -5127,11 +5412,10 @@ var NoteCoveBridgeModule = (() => {
       this.doc ?? warnPrematureAccess();
       const ops = [];
       const currentAttributes = /* @__PURE__ */ new Map();
-      const doc2 = (
+      const doc2 =
         /** @type {Doc} */
-        this.doc
-      );
-      let str = "";
+        this.doc;
+      let str = '';
       let n = this._start;
       function packStr() {
         if (str.length > 0) {
@@ -5146,44 +5430,48 @@ var NoteCoveBridgeModule = (() => {
             op.attributes = attributes;
           }
           ops.push(op);
-          str = "";
+          str = '';
         }
       }
       const computeDelta = () => {
         while (n !== null) {
-          if (isVisible(n, snapshot) || prevSnapshot !== void 0 && isVisible(n, prevSnapshot)) {
+          if (isVisible(n, snapshot) || (prevSnapshot !== void 0 && isVisible(n, prevSnapshot))) {
             switch (n.content.constructor) {
               case ContentString: {
-                const cur = currentAttributes.get("ychange");
+                const cur = currentAttributes.get('ychange');
                 if (snapshot !== void 0 && !isVisible(n, snapshot)) {
-                  if (cur === void 0 || cur.user !== n.id.client || cur.type !== "removed") {
+                  if (cur === void 0 || cur.user !== n.id.client || cur.type !== 'removed') {
                     packStr();
-                    currentAttributes.set("ychange", computeYChange ? computeYChange("removed", n.id) : { type: "removed" });
+                    currentAttributes.set(
+                      'ychange',
+                      computeYChange ? computeYChange('removed', n.id) : { type: 'removed' }
+                    );
                   }
                 } else if (prevSnapshot !== void 0 && !isVisible(n, prevSnapshot)) {
-                  if (cur === void 0 || cur.user !== n.id.client || cur.type !== "added") {
+                  if (cur === void 0 || cur.user !== n.id.client || cur.type !== 'added') {
                     packStr();
-                    currentAttributes.set("ychange", computeYChange ? computeYChange("added", n.id) : { type: "added" });
+                    currentAttributes.set(
+                      'ychange',
+                      computeYChange ? computeYChange('added', n.id) : { type: 'added' }
+                    );
                   }
                 } else if (cur !== void 0) {
                   packStr();
-                  currentAttributes.delete("ychange");
+                  currentAttributes.delete('ychange');
                 }
-                str += /** @type {ContentString} */
-                n.content.str;
+                str += /** @type {ContentString} */ n.content.str;
                 break;
               }
               case ContentType:
               case ContentEmbed: {
                 packStr();
                 const op = {
-                  insert: n.content.getContent()[0]
+                  insert: n.content.getContent()[0],
                 };
                 if (currentAttributes.size > 0) {
-                  const attrs = (
+                  const attrs =
                     /** @type {Object<string,any>} */
-                    {}
-                  );
+                    {};
                   op.attributes = attrs;
                   currentAttributes.forEach((value, key) => {
                     attrs[key] = value;
@@ -5209,15 +5497,19 @@ var NoteCoveBridgeModule = (() => {
         packStr();
       };
       if (snapshot || prevSnapshot) {
-        transact(doc2, (transaction) => {
-          if (snapshot) {
-            splitSnapshotAffectedStructs(transaction, snapshot);
-          }
-          if (prevSnapshot) {
-            splitSnapshotAffectedStructs(transaction, prevSnapshot);
-          }
-          computeDelta();
-        }, "cleanup");
+        transact(
+          doc2,
+          (transaction) => {
+            if (snapshot) {
+              splitSnapshotAffectedStructs(transaction, snapshot);
+            }
+            if (prevSnapshot) {
+              splitSnapshotAffectedStructs(transaction, prevSnapshot);
+            }
+            computeDelta();
+          },
+          'cleanup'
+        );
       } else {
         computeDelta();
       }
@@ -5404,8 +5696,7 @@ var NoteCoveBridgeModule = (() => {
     constructor(root, f = () => true) {
       this._filter = f;
       this._root = root;
-      this._currentNode = /** @type {Item} */
-      root._start;
+      this._currentNode = /** @type {Item} */ root._start;
       this._firstCall = true;
       root.doc ?? warnPrematureAccess();
     }
@@ -5421,13 +5712,15 @@ var NoteCoveBridgeModule = (() => {
      */
     next() {
       let n = this._currentNode;
-      let type = n && n.content && /** @type {any} */
-      n.content.type;
+      let type = n && n.content && /** @type {any} */ n.content.type;
       if (n !== null && (!this._firstCall || n.deleted || !this._filter(type))) {
         do {
-          type = /** @type {any} */
-          n.content.type;
-          if (!n.deleted && (type.constructor === YXmlElement || type.constructor === YXmlFragment) && type._start !== null) {
+          type = /** @type {any} */ n.content.type;
+          if (
+            !n.deleted &&
+            (type.constructor === YXmlElement || type.constructor === YXmlFragment) &&
+            type._start !== null
+          ) {
             n = type._start;
           } else {
             while (n !== null) {
@@ -5438,25 +5731,30 @@ var NoteCoveBridgeModule = (() => {
               } else if (n.parent === this._root) {
                 n = null;
               } else {
-                n = /** @type {AbstractType<any>} */
-                n.parent._item;
+                n = /** @type {AbstractType<any>} */ n.parent._item;
               }
             }
           }
-        } while (n !== null && (n.deleted || !this._filter(
-          /** @type {ContentType} */
-          n.content.type
-        )));
+        } while (
+          n !== null &&
+          (n.deleted ||
+            !this._filter(
+              /** @type {ContentType} */
+              n.content.type
+            ))
+        );
       }
       this._firstCall = false;
       if (n === null) {
         return { value: void 0, done: true };
       }
       this._currentNode = n;
-      return { value: (
-        /** @type {any} */
-        n.content.type
-      ), done: false };
+      return {
+        value:
+          /** @type {any} */
+          n.content.type,
+        done: false,
+      };
     }
   };
   var YXmlFragment = class _YXmlFragment extends AbstractType {
@@ -5502,7 +5800,10 @@ var NoteCoveBridgeModule = (() => {
      */
     clone() {
       const el = new _YXmlFragment();
-      el.insert(0, this.toArray().map((item) => item instanceof AbstractType ? item.clone() : item));
+      el.insert(
+        0,
+        this.toArray().map((item) => (item instanceof AbstractType ? item.clone() : item))
+      );
       return el;
     }
     get length() {
@@ -5546,7 +5847,10 @@ var NoteCoveBridgeModule = (() => {
      */
     querySelector(query) {
       query = query.toUpperCase();
-      const iterator = new YXmlTreeWalker(this, (element2) => element2.nodeName && element2.nodeName.toUpperCase() === query);
+      const iterator = new YXmlTreeWalker(
+        this,
+        (element2) => element2.nodeName && element2.nodeName.toUpperCase() === query
+      );
       const next = iterator.next();
       if (next.done) {
         return null;
@@ -5567,7 +5871,12 @@ var NoteCoveBridgeModule = (() => {
      */
     querySelectorAll(query) {
       query = query.toUpperCase();
-      return from(new YXmlTreeWalker(this, (element2) => element2.nodeName && element2.nodeName.toUpperCase() === query));
+      return from(
+        new YXmlTreeWalker(
+          this,
+          (element2) => element2.nodeName && element2.nodeName.toUpperCase() === query
+        )
+      );
     }
     /**
      * Creates YXmlEvent and calls observers.
@@ -5584,7 +5893,7 @@ var NoteCoveBridgeModule = (() => {
      * @return {string} The string representation of all children.
      */
     toString() {
-      return typeListMap(this, (xml) => xml.toString()).join("");
+      return typeListMap(this, (xml) => xml.toString()).join('');
     }
     /**
      * @return {string}
@@ -5653,13 +5962,12 @@ var NoteCoveBridgeModule = (() => {
           typeListInsertGenericsAfter(transaction, this, refItem, content);
         });
       } else {
-        const pc = (
+        const pc =
           /** @type {Array<any>} */
-          this._prelimContent
-        );
+          this._prelimContent;
         const index = ref === null ? 0 : pc.findIndex((el) => el === ref) + 1;
         if (index === 0 && ref !== null) {
-          throw create3("Reference item not found");
+          throw create3('Reference item not found');
         }
         pc.splice(index, 0, ...content);
       }
@@ -5745,7 +6053,7 @@ var NoteCoveBridgeModule = (() => {
   };
   var readYXmlFragment = (_decoder) => new YXmlFragment();
   var YXmlElement = class _YXmlElement extends YXmlFragment {
-    constructor(nodeName = "UNDEFINED") {
+    constructor(nodeName = 'UNDEFINED') {
       super();
       this.nodeName = nodeName;
       this._prelimAttrs = /* @__PURE__ */ new Map();
@@ -5755,22 +6063,22 @@ var NoteCoveBridgeModule = (() => {
      */
     get nextSibling() {
       const n = this._item ? this._item.next : null;
-      return n ? (
-        /** @type {YXmlElement|YXmlText} */
-        /** @type {ContentType} */
-        n.content.type
-      ) : null;
+      return n
+        ? /** @type {YXmlElement|YXmlText} */
+          /** @type {ContentType} */
+          n.content.type
+        : null;
     }
     /**
      * @type {YXmlElement|YXmlText|null}
      */
     get prevSibling() {
       const n = this._item ? this._item.prev : null;
-      return n ? (
-        /** @type {YXmlElement|YXmlText} */
-        /** @type {ContentType} */
-        n.content.type
-      ) : null;
+      return n
+        ? /** @type {YXmlElement|YXmlText} */
+          /** @type {ContentType} */
+          n.content.type
+        : null;
     }
     /**
      * Integrate this type into the Yjs instance.
@@ -5809,11 +6117,14 @@ var NoteCoveBridgeModule = (() => {
       const el = new _YXmlElement(this.nodeName);
       const attrs = this.getAttributes();
       forEach(attrs, (value, key) => {
-        if (typeof value === "string") {
+        if (typeof value === 'string') {
           el.setAttribute(key, value);
         }
       });
-      el.insert(0, this.toArray().map((item) => item instanceof AbstractType ? item.clone() : item));
+      el.insert(
+        0,
+        this.toArray().map((item) => (item instanceof AbstractType ? item.clone() : item))
+      );
       return el;
     }
     /**
@@ -5839,7 +6150,7 @@ var NoteCoveBridgeModule = (() => {
         stringBuilder.push(key + '="' + attrs[key] + '"');
       }
       const nodeName = this.nodeName.toLocaleLowerCase();
-      const attrsString = stringBuilder.length > 0 ? " " + stringBuilder.join(" ") : "";
+      const attrsString = stringBuilder.length > 0 ? ' ' + stringBuilder.join(' ') : '';
       return `<${nodeName}${attrsString}>${super.toString()}</${nodeName}>`;
     }
     /**
@@ -5942,7 +6253,7 @@ var NoteCoveBridgeModule = (() => {
       const attrs = this.getAttributes();
       for (const key in attrs) {
         const value = attrs[key];
-        if (typeof value === "string") {
+        if (typeof value === 'string') {
           dom.setAttribute(key, value);
         }
       }
@@ -6040,7 +6351,7 @@ var NoteCoveBridgeModule = (() => {
       } else {
         dom = document.createElement(this.hookName);
       }
-      dom.setAttribute("data-yjs-hook", this.hookName);
+      dom.setAttribute('data-yjs-hook', this.hookName);
       if (binding !== void 0) {
         binding._createAssociation(dom, this);
       }
@@ -6066,22 +6377,22 @@ var NoteCoveBridgeModule = (() => {
      */
     get nextSibling() {
       const n = this._item ? this._item.next : null;
-      return n ? (
-        /** @type {YXmlElement|YXmlText} */
-        /** @type {ContentType} */
-        n.content.type
-      ) : null;
+      return n
+        ? /** @type {YXmlElement|YXmlText} */
+          /** @type {ContentType} */
+          n.content.type
+        : null;
     }
     /**
      * @type {YXmlElement|YXmlText|null}
      */
     get prevSibling() {
       const n = this._item ? this._item.prev : null;
-      return n ? (
-        /** @type {YXmlElement|YXmlText} */
-        /** @type {ContentType} */
-        n.content.type
-      ) : null;
+      return n
+        ? /** @type {YXmlElement|YXmlText} */
+          /** @type {ContentType} */
+          n.content.type
+        : null;
     }
     _copy() {
       return new _YXmlText();
@@ -6121,33 +6432,35 @@ var NoteCoveBridgeModule = (() => {
       return dom;
     }
     toString() {
-      return this.toDelta().map((delta) => {
-        const nestedNodes = [];
-        for (const nodeName in delta.attributes) {
-          const attrs = [];
-          for (const key in delta.attributes[nodeName]) {
-            attrs.push({ key, value: delta.attributes[nodeName][key] });
+      return this.toDelta()
+        .map((delta) => {
+          const nestedNodes = [];
+          for (const nodeName in delta.attributes) {
+            const attrs = [];
+            for (const key in delta.attributes[nodeName]) {
+              attrs.push({ key, value: delta.attributes[nodeName][key] });
+            }
+            attrs.sort((a, b) => (a.key < b.key ? -1 : 1));
+            nestedNodes.push({ nodeName, attrs });
           }
-          attrs.sort((a, b) => a.key < b.key ? -1 : 1);
-          nestedNodes.push({ nodeName, attrs });
-        }
-        nestedNodes.sort((a, b) => a.nodeName < b.nodeName ? -1 : 1);
-        let str = "";
-        for (let i = 0; i < nestedNodes.length; i++) {
-          const node = nestedNodes[i];
-          str += `<${node.nodeName}`;
-          for (let j = 0; j < node.attrs.length; j++) {
-            const attr = node.attrs[j];
-            str += ` ${attr.key}="${attr.value}"`;
+          nestedNodes.sort((a, b) => (a.nodeName < b.nodeName ? -1 : 1));
+          let str = '';
+          for (let i = 0; i < nestedNodes.length; i++) {
+            const node = nestedNodes[i];
+            str += `<${node.nodeName}`;
+            for (let j = 0; j < node.attrs.length; j++) {
+              const attr = node.attrs[j];
+              str += ` ${attr.key}="${attr.value}"`;
+            }
+            str += '>';
           }
-          str += ">";
-        }
-        str += delta.insert;
-        for (let i = nestedNodes.length - 1; i >= 0; i--) {
-          str += `</${nestedNodes[i].nodeName}>`;
-        }
-        return str;
-      }).join("");
+          str += delta.insert;
+          for (let i = nestedNodes.length - 1; i >= 0; i--) {
+            str += `</${nestedNodes[i].nodeName}>`;
+          }
+          return str;
+        })
+        .join('');
     }
     /**
      * @return {string}
@@ -6209,8 +6522,7 @@ var NoteCoveBridgeModule = (() => {
     get deleted() {
       return true;
     }
-    delete() {
-    }
+    delete() {}
     /**
      * @param {GC} right
      * @return {boolean}
@@ -6299,18 +6611,15 @@ var NoteCoveBridgeModule = (() => {
      * @param {Transaction} transaction
      * @param {Item} item
      */
-    integrate(transaction, item) {
-    }
+    integrate(transaction, item) {}
     /**
      * @param {Transaction} transaction
      */
-    delete(transaction) {
-    }
+    delete(transaction) {}
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6385,13 +6694,11 @@ var NoteCoveBridgeModule = (() => {
     /**
      * @param {Transaction} transaction
      */
-    delete(transaction) {
-    }
+    delete(transaction) {}
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6407,14 +6714,17 @@ var NoteCoveBridgeModule = (() => {
     }
   };
   var readContentDeleted = (decoder) => new ContentDeleted(decoder.readLen());
-  var createDocFromOpts = (guid, opts) => new Doc({ guid, ...opts, shouldLoad: opts.shouldLoad || opts.autoLoad || false });
+  var createDocFromOpts = (guid, opts) =>
+    new Doc({ guid, ...opts, shouldLoad: opts.shouldLoad || opts.autoLoad || false });
   var ContentDoc = class _ContentDoc {
     /**
      * @param {Doc} doc
      */
     constructor(doc2) {
       if (doc2._item) {
-        console.error("This document was already integrated as a sub-document. You should create a second instance instead with the same guid.");
+        console.error(
+          'This document was already integrated as a sub-document. You should create a second instance instead with the same guid.'
+        );
       }
       this.doc = doc2;
       const opts = {};
@@ -6491,8 +6801,7 @@ var NoteCoveBridgeModule = (() => {
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6508,7 +6817,8 @@ var NoteCoveBridgeModule = (() => {
       return 9;
     }
   };
-  var readContentDoc = (decoder) => new ContentDoc(createDocFromOpts(decoder.readString(), decoder.readAny()));
+  var readContentDoc = (decoder) =>
+    new ContentDoc(createDocFromOpts(decoder.readString(), decoder.readAny()));
   var ContentEmbed = class _ContentEmbed {
     /**
      * @param {Object} embed
@@ -6558,18 +6868,15 @@ var NoteCoveBridgeModule = (() => {
      * @param {Transaction} transaction
      * @param {Item} item
      */
-    integrate(transaction, item) {
-    }
+    integrate(transaction, item) {}
     /**
      * @param {Transaction} transaction
      */
-    delete(transaction) {
-    }
+    delete(transaction) {}
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6637,23 +6944,20 @@ var NoteCoveBridgeModule = (() => {
      * @param {Item} item
      */
     integrate(_transaction, item) {
-      const p = (
+      const p =
         /** @type {YText} */
-        item.parent
-      );
+        item.parent;
       p._searchMarker = null;
       p._hasFormatting = true;
     }
     /**
      * @param {Transaction} transaction
      */
-    delete(transaction) {
-    }
+    delete(transaction) {}
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6722,18 +7026,15 @@ var NoteCoveBridgeModule = (() => {
      * @param {Transaction} transaction
      * @param {Item} item
      */
-    integrate(transaction, item) {
-    }
+    integrate(transaction, item) {}
     /**
      * @param {Transaction} transaction
      */
-    delete(transaction) {
-    }
+    delete(transaction) {}
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6743,7 +7044,7 @@ var NoteCoveBridgeModule = (() => {
       encoder.writeLen(len - offset);
       for (let i = offset; i < len; i++) {
         const c = this.arr[i];
-        encoder.writeString(c === void 0 ? "undefined" : JSON.stringify(c));
+        encoder.writeString(c === void 0 ? 'undefined' : JSON.stringify(c));
       }
     }
     /**
@@ -6758,7 +7059,7 @@ var NoteCoveBridgeModule = (() => {
     const cs = [];
     for (let i = 0; i < len; i++) {
       const c = decoder.readString();
-      if (c === "undefined") {
+      if (c === 'undefined') {
         cs.push(void 0);
       } else {
         cs.push(JSON.parse(c));
@@ -6766,7 +7067,7 @@ var NoteCoveBridgeModule = (() => {
     }
     return new ContentJSON(cs);
   };
-  var isDevMode = getVariable("node_env") === "development";
+  var isDevMode = getVariable('node_env') === 'development';
   var ContentAny = class _ContentAny {
     /**
      * @param {Array<any>} arr
@@ -6820,18 +7121,15 @@ var NoteCoveBridgeModule = (() => {
      * @param {Transaction} transaction
      * @param {Item} item
      */
-    integrate(transaction, item) {
-    }
+    integrate(transaction, item) {}
     /**
      * @param {Transaction} transaction
      */
-    delete(transaction) {
-    }
+    delete(transaction) {}
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6876,7 +7174,7 @@ var NoteCoveBridgeModule = (() => {
      * @return {Array<any>}
      */
     getContent() {
-      return this.str.split("");
+      return this.str.split('');
     }
     /**
      * @return {boolean}
@@ -6899,8 +7197,8 @@ var NoteCoveBridgeModule = (() => {
       this.str = this.str.slice(0, offset);
       const firstCharCode = this.str.charCodeAt(offset - 1);
       if (firstCharCode >= 55296 && firstCharCode <= 56319) {
-        this.str = this.str.slice(0, offset - 1) + "\uFFFD";
-        right.str = "\uFFFD" + right.str.slice(1);
+        this.str = this.str.slice(0, offset - 1) + '\uFFFD';
+        right.str = '\uFFFD' + right.str.slice(1);
       }
       return right;
     }
@@ -6916,18 +7214,15 @@ var NoteCoveBridgeModule = (() => {
      * @param {Transaction} transaction
      * @param {Item} item
      */
-    integrate(transaction, item) {
-    }
+    integrate(transaction, item) {}
     /**
      * @param {Transaction} transaction
      */
-    delete(transaction) {
-    }
+    delete(transaction) {}
     /**
      * @param {StructStore} store
      */
-    gc(store) {
-    }
+    gc(store) {}
     /**
      * @param {UpdateEncoderV1 | UpdateEncoderV2} encoder
      * @param {number} offset
@@ -6950,7 +7245,7 @@ var NoteCoveBridgeModule = (() => {
     readYXmlElement,
     readYXmlFragment,
     readYXmlHook,
-    readYXmlText
+    readYXmlText,
   ];
   var YArrayRefID = 0;
   var YMapRefID = 1;
@@ -7174,13 +7469,26 @@ var NoteCoveBridgeModule = (() => {
      * @return {null | number}
      */
     getMissing(transaction, store) {
-      if (this.origin && this.origin.client !== this.id.client && this.origin.clock >= getState(store, this.origin.client)) {
+      if (
+        this.origin &&
+        this.origin.client !== this.id.client &&
+        this.origin.clock >= getState(store, this.origin.client)
+      ) {
         return this.origin.client;
       }
-      if (this.rightOrigin && this.rightOrigin.client !== this.id.client && this.rightOrigin.clock >= getState(store, this.rightOrigin.client)) {
+      if (
+        this.rightOrigin &&
+        this.rightOrigin.client !== this.id.client &&
+        this.rightOrigin.clock >= getState(store, this.rightOrigin.client)
+      ) {
         return this.rightOrigin.client;
       }
-      if (this.parent && this.parent.constructor === ID && this.id.client !== this.parent.client && this.parent.clock >= getState(store, this.parent.client)) {
+      if (
+        this.parent &&
+        this.parent.constructor === ID &&
+        this.id.client !== this.parent.client &&
+        this.parent.clock >= getState(store, this.parent.client)
+      ) {
         return this.parent.client;
       }
       if (this.origin) {
@@ -7191,7 +7499,10 @@ var NoteCoveBridgeModule = (() => {
         this.right = getItemCleanStart(transaction, this.rightOrigin);
         this.rightOrigin = this.right.id;
       }
-      if (this.left && this.left.constructor === GC || this.right && this.right.constructor === GC) {
+      if (
+        (this.left && this.left.constructor === GC) ||
+        (this.right && this.right.constructor === GC)
+      ) {
         this.parent = null;
       } else if (!this.parent) {
         if (this.left && this.left.constructor === _Item) {
@@ -7206,8 +7517,7 @@ var NoteCoveBridgeModule = (() => {
         if (parentItem.constructor === GC) {
           this.parent = null;
         } else {
-          this.parent = /** @type {ContentType} */
-          parentItem.content.type;
+          this.parent = /** @type {ContentType} */ parentItem.content.type;
         }
       }
       return null;
@@ -7219,26 +7529,31 @@ var NoteCoveBridgeModule = (() => {
     integrate(transaction, offset) {
       if (offset > 0) {
         this.id.clock += offset;
-        this.left = getItemCleanEnd(transaction, transaction.doc.store, createID(this.id.client, this.id.clock - 1));
+        this.left = getItemCleanEnd(
+          transaction,
+          transaction.doc.store,
+          createID(this.id.client, this.id.clock - 1)
+        );
         this.origin = this.left.lastId;
         this.content = this.content.splice(offset);
         this.length -= offset;
       }
       if (this.parent) {
-        if (!this.left && (!this.right || this.right.left !== null) || this.left && this.left.right !== this.right) {
+        if (
+          (!this.left && (!this.right || this.right.left !== null)) ||
+          (this.left && this.left.right !== this.right)
+        ) {
           let left = this.left;
           let o;
           if (left !== null) {
             o = left.right;
           } else if (this.parentSub !== null) {
-            o = /** @type {AbstractType<any>} */
-            this.parent._map.get(this.parentSub) || null;
+            o = /** @type {AbstractType<any>} */ this.parent._map.get(this.parentSub) || null;
             while (o !== null && o.left !== null) {
               o = o.left;
             }
           } else {
-            o = /** @type {AbstractType<any>} */
-            this.parent._start;
+            o = /** @type {AbstractType<any>} */ this.parent._start;
           }
           const conflictingItems = /* @__PURE__ */ new Set();
           const itemsBeforeOrigin = /* @__PURE__ */ new Set();
@@ -7252,7 +7567,10 @@ var NoteCoveBridgeModule = (() => {
               } else if (compareIDs(this.rightOrigin, o.rightOrigin)) {
                 break;
               }
-            } else if (o.origin !== null && itemsBeforeOrigin.has(getItem(transaction.doc.store, o.origin))) {
+            } else if (
+              o.origin !== null &&
+              itemsBeforeOrigin.has(getItem(transaction.doc.store, o.origin))
+            ) {
               if (!conflictingItems.has(getItem(transaction.doc.store, o.origin))) {
                 left = o;
                 conflictingItems.clear();
@@ -7271,14 +7589,12 @@ var NoteCoveBridgeModule = (() => {
         } else {
           let r;
           if (this.parentSub !== null) {
-            r = /** @type {AbstractType<any>} */
-            this.parent._map.get(this.parentSub) || null;
+            r = /** @type {AbstractType<any>} */ this.parent._map.get(this.parentSub) || null;
             while (r !== null && r.left !== null) {
               r = r.left;
             }
           } else {
-            r = /** @type {AbstractType<any>} */
-            this.parent._start;
+            r = /** @type {AbstractType<any>} */ this.parent._start;
             this.parent._start = this;
           }
           this.right = r;
@@ -7304,8 +7620,12 @@ var NoteCoveBridgeModule = (() => {
         );
         if (
           /** @type {AbstractType<any>} */
-          this.parent._item !== null && /** @type {AbstractType<any>} */
-          this.parent._item.deleted || this.parentSub !== null && this.right !== null
+          (
+            this.parent._item !== null &&
+              /** @type {AbstractType<any>} */
+              this.parent._item.deleted
+          ) ||
+          (this.parentSub !== null && this.right !== null)
         ) {
           this.delete(transaction);
         }
@@ -7337,7 +7657,9 @@ var NoteCoveBridgeModule = (() => {
      * Computes the last content address of this Item.
      */
     get lastId() {
-      return this.length === 1 ? this.id : createID(this.id.client, this.id.clock + this.length - 1);
+      return this.length === 1
+        ? this.id
+        : createID(this.id.client, this.id.clock + this.length - 1);
     }
     /**
      * Try to merge two items
@@ -7346,11 +7668,22 @@ var NoteCoveBridgeModule = (() => {
      * @return {boolean}
      */
     mergeWith(right) {
-      if (this.constructor === right.constructor && compareIDs(right.origin, this.lastId) && this.right === right && compareIDs(this.rightOrigin, right.rightOrigin) && this.id.client === right.id.client && this.id.clock + this.length === right.id.clock && this.deleted === right.deleted && this.redone === null && right.redone === null && this.content.constructor === right.content.constructor && this.content.mergeWith(right.content)) {
-        const searchMarker = (
+      if (
+        this.constructor === right.constructor &&
+        compareIDs(right.origin, this.lastId) &&
+        this.right === right &&
+        compareIDs(this.rightOrigin, right.rightOrigin) &&
+        this.id.client === right.id.client &&
+        this.id.clock + this.length === right.id.clock &&
+        this.deleted === right.deleted &&
+        this.redone === null &&
+        right.redone === null &&
+        this.content.constructor === right.content.constructor &&
+        this.content.mergeWith(right.content)
+      ) {
+        const searchMarker =
           /** @type {AbstractType<any>} */
-          this.parent._searchMarker
-        );
+          this.parent._searchMarker;
         if (searchMarker) {
           searchMarker.forEach((marker) => {
             if (marker.p === right) {
@@ -7380,10 +7713,9 @@ var NoteCoveBridgeModule = (() => {
      */
     delete(transaction) {
       if (!this.deleted) {
-        const parent = (
+        const parent =
           /** @type {AbstractType<any>} */
-          this.parent
-        );
+          this.parent;
         if (this.countable && this.parentSub === null) {
           parent._length -= this.length;
         }
@@ -7418,12 +7750,15 @@ var NoteCoveBridgeModule = (() => {
      * @param {number} offset
      */
     write(encoder, offset) {
-      const origin = offset > 0 ? createID(this.id.client, this.id.clock + offset - 1) : this.origin;
+      const origin =
+        offset > 0 ? createID(this.id.client, this.id.clock + offset - 1) : this.origin;
       const rightOrigin = this.rightOrigin;
       const parentSub = this.parentSub;
-      const info = this.content.getRef() & BITS5 | (origin === null ? 0 : BIT8) | // origin is defined
-      (rightOrigin === null ? 0 : BIT7) | // right origin is defined
-      (parentSub === null ? 0 : BIT6);
+      const info =
+        (this.content.getRef() & BITS5) |
+        (origin === null ? 0 : BIT8) | // origin is defined
+        (rightOrigin === null ? 0 : BIT7) | // right origin is defined
+        (parentSub === null ? 0 : BIT6);
       encoder.writeInfo(info);
       if (origin !== null) {
         encoder.writeLeftID(origin);
@@ -7432,10 +7767,9 @@ var NoteCoveBridgeModule = (() => {
         encoder.writeRightID(rightOrigin);
       }
       if (origin === null && rightOrigin === null) {
-        const parent = (
+        const parent =
           /** @type {AbstractType<any>} */
-          this.parent
-        );
+          this.parent;
         if (parent._item !== void 0) {
           const parentItem = parent._item;
           if (parentItem === null) {
@@ -7488,7 +7822,7 @@ var NoteCoveBridgeModule = (() => {
     // 9
     () => {
       unexpectedCase();
-    }
+    },
     // 10 - Skip is not ItemContent
   ];
   var structSkipRefNumber = 10;
@@ -7496,8 +7830,7 @@ var NoteCoveBridgeModule = (() => {
     get deleted() {
       return true;
     }
-    delete() {
-    }
+    delete() {}
     /**
      * @param {Skip} right
      * @return {boolean}
@@ -7533,37 +7866,44 @@ var NoteCoveBridgeModule = (() => {
       return null;
     }
   };
-  var glo = (
+  var glo =
     /** @type {any} */
-    typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : {}
-  );
-  var importIdentifier = "__ $YJS$ __";
+    typeof globalThis !== 'undefined'
+      ? globalThis
+      : typeof window !== 'undefined'
+        ? window
+        : typeof global !== 'undefined'
+          ? global
+          : {};
+  var importIdentifier = '__ $YJS$ __';
   if (glo[importIdentifier] === true) {
-    console.error("Yjs was already imported. This breaks constructor checks and will lead to issues! - https://github.com/yjs/yjs/issues/438");
+    console.error(
+      'Yjs was already imported. This breaks constructor checks and will lead to issues! - https://github.com/yjs/yjs/issues/438'
+    );
   }
   glo[importIdentifier] = true;
 
   // src/crdt/note-doc.ts
   var NoteDoc = class _NoteDoc {
     constructor(noteId) {
-      __publicField(this, "doc");
-      __publicField(this, "metadata");
-      __publicField(this, "content");
+      __publicField(this, 'doc');
+      __publicField(this, 'metadata');
+      __publicField(this, 'content');
       this.doc = new Doc({ guid: noteId });
-      this.metadata = this.doc.getMap("metadata");
-      this.content = this.doc.getXmlFragment("content");
+      this.metadata = this.doc.getMap('metadata');
+      this.content = this.doc.getXmlFragment('content');
     }
     /**
      * Initialize a new note with metadata
      */
     initializeNote(meta) {
       this.doc.transact(() => {
-        this.metadata.set("id", meta.id);
-        this.metadata.set("created", meta.created);
-        this.metadata.set("modified", meta.modified);
-        this.metadata.set("sdId", meta.sdId);
-        this.metadata.set("folderId", meta.folderId);
-        this.metadata.set("deleted", meta.deleted);
+        this.metadata.set('id', meta.id);
+        this.metadata.set('created', meta.created);
+        this.metadata.set('modified', meta.modified);
+        this.metadata.set('sdId', meta.sdId);
+        this.metadata.set('folderId', meta.folderId);
+        this.metadata.set('deleted', meta.deleted);
       });
     }
     /**
@@ -7571,12 +7911,12 @@ var NoteCoveBridgeModule = (() => {
      */
     getMetadata() {
       return {
-        id: this.metadata.get("id"),
-        created: this.metadata.get("created"),
-        modified: this.metadata.get("modified"),
-        sdId: this.metadata.get("sdId"),
-        folderId: this.metadata.get("folderId") ?? null,
-        deleted: this.metadata.get("deleted")
+        id: this.metadata.get('id'),
+        created: this.metadata.get('created'),
+        modified: this.metadata.get('modified'),
+        sdId: this.metadata.get('sdId'),
+        folderId: this.metadata.get('folderId') ?? null,
+        deleted: this.metadata.get('deleted'),
       };
     }
     /**
@@ -7585,16 +7925,16 @@ var NoteCoveBridgeModule = (() => {
     updateMetadata(updates) {
       this.doc.transact(() => {
         if (updates.modified !== void 0) {
-          this.metadata.set("modified", updates.modified);
+          this.metadata.set('modified', updates.modified);
         }
         if (updates.sdId !== void 0) {
-          this.metadata.set("sdId", updates.sdId);
+          this.metadata.set('sdId', updates.sdId);
         }
         if (updates.folderId !== void 0) {
-          this.metadata.set("folderId", updates.folderId);
+          this.metadata.set('folderId', updates.folderId);
         }
         if (updates.deleted !== void 0) {
-          this.metadata.set("deleted", updates.deleted);
+          this.metadata.set('deleted', updates.deleted);
         }
       });
     }
@@ -7604,7 +7944,7 @@ var NoteCoveBridgeModule = (() => {
     markDeleted() {
       this.updateMetadata({
         deleted: true,
-        modified: Date.now()
+        modified: Date.now(),
       });
     }
     /**
@@ -7613,7 +7953,7 @@ var NoteCoveBridgeModule = (() => {
     markRestored() {
       this.updateMetadata({
         deleted: false,
-        modified: Date.now()
+        modified: Date.now(),
       });
     }
     /**
@@ -7647,10 +7987,10 @@ var NoteCoveBridgeModule = (() => {
   // src/crdt/folder-tree-doc.ts
   var FolderTreeDoc = class _FolderTreeDoc {
     constructor(sdId) {
-      __publicField(this, "doc");
-      __publicField(this, "folders");
+      __publicField(this, 'doc');
+      __publicField(this, 'folders');
       this.doc = new Doc({ guid: `folder-tree:${sdId}` });
-      this.folders = this.doc.getMap("folders");
+      this.folders = this.doc.getMap('folders');
     }
     /**
      * Create a new folder
@@ -7660,12 +8000,12 @@ var NoteCoveBridgeModule = (() => {
     createFolder(folder, origin) {
       this.doc.transact(() => {
         const folderMap = new YMap();
-        folderMap.set("id", folder.id);
-        folderMap.set("name", folder.name);
-        folderMap.set("parentId", folder.parentId);
-        folderMap.set("sdId", folder.sdId);
-        folderMap.set("order", folder.order);
-        folderMap.set("deleted", folder.deleted);
+        folderMap.set('id', folder.id);
+        folderMap.set('name', folder.name);
+        folderMap.set('parentId', folder.parentId);
+        folderMap.set('sdId', folder.sdId);
+        folderMap.set('order', folder.order);
+        folderMap.set('deleted', folder.deleted);
         this.folders.set(folder.id, folderMap);
       }, origin);
     }
@@ -7679,32 +8019,32 @@ var NoteCoveBridgeModule = (() => {
       }
       console.log(`[FolderTreeDoc] updateFolder ${folderId}:`, {
         before: {
-          name: folder.get("name"),
-          parentId: folder.get("parentId"),
-          order: folder.get("order"),
-          deleted: folder.get("deleted")
+          name: folder.get('name'),
+          parentId: folder.get('parentId'),
+          order: folder.get('order'),
+          deleted: folder.get('deleted'),
         },
-        updates
+        updates,
       });
       this.doc.transact(() => {
         if (updates.name !== void 0) {
-          folder.set("name", updates.name);
+          folder.set('name', updates.name);
         }
         if (updates.parentId !== void 0) {
-          folder.set("parentId", updates.parentId);
+          folder.set('parentId', updates.parentId);
         }
         if (updates.order !== void 0) {
-          folder.set("order", updates.order);
+          folder.set('order', updates.order);
         }
         if (updates.deleted !== void 0) {
-          folder.set("deleted", updates.deleted);
+          folder.set('deleted', updates.deleted);
         }
       });
       console.log(`[FolderTreeDoc] updateFolder ${folderId} after:`, {
-        name: folder.get("name"),
-        parentId: folder.get("parentId"),
-        order: folder.get("order"),
-        deleted: folder.get("deleted")
+        name: folder.get('name'),
+        parentId: folder.get('parentId'),
+        order: folder.get('order'),
+        deleted: folder.get('deleted'),
       });
     }
     /**
@@ -7716,12 +8056,12 @@ var NoteCoveBridgeModule = (() => {
         return null;
       }
       return {
-        id: folderMap.get("id"),
-        name: folderMap.get("name"),
-        parentId: folderMap.get("parentId") ?? null,
-        sdId: folderMap.get("sdId"),
-        order: folderMap.get("order"),
-        deleted: folderMap.get("deleted")
+        id: folderMap.get('id'),
+        name: folderMap.get('name'),
+        parentId: folderMap.get('parentId') ?? null,
+        sdId: folderMap.get('sdId'),
+        order: folderMap.get('order'),
+        deleted: folderMap.get('deleted'),
       };
     }
     /**
@@ -7732,12 +8072,12 @@ var NoteCoveBridgeModule = (() => {
       console.log(`[FolderTreeDoc] getAllFolders: folders.size = ${this.folders.size}`);
       this.folders.forEach((folderMap, key) => {
         const folderData = {
-          id: folderMap.get("id"),
-          name: folderMap.get("name"),
-          parentId: folderMap.get("parentId") ?? null,
-          sdId: folderMap.get("sdId"),
-          order: folderMap.get("order"),
-          deleted: folderMap.get("deleted")
+          id: folderMap.get('id'),
+          name: folderMap.get('name'),
+          parentId: folderMap.get('parentId') ?? null,
+          sdId: folderMap.get('sdId'),
+          order: folderMap.get('order'),
+          deleted: folderMap.get('deleted'),
         };
         console.log(`[FolderTreeDoc]   folder ${key}:`, folderData);
         result.push(folderData);
@@ -7802,11 +8142,11 @@ var NoteCoveBridgeModule = (() => {
   // src/crdt/update-format.ts
   var UPDATE_FORMAT_VERSION = 1;
   function parseUpdateFilename(filename) {
-    if (!filename.endsWith(".yjson")) {
+    if (!filename.endsWith('.yjson')) {
       return null;
     }
     const baseName = filename.slice(0, -6);
-    const parts = baseName.split("_");
+    const parts = baseName.split('_');
     if (parts.length < 3) {
       return null;
     }
@@ -7817,11 +8157,11 @@ var NoteCoveBridgeModule = (() => {
     }
     let timestamp;
     let sequence;
-    if (lastPart.includes("-")) {
-      const parts2 = lastPart.split("-");
+    if (lastPart.includes('-')) {
+      const parts2 = lastPart.split('-');
       const timestampStr = parts2[0];
       const sequenceStr = parts2[1];
-      timestamp = parseInt(timestampStr ?? "", 10);
+      timestamp = parseInt(timestampStr ?? '', 10);
       if (isNaN(timestamp)) {
         return null;
       }
@@ -7837,27 +8177,27 @@ var NoteCoveBridgeModule = (() => {
         return null;
       }
     }
-    if (parts[1] === "folder-tree") {
-      const sdId = parts.slice(2, -1).join("_");
+    if (parts[1] === 'folder-tree') {
+      const sdId = parts.slice(2, -1).join('_');
       const metadata = {
-        type: "folder-tree" /* FolderTree */,
+        type: 'folder-tree' /* FolderTree */,
         instanceId,
         documentId: sdId,
         timestamp,
-        version: UPDATE_FORMAT_VERSION
+        version: UPDATE_FORMAT_VERSION,
       };
       if (sequence !== void 0) {
         metadata.sequence = sequence;
       }
       return metadata;
     } else {
-      const noteId = parts.slice(1, -1).join("_");
+      const noteId = parts.slice(1, -1).join('_');
       const metadata = {
-        type: "note" /* Note */,
+        type: 'note' /* Note */,
         instanceId,
         documentId: noteId,
         timestamp,
-        version: UPDATE_FORMAT_VERSION
+        version: UPDATE_FORMAT_VERSION,
       };
       if (sequence !== void 0) {
         metadata.sequence = sequence;
@@ -7866,9 +8206,14 @@ var NoteCoveBridgeModule = (() => {
     }
   }
   function generateUpdateFilename(type, instanceId, documentId, timestamp = Date.now(), sequence) {
-    const suffix = sequence !== void 0 ? sequence.toString() : Math.floor(Math.random() * 1e4).toString().padStart(4, "0");
+    const suffix =
+      sequence !== void 0
+        ? sequence.toString()
+        : Math.floor(Math.random() * 1e4)
+            .toString()
+            .padStart(4, '0');
     const uniqueTimestamp = `${timestamp}-${suffix}`;
-    if (type === "folder-tree" /* FolderTree */) {
+    if (type === 'folder-tree' /* FolderTree */) {
       return `${instanceId}_folder-tree_${documentId}_${uniqueTimestamp}.yjson`;
     } else {
       return `${instanceId}_${documentId}_${uniqueTimestamp}.yjson`;
@@ -7878,19 +8223,19 @@ var NoteCoveBridgeModule = (() => {
   // src/crdt/snapshot-format.ts
   function parseSnapshotFilename(filename) {
     let baseName;
-    if (filename.endsWith(".yjson.zst")) {
+    if (filename.endsWith('.yjson.zst')) {
       baseName = filename.slice(0, -10);
-    } else if (filename.endsWith(".yjson")) {
+    } else if (filename.endsWith('.yjson')) {
       baseName = filename.slice(0, -6);
     } else {
       return null;
     }
-    const parts = baseName.split("_");
-    if (parts.length < 3 || parts[0] !== "snapshot") {
+    const parts = baseName.split('_');
+    if (parts.length < 3 || parts[0] !== 'snapshot') {
       return null;
     }
     const totalChangesStr = parts[1];
-    const instanceId = parts.slice(2).join("_");
+    const instanceId = parts.slice(2).join('_');
     if (!totalChangesStr || !instanceId) {
       return null;
     }
@@ -7901,21 +8246,21 @@ var NoteCoveBridgeModule = (() => {
     return {
       totalChanges,
       instanceId,
-      filename
+      filename,
     };
   }
 
   // src/crdt/pack-format.ts
   function parsePackFilename(filename) {
     let base;
-    if (filename.endsWith(".yjson.zst")) {
+    if (filename.endsWith('.yjson.zst')) {
       base = filename.slice(0, -10);
-    } else if (filename.endsWith(".yjson")) {
+    } else if (filename.endsWith('.yjson')) {
       base = filename.slice(0, -6);
     } else {
       return null;
     }
-    const parts = base.split("_pack_");
+    const parts = base.split('_pack_');
     if (parts.length !== 2) {
       return null;
     }
@@ -7924,12 +8269,12 @@ var NoteCoveBridgeModule = (() => {
     if (!instanceId || !range) {
       return null;
     }
-    const rangeParts = range.split("-");
+    const rangeParts = range.split('-');
     if (rangeParts.length !== 2) {
       return null;
     }
-    const startSeq = parseInt(rangeParts[0] ?? "", 10);
-    const endSeq = parseInt(rangeParts[1] ?? "", 10);
+    const startSeq = parseInt(rangeParts[0] ?? '', 10);
+    const endSeq = parseInt(rangeParts[1] ?? '', 10);
     if (isNaN(startSeq) || isNaN(endSeq)) {
       return null;
     }
@@ -7940,7 +8285,7 @@ var NoteCoveBridgeModule = (() => {
       instanceId,
       startSeq,
       endSeq,
-      filename
+      filename,
     };
   }
 
@@ -7949,7 +8294,7 @@ var NoteCoveBridgeModule = (() => {
     snapshotRetentionCount: 3,
     minimumHistoryDuration: 24 * 60 * 60 * 1e3,
     // 24 hours
-    gcInterval: 30 * 60 * 1e3
+    gcInterval: 30 * 60 * 1e3,
     // 30 minutes
   };
 
@@ -7970,10 +8315,10 @@ var NoteCoveBridgeModule = (() => {
         }
       }
     }
-    return "Untitled";
+    return 'Untitled';
   }
   function extractTextFromElement(element2) {
-    let text2 = "";
+    let text2 = '';
     element2.forEach((child) => {
       if (child instanceof YXmlText) {
         text2 += child.toString();
@@ -7996,7 +8341,7 @@ var NoteCoveBridgeModule = (() => {
     return bytes;
   }
   function uint8ArrayToBase64(bytes) {
-    let binaryString = "";
+    let binaryString = '';
     for (let i = 0; i < bytes.length; i++) {
       binaryString += String.fromCharCode(bytes[i]);
     }
@@ -8054,7 +8399,7 @@ var NoteCoveBridgeModule = (() => {
       const stateBytes = base64ToUint8Array(stateBase64);
       const tempDoc = new Doc();
       applyUpdate(tempDoc, stateBytes);
-      const fragment = tempDoc.getXmlFragment("content");
+      const fragment = tempDoc.getXmlFragment('content');
       const title = extractTitleFromFragment(fragment);
       tempDoc.destroy();
       return title;
@@ -8129,7 +8474,7 @@ var NoteCoveBridgeModule = (() => {
     },
     // Internal state (exposed for debugging)
     _openNotes: openNotes,
-    _openFolderTrees: openFolderTrees
+    _openFolderTrees: openFolderTrees,
   };
   globalThis.NoteCoveBridge = bridge;
   var ios_bridge_default = bridge;

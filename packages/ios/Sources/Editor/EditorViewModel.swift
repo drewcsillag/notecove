@@ -23,12 +23,39 @@ class EditorViewModel: ObservableObject {
     private let bridge: CRDTBridge
     private let database: DatabaseManager
     private weak var webView: WKWebView?
+    private let fileIO = FileIOManager()
 
     init(noteId: String, storageId: String, bridge: CRDTBridge, database: DatabaseManager) {
+        print("[EditorViewModel] Initializing for note: \(noteId)")
         self.noteId = noteId
         self.storageId = storageId
         self.bridge = bridge
         self.database = database
+        print("[EditorViewModel] Initialized, isLoading=\(isLoading), editorReady=\(editorReady)")
+    }
+
+    deinit {
+        print("[EditorViewModel] Deinitializing for note: \(noteId)")
+        // Note: We can't call closeNote here because deinit is non-isolated
+        // and closeNote is @MainActor. The JavaScript context will clean up
+        // when the bridge is deallocated.
+    }
+
+    /// Get the file path for the note's CRDT state
+    private func getNoteStatePath() throws -> String {
+        // Get storage directory from database
+        guard let storage = try database.getStorageDirectory(id: storageId) else {
+            throw NSError(domain: "EditorViewModel", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Storage directory not found: \(storageId)"])
+        }
+
+        // Create notes directory if needed
+        let notesDir = "\(storage.path)/notes"
+        if !fileIO.fileExists(at: notesDir) {
+            try fileIO.createDirectory(at: notesDir)
+        }
+
+        return "\(notesDir)/\(noteId).yjs"
     }
 
     /// Set the web view reference
@@ -41,7 +68,25 @@ class EditorViewModel: ObservableObject {
         isLoading = true
 
         do {
-            // Get the note's CRDT state
+            // First, create/open the note in the CRDT bridge
+            try bridge.createNote(noteId: noteId)
+            print("[EditorViewModel] Created/opened note in CRDT bridge: \(noteId)")
+
+            // Try to load existing state from disk
+            let statePath = try getNoteStatePath()
+            var stateData: Data?
+
+            if fileIO.fileExists(at: statePath) {
+                stateData = try fileIO.readFile(at: statePath)
+                print("[EditorViewModel] Loaded note state from disk: \(stateData!.count) bytes")
+
+                // Apply the saved state to the CRDT bridge
+                try bridge.applyUpdate(noteId: noteId, updateData: stateData!)
+            } else {
+                print("[EditorViewModel] No existing state file, starting with empty note")
+            }
+
+            // Get the current CRDT state (either loaded or empty)
             let state = try bridge.getDocumentState(noteId: noteId)
 
             // Convert to base64 for JavaScript
@@ -56,8 +101,13 @@ class EditorViewModel: ObservableObject {
 
         } catch {
             print("[EditorViewModel] Error loading note: \(error)")
-            // Load empty note
-            await callJavaScript(function: "loadNote", args: [noteId, ""])
+            // Try to create note and load empty
+            do {
+                try bridge.createNote(noteId: noteId)
+                await callJavaScript(function: "loadNote", args: [noteId, ""])
+            } catch {
+                print("[EditorViewModel] Failed to create note: \(error)")
+            }
         }
     }
 
@@ -86,6 +136,11 @@ class EditorViewModel: ObservableObject {
 
             // Get updated state
             let state = try bridge.getDocumentState(noteId: noteId)
+
+            // Save state to disk
+            let statePath = try getNoteStatePath()
+            try fileIO.atomicWrite(data: state, to: statePath)
+            print("[EditorViewModel] Saved note state to disk: \(state.count) bytes")
 
             // Extract and update title
             let title = try bridge.extractTitle(stateData: state)

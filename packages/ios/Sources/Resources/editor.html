@@ -4,6 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NoteCove Editor</title>
+    <script>
+        // Test if JavaScript runs at all by sending message to Swift
+        try {
+            window.webkit.messageHandlers.editor.postMessage({
+                type: 'testJavaScript',
+                data: {
+                    message: 'JavaScript is running!',
+                    location: window.location.href,
+                    baseURI: document.baseURI
+                }
+            });
+        } catch(e) {
+            // Message handler might not be ready yet
+            console.log('Message handler not ready:', e);
+        }
+        console.log('✅ JavaScript is running!');
+        console.log('Location:', window.location.href);
+        console.log('Base URL:', document.baseURI);
+    </script>
     <style>
         * {
             margin: 0;
@@ -109,14 +128,13 @@
 <body>
     <div id="editor"></div>
 
-    <!-- Load TipTap from CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/y-prosemirror@1.2.1/dist/y-prosemirror.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.7/dist/yjs.js"></script>
-    <script type="module">
-        import { Editor } from 'https://cdn.jsdelivr.net/npm/@tiptap/core@2.1.13/+esm';
-        import StarterKit from 'https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@2.1.13/+esm';
-        import Collaboration from 'https://cdn.jsdelivr.net/npm/@tiptap/extension-collaboration@2.1.13/+esm';
-        import Underline from 'https://cdn.jsdelivr.net/npm/@tiptap/extension-underline@2.1.13/+esm';
+    <!-- Load TipTap from local bundle (built with esbuild) -->
+    <script src="tiptap-bundle.js"></script>
+    <script>
+        // Use TipTap from global scope (bundled as IIFE)
+        const { Editor, StarterKit, Collaboration, Underline } = window.TipTap;
+        const Y = window.Y;
+        const YProsemirror = window.YProsemirror;
 
         // Create Yjs document
         const ydoc = new Y.Doc();

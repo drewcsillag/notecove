@@ -19,14 +19,13 @@ final class NoteCoveTests: XCTestCase {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
-    func testAppStateInitialization() throws {
-        let appState = AppState()
+    @MainActor
+    func testAppViewModelInitialization() throws {
+        let db = try DatabaseManager.inMemory()
+        let viewModel = try AppViewModel(database: db)
 
         // Verify initial state
-        XCTAssertTrue(appState.storageDirectories.isEmpty, "Storage directories should be empty initially")
-        XCTAssertNil(appState.selectedSD, "No SD should be selected initially")
-        XCTAssertNil(appState.selectedFolderId, "No folder should be selected initially")
-        XCTAssertNil(appState.selectedNoteId, "No note should be selected initially")
+        XCTAssertNil(viewModel.error, "No error should be present initially")
     }
 
     func testStorageDirectoryModel() throws {
@@ -61,11 +60,13 @@ final class NoteCoveTests: XCTestCase {
         XCTAssertTrue(note.tags.isEmpty)
     }
 
+    @MainActor
     func testPerformanceExample() throws {
         // This is an example of a performance test case.
         self.measure {
             // Put the code you want to measure the time of here.
-            _ = AppState()
+            let db = try! DatabaseManager.inMemory()
+            _ = try! AppViewModel(database: db)
         }
     }
 }

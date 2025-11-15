@@ -30,22 +30,27 @@ targets:
 
     resources:
       - Sources/Resources/notecove-bridge.js
+      - Sources/Resources/tiptap-bundle.js
       - Sources/Resources/editor.html
 
     preBuildScripts:
-      - name: "Copy JS Bundle"
+      - name: "Build TipTap Bundle"
+        basedOnDependencyAnalysis: false
+        script: |
+          export PATH="$HOME/.nvm/versions/node/v25.0.0/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+          cd "${PROJECT_DIR}/../shared"
+          node scripts/build-editor-bundle.js
+      - name: "Copy JS Bundles"
+        basedOnDependencyAnalysis: false
         script: |
           cp "${PROJECT_DIR}/Sources/Resources/notecove-bridge.js" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/notecove-bridge.js"
+          cp "${PROJECT_DIR}/Sources/Resources/tiptap-bundle.js" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/tiptap-bundle.js"
 
     info:
       path: Sources/Info.plist
       properties:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
-          UISceneConfigurations:
-            UIWindowSceneSessionRoleApplication:
-              - UISceneConfigurationName: Default Configuration
-                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
 
         UILaunchScreen: {}
 

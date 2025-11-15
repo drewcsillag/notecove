@@ -17,6 +17,7 @@ enum EditorMessage: String {
     case documentState
     case update
     case error
+    case testJavaScript
 }
 
 /// Bridge between WKWebView and Swift for editor communication
@@ -55,6 +56,9 @@ class EditorBridge: NSObject, WKScriptMessageHandler {
 
         case .error:
             handleError(data)
+
+        case .testJavaScript:
+            handleTestJavaScript(data)
         }
     }
 
@@ -102,5 +106,14 @@ class EditorBridge: NSObject, WKScriptMessageHandler {
     private func handleError(_ data: [String: Any]) {
         let message = data["message"] as? String ?? "Unknown error"
         print("[EditorBridge] Error from JavaScript: \(message)")
+    }
+
+    private func handleTestJavaScript(_ data: [String: Any]) {
+        let message = data["message"] as? String ?? ""
+        let location = data["location"] as? String ?? ""
+        let baseURI = data["baseURI"] as? String ?? ""
+        print("[EditorBridge] ✅ \(message)")
+        print("[EditorBridge] Location: \(location)")
+        print("[EditorBridge] BaseURI: \(baseURI)")
     }
 }

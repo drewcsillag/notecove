@@ -18,7 +18,7 @@ struct ContentView: View {
                     Label("Notes", systemImage: "note.text")
                 }
 
-            TagsTab()
+            TagBrowserView(viewModel: viewModel)
                 .tabItem {
                     Label("Tags", systemImage: "tag")
                 }
@@ -32,21 +32,6 @@ struct ContentView: View {
 }
 
 // MARK: - Placeholder Tab Views
-
-struct TagsTab: View {
-    var body: some View {
-        NavigationView {
-            VStack {
-                Text("Tags Tab")
-                    .font(.largeTitle)
-                Text("Phase 3.4 - Combined Folder/Tag View")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .navigationTitle("Tags")
-        }
-    }
-}
 
 struct SettingsTab: View {
     var body: some View {

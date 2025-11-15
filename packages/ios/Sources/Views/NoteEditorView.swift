@@ -16,6 +16,7 @@ struct NoteEditorView: View {
     @StateObject private var editorViewModel: EditorViewModel
 
     init(viewModel: AppViewModel, noteId: String, storageId: String) {
+        print("[NoteEditorView] Initializing for note: \(noteId)")
         self.viewModel = viewModel
         self.noteId = noteId
         self.storageId = storageId
@@ -27,17 +28,20 @@ struct NoteEditorView: View {
             bridge: viewModel.bridge,
             database: viewModel.database
         ))
+        print("[NoteEditorView] EditorViewModel created")
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            // Always create the EditorWebView so it can initialize
+            EditorWebView(viewModel: editorViewModel)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Show loading spinner on top while loading
             if editorViewModel.isLoading {
+                Color.white.opacity(0.9)
+                    .ignoresSafeArea()
                 ProgressView("Loading note...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                // Rich text editor
-                EditorWebView(viewModel: editorViewModel)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .navigationTitle(editorViewModel.noteTitle)
