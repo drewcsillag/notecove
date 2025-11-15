@@ -327,6 +327,120 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(notes.count, 2)
     }
 
+    func testGetTagByName() throws {
+        // Given: A storage directory with tags
+        try db.upsertStorageDirectory(id: "sd-1", name: "Test", path: "/test")
+        try db.insertTag(id: "tag-1", storageDirectoryId: "sd-1", name: "important", color: nil)
+
+        // When: Getting tag by name (case-insensitive)
+        let tag1 = try db.getTagByName("important", in: "sd-1")
+        let tag2 = try db.getTagByName("IMPORTANT", in: "sd-1")
+        let tag3 = try db.getTagByName("nonexistent", in: "sd-1")
+
+        // Then: Tag is found regardless of case
+        XCTAssertNotNil(tag1)
+        XCTAssertEqual(tag1?.name, "important")
+        XCTAssertNotNil(tag2)
+        XCTAssertEqual(tag2?.id, tag1?.id)
+        XCTAssertNil(tag3)
+    }
+
+    func testReindexTagsAddNew() throws {
+        // Given: A note with no tags
+        try db.upsertStorageDirectory(id: "sd-1", name: "Test", path: "/test")
+        try db.insertNote(id: "note-1", storageDirectoryId: "sd-1", folderId: nil, title: "Test")
+
+        // When: Re-indexing with new tags
+        try db.reindexTags(for: "note-1", in: "sd-1", tags: ["tag1", "tag2", "tag3"])
+
+        // Then: Tags are created and associated
+        let tags = try db.getTagsForNote(noteId: "note-1")
+        XCTAssertEqual(tags.count, 3)
+        XCTAssertTrue(tags.contains { $0.name == "tag1" })
+        XCTAssertTrue(tags.contains { $0.name == "tag2" })
+        XCTAssertTrue(tags.contains { $0.name == "tag3" })
+    }
+
+    func testReindexTagsRemoveOld() throws {
+        // Given: A note with existing tags
+        try db.upsertStorageDirectory(id: "sd-1", name: "Test", path: "/test")
+        try db.insertNote(id: "note-1", storageDirectoryId: "sd-1", folderId: nil, title: "Test")
+        try db.insertTag(id: "tag-1", storageDirectoryId: "sd-1", name: "old1", color: nil)
+        try db.insertTag(id: "tag-2", storageDirectoryId: "sd-1", name: "old2", color: nil)
+        try db.addTagToNote(noteId: "note-1", tagId: "tag-1")
+        try db.addTagToNote(noteId: "note-1", tagId: "tag-2")
+
+        // When: Re-indexing with different tags
+        try db.reindexTags(for: "note-1", in: "sd-1", tags: ["new1", "new2"])
+
+        // Then: Old tags are removed, new tags are added
+        let tags = try db.getTagsForNote(noteId: "note-1")
+        XCTAssertEqual(tags.count, 2)
+        XCTAssertFalse(tags.contains { $0.name == "old1" })
+        XCTAssertFalse(tags.contains { $0.name == "old2" })
+        XCTAssertTrue(tags.contains { $0.name == "new1" })
+        XCTAssertTrue(tags.contains { $0.name == "new2" })
+    }
+
+    func testReindexTagsPartialUpdate() throws {
+        // Given: A note with existing tags
+        try db.upsertStorageDirectory(id: "sd-1", name: "Test", path: "/test")
+        try db.insertNote(id: "note-1", storageDirectoryId: "sd-1", folderId: nil, title: "Test")
+        try db.insertTag(id: "tag-1", storageDirectoryId: "sd-1", name: "keep", color: nil)
+        try db.insertTag(id: "tag-2", storageDirectoryId: "sd-1", name: "remove", color: nil)
+        try db.addTagToNote(noteId: "note-1", tagId: "tag-1")
+        try db.addTagToNote(noteId: "note-1", tagId: "tag-2")
+
+        // When: Re-indexing with one kept tag and one new tag
+        try db.reindexTags(for: "note-1", in: "sd-1", tags: ["keep", "new"])
+
+        // Then: One tag is kept, one removed, one added
+        let tags = try db.getTagsForNote(noteId: "note-1")
+        XCTAssertEqual(tags.count, 2)
+        XCTAssertTrue(tags.contains { $0.name == "keep" })
+        XCTAssertTrue(tags.contains { $0.name == "new" })
+        XCTAssertFalse(tags.contains { $0.name == "remove" })
+    }
+
+    func testReindexTagsReuseExisting() throws {
+        // Given: Tags already exist in the storage directory
+        try db.upsertStorageDirectory(id: "sd-1", name: "Test", path: "/test")
+        try db.insertNote(id: "note-1", storageDirectoryId: "sd-1", folderId: nil, title: "Test")
+        try db.insertNote(id: "note-2", storageDirectoryId: "sd-1", folderId: nil, title: "Test 2")
+        try db.insertTag(id: "tag-1", storageDirectoryId: "sd-1", name: "shared", color: "#FF0000")
+        try db.addTagToNote(noteId: "note-2", tagId: "tag-1")
+
+        // When: Re-indexing note-1 with the same tag name
+        try db.reindexTags(for: "note-1", in: "sd-1", tags: ["shared"])
+
+        // Then: Existing tag is reused (not duplicated)
+        let tags = try db.getTagsForNote(noteId: "note-1")
+        XCTAssertEqual(tags.count, 1)
+        XCTAssertEqual(tags[0].id, "tag-1")
+        XCTAssertEqual(tags[0].color, "#FF0000")
+
+        // And: Tag is still associated with both notes
+        let note2Tags = try db.getTagsForNote(noteId: "note-2")
+        XCTAssertEqual(note2Tags.count, 1)
+        XCTAssertEqual(note2Tags[0].id, "tag-1")
+    }
+
+    func testReindexTagsCaseInsensitive() throws {
+        // Given: A note with no tags
+        try db.upsertStorageDirectory(id: "sd-1", name: "Test", path: "/test")
+        try db.insertNote(id: "note-1", storageDirectoryId: "sd-1", folderId: nil, title: "Test")
+
+        // When: Re-indexing with mixed case tags
+        try db.reindexTags(for: "note-1", in: "sd-1", tags: ["Tag1", "TAG2", "tag3"])
+
+        // Then: Tags are stored in lowercase
+        let tags = try db.getTagsForNote(noteId: "note-1")
+        XCTAssertEqual(tags.count, 3)
+        tags.forEach { tag in
+            XCTAssertEqual(tag.name, tag.name.lowercased())
+        }
+    }
+
     // MARK: - Transaction Tests
 
     func testTransaction() throws {

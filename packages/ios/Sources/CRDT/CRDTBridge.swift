@@ -382,6 +382,29 @@ public class CRDTBridge {
         return title
     }
 
+    /// Extract all text content from a note's CRDT state
+    func extractContent(stateData: Data) throws -> String {
+        guard let bridge = bridgeObject else {
+            throw CRDTBridgeError.bridgeNotInitialized
+        }
+
+        let base64 = stateData.base64EncodedString()
+        let result = bridge.invokeMethod("extractContent", withArguments: [base64])
+
+        if let error = context?.exception {
+            throw CRDTBridgeError.javascriptError(error.toString())
+        }
+
+        guard let result = result,
+              !result.isUndefined,
+              !result.isNull,
+              let content = result.toString() else {
+            throw CRDTBridgeError.invalidResult
+        }
+
+        return content
+    }
+
     /// Close a note document (free memory)
     func closeNote(noteId: String) {
         guard let bridge = bridgeObject else { return }

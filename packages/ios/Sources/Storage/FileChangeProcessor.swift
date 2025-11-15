@@ -143,8 +143,8 @@ public class FileChangeProcessor {
         let title = try bridge.extractTitle(stateData: state)
         print("[FileChangeProcessor] Extracted title: \(title)")
 
-        // Get the content for indexing
-        let content = String(data: state, encoding: .utf8) ?? ""
+        // Extract content for indexing and tag extraction
+        let content = try bridge.extractContent(stateData: state)
 
         // Update the database
         // Check if note exists in database
@@ -168,6 +168,11 @@ public class FileChangeProcessor {
 
         // Update the FTS5 index
         try await indexNoteContent(noteId: noteId, title: title, content: content)
+
+        // Extract and index tags
+        let tags = TagExtractor.extractTags(from: content)
+        try db.reindexTags(for: noteId, in: storageId, tags: tags)
+        print("[FileChangeProcessor] Re-indexed \(tags.count) tags for note: \(noteId)")
 
         print("[FileChangeProcessor] Successfully updated note: \(noteId)")
     }

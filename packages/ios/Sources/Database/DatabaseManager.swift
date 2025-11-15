@@ -414,6 +414,81 @@ public class DatabaseManager {
         }
     }
 
+    /// Get a tag by name (case-insensitive)
+    func getTagByName(_ name: String, in storageDirectoryId: String) throws -> TagRecord? {
+        return try dbQueue.read { db in
+            let sql = "SELECT * FROM tags WHERE LOWER(name) = LOWER(?) AND storage_directory_id = ? LIMIT 1"
+            return try TagRecord.fetchOne(db, sql: sql, arguments: [name, storageDirectoryId])
+        }
+    }
+
+    /// Re-index tags for a note based on extracted tag names
+    ///
+    /// - Parameters:
+    ///   - noteId: The note ID to re-index
+    ///   - storageDirectoryId: The storage directory ID
+    ///   - tags: Array of tag names (lowercase, without # prefix)
+    func reindexTags(for noteId: String, in storageDirectoryId: String, tags: [String]) throws {
+        try dbQueue.write { db in
+            // Get existing tags for this note
+            let existingTags = try TagRecord.fetchAll(db, sql: """
+                SELECT t.* FROM tags t
+                INNER JOIN note_tags nt ON t.id = nt.tag_id
+                WHERE nt.note_id = ?
+            """, arguments: [noteId])
+
+            let existingTagsMap = Dictionary(uniqueKeysWithValues: existingTags.map { ($0.name.lowercased(), $0) })
+            let newTagNames = Set(tags.map { $0.lowercased() })
+
+            // Determine which tags to remove
+            let tagsToRemove = existingTags.filter { !newTagNames.contains($0.name.lowercased()) }
+
+            // Determine which tags to add
+            let tagsToAdd = tags.filter { !existingTagsMap.keys.contains($0.lowercased()) }
+
+            // Remove tags no longer in the document
+            for tag in tagsToRemove {
+                try db.execute(
+                    sql: "DELETE FROM note_tags WHERE note_id = ? AND tag_id = ?",
+                    arguments: [noteId, tag.id]
+                )
+            }
+
+            // Add new tags
+            for tagName in tagsToAdd {
+                // Check if tag exists (case-insensitive)
+                var tag = try TagRecord.fetchOne(db, sql: """
+                    SELECT * FROM tags
+                    WHERE LOWER(name) = LOWER(?) AND storage_directory_id = ?
+                    LIMIT 1
+                """, arguments: [tagName, storageDirectoryId])
+
+                // Create tag if it doesn't exist
+                if tag == nil {
+                    let newTag = TagRecord(
+                        id: UUID().uuidString,
+                        storageDirectoryId: storageDirectoryId,
+                        name: tagName.lowercased(),
+                        color: nil,
+                        createdAt: Date()
+                    )
+                    try newTag.insert(db)
+                    tag = newTag
+                }
+
+                // Associate tag with note
+                if let tag = tag {
+                    let noteTag = NoteTagRecord(
+                        noteId: noteId,
+                        tagId: tag.id,
+                        createdAt: Date()
+                    )
+                    try noteTag.insert(db)
+                }
+            }
+        }
+    }
+
     // MARK: - Transactions
 
     /// Execute a block within a transaction

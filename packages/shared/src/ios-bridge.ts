@@ -31,6 +31,7 @@ interface NoteCoveBridge {
   applyUpdate(noteId: string, updateBase64: string): void;
   getDocumentState(noteId: string): string;
   extractTitle(stateBase64: string): string;
+  extractContent(stateBase64: string): string;
   closeNote(noteId: string): void;
 
   // Folder tree operations
@@ -208,6 +209,41 @@ const bridge: NoteCoveBridge = {
     const title = extractTitleFromFragment(fragment);
     tempDoc.destroy();
     return title;
+  },
+
+  extractContent(stateBase64: string): string {
+    const stateBytes = base64ToUint8Array(stateBase64);
+    // Create a temporary doc to decode the state
+    const tempDoc = new Y.Doc();
+    Y.applyUpdate(tempDoc, stateBytes);
+    // Extract all text content from the fragment
+    const fragment = tempDoc.getXmlFragment('content');
+    let contentText = '';
+
+    // Recursively extract text from elements
+    const extractText = (elem: Y.XmlElement): string => {
+      let text = '';
+      elem.forEach((child) => {
+        if (child instanceof Y.XmlText) {
+          text += String(child.toString());
+        } else if (child instanceof Y.XmlElement) {
+          text += extractText(child);
+        }
+      });
+      return text;
+    };
+
+    // Iterate through all top-level items
+    fragment.forEach((item) => {
+      if (item instanceof Y.XmlText) {
+        contentText += String(item.toString()) + '\n';
+      } else if (item instanceof Y.XmlElement) {
+        contentText += extractText(item) + '\n';
+      }
+    });
+
+    tempDoc.destroy();
+    return contentText;
   },
 
   closeNote(noteId: string): void {

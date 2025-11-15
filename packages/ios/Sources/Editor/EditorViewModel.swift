@@ -146,6 +146,12 @@ class EditorViewModel: ObservableObject {
             let title = try bridge.extractTitle(stateData: state)
             await handleContentChanged(noteId: noteId, title: title, isEmpty: title.isEmpty)
 
+            // Extract and index tags
+            let content = try bridge.extractContent(stateData: state)
+            let tags = TagExtractor.extractTags(from: content)
+            try database.reindexTags(for: noteId, in: storageId, tags: tags)
+            print("[EditorViewModel] Re-indexed \(tags.count) tags for note: \(noteId)")
+
         } catch {
             print("[EditorViewModel] Error handling update: \(error)")
         }
