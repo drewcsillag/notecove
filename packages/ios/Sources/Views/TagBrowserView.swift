@@ -298,9 +298,9 @@ struct AllTagsView: View {
     }
 
     private func filterNotes() {
-        let andTags = tagStates.filter({ $0.value == .and }).map({ $0.key })
-        let orTags = tagStates.filter({ $0.value == .or }).map({ $0.key })
-        let notTags = tagStates.filter({ $0.value == .not }).map({ $0.key })
+        let andTags = Set(tagStates.filter({ $0.value == .and }).map({ $0.key }))
+        let orTags = Set(tagStates.filter({ $0.value == .or }).map({ $0.key }))
+        let notTags = Set(tagStates.filter({ $0.value == .not }).map({ $0.key }))
 
         // If no filters active, clear results
         guard !andTags.isEmpty || !orTags.isEmpty || !notTags.isEmpty else {
@@ -338,7 +338,7 @@ struct AllTagsView: View {
                     }
 
                     // AND logic: note must have ALL AND tags
-                    if !andTags.isEmpty && !Set(andTags).isSubset(of: noteTagIds) {
+                    if !andTags.isEmpty && !andTags.isSubset(of: noteTagIds) {
                         continue
                     }
 

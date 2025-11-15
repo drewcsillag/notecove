@@ -178,7 +178,7 @@ public struct FolderRecord: Identifiable, Codable, FetchableRecord, PersistableR
 }
 
 /// Tag record
-struct TagRecord: Codable, FetchableRecord, PersistableRecord {
+struct TagRecord: Codable, FetchableRecord, PersistableRecord, Identifiable {
     static let databaseTableName = "tags"
 
     var id: String
