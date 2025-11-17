@@ -96,8 +96,12 @@ class EditorBridge: NSObject, WKScriptMessageHandler {
 
     private func handleUpdate(_ data: [String: Any]) {
         guard let base64 = data["update"] as? String,
-              let updateData = Data(base64Encoded: base64) else { return }
+              let updateData = Data(base64Encoded: base64) else {
+            print("[EditorBridge] Invalid update data")
+            return
+        }
 
+        print("[EditorBridge] Received update, size: \(updateData.count) bytes")
         Task {
             await viewModel?.handleUpdate(updateData)
         }
