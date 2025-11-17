@@ -131,20 +131,13 @@ class EditorViewModel: ObservableObject {
     }
 
     /// Handle content changes from the editor
+    /// Note: Only updates UI. Database title is updated in handleUpdate() after extracting from CRDT.
     func handleContentChanged(noteId: String, title: String, isEmpty: Bool) async {
         // Update title in UI
         self.noteTitle = title.isEmpty ? "Untitled" : title
 
-        // Update title in database
-        do {
-            try database.updateNote(
-                id: noteId,
-                title: self.noteTitle,
-                folderId: nil
-            )
-        } catch {
-            print("[EditorViewModel] Error updating title: \(error)")
-        }
+        // Don't update database here - title will be extracted from CRDT and updated in handleUpdate()
+        // This ensures the database title matches what desktop extracts from CRDT, avoiding sync conflicts
     }
 
     /// Handle CRDT updates from the editor
