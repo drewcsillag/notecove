@@ -95,8 +95,8 @@ class EditorViewModel: ObservableObject {
                 print("[EditorViewModel] Found \(updateFiles.count) update files for note: \(noteId)")
 
                 // Apply each update file in order
-                for filename in updateFiles {
-                    let filePath = "\(updatesDir)/\(filename)"
+                for filePath in updateFiles {
+                    // listFiles returns full paths, use them directly
                     let updateData = try fileIO.readFile(at: filePath)
                     try bridge.applyUpdate(noteId: noteId, updateData: updateData)
                 }
