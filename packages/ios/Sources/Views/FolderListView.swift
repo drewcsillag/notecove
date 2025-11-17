@@ -247,7 +247,9 @@ struct FolderListView: View {
             // Navigate to the editor
             navigationPath = noteId
 
-            await loadContent()
+            // Don't reload content here - it will be reloaded when we return from the editor
+            // Reloading here causes the note to appear in the list, creating a duplicate NavigationLink
+            // which requires two back taps to dismiss
         } catch {
             print("[FolderListView] Error creating note: \(error)")
         }
