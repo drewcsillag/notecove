@@ -27,7 +27,7 @@ final class UpdateFileManagerTests: XCTestCase {
 
         // Then
         // Format should be: instanceId_noteId_timestamp-sequence.yjson
-        XCTAssertTrue(filename.hasPrefix("\(testInstanceId)_\(noteId)_"))
+        XCTAssertTrue(filename.hasPrefix("\(testInstanceId!)_\(noteId)_"))
         XCTAssertTrue(filename.hasSuffix(".yjson"))
         XCTAssertTrue(filename.contains("-"), "Should contain timestamp-sequence separator")
     }
@@ -130,9 +130,9 @@ final class UpdateFileManagerTests: XCTestCase {
 
         // Create mock update files with various sequence numbers
         let existingFiles = [
-            "\(testInstanceId)_\(noteId)_1763219787329-5.yjson",
-            "\(testInstanceId)_\(noteId)_1763219787330-6.yjson",
-            "\(testInstanceId)_\(noteId)_1763219787331-7.yjson",
+            "\(testInstanceId!)_\(noteId)_1763219787329-5.yjson",
+            "\(testInstanceId!)_\(noteId)_1763219787330-6.yjson",
+            "\(testInstanceId!)_\(noteId)_1763219787331-7.yjson",
             // File from different instance (should be ignored for sequence)
             "other-instance_\(noteId)_1763219787332-99.yjson",
         ]

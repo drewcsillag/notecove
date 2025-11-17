@@ -137,7 +137,7 @@
         const YProsemirror = window.YProsemirror;
 
         // Create Yjs document
-        const ydoc = new Y.Doc();
+        let ydoc = new Y.Doc();
         let editor = null;
         let noteId = null;
 
@@ -186,6 +186,16 @@
             try {
                 noteId = id;
 
+                // Destroy old editor if it exists
+                if (editor) {
+                    editor.destroy();
+                    editor = null;
+                }
+
+                // Create new Yjs document for this note
+                ydoc = new Y.Doc();
+
+                // Apply state if provided
                 if (stateBase64 && stateBase64.length > 0) {
                     // Decode base64 to Uint8Array
                     const binaryString = atob(stateBase64);
@@ -195,9 +205,49 @@
                         bytes[i] = binaryString.charCodeAt(i);
                     }
 
-                    // Apply state to Yjs document
-                    Y.applyUpdate(ydoc, bytes);
+                    // Apply state to new Yjs document with 'swift' origin to prevent echo
+                    Y.applyUpdate(ydoc, bytes, 'swift');
                 }
+
+                // Set up update listener for new ydoc
+                ydoc.on('update', (update, origin) => {
+                    // Don't send updates that came from Swift
+                    if (origin === 'swift') return;
+
+                    // Convert Uint8Array to base64
+                    let binary = '';
+                    const len = update.byteLength;
+                    for (let i = 0; i < len; i++) {
+                        binary += String.fromCharCode(update[i]);
+                    }
+                    const base64 = btoa(binary);
+
+                    sendMessage('update', { update: base64 });
+                });
+
+                // Reinitialize editor with new ydoc
+                editor = new Editor({
+                    element: document.getElementById('editor'),
+                    extensions: [
+                        StarterKit.configure({
+                            history: false, // Yjs handles history
+                        }),
+                        Underline,
+                        Collaboration.configure({
+                            document: ydoc,
+                            fragment: ydoc.getXmlFragment('content'),
+                        }),
+                    ],
+                    editable: true,
+                    onUpdate: ({ editor }) => {
+                        // Send update to Swift when content changes
+                        sendMessage('contentChanged', {
+                            noteId: noteId,
+                            text: editor.getText(),
+                            isEmpty: editor.isEmpty,
+                        });
+                    },
+                });
 
                 sendMessage('noteLoaded', { noteId: id });
             } catch (error) {
@@ -276,22 +326,6 @@
                 sendMessage('error', { message: error.toString() });
             }
         };
-
-        // Listen for Yjs updates to send to Swift
-        ydoc.on('update', (update, origin) => {
-            // Don't send updates that came from Swift
-            if (origin === 'swift') return;
-
-            // Convert Uint8Array to base64
-            let binary = '';
-            const len = update.byteLength;
-            for (let i = 0; i < len; i++) {
-                binary += String.fromCharCode(update[i]);
-            }
-            const base64 = btoa(binary);
-
-            sendMessage('update', { update: base64 });
-        });
 
         // Initialize when DOM is ready
         if (document.readyState === 'loading') {

@@ -62,7 +62,9 @@ class UpdateFileManager {
         if fileIO.fileExists(at: updatesDirectory) {
             let files = try fileIO.listFiles(in: updatesDirectory, matching: "*.yjson")
 
-            for filename in files {
+            for filePath in files {
+                // Extract just the filename from the full path
+                let filename = (filePath as NSString).lastPathComponent
                 if let metadata = parseUpdateFilename(filename) {
                     // Only count files from this instance for this note
                     if metadata.instanceId == instanceId && metadata.noteId == noteId {

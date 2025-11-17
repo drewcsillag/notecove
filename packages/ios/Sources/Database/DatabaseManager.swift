@@ -355,8 +355,18 @@ public class DatabaseManager {
         }
     }
 
-    /// List all tags in a storage directory that have at least one note
+    /// List all tags in a storage directory
     func listTags(in storageDirectoryId: String) throws -> [TagRecord] {
+        return try dbQueue.read { db in
+            try TagRecord
+                .filter(Column("storage_directory_id") == storageDirectoryId)
+                .order(Column("name").asc)
+                .fetchAll(db)
+        }
+    }
+
+    /// List only tags that have at least one note
+    func listTagsWithNotes(in storageDirectoryId: String) throws -> [TagRecord] {
         return try dbQueue.read { db in
             let sql = """
                 SELECT DISTINCT t.* FROM tags t
