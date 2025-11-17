@@ -410,6 +410,80 @@ The current app (Phase 3.1) is a skeleton with:
 
 This is expected! We're building the foundation first.
 
+## Installing to Your Personal iPhone
+
+You can install the app directly to your iPhone without using the App Store or TestFlight:
+
+### Prerequisites
+
+- Personal iPhone with iOS 17.0 or later
+- USB cable (or USB-C cable for newer devices)
+- Apple ID (free account works for development)
+
+### Installation Steps
+
+1. **Connect your iPhone**:
+   - Plug your iPhone into your Mac using a USB/USB-C cable
+   - Unlock your iPhone
+
+2. **Trust your Mac** (first time only):
+   - On your iPhone, you'll see an alert: "Trust This Computer?"
+   - Tap **Trust**
+   - Enter your iPhone passcode if prompted
+
+3. **Select your iPhone as the build destination**:
+   - In Xcode, click the scheme selector at the top (next to the Play button)
+   - Under "iOS Device", select your connected iPhone (it will show your device name)
+   - Your iPhone should appear at the top of the list with your device name
+
+4. **Build and run**:
+   - Press **Cmd+R** (or click the **Play** button)
+   - Xcode will build the app and install it on your iPhone
+   - The first build may take a minute or two
+
+5. **Trust the developer certificate** (first time only with free account):
+   - After installation, you'll see "Untrusted Developer" when trying to launch the app
+   - On your iPhone, go to **Settings** > **General** > **VPN & Device Management**
+   - Under "DEVELOPER APP", tap on your Apple ID email
+   - Tap **Trust "[Your Apple ID]"**
+   - Tap **Trust** in the confirmation dialog
+   - Now you can launch the app
+
+### Important Notes
+
+- **Free Apple Developer Account**: Apps signed with a free account expire after **7 days**. You'll need to rebuild and reinstall the app weekly. For longer validity, consider a paid Apple Developer Program membership ($99/year).
+- **App stays on device**: Once installed, the app remains on your iPhone until you delete it or the provisioning expires.
+- **Wireless debugging** (optional): After the first USB installation, you can enable wireless debugging:
+  1. In Xcode, go to **Window** > **Devices and Simulators**
+  2. Select your device
+  3. Check **Connect via network**
+  4. Your device will appear in the scheme selector even when not plugged in
+
+### Troubleshooting
+
+**"Failed to prepare device for development"**:
+
+- Unplug and replug your iPhone
+- Restart Xcode
+- On your iPhone, go to **Settings** > **Privacy & Security** > **Developer Mode** and enable it (iOS 16+)
+
+**"The operation couldn't be completed. Unable to launch..."**:
+
+- Make sure you've trusted the developer certificate (see step 5 above)
+- Check that your iPhone is unlocked
+
+**"Your device has run out of application identifiers"**:
+
+- Free accounts are limited to 3 app identifiers per 7-day period
+- Wait a few days or use a different Apple ID
+- Consider upgrading to a paid developer account
+
+**App won't install or crashes immediately**:
+
+- Make sure your iPhone is running iOS 17.0 or later
+- Clean build folder in Xcode: **Product** > **Clean Build Folder** (Cmd+Shift+K)
+- Delete the app from your iPhone and reinstall
+
 ## Building
 
 ### Regenerate Xcode Project
