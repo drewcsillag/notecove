@@ -13,6 +13,8 @@ struct StorageDirectoryListView: View {
     @State private var showingAddSheet = false
     @State private var newSDName = ""
     @State private var newSDPath = ""
+    @State private var errorMessage: String?
+    @State private var showingError = false
 
     var body: some View {
         NavigationStack {
@@ -38,6 +40,13 @@ struct StorageDirectoryListView: View {
             }
             .sheet(isPresented: $showingAddSheet) {
                 addStorageDirectorySheet
+            }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") {
+                    showingError = false
+                }
+            } message: {
+                Text(errorMessage ?? "An error occurred")
             }
         }
     }
@@ -151,7 +160,8 @@ struct StorageDirectoryListView: View {
             resetForm()
         } catch {
             print("Error creating storage directory: \(error)")
-            // TODO: Show error alert
+            errorMessage = error.localizedDescription
+            showingError = true
         }
     }
 

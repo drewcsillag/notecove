@@ -70,6 +70,16 @@ public class AppViewModel: ObservableObject {
 
     /// Create a new storage directory
     public func createStorageDirectory(name: String, path: String) async throws {
+        // Check if a storage directory with this path already exists
+        let existingDirectories = try database.listStorageDirectories()
+        if existingDirectories.contains(where: { $0.path == path }) {
+            throw NSError(
+                domain: "AppViewModel",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "A storage directory with this path already exists"]
+            )
+        }
+
         let id = UUID().uuidString
 
         try database.upsertStorageDirectory(
