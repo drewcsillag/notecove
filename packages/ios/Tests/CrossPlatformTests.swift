@@ -134,11 +134,14 @@ final class CrossPlatformTests: XCTestCase {
         // For testing, we'll just verify we can write updates to the shared directory
 
         // Get state as an update and write it to a new file
-        let updateFilename = "ios-update-\(Date().timeIntervalSince1970).yjson"
+        let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        let updateFilename = "ios-update-\(timestamp).yjson"
         let updatePath = "\(updatesDir)/\(updateFilename)"
 
         // Write current state as an update file
         try initialState.write(to: URL(fileURLWithPath: updatePath))
+
+        print("[CrossPlatformTests] Created update file: \(updateFilename)")
 
         // Verify the file was written
         XCTAssertTrue(fileIO.fileExists(at: updatePath), "iOS should be able to write update files to shared directory")

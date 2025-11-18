@@ -57,7 +57,7 @@ if [ -z "$SIMULATOR_ID" ]; then
   exit 1
 fi
 
-xcodebuild test \
+NOTECOVE_CROSS_PLATFORM_SD="$SHARED_SD" xcodebuild test \
   -project NoteCove.xcodeproj \
   -scheme NoteCove \
   -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
@@ -73,7 +73,7 @@ echo -e "${GREEN}✅ iOS verification passed${NC}\n"
 # Step 3: Run iOS test to edit the note
 echo -e "${BLUE}✏️  Step 3: iOS edits the note${NC}"
 echo -e "   Running iOS XCTest..."
-xcodebuild test \
+NOTECOVE_CROSS_PLATFORM_SD="$SHARED_SD" xcodebuild test \
   -project NoteCove.xcodeproj \
   -scheme NoteCove \
   -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
@@ -85,6 +85,11 @@ if [ ${PIPESTATUS[0]} -ne 0 ]; then
   exit 1
 fi
 echo -e "${GREEN}✅ iOS edit passed${NC}\n"
+
+# Debug: List files in updates directory
+echo -e "${BLUE}🔍 Debug: Listing files in updates directory${NC}"
+ls -la "$SHARED_SD/cross-platform-note-1/updates/" || echo "Directory not found"
+echo ""
 
 # Step 4: Run desktop test to verify iOS edit
 echo -e "${BLUE}👀 Step 4: Desktop verifies iOS's edit${NC}"
