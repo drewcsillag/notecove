@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test'
 import { promises as fs } from 'fs'
 import path from 'path'
+import * as Y from 'yjs'
 
 test.describe('Cross-Platform Setup (Desktop)', () => {
   test('desktop creates a note in shared storage', async () => {
@@ -32,20 +33,30 @@ test.describe('Cross-Platform Setup (Desktop)', () => {
 
     console.log('[Desktop] Created note directories')
 
-    // Create a simple CRDT update file with title
-    // For now, we'll create a minimal Yjs update
-    // In a real scenario, this would be a proper Yjs document with content
-    const updateContent = Buffer.from(
-      JSON.stringify({
-        note: 'Cross-Platform Test Note',
-        timestamp: Date.now()
-      })
-    )
+    // Create a proper Yjs CRDT update with title
+    const doc = new Y.Doc({ guid: noteId })
+    const fragment = doc.getXmlFragment('content')
+
+    // Create TipTap-compatible document structure with title
+    // The structure is: <doc><p>Cross-Platform Test Note</p></doc>
+    doc.transact(() => {
+      const paragraph = new Y.XmlElement('p')
+      const text = new Y.XmlText()
+      text.insert(0, 'Cross-Platform Test Note')
+      paragraph.insert(0, [text])
+      fragment.insert(0, [paragraph])
+    })
+
+    // Encode as update
+    const update = Y.encodeStateAsUpdate(doc)
 
     const updateFile = path.join(updatesDir, `desktop-initial-${Date.now()}.yjson`)
-    await fs.writeFile(updateFile, updateContent)
+    await fs.writeFile(updateFile, Buffer.from(update))
 
     console.log('[Desktop] Created update file:', updateFile)
+
+    // Clean up Yjs doc
+    doc.destroy()
 
     // Verify files exist
     const noteExists = await fs.access(noteDir).then(() => true).catch(() => false)

@@ -38,17 +38,11 @@ test.describe('Cross-Platform Verification (Desktop)', () => {
     console.log('[Desktop] Desktop updates:', desktopUpdates.length)
     console.log('[Desktop] iOS updates:', iosUpdates.length)
 
-    // NOTE: In the full test flow with proper environment variable passing,
-    // we would verify iOS created update files. For now, we verify the
-    // directory structure is accessible and desktop files exist.
+    // Verify both platforms wrote updates
     expect(desktopUpdates.length).toBeGreaterThan(0)
+    expect(iosUpdates.length).toBeGreaterThan(0)
 
-    if (iosUpdates.length > 0) {
-      console.log('[Desktop] ✅ Verification complete - iOS successfully edited the note')
-    } else {
-      console.log('[Desktop] ⚠️  Note: iOS updates would be verified with proper environment variable passing to xcodebuild')
-      console.log('[Desktop] ✅ Directory structure verified - cross-platform storage is accessible')
-    }
+    console.log('[Desktop] ✅ Verification complete - iOS successfully edited the note')
   })
 
   test('desktop verifies iOS can create notes', async () => {
@@ -79,8 +73,9 @@ test.describe('Cross-Platform Verification (Desktop)', () => {
 
       expect(updateFiles.length).toBeGreaterThan(0)
     } else {
-      console.log('[Desktop] ⚠️  iOS note not found (may not have run yet)')
-      // Don't fail the test - iOS test might run separately
+      console.log('[Desktop] ⚠️  iOS note not found')
+      console.log('[Desktop]    This is expected - iOS note creation test may not have run in this test flow')
+      // Don't fail the test - this test (testCreateNoteFromIOS) runs separately
     }
   })
 })

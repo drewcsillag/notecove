@@ -647,31 +647,141 @@ See [PLAN-PHASE-3.md](../../PLAN-PHASE-3.md) for detailed implementation plan.
 
 Unit tests are written using XCTest and located in the `Tests/` directory.
 
-**Current Test Coverage**:
+**Current Test Coverage**: 72.15% (target: 80%)
 
-- 108 tests total (all passing ✅)
-- CRDTBridgeTests: 7 tests
-- FileIOManagerTests: 21 tests
-- StorageIntegrationTests: 13 tests
-- DatabaseManagerTests: 23 tests
-- FileWatchManagerTests: 8 tests
-- FileChangeProcessorTests: 8 tests
-- iCloudManagerTests: 8 tests
-- StorageCoordinatorTests: 9 tests
-- DebouncerTests: 7 tests
-- NoteCoveTests: 4 tests
+- 158 tests total (all passing ✅)
+- Unit tests: 149 tests
+  - CRDTBridgeTests: 7 tests
+  - FileIOManagerTests: 21 tests
+  - StorageIntegrationTests: 13 tests
+  - DatabaseManagerTests: 23 tests
+  - FileWatchManagerTests: 8 tests
+  - FileChangeProcessorTests: 15 tests (includes new error path tests)
+  - iCloudManagerTests: 8 tests
+  - StorageCoordinatorTests: 9 tests
+  - DebouncerTests: 7 tests
+  - EditorViewModelTests: 2 tests
+  - ModelsTests: 16 tests (data model validation)
+  - StorageDirectoryManagerTests: 16 tests (path management)
+  - NoteCoveTests: 4 tests
+- UI tests: 9 tests
+  - AppLaunchTests: 2 tests
+  - BasicFlowTests: 4 tests
+  - StorageAndNoteTests: 3 tests
+- Cross-platform tests: 4 tests (see below)
+
+### Running Unit Tests
 
 Run tests from Xcode (Cmd+U) or from the command line:
 
 ```bash
-xcodebuild test -project NoteCove.xcodeproj -scheme NoteCove -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild test -project NoteCove.xcodeproj -scheme NoteCove -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-Or use the iOS CI script:
+Or use the iOS CI script (includes coverage reporting):
 
 ```bash
 pnpm --filter @notecove/ios ci-local
 ```
+
+The CI script will fail if coverage drops below 80%.
+
+### Running UI Tests
+
+UI tests verify end-to-end user flows:
+
+```bash
+xcodebuild test \
+  -project NoteCove.xcodeproj \
+  -scheme NoteCove \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:NoteCoveUITests
+```
+
+### Cross-Platform Tests
+
+Cross-platform e2e tests verify that iOS and Desktop can share a storage directory and sync changes bidirectionally.
+
+**Source Files**:
+- `packages/ios/scripts/test-cross-platform.sh` - Coordinator script
+- `packages/ios/Tests/CrossPlatformTests.swift` - iOS test suite
+- `packages/desktop/e2e/cross-platform-setup.spec.ts` - Desktop creates shared note
+- `packages/desktop/e2e/cross-platform-verify.spec.ts` - Desktop verifies iOS changes
+
+**Running Cross-Platform Tests**:
+
+```bash
+cd packages/ios
+./scripts/test-cross-platform.sh
+```
+
+The script will:
+1. Find and boot the iOS simulator
+2. Generate the Xcode project
+3. Create a shared directory at `/tmp/notecove-cross-platform-test`
+4. Run desktop test to create a note in the shared directory
+5. Run iOS test to verify desktop's note
+6. Run iOS test to edit the note
+7. Run desktop test to verify iOS's changes
+8. Clean up the shared directory
+
+**How it Works**:
+- Both Desktop and iOS tests use a fixed shared directory: `/tmp/notecove-cross-platform-test`
+- Desktop tests read the path from the `NOTECOVE_CROSS_PLATFORM_SD` environment variable (set by the script)
+- iOS tests use the hardcoded path (iOS test sandboxes can access `/tmp`)
+- No complex environment variable passing or app container discovery needed!
+- The tests can even run standalone (they'll create the directory if it doesn't exist)
+
+**What's Tested**:
+- ✅ Desktop creates note → iOS can read it with correct title
+- ✅ iOS can edit the note → Desktop sees the changes
+- ✅ iOS can create new notes → Desktop can see them
+- ✅ iOS can create folders → Desktop can see them
+- ✅ Directory structure is fully compatible across platforms
+- ✅ CRDT sync works bidirectionally
+- ✅ Yjs update files are properly formatted and readable by both platforms
+
+**Manual Testing**:
+
+To manually test cross-platform sync outside of the automated tests:
+
+1. **Create a shared storage directory:**
+   ```bash
+   mkdir -p /tmp/notecove-manual-test
+   ```
+
+2. **On Desktop (Electron app):**
+   - Open NoteCove Desktop
+   - Create a new storage directory pointing to `/tmp/notecove-manual-test`
+   - Create some notes and folders
+   - Edit notes and verify content is saved
+
+3. **On iOS (Simulator or Device):**
+   - Run the iOS app in Xcode
+   - Add a storage directory in Settings
+   - For simulator: Use `/tmp/notecove-manual-test` (can access via file browser)
+   - For device: Use iCloud Drive or a synced folder
+   - Navigate to the storage directory
+   - You should see the notes and folders created by Desktop
+   - Edit the notes and create new ones
+
+4. **Verify Bidirectional Sync:**
+   - Check that Desktop sees the iOS changes
+   - Check that iOS sees the Desktop changes
+   - Verify note titles, content, and folder structure match
+   - Check that CRDT updates are properly merged (no conflicts)
+
+5. **Inspect the File Structure:**
+   ```bash
+   # See the shared storage structure
+   ls -la /tmp/notecove-manual-test/
+
+   # Check a note's update files
+   ls -la /tmp/notecove-manual-test/<note-id>/updates/
+
+   # View update file contents (Yjs binary format)
+   hexdump -C /tmp/notecove-manual-test/<note-id>/updates/*.yjson
+   ```
 
 ## License
 

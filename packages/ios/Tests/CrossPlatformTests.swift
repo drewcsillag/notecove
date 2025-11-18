@@ -22,13 +22,21 @@ final class CrossPlatformTests: XCTestCase {
     override func setUpWithError() throws {
         try super.setUpWithError()
 
-        // Get shared storage directory from environment variable
-        // (Set by test-cross-platform.sh script)
-        guard let envPath = ProcessInfo.processInfo.environment["NOTECOVE_CROSS_PLATFORM_SD"] else {
-            throw XCTSkip("Skipping cross-platform test - not running in cross-platform test mode")
+        // Use a fixed shared directory that both Desktop and iOS can access
+        // The test-cross-platform.sh script creates this directory
+        sharedSDPath = "/tmp/notecove-cross-platform-test"
+
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: sharedSDPath) {
+            // If running standalone (not via script), create the directory
+            try fileManager.createDirectory(
+                atPath: sharedSDPath,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            print("[CrossPlatformTests] Created shared directory (standalone mode)")
         }
 
-        sharedSDPath = envPath
         storageId = "cross-platform-test-sd"
 
         // Create in-memory database
