@@ -743,44 +743,68 @@ The script will:
 
 **Manual Testing**:
 
-To manually test cross-platform sync outside of the automated tests:
+To manually test cross-platform sync outside of the automated tests, you need to use the iOS app's Documents directory (since regular apps can't access `/tmp` like XCTest can).
 
-1. **Create a shared storage directory:**
+**Quick Setup (Recommended):**
+```bash
+cd packages/ios
+./scripts/setup-manual-test.sh
+```
+
+This will:
+- Find your booted simulator
+- Locate the NoteCove app container
+- Create a shared directory
+- Print the paths to use in both apps
+
+**Or manually:**
+
+1. **Find the iOS app's Documents directory:**
    ```bash
-   mkdir -p /tmp/notecove-manual-test
+   # Boot simulator and run NoteCove app first
+   SIMULATOR_ID=$(xcrun simctl list devices booted | grep "iPhone" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+   APP_CONTAINER=$(xcrun simctl get_app_container "$SIMULATOR_ID" com.notecove.NoteCove data)
+   SHARED_DIR="$APP_CONTAINER/Documents/ManualTestStorage"
+   mkdir -p "$SHARED_DIR"
+   echo "Shared directory: $SHARED_DIR"
    ```
 
 2. **On Desktop (Electron app):**
    - Open NoteCove Desktop
-   - Create a new storage directory pointing to `/tmp/notecove-manual-test`
+   - Create a new storage directory pointing to the path from step 1
+   - Example: `/Users/you/Library/Developer/CoreSimulator/.../Documents/ManualTestStorage`
    - Create some notes and folders
    - Edit notes and verify content is saved
 
-3. **On iOS (Simulator or Device):**
+3. **On iOS (Simulator):**
    - Run the iOS app in Xcode
    - Add a storage directory in Settings
-   - For simulator: Use `/tmp/notecove-manual-test` (can access via file browser)
-   - For device: Use iCloud Drive or a synced folder
+   - Use the relative path: `Documents/ManualTestStorage`
    - Navigate to the storage directory
    - You should see the notes and folders created by Desktop
    - Edit the notes and create new ones
 
-4. **Verify Bidirectional Sync:**
+4. **On iOS (Real Device):**
+   - Use iCloud Drive or another cloud storage service
+   - Both iOS and Desktop apps can point to the same iCloud folder
+   - Or use a network share accessible to both
+
+5. **Verify Bidirectional Sync:**
    - Check that Desktop sees the iOS changes
    - Check that iOS sees the Desktop changes
    - Verify note titles, content, and folder structure match
    - Check that CRDT updates are properly merged (no conflicts)
 
-5. **Inspect the File Structure:**
+6. **Inspect the File Structure:**
    ```bash
-   # See the shared storage structure
-   ls -la /tmp/notecove-manual-test/
+   # Browse in Finder
+   open "$SHARED_DIR"
 
    # Check a note's update files
-   ls -la /tmp/notecove-manual-test/<note-id>/updates/
+   ls -la "$SHARED_DIR/<note-id>/updates/"
 
    # View update file contents (Yjs binary format)
-   hexdump -C /tmp/notecove-manual-test/<note-id>/updates/*.yjson
+   hexdump -C "$SHARED_DIR/<note-id>/updates/*.yjson"
    ```
 
 ## License
