@@ -163,6 +163,12 @@ class EditorViewModel: ObservableObject {
 
             // Extract and update title (immediate, users expect live updates)
             let title = try bridge.extractTitle(stateData: state)
+
+            // Update database with extracted title from CRDT
+            // This ensures the database title matches what desktop extracts from CRDT
+            let displayTitle = title.isEmpty ? "Untitled" : title
+            try database.updateNote(id: noteId, title: displayTitle)
+
             await handleContentChanged(noteId: noteId, title: title, isEmpty: title.isEmpty)
 
             // Debounce tag extraction to avoid indexing partial tags while typing
