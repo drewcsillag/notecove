@@ -198,6 +198,36 @@ public class FileChangeProcessor {
         try db.indexNoteContent(noteId: noteId, title: title, content: content)
         print("[FileChangeProcessor] Indexed content for note: \(noteId)")
     }
+
+    /// Scans an entire storage directory for notes
+    ///
+    /// This simulates what happens when:
+    /// - The app first launches
+    /// - A storage directory is first added
+    /// - The user manually refreshes
+    ///
+    /// It discovers all notes by scanning the notes/ subdirectory
+    ///
+    /// - Parameter storageId: The storage directory ID to scan
+    public func scanStorageDirectory(storageId: String) async throws {
+        print("[FileChangeProcessor] Scanning storage directory: \(storageId)")
+
+        // Get storage directory path
+        guard let sd = try? db.getStorageDirectory(id: storageId) else {
+            throw FileChangeProcessorError.storageDirectoryNotFound(storageId)
+        }
+
+        let notesDir = "\(sd.path)/notes"
+
+        // Check if notes directory exists
+        guard fileIO.fileExists(at: notesDir) else {
+            print("[FileChangeProcessor] Notes directory doesn't exist yet: \(notesDir)")
+            return
+        }
+
+        // Process all notes in the directory
+        try await processChangedFiles(in: notesDir, storageId: storageId)
+    }
 }
 
 /// Errors that can occur during file change processing
