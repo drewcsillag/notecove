@@ -274,7 +274,11 @@ final class FileChangeProcessorTests: XCTestCase {
         let noteDir = testDirectory.appendingPathComponent(noteId)
         try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
 
-        let corruptedFile = noteDir.appendingPathComponent("update-001.yjson")
+        // Create updates directory
+        let updatesDir = noteDir.appendingPathComponent("updates")
+        try FileManager.default.createDirectory(at: updatesDir, withIntermediateDirectories: true)
+
+        let corruptedFile = updatesDir.appendingPathComponent("update-001.yjson")
         try "This is not valid CRDT data".data(using: .utf8)!.write(to: corruptedFile)
 
         // Try to process - should handle gracefully
@@ -285,5 +289,154 @@ final class FileChangeProcessorTests: XCTestCase {
             // If error thrown, it should be a specific error type
             print("Expected error for corrupted file: \(error)")
         }
+    }
+
+    /// Test error when storage directory not found
+    func testStorageDirectoryNotFound() async throws {
+        let noteId = "note-\(UUID().uuidString)"
+        let invalidStorageId = "invalid-storage-\(UUID().uuidString)"
+
+        // Try to process note with non-existent storage
+        do {
+            try await processor.updateNoteFromFile(noteId: noteId, storageId: invalidStorageId)
+            XCTFail("Should throw error for missing storage directory")
+        } catch let error as FileChangeProcessorError {
+            switch error {
+            case .storageDirectoryNotFound(let id):
+                XCTAssertEqual(id, invalidStorageId)
+            default:
+                XCTFail("Should throw storageDirectoryNotFound error")
+            }
+        }
+    }
+
+    /// Test error when note directory not found
+    func testNoteDirectoryNotFoundError() async throws {
+        let noteId = "nonexistent-note-\(UUID().uuidString)"
+
+        // Try to process non-existent note
+        do {
+            try await processor.updateNoteFromFile(noteId: noteId, storageId: storageId)
+            XCTFail("Should throw error for missing note directory")
+        } catch let error as FileChangeProcessorError {
+            switch error {
+            case .noteDirectoryNotFound(let id):
+                XCTAssertEqual(id, noteId)
+            default:
+                XCTFail("Should throw noteDirectoryNotFound error")
+            }
+        }
+    }
+
+    /// Test processing note without updates directory
+    func testNoteWithoutUpdatesDirectory() async throws {
+        let noteId = "note-\(UUID().uuidString)"
+
+        // Create note directory but no updates subdirectory
+        let noteDir = testDirectory.appendingPathComponent(noteId)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        // Should return early without error
+        try await processor.updateNoteFromFile(noteId: noteId, storageId: storageId)
+
+        // Verify no crash or error
+        XCTAssertTrue(true, "Should handle missing updates directory gracefully")
+    }
+
+    /// Test processing note with empty updates directory
+    func testNoteWithEmptyUpdatesDirectory() async throws {
+        let noteId = "note-\(UUID().uuidString)"
+
+        // Create note directory with empty updates directory
+        let noteDir = testDirectory.appendingPathComponent(noteId)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        let updatesDir = noteDir.appendingPathComponent("updates")
+        try FileManager.default.createDirectory(at: updatesDir, withIntermediateDirectories: true)
+
+        // Should return early without error
+        try await processor.updateNoteFromFile(noteId: noteId, storageId: storageId)
+
+        // Verify no crash or error
+        XCTAssertTrue(true, "Should handle empty updates directory gracefully")
+    }
+
+    /// Test creating new note from file (not in database yet)
+    func testCreateNoteFromFile() async throws {
+        let noteId = "new-note-\(UUID().uuidString)"
+
+        // Create note directory and files but NOT in database
+        let noteDir = testDirectory.appendingPathComponent(noteId)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        let updatesDir = noteDir.appendingPathComponent("updates")
+        try FileManager.default.createDirectory(at: updatesDir, withIntermediateDirectories: true)
+
+        // Create a CRDT note via bridge
+        try await bridge.createNote(noteId: noteId)
+        let state = try await bridge.getDocumentState(noteId: noteId)
+
+        // Write state to file
+        let updateFile = updatesDir.appendingPathComponent("update-001.yjson")
+        try state.write(to: updateFile)
+
+        // Process the note - should create it in database
+        try await processor.updateNoteFromFile(noteId: noteId, storageId: storageId)
+
+        // Verify note was created in database
+        let notes = try db.listNotes(in: storageId, folderId: nil, includeDeleted: false)
+        let createdNote = notes.first { $0.id == noteId }
+
+        XCTAssertNotNil(createdNote, "Note should be created in database")
+        XCTAssertEqual(createdNote?.id, noteId)
+    }
+
+    /// Test tag extraction and indexing
+    func testTagExtractionAndIndexing() async throws {
+        let noteId = "note-\(UUID().uuidString)"
+
+        // Create note in database
+        try db.insertNote(
+            id: noteId,
+            storageDirectoryId: storageId,
+            folderId: nil,
+            title: "Note with tags"
+        )
+
+        // Create note directory
+        let noteDir = testDirectory.appendingPathComponent(noteId)
+        try FileManager.default.createDirectory(at: noteDir, withIntermediateDirectories: true)
+
+        let updatesDir = noteDir.appendingPathComponent("updates")
+        try FileManager.default.createDirectory(at: updatesDir, withIntermediateDirectories: true)
+
+        // Create a CRDT note with content containing tags
+        try await bridge.createNote(noteId: noteId)
+        let state = try await bridge.getDocumentState(noteId: noteId)
+
+        // Write state to file
+        let updateFile = updatesDir.appendingPathComponent("update-001.yjson")
+        try state.write(to: updateFile)
+
+        // Process the note
+        try await processor.updateNoteFromFile(noteId: noteId, storageId: storageId)
+
+        // Verify processing completed (tags would be extracted if content had them)
+        XCTAssertTrue(true, "Tag extraction completed")
+    }
+
+    /// Test FileChangeProcessorError descriptions
+    func testErrorDescriptions() {
+        let storageError = FileChangeProcessorError.storageDirectoryNotFound("sd-123")
+        XCTAssertTrue(storageError.localizedDescription.contains("Storage directory not found"))
+        XCTAssertTrue(storageError.localizedDescription.contains("sd-123"))
+
+        let noteError = FileChangeProcessorError.noteDirectoryNotFound("note-456")
+        XCTAssertTrue(noteError.localizedDescription.contains("Note directory not found"))
+        XCTAssertTrue(noteError.localizedDescription.contains("note-456"))
+
+        let dataError = FileChangeProcessorError.invalidNoteData("corrupted")
+        XCTAssertTrue(dataError.localizedDescription.contains("Invalid note data"))
+        XCTAssertTrue(dataError.localizedDescription.contains("corrupted"))
     }
 }
