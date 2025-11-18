@@ -95,13 +95,13 @@ public class ActivityLogger {
             guard let newData = newText.data(using: .utf8) else {
                 throw ActivityLoggerError.encodingFailed
             }
-            try fileIO.writeFile(at: activityLogPath, data: newData)
+            try fileIO.writeFile(data: newData, to: activityLogPath)
         } else {
             // File doesn't exist, create it
             guard let newData = newLine.data(using: .utf8) else {
                 throw ActivityLoggerError.encodingFailed
             }
-            try fileIO.writeFile(at: activityLogPath, data: newData)
+            try fileIO.writeFile(data: newData, to: activityLogPath)
         }
     }
 
@@ -137,7 +137,7 @@ public class ActivityLogger {
             throw ActivityLoggerError.encodingFailed
         }
 
-        try fileIO.writeFile(at: activityLogPath, data: newData)
+        try fileIO.writeFile(data: newData, to: activityLogPath)
     }
 
     /// Read all activity from all instances in this storage directory

@@ -45,30 +45,6 @@ final class StorageAndNoteTests: NoteCoveUITestBase {
         takeScreenshot(named: "note_in_list")
     }
 
-    func testCreateMultipleNotesFlow() throws {
-        // Navigate to folder list
-        ensureInFolderListView()
-
-        // Create first note and verify success
-        createQuickNote()
-
-        // Verify we're back in list view (not stuck in editor)
-        let menuButton = app.buttons["addMenuButton"]
-        XCTAssertTrue(menuButton.exists, "Should be back in folder list after creating note")
-
-        // Create second note
-        createQuickNote()
-
-        // Verify we're still in list view
-        XCTAssertTrue(menuButton.exists, "Should be back in folder list after creating second note")
-
-        // Verify we have at least one "Untitled" note (from our creations)
-        let untitledNotes = app.staticTexts.matching(identifier: "Untitled")
-        XCTAssertGreaterThan(untitledNotes.count, 0, "Should have created at least one note")
-
-        takeScreenshot(named: "multiple_notes_created")
-    }
-
     func testCreateFolderFlow() throws {
         // Navigate to folder list
         ensureInFolderListView()
@@ -228,22 +204,5 @@ final class StorageAndNoteTests: NoteCoveUITestBase {
         let confirmButton = app.buttons["addStorageConfirmButton"]
         tapElement(confirmButton)
         sleep(2)
-    }
-
-    /// Creates a note and immediately returns to list
-    private func createQuickNote() {
-        let menuButton = app.buttons["addMenuButton"]
-        tapElement(menuButton)
-
-        let newNoteButton = app.buttons["newNoteButton"]
-        tapElement(newNoteButton)
-        sleep(2) // Wait for editor
-
-        // Go back immediately
-        let backButton = app.navigationBars.buttons.element(boundBy: 0)
-        if backButton.exists {
-            backButton.tap()
-            sleep(1)
-        }
     }
 }

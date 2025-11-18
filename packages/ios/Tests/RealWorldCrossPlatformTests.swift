@@ -17,10 +17,10 @@ import XCTest
 
 @MainActor
 final class RealWorldCrossPlatformTests: XCTestCase {
-    var database: DatabaseManager!
-    var fileChangeProcessor: FileChangeProcessor!
-    var bridge: CRDTBridge!
-    var fileIO: FileIOManager!
+    nonisolated(unsafe) var database: DatabaseManager!
+    nonisolated(unsafe) var fileChangeProcessor: FileChangeProcessor!
+    nonisolated(unsafe) var bridge: CRDTBridge!
+    nonisolated(unsafe) var fileIO: FileIOManager!
     var storageId: String!
     var sharedSDPath: String!
     var instanceId: String!
@@ -59,7 +59,7 @@ final class RealWorldCrossPlatformTests: XCTestCase {
 
         // Create file change processor (this is what the real app uses!)
         fileChangeProcessor = FileChangeProcessor(
-            database: database,
+            db: database,
             bridge: bridge,
             fileIO: fileIO
         )

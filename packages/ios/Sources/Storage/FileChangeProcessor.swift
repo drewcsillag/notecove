@@ -15,16 +15,16 @@ import Foundation
 /// ```
 @MainActor
 public class FileChangeProcessor {
-    private let db: DatabaseManager
-    private let bridge: CRDTBridge
-    private let fileIO: FileIOManager
+    nonisolated(unsafe) private let db: DatabaseManager
+    nonisolated(unsafe) private let bridge: CRDTBridge
+    nonisolated(unsafe) private let fileIO: FileIOManager
 
     /// Creates a new file change processor
     /// - Parameters:
     ///   - db: Database manager for storing metadata
     ///   - bridge: CRDT bridge for loading and parsing note documents
     ///   - fileIO: File IO manager for reading files
-    public init(db: DatabaseManager, bridge: CRDTBridge, fileIO: FileIOManager) {
+    nonisolated public init(db: DatabaseManager, bridge: CRDTBridge, fileIO: FileIOManager) {
         self.db = db
         self.bridge = bridge
         self.fileIO = fileIO

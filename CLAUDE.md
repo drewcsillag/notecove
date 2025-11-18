@@ -198,3 +198,5 @@ This installs:
 Without the pre-push hook, you can have database changes committed locally but stale JSONL pushed to remote, causing multi-workspace divergence. The hooks guarantee DB ↔ JSONL consistency.
 
 **Note:** Hooks are embedded in the bd binary and work for all bd users (not just source repo users).
+
+- NEVER run CI tests unless you're ready to commit. You should run more targeted tests otherwise. More targeted could be all ios depending on the nature of the change you made, but ideally it should be narrowed to the feature you're working on.

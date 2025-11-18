@@ -703,6 +703,7 @@ xcodebuild test \
 Cross-platform e2e tests verify that iOS and Desktop can share a storage directory and sync changes bidirectionally.
 
 **Source Files**:
+
 - `packages/ios/scripts/test-cross-platform.sh` - Coordinator script
 - `packages/ios/Tests/CrossPlatformTests.swift` - iOS test suite
 - `packages/desktop/e2e/cross-platform-setup.spec.ts` - Desktop creates shared note
@@ -716,6 +717,7 @@ cd packages/ios
 ```
 
 The script will:
+
 1. Find and boot the iOS simulator
 2. Generate the Xcode project
 3. Create a shared directory at `/tmp/notecove-cross-platform-test`
@@ -726,6 +728,7 @@ The script will:
 8. Clean up the shared directory
 
 **How it Works**:
+
 - Both Desktop and iOS tests use a fixed shared directory: `/tmp/notecove-cross-platform-test`
 - Desktop tests read the path from the `NOTECOVE_CROSS_PLATFORM_SD` environment variable (set by the script)
 - iOS tests use the hardcoded path (iOS test sandboxes can access `/tmp`)
@@ -733,6 +736,7 @@ The script will:
 - The tests can even run standalone (they'll create the directory if it doesn't exist)
 
 **What's Tested**:
+
 - ✅ Desktop creates note → iOS can read it with correct title
 - ✅ iOS can edit the note → Desktop sees the changes
 - ✅ iOS can create new notes → Desktop can see them
@@ -746,12 +750,14 @@ The script will:
 To manually test cross-platform sync outside of the automated tests, you need to use the iOS app's Documents directory (since regular apps can't access `/tmp` like XCTest can).
 
 **Quick Setup (Recommended):**
+
 ```bash
 cd packages/ios
 ./scripts/setup-manual-test.sh
 ```
 
 This will:
+
 - Find your booted simulator
 - Locate the NoteCove app container
 - Create a shared directory
@@ -760,6 +766,7 @@ This will:
 **Or manually:**
 
 1. **Find the iOS app's Documents directory:**
+
    ```bash
    # Boot simulator and run NoteCove app first
    SIMULATOR_ID=$(xcrun simctl list devices booted | grep "iPhone" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
@@ -796,6 +803,7 @@ This will:
    - Check that CRDT updates are properly merged (no conflicts)
 
 6. **Inspect the File Structure:**
+
    ```bash
    # Browse in Finder
    open "$SHARED_DIR"

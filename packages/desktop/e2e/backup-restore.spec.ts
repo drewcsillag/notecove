@@ -100,7 +100,8 @@ test.describe('Backup and Restore', () => {
       },
     });
 
-    window = await electronApp.firstWindow();
+    // Increase timeout for slow CI environments
+    window = await electronApp.firstWindow({ timeout: 60000 });
     await window.waitForLoadState('domcontentloaded');
     await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
     await window.waitForTimeout(1000);

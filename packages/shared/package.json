@@ -8,29 +8,29 @@
   "types": "./dist/esm/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/esm/index.d.ts",
       "require": "./dist/cjs/index.js",
-      "import": "./dist/esm/index.js",
-      "types": "./dist/esm/index.d.ts"
+      "import": "./dist/esm/index.js"
     },
     "./storage/versioning/sd-version": {
+      "types": "./dist/esm/storage/versioning/sd-version.d.ts",
       "require": "./dist/cjs/storage/versioning/sd-version.js",
-      "import": "./dist/esm/storage/versioning/sd-version.js",
-      "types": "./dist/esm/storage/versioning/sd-version.d.ts"
+      "import": "./dist/esm/storage/versioning/sd-version.js"
     },
     "./storage/versioning/types": {
+      "types": "./dist/esm/storage/versioning/types.d.ts",
       "require": "./dist/cjs/storage/versioning/types.js",
-      "import": "./dist/esm/storage/versioning/types.js",
-      "types": "./dist/esm/storage/versioning/types.d.ts"
+      "import": "./dist/esm/storage/versioning/types.js"
     },
     "./storage/update-manager": {
+      "types": "./dist/esm/storage/update-manager.d.ts",
       "require": "./dist/cjs/storage/update-manager.js",
-      "import": "./dist/esm/storage/update-manager.js",
-      "types": "./dist/esm/storage/update-manager.d.ts"
+      "import": "./dist/esm/storage/update-manager.js"
     },
     "./history": {
+      "types": "./dist/esm/history/index.d.ts",
       "require": "./dist/cjs/history/index.js",
-      "import": "./dist/esm/history/index.js",
-      "types": "./dist/esm/history/index.d.ts"
+      "import": "./dist/esm/history/index.js"
     }
   },
   "scripts": {

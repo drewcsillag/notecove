@@ -46,6 +46,10 @@ const checks = [
     cmd: 'cd packages/desktop && npx @electron/rebuild -f -w better-sqlite3',
   },
   { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
+  {
+    name: 'Cross-Platform Tests',
+    cmd: 'cd packages/ios && ./scripts/test-cross-platform.sh',
+  },
 ];
 
 console.log(

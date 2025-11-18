@@ -9,17 +9,15 @@ class NoteCoveUITestBase: XCTestCase {
         continueAfterFailure = false
 
         app = XCUIApplication()
-        app.launchArguments = ["--uitesting"]
 
-        // Reset app state for consistent testing
-        app.launchEnvironment = [
-            "UITEST_RESET_STATE": "1"
-        ]
+        // Enable UI testing mode - app will reset state on launch
+        app.launchArguments = ["-UITesting"]
 
         app.launch()
     }
 
     override func tearDownWithError() throws {
+        // Terminate app to ensure clean state for next test
         app.terminate()
         app = nil
     }
