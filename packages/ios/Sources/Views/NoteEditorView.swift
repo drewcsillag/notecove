@@ -21,12 +21,19 @@ struct NoteEditorView: View {
         self.noteId = noteId
         self.storageId = storageId
 
+        // Get or create ActivityLogger for this storage directory
+        let activityLogger = try? viewModel.getActivityLogger(for: storageId)
+        if activityLogger == nil {
+            print("[NoteEditorView] Warning: Could not create ActivityLogger for storage: \(storageId)")
+        }
+
         // Initialize editor view model
         _editorViewModel = StateObject(wrappedValue: EditorViewModel(
             noteId: noteId,
             storageId: storageId,
             bridge: viewModel.bridge,
-            database: viewModel.database
+            database: viewModel.database,
+            activityLogger: activityLogger
         ))
         print("[NoteEditorView] EditorViewModel created")
     }

@@ -71,7 +71,14 @@
       "Bash(sqlite3:*)",
       "Bash(pnpm exec turbo:*)",
       "Bash(pnpm lint:*)",
-      "Bash(pnpm tsc:*)"
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm test:*)",
+      "Bash(prettier --write:*)",
+      "Bash(pnpm exec prettier:*)",
+      "Bash(while:*)",
+      "Bash(/dev/null)",
+      "Bash(do sleep 10)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

@@ -190,11 +190,18 @@ final class RealWorldCrossPlatformTests: XCTestCase {
             title: title
         )
 
-        // THIS IS THE BUG: iOS should write to activity log, but doesn't!
-        // Desktop scans for activity logs to know which notes to process
+        // Record activity (simulating what EditorViewModel does)
+        let activityDir = "\(sharedSDPath!)/.activity"
+        let activityLogger = ActivityLogger(
+            fileIO: fileIO,
+            activityDir: activityDir,
+            instanceId: instanceId
+        )
+        try activityLogger.initialize()
+        try activityLogger.recordNoteActivity(noteId: iosNoteId, sequenceNumber: 0)
 
         // Check if iOS wrote an activity log
-        let activityDir = "\(sharedSDPath!)/notes/.activity"
+        // Activity logs are at <sdPath>/.activity/, not <sdPath>/notes/.activity/
         let activityLog = "\(activityDir)/\(instanceId!).log"
 
         let activityLogExists = fileIO.fileExists(at: activityLog)

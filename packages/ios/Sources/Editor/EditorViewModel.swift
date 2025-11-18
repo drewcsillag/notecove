@@ -26,18 +26,20 @@ class EditorViewModel: ObservableObject {
     private let fileIO = FileIOManager()
     private let sdManager = StorageDirectoryManager()
     private let updateFileManager = UpdateFileManager()
+    private let activityLogger: ActivityLogger?
 
     // Debounce timer for tag extraction
     private var tagExtractionTask: Task<Void, Never>?
     private let tagExtractionDelay: TimeInterval = 1.5 // Wait 1.5 seconds after last keystroke
 
-    init(noteId: String, storageId: String, bridge: CRDTBridge, database: DatabaseManager) {
+    init(noteId: String, storageId: String, bridge: CRDTBridge, database: DatabaseManager, activityLogger: ActivityLogger? = nil) {
         print("[EditorViewModel] Initializing for note: \(noteId)")
         self.noteId = noteId
         self.storageId = storageId
         self.bridge = bridge
         self.database = database
-        print("[EditorViewModel] Initialized, isLoading=\(isLoading), editorReady=\(editorReady)")
+        self.activityLogger = activityLogger
+        print("[EditorViewModel] Initialized, isLoading=\(isLoading), editorReady=\(editorReady), activityLogger=\(activityLogger != nil ? "present" : "nil")")
     }
 
     deinit {
@@ -157,6 +159,17 @@ class EditorViewModel: ObservableObject {
             // Write the update file
             try fileIO.atomicWrite(data: updateData, to: filePath)
             print("[EditorViewModel] Saved update to: \(filename)")
+
+            // Record activity for cross-platform sync
+            if let activityLogger = activityLogger {
+                // Extract sequence number from filename
+                if let metadata = updateFileManager.parseUpdateFilename(filename) {
+                    try activityLogger.recordNoteActivity(noteId: noteId, sequenceNumber: metadata.sequence)
+                    print("[EditorViewModel] Recorded activity: \(noteId) sequence \(metadata.sequence)")
+                } else {
+                    print("[EditorViewModel] Warning: Could not parse filename for activity logging: \(filename)")
+                }
+            }
 
             // Get updated state for title extraction
             let state = try bridge.getDocumentState(noteId: noteId)

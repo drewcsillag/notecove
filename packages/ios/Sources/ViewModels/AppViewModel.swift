@@ -23,6 +23,10 @@ public class AppViewModel: ObservableObject {
     public let coordinator: StorageCoordinator
     public let bridge: CRDTBridge
 
+    // Activity logging (one ActivityLogger per storage directory)
+    private var activityLoggers: [String: ActivityLogger] = [:]
+    private let fileIO = FileIOManager()
+
     /// Initialize with an existing database, or create a new one
     public init(database: DatabaseManager? = nil) throws {
         // Initialize database (in-memory for tests, on-disk for production)
@@ -101,5 +105,37 @@ public class AppViewModel: ObservableObject {
         // For now, just reload
 
         await loadStorageDirectories()
+    }
+
+    /// Get or create an ActivityLogger for a storage directory
+    /// - Parameter storageId: The storage directory ID
+    /// - Returns: ActivityLogger instance for this storage directory
+    public func getActivityLogger(for storageId: String) throws -> ActivityLogger {
+        // Return existing logger if we have one
+        if let logger = activityLoggers[storageId] {
+            return logger
+        }
+
+        // Get storage directory path
+        guard let storage = try database.getStorageDirectory(id: storageId) else {
+            throw NSError(domain: "AppViewModel", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "Storage directory not found: \(storageId)"])
+        }
+
+        // Create activity directory path
+        let activityDir = "\(storage.path)/.activity"
+
+        // Get instance ID (uppercase UUID for iOS)
+        let instanceId = InstanceIDManager.shared.getInstanceId()
+
+        // Create and initialize logger
+        let logger = ActivityLogger(fileIO: fileIO, activityDir: activityDir, instanceId: instanceId)
+        try logger.initialize()
+
+        // Cache for future use
+        activityLoggers[storageId] = logger
+
+        print("[AppViewModel] Created ActivityLogger for storage: \(storageId)")
+        return logger
     }
 }
