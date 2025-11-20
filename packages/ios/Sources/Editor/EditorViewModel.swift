@@ -99,7 +99,26 @@ class EditorViewModel: ObservableObject {
                 // Apply each update file in order
                 for filePath in updateFiles {
                     // listFiles returns full paths, use them directly
-                    let updateData = try fileIO.readFile(at: filePath)
+                    var updateData = try fileIO.readFile(at: filePath)
+
+                    // Strip flag byte if present (for cross-platform compatibility)
+                    // Update files use a flag byte protocol:
+                    // - First byte 0x00 = file still being written
+                    // - First byte 0x01 = file complete and ready
+                    // - Remaining bytes = actual CRDT data
+                    if updateData.count > 0 {
+                        let flagByte = updateData[0]
+                        if flagByte == 0x00 {
+                            print("[EditorViewModel] Warning: Update file incomplete: \(filePath)")
+                            continue // Skip incomplete files
+                        } else if flagByte == 0x01 {
+                            // Strip flag byte, keep CRDT data
+                            updateData = updateData.subdata(in: 1..<updateData.count)
+                        }
+                        // If flagByte is something else, assume it's raw Yjs data (old format)
+                        // and apply it as-is for backward compatibility
+                    }
+
                     try bridge.applyUpdate(noteId: noteId, updateData: updateData)
                 }
             } else {
@@ -156,8 +175,15 @@ class EditorViewModel: ObservableObject {
             let filename = updateFileManager.generateUpdateFilename(noteId: noteId)
             let filePath = "\(updatesDir)/\(filename)"
 
-            // Write the update file
-            try fileIO.atomicWrite(data: updateData, to: filePath)
+            // Prepend flag byte protocol for cross-platform compatibility
+            // Flag byte 0x01 indicates the file is complete and ready to read
+            // (0x00 would indicate file is still being written)
+            var flaggedUpdate = Data(count: 1 + updateData.count)
+            flaggedUpdate[0] = 0x01 // Ready flag
+            flaggedUpdate.replaceSubrange(1..<flaggedUpdate.count, with: updateData)
+
+            // Write the update file with flag byte
+            try fileIO.atomicWrite(data: flaggedUpdate, to: filePath)
             print("[EditorViewModel] Saved update to: \(filename)")
 
             // Record activity for cross-platform sync

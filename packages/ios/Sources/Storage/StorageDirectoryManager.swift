@@ -29,9 +29,16 @@ class StorageDirectoryManager {
     // MARK: - Storage Directory Paths
 
     /// Get the path for a specific storage directory
-    /// - Parameter id: The storage directory ID
+    /// - Parameter id: The storage directory ID or absolute path
     /// - Returns: Absolute path to the storage directory
     func getStorageDirectoryPath(id: String) -> String {
+        // If the id is already an absolute path, use it as-is
+        // This supports cross-platform sync where Desktop uses absolute paths
+        if id.hasPrefix("/") {
+            return id
+        }
+
+        // Otherwise, treat as a storage ID and create path in app sandbox
         let dataDir = getNoteCoveDataDirectory()
         return "\(dataDir)/\(id)"
     }
