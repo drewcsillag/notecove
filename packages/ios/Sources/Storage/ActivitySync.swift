@@ -14,6 +14,7 @@
 import Foundation
 
 /// Callbacks for activity sync operations
+@MainActor
 public protocol ActivitySyncDelegate: AnyObject {
     /// Reload a note from disk
     func reloadNote(noteId: String, storageId: String) async throws
@@ -82,36 +83,45 @@ public class ActivitySync {
     /// Sync from other instances' activity logs
     /// - Returns: Set of note IDs that were affected
     public func syncFromOtherInstances() async -> Set<String> {
+        print("[ActivitySync] ========== Starting sync from other instances ==========")
+        print("[ActivitySync] Activity directory: \(activityDir)")
+        print("[ActivitySync] Our instance ID: \(instanceId)")
+
         var affectedNotes = Set<String>()
 
         do {
             let files = try fileIO.listFiles(in: activityDir, matching: "*.log")
+            print("[ActivitySync] Found \(files.count) activity log files")
 
             for file in files {
                 let filename = URL(fileURLWithPath: file).lastPathComponent
                 guard filename.hasSuffix(".log") else { continue }
 
                 let otherInstanceId = filename.replacingOccurrences(of: ".log", with: "")
+                print("[ActivitySync] Processing log: \(filename)")
 
                 // Skip our own activity log
                 if otherInstanceId == instanceId {
+                    print("[ActivitySync] Skipping our own log")
                     continue
                 }
 
                 do {
                     let data = try fileIO.readFile(at: file)
                     guard let content = String(data: data, encoding: .utf8) else {
-                        print("[ActivitySync] Failed to decode log file: \(filename)")
+                        print("[ActivitySync] ❌ Failed to decode log file: \(filename)")
                         continue
                     }
 
                     let lines = content.components(separatedBy: "\n").filter { !$0.isEmpty }
+                    print("[ActivitySync] Found \(lines.count) entries in \(filename)")
 
                     if lines.isEmpty {
                         continue
                     }
 
                     let lastSeen = lastSeenSequences[otherInstanceId] ?? -1
+                    print("[ActivitySync] Last seen sequence for \(otherInstanceId): \(lastSeen)")
 
                     // Gap detection: check if oldest entry is newer than last seen
                     if let firstLine = lines.first {
@@ -131,6 +141,7 @@ public class ActivitySync {
                     }
 
                     // Process new entries (those with sequence > lastSeen)
+                    var newEntries = 0
                     for line in lines {
                         let parts = line.split(separator: "|", maxSplits: 1)
                         guard parts.count >= 2 else { continue }
@@ -144,10 +155,13 @@ public class ActivitySync {
                         }
 
                         if sequence > lastSeen {
+                            newEntries += 1
+                            print("[ActivitySync] New entry: \(noteId) | \(instanceSeq) (seq: \(sequence) > \(lastSeen))")
                             affectedNotes.insert(noteId)
 
                             // Launch parallel poll for this update (fire and forget)
                             if pendingSyncs[noteId] == nil {
+                                print("[ActivitySync] Launching poll for note: \(noteId)")
                                 let syncTask = Task {
                                     await pollAndReload(instanceSeq: instanceSeq, noteId: noteId)
                                 }
@@ -158,9 +172,13 @@ public class ActivitySync {
                                     await syncTask.value
                                     pendingSyncs.removeValue(forKey: noteId)
                                 }
+                            } else {
+                                print("[ActivitySync] Poll already running for note: \(noteId)")
                             }
                         }
                     }
+
+                    print("[ActivitySync] Processed \(newEntries) new entries from \(filename)")
 
                     updateWatermark(instanceId: otherInstanceId, lines: lines)
 
@@ -169,7 +187,12 @@ public class ActivitySync {
                 }
             }
         } catch {
-            print("[ActivitySync] Failed to sync from other instances: \(error)")
+            print("[ActivitySync] ❌ Failed to sync from other instances: \(error)")
+        }
+
+        print("[ActivitySync] ========== Sync complete: \(affectedNotes.count) affected notes ==========")
+        if !affectedNotes.isEmpty {
+            print("[ActivitySync] Affected notes: \(affectedNotes)")
         }
 
         return affectedNotes
@@ -190,26 +213,33 @@ public class ActivitySync {
     /// Poll for an update file and reload the note when it appears
     /// Uses exponential backoff to avoid hammering the filesystem
     private func pollAndReload(instanceSeq: String, noteId: String) async {
+        print("[ActivitySync] [Poll] Starting poll for note \(noteId) with instanceSeq \(instanceSeq)")
+
         let parts = instanceSeq.split(separator: "_")
         guard parts.count >= 2,
               let seqStr = parts.last,
               let _ = Int(seqStr) else {
+            print("[ActivitySync] [Poll] ❌ Invalid instanceSeq format: \(instanceSeq)")
             return
         }
 
         // Exponential backoff delays (ms)
         let delays: [UInt64] = [100, 200, 500, 1000, 2000, 5000, 10000]
 
-        for delay in delays {
+        for (attempt, delay) in delays.enumerated() {
+            print("[ActivitySync] [Poll] Attempt \(attempt + 1)/\(delays.count) for note \(noteId)")
             do {
                 // Try to reload the note - this will check file existence AND flag byte
                 try await delegate?.reloadNote(noteId: noteId, storageId: storageId)
+                print("[ActivitySync] [Poll] ✅ Successfully loaded note \(noteId)")
                 return // Success!
             } catch {
                 let errorMessage = error.localizedDescription
+                print("[ActivitySync] [Poll] Error loading note \(noteId): \(errorMessage)")
 
                 // Check if file doesn't exist yet
                 if errorMessage.contains("does not exist") || errorMessage.contains("not found") {
+                    print("[ActivitySync] [Poll] File not found yet, waiting \(delay)ms...")
                     // Wait and retry
                     try? await Task.sleep(nanoseconds: delay * 1_000_000)
                     continue
@@ -217,19 +247,20 @@ public class ActivitySync {
 
                 // Check if file is incomplete (still being written)
                 if errorMessage.contains("incomplete") || errorMessage.contains("still being written") {
+                    print("[ActivitySync] [Poll] File incomplete, waiting \(delay)ms...")
                     // Wait and retry - file sync is in progress
                     try? await Task.sleep(nanoseconds: delay * 1_000_000)
                     continue
                 }
 
                 // Other error (corrupted file, permissions, etc.) - give up
-                print("[ActivitySync] Failed to reload note \(noteId): \(error)")
+                print("[ActivitySync] [Poll] ❌ Unrecoverable error for note \(noteId): \(error)")
                 return
             }
         }
 
         // Timeout - log warning but don't fail
-        print("[ActivitySync] Timeout waiting for note \(noteId). File may sync later.")
+        print("[ActivitySync] [Poll] ⏱️ Timeout waiting for note \(noteId). File may sync later.")
     }
 
     /// Update our watermark for an instance

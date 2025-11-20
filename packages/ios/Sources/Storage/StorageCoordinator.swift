@@ -107,6 +107,28 @@ public class StorageCoordinator: ObservableObject {
         watchers[storageId] = watcher
 
         print("[StorageCoordinator] Started watching storage directory: \(storageId) at \(storageDir.path)")
+
+        // Perform initial sync from other instances' activity logs
+        // This catches any changes that happened before we started watching
+        print("[StorageCoordinator] ========================================")
+        print("[StorageCoordinator] PERFORMING INITIAL ACTIVITY SYNC")
+        print("[StorageCoordinator] Storage ID: \(storageId)")
+        print("[StorageCoordinator] Storage Path: \(storageDir.path)")
+        print("[StorageCoordinator] Activity Dir: \(activityDir)")
+        print("[StorageCoordinator] ========================================")
+
+        let affectedNotes = await activitySync.syncFromOtherInstances()
+
+        if !affectedNotes.isEmpty {
+            print("[StorageCoordinator] ✅ Initial sync affected \(affectedNotes.count) notes: \(affectedNotes)")
+            for noteId in affectedNotes {
+                recentlyUpdatedNotes.insert(noteId)
+            }
+        } else {
+            print("[StorageCoordinator] Initial sync found no new notes")
+        }
+
+        print("[StorageCoordinator] ========================================")
     }
 
     /// Stops watching a storage directory
@@ -206,6 +228,7 @@ public class StorageCoordinator: ObservableObject {
 
 // MARK: - ActivitySyncDelegate
 
+@MainActor
 extension StorageCoordinator: ActivitySyncDelegate {
     /// Reload a note from disk (called by ActivitySync)
     public func reloadNote(noteId: String, storageId: String) async throws {

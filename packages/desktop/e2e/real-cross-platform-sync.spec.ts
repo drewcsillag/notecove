@@ -299,26 +299,39 @@ test.describe('Real Cross-Platform Sync', () => {
     //
     // SETUP: Launch iOS app with shared SD
     //
-    console.log('[Test] Launching iOS app...');
+    console.log('[Test] Configuring iOS app...');
 
-    // The iOS app will use its Documents directory, but we need to configure it
-    // to use our shared SD. We'll do this by:
-    // 1. Launch the app
-    // 2. Use file system to check its Documents path
-    // 3. Create a symlink or configure it to use SHARED_SD_PATH
-
-    // For now, let's use the iOS app's Documents directory as the shared location
     const iosDocumentsPath = await getIOSDocumentsPath();
     console.log('[Test] iOS Documents path:', iosDocumentsPath);
 
-    // Actually, let's create a storage directory in iOS Documents that points to our test location
-    const iosTestSD = path.join(iosDocumentsPath, 'TestSD');
-    await fs.rm(iosTestSD, { recursive: true, force: true });
-    await fs.symlink(SHARED_SD_PATH, iosTestSD, 'dir');
+    // Ensure iOS database exists
+    const iosDbPath = path.join(iosDocumentsPath, 'notecove.sqlite');
+    const dbExists = await fs
+      .access(iosDbPath)
+      .then(() => true)
+      .catch(() => false);
 
-    // Launch iOS app
+    if (!dbExists) {
+      // Launch iOS app once to create the database
+      console.log('[Test] Launching iOS app to create database...');
+      exec(`xcrun simctl launch ${iosSimulatorId} ${iosAppBundleId}`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      exec(`xcrun simctl terminate ${iosSimulatorId} ${iosAppBundleId}`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    // Add storage directory to iOS database
+    const sdId = 'test-sd-' + Date.now();
+    const now = new Date().toISOString();
+    console.log('[Test] Adding storage directory to iOS database...');
+    exec(
+      `sqlite3 "${iosDbPath}" "INSERT INTO storage_directories (id, name, path, created_at, modified_at) VALUES ('${sdId}', 'Test SD', '${SHARED_SD_PATH}', '${now}', '${now}')"`
+    );
+
+    // Launch iOS app - it will now automatically start watching the storage directory
+    console.log('[Test] Launching iOS app...');
     exec(`xcrun simctl launch ${iosSimulatorId} ${iosAppBundleId}`);
-    await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait for app to launch
+    await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait for app to fully launch and start watchers
 
     console.log('[Test] Both apps launched and configured');
 
@@ -377,7 +390,16 @@ test.describe('Real Cross-Platform Sync', () => {
       .catch(() => false);
     expect(noteDirExists).toBe(true);
 
-    console.log('[Test] ✅ Desktop note exists on disk, iOS can discover it');
+    console.log('[Test] Desktop note exists on disk');
+
+    // Wait for iOS to discover Desktop's note via ActivitySync
+    console.log('[Test] Waiting for iOS to discover Desktop note...');
+    await waitFor(async () => {
+      return await checkIOSNoteExists(desktopNoteId);
+    }, 15000);
+
+    expect(await checkIOSNoteExists(desktopNoteId)).toBe(true);
+    console.log('[Test] ✅ iOS discovered Desktop note via ActivitySync');
 
     //
     // TEST 2: iOS creates note → Desktop discovers it
@@ -413,7 +435,11 @@ test.describe('Real Cross-Platform Sync', () => {
       .locator('[data-testid^="note-item-"]')
       .filter({ hasText: 'from ios' });
     await expect(iosNoteInDesktop).toBeVisible({ timeout: 5000 });
-    console.log('[Test] ✅ Desktop discovered iOS note via file watching');
+    console.log('[Test] ✅ Desktop discovered iOS note in UI');
+
+    // Verify Desktop database has the note
+    expect(await checkDesktopNoteExists(iosNoteId, testDbPath)).toBe(true);
+    console.log('[Test] ✅ Desktop database contains iOS note');
 
     //
     // TEST 3: Desktop edits iOS note → verify activity log updated
@@ -548,6 +574,45 @@ test.describe('Real Cross-Platform Sync', () => {
       `xcrun simctl get_app_container ${iosSimulatorId} ${iosAppBundleId} data`
     ).trim();
     return path.join(containerPath, 'Documents');
+  }
+
+  /**
+   * Query iOS database to check if a note exists
+   * Returns true if note is found, false otherwise
+   */
+  async function checkIOSNoteExists(noteId: string): Promise<boolean> {
+    const iosDocumentsPath = await getIOSDocumentsPath();
+    const iosDbPath = path.join(iosDocumentsPath, 'notecove.sqlite');
+
+    try {
+      // Use sqlite3 command line to query the database
+      const result = exec(
+        `sqlite3 "${iosDbPath}" "SELECT id FROM notes WHERE id = '${noteId}'"`
+      ).trim();
+
+      return result === noteId;
+    } catch (error) {
+      console.error('[Test] Error querying iOS database:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Query Desktop database to check if a note exists
+   * Returns true if note is found, false otherwise
+   */
+  async function checkDesktopNoteExists(noteId: string, dbPath: string): Promise<boolean> {
+    try {
+      // Use sqlite3 command line to query the database
+      const result = exec(
+        `sqlite3 "${dbPath}" "SELECT id FROM notes WHERE id = '${noteId}'"`
+      ).trim();
+
+      return result === noteId;
+    } catch (error) {
+      console.error('[Test] Error querying Desktop database:', error);
+      return false;
+    }
   }
 
   /**
