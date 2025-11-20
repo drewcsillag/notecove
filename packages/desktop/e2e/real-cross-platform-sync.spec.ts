@@ -200,12 +200,20 @@ test.describe('Real Cross-Platform Sync', () => {
       (window as any).testEvents = {
         fileWatcher: [] as any[],
         gracePeriod: [] as any[],
+        activitySync: [] as any[],
+        watcherDebug: [] as any[],
       };
       window.electronAPI.testing.onFileWatcherEvent((data: any) => {
         (window as any).testEvents.fileWatcher.push(data);
       });
       window.electronAPI.testing.onGracePeriodEnded((data: any) => {
         (window as any).testEvents.gracePeriod.push(data);
+      });
+      window.electronAPI.testing.onActivitySyncComplete((data: any) => {
+        (window as any).testEvents.activitySync.push(data);
+      });
+      window.electronAPI.testing.onActivityWatcherDebug((data: any) => {
+        (window as any).testEvents.watcherDebug.push(data);
       });
     });
 
@@ -496,8 +504,9 @@ test.describe('Real Cross-Platform Sync', () => {
     doc.destroy();
 
     // Write update file
-    const timestamp = Date.now();
-    const updateFilename = `${iosInstanceId}_${noteId}_${timestamp}-0.yjson`;
+    // NOTE: Filename format must match what CRDT manager expects: ${instanceId}_${sequenceNum}.yjson
+    // The noteId is already in the directory path (notes/${noteId}/updates/)
+    const updateFilename = `${iosInstanceId}_0.yjson`;
     await fs.writeFile(path.join(updatesDir, updateFilename), Buffer.from(update));
 
     // Write activity log

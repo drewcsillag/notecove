@@ -72,7 +72,7 @@ export class ActivitySync {
 
           if (lines.length === 0) continue;
 
-          const lastSeen = this.lastSeenSequences.get(otherInstanceId) ?? 0;
+          const lastSeen = this.lastSeenSequences.get(otherInstanceId) ?? -1;
 
           // Parse first line to check for sequence gap
           const firstLine = lines[0];

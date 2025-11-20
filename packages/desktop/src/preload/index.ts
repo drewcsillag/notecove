@@ -1021,5 +1021,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('test:grace-period-ended', listener);
       };
     },
+    onActivitySyncComplete: (
+      callback: (data: { sdId: string; noteIds: string[] }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { sdId: string; noteIds: string[] }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('test:activity-sync-complete', listener);
+      return () => {
+        ipcRenderer.removeListener('test:activity-sync-complete', listener);
+      };
+    },
+    onActivityWatcherDebug: (
+      callback: (data: { sdId: string; filename: string; reason: string; instanceId?: string }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { sdId: string; filename: string; reason: string; instanceId?: string }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('test:activity-watcher-debug', listener);
+      return () => {
+        ipcRenderer.removeListener('test:activity-watcher-debug', listener);
+      };
+    },
   },
 });

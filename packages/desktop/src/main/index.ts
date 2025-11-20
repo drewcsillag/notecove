@@ -432,11 +432,31 @@ async function setupSDWatchers(
   // Create ActivitySync for this SD
   const activitySyncCallbacks: ActivitySyncCallbacks = {
     reloadNote: async (noteId: string, sdIdFromSync: string) => {
+      // Debug: broadcast that we're attempting to reload
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('test:activity-watcher-debug', {
+          sdId,
+          filename: 'reloadNote',
+          reason: 'reload-attempt',
+          noteId,
+        });
+      }
+
       try {
         const existingNote = await db.getNote(noteId);
 
         if (!existingNote) {
           // Note created in another instance
+          // Debug: broadcast that note doesn't exist
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('test:activity-watcher-debug', {
+              sdId,
+              filename: 'reloadNote',
+              reason: 'note-not-exists',
+              noteId,
+            });
+          }
+
           await crdtManager.loadNote(noteId, sdIdFromSync);
 
           // Extract metadata and insert into database
@@ -444,6 +464,15 @@ async function setupSDWatchers(
           const doc = crdtManager.getDocument(noteId);
           if (!doc) {
             console.error(`[ActivitySync] Failed to get document for note ${noteId}`);
+            // Debug: broadcast load failure
+            for (const window of BrowserWindow.getAllWindows()) {
+              window.webContents.send('test:activity-watcher-debug', {
+                sdId,
+                filename: 'reloadNote',
+                reason: 'doc-load-failed',
+                noteId,
+              });
+            }
             return;
           }
 
@@ -453,15 +482,38 @@ async function setupSDWatchers(
           // Extract text content for caching
           const content = doc.getXmlFragment('content');
 
+          // Debug: broadcast content length
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('test:activity-watcher-debug', {
+              sdId,
+              filename: 'reloadNote',
+              reason: 'content-length',
+              noteId,
+              contentLength: content.length,
+            });
+          }
+
           // Skip empty notes to prevent importing blank/incomplete notes
           // This prevents spurious blank notes appearing on startup
+          //
+          // IMPORTANT: Throw an error instead of returning, so pollAndReload
+          // can retry with exponential backoff
           if (content.length === 0) {
             console.log(
-              `[ActivitySync] Skipping empty note ${noteId} - no content in CRDT document`
+              `[ActivitySync] Note ${noteId} has no content - file may be incomplete, will retry`
             );
+            // Debug: broadcast empty note
+            for (const window of BrowserWindow.getAllWindows()) {
+              window.webContents.send('test:activity-watcher-debug', {
+                sdId,
+                filename: 'reloadNote',
+                reason: 'empty-note-retrying',
+                noteId,
+              });
+            }
             // Unload the note since we're not importing it
             await crdtManager.unloadNote(noteId);
-            return;
+            throw new Error('Note is incomplete - content is empty');
           }
 
           let contentText = '';
@@ -509,6 +561,17 @@ async function setupSDWatchers(
           // Broadcast to all windows
           for (const window of BrowserWindow.getAllWindows()) {
             window.webContents.send('note:created', { sdId: sdIdFromSync, noteId, folderId });
+          }
+
+          // Debug: broadcast successful import
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('test:activity-watcher-debug', {
+              sdId,
+              filename: 'reloadNote',
+              reason: 'note-imported',
+              noteId,
+              title: newNoteTitle,
+            });
           }
         } else {
           // Note exists, reload and update metadata
@@ -579,6 +642,18 @@ async function setupSDWatchers(
         }
       } catch (error) {
         console.error(`[ActivitySync] Error in reloadNote callback:`, error);
+        // Debug: broadcast error
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('test:activity-watcher-debug', {
+            sdId,
+            filename: 'reloadNote',
+            reason: 'reload-error',
+            noteId,
+            error: String(error),
+          });
+        }
+        // Re-throw the error so pollAndReload can handle it
+        throw error;
       }
     },
     getLoadedNotes: () => crdtManager.getLoadedNotes(),
@@ -664,25 +739,65 @@ async function setupSDWatchers(
         `[ActivityWatcher ${sdId}] Ignoring event during startup grace period:`,
         event.filename
       );
+      // Broadcast for test debugging
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('test:activity-watcher-debug', {
+          sdId,
+          filename: event.filename,
+          reason: 'grace-period',
+        });
+      }
       return;
     }
 
     // Ignore directory creation events and our own log file
     if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
       console.log(`[ActivityWatcher ${sdId}] Ignoring own log file or directory:`, event.filename);
+      // Broadcast for test debugging
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('test:activity-watcher-debug', {
+          sdId,
+          filename: event.filename,
+          reason: 'own-log',
+          instanceId,
+        });
+      }
       return;
     }
 
     // Only process .log files
     if (!event.filename.endsWith('.log')) {
       console.log(`[ActivityWatcher ${sdId}] Ignoring non-.log file:`, event.filename);
+      // Broadcast for test debugging
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('test:activity-watcher-debug', {
+          sdId,
+          filename: event.filename,
+          reason: 'not-log-file',
+        });
+      }
       return;
     }
 
     // Sync from other instances
     void (async () => {
       try {
+        // Broadcast that we're starting sync
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('test:activity-watcher-debug', {
+            sdId,
+            filename: event.filename,
+            reason: 'starting-sync',
+          });
+        }
+
+        console.log(`[ActivitySync ${sdId}] Starting sync from other instances...`);
         const affectedNotes = await activitySync.syncFromOtherInstances();
+        console.log(
+          `[ActivitySync ${sdId}] Sync complete, affected notes:`,
+          affectedNotes.size,
+          Array.from(affectedNotes)
+        );
 
         // Wait for all pending syncs to complete before broadcasting
         // This ensures CRDT state is up-to-date when renderers reload
@@ -696,15 +811,43 @@ async function setupSDWatchers(
         // Broadcast updates to all windows for affected notes
         if (affectedNotes.size > 0) {
           const noteIds = Array.from(affectedNotes);
+          console.log(`[ActivitySync ${sdId}] Broadcasting to ${BrowserWindow.getAllWindows().length} windows`);
           for (const window of BrowserWindow.getAllWindows()) {
             window.webContents.send('note:external-update', {
               operation: 'sync',
               noteIds,
             });
           }
+
+          // Broadcast to test instrumentation
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('test:activity-sync-complete', {
+              sdId,
+              noteIds,
+            });
+          }
+        } else {
+          console.log(`[ActivitySync ${sdId}] No affected notes to broadcast`);
+          // Broadcast that there were no affected notes
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('test:activity-watcher-debug', {
+              sdId,
+              filename: event.filename,
+              reason: 'no-affected-notes',
+            });
+          }
         }
       } catch (error) {
         console.error(`[ActivityWatcher ${sdId}] Failed to sync from other instances:`, error);
+        // Broadcast the error for debugging
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('test:activity-watcher-debug', {
+            sdId,
+            filename: event.filename,
+            reason: 'sync-error',
+            error: String(error),
+          });
+        }
       }
     })();
   });
