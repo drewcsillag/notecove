@@ -86,7 +86,11 @@
       "Bash(pkill:*)",
       "Bash(xcrun xcresulttool:*)",
       "Bash(python3:*)",
-      "Bash(nm:*)"
+      "Bash(nm:*)",
+      "Bash(pnpm --filter @notecove/desktop build:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(/tmp/diagnose-manual-test.sh:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,1145 @@
+
+> @notecove/desktop@0.1.0 dev /Users/drew/devel/notecove/packages/desktop
+> electron-vite dev
+
+vite v5.4.21 building SSR bundle for development...
+transforming...
+✓ 25 modules transformed.
+rendering chunks...
+dist-electron/main/index.js  245.19 kB
+✓ built in 198ms
+
+build the electron main process successfully
+
+-----
+
+vite v5.4.21 building SSR bundle for development...
+transforming...
+✓ 1 modules transformed.
+rendering chunks...
+dist-electron/preload/index.js  16.11 kB
+✓ built in 11ms
+
+build the electron preload files successfully
+
+-----
+
+dev server running for the electron renderer process at:
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+start electron app...
+
+[Telemetry] Local mode only - remote metrics disabled
+[Telemetry] OpenTelemetry SDK initialized
+[Telemetry] OpenTelemetry initialized
+[Database] Cleaning up orphaned data...
+[Database] No orphaned data found
+[Database] Orphaned data cleanup completed
+[CRDT Manager] Started periodic snapshot checker (every 10 minutes)
+[CRDT Manager] Started periodic packing job (every 5 minutes)
+[CRDT Manager] Started periodic GC job (interval: 1800000ms)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 126
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: The encoded data was not valid for encoding utf-8
+    at TextDecoder.decode (node:internal/encoding:447:16)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:45)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:9394:64)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3) {
+  code: 'ERR_ENCODING_INVALID_ENCODED_DATA'
+}
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: The encoded data was not valid for encoding utf-8
+    at TextDecoder.decode (node:internal/encoding:447:16)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:45)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:9394:64)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3) {
+  code: 'ERR_ENCODING_INVALID_ENCODED_DATA'
+}
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: The encoded data was not valid for encoding utf-8
+    at TextDecoder.decode (node:internal/encoding:447:16)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:45)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:9394:64)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3) {
+  code: 'ERR_ENCODING_INVALID_ENCODED_DATA'
+}
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: The encoded data was not valid for encoding utf-8
+    at TextDecoder.decode (node:internal/encoding:447:16)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:45)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:9394:64)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3) {
+  code: 'ERR_ENCODING_INVALID_ENCODED_DATA'
+}
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: The encoded data was not valid for encoding utf-8
+    at TextDecoder.decode (node:internal/encoding:447:16)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:45)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:9394:64)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3) {
+  code: 'ERR_ENCODING_INVALID_ENCODED_DATA'
+}
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 126
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 126
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[CRDT Manager] Failed to apply folder tree update, skipping: RangeError: Invalid typed array length: 119
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply folder tree update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadFolderTreeUpdates (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3359:24)
+    at async CRDTManagerImpl.loadFolderTree (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3348:5)
+    at async /Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:6455:5
+[Init] NoteMoveManager initialized
+[Init] DiagnosticsManager initialized
+[Init] BackupManager initialized
+[Main] Using existing SD: default
+[ensureDefaultNote] Found default note in SD: default (might have been moved)
+[Init] Setting up watchers for SD: default at /Users/drew/Library/Application Support/@notecove/desktop/storage
+[CRDT Manager] Registering activity logger for SD: default
+[CRDT Manager] Total activity loggers registered: 1
+[Init] Performing initial sync from other instances for SD: default
+[Init] Initial sync complete for SD: default, affected notes: 0
+[Init] Startup grace period ended for SD: default
+[Init] Watchers set up successfully for SD: default
+[Init] Running auto-cleanup for old deleted notes...
+[auto-cleanup] Starting auto-cleanup (threshold: 30 days, cutoff: 1761010897523 = 2025-10-21T01:41:37.523Z)...
+[auto-cleanup] Found 0 old notes to clean: []
+[auto-cleanup] No notes to clean up
+[Init] Checking for incomplete note moves...
+[NoteMoveManager] Checking for incomplete moves...
+[NoteMoveManager] No incomplete moves found for this instance
+[Init] Note move recovery completed
+[IPC] note:list called with: { sdId: 'default', folderId: undefined }
+[IPC] note:list returning 1 notes for sdId: default
+[IPC] note:list called with: { sdId: 'default', folderId: undefined }
+[IPC] note:list returning 1 notes for sdId: default
+[IPC] note:list called with: { sdId: 'default', folderId: undefined }
+[IPC] note:list returning 1 notes for sdId: default
+[CRDT Manager] No snapshots found, loading note default-note from 12 update files
+[CRDT Manager] Failed to apply update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadNote (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3192:26)
+    at async IPCHandlers.handleLoadNote (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:1072:5)
+    at async Session.<anonymous> (node:electron/js2c/browser_init:2:107107)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentDoc (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:8871:76)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+[CRDT Manager] Failed to apply update, skipping: Error: Unexpected end of array
+    at Object.create (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/error-8582d695.cjs:14:21)
+    at Object.<anonymous> (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:38:41)
+    at Module._compile (node:internal/modules/cjs/loader:1714:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1848:10)
+    at Module.load (node:internal/modules/cjs/loader:1448:32)
+    at Module._load (node:internal/modules/cjs/loader:1270:12)
+    at c._load (node:electron/js2c/node_init:2:17993)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.require (node:internal/modules/cjs/loader:1470:12)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] No snapshots found, loading note default-note from 12 update files
+[CRDT Manager] Failed to apply update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadNote (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3192:26)
+    at async IPCHandlers.handleLoadNote (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:1072:5)
+    at async Session.<anonymous> (node:electron/js2c/browser_init:2:107107)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentDoc (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:8871:76)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+[CRDT Manager] Failed to apply update, skipping: Error: Unexpected end of array
+    at Object.create (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/error-8582d695.cjs:14:21)
+    at Object.<anonymous> (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:38:41)
+    at Module._compile (node:internal/modules/cjs/loader:1714:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1848:10)
+    at Module.load (node:internal/modules/cjs/loader:1448:32)
+    at Module._load (node:internal/modules/cjs/loader:1270:12)
+    at c._load (node:electron/js2c/node_init:2:17993)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.require (node:internal/modules/cjs/loader:1470:12)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] No snapshots found, loading note default-note from 12 update files
+[CRDT Manager] Failed to apply update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadNote (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3192:26)
+    at async IPCHandlers.handleGetMetadata (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:1664:7)
+    at async Session.<anonymous> (node:electron/js2c/browser_init:2:107107)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentDoc (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:8871:76)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+[CRDT Manager] Failed to apply update, skipping: Error: Unexpected end of array
+    at Object.create (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/error-8582d695.cjs:14:21)
+    at Object.<anonymous> (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:38:41)
+    at Module._compile (node:internal/modules/cjs/loader:1714:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1848:10)
+    at Module.load (node:internal/modules/cjs/loader:1448:32)
+    at Module._load (node:internal/modules/cjs/loader:1270:12)
+    at c._load (node:electron/js2c/node_init:2:17993)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.require (node:internal/modules/cjs/loader:1470:12)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] No snapshots found, loading note default-note from 12 update files
+[CRDT Manager] Failed to apply update, skipping: TypeError: contentRefs[(info & binary__namespace.BITS5)] is not a function
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+    at Module.applyUpdate (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1798:58)
+    at CRDTManagerImpl.loadNote (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:3192:26)
+    at async IPCHandlers.handleLoadNote (/Users/drew/devel/notecove/packages/desktop/dist-electron/main/index.js:1072:5)
+    at async Session.<anonymous> (node:electron/js2c/browser_init:2:107107)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at Array.readContentDoc (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:8871:76)
+    at readItemContent (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:10224:87)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1469:13)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+[CRDT Manager] Failed to apply update, skipping: Error: Unexpected end of array
+    at Object.create (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/error-8582d695.cjs:14:21)
+    at Object.<anonymous> (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:38:41)
+    at Module._compile (node:internal/modules/cjs/loader:1714:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1848:10)
+    at Module.load (node:internal/modules/cjs/loader:1448:32)
+    at Module._load (node:internal/modules/cjs/loader:1270:12)
+    at c._load (node:electron/js2c/node_init:2:17993)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.require (node:internal/modules/cjs/loader:1470:12)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 115
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 100
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 97
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[CRDT Manager] Failed to apply update, skipping: RangeError: Invalid typed array length: 102
+    at new Uint8Array (<anonymous>)
+    at readUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:105:16)
+    at readVarUint8Array (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:120:38)
+    at Object._readVarStringNative (/Users/drew/devel/notecove/node_modules/.pnpm/lib0@0.2.114/node_modules/lib0/dist/decoding-2b136346.cjs:376:52)
+    at UpdateDecoderV1.readString (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:809:32)
+    at readClientsStructRefs (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1467:78)
+    at /Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1696:16
+    at transact (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:3447:14)
+    at readUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1689:3)
+    at applyUpdateV2 (/Users/drew/devel/notecove/node_modules/.pnpm/yjs@13.6.27/node_modules/yjs/dist/yjs.cjs:1784:3)
+[FolderTreeDoc] getAllFolders: folders.size = 5
+[FolderTreeDoc]   folder folder-1: {
+  id: 'folder-1',
+  name: 'Work',
+  parentId: null,
+  sdId: 'default',
+  order: 0,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-2: {
+  id: 'folder-2',
+  name: 'Projects',
+  parentId: 'folder-1',
+  sdId: 'default',
+  order: 0,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-3: {
+  id: 'folder-3',
+  name: 'Personal',
+  parentId: null,
+  sdId: 'default',
+  order: 1,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-4: {
+  id: 'folder-4',
+  name: 'Ideas',
+  parentId: 'folder-3',
+  sdId: 'default',
+  order: 0,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-5: {
+  id: 'folder-5',
+  name: 'Recipes',
+  parentId: 'folder-3',
+  sdId: 'default',
+  order: 1,
+  deleted: false
+}
+[FolderTreeDoc] getAllFolders returning 5 folders
+[FolderTreeDoc] getAllFolders: folders.size = 5
+[FolderTreeDoc]   folder folder-1: {
+  id: 'folder-1',
+  name: 'Work',
+  parentId: null,
+  sdId: 'default',
+  order: 0,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-2: {
+  id: 'folder-2',
+  name: 'Projects',
+  parentId: 'folder-1',
+  sdId: 'default',
+  order: 0,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-3: {
+  id: 'folder-3',
+  name: 'Personal',
+  parentId: null,
+  sdId: 'default',
+  order: 1,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-4: {
+  id: 'folder-4',
+  name: 'Ideas',
+  parentId: 'folder-3',
+  sdId: 'default',
+  order: 0,
+  deleted: false
+}
+[FolderTreeDoc]   folder folder-5: {
+  id: 'folder-5',
+  name: 'Recipes',
+  parentId: 'folder-3',
+  sdId: 'default',
+  order: 1,
+  deleted: false
+}
+[FolderTreeDoc] getAllFolders returning 5 folders

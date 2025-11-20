@@ -27,7 +27,7 @@ function App(): React.ReactElement {
   const [noteInfoOpen, setNoteInfoOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
-  const [activeSdId, setActiveSdId] = useState<string>('default');
+  const [activeSdId, setActiveSdId] = useState<string | undefined>(undefined);
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
   // Tag filters: tagId -> 'include' | 'exclude' (omitted = neutral/no filter)

@@ -20,7 +20,8 @@ import fs from 'fs/promises';
 import os from 'os';
 
 // Test configuration
-const SHARED_SD_PATH = '/tmp/notecove-real-cross-platform-test';
+// Note: SHARED_SD_PATH will be set dynamically to use iOS Documents path
+let SHARED_SD_PATH = '/tmp/notecove-real-cross-platform-test'; // Default, will be overridden
 const IOS_SIMULATOR_NAME = 'iPhone 17 Pro';
 const TEST_TIMEOUT = 180000; // 3 minutes
 
@@ -51,6 +52,19 @@ async function waitFor(
   throw new Error(`Condition not met within ${timeoutMs}ms`);
 }
 
+// Helper to get iOS Documents path for a simulator without launching the app
+async function getIOSDocumentsPathForSimulator(simulatorId: string, bundleId: string): Promise<string> {
+  // Find the app's data container
+  const containers = exec(`xcrun simctl get_app_container ${simulatorId} ${bundleId} data 2>/dev/null || echo ""`);
+  if (containers && containers.trim()) {
+    return path.join(containers.trim(), 'Documents');
+  }
+
+  // If app not installed yet, we'll need to find it after launching
+  // For now, return a placeholder that will be updated later
+  return '';
+}
+
 test.describe('Real Cross-Platform Sync', () => {
   let desktopApp: ElectronApplication;
   let desktopWindow: Page;
@@ -58,11 +72,7 @@ test.describe('Real Cross-Platform Sync', () => {
   let iosAppBundleId: string = 'com.notecove.NoteCove';
 
   test.beforeAll(async () => {
-    // Clean up shared directory
-    await fs.rm(SHARED_SD_PATH, { recursive: true, force: true });
-    await fs.mkdir(SHARED_SD_PATH, { recursive: true });
-
-    console.log('[Test] Using shared SD:', SHARED_SD_PATH);
+    // Note: Shared directory will be created per-test inside iOS Documents
 
     // Find iOS simulator
     console.log('[Test] Finding iOS simulator...');
@@ -148,6 +158,34 @@ test.describe('Real Cross-Platform Sync', () => {
   });
 
   test('bidirectional sync between Desktop and iOS apps', { timeout: TEST_TIMEOUT }, async () => {
+    //
+    // SETUP: Determine shared storage path using iOS Documents (before launching apps)
+    //
+    console.log('[Test] Setting up shared storage path...');
+
+    // Get iOS Documents path (app should already be installed from beforeAll)
+    let iosDocsPath = await getIOSDocumentsPathForSimulator(iosSimulatorId, iosAppBundleId);
+
+    // If not found (app not launched yet), launch it once to create container
+    if (!iosDocsPath) {
+      console.log('[Test] Launching iOS app to create container...');
+      exec(`xcrun simctl launch ${iosSimulatorId} ${iosAppBundleId}`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      exec(`xcrun simctl terminate ${iosSimulatorId} ${iosAppBundleId}`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      iosDocsPath = await getIOSDocumentsPathForSimulator(iosSimulatorId, iosAppBundleId);
+    }
+
+    // Set shared SD path inside iOS Documents so both apps can access it
+    SHARED_SD_PATH = path.join(iosDocsPath, 'shared-storage');
+    console.log('[Test] Using shared SD path:', SHARED_SD_PATH);
+
+    // Create shared directory structure
+    await fs.mkdir(SHARED_SD_PATH, { recursive: true });
+    await fs.mkdir(path.join(SHARED_SD_PATH, '.activity'), { recursive: true });
+    await fs.mkdir(path.join(SHARED_SD_PATH, 'notes'), { recursive: true });
+    await fs.mkdir(path.join(SHARED_SD_PATH, 'folders'), { recursive: true });
+
     //
     // SETUP: Launch Desktop app
     //
@@ -297,11 +335,11 @@ test.describe('Real Cross-Platform Sync', () => {
     console.log('[Test] Screenshot after SD selection: /tmp/notecove-test-after-sd-selection.png');
 
     //
-    // SETUP: Launch iOS app with shared SD
+    // SETUP: Configure iOS app database
     //
     console.log('[Test] Configuring iOS app...');
 
-    const iosDocumentsPath = await getIOSDocumentsPath();
+    const iosDocumentsPath = iosDocsPath; // Use path determined earlier
     console.log('[Test] iOS Documents path:', iosDocumentsPath);
 
     // Ensure iOS database exists
@@ -534,6 +572,15 @@ test.describe('Real Cross-Platform Sync', () => {
       });
 
       desktopWindow = await desktopApp.firstWindow({ timeout: 60000 });
+
+      // Capture Desktop console logs for debugging
+      desktopWindow.on('console', (msg) => {
+        const text = msg.text();
+        if (text.includes('Activity') || text.includes('CRDT Manager') || text.includes('Init')) {
+          console.log('[Desktop Console]', text);
+        }
+      });
+
       await desktopWindow.waitForLoadState('domcontentloaded');
       await desktopWindow.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
 
@@ -561,6 +608,28 @@ test.describe('Real Cross-Platform Sync', () => {
       const closeButton = settingsDialog.locator('button[aria-label="close"]');
       await closeButton.click();
       await desktopWindow.waitForTimeout(2000);
+
+      // Navigate to test SD's "All Notes" to ensure notes are created there
+      console.log('[Test] Selecting test SD for note creation...');
+      const testSdNode = desktopWindow
+        .locator('[data-testid^="folder-tree-node-sd:"]')
+        .filter({ hasText: 'Collab Test SD' });
+
+      if ((await testSdNode.count()) > 0) {
+        await testSdNode.click();
+        await desktopWindow.waitForTimeout(500);
+
+        // Click "All Notes" under this SD
+        const allNotesNode = desktopWindow
+          .locator('[data-testid^="folder-tree-node-all-notes:"]')
+          .last();
+
+        if ((await allNotesNode.count()) > 0) {
+          await allNotesNode.click();
+          await desktopWindow.waitForTimeout(1000);
+          console.log('[Test] ✅ Test SD selected for note creation');
+        }
+      }
 
       // Configure iOS app
       console.log('[Test] Configuring iOS app...');
