@@ -6,6 +6,7 @@ import Combine
 /// The StorageCoordinator ties together:
 /// - FileWatchManager: Monitors directories for changes
 /// - FileChangeProcessor: Processes changes and updates the database
+/// - ActivitySync: Syncs from other instances' activity logs
 /// - DatabaseManager: Stores note metadata
 /// - iCloudManager: Monitors iCloud sync status
 ///
@@ -40,6 +41,10 @@ public class StorageCoordinator: ObservableObject {
     // File watching infrastructure
     private var watchers: [String: FileWatchManager] = [:] // storageId -> watcher
     private var processors: [String: FileChangeProcessor] = [:] // storageId -> processor
+    private var activitySyncs: [String: ActivitySync] = [:] // storageId -> activity sync
+
+    // Track currently loaded notes (for ActivitySync)
+    private var loadedNotes: Set<String> = []
 
     /// Creates a new storage coordinator
     /// - Parameter db: The database manager to use
@@ -77,6 +82,17 @@ public class StorageCoordinator: ObservableObject {
         let processor = FileChangeProcessor(db: db, bridge: bridge, fileIO: fileIO)
         processors[storageId] = processor
 
+        // Create activity sync for cross-platform sync
+        let activityDir = "\(storageDir.path)/.activity"
+        let activitySync = ActivitySync(
+            fileIO: fileIO,
+            instanceId: InstanceIDManager.shared.getInstanceId(),
+            activityDir: activityDir,
+            storageId: storageId,
+            delegate: self
+        )
+        activitySyncs[storageId] = activitySync
+
         // Create a file watcher
         let watcher = FileWatchManager()
 
@@ -102,6 +118,7 @@ public class StorageCoordinator: ObservableObject {
         }
 
         processors.removeValue(forKey: storageId)
+        activitySyncs.removeValue(forKey: storageId)
 
         print("[StorageCoordinator] Stopped watching storage directory: \(storageId)")
     }
@@ -136,13 +153,25 @@ public class StorageCoordinator: ObservableObject {
             return
         }
 
+        // Sync from other instances' activity logs (cross-platform sync)
+        if let activitySync = activitySyncs[storageId] {
+            print("[StorageCoordinator] Running activity sync...")
+            let affectedNotes = await activitySync.syncFromOtherInstances()
+            if !affectedNotes.isEmpty {
+                print("[StorageCoordinator] Activity sync affected \(affectedNotes.count) notes: \(affectedNotes)")
+                for noteId in affectedNotes {
+                    recentlyUpdatedNotes.insert(noteId)
+                }
+            }
+        }
+
         // Get the processor for this storage directory
         guard let processor = processors[storageId] else {
             print("[StorageCoordinator] No processor found for storage ID: \(storageId)")
             return
         }
 
-        // Process the changes
+        // Process the changes (scan note directories)
         do {
             try await processor.processChangedFiles(in: directory, storageId: storageId)
             print("[StorageCoordinator] Successfully processed file changes")
@@ -172,5 +201,39 @@ public class StorageCoordinator: ObservableObject {
         Task { [weak self] in
             await self?.stopAllWatching()
         }
+    }
+}
+
+// MARK: - ActivitySyncDelegate
+
+extension StorageCoordinator: ActivitySyncDelegate {
+    /// Reload a note from disk (called by ActivitySync)
+    public func reloadNote(noteId: String, storageId: String) async throws {
+        print("[StorageCoordinator] Reloading note from disk: \(noteId)")
+
+        // Get the processor for this storage directory
+        guard let processor = processors[storageId] else {
+            throw NSError(
+                domain: "StorageCoordinator",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "No processor found for storage ID: \(storageId)"]
+            )
+        }
+
+        // Update the note from file system
+        try await processor.updateNoteFromFile(noteId: noteId, storageId: storageId)
+
+        // Mark as loaded
+        loadedNotes.insert(noteId)
+
+        // Mark as recently updated for UI
+        recentlyUpdatedNotes.insert(noteId)
+
+        print("[StorageCoordinator] Successfully reloaded note: \(noteId)")
+    }
+
+    /// Get list of currently loaded note IDs (called by ActivitySync)
+    public func getLoadedNotes() -> [String] {
+        return Array(loadedNotes)
     }
 }
