@@ -7554,7 +7554,7 @@ var NoteCoveBridgeModule = (() => {
       this.content = this.doc.getXmlFragment("content");
     }
     /**
-     * Initialize a new note with metadata
+     * Initialize a new note with metadata and empty content structure
      */
     initializeNote(meta) {
       this.doc.transact(() => {
@@ -7564,6 +7564,10 @@ var NoteCoveBridgeModule = (() => {
         this.metadata.set("sdId", meta.sdId);
         this.metadata.set("folderId", meta.folderId);
         this.metadata.set("deleted", meta.deleted);
+        if (this.content.length === 0) {
+          const paragraph = new YXmlElement("paragraph");
+          this.content.insert(0, [paragraph]);
+        }
       });
     }
     /**
