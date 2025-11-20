@@ -507,6 +507,275 @@ test.describe('Real Cross-Platform Sync', () => {
     console.log('[Test]   - Activity logs are working correctly');
   });
 
+  test(
+    'collaborative editing between Desktop and iOS',
+    { timeout: TEST_TIMEOUT },
+    async () => {
+      //
+      // SETUP: Launch Desktop and iOS apps (same as previous test)
+      //
+      console.log('[Test] Launching Desktop app...');
+
+      const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const testDbPath = path.join(os.tmpdir(), `notecove-collab-test-${uniqueId}.db`);
+      const testConfigPath = path.join(
+        os.tmpdir(),
+        `notecove-collab-config-${uniqueId}.json`
+      );
+
+      desktopApp = await electron.launch({
+        args: ['.'],
+        env: {
+          ...process.env,
+          NODE_ENV: 'test',
+          TEST_DB_PATH: testDbPath,
+          TEST_CONFIG_PATH: testConfigPath,
+        },
+      });
+
+      desktopWindow = await desktopApp.firstWindow({ timeout: 60000 });
+      await desktopWindow.waitForLoadState('domcontentloaded');
+      await desktopWindow.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
+
+      // Add shared storage directory to Desktop
+      const settingsButton = desktopWindow.locator('button[title="Settings"]');
+      await expect(settingsButton).toBeVisible();
+      await settingsButton.click();
+      await desktopWindow.waitForTimeout(500);
+
+      await desktopWindow.locator('button', { hasText: 'Add Directory' }).click();
+      await desktopWindow.waitForTimeout(500);
+
+      const addDialog = desktopWindow.locator('[role="dialog"]', {
+        hasText: 'Add Storage Directory',
+      });
+      await expect(addDialog).toBeVisible({ timeout: 5000 });
+
+      await addDialog.getByLabel('Name').fill('Collab Test SD');
+      await addDialog.getByLabel('Path').fill(SHARED_SD_PATH);
+
+      await addDialog.locator('button', { hasText: 'Add' }).click();
+      await desktopWindow.waitForTimeout(20000); // Wait for SD initialization
+
+      const settingsDialog = desktopWindow.locator('[role="dialog"]', { hasText: 'Settings' });
+      const closeButton = settingsDialog.locator('button[aria-label="close"]');
+      await closeButton.click();
+      await desktopWindow.waitForTimeout(2000);
+
+      // Configure iOS app
+      console.log('[Test] Configuring iOS app...');
+      const iosDocumentsPath = await getIOSDocumentsPath();
+      const iosDbPath = path.join(iosDocumentsPath, 'notecove.sqlite');
+
+      const dbExists = await fs
+        .access(iosDbPath)
+        .then(() => true)
+        .catch(() => false);
+
+      if (!dbExists) {
+        exec(`xcrun simctl launch ${iosSimulatorId} ${iosAppBundleId}`);
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        exec(`xcrun simctl terminate ${iosSimulatorId} ${iosAppBundleId}`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      const sdId = 'collab-test-sd-' + Date.now();
+      const now = new Date().toISOString();
+      exec(
+        `sqlite3 "${iosDbPath}" "INSERT INTO storage_directories (id, name, path, created_at, modified_at) VALUES ('${sdId}', 'Collab Test SD', '${SHARED_SD_PATH}', '${now}', '${now}')"`
+      );
+
+      exec(`xcrun simctl launch ${iosSimulatorId} ${iosAppBundleId}`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+      console.log('[Test] Both apps launched and configured');
+
+      //
+      // TEST: Collaborative editing workflow
+      //
+
+      // Step 1: Desktop creates note with "from desktop"
+      console.log('[Test] Step 1: Desktop creates note "from desktop"');
+
+      const addButton = desktopWindow.getByRole('button', { name: 'create note' });
+      await expect(addButton).toBeVisible({ timeout: 5000 });
+      await addButton.click();
+      await desktopWindow.waitForTimeout(1000);
+
+      const editor = desktopWindow.locator('.tiptap.ProseMirror');
+      await expect(editor).toBeVisible();
+      await editor.click();
+      await editor.type('from desktop');
+      await desktopWindow.waitForTimeout(2000);
+
+      // Get the note ID from activity log
+      const activityFiles = await fs.readdir(path.join(SHARED_SD_PATH, '.activity'));
+      const activityFile = activityFiles.find((f) => f.endsWith('.log'));
+      const activityContent = await fs.readFile(
+        path.join(SHARED_SD_PATH, '.activity', activityFile!),
+        'utf-8'
+      );
+      const lastLine = activityContent.trim().split('\n').pop()!;
+      const desktopNoteId = lastLine.split('|')[0];
+
+      console.log('[Test] Desktop note ID:', desktopNoteId);
+
+      await desktopWindow.keyboard.press('Escape');
+      await desktopWindow.waitForTimeout(1000);
+
+      // Step 2: Wait for iOS to discover the note
+      console.log('[Test] Step 2: Waiting for iOS to discover Desktop note...');
+      await waitFor(async () => {
+        return await checkIOSNoteExists(desktopNoteId);
+      }, 15000);
+
+      expect(await checkIOSNoteExists(desktopNoteId)).toBe(true);
+      console.log('[Test] ✅ iOS discovered Desktop note');
+
+      // Verify iOS has the content "from desktop"
+      const iosContent1 = exec(
+        `sqlite3 "${iosDbPath}" "SELECT content FROM notes WHERE id = '${desktopNoteId}'"`
+      ).trim();
+      expect(iosContent1).toContain('from desktop');
+      console.log('[Test] ✅ iOS has content: "from desktop"');
+
+      // Step 3: iOS adds "hello from ios" to the note
+      console.log('[Test] Step 3: iOS adds "hello from ios" to the note');
+      await appendTextToNoteAsIOS(desktopNoteId, ' hello from ios');
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Step 4: Wait for Desktop to see iOS's edit
+      console.log('[Test] Step 4: Waiting for Desktop to see iOS edit...');
+      await waitFor(async () => {
+        const noteItem = desktopWindow
+          .locator('[data-testid^="note-item-"]')
+          .filter({ hasText: 'from desktop' });
+        if ((await noteItem.count()) === 0) return false;
+
+        // Click the note to open it
+        await noteItem.click();
+        await desktopWindow.waitForTimeout(500);
+
+        const editorContent = await editor.textContent();
+        return editorContent?.includes('hello from ios') || false;
+      }, 15000);
+
+      let editorContent = await editor.textContent();
+      expect(editorContent).toContain('from desktop');
+      expect(editorContent).toContain('hello from ios');
+      console.log('[Test] ✅ Desktop sees both "from desktop" and "hello from ios"');
+
+      // Step 5: Desktop adds "right back atcha"
+      console.log('[Test] Step 5: Desktop adds "right back atcha"');
+      await editor.click();
+      await editor.press('End');
+      await editor.type(' right back atcha');
+      await desktopWindow.waitForTimeout(2000);
+
+      await desktopWindow.keyboard.press('Escape');
+      await desktopWindow.waitForTimeout(1000);
+
+      // Step 6: Wait for iOS to see Desktop's edit
+      console.log('[Test] Step 6: Waiting for iOS to see Desktop edit...');
+      await waitFor(async () => {
+        const content = exec(
+          `sqlite3 "${iosDbPath}" "SELECT content FROM notes WHERE id = '${desktopNoteId}'"`
+        ).trim();
+        return content.includes('right back atcha');
+      }, 15000);
+
+      const iosContent2 = exec(
+        `sqlite3 "${iosDbPath}" "SELECT content FROM notes WHERE id = '${desktopNoteId}'"`
+      ).trim();
+      expect(iosContent2).toContain('from desktop');
+      expect(iosContent2).toContain('hello from ios');
+      expect(iosContent2).toContain('right back atcha');
+      console.log('[Test] ✅ iOS sees all three pieces of text');
+
+      console.log('[Test] 🎉 Collaborative editing test passed!');
+      console.log('[Test] Summary:');
+      console.log('[Test]   - Desktop created note: "from desktop"');
+      console.log('[Test]   - iOS discovered note and saw "from desktop"');
+      console.log('[Test]   - iOS added: "hello from ios"');
+      console.log('[Test]   - Desktop saw both texts');
+      console.log('[Test]   - Desktop added: "right back atcha"');
+      console.log('[Test]   - iOS saw all three texts');
+    }
+  );
+
+  /**
+   * Simulate iOS appending text to an existing note
+   * @param noteId - The note ID to append to
+   * @param textToAppend - The text to append
+   */
+  async function appendTextToNoteAsIOS(noteId: string, textToAppend: string): Promise<void> {
+    const iosInstanceId = generateIOSUUID();
+
+    // Load existing note updates
+    const noteDir = path.join(SHARED_SD_PATH, 'notes', noteId);
+    const updatesDir = path.join(noteDir, 'updates');
+
+    const { applyUpdate, encodeStateAsUpdate } = await import('yjs');
+    const Y = await import('yjs');
+
+    // Create a new doc and apply all existing updates
+    const doc = new Y.Doc({ guid: noteId });
+
+    const updateFiles = await fs.readdir(updatesDir);
+    for (const file of updateFiles.sort()) {
+      if (!file.endsWith('.yjson')) continue;
+
+      const updateData = await fs.readFile(path.join(updatesDir, file));
+      // Skip flag byte (first byte)
+      const update = new Uint8Array(updateData.buffer, 1);
+      applyUpdate(doc, update);
+    }
+
+    // Get the fragment and append text
+    const fragment = doc.getXmlFragment('content');
+
+    doc.transact(() => {
+      // Find the last paragraph
+      const lastParagraph = fragment.get(fragment.length - 1) as any;
+      if (lastParagraph && lastParagraph._first) {
+        // Get the text node
+        const textNode = lastParagraph._first;
+        // Append to the end
+        textNode.insert(textNode.length, textToAppend);
+      }
+    });
+
+    // Create update from the changes
+    const update = encodeStateAsUpdate(doc);
+    doc.destroy();
+
+    // Get next sequence number
+    const existingFiles = updateFiles.filter((f) => f.endsWith('.yjson'));
+    const sequences = existingFiles.map((f) => {
+      const match = f.match(/_(\d+)\.yjson$/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    const nextSeq = Math.max(0, ...sequences) + 1;
+
+    // Write update file with flag byte
+    const flaggedUpdate = new Uint8Array(1 + update.length);
+    flaggedUpdate[0] = 0x01; // Ready flag
+    flaggedUpdate.set(update, 1);
+
+    const updateFilename = `${iosInstanceId}_${nextSeq}.yjson`;
+    await fs.writeFile(path.join(updatesDir, updateFilename), Buffer.from(flaggedUpdate));
+
+    // Update activity log
+    const activityDir = path.join(SHARED_SD_PATH, '.activity');
+    const activityLog = path.join(activityDir, `${iosInstanceId}.log`);
+
+    // Append to existing log or create new one
+    await fs.appendFile(activityLog, `${noteId}|${iosInstanceId}_${nextSeq}\n`, { flush: true });
+
+    // Give file system time to propagate
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
   /**
    * Simulate iOS creating a note
    * Returns the note ID
