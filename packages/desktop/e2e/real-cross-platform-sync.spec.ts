@@ -608,15 +608,10 @@ test.describe('Real Cross-Platform Sync', () => {
       await editor.type('from desktop');
       await desktopWindow.waitForTimeout(2000);
 
-      // Get the note ID from activity log
-      const activityFiles = await fs.readdir(path.join(SHARED_SD_PATH, '.activity'));
-      const activityFile = activityFiles.find((f) => f.endsWith('.log'));
-      const activityContent = await fs.readFile(
-        path.join(SHARED_SD_PATH, '.activity', activityFile!),
-        'utf-8'
-      );
-      const lastLine = activityContent.trim().split('\n').pop()!;
-      const desktopNoteId = lastLine.split('|')[0];
+      // Get the note ID from Desktop's database (Desktop doesn't write activity logs on creation)
+      const desktopNoteId = exec(
+        `sqlite3 "${testDbPath}" "SELECT id FROM notes ORDER BY created DESC LIMIT 1"`
+      ).trim();
 
       console.log('[Test] Desktop note ID:', desktopNoteId);
 
