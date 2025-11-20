@@ -358,6 +358,10 @@ test.describe('Real Cross-Platform Sync', () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
+    // Clean up any old storage directories from previous test runs
+    console.log('[Test] Cleaning up old storage directories from iOS database...');
+    exec(`sqlite3 "${iosDbPath}" "DELETE FROM storage_directories"`);
+
     // Add storage directory to iOS database
     const sdId = 'test-sd-' + Date.now();
     const now = new Date().toISOString();
@@ -414,11 +418,10 @@ test.describe('Real Cross-Platform Sync', () => {
     await desktopWindow.keyboard.press('Escape');
     await desktopWindow.waitForTimeout(1000);
 
-    // Verify note appears in list
-    const noteInList = desktopWindow
-      .locator('[data-testid^="note-item-"]')
-      .filter({ hasText: 'from desktop' });
+    // Verify note appears in list with specific ID
+    const noteInList = desktopWindow.locator(`[data-testid="note-item-${desktopNoteId}"]`);
     await expect(noteInList).toBeVisible({ timeout: 5000 });
+    await expect(noteInList).toContainText('from desktop');
 
     // Verify note directory exists on disk
     const noteDir = path.join(SHARED_SD_PATH, 'notes', desktopNoteId);
