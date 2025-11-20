@@ -503,11 +503,19 @@ test.describe('Real Cross-Platform Sync', () => {
     const update = encodeStateAsUpdate(doc);
     doc.destroy();
 
-    // Write update file
-    // NOTE: Filename format must match what CRDT manager expects: ${instanceId}_${sequenceNum}.yjson
+    // Write update file with flag byte protocol
+    // NOTE: Update files use a flag byte protocol for cross-platform sync:
+    // - First byte 0x00 = file still being written (incomplete)
+    // - First byte 0x01 = file complete and ready to read
+    // - Remaining bytes = actual Yjs CRDT update data
+    const flaggedUpdate = new Uint8Array(1 + update.length);
+    flaggedUpdate[0] = 0x01; // Ready flag
+    flaggedUpdate.set(update, 1); // Copy update data after flag byte
+
+    // Filename format must match what CRDT manager expects: ${instanceId}_${sequenceNum}.yjson
     // The noteId is already in the directory path (notes/${noteId}/updates/)
     const updateFilename = `${iosInstanceId}_0.yjson`;
-    await fs.writeFile(path.join(updatesDir, updateFilename), Buffer.from(update));
+    await fs.writeFile(path.join(updatesDir, updateFilename), Buffer.from(flaggedUpdate));
 
     // Write activity log
     const activityDir = path.join(SHARED_SD_PATH, '.activity');
