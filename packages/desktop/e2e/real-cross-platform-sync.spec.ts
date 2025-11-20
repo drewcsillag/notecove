@@ -963,4 +963,137 @@ test.describe('Real Cross-Platform Sync', () => {
       })
       .toUpperCase();
   }
+
+  test('Desktop→iOS sync: title extraction bug', { timeout: TEST_TIMEOUT }, async () => {
+    // BUG REPRODUCTION TEST
+    // User reported: Notes created on Desktop show as "Untitled" on iOS
+    //
+    // Expected: iOS should extract correct title from Desktop notes
+    // Actual: iOS shows "Untitled" for all notes
+
+    console.log('[Test] Setting up shared storage path...');
+
+    let iosDocsPath = await getIOSDocumentsPathForSimulator(iosSimulatorId, iosAppBundleId);
+
+    if (!iosDocsPath) {
+      console.log('[Test] Launching iOS app to create container...');
+      exec(`xcrun simctl launch ${iosSimulatorId} ${iosAppBundleId}`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      exec(`xcrun simctl terminate ${iosSimulatorId} ${iosAppBundleId}`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      iosDocsPath = await getIOSDocumentsPathForSimulator(iosSimulatorId, iosAppBundleId);
+    }
+
+    SHARED_SD_PATH = path.join(iosDocsPath, 'shared-storage-bug-test');
+    console.log('[Test] Using shared SD path:', SHARED_SD_PATH);
+
+    await fs.mkdir(SHARED_SD_PATH, { recursive: true });
+    await fs.mkdir(path.join(SHARED_SD_PATH, '.activity'), { recursive: true });
+    await fs.mkdir(path.join(SHARED_SD_PATH, 'notes'), { recursive: true });
+    await fs.mkdir(path.join(SHARED_SD_PATH, 'folders'), { recursive: true });
+
+    console.log('[Test] Launching Desktop app...');
+    desktopApp = await electron.launch({
+      args: ['.'],
+      cwd: path.join(__dirname, '..'),
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        SHARED_SD_PATH,
+      },
+    });
+
+    desktopWindow = await desktopApp.firstWindow();
+    await desktopWindow.waitForLoadState('domcontentloaded');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Wait for app to fully load
+    await expect(desktopWindow.locator('button[aria-label="Settings"]')).toBeVisible({ timeout: 10000 });
+
+    console.log('[Test] Adding shared SD to Desktop...');
+    await desktopWindow.click('button[aria-label="Settings"]');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await desktopWindow.click('text=Storage Directories');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await desktopWindow.click('text=Add Storage Directory');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await desktopWindow.fill('input[placeholder="Name"]', 'Bug Test SD');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await desktopWindow.fill('input[placeholder*="Path"]', SHARED_SD_PATH);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await desktopWindow.click('button:has-text("Add")');
+    await new Promise((resolve) => setTimeout(resolve, 20000));
+    await desktopWindow.click('button:has-text("Close")');
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const chevrons = await desktopWindow.locator('[data-testid^="folder-chevron-"]').all();
+    if (chevrons.length > 0) {
+      await chevrons[0].click();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    const allNotesNodes = await desktopWindow
+      .locator('[data-testid="folder-node-all-notes"]')
+      .filter({ hasText: 'Bug Test SD' })
+      .all();
+    if (allNotesNodes.length > 0) {
+      await allNotesNodes[0].click();
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    const iosDbPath = path.join(iosDocsPath, 'notecove.db');
+    const testSdId = '8c914580-a406-43d4-9eef-9189493eb1a3';
+    exec(`sqlite3 "${iosDbPath}" "DELETE FROM storage_directories WHERE id = '${testSdId}'"`);
+    exec(
+      `sqlite3 "${iosDbPath}" "INSERT INTO storage_directories (id, name, path, is_active) VALUES ('${testSdId}', 'Bug Test SD', '${SHARED_SD_PATH}', 1)"`
+    );
+
+    console.log('[Test] Launching iOS app...');
+    exec(`xcrun simctl launch ${iosSimulatorId} ${iosAppBundleId}`);
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    console.log('[Test] TEST: Desktop creates note with specific title');
+
+    const createButton = desktopWindow.locator('button[aria-label="create note"]');
+    await expect(createButton).toBeVisible({ timeout: 5000});
+    await createButton.click();
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    await desktopWindow.locator('.ProseMirror').click();
+    await desktopWindow.keyboard.type('My Important Note Title');
+    await desktopWindow.keyboard.press('Meta+s');
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const testDbPath = path.join(os.homedir(), 'Library', 'Application Support', 'NoteCove', 'notecove.db');
+    const desktopNoteId = exec(
+      `sqlite3 "${testDbPath}" "SELECT id FROM notes WHERE storage_directory_id = '${testSdId}' ORDER BY created DESC LIMIT 1"`
+    ).trim();
+    console.log('[Test] Desktop created note:', desktopNoteId);
+
+    console.log('[Test] Waiting for iOS to discover note (15 seconds)...');
+    await new Promise((resolve) => setTimeout(resolve, 15000));
+
+    const iosNotesQuery = exec(
+      `sqlite3 "${iosDbPath}" "SELECT id, title FROM notes WHERE id = '${desktopNoteId}'"`
+    ).trim();
+    console.log('[Test] iOS database result:', iosNotesQuery);
+
+    if (!iosNotesQuery) {
+      throw new Error('BUG CONFIRMED: iOS did not discover Desktop note at all');
+    }
+
+    const [iosNoteId, iosNoteTitle] = iosNotesQuery.split('|');
+
+    // THIS IS THE BUG CHECK
+    console.log('[Test] iOS note ID:', iosNoteId);
+    console.log('[Test] iOS note title:', iosNoteTitle || '(empty)');
+
+    if (!iosNoteTitle || iosNoteTitle === 'Untitled' || iosNoteTitle.trim() === '') {
+      console.log('[Test] ❌ BUG CONFIRMED: iOS shows "Untitled" instead of "My Important Note Title"');
+      throw new Error(`BUG: iOS note title is "${iosNoteTitle}" instead of "My Important Note Title"`);
+    }
+
+    console.log('[Test] ✅ iOS correctly extracted title:', iosNoteTitle);
+    expect(iosNoteTitle).toBe('My Important Note Title');
+  });
 });

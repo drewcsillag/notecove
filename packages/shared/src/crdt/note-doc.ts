@@ -17,16 +17,24 @@ export class NoteDoc {
   }
 
   /**
-   * Initialize a new note with metadata
+   * Initialize a new note with metadata and empty content structure
    */
   initializeNote(meta: NoteMetadata): void {
     this.doc.transact(() => {
+      // Set metadata
       this.metadata.set('id', meta.id);
       this.metadata.set('created', meta.created);
       this.metadata.set('modified', meta.modified);
       this.metadata.set('sdId', meta.sdId);
       this.metadata.set('folderId', meta.folderId);
       this.metadata.set('deleted', meta.deleted);
+
+      // Initialize empty ProseMirror structure
+      // This ensures iOS can extract a title (even if empty) instead of "Untitled"
+      if (this.content.length === 0) {
+        const paragraph = new Y.XmlElement('paragraph');
+        this.content.insert(0, [paragraph]);
+      }
     });
   }
 
