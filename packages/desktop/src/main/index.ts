@@ -647,6 +647,16 @@ async function setupSDWatchers(
   await activityWatcher.watch(activityDir, (event) => {
     console.log(`[ActivityWatcher ${sdId}] Detected activity log change:`, event.filename);
 
+    // Broadcast to renderer for test instrumentation
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('test:file-watcher-event', {
+        sdId,
+        filename: event.filename,
+        type: 'activity',
+        gracePeriodActive: !startupComplete,
+      });
+    }
+
     // Ignore events during startup to prevent duplicate imports
     // The initial sync (line 663) handles startup properly
     if (!startupComplete) {
@@ -659,11 +669,13 @@ async function setupSDWatchers(
 
     // Ignore directory creation events and our own log file
     if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
+      console.log(`[ActivityWatcher ${sdId}] Ignoring own log file or directory:`, event.filename);
       return;
     }
 
     // Only process .log files
     if (!event.filename.endsWith('.log')) {
+      console.log(`[ActivityWatcher ${sdId}] Ignoring non-.log file:`, event.filename);
       return;
     }
 
@@ -734,6 +746,11 @@ async function setupSDWatchers(
     // This prevents race conditions where file watcher triggers during initial sync
     startupComplete = true;
     console.log(`[Init] Startup grace period ended for SD: ${sdId}`);
+
+    // Broadcast to renderer for test instrumentation
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('test:grace-period-ended', { sdId });
+    }
   }
 
   console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);

@@ -195,15 +195,29 @@ test.describe('Real Cross-Platform Sync', () => {
     await addDialog.getByLabel('Name').fill('Real Test SD');
     await addDialog.getByLabel('Path').fill(SHARED_SD_PATH);
 
+    // Set up test instrumentation listeners to track file watcher events
+    await desktopWindow.evaluate(() => {
+      (window as any).testEvents = {
+        fileWatcher: [] as any[],
+        gracePeriod: [] as any[],
+      };
+      window.electronAPI.testing.onFileWatcherEvent((data: any) => {
+        (window as any).testEvents.fileWatcher.push(data);
+      });
+      window.electronAPI.testing.onGracePeriodEnded((data: any) => {
+        (window as any).testEvents.gracePeriod.push(data);
+      });
+    });
+
     // Click Add button and wait for SD initialization to complete
     // The SD initialization includes:
-    // - Setting up file watchers
+    // - Setting up file watchers (chokidar)
     // - Loading existing notes
     // - Completing the startup grace period
     // This can take several seconds, so we wait generously
     await addDialog.locator('button', { hasText: 'Add' }).click();
-    console.log('[Test] Waiting for SD initialization to complete (10 seconds)...');
-    await desktopWindow.waitForTimeout(10000); // Wait for startup grace period to complete
+    console.log('[Test] Waiting for SD initialization to complete (20 seconds)...');
+    await desktopWindow.waitForTimeout(20000); // Wait for startup grace period to complete
     console.log('[Test] ✅ SD initialization should be complete');
 
     // Verify SD appears in Settings
@@ -374,6 +388,10 @@ test.describe('Real Cross-Platform Sync', () => {
     const iosNoteId = await createNoteAsIOS('from ios');
     console.log('[Test] iOS created note:', iosNoteId);
 
+    // Check what file watcher events were captured
+    const events = await desktopWindow.evaluate(() => (window as any).testEvents);
+    console.log('[Test] Captured events:', JSON.stringify(events, null, 2));
+
     // Wait for Desktop to discover it via file watching
     console.log('[Test] Waiting for Desktop to discover iOS note...');
     await waitFor(async () => {
@@ -486,7 +504,12 @@ test.describe('Real Cross-Platform Sync', () => {
     const activityDir = path.join(SHARED_SD_PATH, '.activity');
     await fs.mkdir(activityDir, { recursive: true });
     const activityLog = path.join(activityDir, `${iosInstanceId}.log`);
-    await fs.writeFile(activityLog, `${noteId}|${iosInstanceId}_0\n`);
+
+    // Write the file and ensure it's fully committed to disk
+    await fs.writeFile(activityLog, `${noteId}|${iosInstanceId}_0\n`, { flush: true });
+
+    // Give the file system a moment to propagate the event to chokidar
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     return noteId;
   }

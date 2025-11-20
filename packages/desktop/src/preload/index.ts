@@ -991,5 +991,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('test:getTagsForNote', noteId) as Promise<{ id: string; name: string }[]>,
     getNoteById: (noteId: string): Promise<NoteCache | null> =>
       ipcRenderer.invoke('test:getNoteById', noteId) as Promise<NoteCache | null>,
+
+    // Test instrumentation: File watcher events
+    onFileWatcherEvent: (
+      callback: (data: {
+        sdId: string;
+        filename: string;
+        type: string;
+        gracePeriodActive: boolean;
+      }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { sdId: string; filename: string; type: string; gracePeriodActive: boolean }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('test:file-watcher-event', listener);
+      return () => {
+        ipcRenderer.removeListener('test:file-watcher-event', listener);
+      };
+    },
+    onGracePeriodEnded: (callback: (data: { sdId: string }) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { sdId: string }): void => {
+        callback(data);
+      };
+      ipcRenderer.on('test:grace-period-ended', listener);
+      return () => {
+        ipcRenderer.removeListener('test:grace-period-ended', listener);
+      };
+    },
   },
 });

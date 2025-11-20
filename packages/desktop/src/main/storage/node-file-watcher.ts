@@ -21,10 +21,8 @@ export class NodeFileWatcher implements FileWatcher {
     this.watcher = chokidar.watch(path, {
       persistent: true,
       ignoreInitial: true, // Don't trigger events for existing files
-      awaitWriteFinish: {
-        stabilityThreshold: 100, // Wait for file writes to finish
-        pollInterval: 50,
-      },
+      // Note: awaitWriteFinish removed - was causing detection issues
+      // Files are written atomically, so we don't need to wait
     });
 
     // Listen for all file events
