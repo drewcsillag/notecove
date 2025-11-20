@@ -76,7 +76,8 @@ final class CrossPlatformTests: XCTestCase {
         let noteId = "cross-platform-note-1"
 
         // Check if note directory exists in shared storage
-        let noteDir = "\(sharedSDPath!)/\(noteId)"
+        // Notes are stored in <sdPath>/notes/<noteId>/, not <sdPath>/<noteId>/
+        let noteDir = "\(sharedSDPath!)/notes/\(noteId)"
         let updatesDir = "\(noteDir)/updates"
 
         guard fileIO.fileExists(at: noteDir) else {
@@ -121,7 +122,8 @@ final class CrossPlatformTests: XCTestCase {
         // First, load the desktop's note
         try bridge.createNote(noteId: noteId)
 
-        let noteDir = "\(sharedSDPath!)/\(noteId)"
+        // Notes are stored in <sdPath>/notes/<noteId>/, not <sdPath>/<noteId>/
+        let noteDir = "\(sharedSDPath!)/notes/\(noteId)"
         let updatesDir = "\(noteDir)/updates"
 
         // Load existing updates
@@ -217,7 +219,8 @@ final class CrossPlatformTests: XCTestCase {
         XCTAssertEqual(note?.title, noteTitle)
 
         // Verify file exists in shared directory
-        let noteDir = "\(sharedSDPath!)/\(noteId)"
+        // Notes are stored in <sdPath>/notes/<noteId>/, not <sdPath>/<noteId>/
+        let noteDir = "\(sharedSDPath!)/notes/\(noteId)"
         XCTAssertTrue(fileIO.fileExists(at: noteDir), "Note directory should exist in shared storage")
         XCTAssertTrue(fileIO.fileExists(at: updatePath), "Update file should exist")
 

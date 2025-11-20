@@ -1,10 +1,11 @@
 /**
- * Node.js File Watcher
+ * Node.js File Watcher using Chokidar
  *
- * Watches a directory for changes and triggers callbacks
+ * Watches a directory for changes and triggers callbacks.
+ * Uses chokidar for reliable cross-platform file watching.
  */
 
-import { watch, type FSWatcher } from 'fs';
+import chokidar, { type FSWatcher } from 'chokidar';
 import type { FileWatcher, FileWatchEvent, FileWatchEventType } from '@notecove/shared';
 
 export class NodeFileWatcher implements FileWatcher {
@@ -16,44 +17,66 @@ export class NodeFileWatcher implements FileWatcher {
       await this.unwatch();
     }
 
-    // Watch for file changes
-    this.watcher = watch(
-      path,
-      { recursive: false },
-      (eventType: string, filename: string | null) => {
-        if (!filename) return;
+    // Watch for file changes using chokidar
+    this.watcher = chokidar.watch(path, {
+      persistent: true,
+      ignoreInitial: true, // Don't trigger events for existing files
+      awaitWriteFinish: {
+        stabilityThreshold: 100, // Wait for file writes to finish
+        pollInterval: 50,
+      },
+    });
 
-        // Map Node.js event types to our FileWatchEventType
-        let type: FileWatchEventType;
-        if (eventType === 'rename') {
-          // In Node.js, 'rename' can mean added or deleted
-          // We'll treat it as 'changed' for simplicity
-          type = 'changed' as FileWatchEventType;
-        } else {
-          // 'change' event
-          type = 'changed' as FileWatchEventType;
-        }
-
-        const event: FileWatchEvent = {
-          type,
+    // Listen for all file events
+    this.watcher
+      .on('add', (filepath) => {
+        // Extract just the filename from the full path
+        const pathModule = require('path');
+        const filename = pathModule.basename(filepath);
+        console.log(`[FileWatcher] File added: ${filename} in ${path}`);
+        callback({
+          type: 'changed' as FileWatchEventType,
           path,
           filename,
-        };
+        });
+      })
+      .on('change', (filepath) => {
+        const pathModule = require('path');
+        const filename = pathModule.basename(filepath);
+        console.log(`[FileWatcher] File changed: ${filename} in ${path}`);
+        callback({
+          type: 'changed' as FileWatchEventType,
+          path,
+          filename,
+        });
+      })
+      .on('unlink', (filepath) => {
+        const pathModule = require('path');
+        const filename = pathModule.basename(filepath);
+        console.log(`[FileWatcher] File removed: ${filename} in ${path}`);
+        callback({
+          type: 'changed' as FileWatchEventType,
+          path,
+          filename,
+        });
+      })
+      .on('error', (error) => {
+        console.error('[FileWatcher] Error watching directory:', error);
+      });
 
-        callback(event);
-      }
-    );
-
-    this.watcher.on('error', (error) => {
-      console.error('[FileWatcher] Error watching directory:', error);
+    // Wait for watcher to be ready
+    await new Promise<void>((resolve) => {
+      this.watcher!.on('ready', () => {
+        console.log(`[FileWatcher] Ready to watch: ${path}`);
+        resolve();
+      });
     });
   }
 
   async unwatch(): Promise<void> {
     if (this.watcher) {
-      this.watcher.close();
+      await this.watcher.close();
       this.watcher = null;
     }
-    return Promise.resolve();
   }
 }

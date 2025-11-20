@@ -120,7 +120,8 @@ final class RealWorldCrossPlatformTests: XCTestCase {
         print("[RealWorldTest] Created update file: \(updateFilename)")
 
         // Desktop would also write to activity log - let's simulate that
-        let activityDir = "\(sharedSDPath!)/notes/.activity"
+        // Activity logs are at <sdPath>/.activity/, NOT <sdPath>/notes/.activity/
+        let activityDir = "\(sharedSDPath!)/.activity"
         try fileIO.createDirectory(at: activityDir)
         let activityLog = "\(activityDir)/\(desktopInstanceId).log"
         let activityEntry = "\(desktopNoteId)|\(desktopInstanceId)_0\n"
