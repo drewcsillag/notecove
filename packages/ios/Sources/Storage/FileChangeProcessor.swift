@@ -84,8 +84,9 @@ public class FileChangeProcessor {
             throw FileChangeProcessorError.storageDirectoryNotFound(storageId)
         }
 
-        // Construct the note directory path
+        // Construct the note directory path (notes are in notes/ subdirectory)
         let notePath = URL(fileURLWithPath: storageDir.path)
+            .appendingPathComponent("notes")
             .appendingPathComponent(noteId)
             .path
 
