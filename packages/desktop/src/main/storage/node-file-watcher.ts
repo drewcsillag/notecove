@@ -6,6 +6,7 @@
  */
 
 import chokidar, { type FSWatcher } from 'chokidar';
+import { basename } from 'path';
 import type { FileWatcher, FileWatchEvent, FileWatchEventType } from '@notecove/shared';
 
 export class NodeFileWatcher implements FileWatcher {
@@ -29,8 +30,7 @@ export class NodeFileWatcher implements FileWatcher {
     this.watcher
       .on('add', (filepath) => {
         // Extract just the filename from the full path
-        const pathModule = require('path');
-        const filename = pathModule.basename(filepath);
+        const filename = basename(filepath);
         console.log(`[FileWatcher] File added: ${filename} in ${path}`);
         callback({
           type: 'changed' as FileWatchEventType,
@@ -39,8 +39,7 @@ export class NodeFileWatcher implements FileWatcher {
         });
       })
       .on('change', (filepath) => {
-        const pathModule = require('path');
-        const filename = pathModule.basename(filepath);
+        const filename = basename(filepath);
         console.log(`[FileWatcher] File changed: ${filename} in ${path}`);
         callback({
           type: 'changed' as FileWatchEventType,
@@ -49,8 +48,7 @@ export class NodeFileWatcher implements FileWatcher {
         });
       })
       .on('unlink', (filepath) => {
-        const pathModule = require('path');
-        const filename = pathModule.basename(filepath);
+        const filename = basename(filepath);
         console.log(`[FileWatcher] File removed: ${filename} in ${path}`);
         callback({
           type: 'changed' as FileWatchEventType,
@@ -63,8 +61,9 @@ export class NodeFileWatcher implements FileWatcher {
       });
 
     // Wait for watcher to be ready
+    const watcher = this.watcher;
     await new Promise<void>((resolve) => {
-      this.watcher!.on('ready', () => {
+      watcher.on('ready', () => {
         console.log(`[FileWatcher] Ready to watch: ${path}`);
         resolve();
       });

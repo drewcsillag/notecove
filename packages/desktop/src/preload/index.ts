@@ -1036,7 +1036,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
     onActivityWatcherDebug: (
-      callback: (data: { sdId: string; filename: string; reason: string; instanceId?: string }) => void
+      callback: (data: {
+        sdId: string;
+        filename: string;
+        reason: string;
+        instanceId?: string;
+      }) => void
     ): (() => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,

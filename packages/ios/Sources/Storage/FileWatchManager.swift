@@ -70,8 +70,12 @@ public class FileWatchManager {
         source.setEventHandler { [weak self] in
             guard let self = self else { return }
 
+            print("[FileWatchManager] ⚡️ File system event detected in: \(path)")
+            print("[FileWatchManager] Event timestamp: \(Date())")
+
             // Debounce the callback to avoid excessive updates
             self.debouncer?.debounce {
+                print("[FileWatchManager] 📢 Calling onChange callback after debounce")
                 onChange()
             }
         }

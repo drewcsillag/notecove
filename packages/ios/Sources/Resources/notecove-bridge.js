@@ -7959,21 +7959,38 @@ var NoteCoveBridgeModule = (() => {
 
   // src/crdt/title-extractor.ts
   function extractTitleFromFragment(fragment) {
+    console.log("[TitleExtractor] ========== Extracting title from fragment ==========");
+    console.log("[TitleExtractor] Fragment length:", fragment.length);
+    console.log("[TitleExtractor] Fragment type:", fragment.constructor.name);
     for (let i = 0; i < fragment.length; i++) {
       const node = fragment.get(i);
-      if (!node) continue;
+      console.log(`[TitleExtractor] Node ${i}:`, node ? node.constructor.name : "null");
+      if (!node) {
+        console.log(`[TitleExtractor] Node ${i} is null, skipping`);
+        continue;
+      }
       if (node instanceof YXmlElement) {
+        console.log(`[TitleExtractor] Node ${i} is XmlElement, tag:`, node.nodeName);
+        console.log(`[TitleExtractor] Node ${i} has ${node.length} children`);
         const text2 = extractTextFromElement(node);
+        console.log(`[TitleExtractor] Node ${i} extracted text: "${text2}"`);
+        console.log(`[TitleExtractor] Node ${i} trimmed length: ${text2.trim().length}`);
         if (text2.trim().length > 0) {
+          console.log(`[TitleExtractor] \u2705 Returning title: "${text2.trim()}"`);
           return text2.trim();
         }
       } else if (node instanceof YXmlText) {
         const text2 = node.toString();
+        console.log(`[TitleExtractor] Node ${i} is XmlText: "${text2}"`);
         if (text2.trim().length > 0) {
+          console.log(`[TitleExtractor] \u2705 Returning title from XmlText: "${text2.trim()}"`);
           return text2.trim();
         }
+      } else {
+        console.log(`[TitleExtractor] Node ${i} is unknown type: ${node.constructor.name}`);
       }
     }
+    console.log('[TitleExtractor] \u274C No title found, returning "Untitled"');
     return "Untitled";
   }
   function extractTextFromElement(element2) {
@@ -8055,12 +8072,21 @@ var NoteCoveBridgeModule = (() => {
       return uint8ArrayToBase64(stateBytes);
     },
     extractTitle(stateBase64) {
+      console.log("[Bridge] ========== extractTitle called ==========");
+      console.log("[Bridge] State base64 length:", stateBase64.length);
       const stateBytes = base64ToUint8Array(stateBase64);
+      console.log("[Bridge] State bytes length:", stateBytes.length);
       const tempDoc = new Doc();
+      console.log("[Bridge] Created temporary Y.Doc");
       applyUpdate(tempDoc, stateBytes);
+      console.log("[Bridge] Applied update to temporary doc");
       const fragment = tempDoc.getXmlFragment("content");
+      console.log('[Bridge] Got fragment "content", length:', fragment.length);
       const title = extractTitleFromFragment(fragment);
+      console.log("[Bridge] extractTitleFromFragment returned:", title);
       tempDoc.destroy();
+      console.log("[Bridge] Destroyed temporary doc");
+      console.log("[Bridge] ========== extractTitle complete ==========");
       return title;
     },
     extractContent(stateBase64) {

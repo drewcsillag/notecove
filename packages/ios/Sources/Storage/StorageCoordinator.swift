@@ -43,6 +43,9 @@ public class StorageCoordinator: ObservableObject {
     private var processors: [String: FileChangeProcessor] = [:] // storageId -> processor
     private var activitySyncs: [String: ActivitySync] = [:] // storageId -> activity sync
 
+    // Periodic polling timer (fallback for file watching unreliability)
+    private var pollingTimers: [String: Timer] = [:] // storageId -> timer
+
     // Track currently loaded notes (for ActivitySync)
     private var loadedNotes: Set<String> = []
 
@@ -129,6 +132,28 @@ public class StorageCoordinator: ObservableObject {
         }
 
         print("[StorageCoordinator] ========================================")
+
+        // Start periodic polling as fallback (every 5 seconds)
+        // This ensures cross-platform sync works even if file watching fails
+        print("[StorageCoordinator] Starting periodic activity sync timer (5s interval)")
+        let timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                print("[StorageCoordinator] ⏰ Periodic sync triggered for \(storageId)")
+
+                if let activitySync = self.activitySyncs[storageId] {
+                    let affected = await activitySync.syncFromOtherInstances()
+                    if !affected.isEmpty {
+                        print("[StorageCoordinator] Periodic sync found \(affected.count) notes")
+                        for noteId in affected {
+                            self.recentlyUpdatedNotes.insert(noteId)
+                        }
+                    }
+                }
+            }
+        }
+        pollingTimers[storageId] = timer
+        print("[StorageCoordinator] Periodic polling timer started for \(storageId)")
     }
 
     /// Stops watching a storage directory
@@ -137,6 +162,13 @@ public class StorageCoordinator: ObservableObject {
         if let watcher = watchers[storageId] {
             watcher.stopWatching()
             watchers.removeValue(forKey: storageId)
+        }
+
+        // Stop periodic polling timer
+        if let timer = pollingTimers[storageId] {
+            timer.invalidate()
+            pollingTimers.removeValue(forKey: storageId)
+            print("[StorageCoordinator] Stopped periodic polling timer for \(storageId)")
         }
 
         processors.removeValue(forKey: storageId)
@@ -159,7 +191,12 @@ public class StorageCoordinator: ObservableObject {
     ///   - directory: The directory path where changes occurred
     ///   - storageId: The storage directory ID (optional, will be looked up if not provided)
     public func handleFileChange(in directory: String, storageId: String? = nil) async {
-        print("[StorageCoordinator] Handling file change in: \(directory)")
+        print("[StorageCoordinator] ========================================")
+        print("[StorageCoordinator] 🔔 HANDLE FILE CHANGE CALLED")
+        print("[StorageCoordinator] Timestamp: \(Date())")
+        print("[StorageCoordinator] Directory: \(directory)")
+        print("[StorageCoordinator] Provided storage ID: \(storageId ?? "nil")")
+        print("[StorageCoordinator] ========================================")
 
         // Find the storage ID if not provided
         var storageIdToUse = storageId

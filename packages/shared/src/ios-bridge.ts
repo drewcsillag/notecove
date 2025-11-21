@@ -200,14 +200,29 @@ const bridge: NoteCoveBridge = {
   },
 
   extractTitle(stateBase64: string): string {
+    console.log('[Bridge] ========== extractTitle called ==========');
+    console.log('[Bridge] State base64 length:', stateBase64.length);
+
     const stateBytes = base64ToUint8Array(stateBase64);
+    console.log('[Bridge] State bytes length:', stateBytes.length);
+
     // Create a temporary doc to decode the state
     const tempDoc = new Y.Doc();
+    console.log('[Bridge] Created temporary Y.Doc');
+
     Y.applyUpdate(tempDoc, stateBytes);
+    console.log('[Bridge] Applied update to temporary doc');
+
     // Extract the fragment and get the title
     const fragment = tempDoc.getXmlFragment('content');
+    console.log('[Bridge] Got fragment "content", length:', fragment.length);
+
     const title = extractTitleFromFragment(fragment);
+    console.log('[Bridge] extractTitleFromFragment returned:', title);
+
     tempDoc.destroy();
+    console.log('[Bridge] Destroyed temporary doc');
+    console.log('[Bridge] ========== extractTitle complete ==========');
     return title;
   },
 

@@ -131,16 +131,20 @@ public class FileChangeProcessor {
         }
 
         // Apply updates from the files (in sorted order)
-        for fileName in yjsonFiles.sorted() {
-            let filePath = URL(fileURLWithPath: updatesPath)
-                .appendingPathComponent(fileName)
-                .path
+        print("[FileChangeProcessor] Applying \(yjsonFiles.count) update files in sorted order")
+        var updateIndex = 0
+        for filePath in yjsonFiles.sorted() {
+            updateIndex += 1
+            // listFiles returns full paths, so use them directly
+            let fileName = URL(fileURLWithPath: filePath).lastPathComponent
 
             // Read the update file
             guard let updateData = try? fileIO.readFile(at: filePath) else {
                 print("[FileChangeProcessor] Could not read file: \(filePath)")
                 continue
             }
+
+            print("[FileChangeProcessor] [\(updateIndex)/\(yjsonFiles.count)] Applying \(fileName) (\(updateData.count) bytes)")
 
             // Apply the update to the note
             do {
@@ -151,10 +155,14 @@ public class FileChangeProcessor {
             }
         }
 
+        print("[FileChangeProcessor] All updates applied, extracting document state...")
         // Extract metadata from the document
         let state = try bridge.getDocumentState(noteId: noteId)
+        print("[FileChangeProcessor] Document state size: \(state.count) chars (base64)")
+
+        print("[FileChangeProcessor] Calling bridge.extractTitle...")
         let title = try bridge.extractTitle(stateData: state)
-        print("[FileChangeProcessor] Extracted title: \(title)")
+        print("[FileChangeProcessor] ✅ Extracted title: '\(title)'")
 
         // Extract content for indexing and tag extraction
         let content = try bridge.extractContent(stateData: state)

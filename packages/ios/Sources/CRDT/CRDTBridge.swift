@@ -77,6 +77,45 @@ public class CRDTBridge {
         }
         ctx.setObject(consoleLog, forKeyedSubscript: "consoleLog" as NSString)
 
+        // Set up console object with log, warn, error methods
+        ctx.evaluateScript("""
+        var console = {
+            log: function() {
+                var args = Array.prototype.slice.call(arguments);
+                var message = args.map(function(arg) {
+                    if (typeof arg === 'object') {
+                        try { return JSON.stringify(arg); }
+                        catch(e) { return String(arg); }
+                    }
+                    return String(arg);
+                }).join(' ');
+                consoleLog(message);
+            },
+            warn: function() {
+                var args = Array.prototype.slice.call(arguments);
+                var message = '[WARN] ' + args.map(function(arg) {
+                    if (typeof arg === 'object') {
+                        try { return JSON.stringify(arg); }
+                        catch(e) { return String(arg); }
+                    }
+                    return String(arg);
+                }).join(' ');
+                consoleLog(message);
+            },
+            error: function() {
+                var args = Array.prototype.slice.call(arguments);
+                var message = '[ERROR] ' + args.map(function(arg) {
+                    if (typeof arg === 'object') {
+                        try { return JSON.stringify(arg); }
+                        catch(e) { return String(arg); }
+                    }
+                    return String(arg);
+                }).join(' ');
+                consoleLog(message);
+            }
+        };
+        """)
+
         // Set up global object (JavaScriptCore doesn't have window or global by default)
         // The bundled JavaScript expects to find 'global' to attach NoteCoveBridge
         ctx.evaluateScript("var global = this;");
@@ -361,14 +400,21 @@ public class CRDTBridge {
 
     /// Extract the title from a note's CRDT state
     func extractTitle(stateData: Data) throws -> String {
+        print("[CRDTBridge] extractTitle called with state data of size: \(stateData.count) bytes")
+
         guard let bridge = bridgeObject else {
+            print("[CRDTBridge] ERROR: Bridge not initialized")
             throw CRDTBridgeError.bridgeNotInitialized
         }
 
         let base64 = stateData.base64EncodedString()
+        print("[CRDTBridge] Encoded to base64: \(base64.count) chars")
+        print("[CRDTBridge] Calling JavaScript extractTitle...")
+
         let result = bridge.invokeMethod("extractTitle", withArguments: [base64])
 
         if let error = context?.exception {
+            print("[CRDTBridge] JavaScript error: \(error.toString())")
             throw CRDTBridgeError.javascriptError(error.toString())
         }
 
@@ -376,9 +422,11 @@ public class CRDTBridge {
               !result.isUndefined,
               !result.isNull,
               let title = result.toString() else {
+            print("[CRDTBridge] ERROR: Invalid result from JavaScript")
             throw CRDTBridgeError.invalidResult
         }
 
+        print("[CRDTBridge] JavaScript returned title: '\(title)'")
         return title
     }
 

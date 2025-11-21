@@ -612,7 +612,8 @@ describe('UpdateManager', () => {
         expect(metadata2.folderId).toBe('folder-1');
 
         // Verify content was restored
-        expect(noteDoc2.content.length).toBe(1);
+        // Note: content has 2 elements - the XmlText inserted at 0 and the paragraph from initializeNote
+        expect(noteDoc2.content.length).toBe(2);
         const restoredText = noteDoc2.content.get(0) as Y.XmlText;
         expect(restoredText.toString()).toBe('This is test content');
 

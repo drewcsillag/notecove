@@ -9,6 +9,8 @@ enum FileIOError: Error, Equatable {
     case atomicWriteFailed(String)
     case directoryCreationFailed(String)
     case deleteFailed(String)
+    case fileIncomplete(String) // File is still being written (flag byte = 0x00)
+    case invalidFlagByte(String, UInt8) // Invalid flag byte value
 }
 
 /// Manages file system operations for NoteCove storage
@@ -25,7 +27,7 @@ public class FileIOManager {
 
     /// Read file data from the specified path
     /// - Parameter path: Absolute path to the file
-    /// - Returns: File data
+    /// - Returns: File data (with flag byte stripped for .yjson files)
     /// - Throws: FileIOError if the file cannot be read
     func readFile(at path: String) throws -> Data {
         let url = URL(fileURLWithPath: path)
@@ -35,7 +37,34 @@ public class FileIOManager {
         }
 
         do {
-            return try Data(contentsOf: url)
+            let data = try Data(contentsOf: url)
+
+            // Handle flag byte protocol for .yjson files (CRDT update files)
+            if path.hasSuffix(".yjson") {
+                guard data.count > 0 else {
+                    throw FileIOError.fileIncomplete(path)
+                }
+
+                let flagByte = data[0]
+
+                // Check if file is still being written
+                if flagByte == 0x00 {
+                    throw FileIOError.fileIncomplete(path)
+                }
+
+                // Check for valid flag byte
+                if flagByte != 0x01 {
+                    throw FileIOError.invalidFlagByte(path, flagByte)
+                }
+
+                // Strip flag byte and return actual data
+                return data.subdata(in: 1..<data.count)
+            }
+
+            return data
+        } catch let error as FileIOError {
+            // Re-throw FileIOError instances
+            throw error
         } catch let error as NSError {
             if error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoPermissionError {
                 throw FileIOError.permissionDenied(path)

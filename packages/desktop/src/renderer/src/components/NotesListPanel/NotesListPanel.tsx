@@ -49,7 +49,7 @@ interface NotesListPanelProps {
   selectedNoteId: string | null;
   onNoteSelect: (noteId: string | null) => void;
   onNoteCreated?: (noteId: string) => void;
-  activeSdId?: string;
+  activeSdId?: string | undefined;
   tagFilters?: Record<string, 'include' | 'exclude'>;
 }
 

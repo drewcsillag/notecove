@@ -84,8 +84,10 @@ public class ActivitySync {
     /// - Returns: Set of note IDs that were affected
     public func syncFromOtherInstances() async -> Set<String> {
         print("[ActivitySync] ========== Starting sync from other instances ==========")
+        print("[ActivitySync] Timestamp: \(Date())")
         print("[ActivitySync] Activity directory: \(activityDir)")
         print("[ActivitySync] Our instance ID: \(instanceId)")
+        print("[ActivitySync] Current watermarks: \(lastSeenSequences)")
 
         var affectedNotes = Set<String>()
 

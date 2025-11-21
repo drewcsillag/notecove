@@ -811,7 +811,9 @@ async function setupSDWatchers(
         // Broadcast updates to all windows for affected notes
         if (affectedNotes.size > 0) {
           const noteIds = Array.from(affectedNotes);
-          console.log(`[ActivitySync ${sdId}] Broadcasting to ${BrowserWindow.getAllWindows().length} windows`);
+          console.log(
+            `[ActivitySync ${sdId}] Broadcasting to ${BrowserWindow.getAllWindows().length} windows`
+          );
           for (const window of BrowserWindow.getAllWindows()) {
             window.webContents.send('note:external-update', {
               operation: 'sync',

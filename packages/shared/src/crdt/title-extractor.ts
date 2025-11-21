@@ -17,16 +17,29 @@ import * as Y from 'yjs';
  * @returns The extracted title (first line with text) or "Untitled"
  */
 export function extractTitleFromFragment(fragment: Y.XmlFragment): string {
+  console.log('[TitleExtractor] ========== Extracting title from fragment ==========');
+  console.log('[TitleExtractor] Fragment length:', fragment.length);
+  console.log('[TitleExtractor] Fragment type:', fragment.constructor.name);
+
   // Iterate through top-level nodes
   for (let i = 0; i < fragment.length; i++) {
     const node = fragment.get(i);
+    console.log(`[TitleExtractor] Node ${i}:`, node ? node.constructor.name : 'null');
 
-    if (!node) continue;
+    if (!node) {
+      console.log(`[TitleExtractor] Node ${i} is null, skipping`);
+      continue;
+    }
 
     // Check if it's an XmlElement (like <p>, <h1>, etc.)
     if (node instanceof Y.XmlElement) {
+      console.log(`[TitleExtractor] Node ${i} is XmlElement, tag:`, node.nodeName);
+      console.log(`[TitleExtractor] Node ${i} has ${node.length} children`);
       const text = extractTextFromElement(node);
+      console.log(`[TitleExtractor] Node ${i} extracted text: "${text}"`);
+      console.log(`[TitleExtractor] Node ${i} trimmed length: ${text.trim().length}`);
       if (text.trim().length > 0) {
+        console.log(`[TitleExtractor] ✅ Returning title: "${text.trim()}"`);
         return text.trim();
       }
     }
@@ -34,14 +47,21 @@ export function extractTitleFromFragment(fragment: Y.XmlFragment): string {
     else if (node instanceof Y.XmlText) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const text = node.toString();
+      console.log(`[TitleExtractor] Node ${i} is XmlText: "${text}"`);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       if (text.trim().length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        console.log(`[TitleExtractor] ✅ Returning title from XmlText: "${text.trim()}"`);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         return text.trim();
       }
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+      console.log(`[TitleExtractor] Node ${i} is unknown type: ${(node as any).constructor.name}`);
     }
   }
 
+  console.log('[TitleExtractor] ❌ No title found, returning "Untitled"');
   return 'Untitled';
 }
 

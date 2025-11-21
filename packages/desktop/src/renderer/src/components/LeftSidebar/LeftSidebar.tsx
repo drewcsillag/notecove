@@ -12,7 +12,7 @@ import { TagPanel } from '../TagPanel/TagPanel';
 
 export interface LeftSidebarProps {
   onOpenSettings?: () => void;
-  activeSdId?: string;
+  activeSdId?: string | undefined;
   onActiveSdChange?: (sdId: string) => void;
   tagFilters: Record<string, 'include' | 'exclude'>;
   onTagSelect: (tagId: string) => void;
