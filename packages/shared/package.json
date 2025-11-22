@@ -34,10 +34,9 @@
     }
   },
   "scripts": {
-    "build": "pnpm build:esm && pnpm build:cjs && pnpm build:ios",
+    "build": "pnpm build:esm && pnpm build:cjs",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:ios": "node scripts/build-ios-bundle.js",
     "dev": "tsc --watch",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",

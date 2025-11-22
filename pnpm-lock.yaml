@@ -223,8 +223,6 @@ importers:
         specifier: ^5.0.10
         version: 5.4.21(@types/node@20.19.23)
 
-  packages/ios: {}
-
   packages/shared:
     dependencies:
       '@tiptap/core':

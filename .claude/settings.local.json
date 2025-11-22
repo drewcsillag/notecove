@@ -99,7 +99,8 @@
       "Bash(pnpm --filter @notecove/shared lint:*)",
       "Bash(pnpm --filter @notecove/desktop lint:*)",
       "Bash(npx playwright test:*)",
-      "Bash(pnpm --filter @notecove/desktop test:e2e --grep \"Cross-Platform Full Sync|collaborative editing\")"
+      "Bash(pnpm --filter @notecove/desktop test:e2e --grep \"Cross-Platform Full Sync|collaborative editing\")",
+      "Bash(pnpm install)"
     ],
     "deny": [],
     "ask": []

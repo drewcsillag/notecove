@@ -24,18 +24,6 @@ const checks = [
   { name: 'Type Check', cmd: 'pnpm typecheck' },
   { name: 'Build', cmd: 'pnpm build' },
   {
-    name: 'iOS: Generate Xcode Project',
-    cmd: 'cd packages/ios && xcodegen generate',
-  },
-  {
-    name: 'iOS: Build',
-    cmd: 'cd packages/ios && xcodebuild -scheme NoteCove -destination "platform=iOS Simulator,name=iPhone 17" build',
-  },
-  {
-    name: 'iOS: UI Tests',
-    cmd: 'cd packages/ios && xcodebuild test -scheme NoteCove -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:NoteCoveUITests',
-  },
-  {
     name: 'Rebuild for Node.js',
     cmd: 'cd packages/desktop && pnpm rebuild better-sqlite3',
   },
@@ -46,10 +34,6 @@ const checks = [
     cmd: 'cd packages/desktop && npx @electron/rebuild -f -w better-sqlite3',
   },
   { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
-  {
-    name: 'Cross-Platform Tests',
-    cmd: 'cd packages/ios && ./scripts/test-cross-platform.sh',
-  },
 ];
 
 console.log(

@@ -62,11 +62,6 @@ packages/desktop/.electron-vite/
 packages/desktop/dist-electron/
 packages/desktop/release/
 
-# iOS
-packages/ios/build/
-packages/ios/*.xcworkspace
-packages/ios/xcuserdata/
-packages/ios/DerivedData/
 *.pbxuser
 *.mode1v3
 *.mode2v3
