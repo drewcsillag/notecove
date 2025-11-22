@@ -90,7 +90,16 @@
       "Bash(pnpm --filter @notecove/desktop build:*)",
       "Bash(pnpm exec:*)",
       "Bash(/tmp/diagnose-manual-test.sh:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(SHARED_PATH=\"/Users/drew/Library/Developer/CoreSimulator/Devices/A5EB95E6-202D-4FDC-9FD2-74224691B1A0/data/Containers/Data/Application/AEFBD92D-306A-4623-9EFC-58882F526D22/Documents/shared-storage\" if [ -d \"$SHARED_PATH\" ])",
+      "Bash(then echo \"Found shared storage\" ls -R \"$SHARED_PATH\")",
+      "Bash(pnpm --filter @notecove/desktop test:e2e real-cross-platform-sync.spec.ts --grep \"Desktop→iOS sync: title extraction bug\")",
+      "Bash(pnpm --filter @notecove/ios build:ios:*)",
+      "Bash(/tmp/test-output-full.log)",
+      "Bash(pnpm --filter @notecove/shared lint:*)",
+      "Bash(pnpm --filter @notecove/desktop lint:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(pnpm --filter @notecove/desktop test:e2e --grep \"Cross-Platform Full Sync|collaborative editing\")"
     ],
     "deny": [],
     "ask": []

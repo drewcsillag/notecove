@@ -111,15 +111,34 @@ test.describe('Cross-Platform Full Sync', () => {
 
     // Select the storage directory we just created
     console.log('[Test] Selecting storage directory...');
-    const sdItem = desktopWindow.locator('[data-testid="sd-item"]', {
+    const sdItem = desktopWindow.locator('[data-testid^="folder-tree-node-sd:"]').filter({
       hasText: 'Cross-Platform Test SD',
     });
+    await expect(sdItem).toBeVisible({ timeout: 10000 });
+
+    // Extract the SD ID from the test ID attribute
+    const sdTestId = await sdItem.getAttribute('data-testid');
+    const sdId = sdTestId?.replace('folder-tree-node-', '');
+    console.log('[Test] Extracted SD ID:', sdId);
+
+    // Click to expand if needed
     await sdItem.click();
     await desktopWindow.waitForTimeout(1000);
 
+    // Click "All Notes" using the exact test ID with extracted SD ID
+    const allNotesTestId = sdId ? `folder-tree-node-all-notes:${sdId.replace('sd:', '')}` : '';
+    console.log('[Test] Looking for All Notes with testId:', allNotesTestId);
+    const allNotesNode = desktopWindow.getByTestId(allNotesTestId);
+    await expect(allNotesNode).toBeVisible({ timeout: 5000 });
+    await allNotesNode.click();
+    await desktopWindow.waitForTimeout(1000);
+
+    console.log('[Test] ✅ Cross-Platform Test SD selected');
+
     // Create a note to initialize Desktop's activity logger
     console.log('[Test] Initializing Desktop activity logger...');
-    const addNoteButton = desktopWindow.locator('button[aria-label="Add note"]');
+    const addNoteButton = desktopWindow.getByRole('button', { name: 'create note' });
+    await expect(addNoteButton).toBeVisible({ timeout: 5000 });
     await addNoteButton.click();
     await desktopWindow.waitForTimeout(500);
 

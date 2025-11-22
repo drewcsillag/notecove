@@ -71,6 +71,10 @@ async function getIOSDocumentsPathForSimulator(
 }
 
 test.describe('Real Cross-Platform Sync', () => {
+  // Configure tests to run serially to avoid xcodegen race conditions
+  // Multiple workers trying to run xcodegen simultaneously causes file copy conflicts
+  test.describe.configure({ mode: 'serial' });
+
   let desktopApp: ElectronApplication;
   let desktopWindow: Page;
   let iosSimulatorId: string;
@@ -618,18 +622,25 @@ test.describe('Real Cross-Platform Sync', () => {
       .filter({ hasText: 'Collab Test SD' });
 
     if ((await testSdNode.count()) > 0) {
+      // Extract SD ID from the test ID attribute
+      const testSdTestId = await testSdNode.getAttribute('data-testid');
+      const extractedSdId = testSdTestId?.replace('folder-tree-node-sd:', '');
+      console.log('[Test] Extracted SD ID from Collab Test SD:', extractedSdId);
+
       await testSdNode.click();
       await desktopWindow.waitForTimeout(500);
 
-      // Click "All Notes" under this SD
-      const allNotesNode = desktopWindow
-        .locator('[data-testid^="folder-tree-node-all-notes:"]')
-        .last();
+      // Click "All Notes" under this SD using exact test ID
+      if (extractedSdId) {
+        const allNotesTestId = `folder-tree-node-all-notes:${extractedSdId}`;
+        console.log('[Test] Looking for All Notes with testId:', allNotesTestId);
+        const allNotesNode = desktopWindow.getByTestId(allNotesTestId);
 
-      if ((await allNotesNode.count()) > 0) {
-        await allNotesNode.click();
-        await desktopWindow.waitForTimeout(1000);
-        console.log('[Test] ✅ Test SD selected for note creation');
+        if ((await allNotesNode.count()) > 0) {
+          await allNotesNode.click();
+          await desktopWindow.waitForTimeout(1000);
+          console.log('[Test] ✅ Test SD selected for note creation');
+        }
       }
     }
 
