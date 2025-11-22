@@ -45,6 +45,8 @@ function App(): React.ReactElement {
   }>({ open: false, step: 0, total: 6, message: '' });
   // Minimal mode (for linked note windows)
   const [minimalMode, setMinimalMode] = useState(false);
+  // Export trigger from menu (null | 'selected' | 'all')
+  const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
@@ -323,6 +325,16 @@ function App(): React.ReactElement {
       }
     });
 
+    // Export Selected Notes
+    const cleanupExportSelected = window.electronAPI.menu.onExportSelectedNotes(() => {
+      setExportTrigger('selected');
+    });
+
+    // Export All Notes
+    const cleanupExportAll = window.electronAPI.menu.onExportAllNotes(() => {
+      setExportTrigger('all');
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -335,6 +347,8 @@ function App(): React.ReactElement {
       cleanupCreateSnapshot();
       cleanupNoteInfo();
       cleanupViewHistory();
+      cleanupExportSelected();
+      cleanupExportAll();
     };
   }, [selectedNoteId]);
 
@@ -441,6 +455,10 @@ function App(): React.ReactElement {
                 onNoteCreated={setNewlyCreatedNoteId}
                 activeSdId={activeSdId}
                 tagFilters={tagFilters}
+                exportTrigger={exportTrigger}
+                onExportComplete={() => {
+                  setExportTrigger(null);
+                }}
               />
             }
             rightPanel={

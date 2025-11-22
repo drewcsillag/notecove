@@ -973,7 +973,25 @@ function createMenu(): void {
           },
         },
         { type: 'separator' },
-        // Settings on Windows/Linux only (on macOS it's in app menu)
+        {
+          label: 'Export Selected Notes to Markdown...',
+          accelerator: 'CmdOrCtrl+Shift+E',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:export-selected-notes');
+            }
+          },
+        },
+        {
+          label: 'Export All Notes to Markdown...',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:export-all-notes');
+            }
+          },
+        },
+        { type: 'separator' },
+        // Settings on Windows/Linux only (on macOS it's in App menu)
         ...(!isMac
           ? [
               {

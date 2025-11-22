@@ -109,6 +109,19 @@ const mockElectronAPI = {
     onViewHistory: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    onExportSelectedNotes: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onExportAllNotes: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+  },
+  export: {
+    selectDirectory: jest.fn(() => Promise.resolve(null)),
+    writeFile: jest.fn(() => Promise.resolve({ success: true })),
+    createDirectory: jest.fn(() => Promise.resolve({ success: true })),
+    getNotesForExport: jest.fn(() => Promise.resolve([])),
+    showCompletionMessage: jest.fn(() => Promise.resolve()),
   },
 };
 

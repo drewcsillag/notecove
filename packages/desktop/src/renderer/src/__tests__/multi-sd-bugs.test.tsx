@@ -97,6 +97,15 @@ const mockElectronAPI = {
     onCreateSnapshot: jest.fn(() => () => {}),
     onNoteInfo: jest.fn(() => () => {}),
     onViewHistory: jest.fn(() => () => {}),
+    onExportSelectedNotes: jest.fn(() => () => {}),
+    onExportAllNotes: jest.fn(() => () => {}),
+  },
+  export: {
+    selectDirectory: jest.fn(() => Promise.resolve(null)),
+    writeFile: jest.fn(() => Promise.resolve({ success: true })),
+    createDirectory: jest.fn(() => Promise.resolve({ success: true })),
+    getNotesForExport: jest.fn(() => Promise.resolve([])),
+    showCompletionMessage: jest.fn(() => Promise.resolve()),
   },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */

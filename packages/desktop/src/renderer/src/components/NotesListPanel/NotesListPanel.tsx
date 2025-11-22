@@ -29,6 +29,14 @@ import { Add as AddIcon, Clear as ClearIcon, Folder as FolderIcon } from '@mui/i
 import { DraggableNoteItem } from './DraggableNoteItem';
 import { CrossSDConflictDialog } from './CrossSDConflictDialog';
 import { extractTags } from '@notecove/shared';
+import { ExportProgressDialog } from '../ExportProgressDialog/ExportProgressDialog';
+import {
+  exportNotes,
+  exportAllNotes,
+  buildNoteTitleLookup,
+  type FolderInfo,
+} from '../../services/export-service';
+import type { ExportProgress } from '../../utils/markdown-export';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -51,6 +59,8 @@ interface NotesListPanelProps {
   onNoteCreated?: (noteId: string) => void;
   activeSdId?: string | undefined;
   tagFilters?: Record<string, 'include' | 'exclude'>;
+  exportTrigger?: 'selected' | 'all' | null;
+  onExportComplete?: () => void;
 }
 
 export const NotesListPanel: React.FC<NotesListPanelProps> = ({
@@ -59,6 +69,8 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   onNoteCreated,
   activeSdId,
   tagFilters = {},
+  exportTrigger,
+  onExportComplete,
 }) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -116,6 +128,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       targetFolderId: string | null;
     }[]
   >([]);
+
+  // Export progress dialog state
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Load selected folder from app state
   const loadSelectedFolder = useCallback(async () => {
@@ -604,6 +620,68 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
 
+  // Handle export trigger from app menu
+  useEffect(() => {
+    if (!exportTrigger) return;
+
+    const runExport = async (): Promise<void> => {
+      const noteTitleLookup = buildNoteTitleLookup(notes);
+
+      setIsExporting(true);
+      setExportProgress({ current: 0, total: 0, currentNoteName: '' });
+
+      try {
+        if (exportTrigger === 'selected') {
+          // Export selected notes (multi-select or current note)
+          const noteIdsToExport =
+            selectedNoteIds.size > 0
+              ? Array.from(selectedNoteIds)
+              : selectedNoteId
+                ? [selectedNoteId]
+                : [];
+
+          if (noteIdsToExport.length === 0) {
+            console.log('[Export] No notes selected to export');
+            return;
+          }
+
+          setExportProgress({ current: 0, total: noteIdsToExport.length, currentNoteName: '' });
+          await exportNotes(noteIdsToExport, noteTitleLookup, (progress) => {
+            setExportProgress(progress);
+          });
+        } else {
+          // Export all notes in the current SD (exportTrigger === 'all')
+          const sdId = activeSdId ?? DEFAULT_SD_ID;
+
+          // Get all folders for this SD
+          const foldersData = await window.electronAPI.folder.list(sdId);
+          const folders: FolderInfo[] = foldersData.map((f) => ({
+            id: f.id,
+            name: f.name,
+            parentId: f.parentId,
+          }));
+
+          // Get all notes for this SD (pass undefined to get ALL notes, not just root folder)
+          const allNotesInSD = await window.electronAPI.note.list(sdId, undefined);
+
+          setExportProgress({ current: 0, total: allNotesInSD.length, currentNoteName: '' });
+          await exportAllNotes(sdId, folders, allNotesInSD, noteTitleLookup, (progress) => {
+            setExportProgress(progress);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to export notes:', err);
+        setError(err instanceof Error ? err.message : 'Failed to export notes');
+      } finally {
+        setIsExporting(false);
+        setExportProgress(null);
+        onExportComplete?.();
+      }
+    };
+
+    void runExport();
+  }, [exportTrigger, notes, selectedNoteIds, selectedNoteId, activeSdId, onExportComplete]);
+
   // Handle context menu open
   const handleContextMenu = useCallback(
     (event: React.MouseEvent, noteId: string) => {
@@ -679,6 +757,34 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     setDeleteDialogOpen(false);
     setNoteToDelete(null);
   }, []);
+
+  // Handle export from context menu
+  const handleExportFromMenu = useCallback(async () => {
+    if (!contextMenu) return;
+    handleContextMenuClose();
+
+    // Determine which notes to export
+    const noteIdsToExport =
+      selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [contextMenu.noteId];
+
+    // Build note title lookup for resolving inter-note links
+    const noteTitleLookup = buildNoteTitleLookup(notes);
+
+    setIsExporting(true);
+    setExportProgress({ current: 0, total: noteIdsToExport.length, currentNoteName: '' });
+
+    try {
+      await exportNotes(noteIdsToExport, noteTitleLookup, (progress) => {
+        setExportProgress(progress);
+      });
+    } catch (err) {
+      console.error('Failed to export notes:', err);
+      setError(err instanceof Error ? err.message : 'Failed to export notes');
+    } finally {
+      setIsExporting(false);
+      setExportProgress(null);
+    }
+  }, [contextMenu, handleContextMenuClose, selectedNoteIds, notes]);
 
   // Handle restore from menu
   const handleRestoreFromMenu = useCallback(() => {
@@ -1249,6 +1355,11 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
               <MenuItem onClick={handleDeleteFromMenu}>
                 {selectedNoteIds.size > 0 ? `Delete ${selectedNoteIds.size} notes` : 'Delete'}
               </MenuItem>
+              <MenuItem onClick={() => void handleExportFromMenu()}>
+                {selectedNoteIds.size > 0
+                  ? `Export ${selectedNoteIds.size} notes to Markdown`
+                  : 'Export to Markdown'}
+              </MenuItem>
             </>
           )}
         </Menu>
@@ -1305,6 +1416,14 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           onResolve={handleConflictResolution}
         />
       )}
+
+      {/* Export Progress Dialog */}
+      <ExportProgressDialog
+        open={isExporting}
+        current={exportProgress?.current ?? 0}
+        total={exportProgress?.total ?? 0}
+        currentNoteName={exportProgress?.currentNoteName ?? ''}
+      />
 
       {/* Move to Folder Dialog */}
       <Dialog open={moveDialogOpen} onClose={handleCancelMove} maxWidth="md" fullWidth>

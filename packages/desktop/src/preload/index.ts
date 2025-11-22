@@ -975,6 +975,73 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('menu:about', listener);
       };
     },
+    onExportSelectedNotes: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:export-selected-notes', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:export-selected-notes', listener);
+      };
+    },
+    onExportAllNotes: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:export-all-notes', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:export-all-notes', listener);
+      };
+    },
+  },
+
+  // Export operations
+  export: {
+    selectDirectory: (): Promise<string | null> =>
+      ipcRenderer.invoke('export:selectDirectory') as Promise<string | null>,
+    writeFile: (filePath: string, content: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('export:writeFile', filePath, content) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+    createDirectory: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('export:createDirectory', dirPath) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+    getNotesForExport: (
+      noteIds: string[]
+    ): Promise<
+      {
+        id: string;
+        title: string;
+        folderId: string | null;
+        content: unknown;
+        isEmpty: boolean;
+      }[]
+    > =>
+      ipcRenderer.invoke('export:getNotesForExport', noteIds) as Promise<
+        {
+          id: string;
+          title: string;
+          folderId: string | null;
+          content: unknown;
+          isEmpty: boolean;
+        }[]
+      >,
+    showCompletionMessage: (
+      exportedCount: number,
+      skippedCount: number,
+      destinationPath: string,
+      errors: string[]
+    ): Promise<void> =>
+      ipcRenderer.invoke(
+        'export:showCompletionMessage',
+        exportedCount,
+        skippedCount,
+        destinationPath,
+        errors
+      ) as Promise<void>,
   },
 
   // Testing operations (only available if main process registered handler)

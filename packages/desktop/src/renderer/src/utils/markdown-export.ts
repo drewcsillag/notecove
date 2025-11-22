@@ -1,0 +1,455 @@
+/**
+ * Markdown Export Utilities
+ *
+ * Converts ProseMirror/TipTap JSON to Markdown format.
+ * Handles standard formatting as well as custom nodes:
+ * - Hashtags: #tag (these are just decorated text, so they export naturally)
+ * - Inter-note links: [[note-id]] -> [[Note Title]]
+ * - Tri-state checkboxes: [ ] / [x] / [-]
+ */
+
+import type { JSONContent } from '@tiptap/core';
+
+// Lookup function type for resolving note IDs to titles
+export type NoteTitleLookup = (noteId: string) => string | undefined;
+
+// Inter-note link pattern: [[uuid]] or [[note-id]]
+const LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
+
+/**
+ * Convert ProseMirror JSON content to Markdown string
+ */
+export function prosemirrorToMarkdown(
+  content: JSONContent,
+  noteTitleLookup: NoteTitleLookup
+): string {
+  if (!content.content || content.content.length === 0) {
+    return '';
+  }
+
+  const lines: string[] = [];
+
+  for (const node of content.content) {
+    const line = convertNode(node, noteTitleLookup, 0);
+    if (line !== null) {
+      lines.push(line);
+    }
+  }
+
+  return lines.join('\n\n');
+}
+
+/**
+ * Convert a single node to markdown
+ */
+function convertNode(
+  node: JSONContent,
+  noteTitleLookup: NoteTitleLookup,
+  listDepth: number
+): string | null {
+  switch (node.type) {
+    case 'paragraph':
+      return convertParagraph(node, noteTitleLookup);
+
+    case 'heading':
+      return convertHeading(node, noteTitleLookup);
+
+    case 'bulletList':
+      return convertBulletList(node, noteTitleLookup, listDepth);
+
+    case 'orderedList':
+      return convertOrderedList(node, noteTitleLookup, listDepth);
+
+    case 'listItem':
+      return convertListItem(node, noteTitleLookup, listDepth);
+
+    case 'blockquote':
+      return convertBlockquote(node, noteTitleLookup);
+
+    case 'codeBlock':
+      return convertCodeBlock(node);
+
+    case 'horizontalRule':
+      return '---';
+
+    case 'text':
+      return convertTextNode(node, noteTitleLookup);
+
+    case 'triStateCheckbox':
+      return convertCheckbox(node);
+
+    default:
+      // For unknown nodes, try to extract text content
+      if (node.content) {
+        return node.content
+          .map((n) => convertNode(n, noteTitleLookup, listDepth))
+          .filter((s) => s !== null)
+          .join('');
+      }
+      return null;
+  }
+}
+
+/**
+ * Convert paragraph node
+ */
+function convertParagraph(node: JSONContent, noteTitleLookup: NoteTitleLookup): string {
+  if (!node.content || node.content.length === 0) {
+    return '';
+  }
+
+  return node.content
+    .map((n) => convertNode(n, noteTitleLookup, 0))
+    .filter((s) => s !== null)
+    .join('');
+}
+
+/**
+ * Convert heading node
+ */
+function convertHeading(node: JSONContent, noteTitleLookup: NoteTitleLookup): string {
+  const level = (node.attrs?.['level'] as number) || 1;
+  const prefix = '#'.repeat(level) + ' ';
+
+  if (!node.content || node.content.length === 0) {
+    return prefix;
+  }
+
+  const text = node.content
+    .map((n) => convertNode(n, noteTitleLookup, 0))
+    .filter((s) => s !== null)
+    .join('');
+
+  return prefix + text;
+}
+
+/**
+ * Convert bullet list node
+ */
+function convertBulletList(
+  node: JSONContent,
+  noteTitleLookup: NoteTitleLookup,
+  listDepth: number
+): string {
+  if (!node.content) return '';
+
+  return node.content
+    .map((item) => {
+      const indent = '  '.repeat(listDepth);
+      const itemContent = convertListItem(item, noteTitleLookup, listDepth + 1);
+      return `${indent}- ${itemContent}`;
+    })
+    .join('\n');
+}
+
+/**
+ * Convert ordered list node
+ */
+function convertOrderedList(
+  node: JSONContent,
+  noteTitleLookup: NoteTitleLookup,
+  listDepth: number
+): string {
+  if (!node.content) return '';
+
+  return node.content
+    .map((item, index) => {
+      const indent = '  '.repeat(listDepth);
+      const itemContent = convertListItem(item, noteTitleLookup, listDepth + 1);
+      return `${indent}${index + 1}. ${itemContent}`;
+    })
+    .join('\n');
+}
+
+/**
+ * Convert list item node
+ */
+function convertListItem(
+  node: JSONContent,
+  noteTitleLookup: NoteTitleLookup,
+  listDepth: number
+): string {
+  if (!node.content) return '';
+
+  const parts: string[] = [];
+
+  for (const child of node.content) {
+    if (child.type === 'paragraph') {
+      const text = convertParagraph(child, noteTitleLookup);
+      parts.push(text);
+    } else if (child.type === 'bulletList' || child.type === 'orderedList') {
+      // Nested list
+      const nestedList = convertNode(child, noteTitleLookup, listDepth);
+      if (nestedList) {
+        parts.push('\n' + nestedList);
+      }
+    } else {
+      const text = convertNode(child, noteTitleLookup, listDepth);
+      if (text !== null) {
+        parts.push(text);
+      }
+    }
+  }
+
+  return parts.join('');
+}
+
+/**
+ * Convert blockquote node
+ */
+function convertBlockquote(node: JSONContent, noteTitleLookup: NoteTitleLookup): string {
+  if (!node.content) return '>';
+
+  const content = node.content
+    .map((n) => convertNode(n, noteTitleLookup, 0))
+    .filter((s) => s !== null)
+    .join('\n');
+
+  // Add > prefix to each line
+  return content
+    .split('\n')
+    .map((line) => '> ' + line)
+    .join('\n');
+}
+
+/**
+ * Convert code block node
+ */
+function convertCodeBlock(node: JSONContent): string {
+  const language = (node.attrs?.['language'] as string | undefined) ?? '';
+  const code = node.content?.map((n) => n.text ?? '').join('') ?? '';
+
+  return '```' + language + '\n' + code + '\n```';
+}
+
+/**
+ * Convert text node with marks
+ */
+function convertTextNode(node: JSONContent, noteTitleLookup: NoteTitleLookup): string {
+  let text = node.text ?? '';
+
+  // Replace inter-note links [[note-id]] with [[Note Title]]
+  text = text.replace(LINK_PATTERN, (_match, noteId: string) => {
+    const title = noteTitleLookup(noteId.toLowerCase());
+    return title ? `[[${title}]]` : `[[${noteId}]]`;
+  });
+
+  // Apply marks
+  if (node.marks && node.marks.length > 0) {
+    for (const mark of node.marks) {
+      text = applyMark(text, mark);
+    }
+  }
+
+  return text;
+}
+
+/**
+ * Apply a mark to text
+ */
+function applyMark(text: string, mark: { type: string; attrs?: Record<string, unknown> }): string {
+  switch (mark.type) {
+    case 'bold':
+      return `**${text}**`;
+
+    case 'italic':
+      return `*${text}*`;
+
+    case 'underline':
+      // Markdown doesn't have native underline, use HTML
+      return `<u>${text}</u>`;
+
+    case 'strike':
+      return `~~${text}~~`;
+
+    case 'code':
+      return `\`${text}\``;
+
+    case 'link': {
+      const href = mark.attrs?.['href'] as string;
+      return href ? `[${text}](${href})` : text;
+    }
+
+    default:
+      return text;
+  }
+}
+
+/**
+ * Convert tri-state checkbox node
+ */
+function convertCheckbox(node: JSONContent): string {
+  const state = node.attrs?.['checked'] as string;
+
+  switch (state) {
+    case 'checked':
+      return '[x]';
+    case 'nope':
+      return '[-]';
+    case 'unchecked':
+    default:
+      return '[ ]';
+  }
+}
+
+// ============================================================================
+// Filename utilities
+// ============================================================================
+
+/**
+ * Characters that are not allowed in filenames on various operating systems
+ * Note: Control characters \x00-\x1f are intentionally included for security
+ */
+// eslint-disable-next-line no-control-regex
+const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
+
+/**
+ * Reserved names on Windows
+ */
+const RESERVED_NAMES = new Set([
+  'CON',
+  'PRN',
+  'AUX',
+  'NUL',
+  'COM1',
+  'COM2',
+  'COM3',
+  'COM4',
+  'COM5',
+  'COM6',
+  'COM7',
+  'COM8',
+  'COM9',
+  'LPT1',
+  'LPT2',
+  'LPT3',
+  'LPT4',
+  'LPT5',
+  'LPT6',
+  'LPT7',
+  'LPT8',
+  'LPT9',
+]);
+
+/**
+ * Maximum filename length (before extension)
+ */
+const MAX_FILENAME_LENGTH = 40;
+
+/**
+ * Sanitize a string to be used as a filename
+ * - Replaces invalid characters with underscore
+ * - Trims whitespace
+ * - Handles reserved names
+ */
+export function sanitizeFilename(name: string): string {
+  if (!name || name.trim() === '') {
+    return 'Untitled';
+  }
+
+  // Replace invalid characters with underscore
+  let sanitized = name.replace(INVALID_FILENAME_CHARS, '_');
+
+  // Replace multiple consecutive underscores with single underscore
+  sanitized = sanitized.replace(/_+/g, '_');
+
+  // Trim whitespace and underscores from ends
+  sanitized = sanitized.trim().replace(/^_+|_+$/g, '');
+
+  // Handle empty result
+  if (sanitized === '') {
+    return 'Untitled';
+  }
+
+  // Handle Windows reserved names
+  const upperName = sanitized.toUpperCase();
+  if (RESERVED_NAMES.has(upperName) || RESERVED_NAMES.has(upperName.split('.')[0] ?? '')) {
+    sanitized = '_' + sanitized;
+  }
+
+  return sanitized;
+}
+
+/**
+ * Truncate filename to maximum length
+ * - Preserves word boundaries where possible
+ */
+export function truncateFilename(name: string, maxLength: number = MAX_FILENAME_LENGTH): string {
+  if (name.length <= maxLength) {
+    return name;
+  }
+
+  // Try to truncate at word boundary
+  const truncated = name.slice(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+
+  if (lastSpace > maxLength * 0.5) {
+    // Found a space in the second half, truncate there
+    return truncated.slice(0, lastSpace).trim();
+  }
+
+  // No good word boundary, just truncate
+  return truncated.trim();
+}
+
+/**
+ * Resolve filename collision by appending a number
+ * - Returns a unique filename that doesn't exist in the set
+ * - Updates the set with the new filename
+ */
+export function resolveFilenameCollision(
+  baseFilename: string,
+  existingFilenames: Set<string>
+): string {
+  const lowerBase = baseFilename.toLowerCase();
+
+  if (!existingFilenames.has(lowerBase)) {
+    existingFilenames.add(lowerBase);
+    return baseFilename;
+  }
+
+  // Find next available number
+  let counter = 2;
+  let candidate: string;
+
+  do {
+    candidate = `${baseFilename} (${counter})`;
+    counter++;
+  } while (existingFilenames.has(candidate.toLowerCase()));
+
+  existingFilenames.add(candidate.toLowerCase());
+  return candidate;
+}
+
+/**
+ * Generate a complete filename for a note
+ * - Sanitizes the title
+ * - Truncates to max length
+ * - Resolves collisions
+ * - Adds .md extension
+ */
+export function generateNoteFilename(title: string, existingFilenames: Set<string>): string {
+  const sanitized = sanitizeFilename(title);
+  const truncated = truncateFilename(sanitized);
+  const unique = resolveFilenameCollision(truncated, existingFilenames);
+
+  return `${unique}.md`;
+}
+
+// ============================================================================
+// Export result types
+// ============================================================================
+
+export interface ExportProgress {
+  current: number;
+  total: number;
+  currentNoteName: string;
+}
+
+export interface ExportResult {
+  success: boolean;
+  exportedCount: number;
+  skippedCount: number;
+  errors: string[];
+  destinationPath: string;
+}

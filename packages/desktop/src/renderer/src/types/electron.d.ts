@@ -443,6 +443,32 @@ declare global {
         onViewHistory: (callback: () => void) => () => void;
         onNoteInfo: (callback: () => void) => () => void;
         onAbout: (callback: () => void) => () => void;
+        onExportSelectedNotes: (callback: () => void) => () => void;
+        onExportAllNotes: (callback: () => void) => () => void;
+      };
+
+      export: {
+        selectDirectory: () => Promise<string | null>;
+        writeFile: (
+          filePath: string,
+          content: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        createDirectory: (dirPath: string) => Promise<{ success: boolean; error?: string }>;
+        getNotesForExport: (noteIds: string[]) => Promise<
+          {
+            id: string;
+            title: string;
+            folderId: string | null;
+            content: unknown;
+            isEmpty: boolean;
+          }[]
+        >;
+        showCompletionMessage: (
+          exportedCount: number,
+          skippedCount: number,
+          destinationPath: string,
+          errors: string[]
+        ) => Promise<void>;
       };
 
       testing: {
