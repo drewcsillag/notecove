@@ -11,6 +11,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Features', link: '/features/' },
       { text: 'Architecture', link: '/architecture/' },
+      { text: 'Technical Docs', link: '/technical_documents/' },
     ],
 
     sidebar: {
@@ -52,6 +53,34 @@ export default defineConfig({
             { text: 'CRDT Synchronization', link: '/architecture/crdt-sync' },
             { text: 'Storage Layer', link: '/architecture/storage' },
             { text: 'Tech Stack', link: '/architecture/tech-stack' },
+          ],
+        },
+      ],
+      '/technical_documents/': [
+        {
+          text: 'Technical Documents',
+          items: [
+            { text: 'Overview', link: '/technical_documents/' },
+          ],
+        },
+        {
+          text: 'Storage System',
+          items: [
+            { text: 'Storage Format Design', link: '/technical_documents/STORAGE-FORMAT-DESIGN' },
+            { text: 'Storage Supplemental', link: '/technical_documents/STORAGE-SUPPLEMENTAL' },
+          ],
+        },
+        {
+          text: 'Architecture',
+          items: [
+            { text: 'Cross-SD Move State Machine', link: '/technical_documents/cross-sd-move-state-machine' },
+          ],
+        },
+        {
+          text: 'Integration',
+          items: [
+            { text: 'IPC Protocol', link: '/technical_documents/ipc-protocol' },
+            { text: 'TipTap-Yjs Compatibility', link: '/technical_documents/tiptap-yjs-compatibility' },
           ],
         },
       ],
