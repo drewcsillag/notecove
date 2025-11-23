@@ -6,7 +6,6 @@
  * - Edit count (100+ updates in single session = split)
  */
 
-import type { UUID } from '../types';
 import type { FileSystemAdapter } from '../storage/types';
 import { LogReader } from '../storage/log-reader';
 

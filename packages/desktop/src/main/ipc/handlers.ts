@@ -17,9 +17,10 @@ import type { NoteMetadata } from './types';
 import type { Database, NoteCache, AppendLogManager, UUID } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags, extractLinks } from '@notecove/shared';
-import { type ActivitySession, type ReconstructionPoint } from '@notecove/shared/history';
+import { type ActivitySession, type ReconstructionPoint, TimelineBuilder } from '@notecove/shared/history';
 import { getTelemetryManager } from '../telemetry/config';
 import type { NoteMoveManager } from '../note-move-manager';
+import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
 import type { DiagnosticsManager } from '../diagnostics-manager';
 import type { BackupManager } from '../backup-manager';
 
@@ -2541,11 +2542,20 @@ export class IPCHandlers {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    // TODO: Phase 8 - Update TimelineBuilder to work with new storage format
-    // TimelineBuilder currently expects UpdateManager with old format methods
-    throw new Error(
-      'History timeline feature is temporarily unavailable during storage format migration'
-    );
+    // Get the SD path for this note
+    const sdPath = this.storageManager.getSDPath(note.sdId);
+    const logsDir = path.join(sdPath, 'notes', noteId, 'logs');
+
+    console.log(`[History] Building timeline for note ${noteId}, logsDir: ${logsDir}`);
+
+    // Build timeline using new log format
+    const fsAdapter = new NodeFileSystemAdapter();
+    const timelineBuilder = new TimelineBuilder(fsAdapter);
+    const sessions = await timelineBuilder.buildTimeline(logsDir);
+
+    console.log(`[History] Found ${sessions.length} sessions for note ${noteId}`);
+
+    return sessions;
   }
 
   /**
@@ -2567,10 +2577,32 @@ export class IPCHandlers {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    // TODO: Phase 8 - Update TimelineBuilder to work with new storage format
-    throw new Error(
-      'History stats feature is temporarily unavailable during storage format migration'
-    );
+    // Get the SD path for this note
+    const sdPath = this.storageManager.getSDPath(note.sdId);
+    const logsDir = path.join(sdPath, 'notes', noteId, 'logs');
+
+    // Build timeline and compute stats
+    const fsAdapter = new NodeFileSystemAdapter();
+    const timelineBuilder = new TimelineBuilder(fsAdapter);
+    const sessions = await timelineBuilder.buildTimeline(logsDir);
+
+    // Compute statistics from sessions
+    const totalUpdates = sessions.reduce((sum, s) => sum + s.updateCount, 0);
+    const allInstances = new Set<string>();
+    for (const session of sessions) {
+      for (const instanceId of session.instanceIds) {
+        allInstances.add(instanceId);
+      }
+    }
+
+    return {
+      totalUpdates,
+      totalSessions: sessions.length,
+      firstEdit: sessions.length > 0 ? sessions[0]!.startTime : null,
+      lastEdit: sessions.length > 0 ? sessions[sessions.length - 1]!.endTime : null,
+      instanceCount: allInstances.size,
+      instances: Array.from(allInstances),
+    };
   }
 
   /**
@@ -2579,17 +2611,33 @@ export class IPCHandlers {
   private async handleReconstructAt(
     _event: IpcMainInvokeEvent,
     noteId: string,
-    _point: ReconstructionPoint
+    point: ReconstructionPoint
   ): Promise<Uint8Array> {
     const note = await this.database.getNote(noteId);
     if (!note) {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    // TODO: Phase 8 - Update TimelineBuilder/StateReconstructor to work with new storage format
-    throw new Error(
-      'History reconstruction feature is temporarily unavailable during storage format migration'
-    );
+    // Get the SD path for this note
+    const sdPath = this.storageManager.getSDPath(note.sdId);
+    const logsDir = path.join(sdPath, 'notes', noteId, 'logs');
+
+    // Build timeline to get all updates
+    const fsAdapter = new NodeFileSystemAdapter();
+    const timelineBuilder = new TimelineBuilder(fsAdapter);
+    const sessions = await timelineBuilder.buildTimeline(logsDir);
+
+    // Collect all updates from all sessions up to target timestamp
+    const doc = new Y.Doc();
+    for (const session of sessions) {
+      for (const update of session.updates) {
+        if (update.timestamp <= point.timestamp) {
+          Y.applyUpdate(doc, update.data);
+        }
+      }
+    }
+
+    return Y.encodeStateAsUpdate(doc);
   }
 
   /**
@@ -2598,17 +2646,61 @@ export class IPCHandlers {
   private async handleGetSessionPreview(
     _event: IpcMainInvokeEvent,
     noteId: string,
-    _sessionId: string
+    sessionId: string
   ): Promise<{ firstPreview: string; lastPreview: string }> {
     const note = await this.database.getNote(noteId);
     if (!note) {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    // TODO: Phase 8 - Update TimelineBuilder/StateReconstructor to work with new storage format
-    throw new Error(
-      'History session preview feature is temporarily unavailable during storage format migration'
-    );
+    // Get the SD path for this note
+    const sdPath = this.storageManager.getSDPath(note.sdId);
+    const logsDir = path.join(sdPath, 'notes', noteId, 'logs');
+
+    // Build timeline to find the session
+    const fsAdapter = new NodeFileSystemAdapter();
+    const timelineBuilder = new TimelineBuilder(fsAdapter);
+    const sessions = await timelineBuilder.buildTimeline(logsDir);
+
+    const targetSession = sessions.find((s) => s.id === sessionId);
+    if (!targetSession) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    // Build state at first update of session
+    const firstDoc = new Y.Doc();
+    // Apply all updates from previous sessions
+    for (const session of sessions) {
+      if (session.id === sessionId) break;
+      for (const update of session.updates) {
+        Y.applyUpdate(firstDoc, update.data);
+      }
+    }
+    // Apply first update of target session
+    if (targetSession.updates.length > 0) {
+      Y.applyUpdate(firstDoc, targetSession.updates[0]!.data);
+    }
+
+    // Build state at last update of session
+    const lastDoc = new Y.Doc();
+    // Apply all updates through target session
+    for (const session of sessions) {
+      for (const update of session.updates) {
+        Y.applyUpdate(lastDoc, update.data);
+      }
+      if (session.id === sessionId) break;
+    }
+
+    // Extract text content from docs
+    const extractText = (doc: Y.Doc): string => {
+      const content = doc.getXmlFragment('content');
+      return content.toString().substring(0, 200); // First 200 chars
+    };
+
+    return {
+      firstPreview: extractText(firstDoc),
+      lastPreview: extractText(lastDoc),
+    };
   }
 
   // ============================================================================
