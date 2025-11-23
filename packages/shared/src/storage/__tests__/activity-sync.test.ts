@@ -12,7 +12,7 @@ describe('ActivitySync', () => {
   let mockFs: jest.Mocked<FileSystemAdapter>;
   let mockCallbacks: jest.Mocked<ActivitySyncCallbacks>;
   let sync: ActivitySync;
-  const activityDir = '/test/.activity';
+  const activityDir = '/test/activity';
   const instanceId = 'test-instance';
 
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('ActivitySync', () => {
 
       // Should only read the other instance's file
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(mockFs.readFile).toHaveBeenCalledWith('/test/.activity/other-instance.log');
+      expect(mockFs.readFile).toHaveBeenCalledWith('/test/activity/other-instance.log');
     });
 
     it('should skip non-log files', async () => {

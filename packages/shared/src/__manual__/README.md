@@ -60,11 +60,11 @@ Results are saved to `/tmp/fuzz-test-{scenario}-{timestamp}/`:
 ├── instance-1/              # First instance's storage directory
 │   ├── notes/
 │   ├── updates/
-│   └── .activity/
+│   └── activity/
 ├── instance-2/              # Second instance's storage directory
 │   ├── notes/
 │   ├── updates/
-│   └── .activity/
+│   └── activity/
 ├── event-log.jsonl         # Complete event log (one JSON per line)
 ├── timeline.txt            # ASCII timeline
 ├── timeline.html           # Interactive HTML timeline

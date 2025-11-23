@@ -8,9 +8,7 @@
 import * as Y from 'yjs';
 import type { CRDTManager, DocumentState } from './types';
 import { NoteDoc, FolderTreeDoc } from '@shared/crdt';
-import { shouldApplyUpdate, parseUpdateFilename } from '@shared/crdt';
-import { DEFAULT_GC_CONFIG, type GCConfig } from '@shared/crdt';
-import type { UpdateManager } from '@shared/storage';
+import type { AppendLogManager } from '@shared/storage';
 import type { UUID, FolderData } from '@shared/types';
 import type { Database } from '@notecove/shared';
 import { getCRDTMetrics } from '../telemetry/crdt-metrics';
@@ -20,21 +18,16 @@ export class CRDTManagerImpl implements CRDTManager {
   private folderTrees = new Map<string, FolderTreeDoc>();
   private activityLoggers = new Map<string, import('@shared/storage').ActivityLogger>();
   private snapshotCheckTimer: NodeJS.Timeout | undefined;
-  private packingTimer: NodeJS.Timeout | undefined;
-  private gcTimer: NodeJS.Timeout | undefined;
   // Track pending update writes for graceful shutdown
   private pendingUpdates = new Set<Promise<void>>();
 
   constructor(
-    private updateManager: UpdateManager,
+    private storageManager: AppendLogManager,
     private database?: Database
   ) {
     // Start periodic snapshot checker (every 10 minutes)
     this.startPeriodicSnapshotChecker();
-    // Start periodic packing job (every 5 minutes)
-    this.startPeriodicPacking();
-    // Start periodic garbage collection (every 30 minutes)
-    this.startPeriodicGC();
+    // Note: GC is deferred per STORAGE-FORMAT-DESIGN.md
   }
 
   async loadNote(noteId: string, sdId?: string): Promise<Y.Doc> {
@@ -52,186 +45,24 @@ export class CRDTManagerImpl implements CRDTManager {
     // If sdId not provided, try to determine it from existing updates
     const noteSdId = sdId ?? (await this.getNoteSdId(noteId));
 
-    // Create new Yjs document
+    // Create new NoteDoc wrapper
     const noteDoc = new NoteDoc(noteId);
-    const doc = noteDoc.doc;
 
-    // Load from snapshot if available, otherwise fall back to loading all updates
+    // Load from storage (handles snapshots, logs, DB cache automatically)
     try {
-      // Check for snapshots
-      const snapshots = await this.updateManager.listSnapshotFiles(noteSdId, noteId);
+      const loadResult = await this.storageManager.loadNote(noteSdId, noteId);
 
-      if (snapshots.length > 0) {
-        // Use snapshot-based loading with error recovery
-        let snapshotLoaded = false;
+      // Merge loaded state into our doc
+      Y.applyUpdate(noteDoc.doc, Y.encodeStateAsUpdate(loadResult.doc));
+      loadResult.doc.destroy(); // Clean up the temporary doc
 
-        // Try snapshots in order (best to worst) until one works
-        for (const snapshotMeta of snapshots) {
-          try {
-            console.log(
-              `[CRDT Manager] Attempting to load snapshot ${snapshotMeta.filename} (${snapshotMeta.totalChanges} changes)`
-            );
-
-            // Load the snapshot
-            const snapshot = await this.updateManager.readSnapshot(
-              noteSdId,
-              noteId,
-              snapshotMeta.filename
-            );
-
-            // Apply snapshot's document state
-            Y.applyUpdate(doc, snapshot.documentState);
-
-            console.log(
-              `[CRDT Manager] Snapshot loaded successfully, now loading packs and remaining updates with vector clock filter`
-            );
-
-            let appliedCount = 0;
-            let skippedCount = 0;
-
-            // Load pack files first (filtered by vector clock)
-            const packFiles = await this.updateManager.listPackFiles(noteSdId, noteId);
-            let packUpdatesApplied = 0;
-
-            for (const packMeta of packFiles) {
-              try {
-                // Check if this pack contains any updates we need
-                // We need the pack if its endSeq > snapshot's maxSeq for this instance
-                const maxSeqForInstance = snapshot.maxSequences[packMeta.instanceId] ?? -1;
-
-                if (packMeta.endSeq <= maxSeqForInstance) {
-                  // All updates in this pack are already in snapshot
-                  console.log(
-                    `[CRDT Manager] Skipping pack ${packMeta.filename} (all updates in snapshot)`
-                  );
-                  continue;
-                }
-
-                // Load the pack
-                const pack = await this.updateManager.readPackFile(
-                  noteSdId,
-                  noteId,
-                  packMeta.filename
-                );
-
-                // Apply updates from pack that aren't in snapshot
-                for (const update of pack.updates) {
-                  if (shouldApplyUpdate(snapshot.maxSequences, packMeta.instanceId, update.seq)) {
-                    Y.applyUpdate(doc, update.data);
-                    appliedCount++;
-                    packUpdatesApplied++;
-                  } else {
-                    skippedCount++;
-                  }
-                }
-
-                console.log(
-                  `[CRDT Manager] Loaded pack ${packMeta.filename}: applied ${pack.updates.length} updates`
-                );
-              } catch (error) {
-                console.error(
-                  `[CRDT Manager] Failed to load pack file ${packMeta.filename}, skipping:`,
-                  error
-                );
-              }
-            }
-
-            if (packFiles.length > 0) {
-              console.log(
-                `[CRDT Manager] Loaded ${packFiles.length} pack files (${packUpdatesApplied} updates)`
-              );
-            }
-
-            // Load unpacked update files and filter based on vector clock
-            const updateFiles = await this.updateManager.listNoteUpdateFiles(noteSdId, noteId);
-
-            for (const updateFile of updateFiles) {
-              try {
-                const metadata = parseUpdateFilename(updateFile.filename);
-
-                if (metadata?.sequence === undefined) {
-                  // Old format without sequence numbers, skip
-                  console.log(
-                    `[CRDT Manager] Skipping update file without sequence: ${updateFile.filename}`
-                  );
-                  skippedCount++;
-                  continue;
-                }
-
-                // Check if this update needs to be applied
-                if (
-                  shouldApplyUpdate(snapshot.maxSequences, metadata.instanceId, metadata.sequence)
-                ) {
-                  // Apply this update (not in snapshot or packs)
-                  const update = await this.updateManager.readUpdateFile(updateFile.path);
-                  Y.applyUpdate(doc, update);
-                  appliedCount++;
-                } else {
-                  // Skip (already in snapshot)
-                  skippedCount++;
-                }
-              } catch (error) {
-                // Log error but continue with other update files
-                console.error(
-                  `[CRDT Manager] Failed to load update file ${updateFile.filename}, skipping:`,
-                  error
-                );
-                skippedCount++;
-              }
-            }
-
-            console.log(
-              `[CRDT Manager] Applied ${appliedCount} total updates (${packUpdatesApplied} from packs, ${appliedCount - packUpdatesApplied} from individual files), skipped ${skippedCount} (already in snapshot or failed)`
-            );
-
-            snapshotLoaded = true;
-            break; // Successfully loaded snapshot, exit loop
-          } catch (error) {
-            console.error(
-              `[CRDT Manager] Failed to load snapshot ${snapshotMeta.filename}, trying next:`,
-              error
-            );
-            // Continue to next snapshot
-          }
-        }
-
-        // If all snapshots failed, fall back to loading all updates
-        if (!snapshotLoaded) {
-          console.warn(
-            `[CRDT Manager] All snapshots failed for note ${noteId}, falling back to loading all updates`
-          );
-          const updates = await this.updateManager.readNoteUpdates(noteSdId, noteId);
-          console.log(
-            `[CRDT Manager] Fallback: loading note ${noteId} from ${updates.length} update files`
-          );
-
-          for (const update of updates) {
-            try {
-              Y.applyUpdate(doc, update);
-            } catch (error) {
-              console.error(`[CRDT Manager] Failed to apply update, skipping:`, error);
-            }
-          }
-        }
-      } else {
-        // No snapshots available, load all updates (old behavior)
-        const updates = await this.updateManager.readNoteUpdates(noteSdId, noteId);
-        console.log(
-          `[CRDT Manager] No snapshots found, loading note ${noteId} from ${updates.length} update files`
-        );
-
-        for (const update of updates) {
-          try {
-            Y.applyUpdate(doc, update);
-          } catch (error) {
-            console.error(`[CRDT Manager] Failed to apply update, skipping:`, error);
-          }
-        }
-      }
+      console.log(`[CRDT Manager] Loaded note ${noteId} from storage`);
     } catch (error) {
       console.error(`Failed to load note ${noteId}:`, error);
       // Continue with empty document
     }
+
+    const doc = noteDoc.doc;
 
     // Store document state
     const now = Date.now();
@@ -262,20 +93,9 @@ export class CRDTManagerImpl implements CRDTManager {
       this.pendingUpdates.add(updatePromise);
     });
 
-    // Check if we should create a snapshot immediately after loading
-    // (e.g., if note has 1000s of updates but no snapshot)
-    this.checkAndCreateSnapshot(noteId).catch((error) => {
-      console.error(`Failed to check/create snapshot for note ${noteId}:`, error);
-    });
-
     // Record cold load metrics
     const loadDuration = Date.now() - loadStartTime;
     getCRDTMetrics().recordColdLoad(loadDuration, { note_id: noteId, sd_id: noteSdId });
-
-    // Record file counts (async, don't block return)
-    this.recordFileCountsAsync(noteSdId, noteId).catch((error) => {
-      console.error(`Failed to record file counts for note ${noteId}:`, error);
-    });
 
     return doc;
   }
@@ -349,7 +169,7 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     // Write update to disk using the note's SD ID and get the sequence number
-    const sequenceNumber = await this.updateManager.writeNoteUpdate(state.sdId, noteId, update);
+    const sequenceNumber = await this.storageManager.writeNoteUpdate(state.sdId, noteId, update);
 
     const now = Date.now();
     state.lastModified = now;
@@ -396,13 +216,12 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     try {
-      // Re-read all updates from disk using the note's SD ID
-      const updates = await this.updateManager.readNoteUpdates(state.sdId, noteId);
+      // Load full state from storage and merge with in-memory doc
+      const loadResult = await this.storageManager.loadNote(state.sdId, noteId);
 
-      // Apply all updates (Yjs will automatically merge and deduplicate)
-      for (const update of updates) {
-        Y.applyUpdate(state.doc, update, 'reload');
-      }
+      // Apply loaded state (Yjs will automatically merge and deduplicate)
+      Y.applyUpdate(state.doc, Y.encodeStateAsUpdate(loadResult.doc), 'reload');
+      loadResult.doc.destroy();
 
       state.lastModified = Date.now();
     } catch (error) {
@@ -454,20 +273,16 @@ export class CRDTManagerImpl implements CRDTManager {
    */
   private async loadFolderTreeUpdates(sdId: string, folderTree: FolderTreeDoc): Promise<void> {
     try {
-      // Read updates for this specific SD only
-      const updates = await this.updateManager.readFolderUpdates(sdId);
+      // Load from storage (handles snapshots, logs, DB cache automatically)
+      const loadResult = await this.storageManager.loadFolderTree(sdId);
 
-      // Apply all updates with 'load' origin to prevent triggering persistence
-      for (const update of updates) {
-        try {
-          Y.applyUpdate(folderTree.doc, update, 'load');
-        } catch (error) {
-          console.error(`[CRDT Manager] Failed to apply folder tree update, skipping:`, error);
-        }
-      }
+      // Apply loaded state with 'load' origin to prevent triggering persistence
+      Y.applyUpdate(folderTree.doc, Y.encodeStateAsUpdate(loadResult.doc), 'load');
+      loadResult.doc.destroy();
 
-      // If no updates were found (new installation), create demo folders
-      if (updates.length === 0 && sdId === 'default') {
+      // Check if folder tree is empty (new installation)
+      const folders = folderTree.getAllFolders();
+      if (folders.length === 0 && sdId === 'default') {
         this.createDemoFolders(folderTree);
       }
     } catch (error) {
@@ -493,7 +308,7 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     // Write update to disk
-    await this.updateManager.writeFolderUpdate(sdId, update);
+    await this.storageManager.writeFolderUpdate(sdId, update);
   }
 
   /**
@@ -654,6 +469,7 @@ export class CRDTManagerImpl implements CRDTManager {
 
   /**
    * Check if a note needs a snapshot and create one if needed
+   * Saves to DB for fast loading on next startup
    * @param noteId Note ID
    */
   private async checkAndCreateSnapshot(noteId: string): Promise<void> {
@@ -666,380 +482,39 @@ export class CRDTManagerImpl implements CRDTManager {
       // Calculate adaptive threshold based on edit rate
       const threshold = this.calculateSnapshotThreshold(state);
 
-      const shouldSnapshot = await this.updateManager.shouldCreateSnapshot(
-        state.sdId,
-        noteId,
-        threshold // adaptive threshold based on document activity
-      );
-
-      if (shouldSnapshot) {
-        console.log(`[CRDT Manager] Creating snapshot for note ${noteId}`);
-
-        const snapshotStartTime = Date.now();
-
-        // Build vector clock from existing update files
-        const vectorClock = await this.updateManager.buildVectorClock(state.sdId, noteId);
-
-        // Get full document state
-        const documentState = Y.encodeStateAsUpdate(state.doc);
-
-        // Write snapshot
-        const filename = await this.updateManager.writeSnapshot(
-          state.sdId,
-          noteId,
-          documentState,
-          vectorClock
-        );
-
-        // Record snapshot creation metrics
-        const now = Date.now();
-        const snapshotDuration = now - snapshotStartTime;
-        getCRDTMetrics().recordSnapshotCreation(snapshotDuration, {
-          note_id: noteId,
-          sd_id: state.sdId,
-          edit_count: state.editCount,
-          threshold,
-        });
-
-        console.log(
-          `[CRDT Manager] Snapshot created: ${filename} (threshold: ${threshold}, edits: ${state.editCount})`
-        );
-
-        // Reset edit tracking
-        state.editCount = 0;
-        state.lastSnapshotCreated = now;
+      // Check if we've exceeded the edit threshold since last snapshot
+      if (state.editCount < threshold) {
+        state.lastSnapshotCheck = Date.now();
+        return;
       }
 
-      // Update last snapshot check time
-      state.lastSnapshotCheck = Date.now();
+      console.log(`[CRDT Manager] Creating DB snapshot for note ${noteId}`);
+
+      const snapshotStartTime = Date.now();
+
+      // Save snapshot to DB (AppendLogManager handles vector clock internally)
+      await this.storageManager.saveNoteSnapshot(state.sdId, noteId, state.doc);
+
+      // Record snapshot creation metrics
+      const now = Date.now();
+      const snapshotDuration = now - snapshotStartTime;
+      getCRDTMetrics().recordSnapshotCreation(snapshotDuration, {
+        note_id: noteId,
+        sd_id: state.sdId,
+        edit_count: state.editCount,
+        threshold,
+      });
+
+      console.log(
+        `[CRDT Manager] DB snapshot saved (threshold: ${threshold}, edits: ${state.editCount})`
+      );
+
+      // Reset edit tracking
+      state.editCount = 0;
+      state.lastSnapshotCreated = now;
+      state.lastSnapshotCheck = now;
     } catch (error) {
       console.error(`[CRDT Manager] Failed to create snapshot for note ${noteId}:`, error);
-    }
-  }
-
-  /**
-   * Start periodic packing job
-   * Checks all SDs every 5 minutes and packs old updates
-   */
-  private startPeriodicPacking(): void {
-    // Check every 5 minutes
-    const intervalMs = 5 * 60 * 1000;
-
-    this.packingTimer = setInterval(() => {
-      this.packAllNotes().catch((error) => {
-        console.error('[CRDT Manager] Error during periodic packing:', error);
-      });
-    }, intervalMs);
-
-    console.log('[CRDT Manager] Started periodic packing job (every 5 minutes)');
-  }
-
-  /**
-   * Pack updates for all notes across all SDs
-   */
-  private async packAllNotes(): Promise<void> {
-    // Get all unique SD IDs from loaded documents and activity loggers
-    const sdIds = new Set<string>();
-
-    // Add SD IDs from loaded documents
-    for (const state of this.documents.values()) {
-      sdIds.add(state.sdId);
-    }
-
-    // Add SD IDs from activity loggers
-    for (const sdId of this.activityLoggers.keys()) {
-      sdIds.add(sdId);
-    }
-
-    if (sdIds.size === 0) {
-      return;
-    }
-
-    console.log(`[CRDT Manager] Periodic packing check for ${sdIds.size} SDs`);
-
-    for (const sdId of sdIds) {
-      await this.packNotesInSD(sdId);
-    }
-  }
-
-  /**
-   * Pack updates for all notes in a specific SD
-   */
-  private async packNotesInSD(sdId: string): Promise<void> {
-    try {
-      // List all notes in this SD
-      const noteIds = await this.updateManager.listNotes(sdId);
-
-      if (noteIds.length === 0) {
-        return;
-      }
-
-      console.log(`[CRDT Manager] Packing check for ${noteIds.length} notes in SD ${sdId}`);
-
-      for (const noteId of noteIds) {
-        await this.packNote(sdId, noteId);
-      }
-    } catch (error) {
-      console.error(`[CRDT Manager] Failed to pack notes in SD ${sdId}:`, error);
-    }
-  }
-
-  /**
-   * Pack updates for a single note
-   *
-   * Algorithm:
-   * 1. List all update files for this note
-   * 2. Group by instance ID
-   * 3. For each instance, sort by sequence number
-   * 4. Pack updates older than 5 minutes, keeping last 50 unpacked
-   * 5. Only pack contiguous sequences (stop at first gap)
-   */
-  private async packNote(sdId: string, noteId: string): Promise<void> {
-    try {
-      // List all update files
-      const updateFiles = await this.updateManager.listNoteUpdateFiles(sdId, noteId);
-
-      if (updateFiles.length === 0) {
-        return;
-      }
-
-      // Group by instance ID
-      const updatesByInstance = new Map<
-        string,
-        { path: string; metadata: { seq: number; timestamp: number } }[]
-      >();
-
-      const now = Date.now();
-      const fiveMinutesAgo = now - 5 * 60 * 1000;
-
-      for (const updateFile of updateFiles) {
-        const metadata = parseUpdateFilename(updateFile.filename);
-
-        if (!metadata?.sequence) {
-          // Old format or invalid, skip
-          continue;
-        }
-
-        // Only consider updates older than 5 minutes
-        if (metadata.timestamp > fiveMinutesAgo) {
-          continue;
-        }
-
-        const instanceId = metadata.instanceId;
-        const existing = updatesByInstance.get(instanceId) ?? [];
-        existing.push({
-          path: updateFile.path,
-          metadata: {
-            seq: metadata.sequence,
-            timestamp: metadata.timestamp,
-          },
-        });
-        updatesByInstance.set(instanceId, existing);
-      }
-
-      // Pack each instance's updates
-      for (const [instanceId, updates] of updatesByInstance.entries()) {
-        // Sort by sequence number
-        updates.sort((a, b) => a.metadata.seq - b.metadata.seq);
-
-        // Keep last 50 updates unpacked
-        const minUnpacked = 50;
-        if (updates.length <= minUnpacked) {
-          // Not enough updates to pack
-          continue;
-        }
-
-        const updatesToPack = updates.slice(0, updates.length - minUnpacked);
-
-        // Find contiguous sequences (stop at first gap)
-        const contiguous: typeof updatesToPack = [];
-        let expectedSeq = updatesToPack[0]?.metadata.seq ?? 0;
-
-        for (const update of updatesToPack) {
-          if (update.metadata.seq !== expectedSeq) {
-            // Gap found, stop here
-            console.log(
-              `[CRDT Manager] Gap detected in note ${noteId}, instance ${instanceId}: expected seq ${expectedSeq}, got ${update.metadata.seq}`
-            );
-            break;
-          }
-          contiguous.push(update);
-          expectedSeq = expectedSeq + 1;
-        }
-
-        // Only pack if we have at least 10 contiguous updates (avoid tiny packs)
-        if (contiguous.length < 10) {
-          continue;
-        }
-
-        // Create the pack
-        try {
-          const packStartTime = Date.now();
-          const filename = await this.updateManager.createPack(sdId, noteId, contiguous);
-          const packDuration = Date.now() - packStartTime;
-
-          // Record pack creation metrics
-          getCRDTMetrics().recordPackCreation(packDuration, contiguous.length, {
-            note_id: noteId,
-            sd_id: sdId,
-            instance_id: instanceId,
-          });
-
-          console.log(
-            `[CRDT Manager] Created pack ${filename} for note ${noteId} (${contiguous.length} updates)`
-          );
-        } catch (error) {
-          console.error(
-            `[CRDT Manager] Failed to create pack for note ${noteId}, instance ${instanceId}:`,
-            error
-          );
-        }
-      }
-    } catch (error) {
-      console.error(`[CRDT Manager] Failed to pack note ${noteId}:`, error);
-    }
-  }
-
-  /**
-   * Start periodic garbage collection job (runs every 30 minutes)
-   * @private
-   */
-  private startPeriodicGC(): void {
-    const config: GCConfig = DEFAULT_GC_CONFIG;
-
-    this.gcTimer = setInterval(() => {
-      this.runGarbageCollection(config).catch((error) => {
-        console.error('[CRDT Manager] GC job failed:', error);
-      });
-    }, config.gcInterval);
-
-    console.log(`[CRDT Manager] Started periodic GC job (interval: ${config.gcInterval}ms)`);
-  }
-
-  /**
-   * Run garbage collection across all notes in all SDs
-   * @private
-   */
-  private async runGarbageCollection(config: GCConfig): Promise<void> {
-    console.log('[CRDT Manager] Starting garbage collection...');
-
-    try {
-      // Get all unique SDs from loaded documents and activity loggers
-      const sdIds = new Set<string>();
-
-      // From loaded documents
-      for (const state of this.documents.values()) {
-        if (state.sdId) {
-          sdIds.add(state.sdId);
-        }
-      }
-
-      // From activity loggers
-      for (const sdId of this.activityLoggers.keys()) {
-        sdIds.add(sdId);
-      }
-
-      // Run GC on each SD
-      for (const sdId of sdIds) {
-        try {
-          await this.gcNotesInSD(sdId, config);
-        } catch (error) {
-          console.error(`[CRDT Manager] GC failed for SD ${sdId}:`, error);
-        }
-      }
-
-      console.log('[CRDT Manager] Garbage collection completed');
-    } catch (error) {
-      console.error('[CRDT Manager] GC failed:', error);
-    }
-  }
-
-  /**
-   * Run GC on all notes in a specific SD
-   * @private
-   */
-  private async gcNotesInSD(sdId: string, config: GCConfig): Promise<void> {
-    try {
-      // Get all notes in this SD
-      const noteIds = await this.updateManager.listNotes(sdId);
-
-      console.log(`[CRDT Manager] Running GC on ${noteIds.length} notes in SD ${sdId}`);
-
-      // Run GC on each note
-      for (const noteId of noteIds) {
-        try {
-          await this.gcNote(sdId, noteId, config);
-        } catch (error) {
-          console.error(`[CRDT Manager] GC failed for note ${noteId}:`, error);
-        }
-      }
-    } catch (error) {
-      console.error(`[CRDT Manager] Failed to list notes in SD ${sdId}:`, error);
-    }
-  }
-
-  /**
-   * Run GC on a specific note
-   * @private
-   */
-  private async gcNote(sdId: string, noteId: string, config: GCConfig): Promise<void> {
-    try {
-      const stats = await this.updateManager.runGarbageCollection(sdId, noteId, config);
-
-      // Record GC metrics
-      getCRDTMetrics().recordGC(
-        {
-          durationMs: stats.duration,
-          filesDeleted: stats.totalFilesDeleted,
-          bytesFreed: stats.diskSpaceFreed,
-          errorCount: stats.errors.length,
-        },
-        { note_id: noteId, sd_id: sdId }
-      );
-
-      // Only log if we actually deleted something
-      if (stats.totalFilesDeleted > 0) {
-        console.log(
-          `[CRDT Manager] GC for note ${noteId}: ` +
-            `deleted ${stats.snapshotsDeleted} snapshots, ` +
-            `${stats.packsDeleted} packs, ` +
-            `${stats.updatesDeleted} updates ` +
-            `(freed ${stats.diskSpaceFreed} bytes in ${stats.duration}ms)`
-        );
-
-        if (stats.errors.length > 0) {
-          console.warn(`[CRDT Manager] GC errors for note ${noteId}:`, stats.errors);
-        }
-      }
-    } catch (error) {
-      console.error(`[CRDT Manager] Failed to run GC on note ${noteId}:`, error);
-    }
-  }
-
-  /**
-   * Record file counts for a note (async helper)
-   * @private
-   */
-  private async recordFileCountsAsync(sdId: string, noteId: string): Promise<void> {
-    try {
-      const snapshots = await this.updateManager.listSnapshotFiles(sdId, noteId);
-      const packs = await this.updateManager.listPackFiles(sdId, noteId);
-      const updates = await this.updateManager.listNoteUpdateFiles(sdId, noteId);
-
-      const total = snapshots.length + packs.length + updates.length;
-
-      getCRDTMetrics().recordFileCounts(
-        {
-          total,
-          snapshots: snapshots.length,
-          packs: packs.length,
-          updates: updates.length,
-        },
-        { note_id: noteId, sd_id: sdId }
-      );
-    } catch (error) {
-      // Silent failure - don't interrupt normal operation
-      console.error(`[CRDT Manager] Failed to record file counts for note ${noteId}:`, error);
     }
   }
 
@@ -1073,20 +548,6 @@ export class CRDTManagerImpl implements CRDTManager {
       clearInterval(this.snapshotCheckTimer);
       this.snapshotCheckTimer = undefined;
       console.log('[CRDT Manager] Stopped periodic snapshot checker');
-    }
-
-    // Stop periodic packing job
-    if (this.packingTimer) {
-      clearInterval(this.packingTimer);
-      this.packingTimer = undefined;
-      console.log('[CRDT Manager] Stopped periodic packing job');
-    }
-
-    // Stop periodic GC job
-    if (this.gcTimer) {
-      clearInterval(this.gcTimer);
-      this.gcTimer = undefined;
-      console.log('[CRDT Manager] Stopped periodic GC job');
     }
 
     for (const state of this.documents.values()) {

@@ -13,6 +13,10 @@ import type {
   SearchResult,
   SchemaVersionRecord,
   StorageDirCache,
+  NoteSyncState,
+  FolderSyncState,
+  ActivityLogState,
+  SequenceState,
 } from './schema';
 import type { UUID } from '../types';
 
@@ -367,6 +371,116 @@ export interface SchemaVersionOperations {
 }
 
 /**
+ * Note sync state operations (new append-only log format)
+ */
+export interface NoteSyncStateOperations {
+  /**
+   * Get sync state for a note
+   */
+  getNoteSyncState(noteId: string, sdId: string): Promise<NoteSyncState | null>;
+
+  /**
+   * Insert or update sync state for a note
+   */
+  upsertNoteSyncState(state: NoteSyncState): Promise<void>;
+
+  /**
+   * Delete sync state for a note
+   */
+  deleteNoteSyncState(noteId: string, sdId: string): Promise<void>;
+
+  /**
+   * Get all sync states for an SD
+   */
+  getNoteSyncStatesBySd(sdId: string): Promise<NoteSyncState[]>;
+
+  /**
+   * Delete all sync states for an SD
+   */
+  deleteNoteSyncStatesBySd(sdId: string): Promise<void>;
+}
+
+/**
+ * Folder sync state operations
+ */
+export interface FolderSyncStateOperations {
+  /**
+   * Get sync state for folders in an SD
+   */
+  getFolderSyncState(sdId: string): Promise<FolderSyncState | null>;
+
+  /**
+   * Insert or update folder sync state
+   */
+  upsertFolderSyncState(state: FolderSyncState): Promise<void>;
+
+  /**
+   * Delete folder sync state
+   */
+  deleteFolderSyncState(sdId: string): Promise<void>;
+}
+
+/**
+ * Activity log state operations
+ */
+export interface ActivityLogStateOperations {
+  /**
+   * Get activity log state for an instance
+   */
+  getActivityLogState(sdId: string, instanceId: string): Promise<ActivityLogState | null>;
+
+  /**
+   * Insert or update activity log state
+   */
+  upsertActivityLogState(state: ActivityLogState): Promise<void>;
+
+  /**
+   * Get all activity log states for an SD
+   */
+  getActivityLogStatesBySd(sdId: string): Promise<ActivityLogState[]>;
+
+  /**
+   * Delete activity log state
+   */
+  deleteActivityLogState(sdId: string, instanceId: string): Promise<void>;
+
+  /**
+   * Delete all activity log states for an SD
+   */
+  deleteActivityLogStatesBySd(sdId: string): Promise<void>;
+}
+
+/**
+ * Sequence state operations
+ */
+export interface SequenceStateOperations {
+  /**
+   * Get sequence state for a document
+   */
+  getSequenceState(sdId: string, documentId: string): Promise<SequenceState | null>;
+
+  /**
+   * Insert or update sequence state
+   */
+  upsertSequenceState(state: SequenceState): Promise<void>;
+
+  /**
+   * Delete sequence state
+   */
+  deleteSequenceState(sdId: string, documentId: string): Promise<void>;
+
+  /**
+   * Get all sequence states for an SD
+   */
+  getSequenceStatesBySd(sdId: string): Promise<SequenceState[]>;
+
+  /**
+   * Delete all sequence states for an SD
+   */
+  deleteSequenceStatesBySd(sdId: string): Promise<void>;
+}
+
+/**
  * Migration result
  */
 export enum MigrationResult {
@@ -391,7 +505,9 @@ export interface Database
     AppStateOperations,
     UserOperations,
     StorageDirOperations,
-    SchemaVersionOperations {
+    SchemaVersionOperations,
+    NoteSyncStateOperations,
+    FolderSyncStateOperations {
   /**
    * Get the underlying adapter
    */

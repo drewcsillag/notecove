@@ -8,7 +8,7 @@ import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
 import type { Database } from '@notecove/shared';
 import {
-  UpdateManager,
+  AppendLogManager,
   SyncDirectoryStructure,
   ActivityLogger,
   ActivitySync,
@@ -25,7 +25,6 @@ import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
 import { ConfigManager } from './config/manager';
 import { initializeTelemetry } from './telemetry/config';
-import { compress, decompress } from './utils/compression';
 import { NoteMoveManager } from './note-move-manager';
 import { DiagnosticsManager } from './diagnostics-manager';
 import { BackupManager } from './backup-manager';
@@ -35,7 +34,7 @@ let database: Database | null = null;
 let configManager: ConfigManager | null = null;
 let ipcHandlers: IPCHandlers | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
-let updateManager: UpdateManager | null = null;
+let storageManager: AppendLogManager | null = null;
 let crdtManager: CRDTManager | null = null;
 let noteMoveManager: NoteMoveManager | null = null;
 let diagnosticsManager: DiagnosticsManager | null = null;
@@ -407,14 +406,14 @@ async function setupSDWatchers(
   sdPath: string,
   fsAdapter: NodeFileSystemAdapter,
   instanceId: string,
-  updateManager: UpdateManager,
+  storageManager: AppendLogManager,
   crdtManager: CRDTManager,
   db: Database
 ): Promise<void> {
   console.log(`[Init] Setting up watchers for SD: ${sdId} at ${sdPath}`);
 
-  const folderUpdatesPath = join(sdPath, 'folders', 'updates');
-  const activityDir = join(sdPath, '.activity');
+  const folderLogsPath = join(sdPath, 'folders', 'logs');
+  const activityDir = join(sdPath, 'activity');
 
   // Create and initialize ActivityLogger for this SD
   const activityLogger = new ActivityLogger(fsAdapter, activityDir);
@@ -673,30 +672,30 @@ async function setupSDWatchers(
   // Store the ActivitySync instance
   sdActivitySyncs.set(sdId, activitySync);
 
-  // Set up folder updates watcher
+  // Set up folder logs watcher (new format uses .crdtlog files)
   const folderWatcher = new NodeFileWatcher();
-  await folderWatcher.watch(folderUpdatesPath, (event) => {
-    console.log(`[FileWatcher ${sdId}] Detected folder update file change:`, event.filename);
+  await folderWatcher.watch(folderLogsPath, (event) => {
+    console.log(`[FileWatcher ${sdId}] Detected folder log file change:`, event.filename);
 
     // Ignore directory creation events and temporary files
-    if (event.filename === 'updates' || event.filename.endsWith('.tmp')) {
+    if (event.filename === 'logs' || event.filename.endsWith('.tmp')) {
       return;
     }
 
-    // Only process .yjson files
-    if (!event.filename.endsWith('.yjson')) {
+    // Only process .crdtlog files
+    if (!event.filename.endsWith('.crdtlog')) {
       return;
     }
 
-    // Reload folder tree from disk
+    // Reload folder tree from disk using storage manager
     const folderTree = crdtManager.getFolderTree(sdId);
     if (folderTree) {
-      updateManager
-        .readFolderUpdates(sdId)
-        .then((updates) => {
-          for (const update of updates) {
-            folderTree.applyUpdate(update);
-          }
+      storageManager
+        .loadFolderTree(sdId)
+        .then((result) => {
+          // Apply loaded state to folder tree
+          Y.applyUpdate(folderTree.doc, Y.encodeStateAsUpdate(result.doc), 'external-sync');
+          result.doc.destroy();
 
           // Broadcast update to all windows
           const windows = BrowserWindow.getAllWindows();
@@ -709,7 +708,7 @@ async function setupSDWatchers(
           }
         })
         .catch((err) => {
-          console.error(`[FileWatcher ${sdId}] Failed to reload folder updates:`, err);
+          console.error(`[FileWatcher ${sdId}] Failed to reload folder tree:`, err);
         });
     }
   });
@@ -1245,24 +1244,25 @@ void app.whenReady().then(async () => {
     // Initialize SD directory structure
     await sdStructure.initialize();
 
-    // Ensure updates directory exists BEFORE creating CRDT manager
+    // Ensure folders/logs directory exists BEFORE creating CRDT manager
     // This prevents ENOENT errors when demo folders are created
-    const folderUpdatesPath = join(storageDir, 'folders', 'updates');
-    await fsAdapter.mkdir(folderUpdatesPath);
+    const folderLogsPath = join(storageDir, 'folders', 'logs');
+    await fsAdapter.mkdir(folderLogsPath);
 
-    // Initialize UpdateManager with instance ID and compression (multi-SD aware)
+    // Initialize AppendLogManager with database (multi-SD aware)
     const instanceId = process.env['INSTANCE_ID'] ?? randomUUID();
-    updateManager = new UpdateManager(fsAdapter, instanceId, compress, decompress);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    storageManager = new AppendLogManager(fsAdapter as any, database, instanceId);
 
     // Register the default SD
-    updateManager.registerSD('default', storageDir);
+    storageManager.registerSD('default', storageDir);
 
     // Load all Storage Directories from database and register them
     const allSDs = await database.getAllStorageDirs();
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
         // Default is already registered above
-        updateManager.registerSD(sd.id, sd.path);
+        storageManager.registerSD(sd.id, sd.path);
         console.log(`[Init] Registered SD: ${sd.name} at ${sd.path}`);
       }
     }
@@ -1270,7 +1270,7 @@ void app.whenReady().then(async () => {
     // Initialize CRDT manager with database reference
     // Type assertion needed due to TypeScript module resolution quirk between dist and src
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    crdtManager = new CRDTManagerImpl(updateManager as any, database);
+    crdtManager = new CRDTManagerImpl(storageManager as any, database);
 
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
@@ -1283,9 +1283,9 @@ void app.whenReady().then(async () => {
         throw new Error('Database not initialized');
       }
 
-      if (!updateManager) {
-        console.error('[Init] UpdateManager not initialized');
-        throw new Error('UpdateManager not initialized');
+      if (!storageManager) {
+        console.error('[Init] StorageManager not initialized');
+        throw new Error('StorageManager not initialized');
       }
 
       if (!crdtManager) {
@@ -1313,16 +1313,16 @@ void app.whenReady().then(async () => {
 
         // 2. Ensure activity directory exists (required for watchers)
         sendProgress(2, 6, 'Setting up activity tracking...');
-        const activityDir = join(sdPath, '.activity');
+        const activityDir = join(sdPath, 'activity');
         console.log(`[Init] Step 2: Creating activity directory at ${activityDir}`);
         await fsAdapter.mkdir(activityDir);
         console.log(`[Init] Step 2: Activity directory created successfully`);
 
-        // 3. Register with UpdateManager
+        // 3. Register with StorageManager
         sendProgress(3, 6, 'Registering storage directory...');
-        console.log(`[Init] Step 3: Registering with UpdateManager`);
-        updateManager.registerSD(sdId, sdPath);
-        console.log(`[Init] Step 3: Registered with UpdateManager`);
+        console.log(`[Init] Step 3: Registering with StorageManager`);
+        storageManager.registerSD(sdId, sdPath);
+        console.log(`[Init] Step 3: Registered with StorageManager`);
 
         // 4. Load folder tree for this SD
         sendProgress(4, 6, 'Loading folder structure...');
@@ -1338,7 +1338,7 @@ void app.whenReady().then(async () => {
           sdPath,
           fsAdapter,
           instanceId,
-          updateManager,
+          storageManager,
           crdtManager,
           database
         );
@@ -1499,7 +1499,7 @@ void app.whenReady().then(async () => {
       crdtManager,
       database,
       configManager,
-      updateManager,
+      storageManager,
       noteMoveManager,
       diagnosticsManager,
       backupManager,
@@ -1526,7 +1526,7 @@ void app.whenReady().then(async () => {
       storageDir,
       fsAdapter,
       instanceId,
-      updateManager,
+      storageManager,
       crdtManager,
       database
     );
@@ -1566,8 +1566,8 @@ void app.whenReady().then(async () => {
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
         // Check if SD is fully initialized by checking for required subdirectories
-        const folderUpdatesPath = join(sd.path, 'folders', 'updates');
-        const isInitialized = await fsAdapter.exists(folderUpdatesPath);
+        const folderLogsPath = join(sd.path, 'folders', 'logs');
+        const isInitialized = await fsAdapter.exists(folderLogsPath);
         if (isInitialized) {
           console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
           await setupSDWatchers(
@@ -1575,7 +1575,7 @@ void app.whenReady().then(async () => {
             sd.path,
             fsAdapter,
             instanceId,
-            updateManager,
+            storageManager,
             crdtManager,
             database
           );

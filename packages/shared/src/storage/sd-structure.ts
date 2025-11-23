@@ -28,6 +28,7 @@ export class SyncDirectoryStructure {
       root: this.config.path,
       notes: this.fs.joinPath(this.config.path, 'notes'),
       folders: this.fs.joinPath(this.config.path, 'folders'),
+      activity: this.fs.joinPath(this.config.path, 'activity'),
     };
   }
 
@@ -43,6 +44,7 @@ export class SyncDirectoryStructure {
       snapshots: this.fs.joinPath(noteRoot, 'snapshots'),
       packs: this.fs.joinPath(noteRoot, 'packs'),
       meta: this.fs.joinPath(noteRoot, 'meta'),
+      logs: this.fs.joinPath(noteRoot, 'logs'),
     };
   }
 
@@ -68,6 +70,7 @@ export class SyncDirectoryStructure {
     await this.fs.mkdir(paths.root);
     await this.fs.mkdir(paths.notes);
     await this.fs.mkdir(paths.folders);
+    await this.fs.mkdir(paths.activity);
 
     // Create folder structure
     const folderPaths = this.getFolderPaths();
@@ -92,11 +95,19 @@ export class SyncDirectoryStructure {
    */
   async exists(): Promise<boolean> {
     const paths = this.getPaths();
+    // Note: activity directory is optional for backwards compatibility
     return (
       (await this.fs.exists(paths.root)) &&
       (await this.fs.exists(paths.notes)) &&
       (await this.fs.exists(paths.folders))
     );
+  }
+
+  /**
+   * Get activity directory path
+   */
+  getActivityPath(): string {
+    return this.getPaths().activity;
   }
 
   /**

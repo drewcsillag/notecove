@@ -138,6 +138,19 @@ class NodeFileSystemAdapter implements FileSystemAdapter {
       ctimeMs: stats.ctimeMs,
     };
   }
+
+  async appendFile(filePath: string, data: Uint8Array): Promise<void> {
+    // Ensure parent directory exists
+    const dir = path.dirname(filePath);
+    try {
+      await fs.mkdir(dir, { recursive: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw error;
+      }
+    }
+    await fs.appendFile(filePath, data);
+  }
 }
 
 export interface TestInstanceConfig {
@@ -166,7 +179,7 @@ export class TestInstance {
 
     this.updateManager = new UpdateManager(this.fs, instanceIdForFiles);
 
-    const activityDir = path.join(config.sdPath, '.activity');
+    const activityDir = path.join(config.sdPath, 'activity');
     this.activityLogger = new ActivityLogger(this.fs, activityDir);
     this.activityLogger.setInstanceId(instanceIdForFiles);
 
@@ -185,7 +198,7 @@ export class TestInstance {
     await this.fs.mkdir(path.join(this.config.sdPath, 'notes'));
     await this.fs.mkdir(path.join(this.config.sdPath, 'folders'));
     await this.fs.mkdir(path.join(this.config.sdPath, 'updates'));
-    await this.fs.mkdir(path.join(this.config.sdPath, '.activity'));
+    await this.fs.mkdir(path.join(this.config.sdPath, 'activity'));
 
     // Register SD with UpdateManager
     this.updateManager.registerSD(this.sdId, this.config.sdPath);

@@ -42,7 +42,10 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "dump:log": "npx tsx tools/dump-crdtlog.ts",
+    "dump:snapshot": "npx tsx tools/dump-snapshot.ts",
+    "dump:activity": "npx tsx tools/dump-activity.ts"
   },
   "dependencies": {
     "@tiptap/core": "^2.26.4",

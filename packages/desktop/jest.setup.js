@@ -3,6 +3,11 @@
  * Runs before all tests to configure the test environment
  */
 
+// Polyfill TextEncoder/TextDecoder for jsdom environment
+const { TextEncoder, TextDecoder } = require('util');
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 // Mock i18next
 jest.mock('i18next', () => ({
   use: jest.fn().mockReturnThis(),

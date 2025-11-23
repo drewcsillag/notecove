@@ -91,9 +91,9 @@ interface MockConfigManager {
   setDatabasePath: jest.Mock;
 }
 
-interface MockUpdateManager {
-  buildVectorClock: jest.Mock;
-  writeSnapshot: jest.Mock;
+interface MockAppendLogManager {
+  getNoteVectorClock: jest.Mock;
+  writeNoteSnapshot: jest.Mock;
 }
 
 interface MockNoteMoveManager {
@@ -135,7 +135,7 @@ describe('IPCHandlers - Folder CRUD', () => {
   let mockCRDTManager: MockCRDTManager;
   let mockDatabase: MockDatabase;
   let mockConfigManager: MockConfigManager;
-  let mockUpdateManager: MockUpdateManager;
+  let mockAppendLogManager: MockAppendLogManager;
   let mockNoteMoveManager: MockNoteMoveManager;
   let mockDiagnosticsManager: MockDiagnosticsManager;
   let mockBackupManager: MockBackupManager;
@@ -187,10 +187,10 @@ describe('IPCHandlers - Folder CRUD', () => {
       setDatabasePath: jest.fn().mockResolvedValue(undefined),
     };
 
-    // Create mock update manager
-    mockUpdateManager = {
-      buildVectorClock: jest.fn(),
-      writeSnapshot: jest.fn(),
+    // Create mock append log manager
+    mockAppendLogManager = {
+      getNoteVectorClock: jest.fn(),
+      writeNoteSnapshot: jest.fn(),
     };
 
     // Create mock note move manager
@@ -235,7 +235,7 @@ describe('IPCHandlers - Folder CRUD', () => {
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
       mockConfigManager as unknown as ConfigManager,
-      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
+      mockAppendLogManager as unknown as import('@notecove/shared').AppendLogManager,
       mockNoteMoveManager as unknown as NoteMoveManager,
       mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager,
       mockBackupManager as unknown as import('../../backup-manager').BackupManager
@@ -867,7 +867,7 @@ describe('IPCHandlers - SD Management', () => {
   let mockCRDTManager: MockCRDTManager;
   let mockDatabase: MockDatabase;
   let mockConfigManager: MockConfigManager;
-  let mockUpdateManager: MockUpdateManager;
+  let mockAppendLogManager: MockAppendLogManager;
   let mockNoteMoveManager: MockNoteMoveManager;
   let mockDiagnosticsManager: MockDiagnosticsManager;
   let mockBackupManager: MockBackupManager;
@@ -919,10 +919,10 @@ describe('IPCHandlers - SD Management', () => {
       setDatabasePath: jest.fn().mockResolvedValue(undefined),
     };
 
-    // Create mock update manager
-    mockUpdateManager = {
-      buildVectorClock: jest.fn(),
-      writeSnapshot: jest.fn(),
+    // Create mock append log manager
+    mockAppendLogManager = {
+      getNoteVectorClock: jest.fn(),
+      writeNoteSnapshot: jest.fn(),
     };
 
     // Create mock note move manager
@@ -967,7 +967,7 @@ describe('IPCHandlers - SD Management', () => {
       mockCRDTManager as unknown as CRDTManager,
       mockDatabase as unknown as Database,
       mockConfigManager as unknown as ConfigManager,
-      mockUpdateManager as unknown as import('@notecove/shared').UpdateManager,
+      mockAppendLogManager as unknown as import('@notecove/shared').AppendLogManager,
       mockNoteMoveManager as unknown as NoteMoveManager,
       mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager,
       mockBackupManager as unknown as import('../../backup-manager').BackupManager

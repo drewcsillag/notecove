@@ -8,7 +8,7 @@ import { FileSystemAdapter } from '../types';
 describe('ActivityLogger', () => {
   let mockFs: jest.Mocked<FileSystemAdapter>;
   let logger: ActivityLogger;
-  const activityDir = '/test/.activity';
+  const activityDir = '/test/activity';
 
   beforeEach(() => {
     mockFs = {

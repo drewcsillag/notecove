@@ -129,15 +129,23 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
       const noteContents = readdirSync(sampleNotePath);
       console.log(`${E2E_LOG_PREFIX} Contents of note directory:`, noteContents);
 
-      // Check if there are any updates
-      const updatesPath = `${sampleNotePath}/updates`;
-      const updateFiles = readdirSync(updatesPath);
-      console.log(`${E2E_LOG_PREFIX} Update files count:`, updateFiles.length);
+      // Check if there are any logs (new format uses logs/ instead of updates/)
+      const logsPath = `${sampleNotePath}/logs`;
+      try {
+        const logFiles = readdirSync(logsPath);
+        console.log(`${E2E_LOG_PREFIX} Log files count:`, logFiles.length);
+      } catch {
+        console.log(`${E2E_LOG_PREFIX} No logs directory found (may use snapshots only)`);
+      }
 
-      // Check if there's a meta file
-      const metaPath = `${sampleNotePath}/meta`;
-      const metaFiles = readdirSync(metaPath);
-      console.log(`${E2E_LOG_PREFIX} Meta files:`, metaFiles);
+      // Check if there are any snapshots
+      const snapshotsPath = `${sampleNotePath}/snapshots`;
+      try {
+        const snapshotFiles = readdirSync(snapshotsPath);
+        console.log(`${E2E_LOG_PREFIX} Snapshot files:`, snapshotFiles);
+      } catch {
+        console.log(`${E2E_LOG_PREFIX} No snapshots directory found`);
+      }
     }
 
     console.log(`${E2E_LOG_PREFIX} Step 4: Launch second instance with fresh database`);

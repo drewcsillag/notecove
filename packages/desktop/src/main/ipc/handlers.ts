@@ -14,15 +14,10 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
-import type { Database, NoteCache, UpdateManager, UUID } from '@notecove/shared';
+import type { Database, NoteCache, AppendLogManager, UUID } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags, extractLinks } from '@notecove/shared';
-import {
-  TimelineBuilder,
-  StateReconstructor,
-  type ActivitySession,
-  type ReconstructionPoint,
-} from '@notecove/shared/history';
+import { type ActivitySession, type ReconstructionPoint } from '@notecove/shared/history';
 import { getTelemetryManager } from '../telemetry/config';
 import type { NoteMoveManager } from '../note-move-manager';
 import type { DiagnosticsManager } from '../diagnostics-manager';
@@ -33,7 +28,7 @@ export class IPCHandlers {
     private crdtManager: CRDTManager,
     private database: Database,
     private configManager: ConfigManager,
-    private updateManager: UpdateManager,
+    private storageManager: AppendLogManager,
     private noteMoveManager: NoteMoveManager,
     private diagnosticsManager: DiagnosticsManager,
     private backupManager: BackupManager,
@@ -286,26 +281,17 @@ export class IPCHandlers {
       const metadata = noteDoc.getMetadata();
       const sdId = metadata.sdId;
 
-      // Build vector clock from existing update files
-      const vectorClock = await this.updateManager.buildVectorClock(sdId, noteId);
-
-      // Get full document state
+      // Get full document
       const doc = this.crdtManager.getDocument(noteId);
       if (!doc) {
         throw new Error(`Note ${noteId} document not found`);
       }
-      const documentState = Y.encodeStateAsUpdate(doc);
 
-      // Write snapshot
-      const filename = await this.updateManager.writeSnapshot(
-        sdId,
-        noteId,
-        documentState,
-        vectorClock
-      );
+      // Save snapshot to database (new format uses DB snapshots)
+      await this.storageManager.saveNoteSnapshot(sdId, noteId, doc);
 
-      console.log(`[IPC] Manual snapshot created for note ${noteId}: ${filename}`);
-      return { success: true, filename };
+      console.log(`[IPC] Manual snapshot created for note ${noteId}`);
+      return { success: true, filename: 'db-snapshot' };
     } catch (error) {
       console.error(`[IPC] Failed to create snapshot for note ${noteId}:`, error);
       return {
@@ -2413,8 +2399,12 @@ export class IPCHandlers {
     }
 
     // Get vector clock (NoteCove's tracking of updates from other instances)
-    // Build it as if we were writing a snapshot - from all update files on disk
-    const vectorClock = await this.updateManager.buildVectorClock(note.sdId, noteId);
+    // Transform the new VectorClock format to the expected Record<string, number>
+    const fullVectorClock = this.storageManager.getNoteVectorClock(note.sdId, noteId);
+    const vectorClock: Record<string, number> = {};
+    for (const [instanceId, entry] of Object.entries(fullVectorClock)) {
+      vectorClock[instanceId] = entry.sequence;
+    }
 
     // Get document state and create hash (only if note is loaded)
     const documentHash = doc
@@ -2429,24 +2419,49 @@ export class IPCHandlers {
     const noteDir = path.join(sd.path, 'notes', noteId);
     const noteDirPath = noteDir;
 
-    // Calculate total size of all update files, packs, and snapshots
-    // Use parallel stat calls for better performance
-    const [snapshots, packs, updates] = await Promise.all([
-      this.updateManager.listSnapshotFiles(note.sdId, noteId),
-      this.updateManager.listPackFiles(note.sdId, noteId),
-      this.updateManager.listNoteUpdateFiles(note.sdId, noteId),
-    ]);
+    // List files in logs and snapshots directories (new format)
+    const logsDir = path.join(noteDir, 'logs');
+    const snapshotsDir = path.join(noteDir, 'snapshots');
 
-    // Get update count (number of update files on disk)
-    const crdtUpdateCount = updates.length;
+    let logs: string[] = [];
+    let snapshots: string[] = [];
+
+    try {
+      logs = await fs.readdir(logsDir);
+      logs = logs.filter((f) => f.endsWith('.crdtlog'));
+    } catch {
+      // Directory may not exist
+    }
+
+    try {
+      snapshots = await fs.readdir(snapshotsDir);
+      snapshots = snapshots.filter((f) => f.endsWith('.snapshot'));
+    } catch {
+      // Directory may not exist
+    }
+
+    // Get counts (new format has no packs)
+    const crdtUpdateCount = logs.length;
     const snapshotCount = snapshots.length;
-    const packCount = packs.length;
+    const packCount = 0; // No packs in new format
 
-    // Sum up file sizes in parallel for better performance
+    // Sum up file sizes
+    const logSizes = await Promise.all(
+      logs.map(async (log) => {
+        try {
+          const logPath = path.join(logsDir, log);
+          const stats = await fs.stat(logPath);
+          return stats.size;
+        } catch {
+          return 0;
+        }
+      })
+    );
+
     const snapshotSizes = await Promise.all(
       snapshots.map(async (snapshot) => {
         try {
-          const snapshotPath = path.join(noteDir, 'snapshots', snapshot.filename);
+          const snapshotPath = path.join(snapshotsDir, snapshot);
           const stats = await fs.stat(snapshotPath);
           return stats.size;
         } catch {
@@ -2455,33 +2470,9 @@ export class IPCHandlers {
       })
     );
 
-    const packSizes = await Promise.all(
-      packs.map(async (pack) => {
-        try {
-          const packPath = path.join(noteDir, 'packs', pack.filename);
-          const stats = await fs.stat(packPath);
-          return stats.size;
-        } catch {
-          return 0;
-        }
-      })
-    );
-
-    const updateSizes = await Promise.all(
-      updates.map(async (update) => {
-        try {
-          const stats = await fs.stat(update.path);
-          return stats.size;
-        } catch {
-          return 0;
-        }
-      })
-    );
-
     const totalFileSize =
-      snapshotSizes.reduce((sum, size) => sum + size, 0) +
-      packSizes.reduce((sum, size) => sum + size, 0) +
-      updateSizes.reduce((sum, size) => sum + size, 0);
+      logSizes.reduce((sum, size) => sum + size, 0) +
+      snapshotSizes.reduce((sum, size) => sum + size, 0);
 
     return {
       id: noteId,
@@ -2550,10 +2541,11 @@ export class IPCHandlers {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    const timelineBuilder = new TimelineBuilder(this.updateManager);
-    const timeline = await timelineBuilder.buildTimeline(note.sdId, noteId);
-
-    return timeline;
+    // TODO: Phase 8 - Update TimelineBuilder to work with new storage format
+    // TimelineBuilder currently expects UpdateManager with old format methods
+    throw new Error(
+      'History timeline feature is temporarily unavailable during storage format migration'
+    );
   }
 
   /**
@@ -2575,10 +2567,10 @@ export class IPCHandlers {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    const timelineBuilder = new TimelineBuilder(this.updateManager);
-    const stats = await timelineBuilder.getHistoryStats(note.sdId, noteId);
-
-    return stats;
+    // TODO: Phase 8 - Update TimelineBuilder to work with new storage format
+    throw new Error(
+      'History stats feature is temporarily unavailable during storage format migration'
+    );
   }
 
   /**
@@ -2587,25 +2579,17 @@ export class IPCHandlers {
   private async handleReconstructAt(
     _event: IpcMainInvokeEvent,
     noteId: string,
-    point: ReconstructionPoint
+    _point: ReconstructionPoint
   ): Promise<Uint8Array> {
     const note = await this.database.getNote(noteId);
     if (!note) {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    const timelineBuilder = new TimelineBuilder(this.updateManager);
-    const stateReconstructor = new StateReconstructor(this.updateManager);
-
-    // Build timeline to get all updates
-    const timeline = await timelineBuilder.buildTimeline(note.sdId, noteId);
-    const allUpdates = timeline.flatMap((session) => session.updates);
-
-    // Reconstruct at the specified point
-    const doc = await stateReconstructor.reconstructAt(note.sdId, noteId, allUpdates, point);
-
-    // Return the document state as Yjs update
-    return Y.encodeStateAsUpdate(doc);
+    // TODO: Phase 8 - Update TimelineBuilder/StateReconstructor to work with new storage format
+    throw new Error(
+      'History reconstruction feature is temporarily unavailable during storage format migration'
+    );
   }
 
   /**
@@ -2614,33 +2598,17 @@ export class IPCHandlers {
   private async handleGetSessionPreview(
     _event: IpcMainInvokeEvent,
     noteId: string,
-    sessionId: string
+    _sessionId: string
   ): Promise<{ firstPreview: string; lastPreview: string }> {
     const note = await this.database.getNote(noteId);
     if (!note) {
       throw new Error(`Note not found: ${noteId}`);
     }
 
-    const timelineBuilder = new TimelineBuilder(this.updateManager);
-    const stateReconstructor = new StateReconstructor(this.updateManager);
-
-    // Build timeline to find the session
-    const timeline = await timelineBuilder.buildTimeline(note.sdId, noteId);
-    const session = timeline.find((s) => s.id === sessionId);
-
-    if (!session) {
-      throw new Error(`Session not found: ${sessionId}`);
-    }
-
-    const allUpdates = timeline.flatMap((s) => s.updates);
-    const preview = await stateReconstructor.getSessionPreview(
-      note.sdId,
-      noteId,
-      session,
-      allUpdates
+    // TODO: Phase 8 - Update TimelineBuilder/StateReconstructor to work with new storage format
+    throw new Error(
+      'History session preview feature is temporarily unavailable during storage format migration'
     );
-
-    return preview;
   }
 
   // ============================================================================

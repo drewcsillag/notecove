@@ -11,6 +11,7 @@ export interface SyncDirectoryPaths {
   root: string;
   notes: string;
   folders: string;
+  activity: string;
 }
 
 /**
@@ -22,6 +23,8 @@ export interface NotePaths {
   snapshots: string;
   packs: string;
   meta: string;
+  /** New append-only log format */
+  logs: string;
 }
 
 /**
@@ -50,6 +53,12 @@ export interface FileSystemAdapter {
   writeFile(path: string, data: Uint8Array): Promise<void>;
 
   /**
+   * Append data to a file (creates file if it doesn't exist)
+   * For append-only log files
+   */
+  appendFile(path: string, data: Uint8Array): Promise<void>;
+
+  /**
    * Delete a file
    */
   deleteFile(path: string): Promise<void>;
@@ -73,6 +82,13 @@ export interface FileSystemAdapter {
    * Get file stats (size, timestamps)
    */
   stat(path: string): Promise<FileStats>;
+
+  /**
+   * Write data at a specific offset in an existing file (optional)
+   * Used for crash-safe snapshot status byte updates.
+   * If not implemented, falls back to read-modify-write.
+   */
+  seekWrite?(path: string, offset: number, data: Uint8Array): Promise<void>;
 }
 
 /**

@@ -172,6 +172,48 @@ export interface SearchResult {
 }
 
 /**
+ * Note sync state for new append-only log format
+ */
+export interface NoteSyncState {
+  noteId: string;
+  sdId: string;
+  vectorClock: string; // JSON: { [instanceId]: { sequence, offset, file } }
+  documentState: Uint8Array; // Yjs encoded state
+  updatedAt: number;
+}
+
+/**
+ * Folder tree sync state
+ */
+export interface FolderSyncState {
+  sdId: string;
+  vectorClock: string; // JSON
+  documentState: Uint8Array;
+  updatedAt: number;
+}
+
+/**
+ * Activity log consumption state
+ */
+export interface ActivityLogState {
+  sdId: string;
+  instanceId: string;
+  lastOffset: number;
+  logFile: string;
+}
+
+/**
+ * Sequence state for tracking write position
+ */
+export interface SequenceState {
+  sdId: string;
+  documentId: string; // noteId or 'folders'
+  currentSequence: number;
+  currentFile: string;
+  currentOffset: number;
+}
+
+/**
  * Database schema version
  *
  * Version history:
@@ -180,12 +222,14 @@ export interface SearchResult {
  * - v3: Added uuid to storage_dirs, added note_moves table
  * - v4: Added note_links table for inter-note links
  * - v5: Added checkboxes table for tri-state task tracking
+ * - v6: Added note_sync_state, folder_sync_state, activity_log_state, sequence_state tables for new append-only log format
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
  * - User data tables (tags, note_tags, note_links, checkboxes, app_state): Migrate with version-specific logic
+ * - Sync state tables: Safe to recreate (will rebuild from files)
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /**
  * SQL schema definitions
@@ -399,5 +443,69 @@ export const SCHEMA_SQL = {
       applied_at INTEGER NOT NULL,
       description TEXT NOT NULL
     );
+  `,
+
+  /**
+   * Note sync state table
+   * Stores vector clock and document state for each note
+   */
+  noteSyncState: `
+    CREATE TABLE IF NOT EXISTS note_sync_state (
+      note_id TEXT NOT NULL,
+      sd_id TEXT NOT NULL,
+      vector_clock TEXT NOT NULL,
+      document_state BLOB NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (note_id, sd_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_note_sync_state_sd_id ON note_sync_state(sd_id);
+    CREATE INDEX IF NOT EXISTS idx_note_sync_state_updated_at ON note_sync_state(updated_at);
+  `,
+
+  /**
+   * Folder sync state table
+   * Stores vector clock and document state for folder tree per SD
+   */
+  folderSyncState: `
+    CREATE TABLE IF NOT EXISTS folder_sync_state (
+      sd_id TEXT PRIMARY KEY,
+      vector_clock TEXT NOT NULL,
+      document_state BLOB NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `,
+
+  /**
+   * Activity log state table
+   * Tracks consumption position in other instances' activity logs
+   */
+  activityLogState: `
+    CREATE TABLE IF NOT EXISTS activity_log_state (
+      sd_id TEXT NOT NULL,
+      instance_id TEXT NOT NULL,
+      last_offset INTEGER NOT NULL,
+      log_file TEXT NOT NULL,
+      PRIMARY KEY (sd_id, instance_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_activity_log_state_sd_id ON activity_log_state(sd_id);
+  `,
+
+  /**
+   * Sequence state table
+   * Tracks current write position for each document
+   */
+  sequenceState: `
+    CREATE TABLE IF NOT EXISTS sequence_state (
+      sd_id TEXT NOT NULL,
+      document_id TEXT NOT NULL,
+      current_sequence INTEGER NOT NULL,
+      current_file TEXT NOT NULL,
+      current_offset INTEGER NOT NULL,
+      PRIMARY KEY (sd_id, document_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sequence_state_sd_id ON sequence_state(sd_id);
   `,
 };

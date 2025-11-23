@@ -6,11 +6,10 @@
  */
 
 import * as Y from 'yjs';
-import type { UUID } from '../types';
-import type { UpdateManager } from '../storage/update-manager';
+import type { FileSystemAdapter } from '../storage/types';
+import { SnapshotReader, type SnapshotContent } from '../storage/snapshot-reader';
+import type { VectorClockEntry } from '../storage/binary-format';
 import type { ActivitySession, HistoryUpdate } from './timeline-builder';
-import type { VectorClock } from '../crdt/snapshot-format';
-import { shouldApplyUpdate } from '../crdt/snapshot-format';
 
 /**
  * Point in time to reconstruct document state

@@ -7,7 +7,8 @@
  */
 
 import type { UUID } from '../types';
-import type { UpdateManager } from '../storage/update-manager';
+import type { FileSystemAdapter } from '../storage/types';
+import { LogReader } from '../storage/log-reader';
 
 /**
  * Single update in note history with metadata
@@ -54,17 +55,19 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
  */
 export class TimelineBuilder {
   constructor(
-    private readonly updateManager: UpdateManager,
+    private readonly fs: FileSystemAdapter,
     private readonly config: SessionConfig = DEFAULT_SESSION_CONFIG
   ) {}
 
   /**
    * Build timeline for a note
    * Returns sessions in chronological order (oldest first)
+   *
+   * @param logsDir - Path to the note's logs directory (e.g., {sdPath}/notes/{noteId}/logs)
    */
-  async buildTimeline(sdId: UUID, noteId: UUID): Promise<ActivitySession[]> {
-    // 1. Collect all updates from packs and individual files
-    const updates = await this.collectAllUpdates(sdId, noteId);
+  async buildTimeline(logsDir: string): Promise<ActivitySession[]> {
+    // 1. Collect all updates from log files
+    const updates = await this.collectAllUpdates(logsDir);
 
     if (updates.length === 0) {
       return [];
@@ -80,53 +83,30 @@ export class TimelineBuilder {
   }
 
   /**
-   * Collect all updates from packs and individual update files
+   * Collect all updates from .crdtlog files in the logs directory
    */
-  private async collectAllUpdates(sdId: UUID, noteId: UUID): Promise<HistoryUpdate[]> {
+  private async collectAllUpdates(logsDir: string): Promise<HistoryUpdate[]> {
     const allUpdates: HistoryUpdate[] = [];
 
-    // Read from pack files first (historical updates)
-    const packs = await this.updateManager.listPackFiles(sdId, noteId);
+    // List all log files in the directory
+    const logFiles = await LogReader.listLogFiles(logsDir, this.fs);
 
-    for (const pack of packs) {
+    for (const logFile of logFiles) {
       try {
-        const packData = await this.updateManager.readPackFile(sdId, noteId, pack.filename);
+        // Read all records from this log file
+        const records = await LogReader.readAllRecords(logFile.path, this.fs);
 
-        // Add all updates from pack
-        for (const entry of packData.updates) {
+        // Add all records as updates
+        for (const record of records) {
           allUpdates.push({
-            instanceId: packData.instanceId,
-            timestamp: entry.timestamp,
-            sequence: entry.seq,
-            data: entry.data,
+            instanceId: logFile.instanceId,
+            timestamp: record.timestamp,
+            sequence: record.sequence,
+            data: record.data,
           });
         }
       } catch (error) {
-        console.error(`Failed to read pack file ${pack.filename}:`, error);
-        // Continue with other packs
-      }
-    }
-
-    // Read from individual update files (recent updates)
-    const updateFiles = await this.updateManager.listNoteUpdateFiles(sdId, noteId);
-
-    for (const file of updateFiles) {
-      try {
-        const data = await this.updateManager.readUpdateFile(file.path);
-
-        // Parse sequence number from filename
-        // Format: <instance-id>_<timestamp>-<sequence>.yjson
-        const seqMatch = file.filename.match(/-(\d+)\.yjson/);
-        const sequence = seqMatch ? parseInt(seqMatch[1], 10) : 0;
-
-        allUpdates.push({
-          instanceId: file.instanceId,
-          timestamp: file.timestamp,
-          sequence,
-          data,
-        });
-      } catch (error) {
-        console.error(`Failed to read update file ${file.filename}:`, error);
+        console.error(`Failed to read log file ${logFile.filename}:`, error);
         // Continue with other files
       }
     }
@@ -197,11 +177,10 @@ export class TimelineBuilder {
 
   /**
    * Get statistics about a note's history
+   *
+   * @param logsDir - Path to the note's logs directory
    */
-  async getHistoryStats(
-    sdId: UUID,
-    noteId: UUID
-  ): Promise<{
+  async getHistoryStats(logsDir: string): Promise<{
     totalUpdates: number;
     totalSessions: number;
     firstEdit: number | null;
@@ -209,7 +188,7 @@ export class TimelineBuilder {
     instanceCount: number;
     instances: string[];
   }> {
-    const sessions = await this.buildTimeline(sdId, noteId);
+    const sessions = await this.buildTimeline(logsDir);
 
     if (sessions.length === 0) {
       return {
@@ -230,11 +209,14 @@ export class TimelineBuilder {
       session.instanceIds.forEach((id) => allInstanceIds.add(id));
     }
 
+    const firstSession = sessions[0];
+    const lastSession = sessions[sessions.length - 1];
+
     return {
       totalUpdates,
       totalSessions: sessions.length,
-      firstEdit: sessions[0].startTime,
-      lastEdit: sessions[sessions.length - 1].endTime,
+      firstEdit: firstSession ? firstSession.startTime : null,
+      lastEdit: lastSession ? lastSession.endTime : null,
       instanceCount: allInstanceIds.size,
       instances: Array.from(allInstanceIds),
     };

@@ -10,13 +10,17 @@ import {
   type AppState,
   type SearchResult,
   type SchemaVersionRecord,
+  type NoteSyncState,
+  type FolderSyncState,
+  type ActivityLogState,
+  type SequenceState,
 } from '../schema';
 import type { UUID } from '../../types';
 
 describe('Database Schema', () => {
   describe('SCHEMA_VERSION', () => {
     it('should be defined', () => {
-      expect(SCHEMA_VERSION).toBe(5);
+      expect(SCHEMA_VERSION).toBe(6);
     });
   });
 
@@ -32,6 +36,13 @@ describe('Database Schema', () => {
       expect(SCHEMA_SQL.noteMoves).toContain('CREATE TABLE IF NOT EXISTS note_moves');
       expect(SCHEMA_SQL.appState).toContain('CREATE TABLE IF NOT EXISTS app_state');
       expect(SCHEMA_SQL.version).toContain('CREATE TABLE IF NOT EXISTS schema_version');
+      // New sync state tables
+      expect(SCHEMA_SQL.noteSyncState).toContain('CREATE TABLE IF NOT EXISTS note_sync_state');
+      expect(SCHEMA_SQL.folderSyncState).toContain('CREATE TABLE IF NOT EXISTS folder_sync_state');
+      expect(SCHEMA_SQL.activityLogState).toContain(
+        'CREATE TABLE IF NOT EXISTS activity_log_state'
+      );
+      expect(SCHEMA_SQL.sequenceState).toContain('CREATE TABLE IF NOT EXISTS sequence_state');
     });
 
     it('should create indices for notes table', () => {
@@ -186,6 +197,60 @@ describe('Database Schema', () => {
 
       expect(versionRecord.version).toBe(1);
       expect(versionRecord.description).toBe('Initial schema');
+    });
+
+    it('should accept valid NoteSyncState', () => {
+      const syncState: NoteSyncState = {
+        noteId: 'note-123',
+        sdId: 'sd-456',
+        vectorClock: JSON.stringify({
+          'inst-abc': { sequence: 10, offset: 5000, file: 'inst-abc_123.crdtlog' },
+        }),
+        documentState: new Uint8Array([0x01, 0x02, 0x03]),
+        updatedAt: Date.now(),
+      };
+
+      expect(syncState.noteId).toBe('note-123');
+      expect(
+        (JSON.parse(syncState.vectorClock) as Record<string, { sequence: number }>)['inst-abc']
+          .sequence
+      ).toBe(10);
+    });
+
+    it('should accept valid FolderSyncState', () => {
+      const syncState: FolderSyncState = {
+        sdId: 'sd-456',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([0x01]),
+        updatedAt: Date.now(),
+      };
+
+      expect(syncState.sdId).toBe('sd-456');
+    });
+
+    it('should accept valid ActivityLogState', () => {
+      const logState: ActivityLogState = {
+        sdId: 'sd-456',
+        instanceId: 'inst-abc',
+        lastOffset: 1024,
+        logFile: 'inst-abc.log',
+      };
+
+      expect(logState.instanceId).toBe('inst-abc');
+      expect(logState.lastOffset).toBe(1024);
+    });
+
+    it('should accept valid SequenceState', () => {
+      const seqState: SequenceState = {
+        sdId: 'sd-456',
+        documentId: 'note-123',
+        currentSequence: 42,
+        currentFile: 'inst-abc_1699028345000.crdtlog',
+        currentOffset: 5000,
+      };
+
+      expect(seqState.currentSequence).toBe(42);
+      expect(seqState.documentId).toBe('note-123');
     });
   });
 });

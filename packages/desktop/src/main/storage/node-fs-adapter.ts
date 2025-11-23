@@ -128,4 +128,17 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
       ctimeMs: stats.ctimeMs,
     };
   }
+
+  async appendFile(path: string, data: Uint8Array): Promise<void> {
+    // Ensure parent directory exists
+    const dir = dirname(path);
+    try {
+      await fs.mkdir(dir, { recursive: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw error;
+      }
+    }
+    await fs.appendFile(path, data);
+  }
 }
