@@ -4,7 +4,7 @@
 
 export * from './types';
 export { SyncDirectoryStructure } from './sd-structure';
-export { UpdateManager } from './update-manager';
+// UpdateManager removed - replaced by AppendLogManager
 export { ActivityLogger } from './activity-logger';
 export { ActivitySync, type ActivitySyncCallbacks } from './activity-sync';
 export { SdUuidManager, type SdIdFile, type SdUuidInitResult } from './sd-uuid';

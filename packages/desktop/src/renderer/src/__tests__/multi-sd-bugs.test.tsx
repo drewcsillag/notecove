@@ -107,6 +107,10 @@ const mockElectronAPI = {
     getNotesForExport: jest.fn(() => Promise.resolve([])),
     showCompletionMessage: jest.fn(() => Promise.resolve()),
   },
+  shutdown: {
+    onProgress: jest.fn(() => () => {}),
+    onComplete: jest.fn(() => () => {}),
+  },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */
 

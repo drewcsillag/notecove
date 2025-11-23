@@ -123,6 +123,14 @@ const mockElectronAPI = {
     getNotesForExport: jest.fn(() => Promise.resolve([])),
     showCompletionMessage: jest.fn(() => Promise.resolve()),
   },
+  shutdown: {
+    onProgress: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onComplete: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+  },
 };
 
 Object.defineProperty(window, 'electronAPI', {
