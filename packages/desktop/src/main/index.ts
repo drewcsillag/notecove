@@ -1666,7 +1666,34 @@ app.on('will-quit', (event) => {
         await manager.flush();
         console.log('[App] CRDT updates flushed successfully');
 
-        // 2. Destroy CRDT manager
+        // 2. Create snapshots for modified notes (show progress if >5)
+        const pendingCount = manager.getPendingSnapshotCount();
+        if (pendingCount > 0) {
+          console.log(`[App] Creating shutdown snapshots for ${pendingCount} notes...`);
+
+          // Show progress UI if many notes need saving
+          const showProgress = pendingCount > 5;
+          const progressCallback = showProgress
+            ? (current: number, total: number) => {
+                BrowserWindow.getAllWindows().forEach((window) => {
+                  window.webContents.send('shutdown:progress', { current, total });
+                });
+              }
+            : undefined;
+
+          await manager.flushSnapshots(progressCallback);
+
+          // Signal completion
+          if (showProgress) {
+            BrowserWindow.getAllWindows().forEach((window) => {
+              window.webContents.send('shutdown:complete');
+            });
+          }
+
+          console.log('[App] Shutdown snapshots created successfully');
+        }
+
+        // 3. Destroy CRDT manager
         console.log('[App] Destroying CRDT manager...');
         manager.destroy();
       }

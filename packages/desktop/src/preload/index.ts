@@ -523,6 +523,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('appState:set', key, value) as Promise<void>,
   },
 
+  // Shutdown progress operations
+  shutdown: {
+    onProgress: (
+      callback: (data: { current: number; total: number }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { current: number; total: number }
+      ): void => {
+        callback(data);
+      };
+      ipcRenderer.on('shutdown:progress', listener);
+      return () => {
+        ipcRenderer.removeListener('shutdown:progress', listener);
+      };
+    },
+    onComplete: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('shutdown:complete', listener);
+      return () => {
+        ipcRenderer.removeListener('shutdown:complete', listener);
+      };
+    },
+  },
+
   // Config operations
   config: {
     getDatabasePath: (): Promise<string> =>

@@ -11,7 +11,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import Underline from '@tiptap/extension-underline';
 import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
-import { Box, useTheme } from '@mui/material';
+import { Box, useTheme, Chip, Fade } from '@mui/material';
+import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
@@ -42,6 +43,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
+  // Show sync indicator when external updates arrive
+  const [showSyncIndicator, setShowSyncIndicator] = useState(false);
+  const syncIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Start with loading=true to prevent title extraction before note loads
   const isLoadingNoteRef = useRef(true);
   const noteIdRef = useRef<string | null>(noteId);
@@ -355,6 +359,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           try {
             const state = await window.electronAPI.note.getState(noteId);
             Y.applyUpdate(yDoc, state, 'remote');
+
+            // Show sync indicator briefly
+            if (syncIndicatorTimerRef.current) {
+              clearTimeout(syncIndicatorTimerRef.current);
+            }
+            setShowSyncIndicator(true);
+            syncIndicatorTimerRef.current = setTimeout(() => {
+              setShowSyncIndicator(false);
+            }, 2000);
           } catch (error) {
             console.error(`Failed to reload note ${noteId}:`, error);
           }
@@ -368,6 +381,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       isActive = false;
       cleanupNoteUpdate();
       cleanupExternalUpdate();
+      // Clean up sync indicator timer
+      if (syncIndicatorTimerRef.current) {
+        clearTimeout(syncIndicatorTimerRef.current);
+      }
       // Tell main process we're done with this note
       void window.electronAPI.note.unload(noteId);
     };
@@ -535,6 +552,24 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }}
     >
       <EditorToolbar editor={editor} />
+      {/* Sync indicator - shows briefly when external updates arrive */}
+      <Fade in={showSyncIndicator}>
+        <Chip
+          icon={<SyncIcon sx={{ fontSize: '0.9rem' }} />}
+          label="Synced"
+          size="small"
+          color="primary"
+          variant="outlined"
+          sx={{
+            position: 'absolute',
+            top: 48, // Below toolbar
+            right: 8,
+            zIndex: 10,
+            fontSize: '0.75rem',
+            height: 24,
+          }}
+        />
+      </Fade>
       <Box
         sx={{ flex: 1, overflow: 'auto', padding: 2, cursor: 'text' }}
         onClick={(e) => {

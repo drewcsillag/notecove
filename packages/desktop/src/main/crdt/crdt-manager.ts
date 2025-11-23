@@ -540,6 +540,64 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Get count of notes that have unsaved edits needing snapshots
+   */
+  getPendingSnapshotCount(): number {
+    let count = 0;
+    for (const state of this.documents.values()) {
+      if (state.editCount > 0) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Create snapshots for all loaded documents with unsaved edits
+   * Called during graceful shutdown to ensure all edits are persisted
+   */
+  async flushSnapshots(onProgress?: (current: number, total: number) => void): Promise<void> {
+    // Collect notes that need snapshots (any edits since last snapshot)
+    const notesNeedingSnapshots: string[] = [];
+    for (const [noteId, state] of this.documents.entries()) {
+      if (state.editCount > 0) {
+        notesNeedingSnapshots.push(noteId);
+      }
+    }
+
+    const total = notesNeedingSnapshots.length;
+    if (total === 0) {
+      console.log('[CRDT Manager] No notes need snapshots');
+      return;
+    }
+
+    console.log(`[CRDT Manager] Creating shutdown snapshots for ${total} notes...`);
+
+    for (let i = 0; i < notesNeedingSnapshots.length; i++) {
+      const noteId = notesNeedingSnapshots[i]!;
+      const state = this.documents.get(noteId);
+
+      if (state) {
+        try {
+          // Report progress
+          if (onProgress) {
+            onProgress(i + 1, total);
+          }
+
+          console.log(`[CRDT Manager] Creating shutdown snapshot for note ${noteId} (${i + 1}/${total})`);
+          await this.storageManager.saveNoteSnapshot(state.sdId, noteId, state.doc);
+          state.editCount = 0;
+        } catch (error) {
+          console.error(`[CRDT Manager] Failed to create shutdown snapshot for ${noteId}:`, error);
+          // Continue with other notes
+        }
+      }
+    }
+
+    console.log(`[CRDT Manager] Completed shutdown snapshots for ${total} notes`);
+  }
+
+  /**
    * Clean up all documents
    */
   destroy(): void {

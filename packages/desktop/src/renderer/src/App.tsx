@@ -14,6 +14,7 @@ import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
 import { EditorPanel } from './components/EditorPanel/EditorPanel';
 import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgressDialog';
+import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownProgressDialog';
 import { NoteInfoDialog } from './components/NoteInfoDialog';
 import { AppStateKey } from '@notecove/shared';
 
@@ -43,6 +44,12 @@ function App(): React.ReactElement {
     message: string;
     error?: string;
   }>({ open: false, step: 0, total: 6, message: '' });
+  // Shutdown progress (for snapshot saving)
+  const [shutdownProgress, setShutdownProgress] = useState<{
+    open: boolean;
+    current: number;
+    total: number;
+  }>({ open: false, current: 0, total: 0 });
   // Minimal mode (for linked note windows)
   const [minimalMode, setMinimalMode] = useState(false);
   // Export trigger from menu (null | 'selected' | 'all')
@@ -115,6 +122,26 @@ function App(): React.ReactElement {
       unsubscribeProgress();
       unsubscribeComplete();
       unsubscribeError();
+    };
+  }, []);
+
+  // Listen for shutdown progress (when app is closing and saving snapshots)
+  useEffect(() => {
+    const unsubscribeProgress = window.electronAPI.shutdown.onProgress((data) => {
+      setShutdownProgress({
+        open: true,
+        current: data.current,
+        total: data.total,
+      });
+    });
+
+    const unsubscribeComplete = window.electronAPI.shutdown.onComplete(() => {
+      setShutdownProgress({ open: false, current: 0, total: 0 });
+    });
+
+    return () => {
+      unsubscribeProgress();
+      unsubscribeComplete();
     };
   }, []);
 
@@ -509,6 +536,11 @@ function App(): React.ReactElement {
           total={sdInitProgress.total}
           message={sdInitProgress.message}
           {...(sdInitProgress.error ? { error: sdInitProgress.error } : {})}
+        />
+        <ShutdownProgressDialog
+          open={shutdownProgress.open}
+          current={shutdownProgress.current}
+          total={shutdownProgress.total}
         />
       </DndProvider>
     </ThemeProvider>

@@ -100,6 +100,21 @@ export interface CRDTManager {
   flush(): Promise<void>;
 
   /**
+   * Get count of notes that have unsaved edits needing snapshots
+   * Used to determine if shutdown progress UI should be shown
+   * @returns Number of notes with pending edits
+   */
+  getPendingSnapshotCount(): number;
+
+  /**
+   * Create snapshots for all loaded documents with unsaved edits
+   * Should be called during graceful shutdown
+   * @param onProgress Optional callback for progress reporting (current, total)
+   * @returns Promise that resolves when all snapshots are created
+   */
+  flushSnapshots(onProgress?: (current: number, total: number) => void): Promise<void>;
+
+  /**
    * Clean up all documents and resources
    * Should be called after flush() during graceful shutdown
    */

@@ -260,6 +260,11 @@ declare global {
         set: (key: string, value: string) => Promise<void>;
       };
 
+      shutdown: {
+        onProgress: (callback: (data: { current: number; total: number }) => void) => () => void;
+        onComplete: (callback: () => void) => () => void;
+      };
+
       config: {
         getDatabasePath: () => Promise<string>;
         setDatabasePath: (path: string) => Promise<void>;
