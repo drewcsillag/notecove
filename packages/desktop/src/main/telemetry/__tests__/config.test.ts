@@ -141,9 +141,7 @@ describe('TelemetryManager', () => {
         datadogApiKey: 'test-key',
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Remote metrics setting changed')
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Metrics settings changed'));
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('OpenTelemetry SDK initialized')
       );

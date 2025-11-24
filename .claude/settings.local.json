@@ -106,7 +106,9 @@
       "Bash(npx tsx:*)",
       "Bash(git reset:*)",
       "Bash(pnpm --filter @notecove/desktop typecheck:*)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(git restore:*)",
+      "Bash(xxd:*)"
     ],
     "deny": [],
     "ask": []
