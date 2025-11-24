@@ -2325,7 +2325,7 @@ export class IPCHandlers {
     paragraphCount: number;
 
     // CRDT info
-    vectorClock: Record<string, number>; // Maps instance ID to highest sequence number
+    vectorClock: Record<string, { sequence: number; offset: number; file: string }>;
     documentHash: string; // SHA-256 hash of document state (first 16 chars)
     crdtUpdateCount: number; // Number of updates in the document
     noteDirPath: string; // Path to note directory
@@ -2423,12 +2423,8 @@ export class IPCHandlers {
     }
 
     // Get vector clock (NoteCove's tracking of updates from other instances)
-    // Transform the new VectorClock format to the expected Record<string, number>
-    const fullVectorClock = this.storageManager.getNoteVectorClock(note.sdId, noteId);
-    const vectorClock: Record<string, number> = {};
-    for (const [instanceId, entry] of Object.entries(fullVectorClock)) {
-      vectorClock[instanceId] = entry.sequence;
-    }
+    // Return the full VectorClock format for debugging (includes sequence, offset, file)
+    const vectorClock = this.storageManager.getNoteVectorClock(note.sdId, noteId);
 
     // Get document state and create hash (only if note is loaded)
     const documentHash = doc

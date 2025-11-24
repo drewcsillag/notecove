@@ -83,7 +83,7 @@ declare global {
           characterCount: number;
           wordCount: number;
           paragraphCount: number;
-          vectorClock: Record<string, number>;
+          vectorClock: Record<string, { sequence: number; offset: number; file: string }>;
           documentHash: string;
           crdtUpdateCount: number;
           noteDirPath: string;

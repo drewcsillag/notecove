@@ -242,6 +242,8 @@ export class CRDTManagerImpl implements CRDTManager {
       state.lastModified = Date.now();
     } catch (error) {
       console.error(`Failed to reload note ${noteId}:`, error);
+      // Re-throw so ActivitySync can retry with exponential backoff
+      throw error;
     }
   }
 

@@ -48,7 +48,7 @@ interface NoteInfo {
   characterCount: number;
   wordCount: number;
   paragraphCount: number;
-  vectorClock: Record<string, number>;
+  vectorClock: Record<string, { sequence: number; offset: number; file: string }>;
   documentHash: string;
   crdtUpdateCount: number;
   noteDirPath: string;
@@ -298,26 +298,65 @@ export const NoteInfoDialog: React.FC<NoteInfoDialogProps> = ({ open, noteId, on
                         Vector Clock
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontFamily: 'monospace',
-                              fontSize: '0.75rem',
-                              wordBreak: 'break-all',
-                            }}
-                          >
-                            {JSON.stringify(noteInfo.vectorClock)}
-                          </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          {Object.entries(noteInfo.vectorClock).length === 0 ? (
+                            <Typography
+                              variant="body2"
+                              sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                            >
+                              (empty)
+                            </Typography>
+                          ) : (
+                            Object.entries(noteInfo.vectorClock).map(([instanceId, entry]) => (
+                              <Box
+                                key={instanceId}
+                                sx={{
+                                  backgroundColor: 'action.hover',
+                                  borderRadius: 1,
+                                  p: 1,
+                                }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.7rem',
+                                    color: 'text.secondary',
+                                    wordBreak: 'break-all',
+                                  }}
+                                >
+                                  {instanceId}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                                >
+                                  seq: {entry.sequence}, offset: {entry.offset}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.65rem',
+                                    color: 'text.secondary',
+                                    wordBreak: 'break-all',
+                                  }}
+                                >
+                                  {entry.file}
+                                </Typography>
+                              </Box>
+                            ))
+                          )}
                           <IconButton
                             size="small"
                             onClick={() => {
                               void copyToClipboard(
-                                JSON.stringify(noteInfo.vectorClock),
+                                JSON.stringify(noteInfo.vectorClock, null, 2),
                                 'Vector Clock'
                               );
                             }}
                             title="Copy to clipboard"
+                            sx={{ alignSelf: 'flex-start' }}
                           >
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
