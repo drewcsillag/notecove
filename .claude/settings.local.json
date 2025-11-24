@@ -100,7 +100,13 @@
       "Bash(pnpm --filter @notecove/desktop lint:*)",
       "Bash(npx playwright test:*)",
       "Bash(pnpm --filter @notecove/desktop test:e2e --grep \"Cross-Platform Full Sync|collaborative editing\")",
-      "Bash(pnpm install)"
+      "Bash(pnpm install)",
+      "Bash(pnpm --filter @notecove/website build:*)",
+      "Bash(.gitignore)",
+      "Bash(npx tsx:*)",
+      "Bash(git reset:*)",
+      "Bash(pnpm --filter @notecove/desktop typecheck:*)",
+      "Bash(pnpm:*)"
     ],
     "deny": [],
     "ask": []

@@ -46,6 +46,7 @@ const sdFileWatchers = new Map<string, NodeFileWatcher>();
 const sdActivityWatchers = new Map<string, NodeFileWatcher>();
 const sdActivitySyncs = new Map<string, ActivitySync>();
 const sdActivityLoggers = new Map<string, ActivityLogger>();
+const sdActivityPollIntervals = new Map<string, NodeJS.Timeout>();
 
 /**
  * Reindex tags for a set of notes after external sync
@@ -897,6 +898,41 @@ async function setupSDWatchers(
     }
   }
 
+  // Set up polling backup for activity sync
+  // Chokidar may miss/coalesce rapid file changes, so poll every 3 seconds as backup
+  const pollInterval = setInterval(async () => {
+    try {
+      const affectedNotes = await activitySync.syncFromOtherInstances();
+
+      if (affectedNotes.size > 0) {
+        console.log(`[ActivitySync Poll ${sdId}] Found changes via poll:`, Array.from(affectedNotes));
+
+        // Wait for pending syncs to complete
+        await activitySync.waitForPendingSyncs();
+
+        // Reindex tags for affected notes
+        await reindexTagsForNotes(affectedNotes, crdtManager, db);
+
+        // Broadcast updates to all windows
+        const noteIds = Array.from(affectedNotes);
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('note:external-update', {
+            operation: 'sync',
+            noteIds,
+          });
+        }
+      }
+    } catch (error) {
+      // Don't log every poll failure, just errors
+      if (String(error).indexOf('ENOENT') === -1) {
+        console.error(`[ActivitySync Poll ${sdId}] Poll failed:`, error);
+      }
+    }
+  }, 3000);
+
+  // Store interval for cleanup
+  sdActivityPollIntervals.set(sdId, pollInterval);
+
   console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
 }
 
@@ -1718,6 +1754,13 @@ app.on('will-quit', (event) => {
       }
       sdActivityWatchers.clear();
       sdActivitySyncs.clear();
+
+      // 5b. Clear activity poll intervals
+      console.log('[App] Cleaning up activity poll intervals...');
+      for (const interval of sdActivityPollIntervals.values()) {
+        clearInterval(interval);
+      }
+      sdActivityPollIntervals.clear();
 
       // 6. Clear compaction interval
       if (compactionInterval) {

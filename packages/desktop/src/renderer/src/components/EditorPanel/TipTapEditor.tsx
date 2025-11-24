@@ -353,12 +353,29 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
     // Set up listener for updates from other instances (via activity sync)
     const handleExternalUpdate = (data: { operation: string; noteIds: string[] }) => {
+      console.log(
+        `[TipTapEditor] onExternalUpdate received:`,
+        data.operation,
+        data.noteIds,
+        `this note: ${noteId}, included: ${data.noteIds.includes(noteId)}`
+      );
+
       if (data.noteIds.includes(noteId)) {
         // Reload note state from main process
         void (async () => {
           try {
+            console.log(`[TipTapEditor] Fetching state for note ${noteId}...`);
             const state = await window.electronAPI.note.getState(noteId);
+            console.log(`[TipTapEditor] Got state, size: ${state.length} bytes`);
+
+            // Log content before and after
+            const beforeText = yDoc.getText('content')?.toString() ?? '';
+            console.log(`[TipTapEditor] Before apply, content length: ${beforeText.length}`);
+
             Y.applyUpdate(yDoc, state, 'remote');
+
+            const afterText = yDoc.getText('content')?.toString() ?? '';
+            console.log(`[TipTapEditor] After apply, content length: ${afterText.length}`);
 
             // Show sync indicator briefly
             if (syncIndicatorTimerRef.current) {

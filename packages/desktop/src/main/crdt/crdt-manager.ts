@@ -209,19 +209,35 @@ export class CRDTManagerImpl implements CRDTManager {
    * This is used for cross-instance synchronization.
    */
   async reloadNote(noteId: string): Promise<void> {
+    console.log(`[CRDT Manager] reloadNote called for ${noteId}`);
+
     const state = this.documents.get(noteId);
     if (!state) {
       // Note not loaded, nothing to do
+      console.log(`[CRDT Manager] Note ${noteId} not in documents, skipping reload`);
+      console.log(`[CRDT Manager] Loaded notes: ${Array.from(this.documents.keys()).join(', ')}`);
       return;
     }
 
     try {
+      // Log content before reload
+      const beforeContent = state.doc.getXmlFragment('content');
+      console.log(`[CRDT Manager] Before reload, content length: ${beforeContent.length}`);
+
       // Load full state from storage and merge with in-memory doc
       const loadResult = await this.storageManager.loadNote(state.sdId, noteId);
+
+      // Log loaded content
+      const loadedContent = loadResult.doc.getXmlFragment('content');
+      console.log(`[CRDT Manager] Loaded from disk, content length: ${loadedContent.length}`);
 
       // Apply loaded state (Yjs will automatically merge and deduplicate)
       Y.applyUpdate(state.doc, Y.encodeStateAsUpdate(loadResult.doc), 'reload');
       loadResult.doc.destroy();
+
+      // Log content after reload
+      const afterContent = state.doc.getXmlFragment('content');
+      console.log(`[CRDT Manager] After reload, content length: ${afterContent.length}`);
 
       state.lastModified = Date.now();
     } catch (error) {
