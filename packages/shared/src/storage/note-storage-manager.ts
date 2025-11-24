@@ -54,6 +54,8 @@ export class NoteStorageManager {
   private readonly instanceId: string;
   private readonly logWriters: Map<string, LogWriter> = new Map();
   private readonly sequences: Map<string, number> = new Map();
+  // Write queues to serialize writes per note and prevent out-of-order records
+  private readonly writeQueues: Map<string, Promise<SaveUpdateResult>> = new Map();
 
   constructor(fs: FileSystemAdapter, db: NoteSyncStateDb, instanceId: string) {
     this.fs = fs;
@@ -134,6 +136,9 @@ export class NoteStorageManager {
   /**
    * Save an update to the log file.
    * Creates/appends to the current log file for this note.
+   *
+   * Uses a queue to serialize writes per note, ensuring records are written
+   * in sequence order even when multiple updates arrive concurrently.
    */
   async saveUpdate(
     sdId: string,
@@ -141,21 +146,40 @@ export class NoteStorageManager {
     paths: NoteLogPaths,
     update: Uint8Array
   ): Promise<SaveUpdateResult> {
-    const writer = this.getLogWriter(noteId, paths);
+    const queueKey = `${sdId}:${noteId}`;
 
-    // Get next sequence number
-    const seqKey = `${sdId}:${noteId}`;
-    const sequence = (this.sequences.get(seqKey) || 0) + 1;
-    this.sequences.set(seqKey, sequence);
+    // Chain this write after any pending writes for this note
+    const previousWrite = this.writeQueues.get(queueKey) ?? Promise.resolve({} as SaveUpdateResult);
 
-    const timestamp = Date.now();
-    const result = await writer.appendRecord(timestamp, sequence, update);
+    const writePromise = previousWrite.then(async () => {
+      const writer = this.getLogWriter(noteId, paths);
 
-    return {
-      sequence,
-      offset: result.offset,
-      file: result.file,
-    };
+      // Get next sequence number
+      const seqKey = `${sdId}:${noteId}`;
+      const sequence = (this.sequences.get(seqKey) || 0) + 1;
+      this.sequences.set(seqKey, sequence);
+
+      const timestamp = Date.now();
+      const result = await writer.appendRecord(timestamp, sequence, update);
+
+      return {
+        sequence,
+        offset: result.offset,
+        file: result.file,
+      };
+    });
+
+    // Store this write as the new tail of the queue
+    this.writeQueues.set(queueKey, writePromise);
+
+    // Clean up the queue entry after completion to prevent memory leak
+    writePromise.finally(() => {
+      if (this.writeQueues.get(queueKey) === writePromise) {
+        this.writeQueues.delete(queueKey);
+      }
+    });
+
+    return writePromise;
   }
 
   /**

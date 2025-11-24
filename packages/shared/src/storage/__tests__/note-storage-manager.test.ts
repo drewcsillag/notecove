@@ -459,6 +459,47 @@ describe('NoteStorageManager', () => {
       expect(logFiles.length).toBe(1);
     });
 
+    it('should serialize concurrent writes to maintain sequence order', async () => {
+      const fs = createMockFs();
+      const db = createMockDb();
+      const paths = createNotePaths(sdPath, noteId);
+
+      fs.directories.add(paths.logs);
+      fs.directories.add(paths.snapshots);
+
+      const manager = new NoteStorageManager(fs, db, instanceId);
+
+      // Create multiple updates
+      const updates = Array.from({ length: 10 }, (_, i) => {
+        const doc = new Y.Doc();
+        doc.clientID = i + 1;
+        doc.getText('content').insert(0, `Update ${i}`);
+        return Y.encodeStateAsUpdate(doc);
+      });
+
+      // Fire all updates concurrently (simulating rapid Yjs updates)
+      const results = await Promise.all(
+        updates.map((update) => manager.saveUpdate(sdId, noteId, paths, update))
+      );
+
+      // All sequences should be 1, 2, 3, ... 10 in order
+      const sequences = results.map((r) => r.sequence);
+      expect(sequences).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+      // Verify the file has records in order
+      const logFiles = await fs.listFiles(paths.logs);
+      expect(logFiles.length).toBe(1);
+
+      const logData = fs.files.get(`${paths.logs}/${logFiles[0]}`);
+      expect(logData).toBeDefined();
+
+      // Parse records and verify sequence order
+      const { parseLogFile } = await import('../binary-format');
+      const parsed = parseLogFile(logData!);
+      const fileSequences = parsed.records.map((r) => r.sequence);
+      expect(fileSequences).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    });
+
     it('should increment sequence number for each update', async () => {
       const fs = createMockFs();
       const db = createMockDb();
