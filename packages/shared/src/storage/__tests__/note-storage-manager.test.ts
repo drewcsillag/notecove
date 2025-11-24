@@ -583,6 +583,103 @@ describe('NoteStorageManager', () => {
     });
   });
 
+  describe('vector clock offset calculation', () => {
+    it('should set offset to exact next record position (not approximate)', async () => {
+      const fs = createMockFs();
+      const db = createMockDb();
+      const paths = createNotePaths(sdPath, noteId);
+
+      // Create multiple updates with varying data sizes to ensure
+      // the offset calculation is exact, not approximated
+      const doc1 = new Y.Doc();
+      doc1.clientID = 1;
+      doc1.getText('content').insert(0, 'Short');
+      const update1 = Y.encodeStateAsUpdate(doc1);
+
+      const doc2 = new Y.Doc();
+      doc2.clientID = 1;
+      Y.applyUpdate(doc2, update1);
+      doc2.getText('content').insert(5, ' with more content added here');
+      const update2 = Y.encodeStateAsUpdate(doc2, Y.encodeStateVector(doc1));
+
+      const doc3 = new Y.Doc();
+      doc3.clientID = 1;
+      Y.applyUpdate(doc3, Y.encodeStateAsUpdate(doc2));
+      doc3.getText('content').insert(0, 'Prefix: ');
+      const update3 = Y.encodeStateAsUpdate(doc3, Y.encodeStateVector(doc2));
+
+      // Create a log file with 3 records
+      const logData = createLogFile([
+        { timestamp: 1000, sequence: 1, data: update1 },
+        { timestamp: 1001, sequence: 2, data: update2 },
+        { timestamp: 1002, sequence: 3, data: update3 },
+      ]);
+
+      fs.directories.add(paths.logs);
+      fs.directories.add(paths.snapshots);
+      fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData);
+
+      const manager = new NoteStorageManager(fs, db, instanceId);
+      const result = await manager.loadNote(sdId, noteId, paths);
+
+      // The vector clock offset should be exactly at the end of the file
+      // (after the last record), not an approximation
+      const clockEntry = result.vectorClock['inst-test'];
+      expect(clockEntry).toBeDefined();
+      expect(clockEntry.sequence).toBe(3);
+
+      // The offset should equal the file length (no termination sentinel)
+      // This verifies the offset calculation is exact, not using approximation like +20
+      expect(clockEntry.offset).toBe(logData.length);
+    });
+
+    it('should calculate correct offset for incremental reads', async () => {
+      const fs = createMockFs();
+      const db = createMockDb();
+      const paths = createNotePaths(sdPath, noteId);
+
+      // Create a log file with records
+      const doc = new Y.Doc();
+      doc.clientID = 1;
+      const text = doc.getText('content');
+      text.insert(0, 'Initial');
+      const update1 = Y.encodeStateAsUpdate(doc);
+      text.insert(7, ' content');
+      const update2 = Y.encodeStateAsUpdate(doc, Y.encodeStateVector(doc));
+
+      const logData1 = createLogFile([{ timestamp: 1000, sequence: 1, data: update1 }]);
+
+      fs.directories.add(paths.logs);
+      fs.directories.add(paths.snapshots);
+      fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData1);
+
+      const manager = new NoteStorageManager(fs, db, instanceId);
+
+      // First load - reads first record
+      const result1 = await manager.loadNote(sdId, noteId, paths);
+
+      // Append a second record to the same file
+      const logData2 = createLogFile([
+        { timestamp: 1000, sequence: 1, data: update1 },
+        { timestamp: 1001, sequence: 2, data: update2 },
+      ]);
+      fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData2);
+
+      // Save the first load's state to cache, then load incrementally
+      await manager.saveDbSnapshot(sdId, noteId, result1.doc, result1.vectorClock);
+
+      // Verify the cached offset is correct by loading from cache
+      // If the offset was wrong (like the old +20 approximation), this would fail
+      // because it would try to read from the middle of a record
+      const result2 = await manager.loadNoteFromCache(sdId, noteId, paths);
+      expect(result2).not.toBeNull();
+      expect(result2!.vectorClock['inst-test'].sequence).toBe(2);
+
+      // The new offset should be at the end of the expanded file
+      expect(result2!.vectorClock['inst-test'].offset).toBe(logData2.length);
+    });
+  });
+
   describe('finalize', () => {
     it('should finalize all log writers', async () => {
       const fs = createMockFs();

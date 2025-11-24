@@ -1163,6 +1163,20 @@ function createMenu(): void {
             }
           },
         },
+        { type: 'separator' },
+        {
+          label: 'Advanced',
+          submenu: [
+            {
+              label: 'Reload Note from CRDT Logs',
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send('menu:reloadFromCRDTLogs');
+                }
+              },
+            },
+          ],
+        },
       ],
     },
     {

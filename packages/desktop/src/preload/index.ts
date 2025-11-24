@@ -154,6 +154,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         pinned: boolean;
         contentPreview: string;
       } | null>,
+    reloadFromCRDTLogs: (noteId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('note:reloadFromCRDTLogs', noteId) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
 
     // Event listeners
     onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
@@ -558,13 +563,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Telemetry operations
   telemetry: {
-    getSettings: (): Promise<{ remoteMetricsEnabled: boolean; datadogApiKey?: string }> =>
+    getSettings: (): Promise<{
+      consoleMetricsEnabled: boolean;
+      remoteMetricsEnabled: boolean;
+      datadogApiKey?: string;
+    }> =>
       ipcRenderer.invoke('telemetry:getSettings') as Promise<{
+        consoleMetricsEnabled: boolean;
         remoteMetricsEnabled: boolean;
         datadogApiKey?: string;
       }>,
     updateSettings: (settings: {
-      remoteMetricsEnabled: boolean;
+      consoleMetricsEnabled?: boolean;
+      remoteMetricsEnabled?: boolean;
       datadogApiKey?: string;
     }): Promise<void> => ipcRenderer.invoke('telemetry:updateSettings', settings) as Promise<void>,
   },
@@ -1016,6 +1027,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:export-all-notes', listener);
       return () => {
         ipcRenderer.removeListener('menu:export-all-notes', listener);
+      };
+    },
+    onReloadFromCRDTLogs: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:reloadFromCRDTLogs', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:reloadFromCRDTLogs', listener);
       };
     },
   },

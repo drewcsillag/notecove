@@ -49,6 +49,8 @@ const mockElectronAPI = {
     onMoved: jest.fn(() => () => {}),
     updateTitle: jest.fn(),
     createSnapshot: jest.fn().mockResolvedValue({ success: true, filename: 'test-snapshot.yjson' }),
+    getInfo: jest.fn().mockResolvedValue(null),
+    reloadFromCRDTLogs: jest.fn().mockResolvedValue({ success: true }),
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),
@@ -99,6 +101,7 @@ const mockElectronAPI = {
     onViewHistory: jest.fn(() => () => {}),
     onExportSelectedNotes: jest.fn(() => () => {}),
     onExportAllNotes: jest.fn(() => () => {}),
+    onReloadFromCRDTLogs: jest.fn(() => () => {}),
   },
   export: {
     selectDirectory: jest.fn(() => Promise.resolve(null)),

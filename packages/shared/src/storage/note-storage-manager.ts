@@ -253,7 +253,7 @@ export class NoteStorageManager {
           Y.applyUpdate(doc, record.data);
 
           lastSequence = record.sequence;
-          lastOffset = record.offset + record.data.length + 20; // Approximate record size
+          lastOffset = record.offset + record.bytesRead;
         }
       } catch (error) {
         // Log file may be truncated (e.g., cloud sync in progress) - continue with what we got

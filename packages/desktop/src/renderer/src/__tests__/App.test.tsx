@@ -41,6 +41,8 @@ const mockElectronAPI = {
     updateTitle: jest.fn(),
     togglePin: jest.fn(),
     createSnapshot: jest.fn().mockResolvedValue({ success: true, filename: 'test-snapshot.yjson' }),
+    getInfo: jest.fn().mockResolvedValue(null),
+    reloadFromCRDTLogs: jest.fn().mockResolvedValue({ success: true }),
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),
@@ -113,6 +115,9 @@ const mockElectronAPI = {
       /* unsubscribe */
     }),
     onExportAllNotes: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReloadFromCRDTLogs: jest.fn(() => () => {
       /* unsubscribe */
     }),
   },

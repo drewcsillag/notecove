@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 
 export const TelemetrySettings: React.FC = () => {
+  const [consoleMetricsEnabled, setConsoleMetricsEnabled] = useState(true);
   const [remoteMetricsEnabled, setRemoteMetricsEnabled] = useState(false);
   const [datadogApiKey, setDatadogApiKey] = useState('');
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ export const TelemetrySettings: React.FC = () => {
     const loadSettings = async () => {
       try {
         const settings = await window.electronAPI.telemetry.getSettings();
+        setConsoleMetricsEnabled(settings.consoleMetricsEnabled);
         setRemoteMetricsEnabled(settings.remoteMetricsEnabled);
         setDatadogApiKey(settings.datadogApiKey ?? '');
       } catch (error) {
@@ -55,6 +57,19 @@ export const TelemetrySettings: React.FC = () => {
       console.error('Failed to update remote metrics setting:', error);
       // Revert on error
       setRemoteMetricsEnabled(!enabled);
+    }
+  };
+
+  const handleConsoleMetricsToggle = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const enabled = event.target.checked;
+    setConsoleMetricsEnabled(enabled);
+
+    try {
+      await window.electronAPI.telemetry.updateSettings({ consoleMetricsEnabled: enabled });
+    } catch (error) {
+      console.error('Failed to update console metrics setting:', error);
+      // Revert on error
+      setConsoleMetricsEnabled(!enabled);
     }
   };
 
@@ -95,9 +110,25 @@ export const TelemetrySettings: React.FC = () => {
 
       <Alert severity="info" sx={{ mb: 3 }}>
         <AlertTitle>Privacy Notice</AlertTitle>
-        Local metrics are always collected (stored only on your device). Remote metrics export is
-        optional and user-controlled. No personal information is ever included in metrics.
+        All metrics are stored locally on your device. Remote metrics export is optional and
+        user-controlled. No personal information is ever included in metrics.
       </Alert>
+
+      <FormControlLabel
+        control={
+          <Switch
+            checked={consoleMetricsEnabled}
+            onChange={(e) => {
+              void handleConsoleMetricsToggle(e);
+            }}
+          />
+        }
+        label="Console Metrics Logging"
+      />
+
+      <Typography variant="caption" color="text.secondary" display="block" mt={1} mb={3}>
+        Log metrics to the developer console (useful for debugging, can be noisy)
+      </Typography>
 
       <FormControlLabel
         control={

@@ -19,6 +19,9 @@ import {
 import { app } from 'electron';
 
 export interface TelemetryConfig {
+  /** Enable console metrics logging (local debugging) */
+  consoleMetricsEnabled: boolean;
+
   /** Enable remote metrics export to Datadog */
   remoteMetricsEnabled: boolean;
 
@@ -39,6 +42,7 @@ export interface TelemetryConfig {
 }
 
 export const DEFAULT_TELEMETRY_CONFIG: TelemetryConfig = {
+  consoleMetricsEnabled: true,
   remoteMetricsEnabled: false,
   datadogEndpoint: 'https://api.datadoghq.com',
   exportIntervalMs: 60000, // 1 minute
@@ -81,12 +85,17 @@ export class TelemetryManager {
     const metricReaders: PeriodicExportingMetricReader[] = [];
     const exportInterval = this.config.exportIntervalMs ?? 60000;
 
-    // Local exporter (always enabled)
-    const consoleReader = new PeriodicExportingMetricReader({
-      exporter: new ConsoleMetricExporter(),
-      exportIntervalMillis: exportInterval,
-    });
-    metricReaders.push(consoleReader);
+    // Local exporter (optional, user-controlled)
+    if (this.config.consoleMetricsEnabled) {
+      const consoleReader = new PeriodicExportingMetricReader({
+        exporter: new ConsoleMetricExporter(),
+        exportIntervalMillis: exportInterval,
+      });
+      metricReaders.push(consoleReader);
+      console.log('[Telemetry] Console metrics enabled');
+    } else {
+      console.log('[Telemetry] Console metrics disabled');
+    }
 
     // Remote exporter (optional, user-controlled)
     if (this.config.remoteMetricsEnabled) {
@@ -133,15 +142,18 @@ export class TelemetryManager {
   }
 
   /**
-   * Update configuration (e.g., when user toggles remote metrics in settings)
+   * Update configuration (e.g., when user toggles metrics settings)
    */
   async updateConfig(newConfig: Partial<TelemetryConfig>): Promise<void> {
+    const oldConsoleEnabled = this.config.consoleMetricsEnabled;
     const oldRemoteEnabled = this.config.remoteMetricsEnabled;
     this.config = { ...this.config, ...newConfig };
 
-    // If remote metrics setting changed, reinitialize
-    if (oldRemoteEnabled !== this.config.remoteMetricsEnabled) {
-      console.log('[Telemetry] Remote metrics setting changed, reinitializing...');
+    // If any metrics setting changed, reinitialize
+    const consoleChanged = oldConsoleEnabled !== this.config.consoleMetricsEnabled;
+    const remoteChanged = oldRemoteEnabled !== this.config.remoteMetricsEnabled;
+    if (consoleChanged || remoteChanged) {
+      console.log('[Telemetry] Metrics settings changed, reinitializing...');
       await this.shutdown();
       this.initialize();
     }

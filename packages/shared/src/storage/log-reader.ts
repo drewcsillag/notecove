@@ -36,6 +36,8 @@ export interface LogRecordWithOffset {
   data: Uint8Array;
   /** Byte offset where this record starts in the file */
   offset: number;
+  /** Total bytes consumed for this record (use offset + bytesRead for next record position) */
+  bytesRead: number;
 }
 
 export class LogReader {
@@ -133,6 +135,7 @@ export class LogReader {
         sequence: record.sequence,
         data: record.data,
         offset: recordOffset,
+        bytesRead: record.bytesRead,
       };
 
       offset += record.bytesRead;

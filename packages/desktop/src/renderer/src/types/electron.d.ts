@@ -94,6 +94,7 @@ declare global {
           pinned: boolean;
           contentPreview: string;
         } | null>;
+        reloadFromCRDTLogs: (noteId: string) => Promise<{ success: boolean; error?: string }>;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
         onRestored: (callback: (noteId: string) => void) => () => void;
@@ -271,9 +272,14 @@ declare global {
       };
 
       telemetry: {
-        getSettings: () => Promise<{ remoteMetricsEnabled: boolean; datadogApiKey?: string }>;
-        updateSettings: (settings: {
+        getSettings: () => Promise<{
+          consoleMetricsEnabled: boolean;
           remoteMetricsEnabled: boolean;
+          datadogApiKey?: string;
+        }>;
+        updateSettings: (settings: {
+          consoleMetricsEnabled?: boolean;
+          remoteMetricsEnabled?: boolean;
           datadogApiKey?: string;
         }) => Promise<void>;
       };
@@ -450,6 +456,7 @@ declare global {
         onAbout: (callback: () => void) => () => void;
         onExportSelectedNotes: (callback: () => void) => () => void;
         onExportAllNotes: (callback: () => void) => () => void;
+        onReloadFromCRDTLogs: (callback: () => void) => () => void;
       };
 
       export: {

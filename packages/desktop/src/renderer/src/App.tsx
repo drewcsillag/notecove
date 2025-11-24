@@ -362,6 +362,32 @@ function App(): React.ReactElement {
       setExportTrigger('all');
     });
 
+    // Reload from CRDT Logs (Advanced)
+    const cleanupReloadFromCRDTLogs = window.electronAPI.menu.onReloadFromCRDTLogs(() => {
+      if (selectedNoteId) {
+        console.log('[Menu] Reloading note from CRDT logs:', selectedNoteId);
+        void (async () => {
+          try {
+            const result = await window.electronAPI.note.reloadFromCRDTLogs(selectedNoteId);
+            if (result.success) {
+              console.log('[Menu] Successfully reloaded note from CRDT logs');
+              // Trigger a refresh of the editor by reselecting the note
+              setSelectedNoteId(null);
+              setTimeout(() => {
+                setSelectedNoteId(selectedNoteId);
+              }, 100);
+            } else {
+              console.error('[Menu] Failed to reload from CRDT logs:', result.error);
+            }
+          } catch (error) {
+            console.error('[Menu] Error reloading from CRDT logs:', error);
+          }
+        })();
+      } else {
+        console.log('[Menu] No note selected for Reload from CRDT Logs');
+      }
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -376,6 +402,7 @@ function App(): React.ReactElement {
       cleanupViewHistory();
       cleanupExportSelected();
       cleanupExportAll();
+      cleanupReloadFromCRDTLogs();
     };
   }, [selectedNoteId]);
 

@@ -130,6 +130,7 @@ export class IPCHandlers {
     ipcMain.handle('note:createSnapshot', this.handleCreateSnapshot.bind(this));
     ipcMain.handle('note:checkExistsInSD', this.handleCheckNoteExistsInSD.bind(this));
     ipcMain.handle('note:getInfo', this.handleGetNoteInfo.bind(this));
+    ipcMain.handle('note:reloadFromCRDTLogs', this.handleReloadFromCRDTLogs.bind(this));
 
     // History operations
     ipcMain.handle('history:getTimeline', this.handleGetTimeline.bind(this));
@@ -1905,13 +1906,19 @@ export class IPCHandlers {
 
   // Telemetry handlers
   private async handleGetTelemetrySettings(): Promise<{
+    consoleMetricsEnabled: boolean;
     remoteMetricsEnabled: boolean;
     datadogApiKey?: string;
   }> {
     const telemetryManager = getTelemetryManager();
     const config = telemetryManager.getConfig();
 
-    const result: { remoteMetricsEnabled: boolean; datadogApiKey?: string } = {
+    const result: {
+      consoleMetricsEnabled: boolean;
+      remoteMetricsEnabled: boolean;
+      datadogApiKey?: string;
+    } = {
+      consoleMetricsEnabled: config.consoleMetricsEnabled,
       remoteMetricsEnabled: config.remoteMetricsEnabled,
     };
 
@@ -1924,14 +1931,26 @@ export class IPCHandlers {
 
   private async handleUpdateTelemetrySettings(
     _event: IpcMainInvokeEvent,
-    settings: { remoteMetricsEnabled: boolean; datadogApiKey?: string }
+    settings: {
+      consoleMetricsEnabled?: boolean;
+      remoteMetricsEnabled?: boolean;
+      datadogApiKey?: string;
+    }
   ): Promise<void> {
     const telemetryManager = getTelemetryManager();
 
-    const config: { remoteMetricsEnabled: boolean; datadogApiKey?: string } = {
-      remoteMetricsEnabled: settings.remoteMetricsEnabled,
-    };
+    const config: {
+      consoleMetricsEnabled?: boolean;
+      remoteMetricsEnabled?: boolean;
+      datadogApiKey?: string;
+    } = {};
 
+    if (settings.consoleMetricsEnabled !== undefined) {
+      config.consoleMetricsEnabled = settings.consoleMetricsEnabled;
+    }
+    if (settings.remoteMetricsEnabled !== undefined) {
+      config.remoteMetricsEnabled = settings.remoteMetricsEnabled;
+    }
     if (settings.datadogApiKey !== undefined) {
       config.datadogApiKey = settings.datadogApiKey;
     }
@@ -1939,7 +1958,7 @@ export class IPCHandlers {
     await telemetryManager.updateConfig(config);
 
     console.log(
-      `[Telemetry] Settings updated: remoteMetricsEnabled=${settings.remoteMetricsEnabled}`
+      `[Telemetry] Settings updated: consoleMetricsEnabled=${settings.consoleMetricsEnabled ?? 'unchanged'}, remoteMetricsEnabled=${settings.remoteMetricsEnabled ?? 'unchanged'}`
     );
   }
 
@@ -2505,6 +2524,45 @@ export class IPCHandlers {
       pinned: note.pinned,
       contentPreview: note.contentPreview,
     };
+  }
+
+  /**
+   * Note: Reload note from CRDT logs only (clears DB cache and forces fresh load)
+   *
+   * This is useful for debugging sync issues - it bypasses the DB cache
+   * and reloads entirely from the CRDT log files on disk.
+   */
+  private async handleReloadFromCRDTLogs(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Get note to find its SD
+      const note = await this.database.getNote(noteId);
+      if (!note) {
+        return { success: false, error: 'Note not found' };
+      }
+
+      console.log(`[ReloadFromCRDTLogs] Clearing DB cache for note ${noteId} in SD ${note.sdId}`);
+
+      // Step 1: Delete the DB cache (sync state) for this note
+      await this.database.deleteNoteSyncState(noteId, note.sdId);
+
+      // Step 2: Unload the note from CRDTManager (clears in-memory state)
+      await this.crdtManager.unloadNote(noteId);
+
+      // Step 3: Reload the note fresh from CRDT logs
+      // This will perform a cold load since the DB cache is now cleared
+      await this.crdtManager.loadNote(noteId, note.sdId);
+
+      console.log(`[ReloadFromCRDTLogs] Successfully reloaded note ${noteId} from CRDT logs`);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[ReloadFromCRDTLogs] Error:`, error);
+      return { success: false, error: errorMessage };
+    }
   }
 
   // Test-only handlers
