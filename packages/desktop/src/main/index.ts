@@ -900,15 +900,31 @@ async function setupSDWatchers(
 
   // Set up polling backup for activity sync
   // Chokidar may miss/coalesce rapid file changes, so poll every 3 seconds as backup
+  let pollCount = 0;
   const pollInterval = setInterval(() => {
     void (async () => {
+      pollCount++;
       try {
+        // Log watermarks every 10th poll (30 seconds) for debugging
+        if (pollCount % 10 === 0) {
+          const watermarks = activitySync.getWatermarks();
+          console.log(
+            `[ActivitySync Poll ${sdId}] Watermarks:`,
+            Object.fromEntries(watermarks)
+          );
+        }
+
         const affectedNotes = await activitySync.syncFromOtherInstances();
 
         if (affectedNotes.size > 0) {
           console.log(
             `[ActivitySync Poll ${sdId}] Found changes via poll:`,
             Array.from(affectedNotes)
+          );
+          // Also log watermarks when changes found
+          console.log(
+            `[ActivitySync Poll ${sdId}] Watermarks after sync:`,
+            Object.fromEntries(activitySync.getWatermarks())
           );
 
           // Wait for pending syncs to complete
