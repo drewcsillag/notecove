@@ -239,7 +239,9 @@ export class NoteStorageManager {
 
       // Read and apply records
       // Use try/catch to handle truncated files gracefully (e.g., during cloud sync)
-      let lastSequence = startSequence;
+      // Track max sequence seen (not last read) since records may be out-of-order
+      // due to iCloud sync merging files from different instances
+      let maxSequence = startSequence;
       let lastOffset = startOffset || 0;
 
       try {
@@ -252,7 +254,10 @@ export class NoteStorageManager {
           // Apply update to doc
           Y.applyUpdate(doc, record.data);
 
-          lastSequence = record.sequence;
+          // Track the highest sequence seen and the furthest offset read
+          if (record.sequence > maxSequence) {
+            maxSequence = record.sequence;
+          }
           lastOffset = record.offset + record.bytesRead;
         }
       } catch (error) {
@@ -265,9 +270,9 @@ export class NoteStorageManager {
       }
 
       // Update vector clock if we read any new records
-      if (lastSequence > startSequence) {
+      if (maxSequence > startSequence) {
         vectorClock[logFile.instanceId] = {
-          sequence: lastSequence,
+          sequence: maxSequence,
           offset: lastOffset,
           file: logFile.filename,
         };

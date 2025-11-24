@@ -678,6 +678,50 @@ describe('NoteStorageManager', () => {
       // The new offset should be at the end of the expanded file
       expect(result2!.vectorClock['inst-test'].offset).toBe(logData2.length);
     });
+
+    it('should track max sequence when records are out-of-order (iCloud sync scenario)', async () => {
+      const fs = createMockFs();
+      const db = createMockDb();
+      const paths = createNotePaths(sdPath, noteId);
+
+      // Create updates with different content
+      const doc1 = new Y.Doc();
+      doc1.clientID = 1;
+      doc1.getText('content').insert(0, 'A');
+      const update1 = Y.encodeStateAsUpdate(doc1);
+
+      const doc2 = new Y.Doc();
+      doc2.clientID = 1;
+      Y.applyUpdate(doc2, update1);
+      doc2.getText('content').insert(1, 'B');
+      const update2 = Y.encodeStateAsUpdate(doc2, Y.encodeStateVector(doc1));
+
+      const doc3 = new Y.Doc();
+      doc3.clientID = 1;
+      Y.applyUpdate(doc3, Y.encodeStateAsUpdate(doc2));
+      doc3.getText('content').insert(2, 'C');
+      const update3 = Y.encodeStateAsUpdate(doc3, Y.encodeStateVector(doc2));
+
+      // Create a log file with OUT-OF-ORDER sequences (simulates iCloud sync merging)
+      // Records are in file order: seq=1, seq=3, seq=2 (seq 2 arrived later via sync)
+      const logData = createLogFile([
+        { timestamp: 1000, sequence: 1, data: update1 },
+        { timestamp: 1002, sequence: 3, data: update3 }, // Higher seq first
+        { timestamp: 1001, sequence: 2, data: update2 }, // Lower seq arrived later
+      ]);
+
+      fs.directories.add(paths.logs);
+      fs.directories.add(paths.snapshots);
+      fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData);
+
+      const manager = new NoteStorageManager(fs, db, instanceId);
+      const result = await manager.loadNote(sdId, noteId, paths);
+
+      // Vector clock should show max sequence (3), not last read (2)
+      const clockEntry = result.vectorClock['inst-test'];
+      expect(clockEntry).toBeDefined();
+      expect(clockEntry.sequence).toBe(3); // Max, not last read
+    });
   });
 
   describe('finalize', () => {
