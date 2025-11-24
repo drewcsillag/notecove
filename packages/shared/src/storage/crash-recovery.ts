@@ -242,14 +242,22 @@ export class CrashRecovery {
 
       let lastSequence = startSequence;
 
-      for await (const record of LogReader.readRecords(logFile.path, this.fs)) {
-        if (record.sequence <= startSequence) {
-          continue;
-        }
+      try {
+        for await (const record of LogReader.readRecords(logFile.path, this.fs)) {
+          if (record.sequence <= startSequence) {
+            continue;
+          }
 
-        Y.applyUpdate(doc, record.data);
-        lastSequence = record.sequence;
-        hasData = true;
+          Y.applyUpdate(doc, record.data);
+          lastSequence = record.sequence;
+          hasData = true;
+        }
+      } catch (error) {
+        // Log file may be truncated - continue with what we got
+        console.warn(
+          `[CrashRecovery] Error reading log file ${logFile.filename} (may be partially synced):`,
+          error
+        );
       }
 
       if (lastSequence > startSequence) {

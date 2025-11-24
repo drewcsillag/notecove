@@ -238,20 +238,30 @@ export class NoteStorageManager {
       }
 
       // Read and apply records
+      // Use try/catch to handle truncated files gracefully (e.g., during cloud sync)
       let lastSequence = startSequence;
       let lastOffset = startOffset || 0;
 
-      for await (const record of LogReader.readRecords(logFile.path, this.fs, startOffset)) {
-        // Skip records we've already seen (by sequence)
-        if (record.sequence <= startSequence) {
-          continue;
+      try {
+        for await (const record of LogReader.readRecords(logFile.path, this.fs, startOffset)) {
+          // Skip records we've already seen (by sequence)
+          if (record.sequence <= startSequence) {
+            continue;
+          }
+
+          // Apply update to doc
+          Y.applyUpdate(doc, record.data);
+
+          lastSequence = record.sequence;
+          lastOffset = record.offset + record.data.length + 20; // Approximate record size
         }
-
-        // Apply update to doc
-        Y.applyUpdate(doc, record.data);
-
-        lastSequence = record.sequence;
-        lastOffset = record.offset + record.data.length + 20; // Approximate record size
+      } catch (error) {
+        // Log file may be truncated (e.g., cloud sync in progress) - continue with what we got
+        // On next sync/reload, we'll retry and hopefully get the complete file
+        console.warn(
+          `[NoteStorageManager] Error reading log file ${logFile.filename} (may be partially synced):`,
+          error
+        );
       }
 
       // Update vector clock if we read any new records

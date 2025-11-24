@@ -212,15 +212,23 @@ export class FolderStorageManager {
       let lastSequence = startSequence;
       let lastOffset = startOffset || 0;
 
-      for await (const record of LogReader.readRecords(logFile.path, this.fs, startOffset)) {
-        if (record.sequence <= startSequence) {
-          continue;
+      try {
+        for await (const record of LogReader.readRecords(logFile.path, this.fs, startOffset)) {
+          if (record.sequence <= startSequence) {
+            continue;
+          }
+
+          Y.applyUpdate(doc, record.data);
+
+          lastSequence = record.sequence;
+          lastOffset = record.offset + record.data.length + 20;
         }
-
-        Y.applyUpdate(doc, record.data);
-
-        lastSequence = record.sequence;
-        lastOffset = record.offset + record.data.length + 20;
+      } catch (error) {
+        // Log file may be truncated (e.g., cloud sync in progress) - continue with what we got
+        console.warn(
+          `[FolderStorageManager] Error reading log file ${logFile.filename} (may be partially synced):`,
+          error
+        );
       }
 
       if (lastSequence > startSequence) {

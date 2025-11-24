@@ -139,6 +139,16 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
         throw error;
       }
     }
-    await fs.appendFile(path, data);
+
+    // Use file descriptor to append + fsync for cloud sync reliability
+    // Without fsync, writes may stay in OS buffer and cloud sync services
+    // (iCloud, Dropbox, etc.) won't see the changes until the buffer flushes
+    const fd = await fs.open(path, 'a');
+    try {
+      await fd.write(data);
+      await fd.sync();
+    } finally {
+      await fd.close();
+    }
   }
 }
