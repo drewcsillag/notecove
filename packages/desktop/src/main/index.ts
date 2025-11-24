@@ -1620,10 +1620,18 @@ void app.whenReady().then(async () => {
     // Set up watchers for all other registered SDs (only if fully initialized)
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
-        // Check if SD is fully initialized by checking for required subdirectories
-        const folderLogsPath = join(sd.path, 'folders', 'logs');
-        const isInitialized = await fsAdapter.exists(folderLogsPath);
+        // Check if SD has basic structure (notes directory)
+        const notesPath = join(sd.path, 'notes');
+        const isInitialized = await fsAdapter.exists(notesPath);
+
         if (isInitialized) {
+          // Ensure folders/logs exists (create if missing)
+          const folderLogsPath = join(sd.path, 'folders', 'logs');
+          if (!(await fsAdapter.exists(folderLogsPath))) {
+            console.log(`[Init] Creating folders/logs for SD: ${sd.id}`);
+            await fsAdapter.mkdir(folderLogsPath);
+          }
+
           console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
           await setupSDWatchers(
             sd.id,
