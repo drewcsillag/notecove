@@ -900,34 +900,39 @@ async function setupSDWatchers(
 
   // Set up polling backup for activity sync
   // Chokidar may miss/coalesce rapid file changes, so poll every 3 seconds as backup
-  const pollInterval = setInterval(async () => {
-    try {
-      const affectedNotes = await activitySync.syncFromOtherInstances();
+  const pollInterval = setInterval(() => {
+    void (async () => {
+      try {
+        const affectedNotes = await activitySync.syncFromOtherInstances();
 
-      if (affectedNotes.size > 0) {
-        console.log(`[ActivitySync Poll ${sdId}] Found changes via poll:`, Array.from(affectedNotes));
+        if (affectedNotes.size > 0) {
+          console.log(
+            `[ActivitySync Poll ${sdId}] Found changes via poll:`,
+            Array.from(affectedNotes)
+          );
 
-        // Wait for pending syncs to complete
-        await activitySync.waitForPendingSyncs();
+          // Wait for pending syncs to complete
+          await activitySync.waitForPendingSyncs();
 
-        // Reindex tags for affected notes
-        await reindexTagsForNotes(affectedNotes, crdtManager, db);
+          // Reindex tags for affected notes
+          await reindexTagsForNotes(affectedNotes, crdtManager, db);
 
-        // Broadcast updates to all windows
-        const noteIds = Array.from(affectedNotes);
-        for (const window of BrowserWindow.getAllWindows()) {
-          window.webContents.send('note:external-update', {
-            operation: 'sync',
-            noteIds,
-          });
+          // Broadcast updates to all windows
+          const noteIds = Array.from(affectedNotes);
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('note:external-update', {
+              operation: 'sync',
+              noteIds,
+            });
+          }
+        }
+      } catch (error) {
+        // Don't log every poll failure, just errors
+        if (!String(error).includes('ENOENT')) {
+          console.error(`[ActivitySync Poll ${sdId}] Poll failed:`, error);
         }
       }
-    } catch (error) {
-      // Don't log every poll failure, just errors
-      if (String(error).indexOf('ENOENT') === -1) {
-        console.error(`[ActivitySync Poll ${sdId}] Poll failed:`, error);
-      }
-    }
+    })();
   }, 3000);
 
   // Store interval for cleanup

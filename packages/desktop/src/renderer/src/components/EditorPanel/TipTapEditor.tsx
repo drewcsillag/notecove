@@ -11,7 +11,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import Underline from '@tiptap/extension-underline';
 import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
-import { Box, useTheme, Chip, Fade } from '@mui/material';
+import { Box, useTheme, Chip, Fade, CircularProgress } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
 import { EditorToolbar } from './EditorToolbar';
@@ -46,8 +46,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // Show sync indicator when external updates arrive
   const [showSyncIndicator, setShowSyncIndicator] = useState(false);
   const syncIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // Start with loading=true to prevent title extraction before note loads
-  const isLoadingNoteRef = useRef(true);
+  // Loading state - start with loading=true to prevent title extraction before note loads
+  // Use both state (for rendering) and ref (for callbacks that need synchronous access)
+  const [isLoading, setIsLoading] = useState(true);
+  const isLoadingRef = useRef(true);
   const noteIdRef = useRef<string | null>(noteId);
   const titleUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
@@ -101,7 +103,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     ],
     // Don't set initial content - let Yjs/Collaboration handle it from loaded state
     // Setting content here causes onUpdate to fire before note loads
-    editable: !readOnly,
+    // Disable editing while loading or if readOnly
+    editable: !readOnly && !isLoading,
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
@@ -110,7 +113,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     // Track content changes for title extraction
     onUpdate: ({ editor }) => {
       // Don't extract title while loading a note
-      if (isLoadingNoteRef.current) {
+      if (isLoadingRef.current) {
         console.log('[TipTapEditor] onUpdate fired but loading flag is set, skipping');
         return;
       }
@@ -176,7 +179,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       // immediately save the current editor content
       if (previousNoteId && editor && onTitleChange) {
         // Don't save if the note is still loading
-        if (isLoadingNoteRef.current) {
+        if (isLoadingRef.current) {
           console.log(
             `[TipTapEditor] Skipping save during deselection - note ${previousNoteId} still loading`
           );
@@ -217,7 +220,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     return () => {
       // Save current editor content before unmounting
       // IMPORTANT: Only save if note was fully loaded to prevent data corruption
-      if (noteId && editor && onTitleChange && !isLoadingNoteRef.current) {
+      if (noteId && editor && onTitleChange && !isLoadingRef.current) {
         const firstLine = editor.state.doc.firstChild;
         if (firstLine) {
           const titleText = firstLine.textContent.trim();
@@ -235,7 +238,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           );
           onTitleChange(noteId, titleText || 'Untitled', text.trim());
         }
-      } else if (noteId && isLoadingNoteRef.current) {
+      } else if (noteId && isLoadingRef.current) {
         console.log(
           `[TipTapEditor] Unmount: Skipping save for note ${noteId} - still loading (preventing data corruption)`
         );
@@ -289,10 +292,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
     let isActive = true;
 
+    // Helper to set loading state (both ref and state)
+    const setLoadingState = (loading: boolean) => {
+      isLoadingRef.current = loading;
+      setIsLoading(loading);
+    };
+
     // Load note from main process
     const loadNote = async () => {
       try {
-        isLoadingNoteRef.current = true;
+        setLoadingState(true);
         console.log(`[TipTapEditor] Loading note ${noteId}`);
 
         // Clear the title cache to ensure we fetch fresh titles
@@ -328,13 +337,17 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
         // IMPORTANT: Clear loading flag AFTER all content manipulation to prevent
         // spurious title updates from setContent/setHeading operations
-        isLoadingNoteRef.current = false;
+        setLoadingState(false);
+
+        // Enable editing now that loading is complete
+        editor.setEditable(!readOnly);
 
         // Notify parent that note has been loaded
         onNoteLoaded?.();
       } catch (error) {
         console.error(`Failed to load note ${noteId}:`, error);
-        isLoadingNoteRef.current = false;
+        setLoadingState(false);
+        editor.setEditable(!readOnly);
       }
     };
 
@@ -369,12 +382,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             console.log(`[TipTapEditor] Got state, size: ${state.length} bytes`);
 
             // Log content before and after
-            const beforeText = yDoc.getText('content')?.toString() ?? '';
+            const beforeText = yDoc.getText('content').toJSON();
             console.log(`[TipTapEditor] Before apply, content length: ${beforeText.length}`);
 
             Y.applyUpdate(yDoc, state, 'remote');
 
-            const afterText = yDoc.getText('content')?.toString() ?? '';
+            const afterText = yDoc.getText('content').toJSON();
             console.log(`[TipTapEditor] After apply, content length: ${afterText.length}`);
 
             // Show sync indicator briefly
@@ -405,7 +418,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       // Tell main process we're done with this note
       void window.electronAPI.note.unload(noteId);
     };
-  }, [noteId, editor, yDoc, isNewlyCreated, onNoteLoaded]);
+  }, [noteId, editor, yDoc, isNewlyCreated, onNoteLoaded, readOnly]);
 
   return (
     <Box
@@ -587,11 +600,32 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           }}
         />
       </Fade>
+      {/* Loading overlay - shows spinner while note is loading */}
+      <Fade in={isLoading}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 48, // Below toolbar
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.8)',
+            zIndex: 5,
+          }}
+        >
+          <CircularProgress size={40} />
+        </Box>
+      </Fade>
       <Box
-        sx={{ flex: 1, overflow: 'auto', padding: 2, cursor: 'text' }}
+        sx={{ flex: 1, overflow: 'auto', padding: 2, cursor: isLoading ? 'wait' : 'text' }}
         onClick={(e) => {
           // Only handle clicks on the Box itself (empty space), not on the editor content
-          if (e.target === e.currentTarget && editor) {
+          // Don't allow focus while loading
+          if (e.target === e.currentTarget && editor && !isLoading) {
             // Focus the editor and move cursor to the end
             editor.commands.focus('end');
           }
