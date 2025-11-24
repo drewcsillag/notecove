@@ -525,9 +525,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Shutdown progress operations
   shutdown: {
-    onProgress: (
-      callback: (data: { current: number; total: number }) => void
-    ): (() => void) => {
+    onProgress: (callback: (data: { current: number; total: number }) => void): (() => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
         data: { current: number; total: number }

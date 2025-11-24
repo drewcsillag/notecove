@@ -574,7 +574,8 @@ export class CRDTManagerImpl implements CRDTManager {
     console.log(`[CRDT Manager] Creating shutdown snapshots for ${total} notes...`);
 
     for (let i = 0; i < notesNeedingSnapshots.length; i++) {
-      const noteId = notesNeedingSnapshots[i]!;
+      const noteId = notesNeedingSnapshots[i];
+      if (!noteId) continue;
       const state = this.documents.get(noteId);
 
       if (state) {
@@ -584,7 +585,9 @@ export class CRDTManagerImpl implements CRDTManager {
             onProgress(i + 1, total);
           }
 
-          console.log(`[CRDT Manager] Creating shutdown snapshot for note ${noteId} (${i + 1}/${total})`);
+          console.log(
+            `[CRDT Manager] Creating shutdown snapshot for note ${noteId} (${i + 1}/${total})`
+          );
           await this.storageManager.saveNoteSnapshot(state.sdId, noteId, state.doc);
           state.editCount = 0;
         } catch (error) {

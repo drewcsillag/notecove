@@ -6,14 +6,7 @@
  */
 
 import React from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  LinearProgress,
-  Typography,
-  Box,
-} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, LinearProgress, Typography, Box } from '@mui/material';
 
 export interface ShutdownProgressDialogProps {
   open: boolean;

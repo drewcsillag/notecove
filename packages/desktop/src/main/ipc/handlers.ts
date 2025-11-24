@@ -17,7 +17,11 @@ import type { NoteMetadata } from './types';
 import type { Database, NoteCache, AppendLogManager, UUID } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags, extractLinks } from '@notecove/shared';
-import { type ActivitySession, type ReconstructionPoint, TimelineBuilder } from '@notecove/shared/history';
+import {
+  type ActivitySession,
+  type ReconstructionPoint,
+  TimelineBuilder,
+} from '@notecove/shared/history';
 import { getTelemetryManager } from '../telemetry/config';
 import type { NoteMoveManager } from '../note-move-manager';
 import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
@@ -2595,11 +2599,13 @@ export class IPCHandlers {
       }
     }
 
+    const firstSession = sessions[0];
+    const lastSession = sessions[sessions.length - 1];
     return {
       totalUpdates,
       totalSessions: sessions.length,
-      firstEdit: sessions.length > 0 ? sessions[0]!.startTime : null,
-      lastEdit: sessions.length > 0 ? sessions[sessions.length - 1]!.endTime : null,
+      firstEdit: firstSession?.startTime ?? null,
+      lastEdit: lastSession?.endTime ?? null,
       instanceCount: allInstances.size,
       instances: Array.from(allInstances),
     };
@@ -2677,8 +2683,9 @@ export class IPCHandlers {
       }
     }
     // Apply first update of target session
-    if (targetSession.updates.length > 0) {
-      Y.applyUpdate(firstDoc, targetSession.updates[0]!.data);
+    const firstUpdate = targetSession.updates[0];
+    if (firstUpdate) {
+      Y.applyUpdate(firstDoc, firstUpdate.data);
     }
 
     // Build state at last update of session
@@ -2694,7 +2701,9 @@ export class IPCHandlers {
     // Extract text content from docs
     const extractText = (doc: Y.Doc): string => {
       const content = doc.getXmlFragment('content');
-      return content.toString().substring(0, 200); // First 200 chars
+      const json = content.toJSON();
+      // toJSON returns string for XmlFragment, but convert to handle possible other types
+      return (typeof json === 'string' ? json : JSON.stringify(json)).substring(0, 200);
     };
 
     return {

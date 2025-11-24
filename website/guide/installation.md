@@ -22,19 +22,30 @@ cd notecove
 pnpm install
 ```
 
-3. **Build shared packages**
+3. **Run the desktop app in development mode**
 
 ```bash
-pnpm build
+pnpm dev
 ```
 
-4. **Run the desktop app**
+This will automatically build the shared packages first, then launch the desktop app in development mode with hot-reload enabled.
+
+::: tip
+You can also run just the desktop app after the initial build:
 
 ```bash
 pnpm --filter @notecove/desktop dev
 ```
 
-The app will launch in development mode with hot-reload enabled.
+:::
+
+4. **Or build everything first (optional)**
+
+If you prefer to build explicitly before running dev:
+
+```bash
+pnpm build
+```
 
 ### Production Build
 

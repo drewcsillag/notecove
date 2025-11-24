@@ -59,9 +59,7 @@ export default defineConfig({
       '/technical_documents/': [
         {
           text: 'Technical Documents',
-          items: [
-            { text: 'Overview', link: '/technical_documents/' },
-          ],
+          items: [{ text: 'Overview', link: '/technical_documents/' }],
         },
         {
           text: 'Storage System',
@@ -73,14 +71,20 @@ export default defineConfig({
         {
           text: 'Architecture',
           items: [
-            { text: 'Cross-SD Move State Machine', link: '/technical_documents/cross-sd-move-state-machine' },
+            {
+              text: 'Cross-SD Move State Machine',
+              link: '/technical_documents/cross-sd-move-state-machine',
+            },
           ],
         },
         {
           text: 'Integration',
           items: [
             { text: 'IPC Protocol', link: '/technical_documents/ipc-protocol' },
-            { text: 'TipTap-Yjs Compatibility', link: '/technical_documents/tiptap-yjs-compatibility' },
+            {
+              text: 'TipTap-Yjs Compatibility',
+              link: '/technical_documents/tiptap-yjs-compatibility',
+            },
           ],
         },
       ],
