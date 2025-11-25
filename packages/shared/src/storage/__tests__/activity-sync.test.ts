@@ -224,25 +224,40 @@ describe('ActivitySync', () => {
     });
 
     it('should timeout gracefully if update file never appears', async () => {
+      // Use fake timers to avoid long waits in tests
+      jest.useFakeTimers();
+
       mockFs.listFiles.mockResolvedValue(['other-instance.log']);
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode('note-1|other-instance_100\n'));
       // File never appears - reloadNote always fails with ENOENT
       mockCallbacks.reloadNote.mockRejectedValue(new Error('ENOENT: File does not exist'));
 
-      // Mock console.warn to suppress output
+      // Mock console.warn to capture output
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
-      await sync.syncFromOtherInstances();
-      // Wait for all polling attempts (should timeout)
-      await sleep(20000); // Wait for full backoff sequence
+      // Start sync (this will trigger background polling)
+      const syncPromise = sync.syncFromOtherInstances();
+
+      // Advance timers enough for all retry attempts (delays sum to ~44s)
+      // We need to flush all pending promises between timer advances
+      for (let i = 0; i < 15; i++) {
+        await Promise.resolve(); // Let any pending promises resolve
+        jest.advanceTimersByTime(5000); // Advance 5s at a time
+        await Promise.resolve(); // Let any new promises resolve
+      }
+
+      // Wait for sync to complete
+      await syncPromise;
 
       // Should have logged a warning about timeout
+      // Warning format: "Timeout after X attempts waiting for note Y sequence Z"
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/Timeout waiting for.*other-instance_100/)
+        expect.stringMatching(/Timeout after.*attempts waiting for note.*sequence.*100/)
       );
 
       warnSpy.mockRestore();
-    }, 25000); // Increase test timeout
+      jest.useRealTimers();
+    });
   });
 
   describe('cleanupOrphanedLogs', () => {

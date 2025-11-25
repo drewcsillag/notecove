@@ -54,7 +54,7 @@ describe('ActivityLogger', () => {
       expect(lines[1]).toBe('note-2|test-instance_101');
     });
 
-    it('should replace last line for same note edited consecutively', async () => {
+    it('should append all edits for same note (no replace optimization)', async () => {
       // First edit to note-1
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode(''));
       await logger.recordNoteActivity('note-1', 100);
@@ -64,7 +64,8 @@ describe('ActivityLogger', () => {
       const firstText = new TextDecoder().decode(firstWrite);
       expect(firstText).toBe('note-1|test-instance_100\n');
 
-      // Second edit to note-1 (consecutive) - should replace last line
+      // Second edit to note-1 (consecutive) - should append (not replace)
+      // This ensures other instances see ALL intermediate sequences during incremental sync
       mockFs.readFile.mockResolvedValue(firstWrite);
       jest.clearAllMocks();
       await logger.recordNoteActivity('note-1', 105);
@@ -73,9 +74,10 @@ describe('ActivityLogger', () => {
       const text = new TextDecoder().decode(written);
       const lines = text.split('\n').filter((l) => l.length > 0);
 
-      // Should have only 1 line (replaced the previous one)
-      expect(lines).toHaveLength(1);
-      expect(lines[0]).toBe('note-1|test-instance_105');
+      // Should have 2 lines (appended, not replaced)
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toBe('note-1|test-instance_100');
+      expect(lines[1]).toBe('note-1|test-instance_105');
     });
 
     it('should use monotonically increasing sequence numbers', async () => {
