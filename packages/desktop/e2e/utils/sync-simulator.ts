@@ -161,6 +161,29 @@ export async function inspectSDContents(sdPath: string): Promise<SDContents> {
 }
 
 /**
+ * Get folder log file sizes for an SD directory
+ * @param sdPath - Path to the SD directory
+ * @returns Map of filename to size in bytes
+ */
+export async function getFolderLogSizes(sdPath: string): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  const foldersLogsPath = join(sdPath, 'folders', 'logs');
+
+  try {
+    const files = await readdir(foldersLogsPath);
+    for (const file of files) {
+      const filePath = join(foldersLogsPath, file);
+      const fileStat = await stat(filePath);
+      sizes.set(file, fileStat.size);
+    }
+  } catch {
+    // Directory doesn't exist
+  }
+
+  return sizes;
+}
+
+/**
  * Format SD contents for display
  */
 export function formatSDContents(contents: SDContents): string {
@@ -450,11 +473,14 @@ export class FileSyncSimulator {
     this.config.logger.log(`  Sync delay: ${this.config.syncDelayRange[0]}-${this.config.syncDelayRange[1]}ms`);
 
     // Watch SD1 and sync to SD2
-    // Use native FSEvents on macOS, polling can miss quick changes
+    // Use polling mode for reliable detection of file changes, especially appends
+    // FSEvents on macOS is unreliable for detecting appends to existing files
     const watcher1 = chokidar.watch(this.sd1Path, {
       persistent: true,
       ignoreInitial: false,
-      usePolling: false,
+      usePolling: true,
+      interval: 100,
+      binaryInterval: 100,
       awaitWriteFinish: false,
     });
 
@@ -471,11 +497,14 @@ export class FileSyncSimulator {
     });
 
     // Watch SD2 and sync to SD1
-    // Use native FSEvents on macOS, polling can miss quick changes
+    // Use polling mode for reliable detection of file changes, especially appends
+    // FSEvents on macOS is unreliable for detecting appends to existing files
     const watcher2 = chokidar.watch(this.sd2Path, {
       persistent: true,
       ignoreInitial: false,
-      usePolling: false,
+      usePolling: true,
+      interval: 100,
+      binaryInterval: 100,
       awaitWriteFinish: false,
     });
 
@@ -493,16 +522,16 @@ export class FileSyncSimulator {
 
     this.watchers = [watcher1, watcher2];
 
-    // Also poll for file size changes every 2s as backup
+    // Also poll for file size changes every 200ms as backup
     // This catches changes that FSEvents misses (common on macOS for appended files)
-    // Increased interval to avoid excessive I/O with partial sync
+    // More frequent polling needed for small file appends like activity log entries
     this.pollInterval = setInterval(() => {
       if (!this.stopped) {
         this.pollForChanges().catch((err) => {
           this.config.logger.error('Error polling for changes:', err);
         });
       }
-    }, 2000);
+    }, 200);
 
     this.config.logger.log('File sync simulator started');
   }
@@ -526,12 +555,20 @@ export class FileSyncSimulator {
               try {
                 const stats = await fsStat(fullPath);
                 const prevSize = this.fileSizes.get(fullPath);
+                // Log all .crdtlog and .log files for debugging
+                if (fullPath.endsWith('.crdtlog') || fullPath.endsWith('.log')) {
+                  this.config.logger.verbose(
+                    `Poll check: ${fullPath} size=${stats.size}, prev=${prevSize ?? 'none'}`
+                  );
+                }
                 if (prevSize === undefined) {
-                  // New file, record size
+                  // New file - record size AND trigger sync (in case chokidar missed the add event)
                   this.fileSizes.set(fullPath, stats.size);
+                  this.config.logger.log(`Poll detected new file: ${fullPath} (${stats.size} bytes)`);
+                  this.scheduleSync(fullPath, sourceSD, destSD, direction);
                 } else if (stats.size !== prevSize) {
                   // Size changed, trigger sync
-                  this.config.logger.verbose(`Poll detected size change: ${fullPath} (${prevSize} -> ${stats.size})`);
+                  this.config.logger.log(`Poll detected size change: ${fullPath} (${prevSize} -> ${stats.size})`);
                   this.fileSizes.set(fullPath, stats.size);
                   this.scheduleSync(fullPath, sourceSD, destSD, direction);
                 }
@@ -568,9 +605,27 @@ export class FileSyncSimulator {
       clearTimeout(existingTimeout);
     }
 
-    // Calculate delay
+    // Calculate delay - use shorter delays for coordination files
     const [minDelay, maxDelay] = this.config.syncDelayRange;
-    const delay = minDelay + Math.random() * (maxDelay - minDelay);
+    const isActivityLog = filePath.includes('/activity/') && filePath.endsWith('.log');
+    const isCrdtLog = filePath.endsWith('.crdtlog');
+
+    // Activity logs sync fastest (200-500ms) since they're small coordination files
+    // CRDT logs sync quickly (500-1500ms) since they need to arrive before ActivitySync polls
+    // Other files use the configured delay range
+    let effectiveMinDelay: number;
+    let effectiveMaxDelay: number;
+    if (isActivityLog) {
+      effectiveMinDelay = Math.min(200, minDelay);
+      effectiveMaxDelay = Math.min(500, maxDelay);
+    } else if (isCrdtLog) {
+      effectiveMinDelay = Math.min(500, minDelay);
+      effectiveMaxDelay = Math.min(1500, maxDelay);
+    } else {
+      effectiveMinDelay = minDelay;
+      effectiveMaxDelay = maxDelay;
+    }
+    const delay = effectiveMinDelay + Math.random() * (effectiveMaxDelay - effectiveMinDelay);
 
     // Calculate relative path within SD
     const relativePath = filePath.startsWith(sourceSD)
@@ -615,6 +670,24 @@ export class FileSyncSimulator {
         : sourceFilePath;
 
       const destFilePath = join(destSD, relativePath);
+
+      // For append-only log files (.crdtlog, .log), only sync if source is larger than dest
+      // This prevents race conditions where an old version overwrites a newer appended version
+      const isAppendOnlyLog = sourceFilePath.endsWith('.crdtlog') || sourceFilePath.endsWith('.log');
+      if (isAppendOnlyLog) {
+        try {
+          const { stat: fsStat } = await import('fs/promises');
+          const destStats = await fsStat(destFilePath);
+          if (destStats.size >= content.length) {
+            this.config.logger.verbose(
+              `Skipping sync: ${relativePath} (${direction}) - dest ${destStats.size} >= source ${content.length} bytes`
+            );
+            return;
+          }
+        } catch {
+          // Dest file doesn't exist, proceed with sync
+        }
+      }
 
       // Determine if we should do partial sync
       const shouldPartialSync = Math.random() < this.config.partialSyncProbability;

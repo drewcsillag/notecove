@@ -287,6 +287,81 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Check if a CRDT log file exists for a given note and instance with expected sequence.
+   * Used by ActivitySync to verify the CRDT log has synced before triggering reload.
+   *
+   * @param noteId Note ID
+   * @param sdId Storage directory ID
+   * @param instanceId Instance ID to check for
+   * @param expectedSequence The sequence number from the activity log
+   * @returns true if a .crdtlog file exists with at least the expected sequence
+   */
+  async checkCRDTLogExists(
+    noteId: string,
+    sdId: string,
+    instanceId: string,
+    expectedSequence: number
+  ): Promise<boolean> {
+    const { LogReader } = await import('@shared/storage');
+    const { NodeFileSystemAdapter } = await import('../storage/node-fs-adapter');
+    const fsAdapter = new NodeFileSystemAdapter();
+
+    // Construct the logs path manually since getNotePaths is private
+    const sdPath = this.storageManager.getSDPath(sdId);
+    const logsPath = fsAdapter.joinPath(sdPath, 'notes', noteId, 'logs');
+
+    try {
+      const logFiles = await LogReader.listLogFiles(logsPath, fsAdapter);
+
+      // Find the log file for this instance
+      const matchingFile = logFiles.find((f) => f.instanceId === instanceId);
+      if (!matchingFile) {
+        console.log(
+          `[CRDT Manager] checkCRDTLogExists(${noteId}, ${instanceId}, seq=${expectedSequence}): no log file found`
+        );
+        return false;
+      }
+
+      // Read the log file to check its highest sequence number
+      const logPath = fsAdapter.joinPath(logsPath, matchingFile.filename);
+      try {
+        let highestSeq = 0;
+
+        // Read all records to find the highest sequence (static method)
+        for await (const record of LogReader.readRecords(logPath, fsAdapter)) {
+          if (record.sequence > highestSeq) {
+            highestSeq = record.sequence;
+          }
+        }
+
+        const hasExpectedSeq = highestSeq >= expectedSequence;
+        console.log(
+          `[CRDT Manager] checkCRDTLogExists(${noteId}, ${instanceId}, expected=${expectedSequence}): highestSeq=${highestSeq}, ready=${hasExpectedSeq}`
+        );
+        return hasExpectedSeq;
+      } catch (readError) {
+        // File might be incomplete (partial sync)
+        const errorMessage = String(readError);
+        if (
+          errorMessage.includes('Truncated') ||
+          errorMessage.includes('incomplete') ||
+          errorMessage.includes('still being written')
+        ) {
+          console.log(
+            `[CRDT Manager] checkCRDTLogExists: log file incomplete/truncated, not ready`
+          );
+          return false;
+        }
+        throw readError;
+      }
+    } catch (error) {
+      // Directory might not exist yet
+      console.log(`[CRDT Manager] checkCRDTLogExists error:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Reload a note from disk
    *
    * Re-reads all updates from disk and applies them to the in-memory document.
@@ -317,6 +392,33 @@ export class CRDTManagerImpl implements CRDTManager {
       const encodedState = Y.encodeStateAsUpdate(loadResult.doc);
       state.snapshot.replaceWith(encodedState, loadResult.vectorClock);
       loadResult.doc.destroy();
+
+      // CRITICAL: Recreate the NoteDoc wrapper to point to the new Y.Doc
+      // replaceWith() destroys the old Y.Doc and creates a new one, so the
+      // old NoteDoc wrapper would be pointing to a destroyed document
+      state.noteDoc = new NoteDoc(noteId, state.snapshot.getDoc());
+
+      // CRITICAL: Re-attach the update event listener to the new Y.Doc
+      // The old listener was attached to the destroyed doc
+      const newDoc = state.snapshot.getDoc();
+      newDoc.on('update', (update: Uint8Array, origin: unknown) => {
+        // Skip handling if this update came from reload (to avoid duplicate writes)
+        if (origin === 'reload') {
+          console.log(`[CRDT Manager] Skipping disk write for reload origin on note ${noteId}`);
+          this.broadcastUpdate(noteId, update);
+          return;
+        }
+
+        const updatePromise = this.handleUpdate(noteId, update)
+          .catch((error: Error) => {
+            console.error(`Failed to handle update for note ${noteId}:`, error);
+          })
+          .finally(() => {
+            this.pendingUpdates.delete(updatePromise);
+          });
+
+        this.pendingUpdates.add(updatePromise);
+      });
 
       // Broadcast the new state to renderer windows
       this.broadcastUpdate(noteId, encodedState);

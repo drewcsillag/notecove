@@ -355,10 +355,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
     // Set up listener for updates from other windows in same process
     const handleNoteUpdate = (updatedNoteId: string, update: Uint8Array) => {
+      console.log(
+        `[TipTapEditor] handleNoteUpdate received for ${updatedNoteId}, update size: ${update?.length ?? 0}, this note: ${noteId}, match: ${updatedNoteId === noteId}`
+      );
       if (updatedNoteId === noteId) {
         // Apply update from other window to our local Y.Doc with 'remote' origin
         // This will automatically update the editor via the Collaboration extension
+        console.log(`[TipTapEditor] Applying Y.applyUpdate with ${update.length} bytes`);
         Y.applyUpdate(yDoc, update, 'remote');
+        console.log(`[TipTapEditor] Y.applyUpdate complete`);
       }
     };
 

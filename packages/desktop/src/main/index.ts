@@ -245,15 +245,67 @@ async function initializeDatabase(): Promise<Database> {
 }
 
 /**
+ * Check if there are activity logs from other instances in the SD
+ * This indicates content may be syncing from another machine
+ * @param sdPath Path to the storage directory
+ * @param instanceId Our instance ID (to exclude our own log)
+ * @returns Array of other instance IDs that have activity logs
+ */
+async function getOtherInstanceActivityLogs(sdPath: string, instanceId: string): Promise<string[]> {
+  const activityDir = join(sdPath, 'activity');
+  try {
+    const files = await fs.readdir(activityDir);
+    return files
+      .filter((f) => f.endsWith('.log') && f !== `${instanceId}.log`)
+      .map((f) => f.replace('.log', ''));
+  } catch {
+    // Activity directory might not exist yet
+    return [];
+  }
+}
+
+/**
+ * Check if there are CRDT log files from other instances in a note's logs directory
+ * This indicates content from another machine has synced
+ * @param logsPath Path to the note's logs directory
+ * @param instanceId Our instance ID (to exclude our own logs)
+ * @returns Array of other instance IDs that have CRDT log files
+ */
+async function getOtherInstanceCRDTLogs(logsPath: string, instanceId: string): Promise<string[]> {
+  try {
+    const files = await fs.readdir(logsPath);
+    const otherInstances = new Set<string>();
+    for (const file of files) {
+      if (file.endsWith('.crdtlog')) {
+        // File format: {instanceId}_{timestamp}.crdtlog
+        const parts = file.replace('.crdtlog', '').split('_');
+        if (parts.length >= 2) {
+          const fileInstanceId = parts.slice(0, -1).join('_'); // Handle instance IDs with underscores
+          if (fileInstanceId !== instanceId) {
+            otherInstances.add(fileInstanceId);
+          }
+        }
+      }
+    }
+    return Array.from(otherInstances);
+  } catch {
+    // Logs directory might not exist yet
+    return [];
+  }
+}
+
+/**
  * Ensure a default note exists for the user
  * @param db Database instance
  * @param crdtMgr CRDT manager instance
  * @param defaultStoragePath Path to use for the default storage directory (e.g., from TEST_STORAGE_DIR in tests)
+ * @param instanceId Our instance ID (to avoid checking our own activity logs)
  */
 async function ensureDefaultNote(
   db: Database,
   crdtMgr: CRDTManager,
-  defaultStoragePath?: string
+  defaultStoragePath?: string,
+  instanceId?: string
 ): Promise<void> {
   const DEFAULT_NOTE_ID = 'default-note';
 
@@ -284,6 +336,29 @@ async function ensureDefaultNote(
       defaultNoteInAnySD.sdId,
       '(might have been moved)'
     );
+
+    // Load the note from CRDT to sync metadata (handles folder moves from other instances)
+    await crdtMgr.loadNote(DEFAULT_NOTE_ID, defaultNoteInAnySD.sdId);
+    const noteDoc = crdtMgr.getNoteDoc(DEFAULT_NOTE_ID);
+    if (noteDoc) {
+      const crdtMetadata = noteDoc.getMetadata();
+      if (
+        crdtMetadata.folderId !== defaultNoteInAnySD.folderId ||
+        crdtMetadata.deleted !== defaultNoteInAnySD.deleted
+      ) {
+        console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
+          folderId: crdtMetadata.folderId,
+          deleted: crdtMetadata.deleted,
+        });
+        await db.upsertNote({
+          ...defaultNoteInAnySD,
+          folderId: crdtMetadata.folderId,
+          deleted: crdtMetadata.deleted,
+          modified: crdtMetadata.modified ?? defaultNoteInAnySD.modified,
+        });
+      }
+    }
+
     await db.setState('selectedNoteId', DEFAULT_NOTE_ID);
     return;
   }
@@ -310,6 +385,27 @@ async function ensureDefaultNote(
         );
         paragraph.insert(0, [text]);
         content.insert(0, [paragraph]);
+      }
+
+      // Sync CRDT metadata to database (handles folder moves from other instances)
+      const noteDoc = crdtMgr.getNoteDoc(DEFAULT_NOTE_ID);
+      if (noteDoc) {
+        const crdtMetadata = noteDoc.getMetadata();
+        if (
+          crdtMetadata.folderId !== defaultNote.folderId ||
+          crdtMetadata.deleted !== defaultNote.deleted
+        ) {
+          console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
+            folderId: crdtMetadata.folderId,
+            deleted: crdtMetadata.deleted,
+          });
+          await db.upsertNote({
+            ...defaultNote,
+            folderId: crdtMetadata.folderId,
+            deleted: crdtMetadata.deleted,
+            modified: crdtMetadata.modified ?? defaultNote.modified,
+          });
+        }
       }
     }
     await db.setState('selectedNoteId', DEFAULT_NOTE_ID);
@@ -349,6 +445,10 @@ async function ensureDefaultNote(
 
   console.log('[ensureDefaultNote] No existing notes in database, loading from CRDT');
 
+  // Get the SD path to check for activity logs from other instances
+  const sdRecord = await db.getStorageDir(DEFAULT_SD_ID);
+  const sdPath = sdRecord?.path ?? defaultStoragePath;
+
   // No notes exist in database, but CRDT files might exist
   // Load the note to check if it already has content from sync directory
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -360,17 +460,77 @@ async function ensureDefaultNote(
     // Check if content already exists (from sync directory)
     const content = doc.getXmlFragment('content');
     if (content.length === 0) {
-      // Only add welcome content if CRDT is truly empty
-      console.log('[ensureDefaultNote] CRDT is empty, adding welcome content');
-      // ProseMirror structure: paragraph containing text
-      const paragraph = new Y.XmlElement('paragraph');
-      const text = new Y.XmlText();
-      text.insert(
-        0,
-        'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
-      );
-      paragraph.insert(0, [text]);
-      content.insert(0, [paragraph]);
+      // Check if there are activity logs OR CRDT logs from other instances
+      // If so, wait for content to sync before creating welcome content
+      const noteLogsPath = join(sdPath ?? '', 'notes', DEFAULT_NOTE_ID, 'logs');
+      const otherActivityInstances = sdPath && instanceId ? await getOtherInstanceActivityLogs(sdPath, instanceId) : [];
+      const otherCRDTInstances = sdPath && instanceId ? await getOtherInstanceCRDTLogs(noteLogsPath, instanceId) : [];
+
+      // Combine both sources of other instance detection
+      const allOtherInstances = [...new Set([...otherActivityInstances, ...otherCRDTInstances])];
+
+      if (allOtherInstances.length > 0) {
+        console.log(
+          `[ensureDefaultNote] Found ${allOtherInstances.length} other instance(s): ${allOtherInstances.join(', ')}`
+        );
+        console.log(`[ensureDefaultNote]   Activity logs: ${otherActivityInstances.length}, CRDT logs: ${otherCRDTInstances.length}`);
+        console.log('[ensureDefaultNote] Waiting for content to sync from other instances...');
+
+        // Poll for content to arrive (max 10 seconds in 500ms intervals)
+        const maxWaitMs = 10000;
+        const pollIntervalMs = 500;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < maxWaitMs) {
+          // Reload the note to check for new content
+          await crdtMgr.loadNote(DEFAULT_NOTE_ID, DEFAULT_SD_ID);
+          const reloadedDoc = crdtMgr.getDocument(DEFAULT_NOTE_ID);
+          if (reloadedDoc) {
+            const reloadedContent = reloadedDoc.getXmlFragment('content');
+            if (reloadedContent.length > 0) {
+              console.log(
+                '[ensureDefaultNote] Content arrived from another instance, skipping welcome content creation'
+              );
+              break;
+            }
+          }
+          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        }
+
+        // Check one more time after waiting
+        const finalDoc = crdtMgr.getDocument(DEFAULT_NOTE_ID);
+        if (finalDoc) {
+          const finalContent = finalDoc.getXmlFragment('content');
+          if (finalContent.length > 0) {
+            console.log('[ensureDefaultNote] Content found after waiting, using synced content');
+          } else {
+            console.log(
+              '[ensureDefaultNote] Timeout waiting for content from other instances, creating welcome content'
+            );
+            // Create welcome content since nothing arrived
+            const paragraph = new Y.XmlElement('paragraph');
+            const text = new Y.XmlText();
+            text.insert(
+              0,
+              'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
+            );
+            paragraph.insert(0, [text]);
+            finalContent.insert(0, [paragraph]);
+          }
+        }
+      } else {
+        // No other instances, create welcome content immediately
+        console.log('[ensureDefaultNote] CRDT is empty, adding welcome content');
+        // ProseMirror structure: paragraph containing text
+        const paragraph = new Y.XmlElement('paragraph');
+        const text = new Y.XmlText();
+        text.insert(
+          0,
+          'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
+        );
+        paragraph.insert(0, [text]);
+        content.insert(0, [paragraph]);
+      }
     } else {
       console.log(
         '[ensureDefaultNote] CRDT already has content from sync directory, skipping welcome content'
@@ -581,6 +741,32 @@ async function setupSDWatchers(
           const noteDoc = crdtManager.getNoteDoc(noteId);
           const doc = crdtManager.getDocument(noteId);
           if (doc) {
+            // CRITICAL: Broadcast the updated CRDT state to all renderer windows
+            // This allows TipTap editors to update their Y.Doc with the new state
+            const stateUpdate = Y.encodeStateAsUpdate(doc);
+
+            // Log actual content for debugging
+            const contentFrag = doc.getXmlFragment('content');
+            let debugContentText = '';
+            contentFrag.forEach((item) => {
+              if (item instanceof Y.XmlText) {
+                debugContentText += String(item.toString());
+              } else if (item instanceof Y.XmlElement) {
+                item.forEach((child: unknown) => {
+                  if (child instanceof Y.XmlText) {
+                    debugContentText += String(child.toString());
+                  }
+                });
+              }
+            });
+
+            console.log(
+              `[ActivitySync] Broadcasting note:updated for ${noteId} (${stateUpdate.length} bytes), content: "${debugContentText.substring(0, 50)}..."`
+            );
+            for (const window of BrowserWindow.getAllWindows()) {
+              window.webContents.send('note:updated', noteId, stateUpdate);
+            }
+
             const crdtMetadata = noteDoc?.getMetadata();
             // Extract title and strip any HTML/XML tags
             let newTitle = extractTitleFromDoc(doc, 'content');
@@ -657,6 +843,9 @@ async function setupSDWatchers(
       }
     },
     getLoadedNotes: () => crdtManager.getLoadedNotes(),
+    checkCRDTLogExists: async (noteId: string, instanceId: string, expectedSequence: number) => {
+      return crdtManager.checkCRDTLogExists(noteId, sdId, instanceId, expectedSequence);
+    },
   };
 
   const activitySync = new ActivitySync(
@@ -1593,7 +1782,7 @@ void app.whenReady().then(async () => {
     // Create default note if none exists
     // IMPORTANT: Do this BEFORE setupSDWatchers to prevent race condition where
     // activity sync imports empty note files before welcome note is created
-    await ensureDefaultNote(database, crdtManager, storageDir);
+    await ensureDefaultNote(database, crdtManager, storageDir, instanceId);
 
     // Set up watchers for default SD AFTER ensureDefaultNote
     // This ensures the welcome note is created before activity sync runs

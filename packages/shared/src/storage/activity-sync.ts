@@ -17,6 +17,21 @@ export interface ActivitySyncCallbacks {
    * Get list of currently loaded note IDs
    */
   getLoadedNotes: () => string[];
+
+  /**
+   * Check if a CRDT log file exists for a given note and instance with expected sequence.
+   * Used to verify the CRDT log has synced before triggering reload.
+   * Returns true if a .crdtlog file exists with at least the expected sequence number.
+   *
+   * @param noteId - The note ID
+   * @param instanceId - The instance ID to check
+   * @param expectedSequence - The sequence number we're syncing to (from activity log)
+   */
+  checkCRDTLogExists?: (
+    noteId: string,
+    instanceId: string,
+    expectedSequence: number
+  ) => Promise<boolean>;
 }
 
 export class ActivitySync {
@@ -75,6 +90,10 @@ export class ActivitySync {
 
           const lastSeen = this.lastSeenSequences.get(otherInstanceId) ?? -1;
 
+          console.log(
+            `[ActivitySync] Reading ${file}: ${lines.length} lines, lastSeen=${lastSeen}, firstSeq=${lines[0]?.split('|')[1]}, lastSeq=${lines[lines.length - 1]?.split('|')[1]}`
+          );
+
           // Parse first line to check for sequence gap
           const firstLine = lines[0];
           if (firstLine) {
@@ -100,6 +119,8 @@ export class ActivitySync {
           }
 
           // Process new entries (those with sequence > lastSeen)
+          // DON'T update watermark here - it will be updated after successful sync
+          // This prevents race conditions where watermark updates before content syncs
           for (const line of lines) {
             const parts = line.split('|');
             if (parts.length < 2) continue; // Invalid line
@@ -123,12 +144,10 @@ export class ActivitySync {
               // If there's no pending sync, start one
               // Otherwise, the pending sync will be followed by another sync for the highest sequence
               if (!this.pendingSyncs.has(noteId)) {
-                this.startSyncChain(noteId);
+                this.startSyncChain(noteId, otherInstanceId);
               }
             }
           }
-
-          this.updateWatermark(otherInstanceId, lines);
         } catch (error) {
           // File might have been deleted or is corrupted
           console.error(`[ActivitySync] Failed to read ${file}:`, error);
@@ -152,8 +171,11 @@ export class ActivitySync {
    *
    * This ensures we always sync to the latest available sequence, even if
    * new sequences arrive while we're still polling for earlier ones.
+   *
+   * @param noteId The note to sync
+   * @param otherInstanceId The instance ID whose activity we're syncing from
    */
-  private startSyncChain(noteId: string): void {
+  private startSyncChain(noteId: string, otherInstanceId: string): void {
     const syncOneAndContinue = async (): Promise<void> => {
       // Get the current highest sequence we need to sync to
       const target = this.highestPendingSequence.get(noteId);
@@ -171,7 +193,16 @@ export class ActivitySync {
       );
 
       // Sync to this sequence
-      await this.pollAndReload(target.instanceSeq, noteId);
+      const success = await this.pollAndReload(target.instanceSeq, noteId);
+
+      // Update watermark ONLY after successful sync
+      // This prevents the race condition where we mark sequences as "seen" before their content syncs
+      if (success) {
+        this.lastSeenSequences.set(otherInstanceId, target.sequence);
+        console.log(
+          `[ActivitySync] Watermark updated for ${otherInstanceId} to ${target.sequence}`
+        );
+      }
 
       // Check if a new higher sequence arrived while we were syncing
       const newTarget = this.highestPendingSequence.get(noteId);
@@ -201,14 +232,26 @@ export class ActivitySync {
    *
    * Uses exponential backoff to avoid hammering the filesystem.
    * Handles both missing files and incomplete files (0x00 flag byte).
+   *
+   * IMPORTANT: Before calling reloadNote, we verify the CRDT log file from
+   * the source instance actually exists. This prevents a race condition where
+   * the activity log syncs before the CRDT log, causing reloadNote to succeed
+   * but not find any new content (since the CRDT log isn't there yet).
+   *
+   * @returns true if sync succeeded, false if it failed/timed out
    */
-  private async pollAndReload(instanceSeq: string, noteId: string): Promise<void> {
+  private async pollAndReload(instanceSeq: string, noteId: string): Promise<boolean> {
     // Exponential backoff delays (ms)
-    // Extended delays to handle slow cloud sync (e.g., iCloud incremental sync)
+    // Extended delays to handle slow cloud sync (e.g., iCloud, Dropbox, Google Drive, OneDrive)
     const delays = [100, 200, 500, 1000, 2000, 3000, 5000, 7000, 10000, 15000];
 
+    // Parse instance ID and sequence from instanceSeq (format: "{instanceId}_{sequence}")
+    const seqParts = instanceSeq.split('_');
+    const expectedSequence = parseInt(seqParts[seqParts.length - 1] ?? '0');
+    const sourceInstanceId = seqParts.length > 1 ? seqParts.slice(0, -1).join('_') : instanceSeq;
+
     console.log(
-      `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}`
+      `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}, sourceInstance: ${sourceInstanceId}, expectedSeq: ${expectedSequence}`
     );
 
     for (let attempt = 0; attempt < delays.length; attempt++) {
@@ -218,12 +261,33 @@ export class ActivitySync {
       );
 
       try {
+        // CRITICAL: Check if the CRDT log file from the source instance has the expected
+        // sequence. This prevents the race condition where activity log syncs before CRDT
+        // log, causing reloadNote to read stale content.
+        if (this.callbacks.checkCRDTLogExists) {
+          const hasExpectedSeq = await this.callbacks.checkCRDTLogExists(
+            noteId,
+            sourceInstanceId,
+            expectedSequence
+          );
+          if (!hasExpectedSeq) {
+            console.log(
+              `[ActivitySync] CRDT log for instance ${sourceInstanceId} not ready (expected seq ${expectedSequence}), attempt ${attempt + 1}, will retry after ${delay}ms`
+            );
+            await this.sleep(delay);
+            continue;
+          }
+          console.log(
+            `[ActivitySync] CRDT log for instance ${sourceInstanceId} has expected seq ${expectedSequence}, proceeding with reload`
+          );
+        }
+
         // Try to reload the note - this will read all .crdtlog files
         await this.callbacks.reloadNote(noteId, this.sdId);
         console.log(
           `[ActivitySync] SUCCESS on attempt ${attempt + 1} for note ${noteId}, sequence ${instanceSeq}`
         );
-        return; // Success!
+        return true; // Success!
       } catch (error) {
         const errorMessage = (error as Error).message || '';
 
@@ -256,7 +320,7 @@ export class ActivitySync {
           `[ActivitySync] Failed to reload note ${noteId} for sequence ${instanceSeq} (attempt ${attempt + 1}):`,
           error
         );
-        return;
+        return false;
       }
     }
 
@@ -265,6 +329,7 @@ export class ActivitySync {
     console.warn(
       `[ActivitySync] Timeout after ${delays.length} attempts waiting for note ${noteId} sequence ${instanceSeq}. File may sync later.`
     );
+    return false;
   }
 
   /**
@@ -272,27 +337,6 @@ export class ActivitySync {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Update our watermark for an instance
-   */
-  private updateWatermark(instanceId: string, lines: string[]): void {
-    if (lines.length > 0) {
-      const lastLine = lines[lines.length - 1];
-      if (!lastLine) return;
-
-      const parts = lastLine.split('|');
-      if (parts.length < 2) return;
-
-      const instanceSeq = parts[1];
-      if (!instanceSeq) return;
-
-      const seqParts = instanceSeq.split('_');
-      const sequence = parseInt(seqParts[1] ?? '0');
-
-      this.lastSeenSequences.set(instanceId, sequence);
-    }
   }
 
   /**

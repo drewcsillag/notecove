@@ -93,6 +93,22 @@ export interface CRDTManager {
   getLoadedNotes(): string[];
 
   /**
+   * Check if a CRDT log file exists for a given note and instance with expected sequence.
+   * Used by ActivitySync to verify the CRDT log has synced before triggering reload.
+   * @param noteId Note ID
+   * @param sdId Storage Directory ID
+   * @param instanceId Instance ID to check for
+   * @param expectedSequence The sequence number from the activity log
+   * @returns true if a .crdtlog file exists with at least the expected sequence
+   */
+  checkCRDTLogExists(
+    noteId: string,
+    sdId: string,
+    instanceId: string,
+    expectedSequence: number
+  ): Promise<boolean>;
+
+  /**
    * Flush all pending updates to disk
    * Should be called before shutdown to ensure all writes complete
    * @returns Promise that resolves when all pending updates are written
