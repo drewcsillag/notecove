@@ -288,7 +288,8 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
       offset = sequenceResult.offset;
 
       // Skip data
-      const dataSize = length - 8 - (sequenceResult.offset - (offset - (sequenceResult.offset - offset)));
+      const dataSize =
+        length - 8 - (sequenceResult.offset - (offset - (sequenceResult.offset - offset)));
       offset += dataSize;
 
       records.push({
@@ -470,7 +471,9 @@ export class FileSyncSimulator {
     this.config.logger.log(`Starting file sync simulator`);
     this.config.logger.log(`  SD1: ${this.sd1Path}`);
     this.config.logger.log(`  SD2: ${this.sd2Path}`);
-    this.config.logger.log(`  Sync delay: ${this.config.syncDelayRange[0]}-${this.config.syncDelayRange[1]}ms`);
+    this.config.logger.log(
+      `  Sync delay: ${this.config.syncDelayRange[0]}-${this.config.syncDelayRange[1]}ms`
+    );
 
     // Watch SD1 and sync to SD2
     // Use polling mode for reliable detection of file changes, especially appends
@@ -543,7 +546,12 @@ export class FileSyncSimulator {
     const { readdir, stat: fsStat } = await import('fs/promises');
     const { join } = await import('path');
 
-    const scanDir = async (basePath: string, sourceSD: string, destSD: string, direction: string) => {
+    const scanDir = async (
+      basePath: string,
+      sourceSD: string,
+      destSD: string,
+      direction: string
+    ) => {
       const scanRecursive = async (dir: string) => {
         try {
           const entries = await readdir(dir, { withFileTypes: true });
@@ -564,11 +572,15 @@ export class FileSyncSimulator {
                 if (prevSize === undefined) {
                   // New file - record size AND trigger sync (in case chokidar missed the add event)
                   this.fileSizes.set(fullPath, stats.size);
-                  this.config.logger.log(`Poll detected new file: ${fullPath} (${stats.size} bytes)`);
+                  this.config.logger.log(
+                    `Poll detected new file: ${fullPath} (${stats.size} bytes)`
+                  );
                   this.scheduleSync(fullPath, sourceSD, destSD, direction);
                 } else if (stats.size !== prevSize) {
                   // Size changed, trigger sync
-                  this.config.logger.log(`Poll detected size change: ${fullPath} (${prevSize} -> ${stats.size})`);
+                  this.config.logger.log(
+                    `Poll detected size change: ${fullPath} (${prevSize} -> ${stats.size})`
+                  );
                   this.fileSizes.set(fullPath, stats.size);
                   this.scheduleSync(fullPath, sourceSD, destSD, direction);
                 }
@@ -673,7 +685,8 @@ export class FileSyncSimulator {
 
       // For append-only log files (.crdtlog, .log), only sync if source is larger than dest
       // This prevents race conditions where an old version overwrites a newer appended version
-      const isAppendOnlyLog = sourceFilePath.endsWith('.crdtlog') || sourceFilePath.endsWith('.log');
+      const isAppendOnlyLog =
+        sourceFilePath.endsWith('.crdtlog') || sourceFilePath.endsWith('.log');
       if (isAppendOnlyLog) {
         try {
           const { stat: fsStat } = await import('fs/promises');
@@ -713,10 +726,10 @@ export class FileSyncSimulator {
         await writeFilePromise(destFilePath, partialContent);
 
         // Schedule completion of the file (use partialCompletionDelayRange if set, otherwise syncDelayRange)
-        const completionRange = this.config.partialCompletionDelayRange ?? this.config.syncDelayRange;
+        const completionRange =
+          this.config.partialCompletionDelayRange ?? this.config.syncDelayRange;
         const completionDelay =
-          completionRange[0] +
-          Math.random() * (completionRange[1] - completionRange[0]);
+          completionRange[0] + Math.random() * (completionRange[1] - completionRange[0]);
 
         // Track completion timeout so it can be cleared on stop()
         const completionKey = `${destFilePath}:completion`;

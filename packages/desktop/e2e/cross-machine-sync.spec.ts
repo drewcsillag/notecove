@@ -170,7 +170,10 @@ test.describe('cross-machine sync - smoke test', () => {
     // Relaunch instance 2
     console.log('[Smoke Test] Relaunching instance 2...');
     instance2 = await electron.launch({
-      args: [resolve(__dirname, '..', 'dist-electron', 'main', 'index.js'), `--user-data-dir=${userDataDir2}`],
+      args: [
+        resolve(__dirname, '..', 'dist-electron', 'main', 'index.js'),
+        `--user-data-dir=${userDataDir2}`,
+      ],
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -421,7 +424,9 @@ test.describe('cross-machine sync - file sync simulator', () => {
     // Check SD2 for partial files
     console.log('[Partial Sync Test] Checking SD2 for partial files...');
     const sd2ContentsPartial = await inspectSDContents(sd2);
-    console.log('[Partial Sync Test] SD2 contents (partial):\n' + formatSDContents(sd2ContentsPartial));
+    console.log(
+      '[Partial Sync Test] SD2 contents (partial):\n' + formatSDContents(sd2ContentsPartial)
+    );
 
     // Files should exist in SD2 (even if partial)
     expect(sd2ContentsPartial.totalFiles).toBeGreaterThan(0);
@@ -906,7 +911,9 @@ test.describe('cross-machine sync - two instances', () => {
     }
 
     console.log('[Bidirectional] ✅ All sequence numbers are in order');
-    console.log('[Bidirectional] ✅ Bidirectional sync with human-like typing completed successfully');
+    console.log(
+      '[Bidirectional] ✅ Bidirectional sync with human-like typing completed successfully'
+    );
 
     // Checkpoint: Bidirectional sync works
     // - Instance 1 typed content, synced to Instance 2
@@ -988,7 +995,9 @@ test.describe('cross-machine sync - two instances', () => {
     // 3. File sync simulator to apply delays (1-2 seconds per file, but can overlap)
     // 4. All files to be written to SD2
     // Using 15s to ensure CRDT log has time to sync (activity log syncs faster)
-    console.log('[LiveEditorSync] Waiting for initial content (CRDT log + activity log) to sync to SD2...');
+    console.log(
+      '[LiveEditorSync] Waiting for initial content (CRDT log + activity log) to sync to SD2...'
+    );
     await window1.waitForTimeout(15000);
 
     // Launch instance 2
@@ -1021,7 +1030,10 @@ test.describe('cross-machine sync - two instances', () => {
     // Capture Instance 2's initial content for comparison
     const editor2 = window2.locator('.ProseMirror');
     const initialContent2 = await editor2.textContent();
-    console.log('[LiveEditorSync] Instance 2 initial content:', initialContent2?.substring(0, 50) + '...');
+    console.log(
+      '[LiveEditorSync] Instance 2 initial content:',
+      initialContent2?.substring(0, 50) + '...'
+    );
 
     // Instance 1 types unique content using keyboard (not .fill() which doesn't trigger Y.js)
     const editor1 = window1.locator('.ProseMirror');
@@ -1199,7 +1211,9 @@ test.describe('cross-machine sync - note move', () => {
     await window1.waitForTimeout(1000);
 
     // Verify folder was created
-    const folderNode1 = window1.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: testFolderName });
+    const folderNode1 = window1
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: testFolderName });
     await expect(folderNode1).toBeVisible({ timeout: 5000 });
     console.log('[NoteMoveSync] Folder created:', testFolderName);
 
@@ -1283,7 +1297,9 @@ test.describe('cross-machine sync - note move', () => {
 
     // === Step 5: Verify folder exists in Instance 2 ===
     console.log('[NoteMoveSync] Checking for folder in Instance 2...');
-    const folderNode2 = window2.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: testFolderName });
+    const folderNode2 = window2
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: testFolderName });
     await expect(folderNode2).toBeVisible({ timeout: 10000 });
     console.log('[NoteMoveSync] ✅ Folder synced to Instance 2');
 
@@ -1457,7 +1473,9 @@ test.describe('cross-machine sync - move conflict', () => {
     await window1.waitForTimeout(1000);
 
     // Verify Folder A was created
-    const folderNodeA = window1.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: folderAName });
+    const folderNodeA = window1
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: folderAName });
     await expect(folderNodeA).toBeVisible({ timeout: 5000 });
     console.log('[MoveConflict] Folder A created:', folderAName);
 
@@ -1529,7 +1547,9 @@ test.describe('cross-machine sync - move conflict', () => {
     await window2.waitForTimeout(1000);
 
     // Verify Instance 2 sees Folder A (synced from Instance 1)
-    const folderNodeASynced = window2.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: folderAName });
+    const folderNodeASynced = window2
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: folderAName });
     await expect(folderNodeASynced).toBeVisible({ timeout: 10000 });
     console.log('[MoveConflict] Instance 2 sees Folder A from sync');
 
@@ -1546,7 +1566,9 @@ test.describe('cross-machine sync - move conflict', () => {
     await window2.waitForTimeout(1000);
 
     // Verify Folder B was created
-    const folderNodeB = window2.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: folderBName });
+    const folderNodeB = window2
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: folderBName });
     await expect(folderNodeB).toBeVisible({ timeout: 5000 });
     console.log('[MoveConflict] Folder B created:', folderBName);
 
@@ -1641,8 +1663,12 @@ test.describe('cross-machine sync - move conflict', () => {
     await window2.waitForTimeout(2000);
 
     // Check which folder has the note in Instance 1
-    const folderAVerify1 = window1.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: folderAName });
-    const folderBVerify1 = window1.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: folderBName });
+    const folderAVerify1 = window1
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: folderAName });
+    const folderBVerify1 = window1
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: folderBName });
 
     const badgeAVerify1 = folderAVerify1.locator('.MuiChip-root').filter({ hasText: '1' });
     const badgeBVerify1 = folderBVerify1.locator('.MuiChip-root').filter({ hasText: '1' });
@@ -1650,11 +1676,17 @@ test.describe('cross-machine sync - move conflict', () => {
     const noteInA1 = await badgeAVerify1.isVisible().catch(() => false);
     const noteInB1 = await badgeBVerify1.isVisible().catch(() => false);
 
-    console.log(`[MoveConflict] Instance 1: Note in Folder A: ${noteInA1}, Note in Folder B: ${noteInB1}`);
+    console.log(
+      `[MoveConflict] Instance 1: Note in Folder A: ${noteInA1}, Note in Folder B: ${noteInB1}`
+    );
 
     // Check which folder has the note in Instance 2
-    const folderAVerify2 = window2.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: folderAName });
-    const folderBVerify2 = window2.locator(`[data-testid^="folder-tree-node-"]`).filter({ hasText: folderBName });
+    const folderAVerify2 = window2
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: folderAName });
+    const folderBVerify2 = window2
+      .locator(`[data-testid^="folder-tree-node-"]`)
+      .filter({ hasText: folderBName });
 
     const badgeAVerify2 = folderAVerify2.locator('.MuiChip-root').filter({ hasText: '1' });
     const badgeBVerify2 = folderBVerify2.locator('.MuiChip-root').filter({ hasText: '1' });
@@ -1662,7 +1694,9 @@ test.describe('cross-machine sync - move conflict', () => {
     const noteInA2 = await badgeAVerify2.isVisible().catch(() => false);
     const noteInB2 = await badgeBVerify2.isVisible().catch(() => false);
 
-    console.log(`[MoveConflict] Instance 2: Note in Folder A: ${noteInA2}, Note in Folder B: ${noteInB2}`);
+    console.log(
+      `[MoveConflict] Instance 2: Note in Folder A: ${noteInA2}, Note in Folder B: ${noteInB2}`
+    );
 
     // CRDT Convergence Check: Both instances should agree on which folder has the note
     // Due to LWW (Last Writer Wins), the note should be in exactly ONE folder (either A or B, but same on both)
@@ -1672,12 +1706,18 @@ test.describe('cross-machine sync - move conflict', () => {
 
     // Verify CRDT convergence - both instances MUST agree
     if (winnerFolder === 'B') {
-      console.log('[MoveConflict] ✅ CRDT resolved conflict: Folder B wins (Instance 2\'s later move)');
+      console.log(
+        "[MoveConflict] ✅ CRDT resolved conflict: Folder B wins (Instance 2's later move)"
+      );
     } else if (winnerFolder === 'A') {
-      console.log('[MoveConflict] ✅ CRDT resolved conflict: Folder A wins (Instance 1\'s earlier move)');
+      console.log(
+        "[MoveConflict] ✅ CRDT resolved conflict: Folder A wins (Instance 1's earlier move)"
+      );
     } else {
       // This would be a bug - CRDT should converge deterministically
-      console.error('[MoveConflict] ❌ CRDT CONVERGENCE FAILURE: Instances have different folder assignments');
+      console.error(
+        '[MoveConflict] ❌ CRDT CONVERGENCE FAILURE: Instances have different folder assignments'
+      );
       console.error(`  Instance 1: A=${noteInA1}, B=${noteInB1}`);
       console.error(`  Instance 2: A=${noteInA2}, B=${noteInB2}`);
     }

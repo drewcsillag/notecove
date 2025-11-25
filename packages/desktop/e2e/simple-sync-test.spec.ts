@@ -100,7 +100,7 @@ test.describe('Simple sync test - fresh note', () => {
 
     console.log('[Simple Test] Files copied, closing instance 1...');
     await instance1.close();
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // === Phase 2: Instance 2 loads and should see the content ===
     console.log('[Simple Test] Launching instance 2...');

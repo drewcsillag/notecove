@@ -6,7 +6,11 @@ export * from './types';
 export { SyncDirectoryStructure } from './sd-structure';
 // UpdateManager removed - replaced by AppendLogManager
 export { ActivityLogger } from './activity-logger';
-export { ActivitySync, type ActivitySyncCallbacks, type SyncMetricsCallbacks } from './activity-sync';
+export {
+  ActivitySync,
+  type ActivitySyncCallbacks,
+  type SyncMetricsCallbacks,
+} from './activity-sync';
 export { SdUuidManager, type SdIdFile, type SdUuidInitResult } from './sd-uuid';
 
 // New append-only log format (Phase 1-5)

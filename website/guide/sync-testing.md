@@ -42,16 +42,17 @@ npx tsx packages/shared/src/__manual__/sloppy-sync-fuzz-test.ts --duration 120
 
 ### Scenarios
 
-| Scenario | Description |
-|----------|-------------|
-| `basic-sloppy-sync` | Two instances write records, sync is delayed and out of order |
-| `partial-file-sync` | Files may arrive partially (30% probability of truncation) |
-| `rapid-edits` | Stress test with rapid alternating writes from two instances |
-| `note-load-partial-files` | Tests NoteStorageManager handling of truncated files |
+| Scenario                  | Description                                                   |
+| ------------------------- | ------------------------------------------------------------- |
+| `basic-sloppy-sync`       | Two instances write records, sync is delayed and out of order |
+| `partial-file-sync`       | Files may arrive partially (30% probability of truncation)    |
+| `rapid-edits`             | Stress test with rapid alternating writes from two instances  |
+| `note-load-partial-files` | Tests NoteStorageManager handling of truncated files          |
 
 ### How It Works
 
 The test uses `SloppySyncFileSystem`, an in-memory file system that simulates:
+
 - Configurable sync delays (100ms - 2000ms)
 - Random partial file visibility (0-50% probability)
 - Delayed file visibility (files become "visible" after a random delay)
@@ -86,11 +87,11 @@ NODE_ENV=test npx tsx packages/desktop/src/__manual__/cross-sd-move-fuzz-test.ts
 
 ### Scenarios
 
-| Scenario | Description |
-|----------|-------------|
-| `concurrent-moves` | Two instances move 10 notes concurrently to different SDs |
+| Scenario            | Description                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `concurrent-moves`  | Two instances move 10 notes concurrently to different SDs                             |
 | `interrupted-moves` | Simulates crash at each state: initiated, copying, files_copied, db_updated, cleaning |
-| `missing-sd` | Tests recovery when source SD becomes inaccessible mid-move |
+| `missing-sd`        | Tests recovery when source SD becomes inaccessible mid-move                           |
 
 ### Move State Machine
 
@@ -127,14 +128,14 @@ pnpm --filter @notecove/desktop test:e2e --grep "should resolve conflicting move
 
 ### Test Scenarios
 
-| Test | Description |
-|------|-------------|
-| Smoke test | Two instances share same SD, verify basic edit sync |
-| Basic sync | Instance A types → file sync → Instance B sees content |
-| Bidirectional sync | A types → sync → B types → sync → both verify |
-| Live editor sync | Both instances have same note open, edits sync live |
-| Note move sync | A moves note to folder → syncs to B |
-| Move conflict | Both instances move same note to different folders → CRDT resolves |
+| Test               | Description                                                        |
+| ------------------ | ------------------------------------------------------------------ |
+| Smoke test         | Two instances share same SD, verify basic edit sync                |
+| Basic sync         | Instance A types → file sync → Instance B sees content             |
+| Bidirectional sync | A types → sync → B types → sync → both verify                      |
+| Live editor sync   | Both instances have same note open, edits sync live                |
+| Note move sync     | A moves note to folder → syncs to B                                |
+| Move conflict      | Both instances move same note to different folders → CRDT resolves |
 
 ### FileSyncSimulator
 
@@ -144,9 +145,9 @@ The `FileSyncSimulator` class simulates cloud storage sync behavior:
 const simulator = new FileSyncSimulator({
   sourceDir: sd1Path,
   targetDir: sd2Path,
-  minDelay: 1000,  // Minimum sync delay in ms
-  maxDelay: 3000,  // Maximum sync delay in ms
-  bidirectional: true,  // Enable two-way sync
+  minDelay: 1000, // Minimum sync delay in ms
+  maxDelay: 3000, // Maximum sync delay in ms
+  bidirectional: true, // Enable two-way sync
   logger: new SimulatorLogger({ enabled: true, verbose: false }),
 });
 
@@ -197,14 +198,17 @@ const allValid = await validateAllSequences(sdPath);
 ### Troubleshooting
 
 **Tests timing out:**
+
 - Increase test timeout in playwright.config.ts
 - Check that builds are up to date: `pnpm build`
 
 **Inconsistent results:**
+
 - Run multiple times to verify (tests have expected ~70-90% pass rate)
 - Check console logs for ActivitySync and CRDT Manager messages
 
 **Cleanup failures:**
+
 - Temporary directories in `/tmp/notecove-*` can be manually removed
 - Tests clean up after themselves but may leave artifacts on crash
 
