@@ -8,8 +8,8 @@ import type * as Y from 'yjs';
  * Document state in memory
  */
 export interface DocumentState {
-  snapshot: import('@notecove/shared').DocumentSnapshot; // Encapsulated Y.Doc + VectorClock
-  noteDoc: import('@notecove/shared').NoteDoc; // NoteDoc wrapper with metadata methods
+  snapshot: import('@shared/storage').DocumentSnapshot; // Encapsulated Y.Doc + VectorClock
+  noteDoc: import('@shared/crdt').NoteDoc; // NoteDoc wrapper with metadata methods
   noteId: string;
   sdId: string; // Storage Directory ID for this note
   refCount: number; // Number of renderer windows using this document
@@ -57,21 +57,21 @@ export interface CRDTManager {
    * @param noteId Note ID
    * @returns The NoteDoc instance or undefined
    */
-  getNoteDoc(noteId: string): import('@notecove/shared').NoteDoc | undefined;
+  getNoteDoc(noteId: string): import('@shared/crdt').NoteDoc | undefined;
 
   /**
    * Load a folder tree document for an SD
    * @param sdId Sync Directory ID
    * @returns Promise resolving to the FolderTreeDoc instance
    */
-  loadFolderTree(sdId: string): Promise<import('@notecove/shared').FolderTreeDoc>;
+  loadFolderTree(sdId: string): Promise<import('@shared/crdt').FolderTreeDoc>;
 
   /**
    * Get the loaded folder tree for an SD
    * @param sdId Sync Directory ID
    * @returns The FolderTreeDoc instance or undefined
    */
-  getFolderTree(sdId: string): import('@notecove/shared').FolderTreeDoc | undefined;
+  getFolderTree(sdId: string): import('@shared/crdt').FolderTreeDoc | undefined;
 
   /**
    * Set the activity logger for a specific SD
@@ -135,4 +135,10 @@ export interface CRDTManager {
    * Should be called after flush() during graceful shutdown
    */
   destroy(): void;
+
+  /**
+   * Set the broadcast callback for sending updates to renderer windows
+   * @param callback Function that broadcasts updates to renderers
+   */
+  setBroadcastCallback(callback: (noteId: string, update: Uint8Array) => void): void;
 }

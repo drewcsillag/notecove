@@ -201,7 +201,10 @@ export class CRDTManagerImpl implements CRDTManager {
           console.warn(
             `[CRDT Manager] No activity logger found for SD ${state.sdId} when updating note ${noteId}`
           );
-          console.warn(`[CRDT Manager] Available loggers:`, Array.from(this.activityLoggers.keys()));
+          console.warn(
+            `[CRDT Manager] Available loggers:`,
+            Array.from(this.activityLoggers.keys())
+          );
         }
       } catch (error) {
         console.error(`Failed to handle update for note ${noteId}:`, error);
@@ -708,12 +711,7 @@ export class CRDTManagerImpl implements CRDTManager {
 
       // Save snapshot to DB using the encoded state we got atomically from getSnapshot()
       // This ensures the encoded state and vector clock are perfectly paired
-      await this.storageManager.saveNoteSnapshot(
-        state.sdId,
-        noteId,
-        encodedState,
-        vectorClock
-      );
+      await this.storageManager.saveNoteSnapshot(state.sdId, noteId, encodedState, vectorClock);
 
       // Record snapshot creation metrics
       const now = Date.now();
@@ -809,15 +807,10 @@ export class CRDTManagerImpl implements CRDTManager {
             `[CRDT Manager] Creating shutdown snapshot for note ${noteId} (${i + 1}/${total})`
           );
 
-          // Get snapshot data
-          const { vectorClock } = state.snapshot.getSnapshot();
+          // Get snapshot data atomically (await ensures vector clock and state are paired)
+          const { state: encodedState, vectorClock } = await state.snapshot.getSnapshot();
 
-          await this.storageManager.saveNoteSnapshot(
-            state.sdId,
-            noteId,
-            state.snapshot.getDoc(),
-            vectorClock
-          );
+          await this.storageManager.saveNoteSnapshot(state.sdId, noteId, encodedState, vectorClock);
           state.editCount = 0;
         } catch (error) {
           console.error(`[CRDT Manager] Failed to create shutdown snapshot for ${noteId}:`, error);

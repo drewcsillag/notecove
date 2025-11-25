@@ -46,7 +46,7 @@ export class IPCHandlers {
   /**
    * Broadcast an event to all renderer windows
    */
-  private broadcastToAll(channel: string, ...args: unknown[]): void {
+  broadcastToAll(channel: string, ...args: unknown[]): void {
     const windows = BrowserWindow.getAllWindows();
     for (const window of windows) {
       window.webContents.send(channel, ...args);
@@ -322,14 +322,20 @@ export class IPCHandlers {
     // If renderer provides its state vector, only send the diff
     // Otherwise send the entire document state (for initial load)
     if (stateVector) {
-      console.log(`[handleGetState] Note ${noteId}: Received state vector (${stateVector.length} bytes)`);
+      console.log(
+        `[handleGetState] Note ${noteId}: Received state vector (${stateVector.length} bytes)`
+      );
       const update = Y.encodeStateAsUpdate(doc, stateVector);
-      console.log(`[handleGetState] Note ${noteId}: Returning diff update (${update.length} bytes)`);
+      console.log(
+        `[handleGetState] Note ${noteId}: Returning diff update (${update.length} bytes)`
+      );
       return update;
     } else {
       console.log(`[handleGetState] Note ${noteId}: No state vector, returning full state`);
       const update = Y.encodeStateAsUpdate(doc);
-      console.log(`[handleGetState] Note ${noteId}: Returning full update (${update.length} bytes)`);
+      console.log(
+        `[handleGetState] Note ${noteId}: Returning full update (${update.length} bytes)`
+      );
       return update;
     }
   }

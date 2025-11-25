@@ -173,7 +173,7 @@ export class NoteStorageManager {
     this.writeQueues.set(queueKey, writePromise);
 
     // Clean up the queue entry after completion to prevent memory leak
-    writePromise.finally(() => {
+    void writePromise.finally(() => {
       if (this.writeQueues.get(queueKey) === writePromise) {
         this.writeQueues.delete(queueKey);
       }
@@ -236,11 +236,15 @@ export class NoteStorageManager {
     // List all log files
     const logFiles = await LogReader.listLogFiles(logsDir, this.fs);
 
-    console.log(`[NoteStorageManager] applyLogRecords: Found ${logFiles.length} log files in ${logsDir}`);
+    console.log(
+      `[NoteStorageManager] applyLogRecords: Found ${logFiles.length} log files in ${logsDir}`
+    );
     console.log(`[NoteStorageManager] Vector clock:`, JSON.stringify(vectorClock));
 
     for (const logFile of logFiles) {
-      console.log(`[NoteStorageManager] Processing log file: ${logFile.filename} (instanceId: ${logFile.instanceId})`);
+      console.log(
+        `[NoteStorageManager] Processing log file: ${logFile.filename} (instanceId: ${logFile.instanceId})`
+      );
       const existingEntry = vectorClock[logFile.instanceId];
       console.log(`[NoteStorageManager] Existing entry for ${logFile.instanceId}:`, existingEntry);
 
@@ -277,11 +281,15 @@ export class NoteStorageManager {
           recordCount++;
           // Skip records we've already seen (by sequence)
           if (record.sequence <= startSequence) {
-            console.log(`[NoteStorageManager] Skipping record ${record.sequence} (already seen, startSequence=${startSequence})`);
+            console.log(
+              `[NoteStorageManager] Skipping record ${record.sequence} (already seen, startSequence=${startSequence})`
+            );
             continue;
           }
 
-          console.log(`[NoteStorageManager] Applying record ${record.sequence} from ${logFile.filename}, data size: ${record.data.length}`);
+          console.log(
+            `[NoteStorageManager] Applying record ${record.sequence} from ${logFile.filename}, data size: ${record.data.length}`
+          );
           // Apply update to doc
           Y.applyUpdate(doc, record.data);
 
@@ -291,7 +299,9 @@ export class NoteStorageManager {
           }
           lastOffset = record.offset + record.bytesRead;
         }
-        console.log(`[NoteStorageManager] Read ${recordCount} total records from ${logFile.filename}`);
+        console.log(
+          `[NoteStorageManager] Read ${recordCount} total records from ${logFile.filename}`
+        );
       } catch (error) {
         // Log file may be truncated (e.g., cloud sync in progress)
         // Throw the error so ActivitySync can retry with exponential backoff
@@ -307,13 +317,12 @@ export class NoteStorageManager {
           throw error; // Throw to trigger retry in ActivitySync
         }
         // For other errors, log and continue with what we got
-        console.warn(
-          `[NoteStorageManager] Error reading log file ${logFile.filename}:`,
-          error
-        );
+        console.warn(`[NoteStorageManager] Error reading log file ${logFile.filename}:`, error);
       }
 
-      console.log(`[NoteStorageManager] maxSequence=${maxSequence}, startSequence=${startSequence}`);
+      console.log(
+        `[NoteStorageManager] maxSequence=${maxSequence}, startSequence=${startSequence}`
+      );
       // Update vector clock if we read any new records
       if (maxSequence > startSequence) {
         vectorClock[logFile.instanceId] = {

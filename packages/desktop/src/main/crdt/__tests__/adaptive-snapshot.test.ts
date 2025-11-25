@@ -7,7 +7,8 @@
  */
 
 import type { DocumentState } from '../types';
-import { NoteDoc } from '@notecove/shared';
+import { NoteDoc } from '@shared/crdt';
+import { DocumentSnapshot } from '@shared/storage';
 
 describe('Adaptive Snapshot Threshold Logic', () => {
   /**
@@ -48,8 +49,9 @@ describe('Adaptive Snapshot Threshold Logic', () => {
     const now = Date.now();
     const noteId = 'test-note';
     const noteDoc = new NoteDoc(noteId);
+    const snapshot = DocumentSnapshot.createEmpty();
     return {
-      doc: noteDoc.doc,
+      snapshot,
       noteDoc,
       noteId,
       sdId: 'default',

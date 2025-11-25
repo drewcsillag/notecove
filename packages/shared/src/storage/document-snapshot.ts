@@ -160,7 +160,7 @@ export class DocumentSnapshot {
     file: string
   ): Promise<void> {
     // Chain this operation onto the lock and await it
-    this.operationLock = this.operationLock.then(async () => {
+    this.operationLock = this.operationLock.then(() => {
       // Validate sequence is next in order for this instance
       const current = this.vectorClock[instanceId];
       const expectedSequence = current ? current.sequence + 1 : 1;

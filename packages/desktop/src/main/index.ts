@@ -355,7 +355,7 @@ async function ensureDefaultNote(
           ...defaultNoteInAnySD,
           folderId: crdtMetadata.folderId,
           deleted: crdtMetadata.deleted,
-          modified: crdtMetadata.modified ?? defaultNoteInAnySD.modified,
+          modified: crdtMetadata.modified,
         });
       }
     }
@@ -404,7 +404,7 @@ async function ensureDefaultNote(
             ...defaultNote,
             folderId: crdtMetadata.folderId,
             deleted: crdtMetadata.deleted,
-            modified: crdtMetadata.modified ?? defaultNote.modified,
+            modified: crdtMetadata.modified,
           });
         }
       }
@@ -464,8 +464,10 @@ async function ensureDefaultNote(
       // Check if there are activity logs OR CRDT logs from other instances
       // If so, wait for content to sync before creating welcome content
       const noteLogsPath = join(sdPath ?? '', 'notes', DEFAULT_NOTE_ID, 'logs');
-      const otherActivityInstances = sdPath && instanceId ? await getOtherInstanceActivityLogs(sdPath, instanceId) : [];
-      const otherCRDTInstances = sdPath && instanceId ? await getOtherInstanceCRDTLogs(noteLogsPath, instanceId) : [];
+      const otherActivityInstances =
+        sdPath && instanceId ? await getOtherInstanceActivityLogs(sdPath, instanceId) : [];
+      const otherCRDTInstances =
+        sdPath && instanceId ? await getOtherInstanceCRDTLogs(noteLogsPath, instanceId) : [];
 
       // Combine both sources of other instance detection
       const allOtherInstances = [...new Set([...otherActivityInstances, ...otherCRDTInstances])];
@@ -474,7 +476,9 @@ async function ensureDefaultNote(
         console.log(
           `[ensureDefaultNote] Found ${allOtherInstances.length} other instance(s): ${allOtherInstances.join(', ')}`
         );
-        console.log(`[ensureDefaultNote]   Activity logs: ${otherActivityInstances.length}, CRDT logs: ${otherCRDTInstances.length}`);
+        console.log(
+          `[ensureDefaultNote]   Activity logs: ${otherActivityInstances.length}, CRDT logs: ${otherCRDTInstances.length}`
+        );
         console.log('[ensureDefaultNote] Waiting for content to sync from other instances...');
 
         // Poll for content to arrive (max 10 seconds in 500ms intervals)
@@ -848,7 +852,12 @@ async function setupSDWatchers(
       return crdtManager.checkCRDTLogExists(noteId, sdId, instanceId, expectedSequence);
     },
     metrics: {
-      recordSyncSuccess: (latencyMs: number, attempts: number, noteId: string, metricSdId: string) => {
+      recordSyncSuccess: (
+        latencyMs: number,
+        attempts: number,
+        noteId: string,
+        metricSdId: string
+      ) => {
         getSyncMetrics().recordSyncSuccess(latencyMs, attempts, {
           note_id: noteId,
           sd_id: metricSdId,
@@ -864,7 +873,10 @@ async function setupSDWatchers(
         getSyncMetrics().recordFullScan(notesReloaded, { sd_id: metricSdId });
       },
       recordActivityLogProcessed: (instanceIdAttr: string, metricSdId: string) => {
-        getSyncMetrics().recordActivityLogProcessed({ instance_id: instanceIdAttr, sd_id: metricSdId });
+        getSyncMetrics().recordActivityLogProcessed({
+          instance_id: instanceIdAttr,
+          sd_id: metricSdId,
+        });
       },
     },
   };
@@ -1118,10 +1130,7 @@ async function setupSDWatchers(
         // Log watermarks every 10th poll (30 seconds) for debugging
         if (pollCount % 10 === 0) {
           const watermarks = activitySync.getWatermarks();
-          console.log(
-            `[ActivitySync Poll ${sdId}] Watermarks:`,
-            Object.fromEntries(watermarks)
-          );
+          console.log(`[ActivitySync Poll ${sdId}] Watermarks:`, Object.fromEntries(watermarks));
         }
 
         const affectedNotes = await activitySync.syncFromOtherInstances();
@@ -1789,6 +1798,7 @@ void app.whenReady().then(async () => {
     );
 
     // Set up broadcast callback for CRDT manager to send updates to renderer
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- crdtManager is definitely assigned by this point
     crdtManager.setBroadcastCallback((noteId: string, update: Uint8Array) => {
       ipcHandlers?.broadcastToAll('note:updated', noteId, update);
     });
