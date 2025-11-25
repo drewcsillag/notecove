@@ -1577,6 +1577,11 @@ void app.whenReady().then(async () => {
       createWindow,
       handleNewStorageDir
     );
+
+    // Set up broadcast callback for CRDT manager to send updates to renderer
+    crdtManager.setBroadcastCallback((noteId: string, update: Uint8Array) => {
+      ipcHandlers?.broadcastToAll('note:updated', noteId, update);
+    });
     if (process.env['NODE_ENV'] === 'test') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await fs.appendFile(
@@ -1731,7 +1736,7 @@ app.on('will-quit', (event) => {
   if (isTestMode) {
     setTimeout(() => {
       console.warn('[App] Shutdown timeout reached in test mode, forcing quit');
-      app.quit();
+      app.exit(1);
     }, 3000); // 3 second timeout in test mode
   }
 
@@ -1820,11 +1825,13 @@ app.on('will-quit', (event) => {
       console.log('[App] Graceful shutdown complete');
 
       // Now allow the app to quit
-      app.quit();
+      // Use exit() instead of quit() because we already prevented will-quit
+      // Calling quit() again would re-trigger will-quit causing recursion
+      app.exit(0);
     } catch (error: unknown) {
       console.error('[App] Error during graceful shutdown:', error);
       // Still quit even if cleanup fails
-      app.quit();
+      app.exit(1);
     }
   })();
 });

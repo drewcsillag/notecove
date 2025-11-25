@@ -19,8 +19,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('note:load', noteId) as Promise<void>,
     unload: (noteId: string): Promise<void> =>
       ipcRenderer.invoke('note:unload', noteId) as Promise<void>,
-    getState: (noteId: string): Promise<Uint8Array> =>
-      ipcRenderer.invoke('note:getState', noteId) as Promise<Uint8Array>,
+    getState: (noteId: string, stateVector?: Uint8Array): Promise<Uint8Array> =>
+      ipcRenderer.invoke('note:getState', noteId, stateVector) as Promise<Uint8Array>,
     applyUpdate: (noteId: string, update: Uint8Array): Promise<void> =>
       ipcRenderer.invoke('note:applyUpdate', noteId, update) as Promise<void>,
     create: (sdId: string, folderId: string, initialContent: string): Promise<string> =>

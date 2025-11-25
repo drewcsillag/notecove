@@ -365,6 +365,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     const cleanupNoteUpdate = window.electronAPI.note.onUpdated(handleNoteUpdate);
 
     // Set up listener for updates from other instances (via activity sync)
+    // Note: We don't need to do anything here - the main process will broadcast
+    // note:updated events when it loads updates from disk, which handleNoteUpdate
+    // will receive and process normally.
     const handleExternalUpdate = (data: { operation: string; noteIds: string[] }) => {
       console.log(
         `[TipTapEditor] onExternalUpdate received:`,
@@ -374,34 +377,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       );
 
       if (data.noteIds.includes(noteId)) {
-        // Reload note state from main process
-        void (async () => {
-          try {
-            console.log(`[TipTapEditor] Fetching state for note ${noteId}...`);
-            const state = await window.electronAPI.note.getState(noteId);
-            console.log(`[TipTapEditor] Got state, size: ${state.length} bytes`);
-
-            // Log content before and after
-            const beforeText = yDoc.getText('content').toJSON();
-            console.log(`[TipTapEditor] Before apply, content length: ${beforeText.length}`);
-
-            Y.applyUpdate(yDoc, state, 'remote');
-
-            const afterText = yDoc.getText('content').toJSON();
-            console.log(`[TipTapEditor] After apply, content length: ${afterText.length}`);
-
-            // Show sync indicator briefly
-            if (syncIndicatorTimerRef.current) {
-              clearTimeout(syncIndicatorTimerRef.current);
-            }
-            setShowSyncIndicator(true);
-            syncIndicatorTimerRef.current = setTimeout(() => {
-              setShowSyncIndicator(false);
-            }, 2000);
-          } catch (error) {
-            console.error(`Failed to reload note ${noteId}:`, error);
-          }
-        })();
+        // Just show sync indicator - updates will come via note:updated
+        if (syncIndicatorTimerRef.current) {
+          clearTimeout(syncIndicatorTimerRef.current);
+        }
+        setShowSyncIndicator(true);
+        syncIndicatorTimerRef.current = setTimeout(() => {
+          setShowSyncIndicator(false);
+        }, 2000);
       }
     };
 

@@ -8,7 +8,7 @@ import type * as Y from 'yjs';
  * Document state in memory
  */
 export interface DocumentState {
-  doc: Y.Doc;
+  snapshot: import('@notecove/shared').DocumentSnapshot; // Encapsulated Y.Doc + VectorClock
   noteDoc: import('@notecove/shared').NoteDoc; // NoteDoc wrapper with metadata methods
   noteId: string;
   sdId: string; // Storage Directory ID for this note

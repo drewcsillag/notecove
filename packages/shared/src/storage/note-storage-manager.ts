@@ -188,16 +188,14 @@ export class NoteStorageManager {
   async saveDbSnapshot(
     sdId: string,
     noteId: string,
-    doc: Y.Doc,
+    encodedState: Uint8Array,
     vectorClock: VectorClock
   ): Promise<void> {
-    const documentState = Y.encodeStateAsUpdate(doc);
-
     await this.db.upsertNoteSyncState({
       noteId,
       sdId,
       vectorClock: JSON.stringify(vectorClock),
-      documentState,
+      documentState: encodedState,
       updatedAt: Date.now(),
     });
   }
@@ -238,8 +236,13 @@ export class NoteStorageManager {
     // List all log files
     const logFiles = await LogReader.listLogFiles(logsDir, this.fs);
 
+    console.log(`[NoteStorageManager] applyLogRecords: Found ${logFiles.length} log files in ${logsDir}`);
+    console.log(`[NoteStorageManager] Vector clock:`, JSON.stringify(vectorClock));
+
     for (const logFile of logFiles) {
+      console.log(`[NoteStorageManager] Processing log file: ${logFile.filename} (instanceId: ${logFile.instanceId})`);
       const existingEntry = vectorClock[logFile.instanceId];
+      console.log(`[NoteStorageManager] Existing entry for ${logFile.instanceId}:`, existingEntry);
 
       // Determine where to start reading
       let startOffset: number | undefined;
@@ -269,12 +272,16 @@ export class NoteStorageManager {
       let lastOffset = startOffset || 0;
 
       try {
+        let recordCount = 0;
         for await (const record of LogReader.readRecords(logFile.path, this.fs, startOffset)) {
+          recordCount++;
           // Skip records we've already seen (by sequence)
           if (record.sequence <= startSequence) {
+            console.log(`[NoteStorageManager] Skipping record ${record.sequence} (already seen, startSequence=${startSequence})`);
             continue;
           }
 
+          console.log(`[NoteStorageManager] Applying record ${record.sequence} from ${logFile.filename}, data size: ${record.data.length}`);
           // Apply update to doc
           Y.applyUpdate(doc, record.data);
 
@@ -284,15 +291,29 @@ export class NoteStorageManager {
           }
           lastOffset = record.offset + record.bytesRead;
         }
+        console.log(`[NoteStorageManager] Read ${recordCount} total records from ${logFile.filename}`);
       } catch (error) {
-        // Log file may be truncated (e.g., cloud sync in progress) - continue with what we got
-        // On next sync/reload, we'll retry and hopefully get the complete file
+        // Log file may be truncated (e.g., cloud sync in progress)
+        // Throw the error so ActivitySync can retry with exponential backoff
+        const errorMessage = (error as Error).message || '';
+        if (
+          errorMessage.includes('Truncated record') ||
+          errorMessage.includes('Truncated header')
+        ) {
+          console.warn(
+            `[NoteStorageManager] Truncated log file ${logFile.filename} (cloud sync in progress), will retry:`,
+            errorMessage
+          );
+          throw error; // Throw to trigger retry in ActivitySync
+        }
+        // For other errors, log and continue with what we got
         console.warn(
-          `[NoteStorageManager] Error reading log file ${logFile.filename} (may be partially synced):`,
+          `[NoteStorageManager] Error reading log file ${logFile.filename}:`,
           error
         );
       }
 
+      console.log(`[NoteStorageManager] maxSequence=${maxSequence}, startSequence=${startSequence}`);
       // Update vector clock if we read any new records
       if (maxSequence > startSequence) {
         vectorClock[logFile.instanceId] = {

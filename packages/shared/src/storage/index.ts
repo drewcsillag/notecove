@@ -37,3 +37,4 @@ export {
 export { LogSync, type LogSyncCallbacks, type SyncResult } from './log-sync';
 export { AppendLogManager, type LoadResult, type AppendLogManagerDb } from './append-log-manager';
 export { StorageMigration, type StorageMigrationResult } from './migration';
+export { DocumentSnapshot } from './document-snapshot';

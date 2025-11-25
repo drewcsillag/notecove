@@ -293,8 +293,11 @@ export class IPCHandlers {
         throw new Error(`Note ${noteId} document not found`);
       }
 
+      // Encode the document state
+      const encodedState = Y.encodeStateAsUpdate(doc);
+
       // Save snapshot to database (new format uses DB snapshots)
-      await this.storageManager.saveNoteSnapshot(sdId, noteId, doc);
+      await this.storageManager.saveNoteSnapshot(sdId, noteId, encodedState);
 
       console.log(`[IPC] Manual snapshot created for note ${noteId}`);
       return { success: true, filename: 'db-snapshot' };
@@ -307,13 +310,28 @@ export class IPCHandlers {
     }
   }
 
-  private async handleGetState(_event: IpcMainInvokeEvent, noteId: string): Promise<Uint8Array> {
+  private async handleGetState(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    stateVector?: Uint8Array
+  ): Promise<Uint8Array> {
     const doc = this.crdtManager.getDocument(noteId);
     if (!doc) {
       throw new Error(`Note ${noteId} not loaded`);
     }
-    // Encode the entire document state as an update
-    return Y.encodeStateAsUpdate(doc);
+    // If renderer provides its state vector, only send the diff
+    // Otherwise send the entire document state (for initial load)
+    if (stateVector) {
+      console.log(`[handleGetState] Note ${noteId}: Received state vector (${stateVector.length} bytes)`);
+      const update = Y.encodeStateAsUpdate(doc, stateVector);
+      console.log(`[handleGetState] Note ${noteId}: Returning diff update (${update.length} bytes)`);
+      return update;
+    } else {
+      console.log(`[handleGetState] Note ${noteId}: No state vector, returning full state`);
+      const update = Y.encodeStateAsUpdate(doc);
+      console.log(`[handleGetState] Note ${noteId}: Returning full update (${update.length} bytes)`);
+      return update;
+    }
   }
 
   private async handleApplyUpdate(

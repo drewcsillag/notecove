@@ -542,7 +542,8 @@ describe('NoteStorageManager', () => {
         'inst-a': { sequence: 5, offset: 500, file: 'inst-a_1000.crdtlog' },
       };
 
-      await manager.saveDbSnapshot(sdId, noteId, doc, vectorClock);
+      const encodedState = Y.encodeStateAsUpdate(doc);
+      await manager.saveDbSnapshot(sdId, noteId, encodedState, vectorClock);
 
       // Verify it was saved to DB
       const saved = await db.getNoteSyncState(noteId, sdId);
@@ -568,14 +569,16 @@ describe('NoteStorageManager', () => {
       // Save initial snapshot
       const doc1 = new Y.Doc();
       doc1.getText('content').insert(0, 'Initial');
-      await manager.saveDbSnapshot(sdId, noteId, doc1, {
+      const encodedState1 = Y.encodeStateAsUpdate(doc1);
+      await manager.saveDbSnapshot(sdId, noteId, encodedState1, {
         'inst-a': { sequence: 1, offset: 100, file: 'f1' },
       });
 
       // Update snapshot
       const doc2 = new Y.Doc();
       doc2.getText('content').insert(0, 'Updated');
-      await manager.saveDbSnapshot(sdId, noteId, doc2, {
+      const encodedState2 = Y.encodeStateAsUpdate(doc2);
+      await manager.saveDbSnapshot(sdId, noteId, encodedState2, {
         'inst-a': { sequence: 2, offset: 200, file: 'f2' },
       });
 
@@ -707,7 +710,8 @@ describe('NoteStorageManager', () => {
       fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData2);
 
       // Save the first load's state to cache, then load incrementally
-      await manager.saveDbSnapshot(sdId, noteId, result1.doc, result1.vectorClock);
+      const encodedState1 = Y.encodeStateAsUpdate(result1.doc);
+      await manager.saveDbSnapshot(sdId, noteId, encodedState1, result1.vectorClock);
 
       // Verify the cached offset is correct by loading from cache
       // If the offset was wrong (like the old +20 approximation), this would fail

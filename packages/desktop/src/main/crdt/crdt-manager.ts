@@ -8,6 +8,7 @@
 import * as Y from 'yjs';
 import type { CRDTManager, DocumentState } from './types';
 import { NoteDoc, FolderTreeDoc } from '@shared/crdt';
+import { DocumentSnapshot } from '@shared/storage';
 import type { AppendLogManager } from '@shared/storage';
 import type { UUID, FolderData } from '@shared/types';
 import type { Database } from '@notecove/shared';
@@ -20,6 +21,8 @@ export class CRDTManagerImpl implements CRDTManager {
   private snapshotCheckTimer: NodeJS.Timeout | undefined;
   // Track pending update writes for graceful shutdown
   private pendingUpdates = new Set<Promise<void>>();
+  // Callback to broadcast updates to renderer windows
+  private broadcastCallback?: (noteId: string, update: Uint8Array) => void;
 
   constructor(
     private storageManager: AppendLogManager,
@@ -30,13 +33,29 @@ export class CRDTManagerImpl implements CRDTManager {
     // Note: GC is deferred per STORAGE-FORMAT-DESIGN.md
   }
 
+  /**
+   * Set the broadcast callback for sending updates to renderer windows
+   */
+  setBroadcastCallback(callback: (noteId: string, update: Uint8Array) => void): void {
+    this.broadcastCallback = callback;
+  }
+
+  /**
+   * Broadcast an update to all renderer windows
+   */
+  private broadcastUpdate(noteId: string, update: Uint8Array): void {
+    if (this.broadcastCallback) {
+      this.broadcastCallback(noteId, update);
+    }
+  }
+
   async loadNote(noteId: string, sdId?: string): Promise<Y.Doc> {
     const existing = this.documents.get(noteId);
 
     if (existing) {
       // Document already loaded, increment ref count
       existing.refCount++;
-      return existing.doc;
+      return existing.snapshot.getDoc();
     }
 
     // Track cold load time
@@ -45,29 +64,38 @@ export class CRDTManagerImpl implements CRDTManager {
     // If sdId not provided, try to determine it from existing updates
     const noteSdId = sdId ?? (await this.getNoteSdId(noteId));
 
-    // Create new NoteDoc wrapper
-    const noteDoc = new NoteDoc(noteId);
-
     // Load from storage (handles snapshots, logs, DB cache automatically)
+    // Cache + vector clock system ensures convergence:
+    // - Cached state is loaded first
+    // - Then new log records (not covered by cached vector clock) are applied
+    // - Result converges to the correct state
+    let snapshot: DocumentSnapshot;
+
     try {
       const loadResult = await this.storageManager.loadNote(noteSdId, noteId);
 
-      // Merge loaded state into our doc
-      Y.applyUpdate(noteDoc.doc, Y.encodeStateAsUpdate(loadResult.doc));
+      // Create snapshot from loaded state
+      snapshot = DocumentSnapshot.fromStorage(
+        Y.encodeStateAsUpdate(loadResult.doc),
+        loadResult.vectorClock
+      );
       loadResult.doc.destroy(); // Clean up the temporary doc
 
       console.log(`[CRDT Manager] Loaded note ${noteId} from storage`);
     } catch (error) {
       console.error(`Failed to load note ${noteId}:`, error);
-      // Continue with empty document
+      // Continue with empty snapshot
+      snapshot = DocumentSnapshot.createEmpty();
     }
 
-    const doc = noteDoc.doc;
+    // Create NoteDoc wrapper using the snapshot's doc
+    const noteDoc = new NoteDoc(noteId, snapshot.getDoc());
+    const doc = snapshot.getDoc();
 
     // Store document state
     const now = Date.now();
     this.documents.set(noteId, {
-      doc,
+      snapshot,
       noteDoc,
       noteId,
       sdId: noteSdId,
@@ -79,7 +107,16 @@ export class CRDTManagerImpl implements CRDTManager {
     });
 
     // Set up update listener to write changes to disk
-    doc.on('update', (update: Uint8Array) => {
+    doc.on('update', (update: Uint8Array, origin: unknown) => {
+      // Skip handling if this update came from reload (to avoid duplicate writes)
+      // The updates from reload are already on disk, we just need to broadcast them
+      if (origin === 'reload') {
+        console.log(`[CRDT Manager] Skipping disk write for reload origin on note ${noteId}`);
+        // Broadcast to renderer windows
+        this.broadcastUpdate(noteId, update);
+        return;
+      }
+
       const updatePromise = this.handleUpdate(noteId, update)
         .catch((error: Error) => {
           console.error(`Failed to handle update for note ${noteId}:`, error);
@@ -114,7 +151,7 @@ export class CRDTManagerImpl implements CRDTManager {
       // Check if we should create a snapshot before unloading
       await this.checkAndCreateSnapshot(noteId);
 
-      state.doc.destroy();
+      state.snapshot.destroy();
       this.documents.delete(noteId);
     }
   }
@@ -128,30 +165,64 @@ export class CRDTManagerImpl implements CRDTManager {
 
     console.log(`[CRDT Manager] Applying update to note ${noteId}, size: ${update.length} bytes`);
 
-    // Apply update to in-memory document
-    Y.applyUpdate(state.doc, update);
-    state.lastModified = Date.now();
+    // Write update to disk first to get sequence information
+    const writePromise = (async () => {
+      try {
+        // Write update to disk using the note's SD ID and get the save result
+        const saveResult = await this.storageManager.writeNoteUpdate(state.sdId, noteId, update);
 
-    // Write update to disk (Y.applyUpdate doesn't trigger the 'update' event)
-    const updatePromise = this.handleUpdate(noteId, update)
-      .catch((error: Error) => {
+        // Apply update to snapshot with strict sequencing
+        const instanceId = this.storageManager.getInstanceId();
+        state.snapshot.applyUpdate(
+          update,
+          instanceId,
+          saveResult.sequence,
+          saveResult.offset,
+          saveResult.file
+        );
+
+        const now = Date.now();
+        state.lastModified = now;
+        state.editCount++; // Track edits for adaptive snapshot frequency
+
+        // Record activity for cross-instance sync using the correct SD's activity logger
+        const activityLogger = this.activityLoggers.get(state.sdId);
+        if (activityLogger) {
+          try {
+            console.log(
+              `[CRDT Manager] Recording activity for note ${noteId} in SD ${state.sdId} (sequence: ${saveResult.sequence})`
+            );
+            await activityLogger.recordNoteActivity(noteId, saveResult.sequence);
+          } catch (error) {
+            // Don't let activity logging errors break the update
+            console.error(`[CRDT Manager] Failed to record activity for note ${noteId}:`, error);
+          }
+        } else {
+          console.warn(
+            `[CRDT Manager] No activity logger found for SD ${state.sdId} when updating note ${noteId}`
+          );
+          console.warn(`[CRDT Manager] Available loggers:`, Array.from(this.activityLoggers.keys()));
+        }
+      } catch (error) {
         console.error(`Failed to handle update for note ${noteId}:`, error);
         throw error; // Re-throw to propagate error to caller
-      })
-      .finally(() => {
-        // Remove from pending set when complete
-        this.pendingUpdates.delete(updatePromise);
-      });
+      }
+    })();
 
     // Track this update for graceful shutdown
-    this.pendingUpdates.add(updatePromise);
+    this.pendingUpdates.add(writePromise);
 
-    await updatePromise;
-    console.log(`[CRDT Manager] Update written to disk for note ${noteId}`);
+    try {
+      await writePromise;
+      console.log(`[CRDT Manager] Update written to disk for note ${noteId}`);
+    } finally {
+      // Remove from pending set when complete
+      this.pendingUpdates.delete(writePromise);
+    }
   }
 
   getDocument(noteId: string): Y.Doc | undefined {
-    return this.documents.get(noteId)?.doc;
+    return this.documents.get(noteId)?.snapshot.getDoc();
   }
 
   getNoteDoc(noteId: string): NoteDoc | undefined {
@@ -160,6 +231,8 @@ export class CRDTManagerImpl implements CRDTManager {
 
   /**
    * Handle document update by writing to disk
+   * Called when the doc emits 'update' event (user-generated changes)
+   * Note: The update has already been applied to the doc, so we just record it
    */
   private async handleUpdate(noteId: string, update: Uint8Array): Promise<void> {
     const state = this.documents.get(noteId);
@@ -168,8 +241,19 @@ export class CRDTManagerImpl implements CRDTManager {
       return;
     }
 
-    // Write update to disk using the note's SD ID and get the sequence number
-    const sequenceNumber = await this.storageManager.writeNoteUpdate(state.sdId, noteId, update);
+    // Write update to disk using the note's SD ID and get the save result
+    const saveResult = await this.storageManager.writeNoteUpdate(state.sdId, noteId, update);
+
+    // Record that the update was already applied to the doc (via Y.Doc's 'update' event)
+    // This updates the vector clock to match the doc's current state
+    // CRITICAL: await this to ensure the vector clock update is part of the lock chain
+    const instanceId = this.storageManager.getInstanceId();
+    await state.snapshot.recordExternalUpdate(
+      instanceId,
+      saveResult.sequence,
+      saveResult.offset,
+      saveResult.file
+    );
 
     const now = Date.now();
     state.lastModified = now;
@@ -180,9 +264,9 @@ export class CRDTManagerImpl implements CRDTManager {
     if (activityLogger) {
       try {
         console.log(
-          `[CRDT Manager] Recording activity for note ${noteId} in SD ${state.sdId} (sequence: ${sequenceNumber})`
+          `[CRDT Manager] Recording activity for note ${noteId} in SD ${state.sdId} (sequence: ${saveResult.sequence})`
         );
-        await activityLogger.recordNoteActivity(noteId, sequenceNumber);
+        await activityLogger.recordNoteActivity(noteId, saveResult.sequence);
       } catch (error) {
         // Don't let activity logging errors break the update
         console.error(`[CRDT Manager] Failed to record activity for note ${noteId}:`, error);
@@ -221,23 +305,27 @@ export class CRDTManagerImpl implements CRDTManager {
 
     try {
       // Log content before reload
-      const beforeContent = state.doc.getXmlFragment('content');
+      const beforeContent = state.snapshot.getDoc().getXmlFragment('content');
       console.log(`[CRDT Manager] Before reload, content length: ${beforeContent.length}`);
 
       // Load full state from storage and merge with in-memory doc
+      // Cache + vector clock system ensures convergence - cached state + new log records
       const loadResult = await this.storageManager.loadNote(state.sdId, noteId);
 
-      // Log loaded content
-      const loadedContent = loadResult.doc.getXmlFragment('content');
-      console.log(`[CRDT Manager] Loaded from disk, content length: ${loadedContent.length}`);
-
-      // Apply loaded state (Yjs will automatically merge and deduplicate)
-      Y.applyUpdate(state.doc, Y.encodeStateAsUpdate(loadResult.doc), 'reload');
+      // Replace the entire snapshot atomically (doc + vector clock together)
+      // This ensures they stay perfectly in sync
+      const encodedState = Y.encodeStateAsUpdate(loadResult.doc);
+      state.snapshot.replaceWith(encodedState, loadResult.vectorClock);
       loadResult.doc.destroy();
 
+      // Broadcast the new state to renderer windows
+      this.broadcastUpdate(noteId, encodedState);
+
       // Log content after reload
-      const afterContent = state.doc.getXmlFragment('content');
-      console.log(`[CRDT Manager] After reload, content length: ${afterContent.length}`);
+      const afterContent = state.snapshot.getDoc().getXmlFragment('content');
+      console.log(
+        `[CRDT Manager] After reload, content length: ${beforeContent.length} → ${afterContent.length}`
+      );
 
       state.lastModified = Date.now();
     } catch (error) {
@@ -510,8 +598,20 @@ export class CRDTManagerImpl implements CRDTManager {
 
       const snapshotStartTime = Date.now();
 
-      // Save snapshot to DB (AppendLogManager handles vector clock internally)
-      await this.storageManager.saveNoteSnapshot(state.sdId, noteId, state.doc);
+      // Get snapshot data (doc state and vector clock)
+      // CRITICAL: await this to ensure doc and vector clock are captured atomically
+      const { state: encodedState, vectorClock } = await state.snapshot.getSnapshot();
+
+      console.log(`[CRDT Manager] Saving snapshot for ${noteId}, vector clock:`, vectorClock);
+
+      // Save snapshot to DB using the encoded state we got atomically from getSnapshot()
+      // This ensures the encoded state and vector clock are perfectly paired
+      await this.storageManager.saveNoteSnapshot(
+        state.sdId,
+        noteId,
+        encodedState,
+        vectorClock
+      );
 
       // Record snapshot creation metrics
       const now = Date.now();
@@ -606,7 +706,16 @@ export class CRDTManagerImpl implements CRDTManager {
           console.log(
             `[CRDT Manager] Creating shutdown snapshot for note ${noteId} (${i + 1}/${total})`
           );
-          await this.storageManager.saveNoteSnapshot(state.sdId, noteId, state.doc);
+
+          // Get snapshot data
+          const { vectorClock } = state.snapshot.getSnapshot();
+
+          await this.storageManager.saveNoteSnapshot(
+            state.sdId,
+            noteId,
+            state.snapshot.getDoc(),
+            vectorClock
+          );
           state.editCount = 0;
         } catch (error) {
           console.error(`[CRDT Manager] Failed to create shutdown snapshot for ${noteId}:`, error);
@@ -630,7 +739,7 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     for (const state of this.documents.values()) {
-      state.doc.destroy();
+      state.snapshot.destroy();
     }
     this.documents.clear();
 

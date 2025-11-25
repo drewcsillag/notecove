@@ -12,7 +12,7 @@ declare global {
       note: {
         load: (noteId: string) => Promise<void>;
         unload: (noteId: string) => Promise<void>;
-        getState: (noteId: string) => Promise<Uint8Array>;
+        getState: (noteId: string, stateVector?: Uint8Array) => Promise<Uint8Array>;
         applyUpdate: (noteId: string, update: Uint8Array) => Promise<void>;
         create: (sdId: string, folderId: string, initialContent: string) => Promise<string>;
         delete: (noteId: string) => Promise<void>;

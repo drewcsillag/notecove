@@ -22,6 +22,7 @@ export interface ActivitySyncCallbacks {
 export class ActivitySync {
   private lastSeenSequences = new Map<string, number>(); // instanceId -> last sequence number
   private pendingSyncs = new Map<string, Promise<void>>(); // noteId -> pending sync promise
+  private highestPendingSequence = new Map<string, { instanceSeq: string; sequence: number }>(); // noteId -> highest sequence
 
   constructor(
     private fs: FileSystemAdapter,
@@ -113,14 +114,16 @@ export class ActivitySync {
             if (sequence > lastSeen) {
               affectedNotes.add(noteId);
 
-              // Launch parallel poll for this update (fire and forget)
-              // Don't await - let all notes poll in parallel
-              if (!this.pendingSyncs.has(noteId)) {
-                const syncPromise = this.pollAndReload(instanceSeq, noteId);
-                this.pendingSyncs.set(noteId, syncPromise);
+              // Track the highest sequence we need to sync to
+              const existing = this.highestPendingSequence.get(noteId);
+              if (!existing || sequence > existing.sequence) {
+                this.highestPendingSequence.set(noteId, { instanceSeq, sequence });
+              }
 
-                // Clean up when done (intentionally fire and forget)
-                void syncPromise.finally(() => this.pendingSyncs.delete(noteId));
+              // If there's no pending sync, start one
+              // Otherwise, the pending sync will be followed by another sync for the highest sequence
+              if (!this.pendingSyncs.has(noteId)) {
+                this.startSyncChain(noteId);
               }
             }
           }
@@ -139,44 +142,118 @@ export class ActivitySync {
   }
 
   /**
+   * Start a sync chain for a note
+   *
+   * The chain works as follows:
+   * 1. Poll and reload for the current highest sequence
+   * 2. When done, check if there's a new highest sequence
+   * 3. If yes, sync again for the new highest sequence
+   * 4. Repeat until no new sequences appear
+   *
+   * This ensures we always sync to the latest available sequence, even if
+   * new sequences arrive while we're still polling for earlier ones.
+   */
+  private startSyncChain(noteId: string): void {
+    const syncOneAndContinue = async (): Promise<void> => {
+      // Get the current highest sequence we need to sync to
+      const target = this.highestPendingSequence.get(noteId);
+      if (!target) {
+        // No pending sequence, we're done
+        return;
+      }
+
+      // Clear the pending marker before syncing
+      // This allows new sequences to be recorded while we're syncing
+      this.highestPendingSequence.delete(noteId);
+
+      console.log(
+        `[ActivitySync] Syncing note ${noteId} to sequence ${target.sequence} (${target.instanceSeq})`
+      );
+
+      // Sync to this sequence
+      await this.pollAndReload(target.instanceSeq, noteId);
+
+      // Check if a new higher sequence arrived while we were syncing
+      const newTarget = this.highestPendingSequence.get(noteId);
+      if (newTarget && newTarget.sequence > target.sequence) {
+        console.log(
+          `[ActivitySync] New sequences arrived for note ${noteId}, continuing sync chain to sequence ${newTarget.sequence}`
+        );
+        // Recursively continue the chain
+        await syncOneAndContinue();
+      }
+    };
+
+    // Start the chain and track it
+    const chainPromise = syncOneAndContinue();
+    this.pendingSyncs.set(noteId, chainPromise);
+
+    // Clean up when done
+    void chainPromise.finally(() => {
+      if (this.pendingSyncs.get(noteId) === chainPromise) {
+        this.pendingSyncs.delete(noteId);
+      }
+    });
+  }
+
+  /**
    * Poll for an update file and reload the note when it appears
    *
    * Uses exponential backoff to avoid hammering the filesystem.
    * Handles both missing files and incomplete files (0x00 flag byte).
    */
   private async pollAndReload(instanceSeq: string, noteId: string): Promise<void> {
-    const [instanceId, seqStr] = instanceSeq.split('_');
-    const sequenceNum = parseInt(seqStr ?? '0');
-    const updateFileName = `${instanceId}_${sequenceNum}.yjson`;
-
     // Exponential backoff delays (ms)
-    const delays = [100, 200, 500, 1000, 2000, 5000, 10000];
+    // Extended delays to handle slow cloud sync (e.g., iCloud incremental sync)
+    const delays = [100, 200, 500, 1000, 2000, 3000, 5000, 7000, 10000, 15000];
 
-    for (const delay of delays) {
+    console.log(
+      `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}`
+    );
+
+    for (let attempt = 0; attempt < delays.length; attempt++) {
+      const delay = delays[attempt] ?? 0;
+      console.log(
+        `[ActivitySync] Attempt ${attempt + 1}/${delays.length} for note ${noteId}, sequence ${instanceSeq}`
+      );
+
       try {
-        // Try to reload the note - this will check file existence AND flag byte
+        // Try to reload the note - this will read all .crdtlog files
         await this.callbacks.reloadNote(noteId, this.sdId);
+        console.log(
+          `[ActivitySync] SUCCESS on attempt ${attempt + 1} for note ${noteId}, sequence ${instanceSeq}`
+        );
         return; // Success!
       } catch (error) {
         const errorMessage = (error as Error).message || '';
 
         // Check if file doesn't exist yet
         if (errorMessage.includes('ENOENT') || errorMessage.includes('does not exist')) {
-          // Wait and retry
+          console.log(
+            `[ActivitySync] File not found (attempt ${attempt + 1}), will retry after ${delay}ms: ${errorMessage}`
+          );
           await this.sleep(delay);
           continue;
         }
 
-        // Check if file is incomplete (still being written)
-        if (errorMessage.includes('incomplete') || errorMessage.includes('still being written')) {
-          // Wait and retry - file sync is in progress
+        // Check if file is incomplete (still being written) or has truncation errors
+        // Truncation errors occur when iCloud/cloud storage syncs files incrementally
+        if (
+          errorMessage.includes('incomplete') ||
+          errorMessage.includes('still being written') ||
+          errorMessage.includes('Truncated record') ||
+          errorMessage.includes('Truncated header')
+        ) {
+          console.log(
+            `[ActivitySync] File incomplete/truncated (attempt ${attempt + 1}), will retry after ${delay}ms: ${errorMessage}`
+          );
           await this.sleep(delay);
           continue;
         }
 
         // Other error (corrupted file, permissions, etc.) - give up
         console.error(
-          `[ActivitySync] Failed to reload ${updateFileName} for note ${noteId}:`,
+          `[ActivitySync] Failed to reload note ${noteId} for sequence ${instanceSeq} (attempt ${attempt + 1}):`,
           error
         );
         return;
@@ -186,7 +263,7 @@ export class ActivitySync {
     // Timeout - log warning but don't fail
     // File will be retried on next ActivitySync cycle
     console.warn(
-      `[ActivitySync] Timeout waiting for ${updateFileName} for note ${noteId}. File may sync later.`
+      `[ActivitySync] Timeout after ${delays.length} attempts waiting for note ${noteId} sequence ${instanceSeq}. File may sync later.`
     );
   }
 

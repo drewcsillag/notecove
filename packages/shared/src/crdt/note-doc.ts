@@ -10,8 +10,8 @@ export class NoteDoc {
   readonly metadata: Y.Map<unknown>;
   readonly content: Y.XmlFragment;
 
-  constructor(noteId: UUID) {
-    this.doc = new Y.Doc({ guid: noteId });
+  constructor(noteId: UUID, existingDoc?: Y.Doc) {
+    this.doc = existingDoc ?? new Y.Doc({ guid: noteId });
     this.metadata = this.doc.getMap('metadata');
     this.content = this.doc.getXmlFragment('content');
   }

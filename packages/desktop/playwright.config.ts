@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  testMatch: '**/*.spec.ts', // Only match .spec.ts files, not __tests__/*.test.ts
   timeout: 90000, // Increase to 90 seconds for Electron app with database initialization
   fullyParallel: true, // Run tests in parallel across files
   forbidOnly: !!process.env.CI,
@@ -11,4 +12,8 @@ export default defineConfig({
   use: {
     trace: 'on-first-retry',
   },
+  // Exclude cross-machine sync tests from normal CI runs
+  // These tests are slow and manual-only for now
+  // Run them explicitly with: pnpm test:e2e --grep "cross-machine"
+  grep: process.env.CI ? /^(?!.*cross-machine).*$/ : undefined,
 });

@@ -145,7 +145,8 @@ describe('AppendLogManager Integration Tests', () => {
         await manager.writeNoteUpdate(sdId, noteId, update2);
 
         // Save snapshot to DB (simulates close)
-        await manager.saveNoteSnapshot(sdId, noteId, doc);
+        const encodedState = Y.encodeStateAsUpdate(doc);
+        await manager.saveNoteSnapshot(sdId, noteId, encodedState);
 
         // Shutdown
         await manager.shutdown();

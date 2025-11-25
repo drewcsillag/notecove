@@ -132,9 +132,13 @@ export class AppendLogManager {
 
   /**
    * Write a note update to the log file.
-   * Returns the sequence number of the written update.
+   * Returns the save result with sequence number, offset, and file.
    */
-  async writeNoteUpdate(sdId: string, noteId: string, update: Uint8Array): Promise<number> {
+  async writeNoteUpdate(
+    sdId: string,
+    noteId: string,
+    update: Uint8Array
+  ): Promise<import('./note-storage-manager').SaveUpdateResult> {
     const manager = this.getNoteManager(sdId);
     const paths = this.getNotePaths(sdId, noteId);
 
@@ -150,7 +154,7 @@ export class AppendLogManager {
     };
     this.noteVectorClocks.set(key, existingClock);
 
-    return result.sequence;
+    return result;
   }
 
   /**
@@ -178,22 +182,29 @@ export class AppendLogManager {
   /**
    * Load a note from storage.
    * First tries DB cache, then falls back to full load from files.
+   * The cache + vector clock system ensures convergence:
+   * - Cached state is applied first
+   * - Then new log records (not covered by cached vector clock) are applied
+   * - Result converges to the correct state
    */
   async loadNote(sdId: string, noteId: string): Promise<LoadResult> {
     const manager = this.getNoteManager(sdId);
     const paths = this.getNotePaths(sdId, noteId);
 
-    // Try cache first
+    // Try cache first - it will automatically apply any new log records
     const cached = await manager.loadNoteFromCache(sdId, noteId, paths);
     if (cached) {
-      // Store vector clock for later snapshot building
-      this.noteVectorClocks.set(`${sdId}:${noteId}`, cached.vectorClock);
+      // DO NOT update noteVectorClocks here - it will be updated when we save a snapshot
+      // The cached.vectorClock represents what's in the loaded doc, but we should only
+      // persist it when we actually save a snapshot with that state
+      console.log(`[AppendLogManager] Loaded note ${noteId} from DB cache + new logs`);
       return cached;
     }
 
-    // Full load from files
+    // Full load from files (no cache exists)
     const result = await manager.loadNote(sdId, noteId, paths);
-    this.noteVectorClocks.set(`${sdId}:${noteId}`, result.vectorClock);
+    // DO NOT update noteVectorClocks here either - same reason as above
+    console.log(`[AppendLogManager] Loaded note ${noteId} from files (no cache)`);
     return result;
   }
 
@@ -220,13 +231,19 @@ export class AppendLogManager {
   /**
    * Save a note snapshot to the database.
    * Call this periodically or after significant changes.
+   * @param vectorClock Optional vector clock to use. If not provided, uses internal tracking.
    */
-  async saveNoteSnapshot(sdId: string, noteId: string, doc: Y.Doc): Promise<void> {
+  async saveNoteSnapshot(
+    sdId: string,
+    noteId: string,
+    encodedState: Uint8Array,
+    vectorClock?: VectorClock
+  ): Promise<void> {
     const manager = this.getNoteManager(sdId);
     const key = `${sdId}:${noteId}`;
-    const vectorClock = this.noteVectorClocks.get(key) || {};
+    const clockToUse = vectorClock ?? this.noteVectorClocks.get(key) ?? {};
 
-    await manager.saveDbSnapshot(sdId, noteId, doc, vectorClock);
+    await manager.saveDbSnapshot(sdId, noteId, encodedState, clockToUse);
   }
 
   /**

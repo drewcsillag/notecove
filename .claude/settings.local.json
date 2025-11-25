@@ -108,7 +108,8 @@
       "Bash(pnpm --filter @notecove/desktop typecheck:*)",
       "Bash(pnpm:*)",
       "Bash(git restore:*)",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

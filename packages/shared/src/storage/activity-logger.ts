@@ -8,7 +8,6 @@
 import type { FileSystemAdapter } from './types';
 
 export class ActivityLogger {
-  private lastNoteWritten: string | null = null;
   private activityLogPath: string;
   private instanceId = '';
 
@@ -38,23 +37,22 @@ export class ActivityLogger {
   /**
    * Record note activity
    *
-   * If the same note is edited consecutively, replaces the last line.
-   * Otherwise, appends a new line.
+   * Always appends a new line for each update to ensure other instances
+   * see all intermediate sequence numbers during incremental sync.
    *
    * Format: noteId|instanceId_sequenceNumber
    * This allows other instances to poll for the specific update file.
+   *
+   * Note: The compact() function prevents unbounded growth by keeping
+   * only the last 1000 entries.
    */
   async recordNoteActivity(noteId: string, sequenceNumber: number): Promise<void> {
     const line = `${noteId}|${this.instanceId}_${sequenceNumber}`;
 
-    if (this.lastNoteWritten === noteId) {
-      // Same note edited consecutively - replace last line
-      await this.replaceLastLine(line);
-    } else {
-      // Different note - append new line
-      await this.appendLine(line);
-      this.lastNoteWritten = noteId;
-    }
+    // Always append - don't use replaceLastLine optimization
+    // This ensures other instances see ALL intermediate sequences, which is
+    // critical when cloud sync services (iCloud, Dropbox) sync files incrementally
+    await this.appendLine(line);
   }
 
   /**
@@ -72,35 +70,6 @@ export class ActivityLogger {
       // File doesn't exist, create it
       const newData = new TextEncoder().encode(line + '\n');
       await this.fs.writeFile(this.activityLogPath, newData);
-    }
-  }
-
-  /**
-   * Replace the last line in the activity log
-   *
-   * This is used when the same note is edited consecutively to avoid
-   * creating thousands of entries during continuous typing.
-   */
-  private async replaceLastLine(newLine: string): Promise<void> {
-    try {
-      const data = await this.fs.readFile(this.activityLogPath);
-      const content = new TextDecoder().decode(data);
-      const lines = content.split('\n').filter((l) => l.length > 0);
-
-      if (lines.length === 0) {
-        // File is empty, just append
-        await this.appendLine(newLine);
-        return;
-      }
-
-      // Replace last line
-      lines[lines.length - 1] = newLine;
-      const newContent = lines.join('\n') + '\n';
-      const newData = new TextEncoder().encode(newContent);
-      await this.fs.writeFile(this.activityLogPath, newData);
-    } catch {
-      // File might not exist yet, create it
-      await this.appendLine(newLine);
     }
   }
 

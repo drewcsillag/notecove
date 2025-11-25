@@ -155,9 +155,9 @@ describe('AppendLogManager', () => {
       doc.getText('content').insert(0, 'Hello');
       const update = Y.encodeStateAsUpdate(doc);
 
-      const sequence = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
+      const result = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
 
-      expect(sequence).toBe(1);
+      expect(result.sequence).toBe(1);
 
       // Verify log file was created
       const logFiles = await fs.listFiles('/storage/sd-123/notes/note-abc/logs');
@@ -175,13 +175,13 @@ describe('AppendLogManager', () => {
 
       const update = new Uint8Array([0x01, 0x02]);
 
-      const seq1 = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
-      const seq2 = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
-      const seq3 = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
+      const result1 = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
+      const result2 = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
+      const result3 = await manager.writeNoteUpdate('sd-123', 'note-abc', update);
 
-      expect(seq1).toBe(1);
-      expect(seq2).toBe(2);
-      expect(seq3).toBe(3);
+      expect(result1.sequence).toBe(1);
+      expect(result2.sequence).toBe(2);
+      expect(result3.sequence).toBe(3);
     });
   });
 
@@ -292,8 +292,9 @@ describe('AppendLogManager', () => {
 
       const doc = new Y.Doc();
       doc.getText('content').insert(0, 'Snapshot Content');
+      const encodedState = Y.encodeStateAsUpdate(doc);
 
-      await manager.saveNoteSnapshot('sd-123', 'note-abc', doc);
+      await manager.saveNoteSnapshot('sd-123', 'note-abc', encodedState);
 
       // Verify snapshot was saved to DB
       const saved = await db.getNoteSyncState('note-abc', 'sd-123');
