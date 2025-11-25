@@ -7,6 +7,36 @@
 
 import type { FileSystemAdapter } from './types';
 
+/**
+ * Metrics callback interface for sync telemetry
+ */
+export interface SyncMetricsCallbacks {
+  /**
+   * Record a successful sync operation
+   */
+  recordSyncSuccess?: (latencyMs: number, attempts: number, noteId: string, sdId: string) => void;
+
+  /**
+   * Record a failed sync operation (non-timeout error)
+   */
+  recordSyncFailure?: (noteId: string, sdId: string) => void;
+
+  /**
+   * Record a sync timeout
+   */
+  recordSyncTimeout?: (attempts: number, noteId: string, sdId: string) => void;
+
+  /**
+   * Record a full scan fallback
+   */
+  recordFullScan?: (notesReloaded: number, sdId: string) => void;
+
+  /**
+   * Record activity log processing
+   */
+  recordActivityLogProcessed?: (instanceId: string, sdId: string) => void;
+}
+
 export interface ActivitySyncCallbacks {
   /**
    * Reload a note from disk if it's currently loaded
@@ -32,6 +62,11 @@ export interface ActivitySyncCallbacks {
     instanceId: string,
     expectedSequence: number
   ) => Promise<boolean>;
+
+  /**
+   * Optional metrics callbacks for telemetry
+   */
+  metrics?: SyncMetricsCallbacks;
 }
 
 export class ActivitySync {
@@ -78,6 +113,9 @@ export class ActivitySync {
 
         const otherInstanceId = file.replace('.log', '');
         if (otherInstanceId === this.instanceId) continue; // Skip our own
+
+        // Record activity log processed metric
+        this.callbacks.metrics?.recordActivityLogProcessed?.(otherInstanceId, this.sdId);
 
         const filePath = this.fs.joinPath(this.activityDir, file);
 
@@ -254,6 +292,8 @@ export class ActivitySync {
       `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}, sourceInstance: ${sourceInstanceId}, expectedSeq: ${expectedSequence}`
     );
 
+    const startTime = Date.now();
+
     for (let attempt = 0; attempt < delays.length; attempt++) {
       const delay = delays[attempt] ?? 0;
       console.log(
@@ -287,6 +327,11 @@ export class ActivitySync {
         console.log(
           `[ActivitySync] SUCCESS on attempt ${attempt + 1} for note ${noteId}, sequence ${instanceSeq}`
         );
+
+        // Record success metrics
+        const latencyMs = Date.now() - startTime;
+        this.callbacks.metrics?.recordSyncSuccess?.(latencyMs, attempt + 1, noteId, this.sdId);
+
         return true; // Success!
       } catch (error) {
         const errorMessage = (error as Error).message || '';
@@ -320,6 +365,10 @@ export class ActivitySync {
           `[ActivitySync] Failed to reload note ${noteId} for sequence ${instanceSeq} (attempt ${attempt + 1}):`,
           error
         );
+
+        // Record failure metrics
+        this.callbacks.metrics?.recordSyncFailure?.(noteId, this.sdId);
+
         return false;
       }
     }
@@ -329,6 +378,10 @@ export class ActivitySync {
     console.warn(
       `[ActivitySync] Timeout after ${delays.length} attempts waiting for note ${noteId} sequence ${instanceSeq}. File may sync later.`
     );
+
+    // Record timeout metrics
+    this.callbacks.metrics?.recordSyncTimeout?.(delays.length, noteId, this.sdId);
+
     return false;
   }
 
@@ -361,6 +414,9 @@ export class ActivitySync {
         console.error(`[ActivitySync] Failed to reload note ${noteId}:`, error);
       }
     }
+
+    // Record full scan metrics
+    this.callbacks.metrics?.recordFullScan?.(reloadedNotes.size, this.sdId);
 
     return reloadedNotes;
   }

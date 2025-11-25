@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
 import { ConfigManager } from './config/manager';
 import { initializeTelemetry } from './telemetry/config';
+import { getSyncMetrics } from './telemetry/sync-metrics';
 import { NoteMoveManager } from './note-move-manager';
 import { DiagnosticsManager } from './diagnostics-manager';
 import { BackupManager } from './backup-manager';
@@ -845,6 +846,26 @@ async function setupSDWatchers(
     getLoadedNotes: () => crdtManager.getLoadedNotes(),
     checkCRDTLogExists: async (noteId: string, instanceId: string, expectedSequence: number) => {
       return crdtManager.checkCRDTLogExists(noteId, sdId, instanceId, expectedSequence);
+    },
+    metrics: {
+      recordSyncSuccess: (latencyMs: number, attempts: number, noteId: string, metricSdId: string) => {
+        getSyncMetrics().recordSyncSuccess(latencyMs, attempts, {
+          note_id: noteId,
+          sd_id: metricSdId,
+        });
+      },
+      recordSyncFailure: (noteId: string, metricSdId: string) => {
+        getSyncMetrics().recordSyncFailure({ note_id: noteId, sd_id: metricSdId });
+      },
+      recordSyncTimeout: (attempts: number, noteId: string, metricSdId: string) => {
+        getSyncMetrics().recordSyncTimeout(attempts, { note_id: noteId, sd_id: metricSdId });
+      },
+      recordFullScan: (notesReloaded: number, metricSdId: string) => {
+        getSyncMetrics().recordFullScan(notesReloaded, { sd_id: metricSdId });
+      },
+      recordActivityLogProcessed: (instanceIdAttr: string, metricSdId: string) => {
+        getSyncMetrics().recordActivityLogProcessed({ instance_id: instanceIdAttr, sd_id: metricSdId });
+      },
     },
   };
 
