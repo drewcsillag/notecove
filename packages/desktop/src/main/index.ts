@@ -30,10 +30,12 @@ import { getSyncMetrics } from './telemetry/sync-metrics';
 import { NoteMoveManager } from './note-move-manager';
 import { DiagnosticsManager } from './diagnostics-manager';
 import { BackupManager } from './backup-manager';
+import { showProfilePicker, getProfileStorage } from './profile-picker';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
 let configManager: ConfigManager | null = null;
+let selectedProfileId: string | null = null;
 let ipcHandlers: IPCHandlers | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
 let storageManager: AppendLogManager | null = null;
@@ -212,8 +214,10 @@ function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
 
 /**
  * Initialize database
+ *
+ * @param profileId - Optional profile ID for profile-specific database path
  */
-async function initializeDatabase(): Promise<Database> {
+async function initializeDatabase(profileId?: string): Promise<Database> {
   // Initialize config manager if not already done
   if (!configManager) {
     const configPath = process.env['TEST_CONFIG_PATH'] ?? undefined;
@@ -222,11 +226,20 @@ async function initializeDatabase(): Promise<Database> {
 
   // Determine database path:
   // 1. Use TEST_DB_PATH if in test mode
-  // 2. Otherwise use custom path from config if set
-  // 3. Fall back to default userData/notecove.db
+  // 2. If profileId provided, use profile-specific database path
+  // 3. Otherwise use custom path from config if set
+  // 4. Fall back to default userData/notecove.db
   let dbPath: string;
   if (process.env['TEST_DB_PATH']) {
     dbPath = process.env['TEST_DB_PATH'];
+  } else if (profileId) {
+    // Use profile-specific database path
+    const appDataDir = app.getPath('userData');
+    const profileStorage = getProfileStorage(appDataDir);
+    dbPath = profileStorage.getProfileDatabasePath(profileId);
+    // Ensure profile directory exists
+    await profileStorage.ensureProfileDataDir(profileId);
+    console.log(`[Profile] Using profile database: ${dbPath}`);
   } else {
     dbPath = await configManager.getDatabasePath();
   }
@@ -1523,8 +1536,39 @@ void app.whenReady().then(async () => {
       }
     }
 
-    // Initialize database
-    database = await initializeDatabase();
+    // Profile selection - skip if in test mode
+    // Test mode is indicated by TEST_STORAGE_DIR, TEST_DB_PATH, or NODE_ENV=test
+    const isTestMode =
+      !!process.env['TEST_STORAGE_DIR'] ||
+      !!process.env['TEST_DB_PATH'] ||
+      process.env['NODE_ENV'] === 'test';
+
+    if (!isTestMode) {
+      // Show profile picker and get selected profile
+      const appDataDir = app.getPath('userData');
+      const isDevBuild = !app.isPackaged;
+
+      console.log('[Profile] Showing profile picker...');
+      const result = await showProfilePicker({
+        isDevBuild,
+        appDataDir,
+      });
+
+      if (result.profileId === null) {
+        // User cancelled - quit the app
+        console.log('[Profile] User cancelled profile selection, quitting...');
+        app.quit();
+        return;
+      }
+
+      selectedProfileId = result.profileId;
+      console.log(`[Profile] Selected profile: ${selectedProfileId}`);
+    } else {
+      console.log('[Profile] Test mode - skipping profile picker');
+    }
+
+    // Initialize database (with profile ID if selected)
+    database = await initializeDatabase(selectedProfileId ?? undefined);
 
     // Clean up orphaned data from deleted SDs
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
@@ -2046,6 +2090,29 @@ app.on('will-quit', (event) => {
         await watcher.unwatch();
       }
       sdActivityWatchers.clear();
+
+      // 5a. Wait for pending activity syncs to complete (with timeout)
+      console.log('[App] Waiting for pending activity syncs...');
+      const SYNC_TIMEOUT_MS = 5000; // 5 second timeout to prevent indefinite hang
+      const syncPromises: Promise<void>[] = [];
+      for (const activitySync of sdActivitySyncs.values()) {
+        syncPromises.push(activitySync.waitForPendingSyncs());
+      }
+      if (syncPromises.length > 0) {
+        try {
+          await Promise.race([
+            Promise.all(syncPromises),
+            new Promise<void>((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Sync timeout'));
+              }, SYNC_TIMEOUT_MS);
+            }),
+          ]);
+          console.log('[App] All pending syncs completed');
+        } catch {
+          console.warn('[App] Pending syncs timed out after', SYNC_TIMEOUT_MS, 'ms, continuing shutdown');
+        }
+      }
       sdActivitySyncs.clear();
 
       // 5b. Clear activity poll intervals
