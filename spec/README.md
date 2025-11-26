@@ -5,6 +5,7 @@ This directory contains a TLA+ specification for verifying the correctness of No
 ## Overview
 
 The spec models:
+
 - **CRDT logs**: Append-only logs per node, synced via cloud storage
 - **Activity logs**: Notification mechanism for note changes
 - **Vector clocks**: Track what each node has seen from others
@@ -13,11 +14,11 @@ The spec models:
 
 ## Files
 
-| File | Description |
-|------|-------------|
-| `NoteCoveSync.tla` | Main specification with state variables and actions |
-| `NoteCoveSyncTypes.tla` | Type definitions and helper functions |
-| `NoteCoveSync.cfg` | TLC model checker configuration |
+| File                    | Description                                         |
+| ----------------------- | --------------------------------------------------- |
+| `NoteCoveSync.tla`      | Main specification with state variables and actions |
+| `NoteCoveSyncTypes.tla` | Type definitions and helper functions               |
+| `NoteCoveSync.cfg`      | TLC model checker configuration                     |
 
 ## Prerequisites
 
@@ -37,6 +38,7 @@ java -cp /path/to/tla2tools.jar tlc2.TLC NoteCoveSync.tla
 ## Properties Verified
 
 ### Safety Invariants
+
 - **TypeOK**: All state variables have correct types
 - **VectorClockMonotonic**: Vector clocks never decrease
 - **SequenceContiguous**: Log sequence numbers are contiguous (no gaps)
@@ -44,43 +46,46 @@ java -cp /path/to/tla2tools.jar tlc2.TLC NoteCoveSync.tla
 - **ConvergenceInvariant**: `FullySynced => Converged`
 
 ### Temporal Properties
+
 - **AlwaysConvergesWhenFullySynced**: Once fully synced, nodes have identical state
 
 ## Model Parameters
 
-| Constant | Default | Description |
-|----------|---------|-------------|
-| `Node` | `{n1, n2}` | Set of node identifiers |
-| `MaxUpdates` | `3` | Maximum number of edits to model |
-| `MaxLogSize` | `5` | Activity log size before compaction |
-| `ActivityMode` | `"append"` | `"append"` or `"replace"` mode |
+| Constant       | Default    | Description                         |
+| -------------- | ---------- | ----------------------------------- |
+| `Node`         | `{n1, n2}` | Set of node identifiers             |
+| `MaxUpdates`   | `3`        | Maximum number of edits to model    |
+| `MaxLogSize`   | `5`        | Activity log size before compaction |
+| `ActivityMode` | `"append"` | `"append"` or `"replace"` mode      |
 
 ## State Space
 
 With default parameters:
+
 - **538,557 states generated**
 - **98,612 distinct states**
 - **7 seconds** to check
 
 With compaction enabled (MaxLogSize=2):
+
 - **552,557 states generated**
 - **101,172 distinct states**
 
 ## Actions
 
-| Action | Description |
-|--------|-------------|
-| `Edit(n)` | User makes a change on node n |
-| `CloudSyncLog(n)` | CRDT log entry syncs to cloud |
-| `CloudSyncActivity(n)` | Activity log entry syncs to cloud |
-| `ReloadDirect(n)` | Node reloads from CRDT logs (folder-style) |
-| `PollActivity(n)` | Node polls activity logs (note-style) |
-| `ReloadFromActivity(n)` | Node reloads after detecting activity |
-| `CompactActivity(n)` | Activity log is compacted |
-| `FullScanFallback(n)` | Node recovers from compaction gap |
-| `SaveSnapshot(n)` | Node saves state to DB cache |
-| `Crash(n)` | Node crashes |
-| `Restart(n)` | Node restarts from cache + logs |
+| Action                  | Description                                |
+| ----------------------- | ------------------------------------------ |
+| `Edit(n)`               | User makes a change on node n              |
+| `CloudSyncLog(n)`       | CRDT log entry syncs to cloud              |
+| `CloudSyncActivity(n)`  | Activity log entry syncs to cloud          |
+| `ReloadDirect(n)`       | Node reloads from CRDT logs (folder-style) |
+| `PollActivity(n)`       | Node polls activity logs (note-style)      |
+| `ReloadFromActivity(n)` | Node reloads after detecting activity      |
+| `CompactActivity(n)`    | Activity log is compacted                  |
+| `FullScanFallback(n)`   | Node recovers from compaction gap          |
+| `SaveSnapshot(n)`       | Node saves state to DB cache               |
+| `Crash(n)`              | Node crashes                               |
+| `Restart(n)`            | Node restarts from cache + logs            |
 
 ## Key Design Decisions
 
