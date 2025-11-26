@@ -12,8 +12,4 @@ export default defineConfig({
   use: {
     trace: 'on-first-retry',
   },
-  // Exclude cross-machine sync tests from normal CI runs
-  // These tests are slow and manual-only for now
-  // Run them explicitly with: pnpm test:e2e --grep "cross-machine"
-  grep: process.env.CI ? /^(?!.*cross-machine).*$/ : undefined,
 });

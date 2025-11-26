@@ -13,10 +13,19 @@
  */
 
 import { test, expect, _electron as electron } from '@playwright/test';
+import { ElectronApplication, Page } from 'playwright';
 import { resolve } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+/**
+ * Helper to get the first window with a longer timeout.
+ * The default firstWindow() timeout is 30 seconds, which can be flaky on slower machines.
+ */
+async function getFirstWindow(app: ElectronApplication, timeoutMs = 60000): Promise<Page> {
+  return app.waitForEvent('window', { timeout: timeoutMs });
+}
 
 test.describe('Cross-SD Multi-Select with Edits', () => {
   test('should persist note moves even after editing post-move', async () => {
@@ -37,7 +46,7 @@ test.describe('Cross-SD Multi-Select with Edits', () => {
         },
       });
 
-      const window = await electronApp.firstWindow();
+      const window = await getFirstWindow(electronApp);
       window.on('console', (msg) => {
         if (msg.text().includes('Bug') || msg.text().includes('multiselect')) {
           console.log('[Renderer Console]:', msg.text());
@@ -179,7 +188,7 @@ test.describe('Cross-SD Multi-Select with Edits', () => {
         },
       });
 
-      const window2 = await electronApp2.firstWindow();
+      const window2 = await getFirstWindow(electronApp2);
       await window2.waitForLoadState('domcontentloaded');
       await window2.waitForSelector('[data-testid="notes-list"]', { timeout: 20000 });
       await window2.waitForTimeout(3000);
