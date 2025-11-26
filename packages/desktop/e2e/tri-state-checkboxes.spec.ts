@@ -290,9 +290,9 @@ test.describe('Tri-State Checkboxes - Click Cycling', () => {
   });
 });
 
-test.describe.skip('Tri-State Checkboxes - Multiple Tasks', () => {
-  test('should handle multiple tasks with different states', async () => {
-    // Create a note with multiple tasks
+test.describe('Tri-State Checkboxes - Multiple Checkboxes', () => {
+  test('should handle multiple checkboxes with different states', async () => {
+    // Create a note with multiple checkboxes
     const createButton = page.getByTitle('Create note');
     await createButton.click();
     await page.waitForTimeout(1000);
@@ -301,32 +301,37 @@ test.describe.skip('Tri-State Checkboxes - Multiple Tasks', () => {
     await editor.click();
     await page.waitForTimeout(500);
 
-    // Create three tasks with different states
-    await editor.type('- [ ] Unchecked task');
-    await page.keyboard.press('Enter');
+    // Clear the default H1
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
     await page.waitForTimeout(200);
 
-    await editor.type('- [x] Checked task');
+    // Create three checkboxes with different states using inline syntax
+    await page.keyboard.type('[] Unchecked checkbox');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(300);
 
-    await editor.type('- [N] Nope task');
+    await page.keyboard.type('[x] Checked checkbox');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+
+    await page.keyboard.type('[N] Nope checkbox');
     await page.waitForTimeout(500);
 
-    // Verify all three tasks exist
-    const tasks = page.locator('li[data-type="taskItem"]');
-    await expect(tasks).toHaveCount(3);
+    // Verify all three checkboxes exist
+    const checkboxes = page.locator('span[data-type="tri-state-checkbox"]');
+    await expect(checkboxes).toHaveCount(3);
 
     // Verify each state
-    await expect(tasks.nth(0)).toHaveAttribute('data-checked', 'unchecked');
-    await expect(tasks.nth(1)).toHaveAttribute('data-checked', 'checked');
-    await expect(tasks.nth(2)).toHaveAttribute('data-checked', 'nope');
+    await expect(checkboxes.nth(0)).toHaveAttribute('data-checked', 'unchecked');
+    await expect(checkboxes.nth(1)).toHaveAttribute('data-checked', 'checked');
+    await expect(checkboxes.nth(2)).toHaveAttribute('data-checked', 'nope');
   });
 });
 
-test.describe.skip('Tri-State Checkboxes - Persistence', () => {
-  test('should persist task states across note switches', async () => {
-    // Create a note with tasks
+test.describe('Tri-State Checkboxes - Persistence', () => {
+  test('should persist checkbox states across note switches', async () => {
+    // Create a note with checkboxes
     const createButton = page.getByTitle('Create note');
     await createButton.click();
     await page.waitForTimeout(1000);
@@ -335,41 +340,66 @@ test.describe.skip('Tri-State Checkboxes - Persistence', () => {
     await editor.click();
     await page.waitForTimeout(500);
 
-    await editor.type('Task Note');
+    // Clear default H1
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+
+    // Create checkboxes with different states
+    await page.keyboard.type('Checkbox Note Title');
     await page.keyboard.press('Enter');
-    await editor.type('- [ ] Unchecked');
+    await page.waitForTimeout(300);
+
+    await page.keyboard.type('[] Unchecked item');
     await page.keyboard.press('Enter');
-    await editor.type('- [x] Checked');
+    await page.waitForTimeout(300);
+
+    await page.keyboard.type('[x] Checked item');
     await page.keyboard.press('Enter');
-    await editor.type('- [N] Nope');
+    await page.waitForTimeout(300);
+
+    await page.keyboard.type('[N] Nope item');
     await page.waitForTimeout(1000);
+
+    // Verify checkboxes were created
+    let checkboxes = page.locator('span[data-type="tri-state-checkbox"]');
+    await expect(checkboxes).toHaveCount(3);
 
     // Create a second note
     await createButton.click();
     await page.waitForTimeout(1000);
 
     await editor.click();
-    await editor.type('Second Note');
+    await page.waitForTimeout(500);
+
+    // Clear default H1 and add content
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+    await page.keyboard.type('Second Note');
     await page.waitForTimeout(1000);
 
     // Switch back to the first note by clicking its title in the notes list
-    const firstNote = page.locator('.notes-list-item').filter({ hasText: 'Task Note' });
+    const notesList = page.locator('[data-testid="notes-list"]');
+    const firstNote = notesList
+      .locator('.MuiListItemButton-root')
+      .filter({ hasText: 'Checkbox Note Title' });
     await firstNote.click();
     await page.waitForTimeout(1000);
 
-    // Verify tasks are still there with correct states
-    const tasks = page.locator('li[data-type="taskItem"]');
-    await expect(tasks).toHaveCount(3);
+    // Verify checkboxes are still there with correct states
+    checkboxes = page.locator('span[data-type="tri-state-checkbox"]');
+    await expect(checkboxes).toHaveCount(3);
 
-    await expect(tasks.nth(0)).toHaveAttribute('data-checked', 'unchecked');
-    await expect(tasks.nth(1)).toHaveAttribute('data-checked', 'checked');
-    await expect(tasks.nth(2)).toHaveAttribute('data-checked', 'nope');
+    await expect(checkboxes.nth(0)).toHaveAttribute('data-checked', 'unchecked');
+    await expect(checkboxes.nth(1)).toHaveAttribute('data-checked', 'checked');
+    await expect(checkboxes.nth(2)).toHaveAttribute('data-checked', 'nope');
   });
 });
 
-test.describe.skip('Tri-State Checkboxes - Keyboard Shortcuts', () => {
-  test('should support Enter to create new task item', async () => {
-    // Create a note with a task
+test.describe('Tri-State Checkboxes - Keyboard Behavior', () => {
+  test('should create checkbox on new line after Enter', async () => {
+    // Create a note with a checkbox
     const createButton = page.getByTitle('Create note');
     await createButton.click();
     await page.waitForTimeout(1000);
@@ -378,20 +408,33 @@ test.describe.skip('Tri-State Checkboxes - Keyboard Shortcuts', () => {
     await editor.click();
     await page.waitForTimeout(500);
 
-    await editor.type('- [ ] First task');
+    // Clear default H1
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+
+    // Create first checkbox
+    await page.keyboard.type('[] First checkbox');
+    await page.waitForTimeout(500);
+
+    // Verify first checkbox exists
+    let checkboxes = page.locator('span[data-type="tri-state-checkbox"]');
+    await expect(checkboxes).toHaveCount(1);
+
+    // Press Enter and create second checkbox
     await page.keyboard.press('Enter');
     await page.waitForTimeout(200);
 
-    await editor.type('Second task');
+    await page.keyboard.type('[] Second checkbox');
     await page.waitForTimeout(500);
 
-    // Verify two task items exist
-    const tasks = page.locator('li[data-type="taskItem"]');
-    await expect(tasks).toHaveCount(2);
+    // Verify two checkboxes exist
+    checkboxes = page.locator('span[data-type="tri-state-checkbox"]');
+    await expect(checkboxes).toHaveCount(2);
   });
 
-  test('should support Tab to indent task item', async () => {
-    // Create a note with tasks
+  test('should create checkbox in bullet list', async () => {
+    // Create a note
     const createButton = page.getByTitle('Create note');
     await createButton.click();
     await page.waitForTimeout(1000);
@@ -400,24 +443,33 @@ test.describe.skip('Tri-State Checkboxes - Keyboard Shortcuts', () => {
     await editor.click();
     await page.waitForTimeout(500);
 
-    await editor.type('- [ ] Parent task');
+    // Clear default H1
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+
+    // Create a bullet list with checkbox
+    await page.keyboard.type('- [] First item');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(200);
 
-    // Indent the second task
-    await page.keyboard.press('Tab');
-    await editor.type('Child task');
+    // Continue the bullet list
+    await page.keyboard.type('[] Second item');
     await page.waitForTimeout(500);
 
-    // Verify nested structure exists
-    const tasks = page.locator('li[data-type="taskItem"]');
-    await expect(tasks).toHaveCount(2);
+    // Verify checkboxes exist
+    const checkboxes = page.locator('span[data-type="tri-state-checkbox"]');
+    await expect(checkboxes).toHaveCount(2);
+
+    // Verify we're in a bullet list
+    const bulletList = page.locator('.ProseMirror ul');
+    await expect(bulletList).toBeVisible();
   });
 });
 
-test.describe.skip('Tri-State Checkboxes - Visual Styling', () => {
-  test('should apply correct styling for nope state', async () => {
-    // Create a note with a nope task
+test.describe('Tri-State Checkboxes - Visual Styling', () => {
+  test('should show correct content for each state', async () => {
+    // Create a note with checkboxes in all three states
     const createButton = page.getByTitle('Create note');
     await createButton.click();
     await page.waitForTimeout(1000);
@@ -426,18 +478,66 @@ test.describe.skip('Tri-State Checkboxes - Visual Styling', () => {
     await editor.click();
     await page.waitForTimeout(500);
 
-    await editor.type('- [N] Nope task');
+    // Clear default H1
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+
+    // Create checkboxes with all three states
+    await page.keyboard.type('[] Unchecked');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+
+    await page.keyboard.type('[x] Checked');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+
+    await page.keyboard.type('[N] Nope');
     await page.waitForTimeout(500);
 
-    const taskItem = page.locator('li[data-type="taskItem"][data-checked="nope"]');
-    await expect(taskItem).toBeVisible();
+    // Verify checkboxes have the correct class
+    const checkboxes = page.locator('span[data-type="tri-state-checkbox"]');
+    await expect(checkboxes).toHaveCount(3);
 
-    // Verify nope styling class is applied
-    await expect(taskItem).toHaveClass(/task-item-nope/);
+    // Verify each checkbox has the tri-state-checkbox class
+    await expect(checkboxes.nth(0)).toHaveClass(/tri-state-checkbox/);
+    await expect(checkboxes.nth(1)).toHaveClass(/tri-state-checkbox/);
+    await expect(checkboxes.nth(2)).toHaveClass(/tri-state-checkbox/);
 
-    // Verify checkbox label has "N" indicator
-    const nopeIndicator = taskItem.locator('.task-item-nope-indicator');
-    await expect(nopeIndicator).toBeVisible();
-    await expect(nopeIndicator).toHaveText('N');
+    // Verify unchecked checkbox has empty content
+    const uncheckedContent = checkboxes.nth(0).locator('.tri-state-checkbox-content');
+    await expect(uncheckedContent).toHaveText('');
+
+    // Verify checked checkbox shows checkmark
+    const checkedContent = checkboxes.nth(1).locator('.tri-state-checkbox-content');
+    await expect(checkedContent).toHaveText('✓');
+
+    // Verify nope checkbox shows "N"
+    const nopeContent = checkboxes.nth(2).locator('.tri-state-checkbox-content');
+    await expect(nopeContent).toHaveText('N');
+  });
+
+  test('should have correct data-checked attribute', async () => {
+    // Create a note with a nope checkbox
+    const createButton = page.getByTitle('Create note');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Clear default H1
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(200);
+
+    await page.keyboard.type('[N] Nope checkbox');
+    await page.waitForTimeout(500);
+
+    // Verify the nope checkbox has correct data attribute
+    const nopeCheckbox = page.locator('span[data-type="tri-state-checkbox"][data-checked="nope"]');
+    await expect(nopeCheckbox).toBeVisible();
+    await expect(nopeCheckbox).toHaveAttribute('data-checked', 'nope');
   });
 });

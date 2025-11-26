@@ -901,10 +901,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
     console.log('[Test] ✅ Note A was visible in instance 2 on startup!');
   }, 180000);
 
-  // Skip: Bug 11 documents a feature that isn't implemented yet
-  // The editor needs to subscribe to incoming CRDT updates while a note is open
-  // and apply them to the TipTap editor without disrupting the user's cursor
-  test.skip('Bug 11: Editor should show edits from other instance without reloading note', async () => {
+  // Live sync IS implemented - editor subscribes to note:updated events
+  // and applies CRDT updates via Y.applyUpdate in handleNoteUpdate
+  test('Bug 11: Editor should show edits from other instance without reloading note', async () => {
     console.log('[Test] Testing cross-instance editor synchronization...');
 
     // In instance 1, create note "A" and keep it selected

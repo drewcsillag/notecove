@@ -259,13 +259,13 @@ export class IPCHandlers {
 
       // Only update if note exists in cache and CRDT has initialized metadata
       if (note && crdtMetadata.id) {
-        // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
+        // Defensive fallbacks are handled in getMetadata() itself
         await this.database.upsertNote({
           ...note,
-          folderId: crdtMetadata.folderId ?? null,
-          created: crdtMetadata.created ?? note.created,
-          modified: crdtMetadata.modified ?? Date.now(),
-          deleted: crdtMetadata.deleted ?? false,
+          folderId: crdtMetadata.folderId,
+          created: crdtMetadata.created,
+          modified: crdtMetadata.modified,
+          deleted: crdtMetadata.deleted,
         });
       }
     }
@@ -357,12 +357,11 @@ export class IPCHandlers {
         const cachedNote = await this.database.getNote(noteId);
 
         if (cachedNote) {
-          // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
-          const deleted = crdtMetadata.deleted ?? false;
-          const folderId = crdtMetadata.folderId ?? null;
-          // For sdId, prefer cached value if CRDT metadata is undefined (critical field)
-          const sdId = crdtMetadata.sdId ?? cachedNote.sdId;
-          const modified = crdtMetadata.modified ?? Date.now();
+          // Defensive fallbacks are handled in getMetadata() itself
+          const deleted = crdtMetadata.deleted;
+          const folderId = crdtMetadata.folderId;
+          const sdId = crdtMetadata.sdId;
+          const modified = crdtMetadata.modified;
 
           // Check if metadata has changed and needs to be synced to SQLite
           const metadataChanged =

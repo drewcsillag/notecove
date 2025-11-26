@@ -64,6 +64,15 @@ export interface ActivitySyncCallbacks {
   ) => Promise<boolean>;
 
   /**
+   * Check if a note exists (was not permanently deleted).
+   * Used to skip syncing for notes that have been permanently deleted.
+   * Returns true if the note directory exists on disk.
+   *
+   * @param noteId - The note ID to check
+   */
+  checkNoteExists?: (noteId: string) => Promise<boolean>;
+
+  /**
    * Optional metrics callbacks for telemetry
    */
   metrics?: SyncMetricsCallbacks;
@@ -291,6 +300,17 @@ export class ActivitySync {
     console.log(
       `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}, sourceInstance: ${sourceInstanceId}, expectedSeq: ${expectedSequence}`
     );
+
+    // Check if note was permanently deleted before starting retry loop
+    // This prevents blocking app startup when activity log has orphaned entries
+    if (this.callbacks.checkNoteExists) {
+      const exists = await this.callbacks.checkNoteExists(noteId);
+      if (!exists) {
+        console.log(`[ActivitySync] Note ${noteId} was permanently deleted, skipping sync`);
+        // Return true to update watermark and skip this entry
+        return true;
+      }
+    }
 
     const startTime = Date.now();
 

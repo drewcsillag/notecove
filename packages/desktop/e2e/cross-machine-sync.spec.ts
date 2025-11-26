@@ -4,8 +4,10 @@
  * Tests note synchronization across two app instances simulating different machines
  * with separate SDs connected via a file sync simulator (like iCloud/Dropbox).
  *
- * These tests are excluded from normal CI runs via grep pattern.
- * Run with: pnpm test:e2e --grep "cross-machine"
+ * These tests run in CI and validate cross-instance sync behavior including:
+ * - Content sync between instances
+ * - Title/folder/pin metadata sync
+ * - Sync with slow/partial file replication (sloppy sync)
  */
 
 import { test, expect, _electron as electron } from '@playwright/test';
@@ -21,6 +23,14 @@ import {
   formatSDContents,
   validateAllSequences,
 } from './utils/sync-simulator';
+
+/**
+ * Helper to get the first window with a longer timeout.
+ * The default firstWindow() timeout is 30 seconds, which can be flaky on slower machines.
+ */
+async function getFirstWindow(app: ElectronApplication, timeoutMs = 60000): Promise<Page> {
+  return app.waitForEvent('window', { timeout: timeoutMs });
+}
 
 /**
  * Step 2: Smoke Test - Two Instances with Shared SD
@@ -74,7 +84,7 @@ test.describe('cross-machine sync - smoke test', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -100,7 +110,7 @@ test.describe('cross-machine sync - smoke test', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -187,7 +197,7 @@ test.describe('cross-machine sync - smoke test', () => {
       console.log('[Instance2 Relaunch]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Relaunch Renderer]:', msg.text());
     });
@@ -301,7 +311,7 @@ test.describe('cross-machine sync - file sync simulator', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -390,7 +400,7 @@ test.describe('cross-machine sync - file sync simulator', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -585,7 +595,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -610,7 +620,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -662,7 +672,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance2 Reload]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Reload Renderer]:', msg.text());
     });
@@ -750,7 +760,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -780,7 +790,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -832,7 +842,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance2 Reload1]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Reload1 Renderer]:', msg.text());
     });
@@ -882,7 +892,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance1 Reload]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Reload Renderer]:', msg.text());
     });
@@ -980,7 +990,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -1017,7 +1027,7 @@ test.describe('cross-machine sync - two instances', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -1186,7 +1196,7 @@ test.describe('cross-machine sync - note move', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -1285,7 +1295,7 @@ test.describe('cross-machine sync - note move', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -1452,7 +1462,7 @@ test.describe('cross-machine sync - move conflict', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -1538,7 +1548,7 @@ test.describe('cross-machine sync - move conflict', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -1631,7 +1641,7 @@ test.describe('cross-machine sync - move conflict', () => {
       console.log('[Instance1-Verify]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1-Verify Renderer]:', msg.text());
     });
@@ -1655,7 +1665,7 @@ test.describe('cross-machine sync - move conflict', () => {
       console.log('[Instance2-Verify]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2-Verify Renderer]:', msg.text());
     });
@@ -1846,7 +1856,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
       console.log('[Instance1 Renderer]:', msg.text());
     });
@@ -1891,7 +1901,9 @@ test.describe('cross-machine sync - new note creation', () => {
 
     // Verify SD2 has the new note files
     expect(sd2Contents.notes.length).toBe(sd1Contents.notes.length);
-    expect(sd2Contents.notes.map((n) => n.id).sort()).toEqual(sd1Contents.notes.map((n) => n.id).sort());
+    expect(sd2Contents.notes.map((n) => n.id).sort()).toEqual(
+      sd1Contents.notes.map((n) => n.id).sort()
+    );
 
     // === Launch Instance 2 ===
     console.log('[NewNoteSync] Launching Instance 2...');
@@ -1910,7 +1922,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -1975,7 +1987,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
     await window1.waitForTimeout(2000);
     console.log('[LiveNewNote] Instance 1 ready');
@@ -2001,7 +2013,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -2100,7 +2112,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
     await window1.waitForTimeout(2000);
     console.log('[LiveFolderMove] Instance 1 ready');
@@ -2126,7 +2138,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -2270,7 +2282,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
     await window1.waitForTimeout(2000);
     console.log('[LiveTitleSync] Instance 1 ready');
@@ -2296,7 +2308,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -2395,7 +2407,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance1]:', msg.text());
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
     await window1.waitForTimeout(2000);
     console.log('[LivePinSync] Instance 1 ready');
@@ -2421,7 +2433,7 @@ test.describe('cross-machine sync - new note creation', () => {
       console.log('[Instance2]:', msg.text());
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
       console.log('[Instance2 Renderer]:', msg.text());
     });
@@ -2478,5 +2490,649 @@ test.describe('cross-machine sync - new note creation', () => {
     expect(isPinnedAfter).toBe(true);
 
     console.log('[LivePinSync] ✅ Live pin sync test passed!');
+  });
+
+  /**
+   * BUG TEST: Title changes on an UNOPENED note should still sync to note list.
+   *
+   * Current behavior: If Instance B hasn't opened a note, title changes from
+   * Instance A don't update Instance B's note list until B opens the note.
+   *
+   * Expected behavior: Title should update in the note list even without opening.
+   */
+  test('should sync title change to note list even when note is NOT open in Instance 2', async () => {
+    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Start file sync simulator with fast sync
+    console.log('[TitleSyncUnopened] Starting file sync simulator...');
+    const logger = new SimulatorLogger({
+      prefix: '[TitleSyncUnopened]',
+    });
+    simulator = new FileSyncSimulator(sd1, sd2, {
+      syncDelayRange: [500, 1000],
+      partialSyncProbability: 0.0,
+      partialSyncRatio: [0.5, 0.9],
+      logger,
+    });
+    await simulator.start();
+
+    // === Launch Instance 1 first ===
+    console.log('[TitleSyncUnopened] Launching Instance 1...');
+    instance1 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir1}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd1,
+        INSTANCE_ID: 'titleunopened-instance-1',
+      },
+      timeout: 60000,
+    });
+
+    instance1.on('console', (msg) => {
+      console.log('[Instance1]:', msg.text());
+    });
+
+    window1 = await getFirstWindow(instance1);
+    await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window1.waitForTimeout(2000);
+    console.log('[TitleSyncUnopened] Instance 1 ready');
+
+    // Wait for initial files to sync
+    console.log('[TitleSyncUnopened] Waiting for initial sync...');
+    await window1.waitForTimeout(5000);
+
+    // Launch Instance 2
+    console.log('[TitleSyncUnopened] Launching Instance 2...');
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'titleunopened-instance-2',
+      },
+      timeout: 60000,
+    });
+
+    instance2.on('console', (msg) => {
+      console.log('[Instance2]:', msg.text());
+    });
+
+    window2 = await getFirstWindow(instance2);
+    await window2.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window2.waitForTimeout(2000);
+    console.log('[TitleSyncUnopened] Instance 2 ready');
+
+    // Create a NEW note in Instance 1 (not the default welcome note)
+    console.log('[TitleSyncUnopened] Creating new note in Instance 1...');
+    const createButton1 = window1.locator('button[title="Create note"]');
+    await createButton1.click();
+    await window1.waitForTimeout(1000);
+
+    // Type initial content
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await window1.keyboard.type('Initial Title For Test');
+    await window1.waitForTimeout(2000);
+
+    // Wait for sync to Instance 2
+    console.log('[TitleSyncUnopened] Waiting for new note to sync to Instance 2...');
+    await window1.waitForTimeout(10000);
+
+    // Verify Instance 2 sees the new note in the list
+    const notesList2 = window2.locator('[data-testid="notes-list"]');
+    const initialNote2 = notesList2.locator('li:has-text("Initial Title For Test")');
+    const hasInitialNote = await initialNote2.isVisible();
+    console.log(`[TitleSyncUnopened] Instance 2 has initial note: ${hasInitialNote}`);
+    expect(hasInitialNote).toBe(true);
+
+    // KEY: Switch Instance 2 back to welcome note so the new note is NOT open
+    console.log('[TitleSyncUnopened] Switching Instance 2 to welcome note (closing test note)...');
+    const welcomeNote2 = notesList2.locator('li:has-text("Welcome to NoteCove")');
+    await welcomeNote2.click();
+    await window2.waitForTimeout(1000);
+
+    // Now change the title in Instance 1
+    console.log('[TitleSyncUnopened] Changing title in Instance 1...');
+    const notesList1 = window1.locator('[data-testid="notes-list"]');
+    const testNote1 = notesList1.locator('li:has-text("Initial Title For Test")');
+    await testNote1.click();
+    await window1.waitForTimeout(500);
+
+    // Click in the editor to ensure focus
+    const editor1Edit = window1.locator('.ProseMirror');
+    await editor1Edit.click();
+    await window1.waitForTimeout(200);
+
+    // Select all and replace
+    await window1.keyboard.press('Meta+a');
+    await window1.waitForTimeout(100);
+    await window1.keyboard.press('Backspace');
+    await window1.waitForTimeout(200);
+
+    const newTitle = `Changed Title ${Date.now()}`;
+    await window1.keyboard.type(newTitle);
+    await window1.waitForTimeout(2000);
+    console.log(`[TitleSyncUnopened] New title: ${newTitle}`);
+
+    // Wait for sync to Instance 2
+    console.log('[TitleSyncUnopened] Waiting for title sync to Instance 2...');
+    await window1.waitForTimeout(15000);
+
+    // THE KEY TEST: Does Instance 2's note list show the new title?
+    // (Note is NOT open in Instance 2 - it's viewing the welcome note)
+    const updatedNote2 = notesList2.locator(`li:has-text("${newTitle}")`);
+    const titleUpdated = await updatedNote2.isVisible();
+    console.log(`[TitleSyncUnopened] Instance 2 note list shows new title: ${titleUpdated}`);
+
+    // This should pass - title should sync even when note is not open
+    expect(titleUpdated).toBe(true);
+
+    console.log('[TitleSyncUnopened] ✅ Title sync on unopened note test passed!');
+  });
+
+  /**
+   * BUG TEST: Note deletion should sync to Instance B and remove from note list.
+   *
+   * Current behavior: Deleting a note on Instance A doesn't remove it from
+   * Instance B's note list.
+   *
+   * Expected behavior: Note should be removed from the list (or marked deleted).
+   */
+  test('should sync note deletion to Instance 2 note list', async () => {
+    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Start file sync simulator
+    console.log('[DeletionSync] Starting file sync simulator...');
+    const logger = new SimulatorLogger({
+      prefix: '[DeletionSync]',
+    });
+    simulator = new FileSyncSimulator(sd1, sd2, {
+      syncDelayRange: [500, 1000],
+      partialSyncProbability: 0.0,
+      partialSyncRatio: [0.5, 0.9],
+      logger,
+    });
+    await simulator.start();
+
+    // Launch both instances
+    console.log('[DeletionSync] Launching Instance 1...');
+    instance1 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir1}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd1,
+        INSTANCE_ID: 'deletion-instance-1',
+      },
+      timeout: 60000,
+    });
+
+    instance1.on('console', (msg) => {
+      console.log('[Instance1]:', msg.text());
+    });
+
+    window1 = await getFirstWindow(instance1);
+    await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window1.waitForTimeout(2000);
+    console.log('[DeletionSync] Instance 1 ready');
+
+    // Wait for initial sync
+    await window1.waitForTimeout(5000);
+
+    console.log('[DeletionSync] Launching Instance 2...');
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'deletion-instance-2',
+      },
+      timeout: 60000,
+    });
+
+    instance2.on('console', (msg) => {
+      console.log('[Instance2]:', msg.text());
+    });
+
+    window2 = await getFirstWindow(instance2);
+    await window2.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window2.waitForTimeout(2000);
+    console.log('[DeletionSync] Instance 2 ready');
+
+    // Create a new note in Instance 1
+    console.log('[DeletionSync] Creating new note in Instance 1...');
+    await window1.keyboard.press('Meta+n');
+    await window1.waitForTimeout(1000);
+
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    const noteTitle = `Delete Me ${Date.now()}`;
+    await window1.keyboard.type(noteTitle);
+    await window1.waitForTimeout(2000);
+
+    // Wait for sync to Instance 2
+    console.log('[DeletionSync] Waiting for new note to sync...');
+    await window1.waitForTimeout(10000);
+
+    // Verify Instance 2 sees the note
+    const notesList2 = window2.locator('[data-testid="notes-list"]');
+    const noteToDelete2 = notesList2.locator(`li:has-text("${noteTitle}")`);
+    const hasNote = await noteToDelete2.isVisible();
+    console.log(`[DeletionSync] Instance 2 has note before delete: ${hasNote}`);
+    expect(hasNote).toBe(true);
+
+    // Delete the note in Instance 1 via context menu
+    console.log('[DeletionSync] Deleting note in Instance 1...');
+    const notesList1 = window1.locator('[data-testid="notes-list"]');
+    const noteToDelete1 = notesList1.locator(`li:has-text("${noteTitle}")`);
+
+    // Right-click and delete
+    await noteToDelete1.click({ button: 'right' });
+    await window1.waitForTimeout(500);
+
+    await window1.locator('[role="menuitem"]:has-text("Delete")').click();
+    await window1.waitForTimeout(500);
+
+    // Confirm deletion in dialog
+    const dialog = window1.locator('[role="dialog"]');
+    const deleteButton = dialog.locator('button:has-text("Delete")');
+    await deleteButton.click();
+    await window1.waitForTimeout(1000);
+
+    // The note should no longer be in the All Notes list (soft deleted)
+    // It goes to Recently Deleted, so it disappears from the active list
+    const noteStillVisible = await noteToDelete1.isVisible();
+    const noteGoneFrom1 = !noteStillVisible;
+    console.log(`[DeletionSync] Note removed from Instance 1 list: ${noteGoneFrom1}`);
+    expect(noteGoneFrom1).toBe(true);
+
+    // Wait for sync to Instance 2
+    console.log('[DeletionSync] Waiting for deletion to sync to Instance 2...');
+    await window1.waitForTimeout(15000);
+
+    // THE KEY TEST: Is the note gone from Instance 2's list?
+    const noteGoneFrom2 = !(await noteToDelete2.isVisible());
+    console.log(`[DeletionSync] Note removed from Instance 2: ${noteGoneFrom2}`);
+
+    // This should pass - deletion should sync
+    expect(noteGoneFrom2).toBe(true);
+
+    console.log('[DeletionSync] ✅ Deletion sync test passed!');
+  });
+
+  /**
+   * BUG TEST: Unpinning a note should sync to Instance B.
+   *
+   * This is the reverse of the pin test - ensures unpin also syncs.
+   */
+  test('should sync note UNPIN to RUNNING Instance 2 note list', async () => {
+    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Start file sync simulator
+    console.log('[UnpinSync] Starting file sync simulator...');
+    const logger = new SimulatorLogger({
+      prefix: '[UnpinSync]',
+    });
+    simulator = new FileSyncSimulator(sd1, sd2, {
+      syncDelayRange: [500, 1000],
+      partialSyncProbability: 0.0,
+      partialSyncRatio: [0.5, 0.9],
+      logger,
+    });
+    await simulator.start();
+
+    // Launch Instance 1
+    console.log('[UnpinSync] Launching Instance 1...');
+    instance1 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir1}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd1,
+        INSTANCE_ID: 'unpin-instance-1',
+      },
+      timeout: 60000,
+    });
+
+    instance1.on('console', (msg) => {
+      console.log('[Instance1]:', msg.text());
+    });
+
+    window1 = await getFirstWindow(instance1);
+    await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window1.waitForTimeout(2000);
+    console.log('[UnpinSync] Instance 1 ready');
+
+    // Pin the note in Instance 1 first
+    console.log('[UnpinSync] Pinning note in Instance 1...');
+    const notesList1 = window1.locator('[data-testid="notes-list"]');
+    const welcomeNote1 = notesList1.locator('li:has-text("Welcome to NoteCove")');
+    await welcomeNote1.click({ button: 'right' });
+    await window1.waitForTimeout(500);
+    const pinMenuItem = window1.getByRole('menuitem', { name: 'Pin' });
+    await pinMenuItem.click();
+    await window1.waitForTimeout(1000);
+
+    // Verify pinned in Instance 1
+    const pinIcon1 = welcomeNote1.locator('[data-testid="PushPinIcon"]');
+    const isPinned1 = await pinIcon1.isVisible().catch(() => false);
+    console.log(`[UnpinSync] Instance 1 note pinned: ${isPinned1}`);
+    expect(isPinned1).toBe(true);
+
+    // Wait for initial sync
+    await window1.waitForTimeout(5000);
+
+    // Launch Instance 2
+    console.log('[UnpinSync] Launching Instance 2...');
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'unpin-instance-2',
+      },
+      timeout: 60000,
+    });
+
+    instance2.on('console', (msg) => {
+      console.log('[Instance2]:', msg.text());
+    });
+
+    window2 = await getFirstWindow(instance2);
+    await window2.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window2.waitForTimeout(2000);
+    console.log('[UnpinSync] Instance 2 ready');
+
+    // Verify Instance 2 sees the note as pinned
+    const notesList2 = window2.locator('[data-testid="notes-list"]');
+    const welcomeNote2 = notesList2.locator('li:has-text("Welcome to NoteCove")');
+    const pinIcon2Before = welcomeNote2.locator('[data-testid="PushPinIcon"]');
+    const isPinnedBefore = await pinIcon2Before.isVisible().catch(() => false);
+    console.log(`[UnpinSync] Instance 2 note pinned before: ${isPinnedBefore}`);
+    expect(isPinnedBefore).toBe(true);
+
+    // Now UNPIN in Instance 1
+    console.log('[UnpinSync] Unpinning note in Instance 1...');
+    await welcomeNote1.click({ button: 'right' });
+    await window1.waitForTimeout(500);
+    const unpinMenuItem = window1.getByRole('menuitem', { name: 'Unpin' });
+    await unpinMenuItem.click();
+    await window1.waitForTimeout(1000);
+
+    // Verify unpinned in Instance 1
+    const isPinned1After = await pinIcon1.isVisible().catch(() => false);
+    console.log(`[UnpinSync] Instance 1 note pinned after unpin: ${isPinned1After}`);
+    expect(isPinned1After).toBe(false);
+
+    // Wait for sync to Instance 2
+    console.log('[UnpinSync] Waiting for unpin sync to Instance 2...');
+    await window1.waitForTimeout(15000);
+
+    // THE KEY TEST: Is the pin icon gone from Instance 2?
+    const isPinnedAfter = await pinIcon2Before.isVisible().catch(() => false);
+    console.log(`[UnpinSync] Instance 2 note pinned after sync: ${isPinnedAfter}`);
+
+    expect(isPinnedAfter).toBe(false);
+
+    console.log('[UnpinSync] ✅ Unpin sync test passed!');
+  });
+
+  /**
+   * TEST: Partial/slow sync should not cause missed updates.
+   *
+   * Uses "sloppy sync" (partialSyncProbability > 0) to simulate real-world
+   * cloud sync conditions where files sync incrementally.
+   *
+   * This verifies that even with slow/partial sync (like iCloud, Dropbox, Google Drive),
+   * all updates eventually sync correctly.
+   */
+  test('should handle partial/slow sync without missing updates', async () => {
+    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Start file sync simulator with SLOPPY SYNC - partial and slow
+    console.log('[SloppySync] Starting file sync simulator with sloppy settings...');
+    const logger = new SimulatorLogger({
+      prefix: '[SloppySync]',
+    });
+    simulator = new FileSyncSimulator(sd1, sd2, {
+      syncDelayRange: [2000, 5000], // Slow sync (2-5 seconds)
+      partialSyncProbability: 0.5, // 50% chance of partial sync
+      partialSyncRatio: [0.3, 0.7], // When partial, sync 30-70% of file
+      logger,
+    });
+    await simulator.start();
+
+    // Launch Instance 1
+    console.log('[SloppySync] Launching Instance 1...');
+    instance1 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir1}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd1,
+        INSTANCE_ID: 'sloppy-instance-1',
+      },
+      timeout: 60000,
+    });
+
+    instance1.on('console', (msg) => {
+      console.log('[Instance1]:', msg.text());
+    });
+
+    window1 = await getFirstWindow(instance1);
+    await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window1.waitForTimeout(2000);
+    console.log('[SloppySync] Instance 1 ready');
+
+    // Wait for initial sync
+    await window1.waitForTimeout(8000);
+
+    // Launch Instance 2
+    console.log('[SloppySync] Launching Instance 2...');
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'sloppy-instance-2',
+      },
+      timeout: 60000,
+    });
+
+    instance2.on('console', (msg) => {
+      console.log('[Instance2]:', msg.text());
+    });
+
+    window2 = await getFirstWindow(instance2);
+    await window2.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window2.waitForTimeout(2000);
+    console.log('[SloppySync] Instance 2 ready');
+
+    // Make several rapid changes in Instance 1
+    console.log('[SloppySync] Making multiple rapid changes in Instance 1...');
+
+    // Change 1: Type some content
+    const editor1 = window1.locator('.ProseMirror');
+    await editor1.click();
+    await window1.keyboard.press('Meta+a');
+    await window1.waitForTimeout(100);
+    await window1.keyboard.press('Delete');
+    await window1.waitForTimeout(200);
+
+    const finalTitle = `Final Title After Sloppy Sync ${Date.now()}`;
+    await window1.keyboard.type(finalTitle);
+    await window1.waitForTimeout(500);
+
+    // Change 2: Add more content on next line
+    await window1.keyboard.press('Enter');
+    await window1.keyboard.type('Second line of content');
+    await window1.waitForTimeout(500);
+
+    // Change 3: Add even more
+    await window1.keyboard.press('Enter');
+    await window1.keyboard.type('Third line should also sync');
+    await window1.waitForTimeout(2000);
+
+    console.log('[SloppySync] Waiting for sloppy sync to complete...');
+    // Give extra time for slow/partial sync to complete
+    await window1.waitForTimeout(30000);
+
+    // THE KEY TEST: Does Instance 2 show the FINAL state?
+    const notesList2 = window2.locator('[data-testid="notes-list"]');
+    const finalNote = notesList2.locator(`li:has-text("${finalTitle}")`);
+    const hasTitle = await finalNote.isVisible();
+    console.log(`[SloppySync] Instance 2 has final title: ${hasTitle}`);
+
+    // Also check if the note is open and has all content
+    await finalNote.click().catch(() => {});
+    await window2.waitForTimeout(1000);
+
+    const editor2 = window2.locator('.ProseMirror');
+    const content2 = await editor2.textContent();
+    console.log(`[SloppySync] Instance 2 content: ${content2}`);
+
+    const hasAllContent =
+      content2?.includes(finalTitle) &&
+      content2?.includes('Second line') &&
+      content2?.includes('Third line');
+    console.log(`[SloppySync] Instance 2 has all content: ${hasAllContent}`);
+
+    // Both checks should pass
+    expect(hasTitle).toBe(true);
+    expect(hasAllContent).toBe(true);
+
+    console.log('[SloppySync] ✅ Sloppy sync test passed!');
+  });
+
+  /**
+   * TEST: Folder move should update note list and badges even with sloppy sync.
+   *
+   * Uses partial sync to simulate real-world conditions (iCloud, Dropbox, etc.).
+   * Verifies that folder moves sync correctly even with slow/partial file syncing.
+   */
+  test('should sync folder move to Instance 2 even with sloppy sync', async () => {
+    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
+    // Start file sync simulator with SLOPPY SYNC
+    console.log('[SloppyFolderMove] Starting file sync simulator with sloppy settings...');
+    const logger = new SimulatorLogger({
+      prefix: '[SloppyFolderMove]',
+    });
+    simulator = new FileSyncSimulator(sd1, sd2, {
+      syncDelayRange: [1500, 3000], // Moderate delay
+      partialSyncProbability: 0.4, // 40% chance of partial sync
+      partialSyncRatio: [0.4, 0.8],
+      logger,
+    });
+    await simulator.start();
+
+    // Launch Instance 1
+    console.log('[SloppyFolderMove] Launching Instance 1...');
+    instance1 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir1}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd1,
+        INSTANCE_ID: 'sloppyfolder-instance-1',
+      },
+      timeout: 60000,
+    });
+
+    instance1.on('console', (msg) => {
+      console.log('[Instance1]:', msg.text());
+    });
+
+    window1 = await getFirstWindow(instance1);
+    await window1.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window1.waitForTimeout(2000);
+    console.log('[SloppyFolderMove] Instance 1 ready');
+
+    // Wait for initial sync
+    await window1.waitForTimeout(8000);
+
+    // Launch Instance 2
+    console.log('[SloppyFolderMove] Launching Instance 2...');
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userDataDir2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'sloppyfolder-instance-2',
+      },
+      timeout: 60000,
+    });
+
+    instance2.on('console', (msg) => {
+      console.log('[Instance2]:', msg.text());
+    });
+
+    window2 = await getFirstWindow(instance2);
+    await window2.waitForSelector('.ProseMirror', { timeout: 20000 });
+    await window2.waitForTimeout(2000);
+    console.log('[SloppyFolderMove] Instance 2 ready');
+
+    // Move welcome note to Work folder in Instance 1
+    console.log('[SloppyFolderMove] Moving note to folder in Instance 1...');
+    const notesList1 = window1.locator('[data-testid="notes-list"]');
+    const welcomeNote1 = notesList1.locator('li:has-text("Welcome to NoteCove")');
+    await welcomeNote1.click({ button: 'right' });
+    await window1.waitForTimeout(500);
+
+    const moveToMenuItem = window1.locator('text=Move to...');
+    await moveToMenuItem.click();
+    await window1.waitForTimeout(500);
+
+    // Wait for dialog to appear
+    const moveDialog = window1.locator('div[role="dialog"]').filter({ hasText: 'Move Note' });
+    await expect(moveDialog).toBeVisible({ timeout: 5000 });
+
+    // Find the Work folder in the dialog and click it
+    // Use label since folders are radio options
+    const folderRadio = moveDialog.locator('label:has-text("Work")').first();
+    await folderRadio.click();
+    await window1.waitForTimeout(500);
+
+    // Click Move button
+    const moveButton = moveDialog.locator('button:has-text("Move")');
+    await moveButton.click();
+    await window1.waitForTimeout(2000);
+
+    // Verify moved in Instance 1 by checking the folder badge updates
+    // Click on Work folder to see the note
+    const workNode1 = window1.getByRole('button', { name: /^Work/ }).first();
+    await workNode1.click();
+    await window1.waitForTimeout(1000);
+
+    // Check that the note is in the folder
+    const noteCount1 = await notesList1.locator('li').count();
+    console.log(`[SloppyFolderMove] Instance 1 notes in Work folder: ${noteCount1}`);
+    expect(noteCount1).toBe(1);
+
+    // Wait for sloppy sync
+    console.log('[SloppyFolderMove] Waiting for sloppy sync...');
+    await window1.waitForTimeout(25000);
+
+    // THE KEY TEST: Does Instance 2 see the note in Work folder?
+    const workNode2 = window2.getByRole('button', { name: /^Work/ }).first();
+
+    // Click on Work folder in Instance 2
+    await workNode2.click();
+    await window2.waitForTimeout(1000);
+
+    // Check that the note is in the folder
+    const notesList2 = window2.locator('[data-testid="notes-list"]');
+    const noteCount2 = await notesList2.locator('li').count();
+    console.log(`[SloppyFolderMove] Instance 2 notes in Work folder: ${noteCount2}`);
+
+    expect(noteCount2).toBe(1);
+
+    console.log('[SloppyFolderMove] ✅ Sloppy folder move sync test passed!');
   });
 });

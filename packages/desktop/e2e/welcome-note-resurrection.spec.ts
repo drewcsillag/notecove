@@ -21,6 +21,14 @@ import { tmpdir } from 'os';
 
 const E2E_LOG_PREFIX = '[E2E Welcome Resurrection]';
 
+/**
+ * Helper to get the first window with a longer timeout.
+ * The default firstWindow() timeout is 30 seconds, which can be flaky on slower machines.
+ */
+async function getFirstWindow(app: ElectronApplication, timeoutMs = 60000): Promise<Page> {
+  return app.waitForEvent('window', { timeout: timeoutMs });
+}
+
 test.describe('Welcome Note Resurrection Bug', () => {
   let electronApp: ElectronApplication;
   let page: Page;
@@ -44,7 +52,7 @@ test.describe('Welcome Note Resurrection Bug', () => {
     });
 
     // Wait for app to be ready
-    page = await electronApp.firstWindow();
+    page = await getFirstWindow(electronApp);
     await page.waitForLoadState('domcontentloaded');
     await page.waitForSelector('[data-testid="app-root"]', { timeout: 10000 });
   });
@@ -64,7 +72,9 @@ test.describe('Welcome Note Resurrection Bug', () => {
     }
   });
 
-  test.skip('should NOT recreate welcome note after permanent deletion and app restart', async () => {
+  // Tests that ActivitySync correctly handles permanently deleted notes by checking
+  // if the note directory exists before attempting to sync (fixes orphaned activity log entries)
+  test('should NOT recreate welcome note after permanent deletion and app restart', async () => {
     console.log(`${E2E_LOG_PREFIX} Step 1: Verify welcome note exists`);
 
     // Wait for notes list to load
@@ -89,6 +99,12 @@ test.describe('Welcome Note Resurrection Bug', () => {
 
     // Click "Delete" in context menu
     await page.locator('[role="menu"]').locator('text=Delete').first().click();
+    await page.waitForTimeout(500);
+
+    // Confirm deletion in the dialog
+    const deleteDialog = page.locator('[role="dialog"]').last();
+    const confirmDeleteButton = deleteDialog.locator('button:has-text("Delete")');
+    await confirmDeleteButton.click();
     await page.waitForTimeout(1000);
 
     console.log(`${E2E_LOG_PREFIX} Step 3: Verify note moved to Recently Deleted`);
@@ -147,9 +163,9 @@ test.describe('Welcome Note Resurrection Bug', () => {
 
     console.log(`${E2E_LOG_PREFIX} Step 6: Close and restart app`);
 
-    // Close the app
+    // Close the app and wait for cleanup
     await electronApp.close();
-    await page.waitForTimeout(1000);
+    await new Promise((resolve) => setTimeout(resolve, 3000)); // Longer wait to ensure cleanup
 
     console.log(`${E2E_LOG_PREFIX} Step 7: Relaunch app with same userData`);
 
@@ -162,12 +178,25 @@ test.describe('Welcome Note Resurrection Bug', () => {
       env: {
         ...process.env,
         NODE_ENV: 'test',
+        INSTANCE_ID: 'welcome-resurrect-relaunch',
       },
+      timeout: 90000, // Longer timeout for second launch
     });
 
-    page = await electronApp.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForSelector('[data-testid="app-root"]', { timeout: 10000 });
+    // Add console listener to debug startup
+    electronApp.on('console', (msg) => {
+      console.log(`${E2E_LOG_PREFIX} [Relaunch Console]:`, msg.text());
+    });
+
+    // Use firstWindow with timeout
+    page = await electronApp.firstWindow({ timeout: 90000 });
+
+    // Capture renderer console logs for debugging
+    page.on('console', (msg) => {
+      console.log(`${E2E_LOG_PREFIX} [Renderer]:`, msg.text());
+    });
+
+    await page.waitForSelector('.ProseMirror', { timeout: 15000 });
     await page.waitForTimeout(1000);
 
     console.log(`${E2E_LOG_PREFIX} Step 8: Verify welcome note has NOT been recreated`);

@@ -9,91 +9,138 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import { resolve } from 'path';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { FileSyncSimulator, SimulatorLogger } from './utils/sync-simulator';
+
+/**
+ * Helper to get the first window with a longer timeout.
+ * The default firstWindow() timeout is 30 seconds, which can be flaky on slower machines.
+ */
+async function getFirstWindow(app: ElectronApplication, timeoutMs = 60000): Promise<Page> {
+  return app.waitForEvent('window', { timeout: timeoutMs });
+}
 
 test.describe('Bug 1: Title becomes Untitled when clicking away during load', () => {
   let instance1: ElectronApplication;
   let instance2: ElectronApplication;
   let window1: Page;
   let window2: Page;
-  let testStorageDir: string;
+  let sd1: string;
+  let sd2: string;
   let userData1: string;
   let userData2: string;
+  let simulator: FileSyncSimulator;
 
-  test.beforeAll(async () => {
-    // Create a shared temporary storage directory for both instances
-    testStorageDir = mkdtempSync(join(tmpdir(), 'notecove-bug1-'));
-    console.log('[Bug 1] Shared storage directory:', testStorageDir);
+  test.beforeEach(async () => {
+    const testId = Date.now().toString();
+
+    // Create separate SD directories for each instance (like cross-machine-sync pattern)
+    sd1 = await mkdtemp(join(tmpdir(), `notecove-bug1-sd1-${testId}-`));
+    sd2 = await mkdtemp(join(tmpdir(), `notecove-bug1-sd2-${testId}-`));
+    userData1 = await mkdtemp(join(tmpdir(), `notecove-bug1-userdata1-${testId}-`));
+    userData2 = await mkdtemp(join(tmpdir(), `notecove-bug1-userdata2-${testId}-`));
+
+    console.log('[Bug 1] Test ID:', testId);
+    console.log('[Bug 1] SD1:', sd1);
+    console.log('[Bug 1] SD2:', sd2);
+  }, 180000);
+
+  test.afterEach(async () => {
+    console.log('[Bug 1] Cleaning up...');
+
+    if (simulator) {
+      await simulator.stop();
+    }
+
+    if (instance1) {
+      await instance1.close();
+    }
+    if (instance2) {
+      await instance2.close();
+    }
+
+    // Clean up temporary directories
+    try {
+      await rm(sd1, { recursive: true, force: true });
+      await rm(sd2, { recursive: true, force: true });
+      await rm(userData1, { recursive: true, force: true });
+      await rm(userData2, { recursive: true, force: true });
+      console.log('[Bug 1] Cleanup complete');
+    } catch (error) {
+      console.error('[Bug 1] Cleanup failed:', error);
+    }
+  });
+
+  test('should not change title to Untitled when clicking away during load', async () => {
+    console.log('[Bug 1] Testing title preservation during quick navigation...');
+
+    // Create simulator with fast delays for this test
+    const logger = new SimulatorLogger({
+      enabled: true,
+      verbose: false,
+      prefix: '[Bug1 Sync]',
+    });
+
+    simulator = new FileSyncSimulator(sd1, sd2, {
+      syncDelayRange: [1000, 2000], // 1-2 second delay
+      partialSyncProbability: 0.0, // No partial sync for this test
+      partialSyncRatio: [0.3, 0.9],
+      logger,
+    });
+
+    // Start the simulator
+    await simulator.start();
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
 
-    // Create separate user data directories for each instance
-    userData1 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance1-'));
-    userData2 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance2-'));
-
-    // Launch first instance
+    // Launch instance 1 connected to SD1
+    console.log('[Bug 1] Launching instance 1 on SD1...');
     instance1 = await electron.launch({
       args: [mainPath, `--user-data-dir=${userData1}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
-        TEST_STORAGE_DIR: testStorageDir,
+        TEST_STORAGE_DIR: sd1,
+        INSTANCE_ID: 'bug1-instance-1',
       },
       timeout: 60000,
     });
 
-    window1 = await instance1.firstWindow();
+    window1 = await getFirstWindow(instance1);
     window1.on('console', (msg) => {
-      console.log('[Window1]:', msg.text());
+      console.log('[Instance1]:', msg.text());
     });
 
-    await window1.waitForSelector('.ProseMirror', { timeout: 10000 });
+    await window1.waitForSelector('.ProseMirror', { timeout: 15000 });
     await window1.waitForTimeout(1000);
 
-    // Launch second instance
-    console.log('[Bug 1] Launching second instance...');
+    // Launch instance 2 connected to SD2
+    console.log('[Bug 1] Launching instance 2 on SD2...');
     instance2 = await electron.launch({
       args: [mainPath, `--user-data-dir=${userData2}`],
       env: {
         ...process.env,
         NODE_ENV: 'test',
-        TEST_STORAGE_DIR: testStorageDir,
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'bug1-instance-2',
       },
       timeout: 60000,
     });
 
-    window2 = await instance2.firstWindow();
+    window2 = await getFirstWindow(instance2);
     window2.on('console', (msg) => {
-      console.log('[Window2]:', msg.text());
+      console.log('[Instance2]:', msg.text());
     });
 
-    await window2.waitForSelector('.ProseMirror', { timeout: 10000 });
-    await window2.waitForTimeout(2000);
-  });
+    await window2.waitForSelector('.ProseMirror', { timeout: 15000 });
 
-  test.afterAll(async () => {
-    console.log('[Bug 1] Closing instances...');
-    await instance1?.close();
-    await instance2?.close();
+    // Wait for initial bidirectional sync to settle
+    await window2.waitForTimeout(8000);
 
-    // Clean up
-    try {
-      rmSync(testStorageDir, { recursive: true, force: true });
-      rmSync(userData1, { recursive: true, force: true });
-      rmSync(userData2, { recursive: true, force: true });
-    } catch (err) {
-      console.error('[Bug 1] Cleanup error:', err);
-    }
-  });
-
-  // FIXME: This test relies on file-based sync between two Electron instances on the same machine.
-  // The ActivitySync file watchers don't reliably detect changes from the other instance,
-  // causing the test to fail waiting for "Second Note" to appear in instance 2.
-  // This needs to be redesigned to use FileSyncSimulator like cross-machine-sync.spec.ts.
-  test.skip('should not change title to Untitled when clicking away during load', async () => {
-    console.log('[Test] Testing title preservation during quick navigation...');
+    console.log('[Bug 1] Both instances ready');
 
     // Create a note with substantial content in instance 1
     // We'll make multiple edits to create multiple CRDT files (slower to load)
@@ -105,7 +152,7 @@ test.describe('Bug 1: Title becomes Untitled when clicking away during load', ()
     await editor1.click();
 
     // Add initial content with a clear title
-    const noteTitle = 'Important Note Title';
+    const noteTitle = `Important Note Title ${Date.now()}`;
     await editor1.fill(`${noteTitle}\nThis is the first line of content.`);
     await window1.waitForTimeout(1000);
 
@@ -117,36 +164,87 @@ test.describe('Bug 1: Title becomes Untitled when clicking away during load', ()
       await window1.waitForTimeout(500);
     }
 
-    // Wait for sync
-    await window1.waitForTimeout(2000);
+    // Wait for sync through FileSyncSimulator
+    console.log('[Bug 1] Waiting for first note to sync to instance 2...');
+    await window1.waitForTimeout(5000);
+
+    // Close and relaunch instance 2 to see synced content (workaround for live editor bug)
+    await instance2.close();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userData2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'bug1-instance-2-reload',
+      },
+      timeout: 60000,
+    });
+
+    window2 = await getFirstWindow(instance2);
+    window2.on('console', (msg) => {
+      console.log('[Instance2 Reload]:', msg.text());
+    });
+
+    await window2.waitForSelector('.ProseMirror', { timeout: 15000 });
+    await window2.waitForTimeout(2000);
 
     // Verify the note appears in instance 2
-    console.log('[Test] Waiting for note to sync to instance 2...');
-    await window2.waitForTimeout(2000);
     const noteButton2 = window2.locator(`text=${noteTitle}`).first();
-    await expect(noteButton2).toBeVisible({ timeout: 5000 });
+    await expect(noteButton2).toBeVisible({ timeout: 10000 });
 
     // Create another note to click to (for switching away)
     await createButton.click();
     await window1.waitForTimeout(500);
     await editor1.click();
-    await editor1.fill('Second Note\nJust a placeholder note');
+    const secondNoteTitle = `Second Note ${Date.now()}`;
+    await editor1.fill(`${secondNoteTitle}\nJust a placeholder note`);
     await window1.waitForTimeout(2000);
 
-    // Wait for the second note to sync to instance 2
-    // Use longer timeout since file-based sync between instances can be slow
-    console.log('[Test] Waiting for second note to sync to instance 2...');
-    const secondNoteSynced = window2.locator('text=Second Note').first();
-    await expect(secondNoteSynced).toBeVisible({ timeout: 30000 });
+    // Wait for the second note to sync
+    console.log('[Bug 1] Waiting for second note to sync to instance 2...');
+    await window1.waitForTimeout(5000);
+
+    // Close and relaunch instance 2 again
+    await instance2.close();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    instance2 = await electron.launch({
+      args: [mainPath, `--user-data-dir=${userData2}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        TEST_STORAGE_DIR: sd2,
+        INSTANCE_ID: 'bug1-instance-2-reload2',
+      },
+      timeout: 60000,
+    });
+
+    window2 = await getFirstWindow(instance2);
+    window2.on('console', (msg) => {
+      console.log('[Instance2 Reload2]:', msg.text());
+    });
+
+    await window2.waitForSelector('.ProseMirror', { timeout: 15000 });
+    await window2.waitForTimeout(2000);
+
+    // Verify both notes are visible
+    const noteButton2AfterReload = window2.locator(`text=${noteTitle}`).first();
+    await expect(noteButton2AfterReload).toBeVisible({ timeout: 10000 });
+
+    const secondNoteSynced = window2.locator(`text=${secondNoteTitle}`).first();
+    await expect(secondNoteSynced).toBeVisible({ timeout: 10000 });
 
     // Now in instance 2, click the first note and immediately click away
-    console.log('[Test] Clicking note in instance 2...');
-    const clickPromise = noteButton2.click();
+    console.log('[Bug 1] Clicking note in instance 2...');
+    const clickPromise = noteButton2AfterReload.click();
 
     // Immediately click the second note (before first note finishes loading)
     // Do this WITHOUT waiting for the first click to complete
-    console.log('[Test] Immediately clicking away...');
-    const secondNoteButton = window2.locator('text=Second Note').first();
+    console.log('[Bug 1] Immediately clicking away...');
+    const secondNoteButton = window2.locator(`text=${secondNoteTitle}`).first();
     const secondClickPromise = secondNoteButton.click();
 
     // Now wait for both to complete
@@ -156,7 +254,7 @@ test.describe('Bug 1: Title becomes Untitled when clicking away during load', ()
     await window2.waitForTimeout(2000);
 
     // Verify the first note's title is still correct (not "Untitled")
-    console.log('[Test] Checking title is preserved...');
+    console.log('[Bug 1] Checking title is preserved...');
     const firstNoteTitle = window2.locator(`text=${noteTitle}`).first();
     await expect(firstNoteTitle).toBeVisible({ timeout: 5000 });
 
@@ -166,301 +264,19 @@ test.describe('Bug 1: Title becomes Untitled when clicking away during load', ()
 
     // Verify "Untitled" doesn't appear for our note
     const untitledNotes = await window2.locator('text=Untitled').count();
-    console.log('[Test] Untitled notes count:', untitledNotes);
+    console.log('[Bug 1] Untitled notes count:', untitledNotes);
     // The welcome note might be untitled, so we just verify our note has the right title
 
-    console.log('[Test] Title preservation test passed!');
-  });
+    console.log('[Bug 1] Title preservation test passed!');
+  }, 180000); // 3 minute timeout
 });
 
-test.describe('Bug 2: Batch move across SDs causes UI issues', () => {
-  let instance1: ElectronApplication;
-  let instance2: ElectronApplication;
-  let window1: Page;
-  let window2: Page;
-  let testStorageDir: string;
-  let userData1: string;
-  let userData2: string;
-
-  test.beforeAll(async () => {
-    // Create a shared temporary storage directory for both instances
-    testStorageDir = mkdtempSync(join(tmpdir(), 'notecove-bug2-'));
-    console.log('[Bug 2] Shared storage directory:', testStorageDir);
-
-    const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
-
-    // Create separate user data directories for each instance
-    userData1 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance1-'));
-    userData2 = mkdtempSync(join(tmpdir(), 'notecove-e2e-instance2-'));
-
-    // Launch first instance
-    instance1 = await electron.launch({
-      args: [mainPath, `--user-data-dir=${userData1}`],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        TEST_STORAGE_DIR: testStorageDir,
-      },
-      timeout: 60000,
-    });
-
-    window1 = await instance1.firstWindow();
-    window1.on('console', (msg) => {
-      console.log('[Window1]:', msg.text());
-    });
-
-    await window1.waitForSelector('.ProseMirror', { timeout: 10000 });
-    await window1.waitForTimeout(1000);
-
-    // Launch second instance
-    console.log('[Bug 2] Launching second instance...');
-    instance2 = await electron.launch({
-      args: [mainPath, `--user-data-dir=${userData2}`],
-      env: {
-        ...process.env,
-        NODE_ENV: 'test',
-        TEST_STORAGE_DIR: testStorageDir,
-      },
-      timeout: 60000,
-    });
-
-    window2 = await instance2.firstWindow();
-    window2.on('console', (msg) => {
-      console.log('[Window2]:', msg.text());
-    });
-
-    await window2.waitForSelector('.ProseMirror', { timeout: 10000 });
-    await window2.waitForTimeout(2000);
-  });
-
-  test.afterAll(async () => {
-    console.log('[Bug 2] Closing instances...');
-    await instance1?.close();
-    await instance2?.close();
-
-    // Clean up
-    try {
-      rmSync(testStorageDir, { recursive: true, force: true });
-      rmSync(userData1, { recursive: true, force: true });
-      rmSync(userData2, { recursive: true, force: true });
-    } catch (err) {
-      console.error('[Bug 2] Cleanup error:', err);
-    }
-  });
-
-  // SKIP: Multi-instance sync timing complexity in E2E test environment
-  // Bug 2 fix is proven to work by these passing tests:
-  //   - e2e/cross-sd-drag-drop.spec.ts:379 - Multi-select batch moves across SDs
-  //   - e2e/cross-sd-drag-drop.spec.ts:268 - Permanent deletion from source SD
-  // Both tests validate UUID preservation, batch moves, and permanent deletion.
-  test.skip('should correctly batch move notes across SDs on both instances', async () => {
-    console.log('[Test] Testing batch move across SDs...');
-
-    // Create a second SD in instance 1
-    const settingsButton1 = window1.locator('[title="Settings"]');
-    await settingsButton1.click();
-    await window1.waitForTimeout(500);
-
-    const addSDButton = window1.locator('button:has-text("Add Directory")');
-    await addSDButton.click();
-    await window1.waitForTimeout(500);
-
-    const dialog = window1.locator('div[role="dialog"]');
-    await dialog.locator('input[type="text"]').first().fill('Target SD');
-    const testPath2 = join(tmpdir(), 'notecove-target-sd-' + Date.now());
-    await dialog.locator('input[type="text"]').last().fill(testPath2);
-    await dialog.locator('button:has-text("Add")').last().click();
-    await window1.waitForTimeout(1000);
-    await window1.locator('button:has-text("Close")').click();
-    await window1.waitForTimeout(1000);
-
-    // Wait for sync to instance 2
-    await window2.waitForTimeout(2000);
-
-    // Get SD IDs
-    const sds = await window1.evaluate(async () => {
-      return await window.electronAPI.sd.list();
-    });
-    const sourceSdId = sds[0].id;
-    const targetSdId = sds[1].id;
-
-    console.log('[Test] Source SD:', sourceSdId, 'Target SD:', targetSdId);
-
-    // Create 3 notes with distinct titles in instance 1
-    const createButton = window1.getByTitle('Create note');
-    const noteTitles = ['Batch Note One', 'Batch Note Two', 'Batch Note Three'];
-    const editor1 = window1.locator('.ProseMirror');
-
-    for (let i = 0; i < noteTitles.length; i++) {
-      console.log(`[Test] Creating note ${i + 1}: ${noteTitles[i]}`);
-      await createButton.click();
-      await window1.waitForTimeout(1000);
-
-      // Use keyboard.type() instead of fill() for more reliable input
-      await editor1.click();
-      await window1.keyboard.type(`${noteTitles[i]}\nContent for ${noteTitles[i]}`);
-
-      // Wait for title extraction and save
-      await window1.waitForTimeout(2000);
-
-      // Verify note appears in list before creating next one
-      await expect(window1.locator(`text=${noteTitles[i]}`).first()).toBeVisible({
-        timeout: 5000,
-      });
-      console.log(`[Test] Note ${i + 1} visible in list`);
-
-      // Wait longer to ensure database save completes
-      await window1.waitForTimeout(1000);
-    }
-
-    // Get the note IDs after all notes are created
-    // Wait longer to ensure all async saves have completed
-    await window1.waitForTimeout(3000);
-    const createdNoteIds = await window1.evaluate(async (sdId) => {
-      const notes = await window.electronAPI.note.list(sdId);
-      const activeNotes = notes.filter((n: any) => !n.deleted);
-      // Get the 3 most recently created notes
-      return activeNotes
-        .sort((a: any, b: any) => b.created - a.created)
-        .slice(0, 3)
-        .map((n: any) => n.id);
-    }, sourceSdId);
-
-    console.log('[Test] Created note IDs:', createdNoteIds);
-    expect(createdNoteIds.length).toBe(3);
-
-    // Wait for sync
-    await window1.waitForTimeout(2000);
-    await window2.waitForTimeout(2000);
-
-    // Verify notes appear in both instances
-    for (const title of noteTitles) {
-      await expect(window1.locator(`text=${title}`).first()).toBeVisible({ timeout: 5000 });
-      await expect(window2.locator(`text=${title}`).first()).toBeVisible({ timeout: 5000 });
-    }
-
-    const noteIdsBefore = createdNoteIds;
-    console.log('[Test] Note IDs before move:', noteIdsBefore);
-
-    // Click on folder tree to close any menus and clear focus
-    const allNotesFolder = window1.getByTestId(`folder-tree-node-all-notes:${sourceSdId}`);
-    await allNotesFolder.click();
-    await window1.waitForTimeout(500);
-
-    // Select all three notes using multi-select (Ctrl+Click)
-    // Use .MuiListItemButton-root to get the actual clickable button element
-    const notesList1 = window1.locator('[data-testid="notes-list"]');
-    const noteButtons = notesList1.locator('.MuiListItemButton-root');
-
-    // Select all three notes using multi-select
-    // Use Meta (Cmd on Mac) like the passing cross-sd-drag-drop multi-select test
-    await noteButtons.nth(0).click({ modifiers: ['Meta'] });
-    await window1.waitForTimeout(200);
-    await noteButtons.nth(1).click({ modifiers: ['Meta'] });
-    await window1.waitForTimeout(200);
-    await noteButtons.nth(2).click({ modifiers: ['Meta'] });
-    await window1.waitForTimeout(500);
-
-    // Verify multi-select badge appears
-    await expect(window1.locator('text=3 notes selected')).toBeVisible({ timeout: 3000 });
-
-    const note1 = noteButtons.nth(0);
-
-    // Close any open menus before dragging
-    await window1.keyboard.press('Escape');
-    await window1.waitForTimeout(500);
-
-    // Ensure target SD is expanded and visible
-    const targetSDTreeNode = window1.getByTestId(`folder-tree-node-sd:${targetSdId}`);
-    await targetSDTreeNode.scrollIntoViewIfNeeded();
-    await targetSDTreeNode.click(); // Expand if collapsed
-    await window1.waitForTimeout(500);
-
-    // Drag selected notes to target SD's "All Notes"
-    const targetSDNode = window1.getByTestId(`folder-tree-node-all-notes:${targetSdId}`);
-    await targetSDNode.scrollIntoViewIfNeeded(); // Ensure it's visible
-    await note1.dragTo(targetSDNode);
-    await window1.waitForTimeout(500);
-
-    // Confirm the cross-SD move dialog
-    const confirmButton = window1.locator('button:has-text("Move")');
-    await confirmButton.click();
-    await window1.waitForTimeout(2000);
-
-    // Verify notes moved in instance 1
-    // Switch to target SD
-    await targetSDNode.click();
-    await window1.waitForTimeout(1000);
-
-    console.log('[Test] Verifying notes in target SD on instance 1...');
-    for (const title of noteTitles) {
-      await expect(window1.locator(`text=${title}`).first()).toBeVisible({ timeout: 5000 });
-    }
-
-    // Verify notes no longer in source SD on instance 1
-    const sourceSDNode = window1.getByTestId(`folder-tree-node-all-notes:${sourceSdId}`);
-    await sourceSDNode.click();
-    await window1.waitForTimeout(1000);
-
-    console.log('[Test] Verifying notes removed from source SD on instance 1...');
-    // Check notes list specifically, not the entire page (which might have editor content)
-    const sourceNotesList = window1.locator('[data-testid="notes-list"]');
-    for (const title of noteTitles) {
-      await expect(sourceNotesList.locator(`text=${title}`).first()).not.toBeVisible({
-        timeout: 3000,
-      });
-    }
-
-    // Wait for sync to instance 2
-    await window2.waitForTimeout(3000);
-
-    // Verify notes in target SD on instance 2
-    const targetSDNode2 = window2.getByTestId(`folder-tree-node-all-notes:${targetSdId}`);
-    await targetSDNode2.click();
-    await window2.waitForTimeout(1000);
-
-    console.log('[Test] Verifying notes in target SD on instance 2...');
-    for (const title of noteTitles) {
-      await expect(window2.locator(`text=${title}`).first()).toBeVisible({ timeout: 5000 });
-    }
-
-    // Verify notes no longer in source SD on instance 2
-    const sourceSDNode2 = window2.getByTestId(`folder-tree-node-all-notes:${sourceSdId}`);
-    await sourceSDNode2.click();
-    await window2.waitForTimeout(1000);
-
-    console.log('[Test] Verifying notes removed from source SD on instance 2...');
-    // Check notes list specifically, not the entire page
-    const sourceNotesList2 = window2.locator('[data-testid="notes-list"]');
-    for (const title of noteTitles) {
-      await expect(sourceNotesList2.locator(`text=${title}`).first()).not.toBeVisible({
-        timeout: 3000,
-      });
-    }
-
-    // Verify UUIDs are preserved (same IDs before and after move)
-    const noteIdsAfter = await window1.evaluate(
-      async (args) => {
-        const notes = await window.electronAPI.note.list(args.targetSdId);
-        const targetNotes = notes.filter((n: any) => !n.deleted);
-        // Get the 3 most recently created notes in target SD
-        return targetNotes
-          .sort((a: any, b: any) => b.created - a.created)
-          .slice(0, 3)
-          .map((n: any) => n.id);
-      },
-      { targetSdId }
-    );
-
-    console.log('[Test] Note IDs after move:', noteIdsAfter);
-    console.log('[Test] Note IDs before move:', noteIdsBefore);
-
-    // Check that the original IDs are preserved in the target SD
-    const preservedIds = noteIdsBefore.filter((id: string) => noteIdsAfter.includes(id));
-    console.log('[Test] Preserved IDs:', preservedIds);
-    console.log('[Test] Expected all 3 IDs to be preserved, got:', preservedIds.length);
-    expect(preservedIds.length).toBe(3);
-
-    console.log('[Test] Batch cross-SD move test passed!');
-  });
-});
+/**
+ * Bug 2: Batch move across SDs causes UI issues
+ *
+ * REMOVED: This test was skipped and redundant.
+ * Bug 2 fix is proven to work by these passing tests:
+ *   - e2e/cross-sd-drag-drop.spec.ts:379 - Multi-select batch moves across SDs
+ *   - e2e/cross-sd-drag-drop.spec.ts:268 - Permanent deletion from source SD
+ * Both tests validate UUID preservation, batch moves, and permanent deletion.
+ */

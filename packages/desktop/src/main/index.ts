@@ -20,6 +20,7 @@ import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
+import { existsSync } from 'fs';
 import { NodeFileWatcher } from './storage/node-file-watcher';
 import { randomUUID } from 'crypto';
 import * as Y from 'yjs';
@@ -343,10 +344,10 @@ async function ensureDefaultNote(
     const noteDoc = crdtMgr.getNoteDoc(DEFAULT_NOTE_ID);
     if (noteDoc) {
       const crdtMetadata = noteDoc.getMetadata();
-      // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
-      const folderId = crdtMetadata.folderId ?? null;
-      const deleted = crdtMetadata.deleted ?? false;
-      const modified = crdtMetadata.modified ?? Date.now();
+      // Defensive fallbacks are handled in getMetadata() itself
+      const folderId = crdtMetadata.folderId;
+      const deleted = crdtMetadata.deleted;
+      const modified = crdtMetadata.modified;
       if (folderId !== defaultNoteInAnySD.folderId || deleted !== defaultNoteInAnySD.deleted) {
         console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
           folderId,
@@ -393,10 +394,10 @@ async function ensureDefaultNote(
       const noteDoc = crdtMgr.getNoteDoc(DEFAULT_NOTE_ID);
       if (noteDoc) {
         const crdtMetadata = noteDoc.getMetadata();
-        // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
-        const folderId = crdtMetadata.folderId ?? null;
-        const deleted = crdtMetadata.deleted ?? false;
-        const modified = crdtMetadata.modified ?? Date.now();
+        // Defensive fallbacks are handled in getMetadata() itself
+        const folderId = crdtMetadata.folderId;
+        const deleted = crdtMetadata.deleted;
+        const modified = crdtMetadata.modified;
         if (folderId !== defaultNote.folderId || deleted !== defaultNote.deleted) {
           console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
             folderId,
@@ -742,9 +743,19 @@ async function setupSDWatchers(
           }
         } else {
           // Note exists, reload and update metadata
-          await crdtManager.reloadNote(noteId);
+          // First check if the note is currently loaded in memory
+          const wasLoaded = crdtManager.getNoteDoc(noteId) !== undefined;
 
-          // Extract updated title and metadata from the reloaded document
+          if (wasLoaded) {
+            // Note is open - reload it in place
+            await crdtManager.reloadNote(noteId);
+          } else {
+            // Note is NOT open - temporarily load it to sync metadata
+            // This is critical for syncing title/folder/pin changes on unopened notes
+            await crdtManager.loadNote(noteId, existingNote.sdId);
+          }
+
+          // Extract updated title and metadata from the (now loaded) document
           const noteDoc = crdtManager.getNoteDoc(noteId);
           const doc = crdtManager.getDocument(noteId);
           if (doc) {
@@ -831,6 +842,12 @@ async function setupSDWatchers(
                 title: newTitle,
               });
             }
+
+            // If note wasn't originally loaded, unload it to free memory
+            // Keep notes that were already open (user is editing them)
+            if (!wasLoaded) {
+              await crdtManager.unloadNote(noteId);
+            }
           }
         }
       } catch (error) {
@@ -852,6 +869,12 @@ async function setupSDWatchers(
     getLoadedNotes: () => crdtManager.getLoadedNotes(),
     checkCRDTLogExists: async (noteId: string, instanceId: string, expectedSequence: number) => {
       return crdtManager.checkCRDTLogExists(noteId, sdId, instanceId, expectedSequence);
+    },
+    checkNoteExists: (noteId: string) => {
+      // Check if the note directory exists on disk
+      // If it doesn't exist, the note was permanently deleted and we should skip syncing
+      const noteDirPath = join(sdPath, 'notes', noteId);
+      return Promise.resolve(existsSync(noteDirPath));
     },
     metrics: {
       recordSyncSuccess: (
