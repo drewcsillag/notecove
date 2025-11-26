@@ -380,6 +380,8 @@ export const FolderTree: FC<FolderTreeProps> = ({
     const unsubRestored = window.electronAPI.note.onRestored(refreshCounts);
     const unsubPermanentDeleted = window.electronAPI.note.onPermanentDeleted(refreshCounts);
     const unsubMoved = window.electronAPI.note.onMoved(refreshCounts);
+    // Also refresh when notes are synced from other instances (may include folder changes)
+    const unsubExternalUpdate = window.electronAPI.note.onExternalUpdate(refreshCounts);
 
     return () => {
       unsubCreated();
@@ -387,6 +389,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
       unsubRestored();
       unsubPermanentDeleted();
       unsubMoved();
+      unsubExternalUpdate();
     };
   }, []);
 

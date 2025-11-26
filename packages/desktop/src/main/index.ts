@@ -343,19 +343,20 @@ async function ensureDefaultNote(
     const noteDoc = crdtMgr.getNoteDoc(DEFAULT_NOTE_ID);
     if (noteDoc) {
       const crdtMetadata = noteDoc.getMetadata();
-      if (
-        crdtMetadata.folderId !== defaultNoteInAnySD.folderId ||
-        crdtMetadata.deleted !== defaultNoteInAnySD.deleted
-      ) {
+      // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
+      const folderId = crdtMetadata.folderId ?? null;
+      const deleted = crdtMetadata.deleted ?? false;
+      const modified = crdtMetadata.modified ?? Date.now();
+      if (folderId !== defaultNoteInAnySD.folderId || deleted !== defaultNoteInAnySD.deleted) {
         console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
-          folderId: crdtMetadata.folderId,
-          deleted: crdtMetadata.deleted,
+          folderId,
+          deleted,
         });
         await db.upsertNote({
           ...defaultNoteInAnySD,
-          folderId: crdtMetadata.folderId,
-          deleted: crdtMetadata.deleted,
-          modified: crdtMetadata.modified,
+          folderId,
+          deleted,
+          modified,
         });
       }
     }
@@ -392,19 +393,20 @@ async function ensureDefaultNote(
       const noteDoc = crdtMgr.getNoteDoc(DEFAULT_NOTE_ID);
       if (noteDoc) {
         const crdtMetadata = noteDoc.getMetadata();
-        if (
-          crdtMetadata.folderId !== defaultNote.folderId ||
-          crdtMetadata.deleted !== defaultNote.deleted
-        ) {
+        // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
+        const folderId = crdtMetadata.folderId ?? null;
+        const deleted = crdtMetadata.deleted ?? false;
+        const modified = crdtMetadata.modified ?? Date.now();
+        if (folderId !== defaultNote.folderId || deleted !== defaultNote.deleted) {
           console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
-            folderId: crdtMetadata.folderId,
-            deleted: crdtMetadata.deleted,
+            folderId,
+            deleted,
           });
           await db.upsertNote({
             ...defaultNote,
-            folderId: crdtMetadata.folderId,
-            deleted: crdtMetadata.deleted,
-            modified: crdtMetadata.modified,
+            folderId,
+            deleted,
+            modified,
           });
         }
       }
@@ -718,7 +720,7 @@ async function setupSDWatchers(
             created: crdtMetadata?.created ?? Date.now(),
             modified: crdtMetadata?.modified ?? Date.now(),
             deleted: crdtMetadata?.deleted ?? false,
-            pinned: false,
+            pinned: crdtMetadata?.pinned ?? false,
             contentPreview,
             contentText,
           });
@@ -817,7 +819,7 @@ async function setupSDWatchers(
               created: existingNote.created,
               modified: crdtMetadata?.modified ?? Date.now(),
               deleted: crdtMetadata?.deleted ?? false,
-              pinned: false,
+              pinned: crdtMetadata?.pinned ?? existingNote.pinned,
               contentPreview,
               contentText,
             });
@@ -1722,7 +1724,7 @@ void app.whenReady().then(async () => {
                   created: crdtMetadata?.created ?? Date.now(),
                   modified: crdtMetadata?.modified ?? Date.now(),
                   deleted: crdtMetadata?.deleted ?? false,
-                  pinned: false,
+                  pinned: crdtMetadata?.pinned ?? false,
                   contentPreview,
                   contentText,
                 });

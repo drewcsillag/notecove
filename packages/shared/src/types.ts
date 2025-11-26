@@ -17,6 +17,7 @@ export interface NoteMetadata {
   sdId: UUID; // Storage Directory ID
   folderId: UUID | null; // null for orphan notes
   deleted: boolean;
+  pinned: boolean;
 }
 
 /**

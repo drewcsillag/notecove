@@ -188,4 +188,92 @@ describe('NoteDoc', () => {
       doc2.destroy();
     });
   });
+
+  describe('Y.Doc update events (cross-instance sync behavior)', () => {
+    it('should emit update event when initializeNote is called', () => {
+      const noteDoc = new NoteDoc(noteId);
+      const updates: Uint8Array[] = [];
+
+      // Set up listener BEFORE calling initializeNote
+      noteDoc.doc.on('update', (update: Uint8Array) => {
+        updates.push(update);
+      });
+
+      // This simulates what happens in handleCreateNote:
+      // 1. loadNote() sets up the listener
+      // 2. initializeNote() is called
+      noteDoc.initializeNote(mockMetadata);
+
+      // The update event should have fired synchronously
+      expect(updates.length).toBe(1);
+      expect(updates[0]).toBeInstanceOf(Uint8Array);
+      expect(updates[0].length).toBeGreaterThan(0);
+
+      noteDoc.destroy();
+    });
+
+    it('should emit update event when updateMetadata is called', () => {
+      const noteDoc = new NoteDoc(noteId);
+      noteDoc.initializeNote(mockMetadata);
+
+      const updates: Uint8Array[] = [];
+      noteDoc.doc.on('update', (update: Uint8Array) => {
+        updates.push(update);
+      });
+
+      noteDoc.updateMetadata({ folderId: 'new-folder' as UUID });
+
+      expect(updates.length).toBe(1);
+      expect(updates[0]).toBeInstanceOf(Uint8Array);
+
+      noteDoc.destroy();
+    });
+
+    it('should emit update event when markDeleted is called', () => {
+      const noteDoc = new NoteDoc(noteId);
+      noteDoc.initializeNote(mockMetadata);
+
+      const updates: Uint8Array[] = [];
+      noteDoc.doc.on('update', (update: Uint8Array) => {
+        updates.push(update);
+      });
+
+      noteDoc.markDeleted();
+
+      expect(updates.length).toBe(1);
+      expect(updates[0]).toBeInstanceOf(Uint8Array);
+
+      noteDoc.destroy();
+    });
+
+    it('should allow another NoteDoc to sync from update event', () => {
+      const noteDoc1 = new NoteDoc(noteId);
+      const noteDoc2 = new NoteDoc(noteId);
+
+      // Set up listener to capture update
+      let capturedUpdate: Uint8Array | null = null;
+      noteDoc1.doc.on('update', (update: Uint8Array) => {
+        capturedUpdate = update;
+      });
+
+      // Initialize note (simulates note creation)
+      noteDoc1.initializeNote(mockMetadata);
+
+      // The update should have been captured
+      expect(capturedUpdate).not.toBeNull();
+
+      // Apply to second doc (simulates cross-instance sync)
+      noteDoc2.applyUpdate(capturedUpdate!);
+
+      // Second doc should have the metadata
+      const meta2 = noteDoc2.getMetadata();
+      expect(meta2.id).toBe(noteId);
+      expect(meta2.created).toBe(mockMetadata.created);
+      expect(meta2.folderId).toBe(mockMetadata.folderId);
+      expect(meta2.deleted).toBe(false);
+
+      noteDoc1.destroy();
+      noteDoc2.destroy();
+    });
+  });
 });

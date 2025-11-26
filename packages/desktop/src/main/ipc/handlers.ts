@@ -259,12 +259,13 @@ export class IPCHandlers {
 
       // Only update if note exists in cache and CRDT has initialized metadata
       if (note && crdtMetadata.id) {
+        // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
         await this.database.upsertNote({
           ...note,
-          folderId: crdtMetadata.folderId,
-          created: crdtMetadata.created,
-          modified: crdtMetadata.modified,
-          deleted: crdtMetadata.deleted,
+          folderId: crdtMetadata.folderId ?? null,
+          created: crdtMetadata.created ?? note.created,
+          modified: crdtMetadata.modified ?? Date.now(),
+          deleted: crdtMetadata.deleted ?? false,
         });
       }
     }
@@ -356,35 +357,42 @@ export class IPCHandlers {
         const cachedNote = await this.database.getNote(noteId);
 
         if (cachedNote) {
+          // Use defensive fallbacks for metadata fields that may be undefined during cross-instance sync
+          const deleted = crdtMetadata.deleted ?? false;
+          const folderId = crdtMetadata.folderId ?? null;
+          // For sdId, prefer cached value if CRDT metadata is undefined (critical field)
+          const sdId = crdtMetadata.sdId ?? cachedNote.sdId;
+          const modified = crdtMetadata.modified ?? Date.now();
+
           // Check if metadata has changed and needs to be synced to SQLite
           const metadataChanged =
-            cachedNote.deleted !== crdtMetadata.deleted ||
-            cachedNote.folderId !== crdtMetadata.folderId ||
-            cachedNote.sdId !== crdtMetadata.sdId;
+            cachedNote.deleted !== deleted ||
+            cachedNote.folderId !== folderId ||
+            cachedNote.sdId !== sdId;
 
           if (metadataChanged) {
             console.log(`[IPC] Syncing CRDT metadata to SQLite cache for note ${noteId}:`, {
-              deleted: crdtMetadata.deleted,
-              folderId: crdtMetadata.folderId,
-              sdId: crdtMetadata.sdId,
+              deleted,
+              folderId,
+              sdId,
             });
 
             // Update SQLite cache with CRDT metadata
             await this.database.upsertNote({
               ...cachedNote,
-              deleted: crdtMetadata.deleted,
-              folderId: crdtMetadata.folderId,
-              sdId: crdtMetadata.sdId,
-              modified: crdtMetadata.modified,
+              deleted,
+              folderId,
+              sdId,
+              modified,
             });
 
             // If note was deleted, broadcast delete event
-            if (crdtMetadata.deleted && !cachedNote.deleted) {
+            if (deleted && !cachedNote.deleted) {
               console.log(`[IPC] Broadcasting note:deleted event for synced deletion of ${noteId}`);
               this.broadcastToAll('note:deleted', noteId);
             }
             // If note was restored, broadcast restore event
-            else if (!crdtMetadata.deleted && cachedNote.deleted) {
+            else if (!deleted && cachedNote.deleted) {
               console.log(
                 `[IPC] Broadcasting note:restored event for synced restoration of ${noteId}`
               );
@@ -537,6 +545,7 @@ export class IPCHandlers {
         sdId: sdId,
         folderId: folderId,
         deleted: false,
+        pinned: false,
       });
     } else {
       console.error(`[Note] Failed to get NoteDoc for ${noteId} after loading`);
@@ -793,6 +802,7 @@ export class IPCHandlers {
         sdId: sourceNote.sdId,
         folderId: sourceNote.folderId,
         deleted: false,
+        pinned: false,
       });
     }
 
@@ -845,15 +855,37 @@ export class IPCHandlers {
       throw new Error(`Note ${noteId} not found`);
     }
 
-    // Toggle pinned status in SQLite cache only (not in CRDT)
+    const newPinned = !note.pinned;
+    const now = Date.now();
+
+    // Update CRDT metadata with new pinned status (for cross-instance sync)
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (noteDoc) {
+      noteDoc.updateMetadata({
+        pinned: newPinned,
+        modified: now,
+      });
+    } else {
+      // Note not loaded in memory, load it first with its sdId
+      await this.crdtManager.loadNote(noteId, note.sdId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (loadedNoteDoc) {
+        loadedNoteDoc.updateMetadata({
+          pinned: newPinned,
+          modified: now,
+        });
+      }
+    }
+
+    // Update SQLite cache
     await this.database.upsertNote({
       ...note,
-      pinned: !note.pinned,
-      modified: Date.now(),
+      pinned: newPinned,
+      modified: now,
     });
 
     // Broadcast pin event to all windows
-    this.broadcastToAll('note:pinned', { noteId, pinned: !note.pinned });
+    this.broadcastToAll('note:pinned', { noteId, pinned: newPinned });
   }
 
   private async handleMoveNote(

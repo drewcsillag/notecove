@@ -28,6 +28,7 @@ export class NoteDoc {
       this.metadata.set('sdId', meta.sdId);
       this.metadata.set('folderId', meta.folderId);
       this.metadata.set('deleted', meta.deleted);
+      this.metadata.set('pinned', meta.pinned);
 
       // Initialize empty ProseMirror structure
       // This ensures iOS can extract a title (even if empty) instead of "Untitled"
@@ -40,16 +41,41 @@ export class NoteDoc {
 
   /**
    * Get current note metadata
+   *
+   * Provides defensive fallbacks for fields that may be undefined when loading
+   * notes from another instance's CRDT (cross-machine sync scenario).
+   * This prevents NOT NULL constraint failures in SQLite.
+   *
+   * Note: id and sdId do not have fallbacks as they are critical identifiers
+   * that must be set during note initialization.
    */
   getMetadata(): NoteMetadata {
+    const now = Date.now();
     return {
       id: this.metadata.get('id') as UUID,
-      created: this.metadata.get('created') as number,
-      modified: this.metadata.get('modified') as number,
+      // Fallback to current time if created/modified are undefined (partial sync)
+      created: (this.metadata.get('created') as number | undefined) ?? now,
+      modified: (this.metadata.get('modified') as number | undefined) ?? now,
       sdId: this.metadata.get('sdId') as UUID,
       folderId: (this.metadata.get('folderId') as UUID | null) ?? null,
-      deleted: this.metadata.get('deleted') as boolean,
+      // Fallback to false if deleted is undefined (common during cross-instance sync)
+      deleted: (this.metadata.get('deleted') as boolean | undefined) ?? false,
+      // Fallback to false if pinned is undefined (common during cross-instance sync)
+      pinned: (this.metadata.get('pinned') as boolean | undefined) ?? false,
     };
+  }
+
+  /**
+   * Check if this note has been initialized with metadata.
+   * Returns false if any required metadata fields are missing.
+   */
+  hasMetadata(): boolean {
+    return (
+      this.metadata.has('id') &&
+      this.metadata.has('sdId') &&
+      this.metadata.has('created') &&
+      this.metadata.has('modified')
+    );
   }
 
   /**
@@ -68,6 +94,9 @@ export class NoteDoc {
       }
       if (updates.deleted !== undefined) {
         this.metadata.set('deleted', updates.deleted);
+      }
+      if (updates.pinned !== undefined) {
+        this.metadata.set('pinned', updates.pinned);
       }
     });
   }
