@@ -538,6 +538,25 @@ Both valid CRDT results, neither may be desired
 - WebRTC data channels
 - Faster than cloud sync
 
+## Formal Verification
+
+NoteCove's sync system has been formally verified using TLA+ to ensure correctness:
+
+**Properties verified:**
+
+- Convergence after synchronization
+- No lost updates (vector clock monotonicity)
+- Crash recovery correctness
+- Activity log compaction safety
+
+**Model checker results:**
+
+- 538,557 states explored
+- 0 errors found
+- All safety and liveness properties pass
+
+[Learn more about the TLA+ specification →](/architecture/tla-spec)
+
 ## Resources
 
 ### Documentation
@@ -556,3 +575,4 @@ Both valid CRDT results, neither may be desired
 - [Learn about storage layer](/architecture/storage)
 - [Understand offline sync](/features/offline-sync)
 - [Explore tech stack](/architecture/tech-stack)
+- [View TLA+ formal specification](/architecture/tla-spec)

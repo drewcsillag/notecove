@@ -428,3 +428,4 @@ Support more devices:
 - [Learn about CRDT synchronization](/architecture/crdt-sync)
 - [Understand storage layer](/architecture/storage)
 - [Explore tech stack](/architecture/tech-stack)
+- [View TLA+ formal specification](/architecture/tla-spec)
