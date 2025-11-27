@@ -7,6 +7,8 @@
 export interface CliArgs {
   /** Profile name to use (skips picker if provided) */
   profileName: string | null;
+  /** Profile ID to use directly (skips picker, used for Switch Profile restart) */
+  profileId: string | null;
   /** Skip profile picker entirely (use default or first profile) */
   skipPicker: boolean;
   /** Dump profiles.json to console for debugging */
@@ -24,6 +26,7 @@ export interface CliArgs {
 export function parseCliArgs(argv: string[]): CliArgs {
   const result: CliArgs = {
     profileName: null,
+    profileId: null,
     skipPicker: false,
     debugProfiles: false,
     resetPicker: false,
@@ -35,6 +38,13 @@ export function parseCliArgs(argv: string[]): CliArgs {
       const name = arg.slice('--profile='.length);
       // Only set if non-empty
       result.profileName = name || null;
+    }
+
+    // Parse --profile-id=<id> (used for Switch Profile restart)
+    if (arg.startsWith('--profile-id=')) {
+      const id = arg.slice('--profile-id='.length);
+      // Only set if non-empty
+      result.profileId = id || null;
     }
 
     // Parse --skip-picker

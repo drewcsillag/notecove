@@ -37,6 +37,7 @@ let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
 let configManager: ConfigManager | null = null;
 let selectedProfileId: string | null = null;
+let selectedProfileName: string | null = null;
 let ipcHandlers: IPCHandlers | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
 let storageManager: AppendLogManager | null = null;
@@ -150,6 +151,16 @@ async function reindexTagsForNotes(
   console.log(`[TagSync] Completed tag reindexing for ${noteIds.size} notes`);
 }
 
+/**
+ * Get the window title based on current profile
+ */
+function getWindowTitle(): string {
+  const isDevBuild = !app.isPackaged;
+  const devPrefix = isDevBuild ? '[DEV] ' : '';
+  const profileSuffix = selectedProfileName ? ` - ${selectedProfileName}` : '';
+  return `${devPrefix}NoteCove${profileSuffix}`;
+}
+
 function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
   // Create the browser window
   const newWindow = new BrowserWindow({
@@ -157,6 +168,7 @@ function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
     height: 800,
     show: false,
     autoHideMenuBar: false,
+    title: getWindowTitle(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -1305,6 +1317,27 @@ function createMenu(): void {
           },
         },
         { type: 'separator' },
+        {
+          label: 'Switch Profile...',
+          click: async () => {
+            // Show profile picker and restart with new profile if selected
+            const appDataDir = app.getPath('userData');
+            const isDevBuild = !app.isPackaged;
+
+            const result = await showProfilePicker({
+              isDevBuild,
+              appDataDir,
+            });
+
+            if (result.profileId && result.profileId !== selectedProfileId) {
+              // User selected a different profile - restart the app with it
+              console.log(`[Profile] Switching to profile: ${result.profileId}`);
+              app.relaunch({ args: process.argv.slice(1).concat([`--profile-id=${result.profileId}`]) });
+              app.exit(0);
+            }
+          },
+        },
+        { type: 'separator' },
         // Settings on Windows/Linux only (on macOS it's in App menu)
         ...(!isMac
           ? [
@@ -1567,8 +1600,38 @@ void app.whenReady().then(async () => {
         await profileStorage.clearSkipPicker();
       }
 
+      // Handle --profile-id=<id> CLI argument (used by Switch Profile restart)
+      if (cliArgs.profileId) {
+        console.log(`[Profile] CLI: Using profile ID "${cliArgs.profileId}"...`);
+        const config = await profileStorage.loadProfiles();
+        const profile = config.profiles.find((p) => p.id === cliArgs.profileId);
+
+        if (!profile) {
+          // Profile not found - this shouldn't happen but handle gracefully
+          console.error(`[Profile] CLI: Profile ID "${cliArgs.profileId}" not found, showing picker`);
+          // Fall through to show picker
+        } else {
+          // Check dev/prod compatibility
+          if (!isDevBuild && profile.isDev) {
+            const { dialog } = await import('electron');
+            dialog.showErrorBox(
+              'Cannot Access Development Profile',
+              `The profile "${profile.name}" is a development profile and cannot be accessed from a production build.`
+            );
+            app.quit();
+            return;
+          }
+
+          selectedProfileId = profile.id;
+          console.log(`[Profile] CLI: Using profile "${profile.name}" (${profile.id})`);
+
+          // Update lastUsed
+          await profileStorage.updateLastUsed(profile.id);
+        }
+      }
+
       // Handle --profile=<name> CLI argument
-      if (cliArgs.profileName) {
+      if (!selectedProfileId && cliArgs.profileName) {
         console.log(`[Profile] CLI: Looking for profile "${cliArgs.profileName}"...`);
         const config = await profileStorage.loadProfiles();
         const profile = config.profiles.find((p) => p.name === cliArgs.profileName);
@@ -1600,8 +1663,10 @@ void app.whenReady().then(async () => {
 
         // Update lastUsed
         await profileStorage.updateLastUsed(profile.id);
-      } else if (cliArgs.skipPicker) {
-        // --skip-picker: use default or first available profile
+      }
+
+      // --skip-picker: use default or first available profile
+      if (!selectedProfileId && cliArgs.skipPicker) {
         console.log('[Profile] CLI: Skipping picker, using default profile...');
         const config = await profileStorage.loadProfiles();
 
@@ -1642,8 +1707,10 @@ void app.whenReady().then(async () => {
         }
 
         console.log(`[Profile] CLI: Using profile: ${selectedProfileId}`);
-      } else {
-        // Show profile picker normally
+      }
+
+      // Show profile picker if no profile selected yet
+      if (!selectedProfileId) {
         console.log('[Profile] Showing profile picker...');
         const result = await showProfilePicker({
           isDevBuild,
@@ -1659,6 +1726,13 @@ void app.whenReady().then(async () => {
 
         selectedProfileId = result.profileId;
         console.log(`[Profile] Selected profile: ${selectedProfileId}`);
+      }
+
+      // Get profile name for window title
+      if (selectedProfileId) {
+        const config = await profileStorage.loadProfiles();
+        const profile = config.profiles.find((p) => p.id === selectedProfileId);
+        selectedProfileName = profile?.name ?? null;
       }
     } else {
       console.log('[Profile] Test mode - skipping profile picker');

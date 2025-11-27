@@ -12,10 +12,16 @@ describe('CLI Parser', () => {
       const result = parseCliArgs([]);
       expect(result).toEqual({
         profileName: null,
+        profileId: null,
         skipPicker: false,
         debugProfiles: false,
         resetPicker: false,
       });
+    });
+
+    it('parses --profile-id=<id> argument', () => {
+      const result = parseCliArgs(['--profile-id=abc-123']);
+      expect(result.profileId).toBe('abc-123');
     });
 
     it('parses --profile=<name> argument', () => {
