@@ -50,41 +50,41 @@ FullySynced => Converged
 
 The specification models:
 
-| Component | Description |
-|-----------|-------------|
-| CRDT Logs | Append-only logs per node, synced via cloud |
-| Activity Logs | Notification mechanism for note changes |
-| Vector Clocks | Track what each node has seen |
-| Cloud Sync | Non-deterministic file delivery |
-| Crash Recovery | Restart from DB cache + log replay |
-| Compaction | Activity log truncation with gap detection |
+| Component      | Description                                 |
+| -------------- | ------------------------------------------- |
+| CRDT Logs      | Append-only logs per node, synced via cloud |
+| Activity Logs  | Notification mechanism for note changes     |
+| Vector Clocks  | Track what each node has seen               |
+| Cloud Sync     | Non-deterministic file delivery             |
+| Crash Recovery | Restart from DB cache + log replay          |
+| Compaction     | Activity log truncation with gap detection  |
 
 ### Actions Modeled
 
-| Action | Description |
-|--------|-------------|
-| `Edit` | User makes a change |
-| `CloudSyncLog` | CRDT log syncs to cloud |
-| `CloudSyncActivity` | Activity notification syncs |
-| `ReloadDirect` | Load from CRDT logs (folder-style) |
-| `PollActivity` | Check for new activity (note-style) |
-| `ReloadFromActivity` | Reload after detecting activity |
-| `CompactActivity` | Activity log is truncated |
-| `FullScanFallback` | Recover from compaction gap |
-| `SaveSnapshot` | Save state to DB cache |
-| `Crash` | Node crashes |
-| `Restart` | Node restarts from cache + logs |
+| Action               | Description                         |
+| -------------------- | ----------------------------------- |
+| `Edit`               | User makes a change                 |
+| `CloudSyncLog`       | CRDT log syncs to cloud             |
+| `CloudSyncActivity`  | Activity notification syncs         |
+| `ReloadDirect`       | Load from CRDT logs (folder-style)  |
+| `PollActivity`       | Check for new activity (note-style) |
+| `ReloadFromActivity` | Reload after detecting activity     |
+| `CompactActivity`    | Activity log is truncated           |
+| `FullScanFallback`   | Recover from compaction gap         |
+| `SaveSnapshot`       | Save state to DB cache              |
+| `Crash`              | Node crashes                        |
+| `Restart`            | Node restarts from cache + logs     |
 
 ## Verification Results
 
 With the default model parameters:
 
-| Metric | Value |
-|--------|-------|
-| States generated | 538,557 |
-| Distinct states | 98,612 |
+| Metric            | Value     |
+| ----------------- | --------- |
+| States generated  | 538,557   |
+| Distinct states   | 98,612    |
 | Verification time | 7 seconds |
-| Errors found | 0 |
+| Errors found      | 0         |
 
 All safety and liveness properties pass.
 
@@ -167,26 +167,26 @@ You can adjust these parameters to explore different scenarios:
 
 ## Specification Files
 
-| File | Description |
-|------|-------------|
-| `NoteCoveSync.tla` | Main specification with state and actions |
-| `NoteCoveSyncTypes.tla` | Type definitions and helper operators |
-| `NoteCoveSync.cfg` | TLC model checker configuration |
-| `README.md` | Detailed specification documentation |
+| File                    | Description                               |
+| ----------------------- | ----------------------------------------- |
+| `NoteCoveSync.tla`      | Main specification with state and actions |
+| `NoteCoveSyncTypes.tla` | Type definitions and helper operators     |
+| `NoteCoveSync.cfg`      | TLC model checker configuration           |
+| `README.md`             | Detailed specification documentation      |
 
 ## Architecture Mapping
 
 The specification abstracts the real implementation:
 
-| Spec Concept | Implementation |
-|--------------|----------------|
-| `localDoc` (set of IDs) | `Y.Doc` (Yjs document) |
-| `pendingLogs` | Local log files not yet synced |
-| `syncedLogs` | Log files visible on cloud |
-| `vectorClock` | `VectorClock` type in code |
-| `dbCache` | SQLite `note_sync_state` table |
-| `CloudSync` action | Cloud provider file sync |
-| `Crash`/`Restart` | App crash and relaunch |
+| Spec Concept            | Implementation                 |
+| ----------------------- | ------------------------------ |
+| `localDoc` (set of IDs) | `Y.Doc` (Yjs document)         |
+| `pendingLogs`           | Local log files not yet synced |
+| `syncedLogs`            | Log files visible on cloud     |
+| `vectorClock`           | `VectorClock` type in code     |
+| `dbCache`               | SQLite `note_sync_state` table |
+| `CloudSync` action      | Cloud provider file sync       |
+| `Crash`/`Restart`       | App crash and relaunch         |
 
 ## Limitations
 
