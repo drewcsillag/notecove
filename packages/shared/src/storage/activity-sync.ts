@@ -131,7 +131,14 @@ export class ActivitySync {
         try {
           const data = await this.fs.readFile(filePath);
           const content = new TextDecoder().decode(data);
-          const lines = content.split('\n').filter((l) => l.length > 0);
+          // Split by newlines and filter empty lines
+          // IMPORTANT: If the content doesn't end with \n, the last "line" is incomplete
+          // (partial sync - file still being written by cloud storage). Exclude it.
+          const allLines = content.split('\n');
+          const hasTrailingNewline = content.endsWith('\n');
+          const lines = hasTrailingNewline
+            ? allLines.filter((l) => l.length > 0)
+            : allLines.slice(0, -1).filter((l) => l.length > 0);
 
           if (lines.length === 0) continue;
 

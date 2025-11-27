@@ -14,9 +14,14 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata } from './types';
-import type { Database, NoteCache, AppendLogManager, UUID } from '@notecove/shared';
+import type { Database, NoteCache, AppendLogManager, UUID, DeletionLogger } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags, extractLinks } from '@notecove/shared';
+
+/**
+ * Callback type for getting deletion logger by SD
+ */
+export type GetDeletionLoggerFn = (sdId: string) => DeletionLogger | undefined;
 import {
   type ActivitySession,
   type ReconstructionPoint,
@@ -38,7 +43,8 @@ export class IPCHandlers {
     private diagnosticsManager: DiagnosticsManager,
     private backupManager: BackupManager,
     private createWindowFn?: (options?: { noteId?: string; minimal?: boolean }) => void,
-    private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>
+    private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>,
+    private getDeletionLogger?: GetDeletionLoggerFn
   ) {
     this.registerHandlers();
   }
@@ -677,6 +683,19 @@ export class IPCHandlers {
       // Unload note from memory if loaded
       await this.crdtManager.unloadNote(noteId);
       logMsg(`[permanentlyDeleteNote] Unloaded note ${noteId} from memory`);
+
+      // IMPORTANT: Log the deletion BEFORE deleting files
+      // This ensures other instances can replicate the deletion even if cloud sync
+      // delivers the deletion log before the actual file deletions
+      if (this.getDeletionLogger) {
+        const deletionLogger = this.getDeletionLogger(note.sdId);
+        if (deletionLogger) {
+          await deletionLogger.recordDeletion(noteId);
+          logMsg(`[permanentlyDeleteNote] Recorded deletion in deletion log for SD ${note.sdId}`);
+        } else {
+          logMsg(`[permanentlyDeleteNote] WARNING: No deletion logger found for SD ${note.sdId}`);
+        }
+      }
 
       // Delete CRDT files from disk
       const sd = await this.database.getStorageDir(note.sdId);

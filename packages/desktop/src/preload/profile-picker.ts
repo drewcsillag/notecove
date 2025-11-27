@@ -43,8 +43,7 @@ contextBridge.exposeInMainWorld('profilePickerAPI', {
   /**
    * Cancel profile selection and close the picker
    */
-  cancel: (): Promise<void> =>
-    ipcRenderer.invoke('profile-picker:cancel') as Promise<void>,
+  cancel: (): Promise<void> => ipcRenderer.invoke('profile-picker:cancel') as Promise<void>,
 
   /**
    * Create a new profile
@@ -70,16 +69,19 @@ contextBridge.exposeInMainWorld('profilePickerAPI', {
     ipcRenderer.invoke('profile-picker:renameProfile', profileId, newName) as Promise<void>,
 });
 
+/** Profile picker API interface */
+interface ProfilePickerAPI {
+  getProfiles: () => Promise<ProfilesData>;
+  selectProfile: (profileId: string, skipPicker: boolean) => Promise<void>;
+  cancel: () => Promise<void>;
+  createProfile: (name: string) => Promise<Profile>;
+  deleteProfile: (profileId: string) => Promise<void>;
+  renameProfile: (profileId: string, newName: string) => Promise<void>;
+}
+
 // Type declaration for window
 declare global {
   interface Window {
-    profilePickerAPI: {
-      getProfiles: () => Promise<ProfilesData>;
-      selectProfile: (profileId: string, skipPicker: boolean) => Promise<void>;
-      cancel: () => Promise<void>;
-      createProfile: (name: string) => Promise<Profile>;
-      deleteProfile: (profileId: string) => Promise<void>;
-      renameProfile: (profileId: string, newName: string) => Promise<void>;
-    };
+    profilePickerAPI: ProfilePickerAPI | undefined;
   }
 }

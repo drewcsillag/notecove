@@ -24,17 +24,20 @@ interface ProfilesData {
   isDevBuild: boolean;
 }
 
+/** Profile picker API interface */
+interface ProfilePickerAPI {
+  getProfiles: () => Promise<ProfilesData>;
+  selectProfile: (profileId: string, skipPicker: boolean) => Promise<void>;
+  cancel: () => Promise<void>;
+  createProfile: (name: string) => Promise<Profile>;
+  deleteProfile: (profileId: string) => Promise<void>;
+  renameProfile: (profileId: string, newName: string) => Promise<void>;
+}
+
 /** Declare the preload API type */
 declare global {
   interface Window {
-    profilePickerAPI?: {
-      getProfiles: () => Promise<ProfilesData>;
-      selectProfile: (profileId: string, skipPicker: boolean) => Promise<void>;
-      cancel: () => Promise<void>;
-      createProfile: (name: string) => Promise<Profile>;
-      deleteProfile: (profileId: string) => Promise<void>;
-      renameProfile: (profileId: string, newName: string) => Promise<void>;
-    };
+    profilePickerAPI: ProfilePickerAPI | undefined;
   }
 }
 
@@ -126,7 +129,9 @@ export function ProfilePicker(): React.ReactElement {
       await window.profilePickerAPI.deleteProfile(profileId);
       setProfiles((prev) => prev.filter((p) => p.id !== profileId));
       if (selectedId === profileId) {
-        setSelectedId(profiles.length > 1 ? profiles.find((p) => p.id !== profileId)?.id ?? null : null);
+        setSelectedId(
+          profiles.length > 1 ? (profiles.find((p) => p.id !== profileId)?.id ?? null) : null
+        );
       }
       setDeletingProfileId(null);
     } catch (err) {
@@ -141,9 +146,7 @@ export function ProfilePicker(): React.ReactElement {
     try {
       await window.profilePickerAPI.renameProfile(renamingProfileId, renameValue.trim());
       setProfiles((prev) =>
-        prev.map((p) =>
-          p.id === renamingProfileId ? { ...p, name: renameValue.trim() } : p
-        )
+        prev.map((p) => (p.id === renamingProfileId ? { ...p, name: renameValue.trim() } : p))
       );
       setRenamingProfileId(null);
       setRenameValue('');
@@ -186,7 +189,7 @@ export function ProfilePicker(): React.ReactElement {
     return (
       <div style={styles.container}>
         <div style={styles.error}>{error}</div>
-        <button style={styles.button} onClick={handleCancel}>
+        <button style={styles.button} onClick={() => void handleCancel()}>
           Close
         </button>
       </div>
@@ -197,15 +200,9 @@ export function ProfilePicker(): React.ReactElement {
     <div style={styles.container}>
       <h1 style={styles.title}>Select Profile</h1>
 
-      {isDevBuild && (
-        <div style={styles.devBanner}>
-          Development Build
-        </div>
-      )}
+      {isDevBuild && <div style={styles.devBanner}>Development Build</div>}
 
-      <p style={styles.subtitle}>
-        Choose a profile to launch NoteCove with:
-      </p>
+      <p style={styles.subtitle}>Choose a profile to launch NoteCove with:</p>
 
       {/* Delete confirmation dialog */}
       {deletingProfileId && (
@@ -216,7 +213,9 @@ export function ProfilePicker(): React.ReactElement {
           <div style={styles.confirmButtons}>
             <button
               style={styles.buttonSecondary}
-              onClick={() => setDeletingProfileId(null)}
+              onClick={() => {
+                setDeletingProfileId(null);
+              }}
             >
               Cancel
             </button>
@@ -233,26 +232,29 @@ export function ProfilePicker(): React.ReactElement {
       {/* Profile list */}
       <div style={styles.profileList}>
         {profiles.length === 0 ? (
-          <div style={styles.emptyState}>
-            No profiles yet. Create one to get started.
-          </div>
+          <div style={styles.emptyState}>No profiles yet. Create one to get started.</div>
         ) : (
           profiles.map((profile) => (
             <div
               key={profile.id}
+              data-testid={`profile-item-${profile.id}`}
               style={{
                 ...styles.profileItem,
                 ...(selectedId === profile.id ? styles.profileItemSelected : {}),
               }}
-              onClick={() => setSelectedId(profile.id)}
-              onDoubleClick={handleSelect}
+              onClick={() => {
+                setSelectedId(profile.id);
+              }}
+              onDoubleClick={() => void handleSelect()}
             >
               {renamingProfileId === profile.id ? (
                 <div style={styles.renameForm}>
                   <input
                     type="text"
                     value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
+                    onChange={(e) => {
+                      setRenameValue(e.target.value);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') void handleRenameProfile();
                       if (e.key === 'Escape') {
@@ -262,7 +264,9 @@ export function ProfilePicker(): React.ReactElement {
                     }}
                     style={styles.renameInput}
                     autoFocus
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
                   />
                   <button
                     style={styles.iconButton}
@@ -293,9 +297,7 @@ export function ProfilePicker(): React.ReactElement {
                       {profile.name}
                       {profile.isDev && <span style={styles.devBadge}>DEV</span>}
                     </div>
-                    <div style={styles.profileMeta}>
-                      Last used: {formatDate(profile.lastUsed)}
-                    </div>
+                    <div style={styles.profileMeta}>Last used: {formatDate(profile.lastUsed)}</div>
                   </div>
                   <div style={styles.profileActions}>
                     <button
@@ -333,7 +335,9 @@ export function ProfilePicker(): React.ReactElement {
             type="text"
             placeholder="Profile name..."
             value={newProfileName}
-            onChange={(e) => setNewProfileName(e.target.value)}
+            onChange={(e) => {
+              setNewProfileName(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') void handleCreateProfile();
               if (e.key === 'Escape') setCreatingProfile(false);
@@ -344,7 +348,9 @@ export function ProfilePicker(): React.ReactElement {
           <div style={styles.createFormButtons}>
             <button
               style={styles.buttonSecondary}
-              onClick={() => setCreatingProfile(false)}
+              onClick={() => {
+                setCreatingProfile(false);
+              }}
             >
               Cancel
             </button>
@@ -360,7 +366,9 @@ export function ProfilePicker(): React.ReactElement {
       ) : (
         <button
           style={styles.buttonSecondary}
-          onClick={() => setCreatingProfile(true)}
+          onClick={() => {
+            setCreatingProfile(true);
+          }}
         >
           + New Profile
         </button>
@@ -372,9 +380,11 @@ export function ProfilePicker(): React.ReactElement {
           <input
             type="checkbox"
             checked={skipPicker}
-            onChange={(e) => setSkipPicker(e.target.checked)}
+            onChange={(e) => {
+              setSkipPicker(e.target.checked);
+            }}
           />
-          <span>Don't ask again (use this profile automatically)</span>
+          <span>Don&apos;t ask again (use this profile automatically)</span>
         </label>
       )}
 
@@ -383,11 +393,7 @@ export function ProfilePicker(): React.ReactElement {
         <button style={styles.buttonSecondary} onClick={() => void handleCancel()}>
           Cancel
         </button>
-        <button
-          style={styles.button}
-          onClick={() => void handleSelect()}
-          disabled={!selectedId}
-        >
+        <button style={styles.button} onClick={() => void handleSelect()} disabled={!selectedId}>
           Launch
         </button>
       </div>
@@ -395,8 +401,8 @@ export function ProfilePicker(): React.ReactElement {
   );
 }
 
-/** Styles for the picker */
-const styles: Record<string, React.CSSProperties> = {
+/** Styles for the picker - using explicit type for all style properties */
+const stylesData = {
   container: {
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     padding: '24px',
@@ -598,4 +604,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '4px',
     outline: 'none',
   },
-};
+} as const satisfies Record<string, React.CSSProperties>;
+
+// Type-safe styles access
+const styles = stylesData as { [K in keyof typeof stylesData]: React.CSSProperties };

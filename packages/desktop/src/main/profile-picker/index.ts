@@ -6,10 +6,10 @@
  * and returns the selected profile ID.
  */
 
-import { BrowserWindow, ipcMain, app } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
-import { ProfileStorage, type Profile, type ProfilesConfig } from '@notecove/shared';
+import { ProfileStorage, type Profile } from '@notecove/shared';
 import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
 
 /** Result from showing the profile picker */
@@ -133,9 +133,12 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
   });
 
   // Rename a profile
-  ipcMain.handle('profile-picker:renameProfile', async (_event, profileId: string, newName: string) => {
-    await storage.renameProfile(profileId, newName);
-  });
+  ipcMain.handle(
+    'profile-picker:renameProfile',
+    async (_event, profileId: string, newName: string) => {
+      await storage.renameProfile(profileId, newName);
+    }
+  );
 }
 
 /**
@@ -167,7 +170,9 @@ function generateProfileId(): string {
  * @param options - Configuration options
  * @returns Promise that resolves with the selected profile ID
  */
-export async function showProfilePicker(options: ProfilePickerOptions): Promise<ProfilePickerResult> {
+export async function showProfilePicker(
+  options: ProfilePickerOptions
+): Promise<ProfilePickerResult> {
   // Check if we should skip the picker
   const storage = initProfileStorage(options.appDataDir);
   const config = await storage.loadProfiles();
@@ -245,7 +250,9 @@ export async function showProfilePicker(options: ProfilePickerOptions): Promise<
     if (process.env['NODE_ENV'] === 'test' || !is.dev || !process.env['ELECTRON_RENDERER_URL']) {
       void pickerWindow.loadFile(join(__dirname, '../renderer/profile-picker/index.html'));
     } else {
-      void pickerWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/profile-picker/index.html`);
+      void pickerWindow.loadURL(
+        `${process.env['ELECTRON_RENDERER_URL']}/profile-picker/index.html`
+      );
     }
   });
 }

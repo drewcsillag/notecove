@@ -55,7 +55,12 @@ describe('CLI Parser', () => {
     });
 
     it('parses multiple flags together', () => {
-      const result = parseCliArgs(['--profile=Test', '--skip-picker', '--debug-profiles', '--reset-picker']);
+      const result = parseCliArgs([
+        '--profile=Test',
+        '--skip-picker',
+        '--debug-profiles',
+        '--reset-picker',
+      ]);
       expect(result.profileName).toBe('Test');
       expect(result.skipPicker).toBe(true);
       expect(result.debugProfiles).toBe(true);

@@ -2,7 +2,7 @@
  * Electron Main Process
  */
 
-import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain, powerMonitor } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
@@ -13,6 +13,9 @@ import {
   ActivityLogger,
   ActivitySync,
   type ActivitySyncCallbacks,
+  DeletionLogger,
+  DeletionSync,
+  type DeletionSyncCallbacks,
   extractTitleFromDoc,
   extractTags,
   SDMarker,
@@ -56,6 +59,12 @@ const sdActivityWatchers = new Map<string, NodeFileWatcher>();
 const sdActivitySyncs = new Map<string, ActivitySync>();
 const sdActivityLoggers = new Map<string, ActivityLogger>();
 const sdActivityPollIntervals = new Map<string, NodeJS.Timeout>();
+
+// Deletion sync support: track permanent deletions across instances
+const sdDeletionLoggers = new Map<string, DeletionLogger>();
+const sdDeletionSyncs = new Map<string, DeletionSync>();
+const sdDeletionWatchers = new Map<string, NodeFileWatcher>();
+const sdDeletionPollIntervals = new Map<string, NodeJS.Timeout>();
 
 /**
  * Reindex tags for a set of notes after external sync
@@ -612,6 +621,7 @@ async function setupSDWatchers(
 
   const folderLogsPath = join(sdPath, 'folders', 'logs');
   const activityDir = join(sdPath, 'activity');
+  const deletionDir = join(sdPath, 'deleted');
 
   // Create and initialize ActivityLogger for this SD
   const activityLogger = new ActivityLogger(fsAdapter, activityDir);
@@ -625,6 +635,12 @@ async function setupSDWatchers(
 
   // Store logger for periodic compaction
   sdActivityLoggers.set(sdId, activityLogger);
+
+  // Create and initialize DeletionLogger for this SD
+  const deletionLogger = new DeletionLogger(fsAdapter, deletionDir);
+  deletionLogger.setInstanceId(instanceId);
+  await deletionLogger.initialize();
+  sdDeletionLoggers.set(sdId, deletionLogger);
 
   // Create ActivitySync for this SD
   const activitySyncCallbacks: ActivitySyncCallbacks = {
@@ -851,11 +867,16 @@ async function setupSDWatchers(
               contentPreview = contentAfterTitle.substring(0, 200);
             }
 
+            // Detect folder change (for note:moved event)
+            const oldFolderId = existingNote.folderId;
+            const newFolderId = crdtMetadata?.folderId ?? existingNote.folderId;
+            const folderChanged = oldFolderId !== newFolderId;
+
             await db.upsertNote({
               id: noteId,
               title: newTitle,
               sdId: existingNote.sdId,
-              folderId: crdtMetadata?.folderId ?? existingNote.folderId,
+              folderId: newFolderId,
               created: existingNote.created,
               modified: crdtMetadata?.modified ?? Date.now(),
               deleted: crdtMetadata?.deleted ?? false,
@@ -870,6 +891,16 @@ async function setupSDWatchers(
                 noteId,
                 title: newTitle,
               });
+            }
+
+            // Broadcast folder change if folderId changed (synced from another instance)
+            if (folderChanged) {
+              console.log(
+                `[ActivitySync] Note ${noteId} folder changed: ${oldFolderId} -> ${newFolderId}`
+              );
+              for (const window of BrowserWindow.getAllWindows()) {
+                window.webContents.send('note:moved', { noteId, oldFolderId, newFolderId });
+              }
             }
 
             // If note wasn't originally loaded, unload it to free memory
@@ -948,6 +979,102 @@ async function setupSDWatchers(
 
   // Store the ActivitySync instance
   sdActivitySyncs.set(sdId, activitySync);
+
+  // Create DeletionSync for this SD
+  const deletionSyncCallbacks: DeletionSyncCallbacks = {
+    processRemoteDeletion: async (noteId: string) => {
+      console.log(`[DeletionSync] Processing remote deletion for note ${noteId}`);
+
+      // Check if note exists in database
+      const existingNote = await db.getNote(noteId);
+      if (!existingNote) {
+        console.log(`[DeletionSync] Note ${noteId} already not in database`);
+        return false;
+      }
+
+      // Delete from database
+      await db.deleteNote(noteId);
+
+      // Unload from CRDT manager if loaded
+      if (crdtManager.getNoteDoc(noteId)) {
+        await crdtManager.unloadNote(noteId);
+      }
+
+      // Broadcast to all windows
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('note:permanentDeleted', { noteId, sdId });
+      }
+
+      console.log(`[DeletionSync] Successfully processed remote deletion for note ${noteId}`);
+      return true;
+    },
+    checkNoteExists: async (noteId: string) => {
+      const note = await db.getNote(noteId);
+      return note !== null;
+    },
+  };
+
+  const deletionSync = new DeletionSync(fsAdapter, instanceId, deletionDir, deletionSyncCallbacks);
+
+  // Store the DeletionSync instance
+  sdDeletionSyncs.set(sdId, deletionSync);
+
+  // Set up deletion watcher
+  const deletionWatcher = new NodeFileWatcher();
+  await deletionWatcher.watch(deletionDir, (event) => {
+    console.log(`[DeletionWatcher ${sdId}] Detected deletion log change:`, event.filename);
+
+    // Ignore our own log file (we write to it, don't need to read it)
+    if (event.filename === `${instanceId}.log`) {
+      return;
+    }
+
+    // Only process .log files
+    if (!event.filename.endsWith('.log')) {
+      return;
+    }
+
+    // Sync deletions from other instances
+    void (async () => {
+      try {
+        const deletedNotes = await deletionSync.syncFromOtherInstances();
+        if (deletedNotes.size > 0) {
+          console.log(
+            `[DeletionWatcher ${sdId}] Synced ${deletedNotes.size} deletions:`,
+            Array.from(deletedNotes)
+          );
+        }
+      } catch (error) {
+        console.error(`[DeletionWatcher ${sdId}] Sync failed:`, error);
+      }
+    })();
+  });
+
+  sdDeletionWatchers.set(sdId, deletionWatcher);
+
+  // Set up deletion polling (backup for file watcher failures)
+  const deletionPollInterval = setInterval(
+    () => {
+      void (async () => {
+        try {
+          await deletionSync.syncFromOtherInstances();
+        } catch (error) {
+          // Don't log ENOENT - directory might not exist yet
+          if (!String(error).includes('ENOENT')) {
+            console.error(`[DeletionSync Poll ${sdId}] Poll failed:`, error);
+          }
+        }
+      })();
+    },
+    10000 // Poll every 10 seconds
+  );
+
+  sdDeletionPollIntervals.set(sdId, deletionPollInterval);
+
+  // Initial deletion sync on startup
+  void deletionSync.syncFromOtherInstances().catch((error) => {
+    console.error(`[DeletionSync ${sdId}] Initial sync failed:`, error);
+  });
 
   // Set up folder logs watcher (new format uses .crdtlog files)
   const folderWatcher = new NodeFileWatcher();
@@ -1322,22 +1449,26 @@ function createMenu(): void {
         { type: 'separator' },
         {
           label: 'Switch Profile...',
-          click: async () => {
+          click: () => {
             // Show profile picker and restart with new profile if selected
-            const appDataDir = app.getPath('userData');
-            const isDevBuild = !app.isPackaged;
+            void (async () => {
+              const appDataDir = app.getPath('userData');
+              const isDevBuild = !app.isPackaged;
 
-            const result = await showProfilePicker({
-              isDevBuild,
-              appDataDir,
-            });
+              const result = await showProfilePicker({
+                isDevBuild,
+                appDataDir,
+              });
 
-            if (result.profileId && result.profileId !== selectedProfileId) {
-              // User selected a different profile - restart the app with it
-              console.log(`[Profile] Switching to profile: ${result.profileId}`);
-              app.relaunch({ args: process.argv.slice(1).concat([`--profile-id=${result.profileId}`]) });
-              app.exit(0);
-            }
+              if (result.profileId && result.profileId !== selectedProfileId) {
+                // User selected a different profile - restart the app with it
+                console.log(`[Profile] Switching to profile: ${result.profileId}`);
+                app.relaunch({
+                  args: process.argv.slice(1).concat([`--profile-id=${result.profileId}`]),
+                });
+                app.exit(0);
+              }
+            })();
           },
         },
         { type: 'separator' },
@@ -1611,7 +1742,9 @@ void app.whenReady().then(async () => {
 
         if (!profile) {
           // Profile not found - this shouldn't happen but handle gracefully
-          console.error(`[Profile] CLI: Profile ID "${cliArgs.profileId}" not found, showing picker`);
+          console.error(
+            `[Profile] CLI: Profile ID "${cliArgs.profileId}" not found, showing picker`
+          );
           // Fall through to show picker
         } else {
           // Check dev/prod compatibility
@@ -1644,7 +1777,9 @@ void app.whenReady().then(async () => {
               // Fall through to show picker
             } else {
               selectedProfileId = profile.id;
-              console.log(`[Profile] CLI: User confirmed accessing production profile "${profile.name}" (${profile.id})`);
+              console.log(
+                `[Profile] CLI: User confirmed accessing production profile "${profile.name}" (${profile.id})`
+              );
             }
           } else {
             selectedProfileId = profile.id;
@@ -1810,7 +1945,7 @@ void app.whenReady().then(async () => {
     const fsAdapter = new NodeFileSystemAdapter();
 
     // Initialize SD marker for dev/prod safety checks
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     sdMarker = new SDMarker(fsAdapter as any);
     const isDevBuild = !app.isPackaged;
     const currentSDType: SDType = isDevBuild ? 'dev' : 'prod';
@@ -2116,7 +2251,8 @@ void app.whenReady().then(async () => {
       diagnosticsManager,
       backupManager,
       createWindow,
-      handleNewStorageDir
+      handleNewStorageDir,
+      (sdId: string) => sdDeletionLoggers.get(sdId)
     );
 
     // Set up broadcast callback for CRDT manager to send updates to renderer
@@ -2270,6 +2406,55 @@ void app.on('window-all-closed', () => {
   }
 });
 
+// Handle system resume from sleep/suspend
+// This triggers a sync from other instances to catch up on changes made while sleeping
+powerMonitor.on('resume', () => {
+  console.log('[PowerMonitor] System resumed from sleep, triggering activity and deletion sync...');
+
+  // Sync all storage directories - activity sync
+  for (const [sdId, activitySync] of sdActivitySyncs.entries()) {
+    console.log(`[PowerMonitor] Syncing activity for SD ${sdId}...`);
+    void (async () => {
+      try {
+        const affectedNotes = await activitySync.syncFromOtherInstances();
+        console.log(
+          `[PowerMonitor] SD ${sdId} activity sync complete, affected notes:`,
+          Array.from(affectedNotes)
+        );
+
+        // Broadcast updates to all windows if there were changes
+        if (affectedNotes.size > 0) {
+          const noteIds = Array.from(affectedNotes);
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('note:externalUpdate', {
+              operation: 'sync-resume',
+              noteIds,
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`[PowerMonitor] Failed to sync activity for SD ${sdId}:`, error);
+      }
+    })();
+  }
+
+  // Sync all storage directories - deletion sync
+  for (const [sdId, deletionSync] of sdDeletionSyncs.entries()) {
+    console.log(`[PowerMonitor] Syncing deletions for SD ${sdId}...`);
+    void (async () => {
+      try {
+        const deletedNotes = await deletionSync.syncFromOtherInstances();
+        console.log(
+          `[PowerMonitor] SD ${sdId} deletion sync complete, deleted notes:`,
+          Array.from(deletedNotes)
+        );
+      } catch (error) {
+        console.error(`[PowerMonitor] Failed to sync deletions for SD ${sdId}:`, error);
+      }
+    })();
+  }
+});
+
 // Clean up on app quit
 // Note: We use will-quit with async cleanup to ensure CRDT updates are flushed
 let isQuitting = false;
@@ -2376,7 +2561,11 @@ app.on('will-quit', (event) => {
           ]);
           console.log('[App] All pending syncs completed');
         } catch {
-          console.warn('[App] Pending syncs timed out after', SYNC_TIMEOUT_MS, 'ms, continuing shutdown');
+          console.warn(
+            '[App] Pending syncs timed out after',
+            SYNC_TIMEOUT_MS,
+            'ms, continuing shutdown'
+          );
         }
       }
       sdActivitySyncs.clear();
@@ -2387,6 +2576,19 @@ app.on('will-quit', (event) => {
         clearInterval(interval);
       }
       sdActivityPollIntervals.clear();
+
+      // 5c. Clear deletion syncs and watchers
+      console.log('[App] Cleaning up deletion syncs...');
+      for (const watcher of sdDeletionWatchers.values()) {
+        await watcher.unwatch();
+      }
+      sdDeletionWatchers.clear();
+      for (const interval of sdDeletionPollIntervals.values()) {
+        clearInterval(interval);
+      }
+      sdDeletionPollIntervals.clear();
+      sdDeletionSyncs.clear();
+      sdDeletionLoggers.clear();
 
       // 6. Clear compaction interval
       if (compactionInterval) {

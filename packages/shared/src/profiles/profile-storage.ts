@@ -69,7 +69,10 @@ export class ProfileStorage {
       return config;
     } catch (error) {
       // File corrupted or other error - return empty config for recovery
-      console.error('[ProfileStorage] Failed to load profiles.json, returning empty config:', error);
+      console.error(
+        '[ProfileStorage] Failed to load profiles.json, returning empty config:',
+        error
+      );
       return createEmptyProfilesConfig();
     }
   }

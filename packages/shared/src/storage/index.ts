@@ -11,6 +11,8 @@ export {
   type ActivitySyncCallbacks,
   type SyncMetricsCallbacks,
 } from './activity-sync';
+export { DeletionLogger } from './deletion-logger';
+export { DeletionSync, type DeletionSyncCallbacks } from './deletion-sync';
 export { SdUuidManager, type SdIdFile, type SdUuidInitResult } from './sd-uuid';
 
 // New append-only log format (Phase 1-5)

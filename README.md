@@ -103,3 +103,16 @@ Apache License 2.0 - See [LICENSE](./LICENSE) for details.
 📋 iOS app implementation
 
 See [PLAN.md](./PLAN.md) for detailed implementation plan and progress tracking.
+
+# Why Trust NoteCove?
+
+My (Drew's) history is that I've worked at Google in Google Apps. I helped contribute to Spreadsheets and Docs during my time on the Apps Script team.
+I also worked at Dropbox on the Paper Infra team where there was more details around working on the backends of these systems. For those who don't know what this means:
+both dealt with production quality multiplayer editors at scale. Unrelated they also may be the only places I think the Rhino javascript
+engine was used in production products.
+
+Extensive sync testing. There are extensive tests with two independent instances using "sloppy sync" to replicate the syncing behaviors seen with things like iCloud drive,
+Google Drive, etc. Specifically replicating files out of order, incomplete replication, and so on to ensure that the state of notecove on both sides converges.
+
+Validated TLA+ model. Just to be double sure that there aren't any sync bugs in the design, there's a TLA+ formal verification model that has been checked. Ironically, there
+was a bug discovered in the model, but the code actually handled it.

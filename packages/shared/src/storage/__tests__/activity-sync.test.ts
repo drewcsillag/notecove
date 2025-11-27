@@ -268,4 +268,85 @@ describe('ActivitySync', () => {
       expect(true).toBe(true);
     });
   });
+
+  describe('truncated line handling (partial sync)', () => {
+    it('should ignore a line without trailing newline (incomplete/truncated)', async () => {
+      mockFs.listFiles.mockResolvedValue(['other-instance.log']);
+      // Note: Last line 'note-2|other-instance_101' has no trailing \n
+      // This simulates partial sync where the file is still being written
+      mockFs.readFile.mockResolvedValue(
+        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_101')
+      );
+      mockFs.exists.mockResolvedValue(true);
+
+      await sync.syncFromOtherInstances();
+      await sleep(50);
+
+      // Should only process note-1 (has complete line with trailing \n)
+      // note-2 should be ignored because its line is incomplete
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
+    });
+
+    it('should process truncated line once newline appears in subsequent read', async () => {
+      mockFs.listFiles.mockResolvedValue(['other-instance.log']);
+      mockFs.exists.mockResolvedValue(true);
+
+      // First read: truncated line (missing newline)
+      mockFs.readFile.mockResolvedValueOnce(
+        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_101')
+      );
+
+      await sync.syncFromOtherInstances();
+      await sleep(50);
+
+      // Only note-1 should be processed
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
+
+      jest.clearAllMocks();
+
+      // Second read: file now has trailing newline (sync completed)
+      mockFs.readFile.mockResolvedValueOnce(
+        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_101\n')
+      );
+
+      await sync.syncFromOtherInstances();
+      await sleep(50);
+
+      // Now note-2 should be processed (sequence 101 > last seen 100)
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2', 'test-sd');
+    });
+
+    it('should handle file with only truncated content (no complete lines)', async () => {
+      mockFs.listFiles.mockResolvedValue(['other-instance.log']);
+      // File content has no newlines at all - entire content is "truncated"
+      mockFs.readFile.mockResolvedValue(new TextEncoder().encode('note-1|other-instance_100'));
+      mockFs.exists.mockResolvedValue(true);
+
+      await sync.syncFromOtherInstances();
+      await sleep(50);
+
+      // Should not process any notes since no complete lines exist
+      expect(mockCallbacks.reloadNote).not.toHaveBeenCalled();
+    });
+
+    it('should not advance watermark for incomplete lines', async () => {
+      mockFs.listFiles.mockResolvedValue(['other-instance.log']);
+      mockFs.exists.mockResolvedValue(true);
+
+      // First read: complete line followed by truncated line
+      mockFs.readFile.mockResolvedValueOnce(
+        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_101')
+      );
+
+      await sync.syncFromOtherInstances();
+      await sleep(50);
+
+      // Watermark should be 100 (note-1), not 101 (note-2's sequence)
+      const watermarks = sync.getWatermarks();
+      expect(watermarks.get('other-instance')).toBe(100);
+    });
+  });
 });
