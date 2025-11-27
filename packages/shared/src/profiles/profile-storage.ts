@@ -246,4 +246,18 @@ export class ProfileStorage {
     await this.saveProfiles(config);
     console.log(`[ProfileStorage] Updated lastUsed for profile: ${profileId}`);
   }
+
+  /**
+   * Clear the "skip picker" preference.
+   *
+   * This resets the skipPicker flag to false, forcing the profile picker
+   * to be shown on next launch. The defaultProfileId is kept so the user's
+   * preferred profile is still pre-selected.
+   */
+  async clearSkipPicker(): Promise<void> {
+    const config = await this.loadProfiles();
+    config.skipPicker = false;
+    await this.saveProfiles(config);
+    console.log('[ProfileStorage] Cleared skipPicker preference');
+  }
 }

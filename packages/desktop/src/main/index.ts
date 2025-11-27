@@ -31,6 +31,7 @@ import { NoteMoveManager } from './note-move-manager';
 import { DiagnosticsManager } from './diagnostics-manager';
 import { BackupManager } from './backup-manager';
 import { showProfilePicker, getProfileStorage } from './profile-picker';
+import { parseCliArgs } from './cli/cli-parser';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
@@ -1515,9 +1516,11 @@ function createMenu(): void {
 
 void app.whenReady().then(async () => {
   try {
+    // Parse CLI arguments
+    const cliArgs = parseCliArgs(process.argv);
+
     // Check for --debug-profiles flag
-    const debugProfiles = process.argv.includes('--debug-profiles');
-    if (debugProfiles) {
+    if (cliArgs.debugProfiles) {
       const appDataDir = app.getPath('userData');
       const profileStorage = getProfileStorage(appDataDir);
       const config = await profileStorage.loadProfiles();
@@ -1554,25 +1557,109 @@ void app.whenReady().then(async () => {
       process.env['NODE_ENV'] === 'test';
 
     if (!isTestMode) {
-      // Show profile picker and get selected profile
       const appDataDir = app.getPath('userData');
       const isDevBuild = !app.isPackaged;
+      const profileStorage = getProfileStorage(appDataDir);
 
-      console.log('[Profile] Showing profile picker...');
-      const result = await showProfilePicker({
-        isDevBuild,
-        appDataDir,
-      });
-
-      if (result.profileId === null) {
-        // User cancelled - quit the app
-        console.log('[Profile] User cancelled profile selection, quitting...');
-        app.quit();
-        return;
+      // Handle --reset-picker CLI flag (clears "don't ask again" preference)
+      if (cliArgs.resetPicker) {
+        console.log('[Profile] CLI: Resetting picker preference...');
+        await profileStorage.clearSkipPicker();
       }
 
-      selectedProfileId = result.profileId;
-      console.log(`[Profile] Selected profile: ${selectedProfileId}`);
+      // Handle --profile=<name> CLI argument
+      if (cliArgs.profileName) {
+        console.log(`[Profile] CLI: Looking for profile "${cliArgs.profileName}"...`);
+        const config = await profileStorage.loadProfiles();
+        const profile = config.profiles.find((p) => p.name === cliArgs.profileName);
+
+        if (!profile) {
+          // Profile not found - show error dialog
+          const { dialog } = await import('electron');
+          dialog.showErrorBox(
+            'Profile Not Found',
+            `The profile "${cliArgs.profileName}" does not exist.\n\nAvailable profiles:\n${config.profiles.map((p) => `  - ${p.name}`).join('\n') || '  (none)'}`
+          );
+          app.quit();
+          return;
+        }
+
+        // Check dev/prod compatibility
+        if (!isDevBuild && profile.isDev) {
+          const { dialog } = await import('electron');
+          dialog.showErrorBox(
+            'Cannot Access Development Profile',
+            `The profile "${profile.name}" is a development profile and cannot be accessed from a production build.`
+          );
+          app.quit();
+          return;
+        }
+
+        selectedProfileId = profile.id;
+        console.log(`[Profile] CLI: Selected profile "${profile.name}" (${profile.id})`);
+
+        // Update lastUsed
+        await profileStorage.updateLastUsed(profile.id);
+      } else if (cliArgs.skipPicker) {
+        // --skip-picker: use default or first available profile
+        console.log('[Profile] CLI: Skipping picker, using default profile...');
+        const config = await profileStorage.loadProfiles();
+
+        // Filter profiles based on build type
+        const availableProfiles = isDevBuild
+          ? config.profiles
+          : config.profiles.filter((p) => !p.isDev);
+
+        if (availableProfiles.length === 0) {
+          // No profiles available - create a default one
+          console.log('[Profile] No profiles available, creating default...');
+          const newProfile = await profileStorage.createProfile(
+            isDevBuild ? 'Development' : 'Default',
+            isDevBuild
+          );
+          selectedProfileId = newProfile.id;
+        } else if (config.defaultProfileId) {
+          // Use the saved default if it exists and is compatible
+          const defaultProfile = availableProfiles.find((p) => p.id === config.defaultProfileId);
+          if (defaultProfile) {
+            selectedProfileId = defaultProfile.id;
+            await profileStorage.updateLastUsed(defaultProfile.id);
+          } else {
+            // Default is incompatible, use first available
+            const firstProfile = availableProfiles[0];
+            if (firstProfile) {
+              selectedProfileId = firstProfile.id;
+              await profileStorage.updateLastUsed(firstProfile.id);
+            }
+          }
+        } else {
+          // No default, use first available
+          const firstProfile = availableProfiles[0];
+          if (firstProfile) {
+            selectedProfileId = firstProfile.id;
+            await profileStorage.updateLastUsed(firstProfile.id);
+          }
+        }
+
+        console.log(`[Profile] CLI: Using profile: ${selectedProfileId}`);
+      } else {
+        // Show profile picker normally
+        console.log('[Profile] Showing profile picker...');
+        const result = await showProfilePicker({
+          isDevBuild,
+          appDataDir,
+        });
+
+        if (result.profileId === null) {
+          // User cancelled - quit the app
+          console.log('[Profile] User cancelled profile selection, quitting...');
+          app.quit();
+          return;
+        }
+
+        selectedProfileId = result.profileId;
+        console.log(`[Profile] Selected profile: ${selectedProfileId}`);
+      }
     } else {
       console.log('[Profile] Test mode - skipping profile picker');
     }
