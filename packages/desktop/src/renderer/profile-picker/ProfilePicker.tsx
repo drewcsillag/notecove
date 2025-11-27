@@ -32,6 +32,8 @@ declare global {
       selectProfile: (profileId: string, skipPicker: boolean) => Promise<void>;
       cancel: () => Promise<void>;
       createProfile: (name: string) => Promise<Profile>;
+      deleteProfile: (profileId: string) => Promise<void>;
+      renameProfile: (profileId: string, newName: string) => Promise<void>;
     };
   }
 }
@@ -45,6 +47,9 @@ export function ProfilePicker(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [creatingProfile, setCreatingProfile] = useState(false);
   const [newProfileName, setNewProfileName] = useState('');
+  const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
+  const [renamingProfileId, setRenamingProfileId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   // Load profiles on mount
   useEffect(() => {
@@ -57,15 +62,23 @@ export function ProfilePicker(): React.ReactElement {
 
       try {
         const data = await window.profilePickerAPI.getProfiles();
-        setProfiles(data.profiles);
+
+        // Filter profiles based on build type:
+        // - Production build: hide dev profiles
+        // - Dev build: show all profiles
+        const filteredProfiles = data.isDevBuild
+          ? data.profiles // Dev build shows all
+          : data.profiles.filter((p) => !p.isDev); // Prod hides dev profiles
+
+        setProfiles(filteredProfiles);
         setIsDevBuild(data.isDevBuild);
 
         // Pre-select the default or most recently used profile
-        if (data.defaultProfileId) {
+        if (data.defaultProfileId && filteredProfiles.some((p) => p.id === data.defaultProfileId)) {
           setSelectedId(data.defaultProfileId);
-        } else if (data.profiles.length > 0) {
+        } else if (filteredProfiles.length > 0) {
           // Sort by lastUsed and select the most recent
-          const sorted = [...data.profiles].sort((a, b) => b.lastUsed - a.lastUsed);
+          const sorted = [...filteredProfiles].sort((a, b) => b.lastUsed - a.lastUsed);
           setSelectedId(sorted[0]?.id ?? null);
         }
 
@@ -103,6 +116,46 @@ export function ProfilePicker(): React.ReactElement {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create profile');
     }
+  };
+
+  // Handle deleting a profile
+  const handleDeleteProfile = async (profileId: string): Promise<void> => {
+    if (!window.profilePickerAPI) return;
+
+    try {
+      await window.profilePickerAPI.deleteProfile(profileId);
+      setProfiles((prev) => prev.filter((p) => p.id !== profileId));
+      if (selectedId === profileId) {
+        setSelectedId(profiles.length > 1 ? profiles.find((p) => p.id !== profileId)?.id ?? null : null);
+      }
+      setDeletingProfileId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete profile');
+    }
+  };
+
+  // Handle renaming a profile
+  const handleRenameProfile = async (): Promise<void> => {
+    if (!renamingProfileId || !renameValue.trim() || !window.profilePickerAPI) return;
+
+    try {
+      await window.profilePickerAPI.renameProfile(renamingProfileId, renameValue.trim());
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === renamingProfileId ? { ...p, name: renameValue.trim() } : p
+        )
+      );
+      setRenamingProfileId(null);
+      setRenameValue('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename profile');
+    }
+  };
+
+  // Start renaming a profile
+  const startRename = (profile: Profile): void => {
+    setRenamingProfileId(profile.id);
+    setRenameValue(profile.name);
   };
 
   // Handle cancel
@@ -154,6 +207,29 @@ export function ProfilePicker(): React.ReactElement {
         Choose a profile to launch NoteCove with:
       </p>
 
+      {/* Delete confirmation dialog */}
+      {deletingProfileId && (
+        <div style={styles.confirmDialog}>
+          <p style={styles.confirmText}>
+            Are you sure you want to delete this profile? The profile data will remain on disk.
+          </p>
+          <div style={styles.confirmButtons}>
+            <button
+              style={styles.buttonSecondary}
+              onClick={() => setDeletingProfileId(null)}
+            >
+              Cancel
+            </button>
+            <button
+              style={styles.buttonDanger}
+              onClick={() => void handleDeleteProfile(deletingProfileId)}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Profile list */}
       <div style={styles.profileList}>
         {profiles.length === 0 ? (
@@ -171,13 +247,80 @@ export function ProfilePicker(): React.ReactElement {
               onClick={() => setSelectedId(profile.id)}
               onDoubleClick={handleSelect}
             >
-              <div style={styles.profileName}>
-                {profile.name}
-                {profile.isDev && <span style={styles.devBadge}>DEV</span>}
-              </div>
-              <div style={styles.profileMeta}>
-                Last used: {formatDate(profile.lastUsed)}
-              </div>
+              {renamingProfileId === profile.id ? (
+                <div style={styles.renameForm}>
+                  <input
+                    type="text"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleRenameProfile();
+                      if (e.key === 'Escape') {
+                        setRenamingProfileId(null);
+                        setRenameValue('');
+                      }
+                    }}
+                    style={styles.renameInput}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <button
+                    style={styles.iconButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleRenameProfile();
+                    }}
+                    title="Save"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    style={styles.iconButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenamingProfileId(null);
+                      setRenameValue('');
+                    }}
+                    title="Cancel"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={styles.profileInfo}>
+                    <div style={styles.profileName}>
+                      {profile.name}
+                      {profile.isDev && <span style={styles.devBadge}>DEV</span>}
+                    </div>
+                    <div style={styles.profileMeta}>
+                      Last used: {formatDate(profile.lastUsed)}
+                    </div>
+                  </div>
+                  <div style={styles.profileActions}>
+                    <button
+                      style={styles.iconButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startRename(profile);
+                      }}
+                      title="Rename"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      style={styles.iconButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingProfileId(profile.id);
+                      }}
+                      title="Delete"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))
         )}
@@ -300,6 +443,9 @@ const styles: Record<string, React.CSSProperties> = {
     border: '2px solid transparent',
     backgroundColor: '#f9f9f9',
     transition: 'all 0.15s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   profileItemSelected: {
     backgroundColor: '#e8f4ff',
@@ -395,5 +541,61 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     fontSize: '14px',
     textAlign: 'center',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileActions: {
+    display: 'flex',
+    gap: '4px',
+    opacity: 0.5,
+  },
+  iconButton: {
+    padding: '4px 8px',
+    fontSize: '14px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    color: '#666',
+  },
+  confirmDialog: {
+    backgroundColor: '#fff3cd',
+    padding: '12px',
+    borderRadius: '6px',
+    border: '1px solid #ffc107',
+  },
+  confirmText: {
+    margin: '0 0 12px 0',
+    fontSize: '13px',
+    color: '#856404',
+  },
+  confirmButtons: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px',
+  },
+  buttonDanger: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: 500,
+    backgroundColor: '#dc2626',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+  },
+  renameForm: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  renameInput: {
+    flex: 1,
+    padding: '6px 8px',
+    fontSize: '14px',
+    border: '1px solid #0066cc',
+    borderRadius: '4px',
+    outline: 'none',
   },
 };

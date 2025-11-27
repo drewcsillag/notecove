@@ -53,6 +53,21 @@ contextBridge.exposeInMainWorld('profilePickerAPI', {
    */
   createProfile: (name: string): Promise<Profile> =>
     ipcRenderer.invoke('profile-picker:createProfile', name) as Promise<Profile>,
+
+  /**
+   * Delete a profile
+   * @param profileId - The ID of the profile to delete
+   */
+  deleteProfile: (profileId: string): Promise<void> =>
+    ipcRenderer.invoke('profile-picker:deleteProfile', profileId) as Promise<void>,
+
+  /**
+   * Rename a profile
+   * @param profileId - The ID of the profile to rename
+   * @param newName - The new display name
+   */
+  renameProfile: (profileId: string, newName: string): Promise<void> =>
+    ipcRenderer.invoke('profile-picker:renameProfile', profileId, newName) as Promise<void>,
 });
 
 // Type declaration for window
@@ -63,6 +78,8 @@ declare global {
       selectProfile: (profileId: string, skipPicker: boolean) => Promise<void>;
       cancel: () => Promise<void>;
       createProfile: (name: string) => Promise<Profile>;
+      deleteProfile: (profileId: string) => Promise<void>;
+      renameProfile: (profileId: string, newName: string) => Promise<void>;
     };
   }
 }

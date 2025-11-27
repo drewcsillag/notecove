@@ -126,6 +126,16 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
 
     return newProfile;
   });
+
+  // Delete a profile
+  ipcMain.handle('profile-picker:deleteProfile', async (_event, profileId: string) => {
+    await storage.deleteProfile(profileId);
+  });
+
+  // Rename a profile
+  ipcMain.handle('profile-picker:renameProfile', async (_event, profileId: string, newName: string) => {
+    await storage.renameProfile(profileId, newName);
+  });
 }
 
 /**
@@ -136,6 +146,8 @@ function unregisterIPCHandlers(): void {
   ipcMain.removeHandler('profile-picker:selectProfile');
   ipcMain.removeHandler('profile-picker:cancel');
   ipcMain.removeHandler('profile-picker:createProfile');
+  ipcMain.removeHandler('profile-picker:deleteProfile');
+  ipcMain.removeHandler('profile-picker:renameProfile');
 }
 
 /**
