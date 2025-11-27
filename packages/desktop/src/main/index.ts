@@ -2,7 +2,7 @@
  * Electron Main Process
  */
 
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
@@ -1515,6 +1515,16 @@ function createMenu(): void {
 
 void app.whenReady().then(async () => {
   try {
+    // Check for --debug-profiles flag
+    const debugProfiles = process.argv.includes('--debug-profiles');
+    if (debugProfiles) {
+      const appDataDir = app.getPath('userData');
+      const profileStorage = getProfileStorage(appDataDir);
+      const config = await profileStorage.loadProfiles();
+      console.log('[Profile Debug] profiles.json contents:');
+      console.log(JSON.stringify(config, null, 2));
+    }
+
     // Initialize telemetry (local mode always on, remote opt-in)
     await initializeTelemetry({
       remoteMetricsEnabled: false, // Will be controlled via settings panel
@@ -1975,6 +1985,19 @@ void app.whenReady().then(async () => {
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] IPC handlers ready, creating window...');
     }
+
+    // Register profile debug IPC handler for DevTools inspection
+    ipcMain.handle('profile:getInfo', async () => {
+      const appDataDir = app.getPath('userData');
+      const profileStorage = getProfileStorage(appDataDir);
+      const config = await profileStorage.loadProfiles();
+      const currentProfile = config.profiles.find((p) => p.id === selectedProfileId) ?? null;
+      return {
+        profileId: selectedProfileId,
+        profile: currentProfile,
+        isDevBuild: !app.isPackaged,
+      };
+    });
 
     // Create menu
     createMenu();

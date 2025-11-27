@@ -1167,4 +1167,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
   },
+
+  // Profile operations (for debugging)
+  profile: {
+    getInfo: (): Promise<{
+      profileId: string | null;
+      profile: { id: string; name: string; isDev: boolean } | null;
+      isDevBuild: boolean;
+    }> => ipcRenderer.invoke('profile:getInfo'),
+  },
+});
+
+// Set window.__NOTECOVE_PROFILE__ for DevTools inspection
+void ipcRenderer.invoke('profile:getInfo').then((info: unknown) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+  (window as any).__NOTECOVE_PROFILE__ = info;
 });
