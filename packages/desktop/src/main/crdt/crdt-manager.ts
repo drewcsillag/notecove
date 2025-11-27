@@ -64,29 +64,9 @@ export class CRDTManagerImpl implements CRDTManager {
     // If sdId not provided, try to determine it from existing updates
     const noteSdId = sdId ?? (await this.getNoteSdId(noteId));
 
-    // Load from storage (handles snapshots, logs, DB cache automatically)
-    // Cache + vector clock system ensures convergence:
-    // - Cached state is loaded first
-    // - Then new log records (not covered by cached vector clock) are applied
-    // - Result converges to the correct state
-    let snapshot: DocumentSnapshot;
-
-    try {
-      const loadResult = await this.storageManager.loadNote(noteSdId, noteId);
-
-      // Create snapshot from loaded state
-      snapshot = DocumentSnapshot.fromStorage(
-        Y.encodeStateAsUpdate(loadResult.doc),
-        loadResult.vectorClock
-      );
-      loadResult.doc.destroy(); // Clean up the temporary doc
-
-      console.log(`[CRDT Manager] Loaded note ${noteId} from storage`);
-    } catch (error) {
-      console.error(`Failed to load note ${noteId}:`, error);
-      // Continue with empty snapshot
-      snapshot = DocumentSnapshot.createEmpty();
-    }
+    // Load from storage with retry logic for transient errors
+    // (e.g., truncated files during cloud sync)
+    const snapshot = await this.loadNoteWithRetry(noteSdId, noteId);
 
     // Create NoteDoc wrapper using the snapshot's doc
     const noteDoc = new NoteDoc(noteId, snapshot.getDoc());
@@ -609,6 +589,60 @@ export class CRDTManagerImpl implements CRDTManager {
     // Fallback to default SD
     console.log(`[CRDT Manager] No sdId found for note ${noteId}, using 'default'`);
     return 'default';
+  }
+
+  /**
+   * Load a note from storage with exponential backoff retry for transient errors
+   *
+   * Handles truncation errors that can occur during cloud file sync (iCloud, Dropbox, etc.)
+   * Retries up to 8 times with exponential backoff before falling back to empty snapshot.
+   */
+  private async loadNoteWithRetry(sdId: string, noteId: string): Promise<DocumentSnapshot> {
+    // Retry delays: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s (total ~12s max wait)
+    const delays = [100, 200, 500, 1000, 2000, 3000, 5000];
+
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
+      try {
+        const loadResult = await this.storageManager.loadNote(sdId, noteId);
+
+        // Create snapshot from loaded state
+        const snapshot = DocumentSnapshot.fromStorage(
+          Y.encodeStateAsUpdate(loadResult.doc),
+          loadResult.vectorClock
+        );
+        loadResult.doc.destroy(); // Clean up the temporary doc
+
+        console.log(`[CRDT Manager] Loaded note ${noteId} from storage`);
+        return snapshot;
+      } catch (error) {
+        const errorObj = error as Error;
+        const errorMessage = errorObj.message || '';
+
+        // Check if this is a transient error that should be retried
+        const isTransient =
+          errorMessage.includes('Truncated record') ||
+          errorMessage.includes('Truncated header') ||
+          errorMessage.includes('incomplete') ||
+          errorMessage.includes('still being written') ||
+          errorMessage.includes('ENOENT');
+
+        if (isTransient && attempt < delays.length) {
+          const delay = delays[attempt] ?? 100;
+          console.log(
+            `[CRDT Manager] Transient error loading note ${noteId} (attempt ${attempt + 1}/${delays.length + 1}), retrying in ${delay}ms: ${errorMessage}`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Non-transient error or exhausted retries
+        console.error(`Failed to load note ${noteId}:`, error);
+        break;
+      }
+    }
+
+    // All retries failed, return empty snapshot
+    return DocumentSnapshot.createEmpty();
   }
 
   /**

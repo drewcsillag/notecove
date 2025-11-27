@@ -2576,16 +2576,12 @@ test.describe('cross-machine sync - new note creation', () => {
     await window1.keyboard.type('Initial Title For Test');
     await window1.waitForTimeout(2000);
 
-    // Wait for sync to Instance 2
+    // Wait for sync to Instance 2 - use waitFor instead of fixed timeout
     console.log('[TitleSyncUnopened] Waiting for new note to sync to Instance 2...');
-    await window1.waitForTimeout(10000);
-
-    // Verify Instance 2 sees the new note in the list
     const notesList2 = window2.locator('[data-testid="notes-list"]');
     const initialNote2 = notesList2.locator('li:has-text("Initial Title For Test")');
-    const hasInitialNote = await initialNote2.isVisible();
-    console.log(`[TitleSyncUnopened] Instance 2 has initial note: ${hasInitialNote}`);
-    expect(hasInitialNote).toBe(true);
+    await initialNote2.waitFor({ state: 'visible', timeout: 30000 });
+    console.log('[TitleSyncUnopened] Instance 2 has initial note: true');
 
     // KEY: Switch Instance 2 back to welcome note so the new note is NOT open
     console.log('[TitleSyncUnopened] Switching Instance 2 to welcome note (closing test note)...');
