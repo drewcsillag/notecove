@@ -15,6 +15,8 @@ import {
   type ActivitySyncCallbacks,
   extractTitleFromDoc,
   extractTags,
+  SDMarker,
+  type SDType,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
@@ -45,6 +47,7 @@ let crdtManager: CRDTManager | null = null;
 let noteMoveManager: NoteMoveManager | null = null;
 let diagnosticsManager: DiagnosticsManager | null = null;
 let backupManager: BackupManager | null = null;
+let sdMarker: SDMarker | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -1622,11 +1625,37 @@ void app.whenReady().then(async () => {
             return;
           }
 
-          selectedProfileId = profile.id;
-          console.log(`[Profile] CLI: Using profile "${profile.name}" (${profile.id})`);
+          // Dev build warning when accessing production profile
+          if (isDevBuild && !profile.isDev) {
+            const { dialog } = await import('electron');
+            const result = await dialog.showMessageBox({
+              type: 'warning',
+              title: 'Access Production Data?',
+              message: "You're about to access production data with a development build.",
+              detail: `The profile "${profile.name}" is a production profile. Development builds may have bugs that could corrupt your data. Are you sure you want to continue?`,
+              buttons: ['Cancel', 'Continue Anyway'],
+              defaultId: 0,
+              cancelId: 0,
+            });
 
-          // Update lastUsed
-          await profileStorage.updateLastUsed(profile.id);
+            if (result.response === 0) {
+              // User cancelled - show picker instead
+              console.log('[Profile] CLI: User cancelled accessing production profile');
+              // Fall through to show picker
+            } else {
+              selectedProfileId = profile.id;
+              console.log(`[Profile] CLI: User confirmed accessing production profile "${profile.name}" (${profile.id})`);
+            }
+          } else {
+            selectedProfileId = profile.id;
+          }
+
+          if (selectedProfileId) {
+            console.log(`[Profile] CLI: Using profile "${profile.name}" (${profile.id})`);
+
+            // Update lastUsed
+            await profileStorage.updateLastUsed(profile.id);
+          }
         }
       }
 
@@ -1656,6 +1685,26 @@ void app.whenReady().then(async () => {
           );
           app.quit();
           return;
+        }
+
+        // Dev build warning when accessing production profile
+        if (isDevBuild && !profile.isDev) {
+          const { dialog } = await import('electron');
+          const result = await dialog.showMessageBox({
+            type: 'warning',
+            title: 'Access Production Data?',
+            message: "You're about to access production data with a development build.",
+            detail: `The profile "${profile.name}" is a production profile. Development builds may have bugs that could corrupt your data. Are you sure you want to continue?`,
+            buttons: ['Cancel', 'Continue Anyway'],
+            defaultId: 0,
+            cancelId: 0,
+          });
+
+          if (result.response === 0) {
+            // User cancelled - quit app
+            app.quit();
+            return;
+          }
         }
 
         selectedProfileId = profile.id;
@@ -1760,6 +1809,12 @@ void app.whenReady().then(async () => {
     // Initialize file system adapter
     const fsAdapter = new NodeFileSystemAdapter();
 
+    // Initialize SD marker for dev/prod safety checks
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    sdMarker = new SDMarker(fsAdapter as any);
+    const isDevBuild = !app.isPackaged;
+    const currentSDType: SDType = isDevBuild ? 'dev' : 'prod';
+
     // Determine storage directory (shared across instances for sync)
     const storageDir = process.env['TEST_STORAGE_DIR'] ?? join(app.getPath('userData'), 'storage');
 
@@ -1773,6 +1828,12 @@ void app.whenReady().then(async () => {
 
     // Initialize SD directory structure
     await sdStructure.initialize();
+
+    // Ensure SD has a marker file (for dev/prod safety)
+    // Skip for test mode to avoid breaking E2E tests
+    if (!process.env['TEST_STORAGE_DIR']) {
+      await sdMarker.ensureMarker(storageDir, currentSDType);
+    }
 
     // Ensure folders/logs directory exists BEFORE creating CRDT manager
     // This prevents ENOENT errors when demo folders are created
@@ -1788,9 +1849,24 @@ void app.whenReady().then(async () => {
     storageManager.registerSD('default', storageDir);
 
     // Load all Storage Directories from database and register them
+    // Also perform safety checks for dev/prod mismatches
     const allSDs = await database.getAllStorageDirs();
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
+        // Check SD marker for safety (skip in test mode)
+        if (!process.env['TEST_STORAGE_DIR']) {
+          const existingMarker = await sdMarker.readSDMarker(sd.path);
+
+          // Production build: refuse to load dev SDs
+          if (!isDevBuild && existingMarker === 'dev') {
+            console.warn(`[Init] Skipping dev SD in production: ${sd.name} at ${sd.path}`);
+            continue;
+          }
+
+          // Ensure marker exists (will write current build type if missing)
+          await sdMarker.ensureMarker(sd.path, currentSDType);
+        }
+
         // Default is already registered above
         storageManager.registerSD(sd.id, sd.path);
         console.log(`[Init] Registered SD: ${sd.name} at ${sd.path}`);
@@ -1840,6 +1916,12 @@ void app.whenReady().then(async () => {
         const newSdStructure = new SyncDirectoryStructure(fsAdapter, sdConfig);
         await newSdStructure.initialize();
         console.log(`[Init] Step 1: SD structure created successfully`);
+
+        // Write SD marker file for dev/prod safety (skip in test mode)
+        if (!process.env['TEST_STORAGE_DIR'] && sdMarker) {
+          await sdMarker.writeSDMarker(sdPath, currentSDType);
+          console.log(`[Init] Step 1.5: SD marker written (${currentSDType})`);
+        }
 
         // 2. Ensure activity directory exists (required for watchers)
         sendProgress(2, 6, 'Setting up activity tracking...');
