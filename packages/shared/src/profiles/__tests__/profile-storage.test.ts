@@ -156,4 +156,254 @@ describe('ProfileStorage', () => {
       expect(mockFs.mkdir).toHaveBeenCalledWith(`${APP_DATA_DIR}/profiles/p1`);
     });
   });
+
+  describe('createProfile', () => {
+    it('should create a new profile and save it', async () => {
+      const mockFs = createMockFs();
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const profile = await storage.createProfile('My Profile', false);
+
+      expect(profile.name).toBe('My Profile');
+      expect(profile.isDev).toBe(false);
+      expect(profile.id).toBeDefined();
+      expect(profile.created).toBeGreaterThan(0);
+      expect(profile.lastUsed).toBeGreaterThan(0);
+
+      // Verify it was saved
+      expect(mockFs.writeFile).toHaveBeenCalled();
+      expect(mockFs.mkdir).toHaveBeenCalledWith(`${APP_DATA_DIR}/profiles/${profile.id}`);
+    });
+
+    it('should create a dev profile when isDev is true', async () => {
+      const mockFs = createMockFs();
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const profile = await storage.createProfile('Dev Profile', true);
+
+      expect(profile.name).toBe('Dev Profile');
+      expect(profile.isDev).toBe(true);
+    });
+
+    it('should add profile to existing profiles', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'existing-1',
+            name: 'Existing',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: 'existing-1',
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const profile = await storage.createProfile('New Profile', false);
+
+      // Verify the saved data contains both profiles
+      const writeCall = (mockFs.writeFile as jest.Mock).mock.calls[0] as [string, Uint8Array];
+      const writtenData = writeCall[1];
+      const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
+      expect(parsed.profiles).toHaveLength(2);
+      expect(parsed.profiles.find((p) => p.id === 'existing-1')).toBeDefined();
+      expect(parsed.profiles.find((p) => p.id === profile.id)).toBeDefined();
+    });
+  });
+
+  describe('deleteProfile', () => {
+    it('should remove profile from config', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Profile 1',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+          {
+            id: 'p2',
+            name: 'Profile 2',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: 'p1',
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      await storage.deleteProfile('p1');
+
+      // Verify the saved data only contains p2
+      const writeCall = (mockFs.writeFile as jest.Mock).mock.calls[0] as [string, Uint8Array];
+      const writtenData = writeCall[1];
+      const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
+      expect(parsed.profiles).toHaveLength(1);
+      expect(parsed.profiles[0]?.id).toBe('p2');
+    });
+
+    it('should clear defaultProfileId if deleting the default profile', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Profile 1',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: 'p1',
+        skipPicker: true,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      await storage.deleteProfile('p1');
+
+      const writeCall = (mockFs.writeFile as jest.Mock).mock.calls[0] as [string, Uint8Array];
+      const writtenData = writeCall[1];
+      const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
+      expect(parsed.defaultProfileId).toBeNull();
+      expect(parsed.skipPicker).toBe(false); // Reset skipPicker when default is deleted
+    });
+
+    it('should throw if profile does not exist', async () => {
+      const mockFs = createMockFs();
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      await expect(storage.deleteProfile('nonexistent')).rejects.toThrow('Profile not found');
+    });
+
+    it('should NOT delete profile data directory (only config entry)', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Profile 1',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: null,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      await storage.deleteProfile('p1');
+
+      // deleteFile should NOT be called for the profile directory
+      expect(mockFs.deleteFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('renameProfile', () => {
+    it('should update profile name', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Old Name',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: null,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      await storage.renameProfile('p1', 'New Name');
+
+      const writeCall = (mockFs.writeFile as jest.Mock).mock.calls[0] as [string, Uint8Array];
+      const writtenData = writeCall[1];
+      const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
+      expect(parsed.profiles[0]?.name).toBe('New Name');
+    });
+
+    it('should throw if profile does not exist', async () => {
+      const mockFs = createMockFs();
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      await expect(storage.renameProfile('nonexistent', 'New Name')).rejects.toThrow(
+        'Profile not found'
+      );
+    });
+
+    it('should throw if new name is empty', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Old Name',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: null,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      await expect(storage.renameProfile('p1', '')).rejects.toThrow('Profile name cannot be empty');
+      await expect(storage.renameProfile('p1', '   ')).rejects.toThrow(
+        'Profile name cannot be empty'
+      );
+    });
+  });
+
+  describe('updateLastUsed', () => {
+    it('should update the lastUsed timestamp', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Profile 1',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: null,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const beforeUpdate = Date.now();
+      await storage.updateLastUsed('p1');
+
+      const writeCall = (mockFs.writeFile as jest.Mock).mock.calls[0] as [string, Uint8Array];
+      const writtenData = writeCall[1];
+      const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
+      expect(parsed.profiles[0]?.lastUsed).toBeGreaterThanOrEqual(beforeUpdate);
+    });
+  });
 });

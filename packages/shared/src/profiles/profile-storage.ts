@@ -9,8 +9,8 @@
  */
 
 import type { FileSystemAdapter } from '../storage/types';
-import type { ProfilesConfig } from './types';
-import { createEmptyProfilesConfig } from './types';
+import type { Profile, ProfilesConfig } from './types';
+import { createEmptyProfilesConfig, createProfile } from './types';
 
 /** Filename for the profiles configuration */
 const PROFILES_CONFIG_FILENAME = 'profiles.json';
@@ -134,5 +134,116 @@ export class ProfileStorage {
     const profileDir = this.getProfileDataDir(profileId);
     await this.fs.mkdir(profileDir);
     console.log(`[ProfileStorage] Ensured profile directory exists: ${profileDir}`);
+  }
+
+  /**
+   * Create a new profile with the given name and dev status.
+   *
+   * Creates the profile entry in profiles.json and the profile's data directory.
+   *
+   * @param name - Display name for the profile
+   * @param isDev - Whether this is a development profile
+   * @returns The newly created Profile
+   */
+  async createProfile(name: string, isDev: boolean): Promise<Profile> {
+    // Create the profile object using the helper from types.ts
+    const profile = createProfile(name, isDev);
+
+    // Load existing config and add the new profile
+    const config = await this.loadProfiles();
+    config.profiles.push(profile);
+
+    // Save the updated config
+    await this.saveProfiles(config);
+
+    // Create the profile's data directory
+    await this.ensureProfileDataDir(profile.id);
+
+    console.log(`[ProfileStorage] Created profile: ${profile.name} (${profile.id})`);
+    return profile;
+  }
+
+  /**
+   * Delete a profile from the configuration.
+   *
+   * Note: This only removes the profile entry from profiles.json.
+   * The profile's data directory is NOT deleted (per requirements).
+   * The user can manually delete the directory if desired.
+   *
+   * @param profileId - The ID of the profile to delete
+   * @throws Error if profile does not exist
+   */
+  async deleteProfile(profileId: string): Promise<void> {
+    const config = await this.loadProfiles();
+
+    // Find the profile
+    const profileIndex = config.profiles.findIndex((p) => p.id === profileId);
+    if (profileIndex === -1) {
+      throw new Error('Profile not found');
+    }
+
+    // Remove the profile from the array
+    config.profiles.splice(profileIndex, 1);
+
+    // Clear defaultProfileId if we're deleting the default profile
+    if (config.defaultProfileId === profileId) {
+      config.defaultProfileId = null;
+      config.skipPicker = false; // Reset skipPicker since there's no default
+    }
+
+    // Save the updated config
+    await this.saveProfiles(config);
+
+    console.log(`[ProfileStorage] Deleted profile: ${profileId}`);
+  }
+
+  /**
+   * Rename a profile.
+   *
+   * @param profileId - The ID of the profile to rename
+   * @param newName - The new display name
+   * @throws Error if profile does not exist or name is empty
+   */
+  async renameProfile(profileId: string, newName: string): Promise<void> {
+    // Validate the new name
+    if (!newName.trim()) {
+      throw new Error('Profile name cannot be empty');
+    }
+
+    const config = await this.loadProfiles();
+
+    // Find the profile
+    const profile = config.profiles.find((p) => p.id === profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    // Update the name
+    profile.name = newName.trim();
+
+    // Save the updated config
+    await this.saveProfiles(config);
+
+    console.log(`[ProfileStorage] Renamed profile ${profileId} to: ${newName}`);
+  }
+
+  /**
+   * Update the lastUsed timestamp for a profile.
+   *
+   * @param profileId - The ID of the profile to update
+   */
+  async updateLastUsed(profileId: string): Promise<void> {
+    const config = await this.loadProfiles();
+
+    const profile = config.profiles.find((p) => p.id === profileId);
+    if (!profile) {
+      // Silently ignore if profile doesn't exist (could be a test scenario)
+      return;
+    }
+
+    profile.lastUsed = Date.now();
+
+    await this.saveProfiles(config);
+    console.log(`[ProfileStorage] Updated lastUsed for profile: ${profileId}`);
   }
 }
