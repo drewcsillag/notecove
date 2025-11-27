@@ -79,7 +79,12 @@ export interface ActivitySyncCallbacks {
 }
 
 export class ActivitySync {
-  private lastSeenSequences = new Map<string, number>(); // instanceId -> last sequence number
+  // Track line count per instance's activity log file
+  // This is more robust than tracking sequence numbers because:
+  // 1. Sequence numbers are per-note, not per-instance
+  // 2. A single activity log file contains entries for multiple notes with independent sequences
+  // 3. Using line count ensures we process ALL new entries regardless of their sequence numbers
+  private lastSeenLineCount = new Map<string, number>(); // instanceId -> line count processed
   private pendingSyncs = new Map<string, Promise<void>>(); // noteId -> pending sync promise
   private highestPendingSequence = new Map<string, { instanceSeq: string; sequence: number }>(); // noteId -> highest sequence
 
@@ -142,40 +147,32 @@ export class ActivitySync {
 
           if (lines.length === 0) continue;
 
-          const lastSeen = this.lastSeenSequences.get(otherInstanceId) ?? -1;
+          const lastSeenCount = this.lastSeenLineCount.get(otherInstanceId) ?? 0;
 
           console.log(
-            `[ActivitySync] Reading ${file}: ${lines.length} lines, lastSeen=${lastSeen}, firstSeq=${lines[0]?.split('|')[1]}, lastSeq=${lines[lines.length - 1]?.split('|')[1]}`
+            `[ActivitySync] Reading ${file}: ${lines.length} lines, lastSeenCount=${lastSeenCount}, newLines=${lines.length - lastSeenCount}`
           );
 
-          // Parse first line to check for sequence gap
-          const firstLine = lines[0];
-          if (firstLine) {
-            const firstParts = firstLine.split('|');
-            if (firstParts.length >= 2) {
-              const firstInstanceSeq = firstParts[1];
-              if (firstInstanceSeq) {
-                const firstSeqParts = firstInstanceSeq.split('_');
-                const firstSequence = parseInt(firstSeqParts[1] ?? '0');
-
-                // Gap detection: compaction removed entries we haven't seen yet
-                if (firstSequence > lastSeen + 1 && lastSeen > 0) {
-                  console.warn(
-                    `[ActivitySync] Gap detected for ${otherInstanceId} (oldest: ${firstSequence}, last seen: ${lastSeen}), performing full scan`
-                  );
-                  const reloadedNotes = await this.fullScanAllNotes();
-                  for (const noteId of reloadedNotes) {
-                    affectedNotes.add(noteId);
-                  }
-                }
-              }
+          // Gap detection: if file has fewer lines than we've seen, it was compacted/truncated
+          // This means we may have missed entries, so do a full scan
+          if (lines.length < lastSeenCount && lastSeenCount > 0) {
+            console.warn(
+              `[ActivitySync] File compaction detected for ${otherInstanceId} (current: ${lines.length} lines, last seen: ${lastSeenCount}), performing full scan`
+            );
+            const reloadedNotes = await this.fullScanAllNotes();
+            for (const noteId of reloadedNotes) {
+              affectedNotes.add(noteId);
             }
+            // Reset line count to current file size
+            this.lastSeenLineCount.set(otherInstanceId, lines.length);
+            continue;
           }
 
-          // Process new entries (those with sequence > lastSeen)
-          // DON'T update watermark here - it will be updated after successful sync
-          // This prevents race conditions where watermark updates before content syncs
-          for (const line of lines) {
+          // Process only NEW lines (those beyond what we've already seen)
+          // This correctly handles interleaved entries from different notes
+          const newLines = lines.slice(lastSeenCount);
+
+          for (const line of newLines) {
             const parts = line.split('|');
             if (parts.length < 2) continue; // Invalid line
 
@@ -186,21 +183,27 @@ export class ActivitySync {
             const seqParts = instanceSeq.split('_');
             const sequence = parseInt(seqParts[1] ?? '0');
 
-            if (sequence > lastSeen) {
-              affectedNotes.add(noteId);
+            affectedNotes.add(noteId);
 
-              // Track the highest sequence we need to sync to
-              const existing = this.highestPendingSequence.get(noteId);
-              if (!existing || sequence > existing.sequence) {
-                this.highestPendingSequence.set(noteId, { instanceSeq, sequence });
-              }
-
-              // If there's no pending sync, start one
-              // Otherwise, the pending sync will be followed by another sync for the highest sequence
-              if (!this.pendingSyncs.has(noteId)) {
-                this.startSyncChain(noteId, otherInstanceId);
-              }
+            // Track the highest sequence we need to sync to for this note
+            const existing = this.highestPendingSequence.get(noteId);
+            if (!existing || sequence > existing.sequence) {
+              this.highestPendingSequence.set(noteId, { instanceSeq, sequence });
             }
+
+            // If there's no pending sync, start one
+            // Otherwise, the pending sync will be followed by another sync for the highest sequence
+            if (!this.pendingSyncs.has(noteId)) {
+              this.startSyncChain(noteId, otherInstanceId);
+            }
+          }
+
+          // Update line count watermark after processing
+          // Note: We update this immediately because line count tracking is independent
+          // of whether the CRDT files have synced yet. The pollAndReload will handle
+          // waiting for CRDT files to arrive.
+          if (lines.length > lastSeenCount) {
+            this.lastSeenLineCount.set(otherInstanceId, lines.length);
           }
         } catch (error) {
           // File might have been deleted or is corrupted
@@ -227,9 +230,9 @@ export class ActivitySync {
    * new sequences arrive while we're still polling for earlier ones.
    *
    * @param noteId The note to sync
-   * @param otherInstanceId The instance ID whose activity we're syncing from
+   * @param _otherInstanceId The instance ID whose activity we're syncing from (unused, kept for docs)
    */
-  private startSyncChain(noteId: string, otherInstanceId: string): void {
+  private startSyncChain(noteId: string, _otherInstanceId: string): void {
     const syncOneAndContinue = async (): Promise<void> => {
       // Get the current highest sequence we need to sync to
       const target = this.highestPendingSequence.get(noteId);
@@ -249,12 +252,11 @@ export class ActivitySync {
       // Sync to this sequence
       const success = await this.pollAndReload(target.instanceSeq, noteId);
 
-      // Update watermark ONLY after successful sync
-      // This prevents the race condition where we mark sequences as "seen" before their content syncs
+      // Note: Line count watermark is already updated in syncFromOtherInstances
+      // The pollAndReload handles waiting for CRDT files to arrive
       if (success) {
-        this.lastSeenSequences.set(otherInstanceId, target.sequence);
         console.log(
-          `[ActivitySync] Watermark updated for ${otherInstanceId} to ${target.sequence}`
+          `[ActivitySync] Successfully synced note ${noteId} to sequence ${target.sequence}`
         );
       }
 
@@ -467,13 +469,14 @@ export class ActivitySync {
    * Reset watermark tracking (useful for testing)
    */
   resetWatermarks(): void {
-    this.lastSeenSequences.clear();
+    this.lastSeenLineCount.clear();
   }
 
   /**
    * Get current watermarks (useful for debugging)
+   * Returns instanceId -> line count processed
    */
   getWatermarks(): Map<string, number> {
-    return new Map(this.lastSeenSequences);
+    return new Map(this.lastSeenLineCount);
   }
 }

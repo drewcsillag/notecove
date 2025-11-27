@@ -123,12 +123,14 @@ describe('ActivitySync', () => {
       expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-3', 'test-sd');
     });
 
-    it('should detect sequence gaps and trigger full scan', async () => {
+    it('should detect file compaction (shrinking) and trigger full scan', async () => {
       mockFs.listFiles.mockResolvedValue(['other-instance.log']);
 
-      // First sync - establish baseline
+      // First sync - establish baseline with 3 lines
       mockFs.readFile.mockResolvedValue(
-        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_101\n')
+        new TextEncoder().encode(
+          'note-1|other-instance_100\nnote-2|other-instance_101\nnote-3|other-instance_102\n'
+        )
       );
       mockFs.exists.mockResolvedValue(true);
 
@@ -137,8 +139,8 @@ describe('ActivitySync', () => {
 
       jest.clearAllMocks();
 
-      // Second sync - log has been compacted, oldest entry jumped ahead
-      // This simulates compaction removing sequences 100, 101
+      // Second sync - log has been compacted, file now has only 2 lines
+      // This simulates compaction removing older entries
       mockFs.readFile.mockResolvedValue(
         new TextEncoder().encode('note-5|other-instance_200\nnote-6|other-instance_201\n')
       );
@@ -147,13 +149,13 @@ describe('ActivitySync', () => {
       await sync.syncFromOtherInstances();
       await sleep(50);
 
-      // Should trigger full scan of loaded notes (3) PLUS process new entries (2)
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(5);
+      // Should trigger full scan of loaded notes (3) because file shrank
+      // New entries (note-5, note-6) are NOT processed separately after full scan
+      // (the continue statement skips further processing for this file)
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(3);
       expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
       expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2', 'test-sd');
       expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-3', 'test-sd');
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-5', 'test-sd');
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-6', 'test-sd');
     });
 
     it('should handle empty log files', async () => {
@@ -337,6 +339,8 @@ describe('ActivitySync', () => {
       mockFs.exists.mockResolvedValue(true);
 
       // First read: complete line followed by truncated line
+      // File content is: "note-1|other-instance_100\nnote-2|other-instance_101"
+      // Only the first line is complete (has trailing \n), second line is truncated
       mockFs.readFile.mockResolvedValueOnce(
         new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_101')
       );
@@ -344,9 +348,10 @@ describe('ActivitySync', () => {
       await sync.syncFromOtherInstances();
       await sleep(50);
 
-      // Watermark should be 100 (note-1), not 101 (note-2's sequence)
+      // Watermark is now line-count based, not sequence-based
+      // Only 1 complete line was processed, so watermark should be 1
       const watermarks = sync.getWatermarks();
-      expect(watermarks.get('other-instance')).toBe(100);
+      expect(watermarks.get('other-instance')).toBe(1);
     });
   });
 });

@@ -100,13 +100,7 @@ export class NoteStorageManager {
     }
 
     // Step 2: Apply log records not covered by snapshot
-    console.log(`[NoteStorageManager] Before applyLogRecords, vectorClock:`, JSON.stringify(vectorClock));
     await this.applyLogRecords(doc, vectorClock, paths.logs);
-    console.log(`[NoteStorageManager] After applyLogRecords, vectorClock:`, JSON.stringify(vectorClock));
-
-    // Log final doc state
-    const content = doc.getXmlFragment('content');
-    console.log(`[NoteStorageManager] Final doc content length: ${content.length}`);
 
     return { doc, vectorClock };
   }
