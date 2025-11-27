@@ -75,11 +75,13 @@ export class NoteStorageManager {
    * 5. Return merged doc and updated vector clock
    */
   async loadNote(_sdId: string, _noteId: string, paths: NoteLogPaths): Promise<LoadNoteResult> {
+    console.log(`[NoteStorageManager] loadNote called, logs path: ${paths.logs}`);
     const doc = new Y.Doc();
     const vectorClock: VectorClock = {};
 
     // Step 1: Try to load from snapshot
     const bestSnapshot = await SnapshotReader.findBestSnapshot(paths.snapshots, this.fs);
+    console.log(`[NoteStorageManager] Best snapshot: ${bestSnapshot ? bestSnapshot.path : 'none'}`);
 
     if (bestSnapshot) {
       const snapshot = await SnapshotReader.readSnapshot(bestSnapshot.path, this.fs);
@@ -98,7 +100,13 @@ export class NoteStorageManager {
     }
 
     // Step 2: Apply log records not covered by snapshot
+    console.log(`[NoteStorageManager] Before applyLogRecords, vectorClock:`, JSON.stringify(vectorClock));
     await this.applyLogRecords(doc, vectorClock, paths.logs);
+    console.log(`[NoteStorageManager] After applyLogRecords, vectorClock:`, JSON.stringify(vectorClock));
+
+    // Log final doc state
+    const content = doc.getXmlFragment('content');
+    console.log(`[NoteStorageManager] Final doc content length: ${content.length}`);
 
     return { doc, vectorClock };
   }
