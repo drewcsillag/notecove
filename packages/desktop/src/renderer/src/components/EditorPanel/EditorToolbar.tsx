@@ -139,10 +139,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Insert Checkbox">
+      <Tooltip title="Convert to Task Item">
         <IconButton
           size="small"
-          onClick={() => editor.chain().focus().insertTriStateCheckbox().run()}
+          onClick={() => editor.chain().focus().convertToTaskItem().run()}
+          color={editor.isActive('taskItem') ? 'primary' : 'default'}
         >
           <CheckBoxOutlineBlank fontSize="small" />
         </IconButton>

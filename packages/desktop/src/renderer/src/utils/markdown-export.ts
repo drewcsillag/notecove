@@ -63,6 +63,9 @@ function convertNode(
     case 'listItem':
       return convertListItem(node, noteTitleLookup, listDepth);
 
+    case 'taskItem':
+      return convertTaskItem(node, noteTitleLookup, listDepth);
+
     case 'blockquote':
       return convertBlockquote(node, noteTitleLookup);
 
@@ -75,6 +78,7 @@ function convertNode(
     case 'text':
       return convertTextNode(node, noteTitleLookup);
 
+    // Legacy inline checkbox (may still exist in old documents)
     case 'triStateCheckbox':
       return convertCheckbox(node);
 
@@ -136,6 +140,14 @@ function convertBulletList(
   return node.content
     .map((item) => {
       const indent = '  '.repeat(listDepth);
+
+      // Check if this is a task item
+      if (item.type === 'taskItem') {
+        const taskPrefix = getTaskPrefix(item);
+        const itemContent = convertTaskItem(item, noteTitleLookup, listDepth + 1);
+        return `${indent}- ${taskPrefix} ${itemContent}`;
+      }
+
       const itemContent = convertListItem(item, noteTitleLookup, listDepth + 1);
       return `${indent}- ${itemContent}`;
     })
@@ -155,6 +167,14 @@ function convertOrderedList(
   return node.content
     .map((item, index) => {
       const indent = '  '.repeat(listDepth);
+
+      // Check if this is a task item
+      if (item.type === 'taskItem') {
+        const taskPrefix = getTaskPrefix(item);
+        const itemContent = convertTaskItem(item, noteTitleLookup, listDepth + 1);
+        return `${indent}${index + 1}. ${taskPrefix} ${itemContent}`;
+      }
+
       const itemContent = convertListItem(item, noteTitleLookup, listDepth + 1);
       return `${indent}${index + 1}. ${itemContent}`;
     })
@@ -276,7 +296,7 @@ function applyMark(text: string, mark: { type: string; attrs?: Record<string, un
 }
 
 /**
- * Convert tri-state checkbox node
+ * Convert tri-state checkbox node (legacy inline checkboxes)
  */
 function convertCheckbox(node: JSONContent): string {
   const state = node.attrs?.['checked'] as string;
@@ -290,6 +310,56 @@ function convertCheckbox(node: JSONContent): string {
     default:
       return '[ ]';
   }
+}
+
+/**
+ * Get the task checkbox prefix based on state
+ */
+function getTaskPrefix(node: JSONContent): string {
+  const state = node.attrs?.['checked'] as string;
+
+  switch (state) {
+    case 'checked':
+      return '[x]';
+    case 'nope':
+      return '[-]';
+    case 'unchecked':
+    default:
+      return '[ ]';
+  }
+}
+
+/**
+ * Convert task item node (list item with checkbox state)
+ */
+function convertTaskItem(
+  node: JSONContent,
+  noteTitleLookup: NoteTitleLookup,
+  listDepth: number
+): string {
+  if (!node.content) return '';
+
+  const parts: string[] = [];
+
+  for (const child of node.content) {
+    if (child.type === 'paragraph') {
+      const text = convertParagraph(child, noteTitleLookup);
+      parts.push(text);
+    } else if (child.type === 'bulletList' || child.type === 'orderedList') {
+      // Nested list
+      const nestedList = convertNode(child, noteTitleLookup, listDepth);
+      if (nestedList) {
+        parts.push('\n' + nestedList);
+      }
+    } else {
+      const text = convertNode(child, noteTitleLookup, listDepth);
+      if (text !== null) {
+        parts.push(text);
+      }
+    }
+  }
+
+  return parts.join('');
 }
 
 // ============================================================================

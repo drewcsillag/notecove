@@ -8,6 +8,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
 import Collaboration from '@tiptap/extension-collaboration';
 import Underline from '@tiptap/extension-underline';
 import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
@@ -17,7 +19,7 @@ import * as Y from 'yjs';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
-import { TriStateCheckbox } from './extensions/TriStateCheckbox';
+import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { SearchPanel } from './SearchPanel';
 
 export interface TipTapEditorProps {
@@ -56,15 +58,27 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   const editor = useEditor({
     extensions: [
-      // Use StarterKit but exclude History (Collaboration provides its own)
-      // and TaskList/TaskItem (using tri-state versions instead)
+      // Use StarterKit but exclude History and built-in lists
+      // (we'll add custom list extensions that support taskItem)
       StarterKit.configure({
         history: false, // Collaboration extension handles undo/redo
+        bulletList: false, // Use custom version that accepts taskItem
+        orderedList: false, // Use custom version that accepts taskItem
+      }),
+      // Custom BulletList that accepts both listItem and taskItem
+      BulletList.extend({
+        content: '(listItem | taskItem)+',
+      }),
+      // Custom OrderedList that accepts both listItem and taskItem
+      OrderedList.extend({
+        content: '(listItem | taskItem)+',
       }),
       // Add Underline extension (not in StarterKit)
       Underline,
-      // Add tri-state checkbox extension (inline checkboxes)
-      TriStateCheckbox,
+      // Add tri-state task item extension (list-based checkboxes)
+      TriStateTaskItem.configure({
+        nested: true, // Allow nesting for sub-tasks
+      }),
       // Add Hashtag extension for #tag support
       Hashtag,
       // Add InterNoteLink extension for [[note-id]] support
@@ -514,55 +528,89 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             outline: `2px solid ${theme.palette.primary.main}`,
             outlineOffset: '1px',
           },
-          // Tri-state checkbox styling (inline)
-          '& span[data-type="tri-state-checkbox"]': {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            verticalAlign: 'middle',
-            marginRight: '4px',
-            cursor: 'pointer',
-            userSelect: 'none',
-          },
-          // Custom checkbox styling for all states
-          '& .tri-state-checkbox': {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '18px',
-            height: '18px',
-            marginRight: '6px',
-            border: `2px solid ${theme.palette.text.secondary}`,
-            borderRadius: '3px',
-            cursor: 'pointer',
-            flexShrink: 0,
-            // Checked state (white checkmark on green background)
-            '&[data-checked="checked"]': {
-              backgroundColor: theme.palette.success.main,
-              borderColor: theme.palette.success.main,
-              '& .tri-state-checkbox-content': {
-                color: '#ffffff',
-                fontSize: '12px',
-                fontWeight: 700,
-                lineHeight: 1,
-              },
+          // Task item styling (list-based checkboxes)
+          // The checkbox is positioned to the left of content
+          // Content aligns with body text (task item pulls back to cancel list indentation)
+          '& li[data-type="taskItem"]': {
+            display: 'flex',
+            alignItems: 'flex-start',
+            listStyle: 'none',
+            position: 'relative',
+            // Pull back to cancel list padding, so content aligns with body text
+            // Lists have paddingLeft: 2 (16px), so we offset by -16px
+            marginLeft: -2, // MUI spacing: -16px
+            // Add padding on left for the checkbox
+            paddingLeft: '28px', // 18px checkbox + 10px gap
+
+            // Checkbox wrapper - positioned absolutely in the padding area
+            '& .task-checkbox-wrapper': {
+              position: 'absolute',
+              left: 0,
+              top: '2px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              userSelect: 'none',
             },
-            // Nope state (white N on red background)
-            '&[data-checked="nope"]': {
-              backgroundColor: theme.palette.error.main,
-              borderColor: theme.palette.error.main,
-              '& .tri-state-checkbox-content': {
-                color: '#ffffff',
-                fontSize: '11px',
-                fontWeight: 700,
-                lineHeight: 1,
-              },
+
+            // Checkbox element
+            '& .task-checkbox': {
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '18px',
+              height: '18px',
+              border: `2px solid ${theme.palette.text.secondary}`,
+              borderRadius: '3px',
+              fontSize: '12px',
+              fontWeight: 700,
+              lineHeight: 1,
+              transition: 'all 0.15s ease',
             },
-            // Unchecked state
+
+            // Task content area
+            '& .task-content': {
+              flex: 1,
+              minWidth: 0,
+            },
+
+            // Unchecked state - empty checkbox
             '&[data-checked="unchecked"]': {
-              backgroundColor: 'transparent',
-              '& .tri-state-checkbox-content': {
-                display: 'none',
+              '& .task-checkbox': {
+                backgroundColor: 'transparent',
+              },
+              '& .task-content': {
+                textDecoration: 'none',
+                opacity: 1,
+              },
+            },
+
+            // Checked state - green checkbox with checkmark, strikethrough text
+            '&[data-checked="checked"]': {
+              '& .task-checkbox': {
+                backgroundColor: theme.palette.success.main,
+                borderColor: theme.palette.success.main,
+                color: '#ffffff',
+              },
+              '& .task-content': {
+                textDecoration: 'line-through',
+                opacity: 0.6,
+                color: theme.palette.text.secondary,
+              },
+            },
+
+            // Nope state - red checkbox with X, strikethrough text
+            '&[data-checked="nope"]': {
+              '& .task-checkbox': {
+                backgroundColor: theme.palette.error.main,
+                borderColor: theme.palette.error.main,
+                color: '#ffffff',
+              },
+              '& .task-content': {
+                textDecoration: 'line-through',
+                opacity: 0.6,
+                color: theme.palette.text.secondary,
               },
             },
           },
