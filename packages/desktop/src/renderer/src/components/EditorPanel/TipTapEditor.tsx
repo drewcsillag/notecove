@@ -32,6 +32,10 @@ export interface TipTapEditorProps {
   showSearchPanel?: boolean;
   onSearchPanelClose?: () => void;
   onNavigateToNote?: (noteId: string) => void;
+  /** Lifted search term state for retention across panel open/close */
+  searchTerm?: string;
+  /** Callback to update the lifted search term state */
+  onSearchTermChange?: (term: string) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -43,6 +47,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   showSearchPanel = false,
   onSearchPanelClose,
   onNavigateToNote,
+  searchTerm = '',
+  onSearchTermChange,
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
@@ -732,8 +738,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       >
         <EditorContent editor={editor} />
       </Box>
-      {showSearchPanel && onSearchPanelClose && (
-        <SearchPanel editor={editor} onClose={onSearchPanelClose} />
+      {showSearchPanel && onSearchPanelClose && onSearchTermChange && (
+        <SearchPanel
+          editor={editor}
+          onClose={onSearchPanelClose}
+          searchTerm={searchTerm}
+          onSearchTermChange={onSearchTermChange}
+        />
       )}
     </Box>
   );

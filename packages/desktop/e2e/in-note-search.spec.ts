@@ -275,6 +275,149 @@ test.describe('In-Note Search - Search Results', () => {
   });
 });
 
+test.describe('In-Note Search - Cleanup on Close', () => {
+  test('should clear search highlights when panel is closed with Escape', async () => {
+    const createButton = page.getByTitle('Create note');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    // Type content with searchable text
+    await editor.type('apple banana apple cherry apple');
+    await page.waitForTimeout(1000);
+
+    // Open search panel
+    await page.keyboard.press('Shift+Meta+F');
+    await page.waitForTimeout(500);
+
+    const searchInput = page.locator('input[placeholder*="Find in note" i]');
+    await searchInput.fill('apple');
+    await page.waitForTimeout(1000);
+
+    // Verify highlights are present
+    const highlights = editor.locator('.search-result');
+    await expect(highlights.first()).toBeVisible({ timeout: 5000 });
+    const highlightCount = await highlights.count();
+    expect(highlightCount).toBe(3);
+
+    // Close search panel with Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+
+    // Verify search panel is closed
+    await expect(searchInput).not.toBeVisible();
+
+    // Verify highlights are cleared
+    const highlightsAfterClose = editor.locator('.search-result');
+    await expect(highlightsAfterClose).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('should clear search highlights when panel is closed with close button', async () => {
+    const createButton = page.getByTitle('Create note');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(500);
+
+    await editor.type('test content test');
+    await page.waitForTimeout(1000);
+
+    // Open search panel
+    await page.keyboard.press('Shift+Meta+F');
+    await page.waitForTimeout(500);
+
+    const searchInput = page.locator('input[placeholder*="Find in note" i]');
+    await searchInput.fill('test');
+    await page.waitForTimeout(1000);
+
+    // Verify highlights are present
+    const highlights = editor.locator('.search-result');
+    await expect(highlights.first()).toBeVisible({ timeout: 5000 });
+
+    // Close with close button
+    const closeButton = page.locator(
+      'button[aria-label*="close" i], button:has([data-testid="CloseIcon"])'
+    );
+    await closeButton.click();
+    await page.waitForTimeout(500);
+
+    // Verify highlights are cleared
+    const highlightsAfterClose = editor.locator('.search-result');
+    await expect(highlightsAfterClose).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('should close search panel when switching notes', async () => {
+    // Create first note
+    const createButton = page.getByTitle('Create note');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(500);
+    await editor.type('first note content');
+    await page.waitForTimeout(1000);
+
+    // Open search panel and search
+    await page.keyboard.press('Shift+Meta+F');
+    await page.waitForTimeout(500);
+
+    const searchInput = page.locator('input[placeholder*="Find in note" i]');
+    await searchInput.fill('first');
+    await page.waitForTimeout(1000);
+
+    // Verify search panel is open
+    await expect(searchInput).toBeVisible();
+
+    // Create a second note (this switches to it)
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    // Search panel should be closed after switching notes
+    await expect(searchInput).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('should retain search term when reopening panel on same note', async () => {
+    const createButton = page.getByTitle('Create note');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(500);
+    await editor.type('searchable content here');
+    await page.waitForTimeout(1000);
+
+    // Open search panel and enter a search term
+    await page.keyboard.press('Shift+Meta+F');
+    await page.waitForTimeout(500);
+
+    const searchInput = page.locator('input[placeholder*="Find in note" i]');
+    await searchInput.fill('searchable');
+    await page.waitForTimeout(1000);
+
+    // Close the panel
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+
+    // Reopen the panel
+    await page.keyboard.press('Shift+Meta+F');
+    await page.waitForTimeout(500);
+
+    // Search term should be retained
+    await expect(searchInput).toHaveValue('searchable');
+
+    // And highlights should be reapplied
+    const highlights = editor.locator('.search-result');
+    await expect(highlights.first()).toBeVisible({ timeout: 5000 });
+  });
+});
+
 test.describe('In-Note Search - Case Sensitivity', () => {
   test('should respect case-sensitive option', async () => {
     const createButton = page.getByTitle('Create note');
