@@ -150,7 +150,25 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
           return (
             <Chip
               key={tag.id}
-              label={`#${tag.name} (${tag.count})`}
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  #{tag.name}
+                  <Box
+                    component="span"
+                    sx={{
+                      backgroundColor: 'action.hover',
+                      color: 'text.secondary',
+                      fontSize: '0.75rem',
+                      borderRadius: '10px',
+                      px: 0.75,
+                      minWidth: 20,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {tag.count}
+                  </Box>
+                </Box>
+              }
               onClick={() => {
                 onTagSelect(tag.id);
               }}
