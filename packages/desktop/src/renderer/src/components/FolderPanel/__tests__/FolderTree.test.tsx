@@ -392,3 +392,167 @@ describe('FolderTree', () => {
     });
   });
 });
+
+// Import sortNodes for unit testing
+import { sortNodes } from '../FolderTree';
+import type { NodeModel } from '@minoru/react-dnd-treeview';
+
+describe('sortNodes', () => {
+  // Helper to create a minimal NodeModel for testing
+  const makeNode = (id: string, text: string): NodeModel => ({
+    id,
+    parent: 0,
+    text,
+    droppable: true,
+  });
+
+  describe('All Notes positioning', () => {
+    it('should sort "all-notes" before any user folder', () => {
+      const allNotes = makeNode('all-notes', 'All Notes');
+      const userFolder = makeNode('folder-1', 'Work');
+
+      expect(sortNodes(allNotes, userFolder)).toBeLessThan(0);
+      expect(sortNodes(userFolder, allNotes)).toBeGreaterThan(0);
+    });
+
+    it('should sort "all-notes:sd-id" before any user folder (multi-SD mode)', () => {
+      const allNotes = makeNode('all-notes:sd-123', 'All Notes');
+      const userFolder = makeNode('folder-1', 'Work');
+
+      expect(sortNodes(allNotes, userFolder)).toBeLessThan(0);
+      expect(sortNodes(userFolder, allNotes)).toBeGreaterThan(0);
+    });
+
+    it('should sort "all-notes" before folder starting with "A"', () => {
+      const allNotes = makeNode('all-notes', 'All Notes');
+      const aFolder = makeNode('folder-1', 'AI Workflow');
+
+      expect(sortNodes(allNotes, aFolder)).toBeLessThan(0);
+    });
+  });
+
+  describe('Recently Deleted positioning', () => {
+    it('should sort "recently-deleted" after any user folder', () => {
+      const recentlyDeleted = makeNode('recently-deleted', 'Recently Deleted');
+      const userFolder = makeNode('folder-1', 'Work');
+
+      expect(sortNodes(recentlyDeleted, userFolder)).toBeGreaterThan(0);
+      expect(sortNodes(userFolder, recentlyDeleted)).toBeLessThan(0);
+    });
+
+    it('should sort "recently-deleted:sd-id" after any user folder (multi-SD mode)', () => {
+      const recentlyDeleted = makeNode('recently-deleted:sd-123', 'Recently Deleted');
+      const userFolder = makeNode('folder-1', 'Zebra');
+
+      expect(sortNodes(recentlyDeleted, userFolder)).toBeGreaterThan(0);
+      expect(sortNodes(userFolder, recentlyDeleted)).toBeLessThan(0);
+    });
+
+    it('should sort "recently-deleted" after folder starting with "Z"', () => {
+      const recentlyDeleted = makeNode('recently-deleted', 'Recently Deleted');
+      const zFolder = makeNode('folder-1', 'Zebra Notes');
+
+      expect(sortNodes(recentlyDeleted, zFolder)).toBeGreaterThan(0);
+    });
+  });
+
+  describe('All Notes vs Recently Deleted', () => {
+    it('should sort "all-notes" before "recently-deleted"', () => {
+      const allNotes = makeNode('all-notes', 'All Notes');
+      const recentlyDeleted = makeNode('recently-deleted', 'Recently Deleted');
+
+      expect(sortNodes(allNotes, recentlyDeleted)).toBeLessThan(0);
+      expect(sortNodes(recentlyDeleted, allNotes)).toBeGreaterThan(0);
+    });
+  });
+
+  describe('User folder alphabetical sorting', () => {
+    it('should sort user folders alphabetically', () => {
+      const folderA = makeNode('folder-1', 'Alpha');
+      const folderB = makeNode('folder-2', 'Beta');
+      const folderZ = makeNode('folder-3', 'Zeta');
+
+      expect(sortNodes(folderA, folderB)).toBeLessThan(0);
+      expect(sortNodes(folderB, folderA)).toBeGreaterThan(0);
+      expect(sortNodes(folderA, folderZ)).toBeLessThan(0);
+      expect(sortNodes(folderB, folderZ)).toBeLessThan(0);
+    });
+
+    it('should sort user folders case-insensitively', () => {
+      const folderLower = makeNode('folder-1', 'apple');
+      const folderUpper = makeNode('folder-2', 'Banana');
+      const folderMixed = makeNode('folder-3', 'CHERRY');
+
+      // apple < Banana < CHERRY (case-insensitive)
+      expect(sortNodes(folderLower, folderUpper)).toBeLessThan(0);
+      expect(sortNodes(folderUpper, folderMixed)).toBeLessThan(0);
+    });
+
+    it('should treat same-name folders as equal', () => {
+      const folder1 = makeNode('folder-1', 'Work');
+      const folder2 = makeNode('folder-2', 'Work');
+
+      expect(sortNodes(folder1, folder2)).toBe(0);
+    });
+
+    it('should treat same-name folders with different case as equal', () => {
+      const folder1 = makeNode('folder-1', 'work');
+      const folder2 = makeNode('folder-2', 'WORK');
+
+      expect(sortNodes(folder1, folder2)).toBe(0);
+    });
+  });
+
+  describe('SD header sorting', () => {
+    it('should not reorder SD headers relative to each other', () => {
+      const sd1 = makeNode('sd:sd-1', 'Personal');
+      const sd2 = makeNode('sd:sd-2', 'Work');
+
+      // Should return 0 to preserve original order
+      expect(sortNodes(sd1, sd2)).toBe(0);
+      expect(sortNodes(sd2, sd1)).toBe(0);
+    });
+  });
+
+  describe('complete sorting order', () => {
+    it('should produce correct order: All Notes, user folders (alphabetical), Recently Deleted', () => {
+      const nodes = [
+        makeNode('folder-3', 'Zebra'),
+        makeNode('recently-deleted', 'Recently Deleted'),
+        makeNode('folder-1', 'Alpha'),
+        makeNode('all-notes', 'All Notes'),
+        makeNode('folder-2', 'Beta'),
+      ];
+
+      const sorted = [...nodes].sort(sortNodes);
+
+      expect(sorted.map((n) => n.id)).toEqual([
+        'all-notes',
+        'folder-1', // Alpha
+        'folder-2', // Beta
+        'folder-3', // Zebra
+        'recently-deleted',
+      ]);
+    });
+
+    it('should handle multi-SD mode sorting correctly', () => {
+      const nodes = [
+        makeNode('folder-3', 'Zebra'),
+        makeNode('recently-deleted:sd-1', 'Recently Deleted'),
+        makeNode('folder-1', 'Alpha'),
+        makeNode('all-notes:sd-1', 'All Notes'),
+        makeNode('folder-2', 'Beta'),
+      ];
+
+      const sorted = [...nodes].sort(sortNodes);
+
+      expect(sorted.map((n) => n.id)).toEqual([
+        'all-notes:sd-1',
+        'folder-1',
+        'folder-2',
+        'folder-3',
+        'recently-deleted:sd-1',
+      ]);
+    });
+  });
+});

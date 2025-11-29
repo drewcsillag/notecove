@@ -66,6 +66,41 @@ export interface FolderTreeProps {
 }
 
 /**
+ * Custom sort comparator for tree nodes.
+ * Ensures: "All Notes" first, "Recently Deleted" last, user folders alphabetically (case-insensitive).
+ * Works for both single-SD mode (e.g., "all-notes") and multi-SD mode (e.g., "all-notes:sd-123").
+ * Exported for testing.
+ */
+export function sortNodes(a: NodeModel, b: NodeModel): number {
+  const aId = String(a.id);
+  const bId = String(b.id);
+
+  // Check if nodes are special items
+  const aIsAllNotes = aId === 'all-notes' || aId.startsWith('all-notes:');
+  const bIsAllNotes = bId === 'all-notes' || bId.startsWith('all-notes:');
+  const aIsRecentlyDeleted = aId === 'recently-deleted' || aId.startsWith('recently-deleted:');
+  const bIsRecentlyDeleted = bId === 'recently-deleted' || bId.startsWith('recently-deleted:');
+  const aIsSD = aId.startsWith('sd:');
+  const bIsSD = bId.startsWith('sd:');
+
+  // SD headers: keep their original order (don't sort among themselves)
+  if (aIsSD && bIsSD) {
+    return 0;
+  }
+
+  // "All Notes" always first (among siblings)
+  if (aIsAllNotes && !bIsAllNotes) return -1;
+  if (!aIsAllNotes && bIsAllNotes) return 1;
+
+  // "Recently Deleted" always last (among siblings)
+  if (aIsRecentlyDeleted && !bIsRecentlyDeleted) return 1;
+  if (!aIsRecentlyDeleted && bIsRecentlyDeleted) return -1;
+
+  // User folders: sort alphabetically (case-insensitive)
+  return a.text.toLowerCase().localeCompare(b.text.toLowerCase());
+}
+
+/**
  * Transform flat folder list into react-dnd-treeview NodeModel format (Single SD mode)
  */
 function buildTreeNodes(folders: FolderData[]): NodeModel[] {
@@ -1005,6 +1040,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
           key={`tree-${remountCounter}`} // Force remount when expand/collapse all is clicked
           tree={treeData}
           rootId={0}
+          sort={sortNodes}
           onDrop={(tree, options) => void handleDrop(tree, options)}
           canDrag={canDrag}
           canDrop={canDrop}
