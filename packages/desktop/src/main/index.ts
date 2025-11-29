@@ -1597,7 +1597,7 @@ function createMenu(): void {
         },
         {
           label: 'View History',
-          accelerator: 'CmdOrCtrl+Shift+H',
+          accelerator: 'CmdOrCtrl+Alt+H',
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.send('menu:viewHistory');

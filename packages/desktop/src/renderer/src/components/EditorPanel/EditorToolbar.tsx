@@ -176,6 +176,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
           size="small"
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
+          aria-label="Undo"
+          data-testid="undo-button"
         >
           <Undo fontSize="small" />
         </IconButton>
@@ -186,6 +188,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
           size="small"
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
+          aria-label="Redo"
+          data-testid="redo-button"
         >
           <Redo fontSize="small" />
         </IconButton>

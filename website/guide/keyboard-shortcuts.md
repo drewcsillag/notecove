@@ -46,14 +46,14 @@ Master NoteCove with these keyboard shortcuts.
 
 ### Text Manipulation
 
-| Action     | macOS         | Windows/Linux  |
-| ---------- | ------------- | -------------- |
-| Undo       | `Cmd+Z`       | `Ctrl+Z`       |
-| Redo       | `Cmd+Shift+Z` | `Ctrl+Shift+Z` |
-| Cut        | `Cmd+X`       | `Ctrl+X`       |
-| Copy       | `Cmd+C`       | `Ctrl+C`       |
-| Paste      | `Cmd+V`       | `Ctrl+V`       |
-| Select all | `Cmd+A`       | `Ctrl+A`       |
+| Action     | macOS                   | Windows/Linux             |
+| ---------- | ----------------------- | ------------------------- |
+| Undo       | `Cmd+Z`                 | `Ctrl+Z`                  |
+| Redo       | `Cmd+Shift+Z` / `Cmd+Y` | `Ctrl+Shift+Z` / `Ctrl+Y` |
+| Cut        | `Cmd+X`                 | `Ctrl+X`                  |
+| Copy       | `Cmd+C`                 | `Ctrl+C`                  |
+| Paste      | `Cmd+V`                 | `Ctrl+V`                  |
+| Select all | `Cmd+A`                 | `Ctrl+A`                  |
 
 ## Search
 
@@ -87,6 +87,7 @@ Master NoteCove with these keyboard shortcuts.
 
 | Action             | macOS        | Windows/Linux  |
 | ------------------ | ------------ | -------------- |
+| View history       | `Cmd+Alt+H`  | `Ctrl+Alt+H`   |
 | Zoom in            | `Cmd++`      | `Ctrl++`       |
 | Zoom out           | `Cmd+-`      | `Ctrl+-`       |
 | Reset zoom         | `Cmd+0`      | `Ctrl+0`       |
