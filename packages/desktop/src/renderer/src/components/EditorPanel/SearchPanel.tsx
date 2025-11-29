@@ -24,6 +24,10 @@ import type { Editor } from '@tiptap/react';
 export interface SearchPanelProps {
   editor: Editor | null;
   onClose: () => void;
+  /** Lifted search term state for retention across panel open/close */
+  searchTerm: string;
+  /** Callback to update the lifted search term state */
+  onSearchTermChange: (term: string) => void;
 }
 
 interface SearchAndReplaceStorage {
@@ -31,8 +35,12 @@ interface SearchAndReplaceStorage {
   resultIndex: number;
 }
 
-export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+export const SearchPanel: React.FC<SearchPanelProps> = ({
+  editor,
+  onClose,
+  searchTerm,
+  onSearchTermChange,
+}) => {
   const [replaceTerm, setReplaceTerm] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [currentMatch, setCurrentMatch] = useState(0);
@@ -118,9 +126,12 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
     scrollToCurrentMatch();
   }, [editor, searchTerm, scrollToCurrentMatch]);
 
-  const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
-  }, []);
+  const handleSearchChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onSearchTermChange(event.target.value);
+    },
+    [onSearchTermChange]
+  );
 
   const handleReplaceChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setReplaceTerm(event.target.value);
@@ -147,9 +158,26 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
     editor.commands.replaceAll();
 
     // Clear search after replace all
-    setSearchTerm('');
+    onSearchTermChange('');
     setReplaceTerm('');
-  }, [editor, searchTerm, replaceTerm]);
+  }, [editor, searchTerm, replaceTerm, onSearchTermChange]);
+
+  // Clear editor highlights when closing - keeps the search term in lifted state for reopening
+  const handleClose = useCallback(() => {
+    if (editor) {
+      editor.commands.setSearchTerm('');
+    }
+    onClose();
+  }, [editor, onClose]);
+
+  // Cleanup: clear editor highlights when component unmounts
+  useEffect(() => {
+    return () => {
+      if (editor) {
+        editor.commands.setSearchTerm('');
+      }
+    };
+  }, [editor]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -160,10 +188,10 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
           handleNext();
         }
       } else if (event.key === 'Escape') {
-        onClose();
+        handleClose();
       }
     },
-    [handleNext, handlePrevious, onClose]
+    [handleNext, handlePrevious, handleClose]
   );
 
   return (
@@ -227,7 +255,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ editor, onClose }) => 
         </Tooltip>
 
         <Tooltip title="Close search (Esc)">
-          <IconButton size="small" onClick={onClose}>
+          <IconButton size="small" onClick={handleClose}>
             <CloseIcon />
           </IconButton>
         </Tooltip>

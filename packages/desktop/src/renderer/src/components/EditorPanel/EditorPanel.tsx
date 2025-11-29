@@ -31,6 +31,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   onNavigateToNote,
 }) => {
   const [isNoteDeleted, setIsNoteDeleted] = useState(false);
+  // Lifted search term state - retained across panel open/close, cleared on note switch
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Clear search term when note changes
+  useEffect(() => {
+    setSearchTerm('');
+  }, [selectedNoteId]);
 
   // Check if the selected note is deleted
   useEffect(() => {
@@ -78,6 +85,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         }}
         showSearchPanel={showSearchPanel}
         {...(onSearchPanelClose && { onSearchPanelClose })}
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
       />
 
       {/* History Panel Drawer */}

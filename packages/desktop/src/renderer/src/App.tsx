@@ -100,6 +100,11 @@ function App(): React.ReactElement {
     console.log('[App] activeSdId changed to:', activeSdId);
   }, [activeSdId]);
 
+  // Close search panel when note changes
+  useEffect(() => {
+    setSearchPanelOpen(false);
+  }, [selectedNoteId]);
+
   // Listen for SD initialization progress
   useEffect(() => {
     const unsubscribeProgress = window.electronAPI.sd.onInitProgress((data) => {
