@@ -1,6 +1,6 @@
 # Folder Tree Ordering Feature Plan
 
-**Overall Progress:** `20%` (Phase 0 complete)
+**Overall Progress:** `40%` (Phase 0, 1 complete)
 
 ## Summary
 
@@ -65,32 +65,32 @@ Goal: Get "All Notes" appearing first with minimal changes. Testable in ~15 minu
 
 ---
 
-### Phase 1: Backend - Folder Reordering Support
+### Phase 1: Backend - Folder Reordering Support ✅
 
-- [ ] 🟥 **1.1: Add folder reorder tests (TDD)**
-  - [ ] 🟥 Test `reorderFolder()` updates order field in CRDT
-  - [ ] 🟥 Test reordering renumbers all siblings (0, 1, 2, ...)
-  - [ ] 🟥 Test `getActiveFolders()` returns sorted by order
+- [x] 🟩 **1.1: Add folder reorder tests (TDD)**
+  - [x] 🟩 Test `reorderFolder()` updates order field in CRDT
+  - [x] 🟩 Test reordering renumbers all siblings (0, 1, 2, ...)
+  - [x] 🟩 Test `getActiveFolders()` returns sorted by order
 
-- [ ] 🟥 **1.2: Implement reorderFolder in FolderTreeDoc**
-  - [ ] 🟥 Add `reorderFolder(folderId: UUID, newIndex: number)` method
-  - [ ] 🟥 Get siblings, remove folder, insert at newIndex, renumber all
+- [x] 🟩 **1.2: Implement reorderFolder in FolderTreeDoc**
+  - [x] 🟩 Add `reorderFolder(folderId: UUID, newIndex: number)` method
+  - [x] 🟩 Add `getSiblings(folderId: UUID)` helper method
+  - [x] 🟩 Get siblings, remove folder, insert at newIndex, renumber all
 
-- [ ] 🟥 **1.3: Update getActiveFolders to sort by order**
-  - [ ] 🟥 Sort folders by `order` field before returning
-  - [ ] 🟥 Secondary sort by name for stability
+- [x] 🟩 **1.3: Update getActiveFolders to sort by order**
+  - [x] 🟩 Sort folders by `order` field before returning
+  - [x] 🟩 Secondary sort by name for stability
 
-- [ ] 🟥 **1.4: Add folder:reorder IPC handler**
-  - [ ] 🟥 Implement `handleReorderFolder(sdId, folderId, newIndex)`
-  - [ ] 🟥 Register in ipcMain
-  - [ ] 🟥 Add to preload API: `window.electronAPI.folder.reorder()`
+- [x] 🟩 **1.4: Add folder:reorder IPC handler**
+  - [x] 🟩 Implement `handleReorderFolder(sdId, folderId, newIndex)`
+  - [x] 🟩 Register in ipcMain
+  - [x] 🟩 Add to preload API: `window.electronAPI.folder.reorder()`
 
-- [ ] 🟥 **1.5: Update folder creation for alphabetical insert**
-  - [ ] 🟥 Modify `handleCreateFolder` to find alphabetical position
-  - [ ] 🟥 Insert at that position, renumber siblings
-  - [ ] 🟥 Add test for alphabetical insertion
+- [x] 🟩 **1.5: Update folder creation for alphabetical insert**
+  - [x] 🟩 Modify `handleCreateFolder` to find alphabetical position
+  - [x] 🟩 Insert at that position, renumber siblings
 
-**Checkpoint:** Backend supports reordering. Can test via console. Commit point.
+**Checkpoint:** ✅ Backend supports reordering. Ready for commit.
 
 ---
 

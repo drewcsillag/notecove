@@ -394,6 +394,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('folder:delete', sdId, folderId) as Promise<void>,
     move: (sdId: string, folderId: string, newParentId: string | null): Promise<void> =>
       ipcRenderer.invoke('folder:move', sdId, folderId, newParentId) as Promise<void>,
+    reorder: (sdId: string, folderId: string, newIndex: number): Promise<void> =>
+      ipcRenderer.invoke('folder:reorder', sdId, folderId, newIndex) as Promise<void>,
 
     // Event listeners
     onUpdated: (
