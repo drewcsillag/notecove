@@ -2387,6 +2387,25 @@ void app.whenReady().then(async () => {
       };
     });
 
+    // Register app info IPC handler for titlebar and About dialog
+    ipcMain.handle('app:getInfo', async () => {
+      const appDataDir = app.getPath('userData');
+      const profileStorage = getProfileStorage(appDataDir);
+      const config = await profileStorage.loadProfiles();
+      const currentProfile = config.profiles.find((p) => p.id === selectedProfileId) ?? null;
+      return {
+        version: app.getVersion(),
+        isDevBuild: !app.isPackaged,
+        profileId: selectedProfileId,
+        profileName: currentProfile?.name ?? null,
+      };
+    });
+
+    // Register shell IPC handler for opening external URLs (for About dialog license link)
+    ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+      await shell.openExternal(url);
+    });
+
     // Create menu
     createMenu();
 

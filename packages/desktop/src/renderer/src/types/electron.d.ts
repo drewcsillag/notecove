@@ -497,6 +497,19 @@ declare global {
         createWindow: (options?: { noteId?: string; minimal?: boolean }) => Promise<void>;
         setNoteTimestamp: (noteId: string, timestamp: number) => Promise<void>;
       };
+
+      app: {
+        getInfo: () => Promise<{
+          version: string;
+          isDevBuild: boolean;
+          profileId: string | null;
+          profileName: string | null;
+        }>;
+      };
+
+      shell: {
+        openExternal: (url: string) => Promise<void>;
+      };
     };
   }
 }

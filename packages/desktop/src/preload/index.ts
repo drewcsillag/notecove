@@ -1220,6 +1220,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       isDevBuild: boolean;
     }> => ipcRenderer.invoke('profile:getInfo'),
   },
+
+  // App info operations (for titlebar and About dialog)
+  app: {
+    getInfo: (): Promise<{
+      version: string;
+      isDevBuild: boolean;
+      profileId: string | null;
+      profileName: string | null;
+    }> => ipcRenderer.invoke('app:getInfo'),
+  },
+
+  // Shell operations (for opening external URLs)
+  shell: {
+    openExternal: (url: string): Promise<void> =>
+      ipcRenderer.invoke('shell:openExternal', url) as Promise<void>,
+  },
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection
