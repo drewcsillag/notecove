@@ -66,7 +66,7 @@ export class FolderStorageManager {
    * Load a folder tree from storage (snapshots + logs).
    * This is the full load path - reads all files.
    */
-  async loadFolderTree(_sdId: string, paths: FolderPaths): Promise<LoadFolderTreeResult> {
+  async loadFolderTree(sdId: string, paths: FolderPaths): Promise<LoadFolderTreeResult> {
     const doc = new Y.Doc();
     const vectorClock: VectorClock = {};
 
@@ -91,6 +91,9 @@ export class FolderStorageManager {
 
     // Apply log records not covered by snapshot
     await this.applyLogRecords(doc, vectorClock, paths.logs);
+
+    // Initialize our sequence counter from the vector clock
+    this.initializeSequenceFromVectorClock(sdId, vectorClock);
 
     return { doc, vectorClock };
   }
@@ -117,6 +120,9 @@ export class FolderStorageManager {
 
     // Apply any new log records since cache
     await this.applyLogRecords(doc, vectorClock, paths.logs);
+
+    // Initialize our sequence counter from the vector clock
+    this.initializeSequenceFromVectorClock(sdId, vectorClock);
 
     return { doc, vectorClock };
   }
@@ -180,6 +186,27 @@ export class FolderStorageManager {
     const writers = Array.from(this.logWriters.values());
     await Promise.all(writers.map((w) => w.finalize()));
     this.logWriters.clear();
+  }
+
+  /**
+   * Initialize the sequence counter for a folder tree from its vector clock.
+   *
+   * When this instance restarts and loads an existing folder tree, the vector clock
+   * shows the last sequence number we wrote. We must continue from there,
+   * not start from 1, to avoid sequence violations in the CRDT system.
+   */
+  private initializeSequenceFromVectorClock(sdId: string, vectorClock: VectorClock): void {
+    const ourEntry = vectorClock[this.instanceId];
+    if (ourEntry) {
+      const currentSeq = this.sequences.get(sdId) || 0;
+      // Only update if the loaded sequence is higher
+      if (ourEntry.sequence > currentSeq) {
+        this.sequences.set(sdId, ourEntry.sequence);
+        console.log(
+          `[FolderStorageManager] Initialized sequence for ${sdId} to ${ourEntry.sequence} (from vector clock)`
+        );
+      }
+    }
   }
 
   /**

@@ -72,9 +72,10 @@ export class NoteStorageManager {
    * 2. Load snapshot state and vector clock
    * 3. Find all log files
    * 4. Apply log records not covered by snapshot vector clock
-   * 5. Return merged doc and updated vector clock
+   * 5. Initialize our sequence counter from vector clock
+   * 6. Return merged doc and updated vector clock
    */
-  async loadNote(_sdId: string, _noteId: string, paths: NoteLogPaths): Promise<LoadNoteResult> {
+  async loadNote(sdId: string, noteId: string, paths: NoteLogPaths): Promise<LoadNoteResult> {
     console.log(`[NoteStorageManager] loadNote called, logs path: ${paths.logs}`);
     const doc = new Y.Doc();
     const vectorClock: VectorClock = {};
@@ -101,6 +102,10 @@ export class NoteStorageManager {
 
     // Step 2: Apply log records not covered by snapshot
     await this.applyLogRecords(doc, vectorClock, paths.logs);
+
+    // Step 3: Initialize our sequence counter from the vector clock
+    // This ensures we continue from where we left off after app restart
+    this.initializeSequenceFromVectorClock(sdId, noteId, vectorClock);
 
     return { doc, vectorClock };
   }
@@ -131,6 +136,10 @@ export class NoteStorageManager {
 
     // Apply any new log records since cache
     await this.applyLogRecords(doc, vectorClock, paths.logs);
+
+    // Initialize our sequence counter from the vector clock
+    // This ensures we continue from where we left off after app restart
+    this.initializeSequenceFromVectorClock(sdId, noteId, vectorClock);
 
     return { doc, vectorClock };
   }
@@ -224,6 +233,35 @@ export class NoteStorageManager {
     const writers = Array.from(this.logWriters.values());
     await Promise.all(writers.map((w) => w.finalize()));
     this.logWriters.clear();
+  }
+
+  /**
+   * Initialize the sequence counter for a note from its vector clock.
+   *
+   * When this instance restarts and loads an existing note, the vector clock
+   * shows the last sequence number we wrote. We must continue from there,
+   * not start from 1, to avoid sequence violations in the CRDT system.
+   *
+   * This is critical when using stable instanceIds (like profile IDs) that
+   * persist across app restarts.
+   */
+  private initializeSequenceFromVectorClock(
+    sdId: string,
+    noteId: string,
+    vectorClock: VectorClock
+  ): void {
+    const ourEntry = vectorClock[this.instanceId];
+    if (ourEntry) {
+      const seqKey = `${sdId}:${noteId}`;
+      const currentSeq = this.sequences.get(seqKey) || 0;
+      // Only update if the loaded sequence is higher
+      if (ourEntry.sequence > currentSeq) {
+        this.sequences.set(seqKey, ourEntry.sequence);
+        console.log(
+          `[NoteStorageManager] Initialized sequence for ${seqKey} to ${ourEntry.sequence} (from vector clock)`
+        );
+      }
+    }
   }
 
   /**

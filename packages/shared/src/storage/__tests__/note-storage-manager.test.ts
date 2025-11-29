@@ -520,6 +520,87 @@ describe('NoteStorageManager', () => {
       expect(result1.sequence).toBe(1);
       expect(result2.sequence).toBe(2);
     });
+
+    it('should continue sequence from loaded vector clock when same instance restarts', async () => {
+      const fs = createMockFs();
+      const db = createMockDb();
+      const paths = createNotePaths(sdPath, noteId);
+
+      fs.directories.add(paths.logs);
+      fs.directories.add(paths.snapshots);
+
+      // Simulate: Instance wrote updates before (sequence 1-38), then restarted
+      // The DB cache has the vector clock showing this instance's last sequence was 38
+      const doc = new Y.Doc();
+      doc.clientID = 1;
+      doc.getText('content').insert(0, 'Previous content');
+      const documentState = Y.encodeStateAsUpdate(doc);
+
+      // Vector clock shows OUR instance (instanceId) wrote up to sequence 38
+      const vectorClock = {
+        [instanceId]: { sequence: 38, offset: 5000, file: `${instanceId}_1000.crdtlog` },
+      };
+
+      db.noteSyncStates.set(`${sdId}:${noteId}`, {
+        noteId,
+        sdId,
+        vectorClock: JSON.stringify(vectorClock),
+        documentState,
+        updatedAt: Date.now(),
+      });
+
+      const manager = new NoteStorageManager(fs, db, instanceId);
+
+      // Load the note from cache - this should initialize the sequence counter
+      const loadResult = await manager.loadNoteFromCache(sdId, noteId, paths);
+      expect(loadResult).not.toBeNull();
+
+      // Now save a new update - it should continue from sequence 39, not start at 1
+      const { update } = createYjsUpdate(noteId, 'New content after restart');
+      const saveResult = await manager.saveUpdate(sdId, noteId, paths, update);
+
+      // CRITICAL: The sequence should be 39 (continuing from where we left off)
+      // If this is 1, it means the sequence wasn't initialized from the vector clock
+      expect(saveResult.sequence).toBe(39);
+    });
+
+    it('should continue sequence from loaded vector clock after full file load', async () => {
+      const fs = createMockFs();
+      const db = createMockDb();
+      const paths = createNotePaths(sdPath, noteId);
+
+      fs.directories.add(paths.logs);
+      fs.directories.add(paths.snapshots);
+
+      // Create a log file that shows our instance wrote sequences 1-5
+      const doc = new Y.Doc();
+      doc.clientID = 1;
+      const text = doc.getText('content');
+      text.insert(0, 'Hello');
+
+      const updates: Array<{ timestamp: number; sequence: number; data: Uint8Array }> = [];
+      for (let i = 1; i <= 5; i++) {
+        const prevState = Y.encodeStateVector(doc);
+        text.insert(text.length, `${i}`);
+        const update = Y.encodeStateAsUpdate(doc, prevState);
+        updates.push({ timestamp: 1000 + i, sequence: i, data: update });
+      }
+
+      const logData = createLogFile(updates);
+      fs.files.set(`${paths.logs}/${instanceId}_1000.crdtlog`, logData);
+
+      const manager = new NoteStorageManager(fs, db, instanceId);
+
+      // Load the note from files (no cache)
+      const loadResult = await manager.loadNote(sdId, noteId, paths);
+      expect(loadResult.vectorClock[instanceId].sequence).toBe(5);
+
+      // Save a new update - should continue from sequence 6
+      const { update: newUpdate } = createYjsUpdate(noteId, 'After restart');
+      const saveResult = await manager.saveUpdate(sdId, noteId, paths, newUpdate);
+
+      expect(saveResult.sequence).toBe(6);
+    });
   });
 
   describe('saveDbSnapshot', () => {

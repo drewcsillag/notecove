@@ -17,6 +17,7 @@ import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgress
 import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownProgressDialog';
 import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgressDialog';
 import { NoteInfoDialog } from './components/NoteInfoDialog';
+import { AboutDialog } from './components/AboutDialog/AboutDialog';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
@@ -27,6 +28,7 @@ function App(): React.ReactElement {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noteInfoOpen, setNoteInfoOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [activeSdId, setActiveSdId] = useState<string | undefined>(undefined);
@@ -93,6 +95,23 @@ function App(): React.ReactElement {
     } catch (error) {
       console.error('[App] Error parsing URL parameters:', error);
     }
+  }, []);
+
+  // Set document title based on app info (dev build indicator + profile name)
+  useEffect(() => {
+    const setWindowTitle = async (): Promise<void> => {
+      try {
+        const appInfo = await window.electronAPI.app.getInfo();
+        const devPrefix = appInfo.isDevBuild ? '[DEV] ' : '';
+        const profileSuffix = appInfo.profileName ? ` - ${appInfo.profileName}` : '';
+        document.title = `${devPrefix}NoteCove${profileSuffix}`;
+      } catch (error) {
+        console.error('[App] Failed to get app info for title:', error);
+        // Fallback title
+        document.title = 'NoteCove';
+      }
+    };
+    void setWindowTitle();
   }, []);
 
   // Debug: Log when activeSdId changes
@@ -352,10 +371,9 @@ function App(): React.ReactElement {
       setShowTagPanel((prev) => !prev);
     });
 
-    // About dialog (not implemented yet)
+    // About dialog
     const cleanupAbout = window.electronAPI.menu.onAbout(() => {
-      console.log('[Menu] About NoteCove - not yet implemented');
-      // TODO: Create About dialog with version info, license, etc.
+      setAboutOpen(true);
     });
 
     // Create Snapshot
@@ -608,6 +626,12 @@ function App(): React.ReactElement {
           noteId={selectedNoteId}
           onClose={() => {
             setNoteInfoOpen(false);
+          }}
+        />
+        <AboutDialog
+          open={aboutOpen}
+          onClose={() => {
+            setAboutOpen(false);
           }}
         />
         <SDInitProgressDialog

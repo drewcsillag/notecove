@@ -20,6 +20,7 @@ import {
   extractTags,
   SDMarker,
   type SDType,
+  ProfileLock,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
@@ -51,6 +52,7 @@ let noteMoveManager: NoteMoveManager | null = null;
 let diagnosticsManager: DiagnosticsManager | null = null;
 let backupManager: BackupManager | null = null;
 let sdMarker: SDMarker | null = null;
+let profileLock: ProfileLock | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -1926,6 +1928,28 @@ void app.whenReady().then(async () => {
         const config = await profileStorage.loadProfiles();
         const profile = config.profiles.find((p) => p.id === selectedProfileId);
         selectedProfileName = profile?.name ?? null;
+
+        // Acquire profile lock to ensure single-instance per profile
+        const fsAdapter = new NodeFileSystemAdapter();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+        profileLock = new ProfileLock(fsAdapter as any);
+        const profileDataDir = profileStorage.getProfileDataDir(selectedProfileId);
+        const lockAcquired = await profileLock.acquire(profileDataDir);
+
+        if (!lockAcquired) {
+          // Show error dialog and quit
+          const { dialog } = await import('electron');
+          await dialog.showMessageBox({
+            type: 'error',
+            title: 'Profile Already In Use',
+            message: `The profile "${selectedProfileName ?? selectedProfileId}" is already open in another NoteCove window.`,
+            detail: 'Please close that window first, or choose a different profile.',
+            buttons: ['OK'],
+          });
+          app.quit();
+          return;
+        }
+        console.log(`[Profile] Acquired lock for profile: ${selectedProfileId}`);
       }
     } else {
       console.log('[Profile] Test mode - skipping profile picker');
@@ -1985,7 +2009,9 @@ void app.whenReady().then(async () => {
     await fsAdapter.mkdir(folderLogsPath);
 
     // Initialize AppendLogManager with database (multi-SD aware)
-    const instanceId = process.env['INSTANCE_ID'] ?? randomUUID();
+    // Use profile ID as instanceId for stable identity across restarts
+    // This ensures activity logs persist and sync identifies this as the same instance
+    const instanceId = process.env['INSTANCE_ID'] ?? selectedProfileId ?? randomUUID();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     storageManager = new AppendLogManager(fsAdapter as any, database, instanceId);
 
@@ -2387,6 +2413,25 @@ void app.whenReady().then(async () => {
       };
     });
 
+    // Register app info IPC handler for titlebar and About dialog
+    ipcMain.handle('app:getInfo', async () => {
+      const appDataDir = app.getPath('userData');
+      const profileStorage = getProfileStorage(appDataDir);
+      const config = await profileStorage.loadProfiles();
+      const currentProfile = config.profiles.find((p) => p.id === selectedProfileId) ?? null;
+      return {
+        version: app.getVersion(),
+        isDevBuild: !app.isPackaged,
+        profileId: selectedProfileId,
+        profileName: currentProfile?.name ?? null,
+      };
+    });
+
+    // Register shell IPC handler for opening external URLs (for About dialog license link)
+    ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+      await shell.openExternal(url);
+    });
+
     // Create menu
     createMenu();
 
@@ -2609,6 +2654,13 @@ app.on('will-quit', (event) => {
         console.log('[App] Closing database...');
         await database.close();
         console.log('[App] Database closed successfully');
+      }
+
+      // 8. Release profile lock
+      if (profileLock) {
+        console.log('[App] Releasing profile lock...');
+        await profileLock.release();
+        console.log('[App] Profile lock released');
       }
 
       console.log('[App] Graceful shutdown complete');

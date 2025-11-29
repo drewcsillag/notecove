@@ -8,3 +8,4 @@
 export * from './types';
 export * from './profile-storage';
 export * from './sd-marker';
+export * from './profile-lock';
