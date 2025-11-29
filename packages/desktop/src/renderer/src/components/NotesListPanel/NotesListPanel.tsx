@@ -76,6 +76,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Folders for building folder paths in notes list
+  const [folders, setFolders] = useState<{ id: string; name: string; parentId: string | null }[]>(
+    []
+  );
   const [creating, setCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -155,6 +159,21 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       console.error('Failed to load search query:', err);
     }
   }, []);
+
+  // Load folders for the active SD (for displaying folder paths in notes list)
+  const loadFolders = useCallback(async () => {
+    try {
+      const sdId = activeSdId ?? DEFAULT_SD_ID;
+      const foldersData = await window.electronAPI.folder.list(sdId);
+      setFolders(
+        foldersData
+          .filter((f) => !f.deleted)
+          .map((f) => ({ id: f.id, name: f.name, parentId: f.parentId }))
+      );
+    } catch (err) {
+      console.error('Failed to load folders:', err);
+    }
+  }, [activeSdId]);
 
   // Save search query to app state
   const saveSearchQuery = useCallback(async (query: string) => {
@@ -415,16 +434,18 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     }
   }, [creating, selectedFolderId, handleNoteSelect, fetchNotes, activeSdId, onNoteCreated]);
 
-  // Load selected folder and search query on mount
+  // Load selected folder, search query, and folders on mount
   useEffect(() => {
     void loadSelectedFolder();
     void loadSearchQuery();
-  }, [loadSelectedFolder, loadSearchQuery]);
+    void loadFolders();
+  }, [loadSelectedFolder, loadSearchQuery, loadFolders]);
 
-  // Reset to "all-notes" when active SD changes
+  // Reset to "all-notes" and reload folders when active SD changes
   useEffect(() => {
     setSelectedFolderId('all-notes');
-  }, [activeSdId]);
+    void loadFolders();
+  }, [activeSdId, loadFolders]);
 
   // Fetch notes when selected folder, active SD, or tag filters change (only if not searching)
   useEffect(() => {
@@ -1120,25 +1141,32 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     [pendingMoves]
   );
 
-  // Format date for display
+  // Format date for display - locale-based timestamps
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    // Check if the date is today
+    const isToday =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
 
-    // Format as date
-    return date.toLocaleDateString(undefined, {
+    if (isToday) {
+      // Today: show time only
+      return date.toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    }
+
+    // Not today: show full date and time
+    return date.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     });
   };
 
@@ -1151,22 +1179,29 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   // Build folder hierarchy path for display
   const buildFolderPath = (
     folderId: string,
-    folders: { id: string; name: string; parentId: string | null }[]
+    folderList: { id: string; name: string; parentId: string | null }[]
   ): string => {
-    const folder = folders.find((f) => f.id === folderId);
+    const folder = folderList.find((f) => f.id === folderId);
     if (!folder) return '';
 
     const path: string[] = [folder.name];
     let currentFolder = folder;
 
     while (currentFolder.parentId) {
-      const parent = folders.find((f) => f.id === currentFolder.parentId);
+      const parent = folderList.find((f) => f.id === currentFolder.parentId);
       if (!parent) break;
       path.unshift(parent.name);
       currentFolder = parent;
     }
 
     return path.join(' / ');
+  };
+
+  // Get folder path for a note (returns null for root notes)
+  const getFolderPathForNote = (folderId: string | null): string | null => {
+    if (!folderId) return null;
+    const path = buildFolderPath(folderId, folders);
+    return path || null;
   };
 
   return (
@@ -1303,6 +1338,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
                   }}
                   truncatePreview={truncatePreview}
                   formatDate={formatDate}
+                  folderPath={getFolderPathForNote(note.folderId)}
                 />
               );
             })}

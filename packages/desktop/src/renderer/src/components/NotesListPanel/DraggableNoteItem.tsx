@@ -8,7 +8,7 @@
 import React from 'react';
 import { useDrag } from 'react-dnd';
 import { ListItem, ListItemButton, ListItemText, Typography, Box } from '@mui/material';
-import { PushPin as PushPinIcon } from '@mui/icons-material';
+import { PushPin as PushPinIcon, Folder as FolderIcon } from '@mui/icons-material';
 
 // Drag types for react-dnd
 export const ItemTypes = {
@@ -38,6 +38,7 @@ interface DraggableNoteItemProps {
   onContextMenu: (event: React.MouseEvent) => void;
   truncatePreview: (text: string) => string;
   formatDate: (timestamp: number) => string;
+  folderPath: string | null; // Folder path for display (null for root notes)
 }
 
 export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
@@ -50,6 +51,7 @@ export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
   onContextMenu,
   truncatePreview,
   formatDate,
+  folderPath,
 }) => {
   // Set up drag
   const [{ isDragging }, drag] = useDrag(
@@ -141,6 +143,36 @@ export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
               >
                 {formatDate(note.modified)}
               </Typography>
+              {folderPath && (
+                <Box
+                  component="span"
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    marginTop: 0.25,
+                  }}
+                >
+                  <FolderIcon
+                    sx={{
+                      fontSize: '0.875rem',
+                      color: 'text.secondary',
+                    }}
+                  />
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {folderPath}
+                  </Typography>
+                </Box>
+              )}
             </>
           }
         />

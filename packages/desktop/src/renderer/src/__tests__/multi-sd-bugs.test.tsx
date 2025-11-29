@@ -102,6 +102,7 @@ const mockElectronAPI = {
     onExportSelectedNotes: jest.fn(() => () => {}),
     onExportAllNotes: jest.fn(() => () => {}),
     onReloadFromCRDTLogs: jest.fn(() => () => {}),
+    onReindexNotes: jest.fn(() => () => {}),
   },
   export: {
     selectDirectory: jest.fn(() => Promise.resolve(null)),
@@ -113,6 +114,12 @@ const mockElectronAPI = {
   shutdown: {
     onProgress: jest.fn(() => () => {}),
     onComplete: jest.fn(() => () => {}),
+  },
+  tools: {
+    onReindexProgress: jest.fn(() => () => {}),
+    onReindexComplete: jest.fn(() => () => {}),
+    onReindexError: jest.fn(() => () => {}),
+    reindexNotes: jest.fn(() => Promise.resolve()),
   },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */

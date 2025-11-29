@@ -120,6 +120,9 @@ const mockElectronAPI = {
     onReloadFromCRDTLogs: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    onReindexNotes: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   export: {
     selectDirectory: jest.fn(() => Promise.resolve(null)),
@@ -135,6 +138,18 @@ const mockElectronAPI = {
     onComplete: jest.fn(() => () => {
       /* unsubscribe */
     }),
+  },
+  tools: {
+    onReindexProgress: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReindexComplete: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReindexError: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    reindexNotes: jest.fn(() => Promise.resolve()),
   },
 };
 

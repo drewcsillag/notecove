@@ -444,9 +444,7 @@ export class SqliteDatabase implements Database {
    * This is useful after changes to the indexing logic (e.g., hashtag transformation).
    * @param onProgress Optional callback for progress updates (current, total)
    */
-  async reindexNotes(
-    onProgress?: (current: number, total: number) => void
-  ): Promise<void> {
+  async reindexNotes(onProgress?: (current: number, total: number) => void): Promise<void> {
     // Get all notes (including deleted ones, so they're searchable if restored)
     const rows = await this.adapter.all<{
       id: string;
@@ -467,7 +465,8 @@ export class SqliteDatabase implements Database {
     // The trigger won't fire since we're inserting directly into notes_fts,
     // so we need to apply transform_hashtags ourselves
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]!;
+      const row = rows[i];
+      if (!row) continue;
       await this.adapter.exec(
         'INSERT INTO notes_fts(note_id, title, content) VALUES (?, transform_hashtags(?), transform_hashtags(?))',
         [row.id, row.title, row.content_text]

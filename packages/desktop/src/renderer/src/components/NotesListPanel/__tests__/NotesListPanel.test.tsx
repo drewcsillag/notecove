@@ -29,6 +29,9 @@ const mockElectronAPI = {
     onPinned: jest.fn().mockReturnValue(() => {}),
     onMoved: jest.fn().mockReturnValue(() => {}),
   },
+  folder: {
+    list: jest.fn().mockResolvedValue([]),
+  },
   tag: {
     getAll: jest.fn().mockResolvedValue([]),
     getNotesWithTags: jest.fn().mockResolvedValue([]),
@@ -295,6 +298,200 @@ describe('NotesListPanel', () => {
     });
 
     // Clean up - unmount to stop polling interval
+    unmount();
+  });
+
+  it('should display folder path for notes in folders', async () => {
+    jest.useRealTimers();
+
+    const mockFolders = [
+      { id: 'folder1', name: 'Projects', parentId: null, deleted: false },
+      { id: 'folder2', name: 'Work', parentId: 'folder1', deleted: false },
+    ];
+
+    const mockNotes = [
+      {
+        id: 'note1',
+        title: 'Note in subfolder',
+        sdId: 'default',
+        folderId: 'folder2', // Note is in "Work" folder which is child of "Projects"
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview text',
+        contentText: 'Content text',
+      },
+    ];
+
+    mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+    mockElectronAPI.folder.list.mockResolvedValue(mockFolders);
+    mockElectronAPI.appState.get.mockImplementation((key) => {
+      if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+      if (key === 'searchQuery') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+
+    const onNoteSelect = jest.fn();
+    const { unmount } = render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
+
+    // Wait for the folder path to appear
+    await waitFor(() => {
+      expect(screen.getByText('Projects / Work')).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
+  it('should not display folder path for notes in root', async () => {
+    jest.useRealTimers();
+
+    const mockNotes = [
+      {
+        id: 'note1',
+        title: 'Note in root',
+        sdId: 'default',
+        folderId: null, // Note is in root (no folder)
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview text',
+        contentText: 'Content text',
+      },
+    ];
+
+    mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+    mockElectronAPI.folder.list.mockResolvedValue([]);
+    mockElectronAPI.appState.get.mockImplementation((key) => {
+      if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+      if (key === 'searchQuery') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+
+    const onNoteSelect = jest.fn();
+    const { unmount, container } = render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
+
+    // Wait for the note to appear
+    await waitFor(() => {
+      expect(screen.getByText('Note in root')).toBeInTheDocument();
+    });
+
+    // Check that no folder icon is present (folder path not displayed)
+    const folderIcons = container.querySelectorAll('[data-testid="FolderIcon"]');
+    expect(folderIcons.length).toBe(0);
+
+    unmount();
+  });
+
+  it('should display time only for notes modified today', async () => {
+    jest.useRealTimers();
+
+    // Create a timestamp for today
+    const now = new Date();
+    const todayTimestamp = now.getTime();
+
+    const mockNotes = [
+      {
+        id: 'note1',
+        title: 'Note modified today',
+        sdId: 'default',
+        folderId: null,
+        created: todayTimestamp - 3600000, // 1 hour ago
+        modified: todayTimestamp,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview text',
+        contentText: 'Content text',
+      },
+    ];
+
+    mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+    mockElectronAPI.folder.list.mockResolvedValue([]);
+    mockElectronAPI.appState.get.mockImplementation((key) => {
+      if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+      if (key === 'searchQuery') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+
+    const onNoteSelect = jest.fn();
+    const { unmount } = render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
+
+    // Wait for the note to appear
+    await waitFor(() => {
+      expect(screen.getByText('Note modified today')).toBeInTheDocument();
+    });
+
+    // Get the expected time format (locale-based, time only)
+    const expectedTime = new Date(todayTimestamp).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+    // Check that the time is displayed (not relative like "5m ago")
+    expect(screen.getByText(expectedTime)).toBeInTheDocument();
+
+    unmount();
+  });
+
+  it('should display full date and time for notes not modified today', async () => {
+    jest.useRealTimers();
+
+    // Create a timestamp for yesterday
+    const now = new Date();
+    const yesterdayTimestamp = now.getTime() - 86400000; // 24 hours ago
+
+    const mockNotes = [
+      {
+        id: 'note1',
+        title: 'Note modified yesterday',
+        sdId: 'default',
+        folderId: null,
+        created: yesterdayTimestamp - 3600000,
+        modified: yesterdayTimestamp,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview text',
+        contentText: 'Content text',
+      },
+    ];
+
+    mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+    mockElectronAPI.folder.list.mockResolvedValue([]);
+    mockElectronAPI.appState.get.mockImplementation((key) => {
+      if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+      if (key === 'searchQuery') return Promise.resolve(null);
+      return Promise.resolve(null);
+    });
+
+    const onNoteSelect = jest.fn();
+    const { unmount } = render(
+      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+    );
+
+    // Wait for the note to appear
+    await waitFor(() => {
+      expect(screen.getByText('Note modified yesterday')).toBeInTheDocument();
+    });
+
+    // Get the expected date+time format (locale-based)
+    const expectedDateTime = new Date(yesterdayTimestamp).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+    // Check that the full date+time is displayed (not relative like "1d ago")
+    expect(screen.getByText(expectedDateTime)).toBeInTheDocument();
+
     unmount();
   });
 });
