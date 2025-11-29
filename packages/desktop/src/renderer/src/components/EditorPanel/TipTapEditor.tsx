@@ -132,6 +132,77 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
       },
+      // Custom clipboard text serializer to fix newline handling when copying
+      // Default TipTap behavior adds too many newlines within lists.
+      // We want:
+      // - Paragraphs separated by blank lines (double newline) to preserve that spacing
+      // - List items separated by single newlines (not double)
+      // - List markers (-, 1., [ ], etc.) preserved
+      clipboardTextSerializer: (slice) => {
+        const results: string[] = [];
+
+        // Helper to get text content from a node
+        const getTextContent = (node: typeof slice.content.firstChild): string => {
+          if (!node) return '';
+          if (node.isText) return node.text ?? '';
+
+          let text = '';
+          node.forEach((child) => {
+            text += getTextContent(child);
+          });
+          return text;
+        };
+
+        // Helper to process list items - returns array of item texts with markers
+        const processListItems = (
+          listNode: typeof slice.content.firstChild,
+          listType: string
+        ): string[] => {
+          const items: string[] = [];
+          let index = 1;
+          listNode?.forEach((item) => {
+            const text = getTextContent(item).trim();
+            if (text) {
+              // Add appropriate marker based on list type and item state
+              if (listType === 'orderedList') {
+                items.push(`${index}. ${text}`);
+                index++;
+              } else if (listType === 'taskList' || item.type.name === 'taskItem') {
+                // Check task item state
+                const checked = item.attrs['checked'] as string | undefined;
+                const marker = checked === 'checked' ? '[x]' : checked === 'nope' ? '[-]' : '[ ]';
+                items.push(`${marker} ${text}`);
+              } else {
+                // bulletList
+                items.push(`- ${text}`);
+              }
+            }
+          });
+          return items;
+        };
+
+        // Process each top-level node
+        slice.content.forEach((node) => {
+          const nodeType = node.type.name;
+
+          // Handle lists specially - join items with single newlines
+          if (nodeType === 'bulletList' || nodeType === 'orderedList' || nodeType === 'taskList') {
+            const items = processListItems(node, nodeType);
+            if (items.length > 0) {
+              results.push(items.join('\n'));
+            }
+          } else {
+            // For paragraphs, headings, etc - get text content
+            const text = getTextContent(node).trim();
+            if (text) {
+              results.push(text);
+            }
+          }
+        });
+
+        // Join top-level blocks with double newlines to preserve paragraph spacing
+        return results.join('\n\n');
+      },
     },
     // Track content changes for title extraction
     onUpdate: ({ editor }) => {
