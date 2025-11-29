@@ -9,7 +9,7 @@
  * Based on @tiptap/extension-task-item but extended for tri-state support.
  */
 import { Node, mergeAttributes, InputRule } from '@tiptap/core';
-import { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Node as ProseMirrorNode, Fragment } from '@tiptap/pm/model';
 
 export type TaskItemState = 'unchecked' | 'checked' | 'nope';
 
@@ -35,10 +35,103 @@ function getNextState(currentState: TaskItemState): TaskItemState {
   return 'unchecked';
 }
 
-// Note: Auto-sort feature disabled for now. When re-enabled, use this:
-// function isCompletedState(state: TaskItemState): boolean {
-//   return state === 'checked' || state === 'nope';
-// }
+function isCompletedState(state: TaskItemState): boolean {
+  return state === 'checked' || state === 'nope';
+}
+
+/**
+ * Find the target position for reordering a task item after a state change.
+ *
+ * Rules:
+ * - Unchecked items stay at top of list
+ * - Completed (checked/nope) items go to bottom of list
+ * - When completing: insert at START of completed group (just after last unchecked)
+ * - When uncompleting: insert at END of unchecked group (just before first completed)
+ *
+ * @returns Target position to insert the node, or null if no move needed
+ */
+function findReorderTargetPosition(
+  doc: ProseMirrorNode,
+  taskItemPos: number,
+  willBeCompleted: boolean
+): number | null {
+  const $pos = doc.resolve(taskItemPos);
+
+  // Find the parent list (bulletList or orderedList)
+  let listDepth = -1;
+  for (let d = $pos.depth; d > 0; d--) {
+    const node = $pos.node(d);
+    if (node.type.name === 'bulletList' || node.type.name === 'orderedList') {
+      listDepth = d;
+      break;
+    }
+  }
+  if (listDepth === -1) return null;
+
+  const listNode = $pos.node(listDepth);
+  const listStart = $pos.start(listDepth);
+
+  // Find the index of the current task item within the list
+  let currentIndex = -1;
+  let offset = 0;
+  for (let i = 0; i < listNode.childCount; i++) {
+    const childPos = listStart + offset;
+    if (childPos === taskItemPos) {
+      currentIndex = i;
+      break;
+    }
+    offset += listNode.child(i).nodeSize;
+  }
+  if (currentIndex === -1) return null;
+
+  // Find the boundary between unchecked and completed items
+  // (index of first completed item, or childCount if none)
+  let firstCompletedIndex = listNode.childCount;
+  offset = 0;
+  for (let i = 0; i < listNode.childCount; i++) {
+    if (i === currentIndex) {
+      offset += listNode.child(i).nodeSize;
+      continue; // Skip the item being moved
+    }
+    const child = listNode.child(i);
+    const childState = child.attrs['checked'] as TaskItemState | undefined;
+    if (childState && isCompletedState(childState)) {
+      firstCompletedIndex = i;
+      break;
+    }
+    offset += child.nodeSize;
+  }
+
+  // Determine target index
+  let targetIndex: number;
+  if (willBeCompleted) {
+    // Insert at start of completed group (position of first completed item)
+    // But if current item is before firstCompletedIndex, we need to account for removal
+    targetIndex =
+      currentIndex < firstCompletedIndex ? firstCompletedIndex - 1 : firstCompletedIndex;
+  } else {
+    // Insert at end of unchecked group (just before first completed)
+    // But if current item is after firstCompletedIndex, we account for removal shifting things
+    targetIndex =
+      currentIndex > firstCompletedIndex ? firstCompletedIndex : firstCompletedIndex - 1;
+  }
+
+  // Check if item is already in the correct position
+  if (targetIndex === currentIndex) {
+    return null; // No move needed
+  }
+
+  // Calculate the actual document position to insert at
+  // We need to find the position AFTER the item at targetIndex
+  // (or at the start of the list if targetIndex < 0)
+  let targetPos = listStart;
+  const adjustedTargetIndex = targetIndex < currentIndex ? targetIndex : targetIndex + 1;
+  for (let i = 0; i < adjustedTargetIndex && i < listNode.childCount; i++) {
+    targetPos += listNode.child(i).nodeSize;
+  }
+
+  return targetPos;
+}
 
 export interface TriStateTaskItemOptions {
   nested: boolean;
@@ -161,9 +254,9 @@ export const TriStateTaskItem = Node.create<TriStateTaskItemOptions>({
 
         const currentState = currentNode.attrs['checked'] as TaskItemState;
         const nextState = getNextState(currentState);
-        // Note: wasCompleted and willBeCompleted are computed but unused since auto-sort is disabled
-        // const wasCompleted = isCompletedState(currentState);
-        // const willBeCompleted = isCompletedState(nextState);
+        const wasCompleted = isCompletedState(currentState);
+        const willBeCompleted = isCompletedState(nextState);
+        const needsReorder = wasCompleted !== willBeCompleted;
 
         editor
           .chain()
@@ -172,23 +265,46 @@ export const TriStateTaskItem = Node.create<TriStateTaskItemOptions>({
             const pos = getPos();
             if (typeof pos !== 'number') return false;
 
-            // Update the node's state
-            tr.setNodeMarkup(pos, undefined, {
-              ...currentNode.attrs,
-              checked: nextState,
-            });
+            const nodeToMove = tr.doc.nodeAt(pos);
+            if (!nodeToMove) return false;
+
+            // Calculate reorder target BEFORE modifying the document
+            const targetPos = needsReorder
+              ? findReorderTargetPosition(tr.doc, pos, willBeCompleted)
+              : null;
+
+            if (targetPos !== null) {
+              // Create the node with updated state
+              const newNode = nodeToMove.type.create(
+                { ...nodeToMove.attrs, checked: nextState },
+                nodeToMove.content,
+                nodeToMove.marks
+              );
+
+              // Move the node: delete from current position, insert at target
+              if (targetPos < pos) {
+                // Moving backward: insert first, then delete
+                tr.insert(targetPos, Fragment.from(newNode));
+                // After insert, original position shifted by inserted size
+                const shiftedPos = pos + newNode.nodeSize;
+                tr.delete(shiftedPos, shiftedPos + nodeToMove.nodeSize);
+              } else {
+                // Moving forward: delete first, then insert
+                tr.delete(pos, pos + nodeToMove.nodeSize);
+                // After delete, target shifted back by deleted size
+                tr.insert(targetPos - nodeToMove.nodeSize, Fragment.from(newNode));
+              }
+            } else {
+              // No reorder needed, just update the state
+              tr.setNodeMarkup(pos, undefined, {
+                ...currentNode.attrs,
+                checked: nextState,
+              });
+            }
 
             return true;
           })
           .run();
-
-        // Auto-sort: disabled for now due to complexity with node view re-creation
-        // TODO: Implement auto-sort in a future iteration
-        // if (wasCompleted !== willBeCompleted) {
-        //   setTimeout(() => {
-        //     reorderTaskItems(editor, getPos, willBeCompleted);
-        //   }, 10);
-        // }
       });
 
       // Apply HTML attributes
@@ -359,10 +475,5 @@ function findParentListItemPos(
   }
   return null;
 }
-
-// Auto-sort feature disabled for now due to complexity with ProseMirror node view lifecycle.
-// When a task item is toggled, the node view gets re-created, causing issues with position tracking.
-// TODO: Implement auto-sort in a future iteration. The reorderTaskItems function was here but
-// has been removed to clean up TypeScript warnings. See git history if needed.
 
 export default TriStateTaskItem;
