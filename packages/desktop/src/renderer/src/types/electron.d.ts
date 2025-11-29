@@ -225,6 +225,8 @@ declare global {
         onUpdated: (
           callback: (data: { sdId: string; operation: string; folderId: string }) => void
         ) => () => void;
+        emitSelected: (folderId: string) => Promise<void>;
+        onSelected: (callback: (folderId: string) => void) => () => void;
       };
 
       sd: {

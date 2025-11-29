@@ -121,6 +121,11 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
       window.electronAPI.appState.set('selectedFolderId', folderId).catch((err) => {
         console.error('Failed to save selected folder:', err);
       });
+
+      // Emit folder selected event (clears search in NotesListPanel)
+      window.electronAPI.folder.emitSelected(folderId).catch((err) => {
+        console.error('Failed to emit folder selected event:', err);
+      });
     }
   }, []);
 

@@ -10,6 +10,9 @@ import { NotesListPanel } from '../NotesListPanel';
 jest.mock('../../../i18n', () => ({}));
 
 /* eslint-disable @typescript-eslint/no-empty-function */
+// Store for folder.onSelected callbacks so tests can trigger them
+let folderSelectedCallbacks: ((folderId: string) => void)[] = [];
+
 // Mock window.electronAPI
 const mockElectronAPI = {
   note: {
@@ -31,6 +34,12 @@ const mockElectronAPI = {
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),
+    onSelected: jest.fn().mockImplementation((callback: (folderId: string) => void) => {
+      folderSelectedCallbacks.push(callback);
+      return () => {
+        folderSelectedCallbacks = folderSelectedCallbacks.filter((cb) => cb !== callback);
+      };
+    }),
   },
   tag: {
     getAll: jest.fn().mockResolvedValue([]),
@@ -47,6 +56,13 @@ const mockElectronAPI = {
   },
 };
 
+// Helper to simulate folder selection event
+const simulateFolderSelected = (folderId: string): void => {
+  folderSelectedCallbacks.forEach((cb) => {
+    cb(folderId);
+  });
+};
+
 Object.defineProperty(window, 'electronAPI', {
   value: mockElectronAPI,
   writable: true,
@@ -56,6 +72,7 @@ describe('NotesListPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    folderSelectedCallbacks = [];
   });
 
   afterEach(() => {
@@ -493,5 +510,192 @@ describe('NotesListPanel', () => {
     expect(screen.getByText(expectedDateTime)).toBeInTheDocument();
 
     unmount();
+  });
+
+  describe('clear search on folder selection', () => {
+    it('should clear search when folder:selected event is received', async () => {
+      jest.useRealTimers();
+
+      // Start with a search query
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'searchQuery') return Promise.resolve('test search');
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        return Promise.resolve(null);
+      });
+      mockElectronAPI.note.list.mockResolvedValue([]);
+      mockElectronAPI.note.search.mockResolvedValue([]);
+
+      const onNoteSelect = jest.fn();
+      const { unmount } = render(
+        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+      );
+
+      // Wait for component to load and search to be populated
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('test search');
+      });
+
+      // Simulate folder selection event
+      simulateFolderSelected('folder-123');
+
+      // Search should be cleared
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('');
+      });
+
+      // Should have saved empty search query to app state
+      expect(mockElectronAPI.appState.set).toHaveBeenCalledWith('searchQuery', '');
+
+      unmount();
+    });
+
+    it('should clear search when virtual folder "All Notes" is selected', async () => {
+      jest.useRealTimers();
+
+      // Start with a search query
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'searchQuery') return Promise.resolve('my search');
+        if (key === 'selectedFolderId') return Promise.resolve('folder-1');
+        return Promise.resolve(null);
+      });
+      mockElectronAPI.note.list.mockResolvedValue([]);
+      mockElectronAPI.note.search.mockResolvedValue([]);
+
+      const onNoteSelect = jest.fn();
+      const { unmount } = render(
+        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+      );
+
+      // Wait for search to be populated
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('my search');
+      });
+
+      // Simulate "All Notes" selection
+      simulateFolderSelected('all-notes');
+
+      // Search should be cleared
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('');
+      });
+
+      unmount();
+    });
+
+    it('should clear search when virtual folder "Recently Deleted" is selected', async () => {
+      jest.useRealTimers();
+
+      // Start with a search query
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'searchQuery') return Promise.resolve('another search');
+        if (key === 'selectedFolderId') return Promise.resolve('folder-1');
+        return Promise.resolve(null);
+      });
+      mockElectronAPI.note.list.mockResolvedValue([]);
+      mockElectronAPI.note.search.mockResolvedValue([]);
+
+      const onNoteSelect = jest.fn();
+      const { unmount } = render(
+        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+      );
+
+      // Wait for search to be populated
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('another search');
+      });
+
+      // Simulate "Recently Deleted" selection
+      simulateFolderSelected('recently-deleted');
+
+      // Search should be cleared
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('');
+      });
+
+      unmount();
+    });
+
+    it('should clear search when activeSdId prop changes', async () => {
+      jest.useRealTimers();
+
+      // Start with a search query
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'searchQuery') return Promise.resolve('sd search');
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        return Promise.resolve(null);
+      });
+      mockElectronAPI.note.list.mockResolvedValue([]);
+      mockElectronAPI.note.search.mockResolvedValue([]);
+
+      const onNoteSelect = jest.fn();
+      const { unmount, rerender } = render(
+        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="sd-1" />
+      );
+
+      // Wait for search to be populated
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('sd search');
+      });
+
+      // Change activeSdId
+      rerender(
+        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="sd-2" />
+      );
+
+      // Search should be cleared
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('');
+      });
+
+      // Should have saved empty search query to app state
+      expect(mockElectronAPI.appState.set).toHaveBeenCalledWith('searchQuery', '');
+
+      unmount();
+    });
+
+    it('should clear persisted searchQuery in app state when folder is selected', async () => {
+      jest.useRealTimers();
+
+      // Start with a search query
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'searchQuery') return Promise.resolve('persistent search');
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        return Promise.resolve(null);
+      });
+      mockElectronAPI.note.list.mockResolvedValue([]);
+      mockElectronAPI.note.search.mockResolvedValue([]);
+
+      const onNoteSelect = jest.fn();
+      const { unmount } = render(
+        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
+      );
+
+      // Wait for search to be populated
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search notes...');
+        expect(searchInput).toHaveValue('persistent search');
+      });
+
+      // Clear the mock to track new calls
+      mockElectronAPI.appState.set.mockClear();
+
+      // Simulate folder selection
+      simulateFolderSelected('new-folder');
+
+      // Wait for the search to be cleared and persisted
+      await waitFor(() => {
+        expect(mockElectronAPI.appState.set).toHaveBeenCalledWith('searchQuery', '');
+      });
+
+      unmount();
+    });
   });
 });

@@ -441,11 +441,20 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     void loadFolders();
   }, [loadSelectedFolder, loadSearchQuery, loadFolders]);
 
-  // Reset to "all-notes" and reload folders when active SD changes
+  // Reset to "all-notes", reload folders, and clear search when active SD changes
   useEffect(() => {
     setSelectedFolderId('all-notes');
     void loadFolders();
-  }, [activeSdId, loadFolders]);
+
+    // Clear search when SD changes
+    setSearchQuery('');
+    void saveSearchQuery('');
+    setIsSearching(false);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+  }, [activeSdId, loadFolders, saveSearchQuery]);
 
   // Fetch notes when selected folder, active SD, or tag filters change (only if not searching)
   useEffect(() => {
@@ -640,6 +649,26 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       unsubscribeMoved();
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
+
+  // Listen for folder selection events to clear search
+  useEffect(() => {
+    const unsubscribeFolderSelected = window.electronAPI.folder.onSelected(() => {
+      // Clear search when a folder is selected
+      setSearchQuery('');
+      void saveSearchQuery('');
+      setIsSearching(false);
+
+      // Cancel any pending search timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+    });
+
+    return () => {
+      unsubscribeFolderSelected();
+    };
+  }, [saveSearchQuery]);
 
   // Handle export trigger from app menu
   useEffect(() => {

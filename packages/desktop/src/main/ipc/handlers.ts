@@ -162,6 +162,7 @@ export class IPCHandlers {
     ipcMain.handle('folder:rename', this.handleRenameFolder.bind(this));
     ipcMain.handle('folder:delete', this.handleDeleteFolder.bind(this));
     ipcMain.handle('folder:move', this.handleMoveFolder.bind(this));
+    ipcMain.handle('folder:emitSelected', this.handleEmitFolderSelected.bind(this));
 
     // Storage Directory operations
     ipcMain.handle('sd:list', this.handleListStorageDirs.bind(this));
@@ -1665,6 +1666,13 @@ export class IPCHandlers {
     this.broadcastToAll('folder:updated', { sdId, operation: 'move', folderId });
   }
 
+  /**
+   * Handle folder selection event - broadcasts to all windows to clear search
+   */
+  private handleEmitFolderSelected(_event: IpcMainInvokeEvent, folderId: string): void {
+    this.broadcastToAll('folder:selected', folderId);
+  }
+
   private async handleGetAppState(_event: IpcMainInvokeEvent, key: string): Promise<string | null> {
     return await this.database.getState(key);
   }
@@ -1957,6 +1965,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('folder:rename');
     ipcMain.removeHandler('folder:delete');
     ipcMain.removeHandler('folder:move');
+    ipcMain.removeHandler('folder:emitSelected');
     ipcMain.removeHandler('sd:list');
     ipcMain.removeHandler('sd:create');
     ipcMain.removeHandler('sd:setActive');
