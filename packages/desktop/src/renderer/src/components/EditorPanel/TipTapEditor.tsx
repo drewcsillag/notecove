@@ -16,6 +16,7 @@ import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
 import { Box, useTheme, Chip, Fade, CircularProgress } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
+import { yUndoPluginKey } from 'y-prosemirror';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
@@ -55,6 +56,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const noteIdRef = useRef<string | null>(noteId);
   const titleUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
+  // Track updates we've sent to main process so we can skip them when they bounce back
+  const pendingUpdatesRef = useRef<Set<string>>(new Set());
 
   const editor = useEditor({
     extensions: [
@@ -184,6 +187,41 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     },
   });
 
+  // Fix: Ensure UndoManager is properly configured after React StrictMode double-mount
+  // React StrictMode unmounts and remounts components, which can break the TipTap
+  // Collaboration extension's UndoManager in two ways:
+  // 1. The UndoManager may lose itself from trackedOrigins
+  // 2. The UndoManager's afterTransactionHandler may be unregistered from the Y.Doc
+  useEffect(() => {
+    if (editor) {
+      const undoPluginState = yUndoPluginKey.getState(editor.state);
+      if (undoPluginState?.undoManager) {
+        const um = undoPluginState.undoManager;
+
+        // Fix 1: If the UndoManager doesn't have itself in trackedOrigins, add it
+        if (!um.trackedOrigins.has(um)) {
+          um.trackedOrigins.add(um);
+        }
+
+        // Fix 2: If the UndoManager's handler is not registered on Y.Doc, re-register it
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        const umAny = um as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        const yDocAny = yDoc as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        const observers = yDocAny._observers?.get('afterTransaction');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        const hasUmHandler = observers?.has(umAny.afterTransactionHandler) ?? false;
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (!hasUmHandler && umAny.afterTransactionHandler) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+          yDoc.on('afterTransaction', umAny.afterTransactionHandler);
+        }
+      }
+    }
+  }, [editor, yDoc]);
+
   // Keep noteIdRef in sync with noteId prop and handle note deselection
   useEffect(() => {
     const previousNoteId = noteIdRef.current;
@@ -278,8 +316,19 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         return;
       }
 
+      // Create a hash of the update to track it
+      const updateHash = Array.from(update.slice(0, 32))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      pendingUpdatesRef.current.add(updateHash);
+
+      // Clean up old hashes after a short delay (in case update never comes back)
+      setTimeout(() => {
+        pendingUpdatesRef.current.delete(updateHash);
+      }, 5000);
+
       console.log(
-        `[TipTapEditor] Sending update to main process for note ${noteId}, size: ${update.length} bytes`
+        `[TipTapEditor] Sending update to main process for note ${noteId}, size: ${update.length} bytes, hash: ${updateHash.substring(0, 16)}...`
       );
       // Send update to main process for persistence and distribution to other windows
       window.electronAPI.note.applyUpdate(noteId, update).catch((error: Error) => {
@@ -369,16 +418,30 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
     // Set up listener for updates from other windows in same process
     const handleNoteUpdate = (updatedNoteId: string, update: Uint8Array) => {
-      console.log(
-        `[TipTapEditor] handleNoteUpdate received for ${updatedNoteId}, update size: ${update.length}, this note: ${noteId}, match: ${updatedNoteId === noteId}`
-      );
-      if (updatedNoteId === noteId) {
-        // Apply update from other window to our local Y.Doc with 'remote' origin
-        // This will automatically update the editor via the Collaboration extension
-        console.log(`[TipTapEditor] Applying Y.applyUpdate with ${update.length} bytes`);
-        Y.applyUpdate(yDoc, update, 'remote');
-        console.log(`[TipTapEditor] Y.applyUpdate complete`);
+      if (updatedNoteId !== noteId) {
+        return;
       }
+
+      // Check if this is our own update bouncing back
+      const updateHash = Array.from(update.slice(0, 32))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      if (pendingUpdatesRef.current.has(updateHash)) {
+        // This is our own update, skip it to preserve undo stack
+        console.log(
+          `[TipTapEditor] Skipping own update bounce-back, hash: ${updateHash.substring(0, 16)}...`
+        );
+        pendingUpdatesRef.current.delete(updateHash);
+        return;
+      }
+
+      // Apply update from other window to our local Y.Doc with 'remote' origin
+      // This will automatically update the editor via the Collaboration extension
+      console.log(
+        `[TipTapEditor] Applying remote update with ${update.length} bytes, hash: ${updateHash.substring(0, 16)}...`
+      );
+      Y.applyUpdate(yDoc, update, 'remote');
     };
 
     const cleanupNoteUpdate = window.electronAPI.note.onUpdated(handleNoteUpdate);

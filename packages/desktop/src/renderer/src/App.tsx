@@ -224,8 +224,9 @@ function App(): React.ReactElement {
         event.preventDefault();
         setSettingsOpen(true);
       }
-      // Check for Cmd+Y (macOS) or Ctrl+Y (Windows/Linux) to toggle History
-      if (event.key === 'y' && (event.metaKey || event.ctrlKey)) {
+      // Check for Cmd+Option+H (macOS) or Ctrl+Alt+H (Windows/Linux) to toggle History
+      // Note: Cmd+Y is reserved for redo in the editor
+      if (event.key === 'h' && event.altKey && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         if (selectedNoteId) {
           setHistoryPanelOpen((prev) => !prev);
