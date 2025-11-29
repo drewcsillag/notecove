@@ -410,6 +410,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('folder:updated', listener);
       };
     },
+
+    // Emit folder selection event (for clearing search when folder is clicked)
+    emitSelected: (folderId: string): Promise<void> =>
+      ipcRenderer.invoke('folder:emitSelected', folderId) as Promise<void>,
+
+    // Listen for folder selection events
+    onSelected: (callback: (folderId: string) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, folderId: string): void => {
+        callback(folderId);
+      };
+      ipcRenderer.on('folder:selected', listener);
+      return () => {
+        ipcRenderer.removeListener('folder:selected', listener);
+      };
+    },
   },
 
   // Storage Directory operations
