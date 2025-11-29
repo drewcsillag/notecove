@@ -457,6 +457,16 @@ declare global {
         onExportSelectedNotes: (callback: () => void) => () => void;
         onExportAllNotes: (callback: () => void) => () => void;
         onReloadFromCRDTLogs: (callback: () => void) => () => void;
+        onReindexNotes: (callback: () => void) => () => void;
+      };
+
+      tools: {
+        reindexNotes: () => Promise<{ success: boolean; error?: string }>;
+        onReindexProgress: (
+          callback: (data: { current: number; total: number }) => void
+        ) => () => void;
+        onReindexComplete: (callback: () => void) => () => void;
+        onReindexError: (callback: (data: { error: string }) => void) => () => void;
       };
 
       export: {

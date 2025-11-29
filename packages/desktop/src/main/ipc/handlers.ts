@@ -237,6 +237,9 @@ export class IPCHandlers {
     ipcMain.handle('export:getNotesForExport', this.handleGetNotesForExport.bind(this));
     ipcMain.handle('export:showCompletionMessage', this.handleShowExportCompletion.bind(this));
 
+    // Tools operations
+    ipcMain.handle('tools:reindexNotes', this.handleReindexNotes.bind(this));
+
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
       ipcMain.handle('testing:createWindow', this.handleCreateWindow.bind(this));
@@ -2986,6 +2989,28 @@ export class IPCHandlers {
       detail: message,
       buttons: ['OK'],
     });
+  }
+
+  // ===========================================================================
+  // Tools Operations
+  // ===========================================================================
+
+  /**
+   * Reindex all notes in the FTS5 search index.
+   * Broadcasts progress updates to all windows.
+   */
+  private async handleReindexNotes(): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.database.reindexNotes((current, total) => {
+        this.broadcastToAll('tools:reindex-progress', { current, total });
+      });
+      this.broadcastToAll('tools:reindex-complete');
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.broadcastToAll('tools:reindex-error', { error: message });
+      return { success: false, error: message };
+    }
   }
 }
 

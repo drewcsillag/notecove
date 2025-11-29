@@ -1038,6 +1038,50 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('menu:reloadFromCRDTLogs', listener);
       };
     },
+    onReindexNotes: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:reindexNotes', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:reindexNotes', listener);
+      };
+    },
+  },
+
+  // Tools operations
+  tools: {
+    reindexNotes: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('tools:reindexNotes') as Promise<{ success: boolean; error?: string }>,
+    onReindexProgress: (
+      callback: (data: { current: number; total: number }) => void
+    ): (() => void) => {
+      const listener = (_event: unknown, data: { current: number; total: number }): void => {
+        callback(data);
+      };
+      ipcRenderer.on('tools:reindex-progress', listener);
+      return () => {
+        ipcRenderer.removeListener('tools:reindex-progress', listener);
+      };
+    },
+    onReindexComplete: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('tools:reindex-complete', listener);
+      return () => {
+        ipcRenderer.removeListener('tools:reindex-complete', listener);
+      };
+    },
+    onReindexError: (callback: (data: { error: string }) => void): (() => void) => {
+      const listener = (_event: unknown, data: { error: string }): void => {
+        callback(data);
+      };
+      ipcRenderer.on('tools:reindex-error', listener);
+      return () => {
+        ipcRenderer.removeListener('tools:reindex-error', listener);
+      };
+    },
   },
 
   // Export operations

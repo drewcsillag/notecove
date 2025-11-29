@@ -130,10 +130,11 @@ export class SqliteDatabase implements Database {
     `);
 
     // Triggers to keep FTS index in sync
+    // Use transform_hashtags() to convert #tag to __hashtag__tag for proper hashtag search
     await this.adapter.exec(`
       CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
         INSERT INTO notes_fts(note_id, title, content)
-        VALUES (new.id, new.title, new.content_text);
+        VALUES (new.id, transform_hashtags(new.title), transform_hashtags(new.content_text));
       END;
     `);
 
@@ -145,7 +146,7 @@ export class SqliteDatabase implements Database {
 
     await this.adapter.exec(`
       CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
-        UPDATE notes_fts SET title = new.title, content = new.content_text
+        UPDATE notes_fts SET title = transform_hashtags(new.title), content = transform_hashtags(new.content_text)
         WHERE note_id = new.id;
       END;
     `);
@@ -377,9 +378,17 @@ export class SqliteDatabase implements Database {
   }
 
   async searchNotes(query: string, limit = 50): Promise<SearchResult[]> {
+    // First, transform hashtags in the query to match the indexed format
+    // e.g., "#work" becomes "__hashtag__work"
+    const hashtagTransformedQuery = query.replace(/#(\w+)/g, '__hashtag__$1');
+
+    // FTS5 special characters that need to be quoted (excluding # which is now transformed)
+    // These characters have special meaning in FTS5 query syntax
+    const fts5SpecialChars = /[@:^$(){}[\]\\|!&~<>]/;
+
     // Transform query to support prefix matching
     // For each word >=3 chars, add wildcard for prefix search
-    const fts5Query = query
+    const fts5Query = hashtagTransformedQuery
       .trim()
       .split(/\s+/)
       .filter((word) => word.length > 0)
@@ -387,6 +396,12 @@ export class SqliteDatabase implements Database {
         // If it's already a quoted phrase, keep it as is
         if (word.startsWith('"') && word.endsWith('"')) {
           return word;
+        }
+        // If it contains special characters, quote it for exact match
+        if (fts5SpecialChars.test(word)) {
+          // Escape any internal quotes and wrap in quotes
+          const escaped = word.replace(/"/g, '""');
+          return `"${escaped}"`;
         }
         // For words >= 3 chars, add prefix wildcard
         if (word.length >= 3) {
@@ -422,6 +437,43 @@ export class SqliteDatabase implements Database {
       snippet: row.content,
       rank: row.rank,
     }));
+  }
+
+  /**
+   * Reindex all notes in the FTS5 full-text search index.
+   * This is useful after changes to the indexing logic (e.g., hashtag transformation).
+   * @param onProgress Optional callback for progress updates (current, total)
+   */
+  async reindexNotes(
+    onProgress?: (current: number, total: number) => void
+  ): Promise<void> {
+    // Get all notes (including deleted ones, so they're searchable if restored)
+    const rows = await this.adapter.all<{
+      id: string;
+      title: string;
+      content_text: string;
+    }>('SELECT id, title, content_text FROM notes');
+
+    const total = rows.length;
+    if (total === 0) {
+      onProgress?.(0, 0);
+      return;
+    }
+
+    // Clear the FTS index
+    await this.adapter.exec('DELETE FROM notes_fts');
+
+    // Re-insert all notes with transformed hashtags
+    // The trigger won't fire since we're inserting directly into notes_fts,
+    // so we need to apply transform_hashtags ourselves
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]!;
+      await this.adapter.exec(
+        'INSERT INTO notes_fts(note_id, title, content) VALUES (?, transform_hashtags(?), transform_hashtags(?))',
+        [row.id, row.title, row.content_text]
+      );
+      onProgress?.(i + 1, total);
+    }
   }
 
   private mapNoteRow(row: {

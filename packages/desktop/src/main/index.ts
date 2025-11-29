@@ -1618,6 +1618,15 @@ function createMenu(): void {
             },
           ],
         },
+        { type: 'separator' },
+        {
+          label: 'Reindex Notes',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:reindexNotes');
+            }
+          },
+        },
       ],
     },
     {

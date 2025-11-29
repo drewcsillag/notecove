@@ -15,6 +15,7 @@ import { EditorPanel } from './components/EditorPanel/EditorPanel';
 import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgressDialog';
 import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownProgressDialog';
+import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgressDialog';
 import { NoteInfoDialog } from './components/NoteInfoDialog';
 import { AppStateKey } from '@notecove/shared';
 
@@ -49,6 +50,13 @@ function App(): React.ReactElement {
     open: boolean;
     current: number;
     total: number;
+  }>({ open: false, current: 0, total: 0 });
+  // Reindex progress (for rebuilding search index)
+  const [reindexProgress, setReindexProgress] = useState<{
+    open: boolean;
+    current: number;
+    total: number;
+    error?: string;
   }>({ open: false, current: 0, total: 0 });
   // Minimal mode (for linked note windows)
   const [minimalMode, setMinimalMode] = useState(false);
@@ -142,6 +150,38 @@ function App(): React.ReactElement {
     return () => {
       unsubscribeProgress();
       unsubscribeComplete();
+    };
+  }, []);
+
+  // Listen for reindex progress (when rebuilding search index)
+  useEffect(() => {
+    const unsubscribeProgress = window.electronAPI.tools.onReindexProgress((data) => {
+      setReindexProgress({
+        open: true,
+        current: data.current,
+        total: data.total,
+      });
+    });
+
+    const unsubscribeComplete = window.electronAPI.tools.onReindexComplete(() => {
+      setReindexProgress({ open: false, current: 0, total: 0 });
+    });
+
+    const unsubscribeError = window.electronAPI.tools.onReindexError((data) => {
+      setReindexProgress((prev) => ({
+        ...prev,
+        error: data.error,
+      }));
+      // Auto-close after 3 seconds on error
+      setTimeout(() => {
+        setReindexProgress({ open: false, current: 0, total: 0 });
+      }, 3000);
+    });
+
+    return () => {
+      unsubscribeProgress();
+      unsubscribeComplete();
+      unsubscribeError();
     };
   }, []);
 
@@ -388,6 +428,12 @@ function App(): React.ReactElement {
       }
     });
 
+    // Reindex Notes
+    const cleanupReindexNotes = window.electronAPI.menu.onReindexNotes(() => {
+      console.log('[Menu] Reindexing notes');
+      void window.electronAPI.tools.reindexNotes();
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -403,6 +449,7 @@ function App(): React.ReactElement {
       cleanupExportSelected();
       cleanupExportAll();
       cleanupReloadFromCRDTLogs();
+      cleanupReindexNotes();
     };
   }, [selectedNoteId]);
 
@@ -568,6 +615,12 @@ function App(): React.ReactElement {
           open={shutdownProgress.open}
           current={shutdownProgress.current}
           total={shutdownProgress.total}
+        />
+        <ReindexProgressDialog
+          open={reindexProgress.open}
+          current={reindexProgress.current}
+          total={reindexProgress.total}
+          {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
         />
       </DndProvider>
     </ThemeProvider>

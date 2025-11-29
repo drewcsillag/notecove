@@ -439,6 +439,107 @@ describe('SqliteDatabase', () => {
       expect(results[0]!.snippet).toBeTruthy();
       expect(results[0]!.title).toBeTruthy();
     });
+
+    it('should search for hashtag content without error', async () => {
+      // Insert a note with a hashtag
+      await db.upsertNote({
+        id: 'note-hashtag' as any,
+        title: 'Note with hashtag',
+        sdId: 'sd-1',
+        folderId: null,
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'This note has #work tag',
+        contentText: 'This note has #work tag and some other content',
+      });
+
+      // Searching for #work should not throw an error
+      const results = await db.searchNotes('#work');
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.some((r) => r.noteId === 'note-hashtag')).toBe(true);
+    });
+
+    it('should not match notes without the # when searching for #hashtag', async () => {
+      // Insert a note with just "work" (no hashtag)
+      await db.upsertNote({
+        id: 'note-no-hashtag' as any,
+        title: 'Note without hashtag',
+        sdId: 'sd-1',
+        folderId: null,
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'This note mentions work without hashtag',
+        contentText: 'This note mentions work without hashtag, just the word work',
+      });
+
+      // Insert a note with the actual #work hashtag
+      await db.upsertNote({
+        id: 'note-with-hashtag' as any,
+        title: 'Note with hashtag',
+        sdId: 'sd-1',
+        folderId: null,
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'This note has #work tag',
+        contentText: 'This note has #work tag',
+      });
+
+      // Searching for #work should only find the note with #work, not just "work"
+      const results = await db.searchNotes('#work');
+      expect(results.some((r) => r.noteId === 'note-with-hashtag')).toBe(true);
+      expect(results.some((r) => r.noteId === 'note-no-hashtag')).toBe(false);
+    });
+
+    it('should reindex notes and report progress', async () => {
+      // Insert some notes
+      await db.upsertNote({
+        id: 'note-reindex-1' as any,
+        title: 'Reindex Test 1',
+        sdId: 'sd-1',
+        folderId: null,
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Note with #project tag',
+        contentText: 'Note with #project tag for reindex testing',
+      });
+
+      await db.upsertNote({
+        id: 'note-reindex-2' as any,
+        title: 'Reindex Test 2',
+        sdId: 'sd-1',
+        folderId: null,
+        created: Date.now(),
+        modified: Date.now(),
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Another note with project word',
+        contentText: 'Another note with project word but no hashtag',
+      });
+
+      // Track progress calls
+      const progressCalls: { current: number; total: number }[] = [];
+      await db.reindexNotes((current, total) => {
+        progressCalls.push({ current, total });
+      });
+
+      // Should have made progress calls for each note
+      expect(progressCalls.length).toBeGreaterThan(0);
+      const lastCall = progressCalls[progressCalls.length - 1];
+      expect(lastCall?.current).toBe(lastCall?.total);
+
+      // After reindex, hashtag search should work correctly
+      const results = await db.searchNotes('#project');
+      expect(results.some((r) => r.noteId === 'note-reindex-1')).toBe(true);
+      expect(results.some((r) => r.noteId === 'note-reindex-2')).toBe(false);
+    });
   });
 
   describe('Transactions', () => {

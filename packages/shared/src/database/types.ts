@@ -537,4 +537,11 @@ export interface Database
     tagAssociationsDeleted: number;
     unusedTagsDeleted: number;
   }>;
+
+  /**
+   * Reindex all notes in the FTS5 full-text search index.
+   * This is useful after changes to the indexing logic (e.g., hashtag transformation).
+   * @param onProgress Optional callback for progress updates (current, total)
+   */
+  reindexNotes(onProgress?: (current: number, total: number) => void): Promise<void>;
 }

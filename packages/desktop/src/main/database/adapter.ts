@@ -11,6 +11,16 @@ const BetterSqlite3 = require('better-sqlite3');
 import type { DatabaseAdapter } from '@notecove/shared';
 import type BetterSqlite3Type from 'better-sqlite3';
 
+/**
+ * Transforms hashtags in text to a tokenizer-friendly format.
+ * Converts #tag to __hashtag__tag so FTS5 can distinguish hashtags from plain words.
+ */
+export function transformHashtags(text: string): string {
+  // Match hashtags: # followed by word characters (letters, numbers, underscore)
+  // This regex handles hashtags at word boundaries
+  return text.replace(/#(\w+)/g, '__hashtag__$1');
+}
+
 export class BetterSqliteAdapter implements DatabaseAdapter {
   private db: BetterSqlite3Type.Database | null = null;
 
@@ -23,6 +33,9 @@ export class BetterSqliteAdapter implements DatabaseAdapter {
     this.db = new BetterSqlite3(this.dbPath) as BetterSqlite3Type.Database;
     // Enable foreign keys
     this.db.pragma('foreign_keys = ON');
+
+    // Register custom function for hashtag transformation in FTS indexing
+    this.db.function('transform_hashtags', transformHashtags);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
