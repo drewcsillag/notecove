@@ -50,6 +50,9 @@ const mockElectronAPI = {
     create: jest.fn(),
     delete: jest.fn(),
     onUpdated: jest.fn(),
+    onSelected: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   sd: {
     list: jest.fn().mockResolvedValue([]),

@@ -60,6 +60,7 @@ const mockElectronAPI = {
     rename: jest.fn(),
     move: jest.fn(),
     onUpdated: jest.fn(() => () => {}),
+    onSelected: jest.fn(() => () => {}),
   },
   sd: {
     list: jest.fn().mockResolvedValue([]),
