@@ -22,7 +22,9 @@
     "test:coverage": "turbo run test:coverage",
     "ci-local": "node tools/ci-local.js",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
-    "read-crdt-update": "node tools/read-crdt-update.js"
+    "read-crdt-update": "node tools/read-crdt-update.js",
+    "version:sync": "node tools/version-sync.js",
+    "version:bump": "node tools/version-bump.js"
   },
   "pnpm": {
     "overrides": {
