@@ -262,11 +262,14 @@ function buildMultiSDTreeNodes(
 
   for (const sd of sds) {
     // Add SD as top-level node
+    // NOTE: droppable must be true for the library to allow reordering of child nodes
+    // (the library checks parent.droppable when calculating edge drop targets)
+    // We control actual drop behavior in canDrop callback
     nodes.push({
       id: `sd:${sd.id}`,
       parent: 0,
       text: sd.name,
-      droppable: false, // Cannot drop folders onto SD header
+      droppable: true,
       data: {
         isSD: true,
         sdId: sd.id,
@@ -767,8 +770,10 @@ export const FolderTree: FC<FolderTreeProps> = ({
       const isDropOnSpacer =
         dropTargetStr === 'sd-spacer-top' || dropTargetStr === 'sd-spacer-bottom';
       const isDropOnSD = dropTargetStr.startsWith('sd:');
+      // Also handle drop on root (0) with relativeIndex - this happens for edge drops
+      const isDropOnRoot = dropTargetId === 0 && relativeIndex !== undefined;
 
-      if (isDropOnSpacer || isDropOnSD) {
+      if (isDropOnSpacer || isDropOnSD || isDropOnRoot) {
         const sdIdToMove = dragSourceStr.replace('sd:', '');
         const currentSdIds = sds.map((sd) => sd.id);
         const currentIndex = currentSdIds.indexOf(sdIdToMove);
@@ -826,9 +831,19 @@ export const FolderTree: FC<FolderTreeProps> = ({
       return;
     }
 
-    // Don't allow dropping folders on "Recently Deleted" or SD headers
-    if (dropTargetStr.includes('recently-deleted') || dropTargetStr.startsWith('sd:')) {
+    // Don't allow dropping folders on "Recently Deleted"
+    if (dropTargetStr.includes('recently-deleted')) {
       return;
+    }
+
+    // For SD header drops: allow if this is a reorder operation (relativeIndex provided)
+    // This happens when reordering root-level folders - the library reports the SD header as dropTarget
+    if (dropTargetStr.startsWith('sd:')) {
+      if (relativeIndex === undefined) {
+        // Not a reorder - block the drop (can't nest folders under SD header)
+        return;
+      }
+      // This is a reorder operation - continue to handle it below
     }
 
     // In multi-SD mode, prevent cross-SD drag operations
@@ -856,6 +871,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
     const currentParentId = dragNode.parent;
 
+    // Ignore drop if target is the same as source (can't drop onto self)
+    if (dragSourceId === dropTargetId) {
+      return;
+    }
+
     // Determine which SD this operation is for
     const targetSdId = isMultiSDMode ? ((dragNode.data as { sdId?: string }).sdId ?? sdId) : sdId;
 
@@ -866,21 +886,19 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
     // Check if this is a reorder operation (same parent, relativeIndex provided)
     // relativeIndex is the position among siblings where the item should be placed
+    const currentParentStr = String(currentParentId);
     const isReorderOperation =
       relativeIndex !== undefined &&
-      (currentParentId === dropTargetId ||
+      (currentParentStr === dropTargetStr ||
         // Handle drop on "All Notes" (root) when folder is already at root
-        (dropTargetStr === 'all-notes' && currentParentId === 0) ||
-        (dropTargetStr.startsWith('all-notes:') && currentParentId === `sd:${targetSdId}`) ||
+        (dropTargetStr === 'all-notes' && currentParentStr === '0') ||
+        (dropTargetStr.startsWith('all-notes:') && currentParentStr === `sd:${targetSdId}`) ||
         // Handle drop on SD header when folder is already under that SD
-        (dropTargetStr === `sd:${targetSdId}` && currentParentId === `sd:${targetSdId}`));
+        (dropTargetStr === `sd:${targetSdId}` && currentParentStr === `sd:${targetSdId}`));
 
     try {
       if (isReorderOperation) {
         // Reorder within same parent
-        console.log(
-          `[FolderTree] Reordering folder ${dragSourceId} to index ${relativeIndex} in SD ${targetSdId}`
-        );
         await window.electronAPI.folder.reorder(targetSdId, String(dragSourceId), relativeIndex);
       } else {
         // Move to different parent
@@ -949,13 +967,16 @@ export const FolderTree: FC<FolderTreeProps> = ({
       if (dropTargetStr === 'sd-spacer-top' || dropTargetStr === 'sd-spacer-bottom') {
         return true;
       }
-      // SD can only be reordered with relativeIndex at root level
-      if (dropTargetId === 0 && relativeIndex !== undefined) {
-        return true; // Allow SD reordering at root
+      // SD can be dropped at root level (for reordering among SDs)
+      // NOTE: relativeIndex is always undefined in canDrop (library limitation),
+      // so we just allow drops on root and let handleDrop handle the logic
+      if (dropTargetId === 0) {
+        return true;
       }
-      // SD being dropped between other SDs (relativeIndex provided)
-      if (dropTargetStr.startsWith('sd:') && relativeIndex !== undefined) {
-        return true; // Allow SD reordering
+      // SD can be dropped on another SD (edge drop for reordering)
+      // The library uses the sibling SD as dropTarget for edge detection
+      if (dropTargetStr.startsWith('sd:') && dragSourceStr !== dropTargetStr) {
+        return true;
       }
       return false; // Block all other SD drops
     }
@@ -969,12 +990,11 @@ export const FolderTree: FC<FolderTreeProps> = ({
       return false;
     }
 
-    // Can't drop folders on "Recently Deleted", SD headers, or spacers
-    if (
-      dropTargetStr.includes('recently-deleted') ||
-      dropTargetStr.startsWith('sd:') ||
-      dropTargetStr.startsWith('sd-spacer')
-    ) {
+    // Can't drop folders on "Recently Deleted" or spacers
+    // NOTE: We allow dropping folders on SD headers because the library uses the SD header
+    // as the dropTargetId when reordering root-level folders (it's the parent node).
+    // The handleDrop function will interpret this correctly as a reorder or move-to-root.
+    if (dropTargetStr.includes('recently-deleted') || dropTargetStr.startsWith('sd-spacer')) {
       return false;
     }
 
@@ -1305,7 +1325,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
           rootId={0}
           sort={false} // Disable library sorting - we pre-sort in buildTreeNodes/buildMultiSDTreeNodes
           insertDroppableFirst={false} // Don't auto-reorder droppable nodes
-          dropTargetOffset={10} // Pixels from edge to trigger reorder vs nest
+          dropTargetOffset={20} // Pixels from edge to trigger reorder vs nest (larger = easier to hit)
           onDrop={(tree, options) => void handleDrop(tree, options)}
           canDrag={canDrag}
           canDrop={canDrop}
@@ -1366,12 +1386,23 @@ export const FolderTree: FC<FolderTreeProps> = ({
               />
             );
           }}
-          render={(node, { depth, onToggle, isDropTarget }) => {
-            // Don't render spacer nodes visibly (they're invisible drop targets)
+          render={(node, { depth, onToggle, isDropTarget, handleRef }) => {
+            // Render spacer nodes as thin drop zones
             const nodeId = String(node.id);
             if (nodeId === 'sd-spacer-top' || nodeId === 'sd-spacer-bottom') {
-              // Return a minimal invisible element that can still act as a drop target
-              return <Box sx={{ height: 0, overflow: 'hidden' }} />;
+              // Return a thin drop zone that shows highlight when dragging over
+              return (
+                <Box
+                  data-testid={`folder-tree-node-${nodeId}`}
+                  sx={{
+                    height: isDropTarget ? 8 : 4,
+                    backgroundColor: isDropTarget ? 'primary.main' : 'transparent',
+                    transition: 'all 0.2s ease',
+                    mx: 1,
+                    borderRadius: 1,
+                  }}
+                />
+              );
             }
 
             const isSelected = nodeId === selectedFolderId;
@@ -1404,115 +1435,123 @@ export const FolderTree: FC<FolderTreeProps> = ({
                 (!isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
                 (nodeId.includes(':') && nodeId.split(':')[1] === activeSdId));
 
-            return (
-              <DroppableFolderNode
-                folderId={nodeId}
-                onDrop={(noteIds, targetFolderId, sourceSdId) => {
-                  void handleNoteDrop(noteIds, targetFolderId, sourceSdId);
-                }}
-                isSpecial={isSpecialNode || isSDNode}
-              >
-                <ListItemButton
-                  data-testid={`folder-tree-node-${nodeId}`}
-                  data-active-sd={belongsToActiveSD ? 'true' : undefined}
-                  aria-label={node.text}
-                  sx={{
-                    pl: depth * 2,
-                    py: 0.5, // Reduce vertical padding
-                    minHeight: 32, // Set a compact minimum height
-                    backgroundColor: isDropTarget
-                      ? 'primary.light'
-                      : isSelected
-                        ? 'action.selected'
-                        : isSDNode && isActiveSD
-                          ? 'action.hover'
-                          : 'transparent',
-                    borderLeft: isDropTarget ? 3 : isActiveSD && isSDNode ? 3 : 0,
-                    borderColor: isDropTarget
-                      ? 'primary.main'
-                      : isActiveSD && isSDNode
-                        ? 'primary.main'
+            // SD nodes need a drag handle wrapper for reordering
+            const nodeContent = (
+              <ListItemButton
+                data-testid={`folder-tree-node-${nodeId}`}
+                data-active-sd={belongsToActiveSD ? 'true' : undefined}
+                aria-label={node.text}
+                sx={{
+                  pl: depth * 2,
+                  py: 0.5, // Reduce vertical padding
+                  minHeight: 32, // Set a compact minimum height
+                  backgroundColor: isDropTarget
+                    ? 'primary.light'
+                    : isSelected
+                      ? 'action.selected'
+                      : isSDNode && isActiveSD
+                        ? 'action.hover'
                         : 'transparent',
-                    '&:hover': {
-                      backgroundColor: 'action.hover',
-                    },
-                    fontWeight: isSDNode ? 600 : 400,
-                  }}
-                  onClick={() => {
-                    handleSelect(node);
-                  }}
-                  onContextMenu={(e) => {
-                    if (!isSDNode) {
-                      handleContextMenu(e, String(node.id));
-                    }
-                  }}
-                >
-                  {/* Expand/collapse chevron */}
-                  {(node.droppable ?? isSDNode) && !noExpand && hasChildren && (
-                    <Box
-                      component="span"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggle();
-                        handleToggle(node.id, !isExpanded);
-                      }}
-                      sx={{ mr: 0.5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                    >
-                      {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-                    </Box>
-                  )}
-                  {((!node.droppable && !isSDNode) || noExpand || !hasChildren) && (
-                    <Box sx={{ width: 24, mr: 0.5 }} />
-                  )}
-
-                  {/* Icon */}
-                  <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
-                    {isSDNode ? (
-                      <StorageIcon fontSize="small" color={isActiveSD ? 'primary' : 'action'} />
-                    ) : node.droppable ? (
-                      isExpanded ? (
-                        <FolderOpenIcon fontSize="small" />
-                      ) : (
-                        <FolderIcon fontSize="small" />
-                      )
-                    ) : null}
+                  borderLeft: isDropTarget ? 3 : isActiveSD && isSDNode ? 3 : 0,
+                  borderColor: isDropTarget
+                    ? 'primary.main'
+                    : isActiveSD && isSDNode
+                      ? 'primary.main'
+                      : 'transparent',
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                  },
+                  fontWeight: isSDNode ? 600 : 400,
+                }}
+                onClick={() => {
+                  handleSelect(node);
+                }}
+                onContextMenu={(e) => {
+                  if (!isSDNode) {
+                    handleContextMenu(e, String(node.id));
+                  }
+                }}
+              >
+                {/* Expand/collapse chevron */}
+                {(node.droppable ?? isSDNode) && !noExpand && hasChildren && (
+                  <Box
+                    component="span"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggle();
+                      handleToggle(node.id, !isExpanded);
+                    }}
+                    sx={{ mr: 0.5, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
                   </Box>
+                )}
+                {((!node.droppable && !isSDNode) || noExpand || !hasChildren) && (
+                  <Box sx={{ width: 24, mr: 0.5 }} />
+                )}
 
-                  {/* Text and active indicator */}
-                  <ListItemText primary={node.text} />
+                {/* Icon */}
+                <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+                  {isSDNode ? (
+                    <StorageIcon fontSize="small" color={isActiveSD ? 'primary' : 'action'} />
+                  ) : node.droppable ? (
+                    isExpanded ? (
+                      <FolderOpenIcon fontSize="small" />
+                    ) : (
+                      <FolderIcon fontSize="small" />
+                    )
+                  ) : null}
+                </Box>
 
-                  {/* Note count badge */}
-                  {(() => {
-                    const count = noteCounts.get(String(node.id));
-                    return (
-                      count !== undefined &&
-                      count > 0 && (
-                        <Chip
-                          label={count}
-                          size="small"
-                          sx={{
-                            ml: 1,
-                            height: 20,
-                            backgroundColor: 'action.hover',
-                            color: 'text.secondary',
-                            fontSize: '0.75rem',
-                          }}
-                        />
-                      )
-                    );
-                  })()}
+                {/* Text and active indicator */}
+                <ListItemText primary={node.text} />
 
-                  {isSDNode && isActiveSD && (
-                    <Chip
-                      label="Active"
-                      size="small"
-                      color="primary"
-                      icon={<CheckCircleIcon />}
-                      sx={{ ml: 1, height: 20 }}
-                    />
-                  )}
-                </ListItemButton>
-              </DroppableFolderNode>
+                {/* Note count badge */}
+                {(() => {
+                  const count = noteCounts.get(String(node.id));
+                  return (
+                    count !== undefined &&
+                    count > 0 && (
+                      <Chip
+                        label={count}
+                        size="small"
+                        sx={{
+                          ml: 1,
+                          height: 20,
+                          backgroundColor: 'action.hover',
+                          color: 'text.secondary',
+                          fontSize: '0.75rem',
+                        }}
+                      />
+                    )
+                  );
+                })()}
+
+                {isSDNode && isActiveSD && (
+                  <Chip
+                    label="Active"
+                    size="small"
+                    color="primary"
+                    icon={<CheckCircleIcon />}
+                    sx={{ ml: 1, height: 20 }}
+                  />
+                )}
+              </ListItemButton>
+            );
+
+            // All nodes need handleRef for @minoru/react-dnd-treeview drag-and-drop to work
+            return (
+              <div ref={handleRef as React.RefObject<HTMLDivElement>}>
+                <DroppableFolderNode
+                  folderId={nodeId}
+                  onDrop={(noteIds, targetFolderId, sourceSdId) => {
+                    void handleNoteDrop(noteIds, targetFolderId, sourceSdId);
+                  }}
+                  isSpecial={isSpecialNode || isSDNode}
+                >
+                  {nodeContent}
+                </DroppableFolderNode>
+              </div>
             );
           }}
         />

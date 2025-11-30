@@ -55,9 +55,11 @@ interface MockFolderTreeDoc {
   getFolder: jest.Mock;
   getRootFolders: jest.Mock;
   getChildFolders: jest.Mock;
+  getSiblings: jest.Mock;
   createFolder: jest.Mock;
   updateFolder: jest.Mock;
   deleteFolder: jest.Mock;
+  reorderFolder: jest.Mock;
 }
 
 interface MockCRDTManager {
@@ -148,9 +150,11 @@ describe('IPCHandlers - Folder CRUD', () => {
       getFolder: jest.fn(),
       getRootFolders: jest.fn(),
       getChildFolders: jest.fn(),
+      getSiblings: jest.fn(),
       createFolder: jest.fn(),
       updateFolder: jest.fn(),
       deleteFolder: jest.fn(),
+      reorderFolder: jest.fn(),
     };
 
     // Create mock CRDT manager
@@ -253,6 +257,26 @@ describe('IPCHandlers - Folder CRUD', () => {
       const name = 'New Folder';
 
       mockFolderTree.getRootFolders.mockReturnValue([]);
+      // Mock getFolder to return the folder after creation
+      mockFolderTree.getFolder.mockImplementation((id: string) => ({
+        id,
+        name: 'New Folder',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      }));
+      // Mock getSiblings to return just the new folder (no existing siblings)
+      mockFolderTree.getSiblings.mockImplementation((id: string) => [
+        {
+          id,
+          name: 'New Folder',
+          parentId: null,
+          sdId,
+          order: 0,
+          deleted: false,
+        },
+      ]);
 
       // Call the private handler via type assertion
       const result = await (handlers as any).handleCreateFolder(mockEvent, sdId, null, name);
@@ -880,9 +904,11 @@ describe('IPCHandlers - SD Management', () => {
       getFolder: jest.fn(),
       getRootFolders: jest.fn(),
       getChildFolders: jest.fn(),
+      getSiblings: jest.fn(),
       createFolder: jest.fn(),
       updateFolder: jest.fn(),
       deleteFolder: jest.fn(),
+      reorderFolder: jest.fn(),
     };
 
     // Create mock CRDT manager

@@ -148,13 +148,18 @@ See [Q9](./QUESTIONS-FOLDER-ORDERING.md#q9-placeholder-visual-design) for placeh
   - [x] 🟩 Update `canDrop` to allow SD reordering at root level
   - [x] 🟩 Update `handleDrop` for SD reordering
   - [x] 🟩 Save new order to appState on drop
+  - [x] 🟩 Add spacer nodes (sd-spacer-top/bottom) for drop targets with 2 SDs
+  - [x] 🟩 Attach `handleRef` for @minoru/react-dnd-treeview drag-and-drop to work
 
 - [x] 🟩 **3.4: Add SD reorder tests**
   - [x] 🟩 Test SD order loads from appState
   - [x] 🟩 Test fallback to creation order when no saved order
   - [x] 🟩 Test new SDs not in saved order are appended
+  - [x] 🟩 E2E tests for spacer nodes rendering (drag-drop tests skipped - Playwright + react-dnd limitation)
 
 **Checkpoint:** ✅ SD reordering works. Ready for commit.
+
+**Note:** E2E tests for drag-drop are skipped due to Playwright's inability to properly simulate react-dnd events. The drag-drop functionality has been manually verified and unit tests cover the handleDrop logic.
 
 ---
 
