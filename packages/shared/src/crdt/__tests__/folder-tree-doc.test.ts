@@ -318,9 +318,30 @@ describe('FolderTreeDoc', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
       // Create folders with initial order: A(0), B(1), C(2)
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 1, deleted: false };
-      const folderC: FolderData = { id: 'c' as UUID, name: 'C', parentId: null, sdId, order: 2, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
+      const folderC: FolderData = {
+        id: 'c' as UUID,
+        name: 'C',
+        parentId: null,
+        sdId,
+        order: 2,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderA);
       treeDoc.createFolder(folderB);
@@ -333,8 +354,8 @@ describe('FolderTreeDoc', () => {
       const folders = treeDoc.getActiveFolders();
       const sorted = folders.sort((a, b) => a.order - b.order);
 
-      expect(sorted.map(f => f.id)).toEqual(['c', 'a', 'b']);
-      expect(sorted.map(f => f.order)).toEqual([0, 1, 2]);
+      expect(sorted.map((f) => f.id)).toEqual(['c', 'a', 'b']);
+      expect(sorted.map((f) => f.order)).toEqual([0, 1, 2]);
 
       treeDoc.destroy();
     });
@@ -342,9 +363,30 @@ describe('FolderTreeDoc', () => {
     it('should move folder to end position', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 1, deleted: false };
-      const folderC: FolderData = { id: 'c' as UUID, name: 'C', parentId: null, sdId, order: 2, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
+      const folderC: FolderData = {
+        id: 'c' as UUID,
+        name: 'C',
+        parentId: null,
+        sdId,
+        order: 2,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderA);
       treeDoc.createFolder(folderB);
@@ -357,8 +399,8 @@ describe('FolderTreeDoc', () => {
       const folders = treeDoc.getActiveFolders();
       const sorted = folders.sort((a, b) => a.order - b.order);
 
-      expect(sorted.map(f => f.id)).toEqual(['b', 'c', 'a']);
-      expect(sorted.map(f => f.order)).toEqual([0, 1, 2]);
+      expect(sorted.map((f) => f.id)).toEqual(['b', 'c', 'a']);
+      expect(sorted.map((f) => f.order)).toEqual([0, 1, 2]);
 
       treeDoc.destroy();
     });
@@ -366,9 +408,30 @@ describe('FolderTreeDoc', () => {
     it('should move folder to middle position', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 1, deleted: false };
-      const folderC: FolderData = { id: 'c' as UUID, name: 'C', parentId: null, sdId, order: 2, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
+      const folderC: FolderData = {
+        id: 'c' as UUID,
+        name: 'C',
+        parentId: null,
+        sdId,
+        order: 2,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderA);
       treeDoc.createFolder(folderB);
@@ -381,8 +444,8 @@ describe('FolderTreeDoc', () => {
       const folders = treeDoc.getActiveFolders();
       const sorted = folders.sort((a, b) => a.order - b.order);
 
-      expect(sorted.map(f => f.id)).toEqual(['a', 'c', 'b']);
-      expect(sorted.map(f => f.order)).toEqual([0, 1, 2]);
+      expect(sorted.map((f) => f.id)).toEqual(['a', 'c', 'b']);
+      expect(sorted.map((f) => f.order)).toEqual([0, 1, 2]);
 
       treeDoc.destroy();
     });
@@ -391,12 +454,40 @@ describe('FolderTreeDoc', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
       // Root folders
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 1, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
 
       // Child folders under A
-      const child1: FolderData = { id: 'c1' as UUID, name: 'Child1', parentId: 'a' as UUID, sdId, order: 0, deleted: false };
-      const child2: FolderData = { id: 'c2' as UUID, name: 'Child2', parentId: 'a' as UUID, sdId, order: 1, deleted: false };
+      const child1: FolderData = {
+        id: 'c1' as UUID,
+        name: 'Child1',
+        parentId: 'a' as UUID,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const child2: FolderData = {
+        id: 'c2' as UUID,
+        name: 'Child2',
+        parentId: 'a' as UUID,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderA);
       treeDoc.createFolder(folderB);
@@ -408,11 +499,11 @@ describe('FolderTreeDoc', () => {
 
       // Children should be reordered: Child2(0), Child1(1)
       const children = treeDoc.getChildFolders('a' as UUID).sort((a, b) => a.order - b.order);
-      expect(children.map(f => f.id)).toEqual(['c2', 'c1']);
+      expect(children.map((f) => f.id)).toEqual(['c2', 'c1']);
 
       // Root folders should be unchanged: A(0), B(1)
       const roots = treeDoc.getRootFolders().sort((a, b) => a.order - b.order);
-      expect(roots.map(f => f.id)).toEqual(['a', 'b']);
+      expect(roots.map((f) => f.id)).toEqual(['a', 'b']);
 
       treeDoc.destroy();
     });
@@ -421,9 +512,30 @@ describe('FolderTreeDoc', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
       // Create folders with non-consecutive order values (simulating gaps)
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 5, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 10, deleted: false };
-      const folderC: FolderData = { id: 'c' as UUID, name: 'C', parentId: null, sdId, order: 15, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 5,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 10,
+        deleted: false,
+      };
+      const folderC: FolderData = {
+        id: 'c' as UUID,
+        name: 'C',
+        parentId: null,
+        sdId,
+        order: 15,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderA);
       treeDoc.createFolder(folderB);
@@ -434,7 +546,7 @@ describe('FolderTreeDoc', () => {
 
       // All siblings should have consecutive order values starting at 0
       const folders = treeDoc.getActiveFolders().sort((a, b) => a.order - b.order);
-      expect(folders.map(f => f.order)).toEqual([0, 1, 2]);
+      expect(folders.map((f) => f.order)).toEqual([0, 1, 2]);
 
       treeDoc.destroy();
     });
@@ -452,7 +564,14 @@ describe('FolderTreeDoc', () => {
     it('should handle reordering with single folder (no-op)', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
       treeDoc.createFolder(folderA);
 
       // Reorder single folder (should be a no-op but not error)
@@ -467,8 +586,22 @@ describe('FolderTreeDoc', () => {
     it('should clamp newIndex to valid range', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 1, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderA);
       treeDoc.createFolder(folderB);
@@ -477,7 +610,7 @@ describe('FolderTreeDoc', () => {
       treeDoc.reorderFolder('a' as UUID, 100);
 
       const folders = treeDoc.getActiveFolders().sort((a, b) => a.order - b.order);
-      expect(folders.map(f => f.id)).toEqual(['b', 'a']);
+      expect(folders.map((f) => f.id)).toEqual(['b', 'a']);
 
       treeDoc.destroy();
     });
@@ -488,9 +621,30 @@ describe('FolderTreeDoc', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
       // Create folders in non-sorted order
-      const folderC: FolderData = { id: 'c' as UUID, name: 'C', parentId: null, sdId, order: 2, deleted: false };
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 1, deleted: false };
+      const folderC: FolderData = {
+        id: 'c' as UUID,
+        name: 'C',
+        parentId: null,
+        sdId,
+        order: 2,
+        deleted: false,
+      };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderC);
       treeDoc.createFolder(folderA);
@@ -499,7 +653,7 @@ describe('FolderTreeDoc', () => {
       const folders = treeDoc.getActiveFolders();
 
       // Should be sorted by order
-      expect(folders.map(f => f.id)).toEqual(['a', 'b', 'c']);
+      expect(folders.map((f) => f.id)).toEqual(['a', 'b', 'c']);
 
       treeDoc.destroy();
     });
@@ -508,8 +662,22 @@ describe('FolderTreeDoc', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
       // Create folders with same order (edge case)
-      const folderB: FolderData = { id: 'b' as UUID, name: 'Banana', parentId: null, sdId, order: 0, deleted: false };
-      const folderA: FolderData = { id: 'a' as UUID, name: 'Apple', parentId: null, sdId, order: 0, deleted: false };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'Banana',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'Apple',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderB);
       treeDoc.createFolder(folderA);
@@ -517,7 +685,7 @@ describe('FolderTreeDoc', () => {
       const folders = treeDoc.getActiveFolders();
 
       // Same order, so should fall back to name
-      expect(folders.map(f => f.name)).toEqual(['Apple', 'Banana']);
+      expect(folders.map((f) => f.name)).toEqual(['Apple', 'Banana']);
 
       treeDoc.destroy();
     });
@@ -527,9 +695,30 @@ describe('FolderTreeDoc', () => {
     it('should return siblings including the folder itself', () => {
       const treeDoc = new FolderTreeDoc(sdId);
 
-      const folderA: FolderData = { id: 'a' as UUID, name: 'A', parentId: null, sdId, order: 0, deleted: false };
-      const folderB: FolderData = { id: 'b' as UUID, name: 'B', parentId: null, sdId, order: 1, deleted: false };
-      const child: FolderData = { id: 'c' as UUID, name: 'Child', parentId: 'a' as UUID, sdId, order: 0, deleted: false };
+      const folderA: FolderData = {
+        id: 'a' as UUID,
+        name: 'A',
+        parentId: null,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
+      const folderB: FolderData = {
+        id: 'b' as UUID,
+        name: 'B',
+        parentId: null,
+        sdId,
+        order: 1,
+        deleted: false,
+      };
+      const child: FolderData = {
+        id: 'c' as UUID,
+        name: 'Child',
+        parentId: 'a' as UUID,
+        sdId,
+        order: 0,
+        deleted: false,
+      };
 
       treeDoc.createFolder(folderA);
       treeDoc.createFolder(folderB);
@@ -537,11 +726,11 @@ describe('FolderTreeDoc', () => {
 
       // Get siblings of A (root level)
       const rootSiblings = treeDoc.getSiblings('a' as UUID);
-      expect(rootSiblings.map(f => f.id).sort()).toEqual(['a', 'b']);
+      expect(rootSiblings.map((f) => f.id).sort()).toEqual(['a', 'b']);
 
       // Get siblings of child (under A)
       const childSiblings = treeDoc.getSiblings('c' as UUID);
-      expect(childSiblings.map(f => f.id)).toEqual(['c']);
+      expect(childSiblings.map((f) => f.id)).toEqual(['c']);
 
       treeDoc.destroy();
     });

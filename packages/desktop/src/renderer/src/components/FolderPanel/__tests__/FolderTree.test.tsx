@@ -555,4 +555,79 @@ describe('sortNodes', () => {
       ]);
     });
   });
+
+  describe('order field based sorting', () => {
+    const makeNodeWithOrder = (id: string, text: string, order: number): NodeModel => ({
+      id,
+      parent: 0,
+      text,
+      droppable: true,
+      data: { order },
+    });
+
+    it('should sort user folders by order field when different', () => {
+      const folder1 = makeNodeWithOrder('folder-1', 'Zebra', 0);
+      const folder2 = makeNodeWithOrder('folder-2', 'Alpha', 1);
+      const folder3 = makeNodeWithOrder('folder-3', 'Beta', 2);
+
+      // Despite alphabetical names, order field takes precedence
+      expect(sortNodes(folder1, folder2)).toBeLessThan(0); // order 0 < order 1
+      expect(sortNodes(folder2, folder3)).toBeLessThan(0); // order 1 < order 2
+      expect(sortNodes(folder3, folder1)).toBeGreaterThan(0); // order 2 > order 0
+    });
+
+    it('should fall back to alphabetical when order values are equal', () => {
+      const folderA = makeNodeWithOrder('folder-1', 'Alpha', 5);
+      const folderB = makeNodeWithOrder('folder-2', 'Beta', 5);
+
+      expect(sortNodes(folderA, folderB)).toBeLessThan(0); // Alphabetical fallback
+    });
+
+    it('should handle missing order field (defaults to 0)', () => {
+      const folderWithOrder = makeNodeWithOrder('folder-1', 'Zebra', 1);
+      const folderNoOrder = makeNode('folder-2', 'Alpha'); // No data.order
+
+      // folder-2 has implicit order 0, folder-1 has order 1
+      expect(sortNodes(folderNoOrder, folderWithOrder)).toBeLessThan(0);
+    });
+
+    it('should produce correct order after reordering', () => {
+      const nodes = [
+        makeNodeWithOrder('folder-1', 'Alpha', 2), // Moved to position 2
+        makeNodeWithOrder('folder-2', 'Beta', 0), // Moved to position 0
+        makeNodeWithOrder('folder-3', 'Gamma', 1), // Moved to position 1
+      ];
+
+      const sorted = [...nodes].sort(sortNodes);
+
+      // Should sort by order: Beta (0), Gamma (1), Alpha (2)
+      expect(sorted.map((n) => n.id)).toEqual(['folder-2', 'folder-3', 'folder-1']);
+    });
+
+    it('should keep All Notes first even with reordered folders', () => {
+      const nodes = [
+        makeNodeWithOrder('folder-1', 'Work', 0),
+        makeNode('all-notes', 'All Notes'),
+        makeNodeWithOrder('folder-2', 'Personal', 1),
+      ];
+
+      const sorted = [...nodes].sort(sortNodes);
+
+      expect(sorted[0]?.id).toBe('all-notes');
+      expect(sorted[1]?.id).toBe('folder-1');
+      expect(sorted[2]?.id).toBe('folder-2');
+    });
+
+    it('should keep Recently Deleted last even with reordered folders', () => {
+      const nodes = [
+        makeNodeWithOrder('folder-1', 'Work', 0),
+        makeNodeWithOrder('folder-2', 'Personal', 1),
+        makeNode('recently-deleted', 'Recently Deleted'),
+      ];
+
+      const sorted = [...nodes].sort(sortNodes);
+
+      expect(sorted[sorted.length - 1]?.id).toBe('recently-deleted');
+    });
+  });
 });

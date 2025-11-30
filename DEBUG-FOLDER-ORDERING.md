@@ -26,6 +26,7 @@ if (DEBUG_SORT) {
 ### Existing Tree Logging
 
 The FolderTree component already logs `initialOpen` state:
+
 ```
 [FolderTree] Tree initialOpen: { isCollapsedAll, expandedFolderIds, allFolderIds, result }
 ```
@@ -38,19 +39,22 @@ Open DevTools (Cmd+Option+I) and run:
 
 ```javascript
 // List all folders with their order values
-window.electronAPI.folder.list('default').then(folders => {
-  console.table(folders.map(f => ({
-    name: f.name,
-    id: f.id.slice(0, 8),
-    order: f.order,
-    parentId: f.parentId?.slice(0, 8) ?? 'root'
-  })));
+window.electronAPI.folder.list('default').then((folders) => {
+  console.table(
+    folders.map((f) => ({
+      name: f.name,
+      id: f.id.slice(0, 8),
+      order: f.order,
+      parentId: f.parentId?.slice(0, 8) ?? 'root',
+    }))
+  );
 });
 ```
 
 ### Via Main Process
 
 In the main process debugger or logs, look for:
+
 ```
 [FolderTreeDoc] getAllFolders: folders.size = N
 [FolderTreeDoc]   folder {id}: { name, order, ... }
@@ -78,6 +82,7 @@ In the main process debugger or logs, look for:
 ## Testing Sort Function
 
 Run the unit tests:
+
 ```bash
 npx jest src/renderer/src/components/FolderPanel/__tests__/FolderTree.test.tsx --testNamePattern="sortNodes"
 ```
@@ -96,10 +101,14 @@ When drag-drop reordering is implemented:
 3. Verify order field updates in CRDT:
    ```javascript
    // After reorder, check new values
-   window.electronAPI.folder.list('default').then(folders => {
-     console.table(folders.sort((a,b) => a.order - b.order).map(f => ({
-       name: f.name,
-       order: f.order
-     })));
+   window.electronAPI.folder.list('default').then((folders) => {
+     console.table(
+       folders
+         .sort((a, b) => a.order - b.order)
+         .map((f) => ({
+           name: f.name,
+           order: f.order,
+         }))
+     );
    });
    ```

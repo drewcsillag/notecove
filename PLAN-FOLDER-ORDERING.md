@@ -1,10 +1,11 @@
 # Folder Tree Ordering Feature Plan
 
-**Overall Progress:** `40%` (Phase 0, 1 complete)
+**Overall Progress:** `70%` (Phase 0, 1, 2 complete)
 
 ## Summary
 
 Implement proper ordering in the folder tree sidebar:
+
 1. "All Notes" always appears first within each SD
 2. User folders sorted alphabetically (case-insensitive) by default
 3. Drag-and-drop reordering of user folders (persists across restarts, syncs across devices)
@@ -94,36 +95,39 @@ Goal: Get "All Notes" appearing first with minimal changes. Testable in ~15 minu
 
 ---
 
-### Phase 2: Frontend - Drag-and-Drop Reordering
+### Phase 2: Frontend - Drag-and-Drop Reordering ✅
 
 See [Q9](./QUESTIONS-FOLDER-ORDERING.md#q9-placeholder-visual-design) for placeholder design decision.
 
-- [ ] 🟥 **2.1: Update Tree component for manual ordering**
-  - [ ] 🟥 Change `sort={sortNodes}` to `sort={false}`
-  - [ ] 🟥 Pre-sort nodes in `buildTreeNodes()` / `buildMultiSDTreeNodes()`
-  - [ ] 🟥 Set `insertDroppableFirst={false}`
-  - [ ] 🟥 Set `dropTargetOffset={5}` (tune as needed)
+- [x] 🟩 **2.1: Update Tree component for manual ordering**
+  - [x] 🟩 Change `sort={sortNodes}` to `sort={false}`
+  - [x] 🟩 Pre-sort nodes in `buildTreeNodes()` / `buildMultiSDTreeNodes()`
+  - [x] 🟩 Set `insertDroppableFirst={false}`
+  - [x] 🟩 Set `dropTargetOffset={10}` (tuned from 5 to 10 for better UX)
 
-- [ ] 🟥 **2.2: Add placeholder rendering**
-  - [ ] 🟥 Implement `placeholderRender` prop
-  - [ ] 🟥 Style as horizontal line indicator
+- [x] 🟩 **2.2: Add placeholder rendering**
+  - [x] 🟩 Implement `placeholderRender` prop
+  - [x] 🟩 Style as horizontal line indicator (2px primary color)
 
-- [ ] 🟥 **2.3: Update handleDrop for reordering**
-  - [ ] 🟥 Detect reorder: same parent + relativeIndex provided
-  - [ ] 🟥 Call `folder.reorder()` for reorder operations
-  - [ ] 🟥 Existing logic for parent-change operations
+- [x] 🟩 **2.3: Update handleDrop for reordering**
+  - [x] 🟩 Detect reorder: same parent + relativeIndex provided
+  - [x] 🟩 Call `folder.reorder()` for reorder operations
+  - [x] 🟩 Existing logic for parent-change operations
 
-- [ ] 🟥 **2.4: Update canDrop for reorder constraints**
-  - [ ] 🟥 Block reordering "All Notes" and "Recently Deleted"
-  - [ ] 🟥 Allow reordering user folders within same parent
-  - [ ] 🟥 Block cross-SD reordering (existing)
+- [x] 🟩 **2.4: Update canDrop for reorder constraints**
+  - [x] 🟩 Block reordering "All Notes" and "Recently Deleted"
+  - [x] 🟩 Block drops at index 0 (before All Notes)
+  - [x] 🟩 Block drops at/after last index (after Recently Deleted)
+  - [x] 🟩 Allow reordering user folders within same parent
+  - [x] 🟩 Block cross-SD reordering (existing)
 
-- [ ] 🟥 **2.5: Add reorder tests**
-  - [ ] 🟥 Test drag folder A above folder B calls reorder
-  - [ ] 🟥 Test special items cannot be reordered
-  - [ ] 🟥 Test tree updates immediately after reorder
+- [x] 🟩 **2.5: Add reorder tests**
+  - [x] 🟩 Test order field sorting takes precedence over alphabetical
+  - [x] 🟩 Test alphabetical fallback when order values equal
+  - [x] 🟩 Test All Notes stays first with reordered folders
+  - [x] 🟩 Test Recently Deleted stays last with reordered folders
 
-**Checkpoint:** Full folder reordering works. Commit point.
+**Checkpoint:** ✅ Full folder reordering works. Ready for commit.
 
 ---
 
@@ -178,17 +182,21 @@ Lower priority - can be done later if needed.
 ## Files to Modify
 
 ### Phase 0
+
 - `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx`
 
 ### Phase 1
+
 - `packages/shared/src/crdt/folder-tree-doc.ts` - Add `reorderFolder()`
 - `packages/desktop/src/main/ipc/handlers.ts` - Add `folder:reorder` handler
 - `packages/desktop/src/preload/index.ts` - Expose `folder.reorder()`
 
 ### Phase 2
+
 - `packages/desktop/src/renderer/src/components/FolderPanel/FolderTree.tsx`
 
 ### Phase 3
+
 - `packages/desktop/src/main/ipc/handlers.ts` - SD order handlers
 - `packages/desktop/src/preload/index.ts` - SD order API
 

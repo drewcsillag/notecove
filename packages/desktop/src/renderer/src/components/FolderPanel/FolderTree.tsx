@@ -67,7 +67,7 @@ export interface FolderTreeProps {
 
 /**
  * Custom sort comparator for tree nodes.
- * Ensures: "All Notes" first, "Recently Deleted" last, user folders alphabetically (case-insensitive).
+ * Ensures: "All Notes" first, "Recently Deleted" last, user folders by order field.
  * Works for both single-SD mode (e.g., "all-notes") and multi-SD mode (e.g., "all-notes:sd-123").
  * Exported for testing.
  */
@@ -96,12 +96,64 @@ export function sortNodes(a: NodeModel, b: NodeModel): number {
   if (aIsRecentlyDeleted && !bIsRecentlyDeleted) return 1;
   if (!aIsRecentlyDeleted && bIsRecentlyDeleted) return -1;
 
-  // User folders: sort alphabetically (case-insensitive)
+  // User folders: sort by order field (from backend), with name as fallback
+  const aOrder = (a.data as { order?: number }).order ?? 0;
+  const bOrder = (b.data as { order?: number }).order ?? 0;
+  if (aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+
+  // Fallback to alphabetical (case-insensitive) for same order values
   return a.text.toLowerCase().localeCompare(b.text.toLowerCase());
 }
 
 /**
+ * Sort tree nodes by parent group, applying sortNodes within each parent.
+ * This is used when sort={false} on the Tree component to maintain our custom ordering.
+ */
+function sortTreeNodesByParent(nodes: NodeModel[]): NodeModel[] {
+  // Group nodes by parent
+  const byParent = new Map<string | number, NodeModel[]>();
+  for (const node of nodes) {
+    const parentKey = node.parent;
+    if (!byParent.has(parentKey)) {
+      byParent.set(parentKey, []);
+    }
+    const parentArray = byParent.get(parentKey);
+    if (parentArray) {
+      parentArray.push(node);
+    }
+  }
+
+  // Sort each parent's children
+  for (const children of byParent.values()) {
+    children.sort(sortNodes);
+  }
+
+  // Flatten back, maintaining parent order (root first, then children in sorted order)
+  const result: NodeModel[] = [];
+  const visited = new Set<string | number>();
+
+  function addNodeAndChildren(nodeId: string | number): void {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
+
+    const children = byParent.get(nodeId) ?? [];
+    for (const child of children) {
+      result.push(child);
+      addNodeAndChildren(child.id);
+    }
+  }
+
+  // Start from root (parent: 0)
+  addNodeAndChildren(0);
+
+  return result;
+}
+
+/**
  * Transform flat folder list into react-dnd-treeview NodeModel format (Single SD mode)
+ * Returns nodes pre-sorted for use with sort={false} on Tree component.
  */
 function buildTreeNodes(folders: FolderData[]): NodeModel[] {
   const nodes: NodeModel[] = [];
@@ -139,7 +191,8 @@ function buildTreeNodes(folders: FolderData[]): NodeModel[] {
     data: { isSpecial: true },
   });
 
-  return nodes;
+  // Pre-sort nodes for use with sort={false}
+  return sortTreeNodesByParent(nodes);
 }
 
 /**
@@ -218,7 +271,8 @@ function buildMultiSDTreeNodes(
     });
   }
 
-  return nodes;
+  // Pre-sort nodes for use with sort={false}
+  return sortTreeNodesByParent(nodes);
 }
 
 export const FolderTree: FC<FolderTreeProps> = ({
@@ -634,7 +688,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   // Drag-and-drop handler
   const handleDrop = async (newTree: NodeModel[], options: DropOptions): Promise<void> => {
-    const { dragSourceId, dropTargetId } = options;
+    const { dragSourceId, dropTargetId, relativeIndex } = options;
 
     // Don't allow dragging special items (handle both single and multi-SD formats)
     if (
@@ -669,45 +723,70 @@ export const FolderTree: FC<FolderTreeProps> = ({
       }
     }
 
-    // Determine the new parent ID
-    // In multi-SD mode, dropping on "All Notes" for a specific SD means move to root of that SD
-    let newParentId: string | null = null;
-    const dropTargetStr = String(dropTargetId);
-
-    if (isMultiSDMode) {
-      // Handle multi-SD special cases
-      if (dropTargetStr.startsWith('all-notes:')) {
-        // Dropping on "All Notes" for a specific SD - root level within that SD
-        newParentId = null;
-      } else if (dropTargetStr.startsWith('sd:')) {
-        // Dropping on SD header - shouldn't happen, but treat as root
-        newParentId = null;
-      } else if (dropTargetId !== 0) {
-        // Dropping on a regular folder
-        newParentId = dropTargetStr;
-      }
-    } else {
-      // Single SD mode: original logic
-      if (dropTargetId !== 'all-notes' && dropTargetId !== 0) {
-        newParentId = dropTargetStr;
-      }
-    }
-
-    // Determine which SD this operation is for
-    const targetSdId = isMultiSDMode
-      ? ((newTree.find((n) => n.id === dragSourceId)?.data as { sdId?: string }).sdId ?? sdId)
-      : sdId;
-
-    if (!targetSdId) {
-      console.error('[FolderTree] Cannot determine SD for folder move');
+    // Get the dragged node to check its current parent
+    const dragNode = treeData.find((n) => n.id === dragSourceId);
+    if (!dragNode) {
+      console.error('[FolderTree] Cannot find dragged node');
       return;
     }
 
+    const currentParentId = dragNode.parent;
+    const dropTargetStr = String(dropTargetId);
+
+    // Determine which SD this operation is for
+    const targetSdId = isMultiSDMode ? ((dragNode.data as { sdId?: string }).sdId ?? sdId) : sdId;
+
+    if (!targetSdId) {
+      console.error('[FolderTree] Cannot determine SD for folder operation');
+      return;
+    }
+
+    // Check if this is a reorder operation (same parent, relativeIndex provided)
+    // relativeIndex is the position among siblings where the item should be placed
+    const isReorderOperation =
+      relativeIndex !== undefined &&
+      (currentParentId === dropTargetId ||
+        // Handle drop on "All Notes" (root) when folder is already at root
+        (dropTargetStr === 'all-notes' && currentParentId === 0) ||
+        (dropTargetStr.startsWith('all-notes:') && currentParentId === `sd:${targetSdId}`) ||
+        // Handle drop on SD header when folder is already under that SD
+        (dropTargetStr === `sd:${targetSdId}` && currentParentId === `sd:${targetSdId}`));
+
     try {
-      console.log(
-        `[FolderTree] Moving folder ${dragSourceId} to parent ${newParentId} in SD ${targetSdId}`
-      );
-      await window.electronAPI.folder.move(targetSdId, String(dragSourceId), newParentId);
+      if (isReorderOperation) {
+        // Reorder within same parent
+        console.log(
+          `[FolderTree] Reordering folder ${dragSourceId} to index ${relativeIndex} in SD ${targetSdId}`
+        );
+        await window.electronAPI.folder.reorder(targetSdId, String(dragSourceId), relativeIndex);
+      } else {
+        // Move to different parent
+        let newParentId: string | null = null;
+
+        if (isMultiSDMode) {
+          // Handle multi-SD special cases
+          if (dropTargetStr.startsWith('all-notes:')) {
+            // Dropping on "All Notes" for a specific SD - root level within that SD
+            newParentId = null;
+          } else if (dropTargetStr.startsWith('sd:')) {
+            // Dropping on SD header - shouldn't happen, but treat as root
+            newParentId = null;
+          } else if (dropTargetId !== 0) {
+            // Dropping on a regular folder
+            newParentId = dropTargetStr;
+          }
+        } else {
+          // Single SD mode: original logic
+          if (dropTargetId !== 'all-notes' && dropTargetId !== 0) {
+            newParentId = dropTargetStr;
+          }
+        }
+
+        console.log(
+          `[FolderTree] Moving folder ${dragSourceId} to parent ${newParentId} in SD ${targetSdId}`
+        );
+        await window.electronAPI.folder.move(targetSdId, String(dragSourceId), newParentId);
+      }
 
       // Update tree data locally for immediate feedback
       setTreeData(newTree);
@@ -715,7 +794,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
       // Trigger refresh to get updated data from backend
       onRefresh?.();
     } catch (err) {
-      console.error('Failed to move folder:', err);
+      console.error('Failed to move/reorder folder:', err);
       // Revert to original tree data on error
       if (isMultiSDMode) {
         const nodes = buildMultiSDTreeNodes(sds, foldersBySd, activeSdId);
@@ -735,7 +814,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   // Control where nodes can be dropped
   const canDrop = (tree: NodeModel[], options: DropOptions): boolean => {
-    const { dragSourceId, dropTargetId } = options;
+    const { dragSourceId, dropTargetId, relativeIndex } = options;
 
     // Can't drag special items or SD headers (handle both formats)
     if (
@@ -772,6 +851,46 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
         if (dragSdId && dropSdId && dragSdId !== dropSdId) {
           return false; // Cannot drop across SDs
+        }
+      }
+    }
+
+    // Block reordering that would place a folder before "All Notes" or after "Recently Deleted"
+    // This happens when relativeIndex is provided (reorder operation) and the drop target is at root level
+    if (relativeIndex !== undefined) {
+      const dropTargetStr = String(dropTargetId);
+      const isRootLevelDrop =
+        dropTargetId === 0 ||
+        dropTargetStr === 'all-notes' ||
+        dropTargetStr.startsWith('all-notes:') ||
+        dropTargetStr.startsWith('sd:');
+
+      if (isRootLevelDrop) {
+        // Dropping at index 0 would place folder before "All Notes" - block this
+        if (relativeIndex === 0) {
+          return false;
+        }
+
+        // Get sibling count at this level to check if dropping after "Recently Deleted"
+        // Find all siblings at this parent level
+        let parentId: string | number;
+        if (dropTargetId === 0 || dropTargetStr === 'all-notes') {
+          parentId = 0;
+        } else if (dropTargetStr.startsWith('all-notes:')) {
+          const sdId = dropTargetStr.split(':')[1];
+          parentId = `sd:${sdId}`;
+        } else if (dropTargetStr.startsWith('sd:')) {
+          parentId = dropTargetStr;
+        } else {
+          parentId = dropTargetId;
+        }
+
+        const siblings = tree.filter((n) => n.parent === parentId);
+        // If relativeIndex would place after the last real item (which is Recently Deleted), block it
+        // Recently Deleted is always last, so its index is siblings.length - 1
+        // Dropping at siblings.length would be after Recently Deleted
+        if (relativeIndex >= siblings.length) {
+          return false;
         }
       }
     }
@@ -1040,7 +1159,9 @@ export const FolderTree: FC<FolderTreeProps> = ({
           key={`tree-${remountCounter}`} // Force remount when expand/collapse all is clicked
           tree={treeData}
           rootId={0}
-          sort={sortNodes}
+          sort={false} // Disable library sorting - we pre-sort in buildTreeNodes/buildMultiSDTreeNodes
+          insertDroppableFirst={false} // Don't auto-reorder droppable nodes
+          dropTargetOffset={10} // Pixels from edge to trigger reorder vs nest
           onDrop={(tree, options) => void handleDrop(tree, options)}
           canDrag={canDrag}
           canDrop={canDrop}
@@ -1085,6 +1206,20 @@ export const FolderTree: FC<FolderTreeProps> = ({
                 <FolderIcon fontSize="small" sx={{ mr: 1 }} />
                 <Typography variant="body2">{monitorProps.item.text}</Typography>
               </Box>
+            );
+          }}
+          placeholderRender={(_node, { depth }) => {
+            // Visual indicator for where the dragged item will be inserted
+            return (
+              <Box
+                sx={{
+                  height: '2px',
+                  backgroundColor: 'primary.main',
+                  marginLeft: `${depth * 24 + 8}px`,
+                  marginRight: '8px',
+                  borderRadius: '1px',
+                }}
+              />
             );
           }}
           render={(node, { depth, onToggle, isDropTarget }) => {
