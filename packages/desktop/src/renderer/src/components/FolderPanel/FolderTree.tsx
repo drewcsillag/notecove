@@ -36,6 +36,25 @@ import { IconButton, Tooltip, Chip } from '@mui/material';
 // Phase 2.5.1: Single SD only
 const DEFAULT_SD_ID = 'default';
 
+// App state key for SD order (per-device, not synced)
+const SD_ORDER_KEY = 'sdOrder';
+
+/**
+ * Sort SDs by saved order. SDs not in savedOrder are appended at the end.
+ */
+function sortSDsByOrder(sds: StorageDirectory[], savedOrder: string[]): StorageDirectory[] {
+  const orderMap = new Map(savedOrder.map((id, index) => [id, index]));
+  return [...sds].sort((a, b) => {
+    const aOrder = orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+    // For SDs not in saved order, sort by creation time
+    return a.created - b.created;
+  });
+}
+
 interface FolderData {
   id: string;
   name: string;
@@ -82,6 +101,18 @@ export function sortNodes(a: NodeModel, b: NodeModel): number {
   const bIsRecentlyDeleted = bId === 'recently-deleted' || bId.startsWith('recently-deleted:');
   const aIsSD = aId.startsWith('sd:');
   const bIsSD = bId.startsWith('sd:');
+  const aIsSDSpacerTop = aId === 'sd-spacer-top';
+  const bIsSDSpacerTop = bId === 'sd-spacer-top';
+  const aIsSDSpacerBottom = aId === 'sd-spacer-bottom';
+  const bIsSDSpacerBottom = bId === 'sd-spacer-bottom';
+
+  // SD spacer top: always first at root level
+  if (aIsSDSpacerTop && !bIsSDSpacerTop) return -1;
+  if (!aIsSDSpacerTop && bIsSDSpacerTop) return 1;
+
+  // SD spacer bottom: always last at root level
+  if (aIsSDSpacerBottom && !bIsSDSpacerBottom) return 1;
+  if (!aIsSDSpacerBottom && bIsSDSpacerBottom) return -1;
 
   // SD headers: keep their original order (don't sort among themselves)
   if (aIsSD && bIsSD) {
@@ -97,8 +128,8 @@ export function sortNodes(a: NodeModel, b: NodeModel): number {
   if (!aIsRecentlyDeleted && bIsRecentlyDeleted) return -1;
 
   // User folders: sort by order field (from backend), with name as fallback
-  const aOrder = (a.data as { order?: number }).order ?? 0;
-  const bOrder = (b.data as { order?: number }).order ?? 0;
+  const aOrder = (a.data as { order?: number } | undefined)?.order ?? 0;
+  const bOrder = (b.data as { order?: number } | undefined)?.order ?? 0;
   if (aOrder !== bOrder) {
     return aOrder - bOrder;
   }
@@ -214,6 +245,21 @@ function buildMultiSDTreeNodes(
 ): NodeModel[] {
   const nodes: NodeModel[] = [];
 
+  // Add invisible spacer at the top for SD reordering drop target
+  // This allows dropping before the first SD
+  if (sds.length > 0) {
+    nodes.push({
+      id: 'sd-spacer-top',
+      parent: 0,
+      text: '',
+      droppable: true,
+      data: {
+        isSDSpacer: true,
+        position: 'top',
+      },
+    });
+  }
+
   for (const sd of sds) {
     // Add SD as top-level node
     nodes.push({
@@ -267,6 +313,21 @@ function buildMultiSDTreeNodes(
       data: {
         isSpecial: true,
         sdId: sd.id,
+      },
+    });
+  }
+
+  // Add invisible spacer at the bottom for SD reordering drop target
+  // This allows dropping after the last SD
+  if (sds.length > 0) {
+    nodes.push({
+      id: 'sd-spacer-bottom',
+      parent: 0,
+      text: '',
+      droppable: true,
+      data: {
+        isSDSpacer: true,
+        position: 'bottom',
       },
     });
   }
@@ -384,13 +445,22 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
         if (isMultiSDMode) {
           // Multi-SD mode: load all SDs and folders for each SD
-          const sdList = await window.electronAPI.sd.list();
-          setSds(sdList);
+          const [sdList, savedOrderJson] = await Promise.all([
+            window.electronAPI.sd.list(),
+            window.electronAPI.appState.get(SD_ORDER_KEY),
+          ]);
+
+          // Sort SDs by saved order (per-device setting)
+          const savedOrder: string[] = savedOrderJson
+            ? (JSON.parse(savedOrderJson) as string[])
+            : [];
+          const sortedSdList = sortSDsByOrder(sdList, savedOrder);
+          setSds(sortedSdList);
 
           // Load folders for each SD
           const folderMap = new Map<string, FolderData[]>();
           await Promise.all(
-            sdList.map(async (sd) => {
+            sortedSdList.map(async (sd) => {
               const folderList = await window.electronAPI.folder.list(sd.id);
               folderMap.set(sd.id, folderList);
             })
@@ -402,12 +472,12 @@ export const FolderTree: FC<FolderTreeProps> = ({
           setFolders(allFolders);
 
           // Build tree with SD sections
-          const nodes = buildMultiSDTreeNodes(sdList, folderMap, activeSdId);
+          const nodes = buildMultiSDTreeNodes(sortedSdList, folderMap, activeSdId);
           setTreeData(nodes);
 
           // Set all folder IDs + SD IDs for expand all functionality
           const allFolderIds = allFolders.map((f) => f.id);
-          const allIds = [...sdList.map((s) => `sd:${s.id}`), ...allFolderIds];
+          const allIds = [...sortedSdList.map((s) => `sd:${s.id}`), ...allFolderIds];
           setAllFolderIds(allIds);
 
           // For default expansion: expand all folders for better discoverability
@@ -689,21 +759,75 @@ export const FolderTree: FC<FolderTreeProps> = ({
   // Drag-and-drop handler
   const handleDrop = async (newTree: NodeModel[], options: DropOptions): Promise<void> => {
     const { dragSourceId, dropTargetId, relativeIndex } = options;
+    const dragSourceStr = String(dragSourceId);
+    const dropTargetStr = String(dropTargetId);
+
+    // Handle SD reordering (drop on spacer or between SDs)
+    if (dragSourceStr.startsWith('sd:')) {
+      const isDropOnSpacer =
+        dropTargetStr === 'sd-spacer-top' || dropTargetStr === 'sd-spacer-bottom';
+      const isDropOnSD = dropTargetStr.startsWith('sd:');
+
+      if (isDropOnSpacer || isDropOnSD) {
+        const sdIdToMove = dragSourceStr.replace('sd:', '');
+        const currentSdIds = sds.map((sd) => sd.id);
+        const currentIndex = currentSdIds.indexOf(sdIdToMove);
+
+        if (currentIndex === -1) {
+          console.error('[FolderTree] Cannot find SD to reorder');
+          return;
+        }
+
+        // Create new order by moving the SD
+        const newOrder = [...currentSdIds];
+        newOrder.splice(currentIndex, 1);
+
+        // Determine insertion index based on drop target
+        let insertIndex: number;
+        if (dropTargetStr === 'sd-spacer-top') {
+          // Dropping on top spacer = move to first position
+          insertIndex = 0;
+        } else if (dropTargetStr === 'sd-spacer-bottom') {
+          // Dropping on bottom spacer = move to last position
+          insertIndex = newOrder.length;
+        } else if (relativeIndex !== undefined) {
+          // Dropping between SDs with relativeIndex
+          // Adjust for the spacer-top node at index 0
+          insertIndex = Math.max(0, relativeIndex - 1);
+        } else {
+          // Shouldn't happen, but fallback to end
+          insertIndex = newOrder.length;
+        }
+
+        newOrder.splice(insertIndex, 0, sdIdToMove);
+
+        console.log(`[FolderTree] Reordering SD ${sdIdToMove} to index ${insertIndex}`, newOrder);
+
+        try {
+          // Save new order to app state
+          await window.electronAPI.appState.set(SD_ORDER_KEY, JSON.stringify(newOrder));
+
+          // Update local state immediately
+          const reorderedSds = sortSDsByOrder(sds, newOrder);
+          setSds(reorderedSds);
+
+          // Rebuild tree with new SD order
+          const nodes = buildMultiSDTreeNodes(reorderedSds, foldersBySd, activeSdId);
+          setTreeData(nodes);
+        } catch (err) {
+          console.error('Failed to reorder SDs:', err);
+        }
+        return;
+      }
+    }
 
     // Don't allow dragging special items (handle both single and multi-SD formats)
-    if (
-      String(dragSourceId).includes('all-notes') ||
-      String(dragSourceId).includes('recently-deleted') ||
-      String(dragSourceId).startsWith('sd:')
-    ) {
+    if (dragSourceStr.includes('all-notes') || dragSourceStr.includes('recently-deleted')) {
       return;
     }
 
-    // Don't allow dropping on "Recently Deleted" or SD headers
-    if (
-      String(dropTargetId).includes('recently-deleted') ||
-      String(dropTargetId).startsWith('sd:')
-    ) {
+    // Don't allow dropping folders on "Recently Deleted" or SD headers
+    if (dropTargetStr.includes('recently-deleted') || dropTargetStr.startsWith('sd:')) {
       return;
     }
 
@@ -731,7 +855,6 @@ export const FolderTree: FC<FolderTreeProps> = ({
     }
 
     const currentParentId = dragNode.parent;
-    const dropTargetStr = String(dropTargetId);
 
     // Determine which SD this operation is for
     const targetSdId = isMultiSDMode ? ((dragNode.data as { sdId?: string }).sdId ?? sdId) : sdId;
@@ -809,31 +932,53 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const canDrag = (node: NodeModel | undefined): boolean => {
     if (!node) return false;
     const nodeData = node.data as { isSpecial?: boolean; isSD?: boolean };
-    return !nodeData.isSpecial && !nodeData.isSD;
+    // Allow SD headers to be dragged (for reordering), but not special items
+    if (nodeData.isSD) return true;
+    return !nodeData.isSpecial;
   };
 
   // Control where nodes can be dropped
   const canDrop = (tree: NodeModel[], options: DropOptions): boolean => {
     const { dragSourceId, dropTargetId, relativeIndex } = options;
+    const dragSourceStr = String(dragSourceId);
+    const dropTargetStr = String(dropTargetId);
 
-    // Can't drag special items or SD headers (handle both formats)
+    // SD header reordering: SD can only be dropped at root level (reorder among SDs)
+    if (dragSourceStr.startsWith('sd:')) {
+      // SD can be dropped on spacers (top/bottom) for reordering
+      if (dropTargetStr === 'sd-spacer-top' || dropTargetStr === 'sd-spacer-bottom') {
+        return true;
+      }
+      // SD can only be reordered with relativeIndex at root level
+      if (dropTargetId === 0 && relativeIndex !== undefined) {
+        return true; // Allow SD reordering at root
+      }
+      // SD being dropped between other SDs (relativeIndex provided)
+      if (dropTargetStr.startsWith('sd:') && relativeIndex !== undefined) {
+        return true; // Allow SD reordering
+      }
+      return false; // Block all other SD drops
+    }
+
+    // Can't drag special items (All Notes, Recently Deleted), spacers
     if (
-      String(dragSourceId).includes('all-notes') ||
-      String(dragSourceId).includes('recently-deleted') ||
-      String(dragSourceId).startsWith('sd:')
+      dragSourceStr.includes('all-notes') ||
+      dragSourceStr.includes('recently-deleted') ||
+      dragSourceStr.startsWith('sd-spacer')
     ) {
       return false;
     }
 
-    // Can't drop on "Recently Deleted" or SD headers
+    // Can't drop folders on "Recently Deleted", SD headers, or spacers
     if (
-      String(dropTargetId).includes('recently-deleted') ||
-      String(dropTargetId).startsWith('sd:')
+      dropTargetStr.includes('recently-deleted') ||
+      dropTargetStr.startsWith('sd:') ||
+      dropTargetStr.startsWith('sd-spacer')
     ) {
       return false;
     }
 
-    // In multi-SD mode, prevent cross-SD drops
+    // In multi-SD mode, prevent cross-SD drops for folders
     if (isMultiSDMode) {
       const dragNode = tree.find((n) => n.id === dragSourceId);
       const dropNode = tree.find((n) => n.id === dropTargetId);
@@ -844,8 +989,8 @@ export const FolderTree: FC<FolderTreeProps> = ({
         let dropSdId = (dropNode.data as { sdId?: string }).sdId;
 
         // Extract SD ID from special node IDs
-        if (!dropSdId && String(dropTargetId).includes(':')) {
-          const parts = String(dropTargetId).split(':');
+        if (!dropSdId && dropTargetStr.includes(':')) {
+          const parts = dropTargetStr.split(':');
           dropSdId = parts[1];
         }
 
@@ -858,7 +1003,6 @@ export const FolderTree: FC<FolderTreeProps> = ({
     // Block reordering that would place a folder before "All Notes" or after "Recently Deleted"
     // This happens when relativeIndex is provided (reorder operation) and the drop target is at root level
     if (relativeIndex !== undefined) {
-      const dropTargetStr = String(dropTargetId);
       const isRootLevelDrop =
         dropTargetId === 0 ||
         dropTargetStr === 'all-notes' ||
@@ -1223,8 +1367,15 @@ export const FolderTree: FC<FolderTreeProps> = ({
             );
           }}
           render={(node, { depth, onToggle, isDropTarget }) => {
-            const isSelected = String(node.id) === selectedFolderId;
-            const isExpanded = expandedFolderIds.includes(String(node.id));
+            // Don't render spacer nodes visibly (they're invisible drop targets)
+            const nodeId = String(node.id);
+            if (nodeId === 'sd-spacer-top' || nodeId === 'sd-spacer-bottom') {
+              // Return a minimal invisible element that can still act as a drop target
+              return <Box sx={{ height: 0, overflow: 'hidden' }} />;
+            }
+
+            const isSelected = nodeId === selectedFolderId;
+            const isExpanded = expandedFolderIds.includes(nodeId);
             const noExpand = (node.data as { noExpand?: boolean }).noExpand ?? false;
             const nodeData = node.data as {
               isSD?: boolean;
@@ -1251,18 +1402,18 @@ export const FolderTree: FC<FolderTreeProps> = ({
               activeSdId &&
               ((isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
                 (!isSDNode && nodeDataWithSdId.sdId === activeSdId) ||
-                (String(node.id).includes(':') && String(node.id).split(':')[1] === activeSdId));
+                (nodeId.includes(':') && nodeId.split(':')[1] === activeSdId));
 
             return (
               <DroppableFolderNode
-                folderId={String(node.id)}
+                folderId={nodeId}
                 onDrop={(noteIds, targetFolderId, sourceSdId) => {
                   void handleNoteDrop(noteIds, targetFolderId, sourceSdId);
                 }}
                 isSpecial={isSpecialNode || isSDNode}
               >
                 <ListItemButton
-                  data-testid={`folder-tree-node-${node.id}`}
+                  data-testid={`folder-tree-node-${nodeId}`}
                   data-active-sd={belongsToActiveSD ? 'true' : undefined}
                   aria-label={node.text}
                   sx={{

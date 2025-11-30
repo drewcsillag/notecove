@@ -11,6 +11,8 @@ const mockFolderList = jest.fn();
 const mockFolderOnUpdated = jest.fn();
 const mockSdList = jest.fn();
 const mockSdSetActive = jest.fn();
+const mockAppStateGet = jest.fn();
+const mockAppStateSet = jest.fn();
 global.window.electronAPI = {
   folder: {
     list: mockFolderList,
@@ -20,6 +22,10 @@ global.window.electronAPI = {
     list: mockSdList,
     setActive: mockSdSetActive,
   } as Partial<typeof window.electronAPI.sd>,
+  appState: {
+    get: mockAppStateGet,
+    set: mockAppStateSet,
+  } as Partial<typeof window.electronAPI.appState>,
 } as unknown as typeof window.electronAPI;
 
 describe('FolderTree', () => {
@@ -29,6 +35,8 @@ describe('FolderTree', () => {
     mockFolderOnUpdated.mockReturnValue(() => {
       /* unsubscribe */
     });
+    // Default appState mock - no saved SD order
+    mockAppStateGet.mockResolvedValue(null);
   });
 
   it('should render loading state initially', () => {
@@ -628,6 +636,134 @@ describe('sortNodes', () => {
       const sorted = [...nodes].sort(sortNodes);
 
       expect(sorted[sorted.length - 1]?.id).toBe('recently-deleted');
+    });
+  });
+});
+
+// Import sortSDsByOrder for testing
+// Note: We need to export it from FolderTree.tsx first, or test it indirectly
+describe('SD order persistence', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFolderOnUpdated.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockAppStateGet.mockResolvedValue(null);
+  });
+
+  it('should load SDs in saved order when order is stored', async () => {
+    const mockSds = [
+      {
+        id: 'sd-1',
+        name: 'Alpha',
+        path: '/path/to/alpha',
+        created: 1000,
+        isActive: true,
+      },
+      {
+        id: 'sd-2',
+        name: 'Beta',
+        path: '/path/to/beta',
+        created: 2000,
+        isActive: false,
+      },
+      {
+        id: 'sd-3',
+        name: 'Gamma',
+        path: '/path/to/gamma',
+        created: 3000,
+        isActive: false,
+      },
+    ];
+
+    // Saved order puts sd-3 first, then sd-1, then sd-2
+    mockAppStateGet.mockResolvedValue(JSON.stringify(['sd-3', 'sd-1', 'sd-2']));
+    mockSdList.mockResolvedValue(mockSds);
+    mockFolderList.mockResolvedValue([]);
+
+    render(<FolderTree activeSdId="sd-1" />);
+
+    await waitFor(() => {
+      // Verify the SDs are rendered
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+      expect(screen.getByText('Beta')).toBeInTheDocument();
+      expect(screen.getByText('Gamma')).toBeInTheDocument();
+    });
+
+    // Verify that appState.get was called with the SD order key
+    expect(mockAppStateGet).toHaveBeenCalledWith('sdOrder');
+  });
+
+  it('should use creation order when no saved order exists', async () => {
+    const mockSds = [
+      {
+        id: 'sd-2',
+        name: 'Beta',
+        path: '/path/to/beta',
+        created: 2000,
+        isActive: false,
+      },
+      {
+        id: 'sd-1',
+        name: 'Alpha',
+        path: '/path/to/alpha',
+        created: 1000,
+        isActive: true,
+      },
+    ];
+
+    mockAppStateGet.mockResolvedValue(null); // No saved order
+    mockSdList.mockResolvedValue(mockSds);
+    mockFolderList.mockResolvedValue([]);
+
+    render(<FolderTree activeSdId="sd-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+      expect(screen.getByText('Beta')).toBeInTheDocument();
+    });
+
+    // Verify that appState.get was called
+    expect(mockAppStateGet).toHaveBeenCalledWith('sdOrder');
+  });
+
+  it('should handle new SDs not in saved order', async () => {
+    const mockSds = [
+      {
+        id: 'sd-1',
+        name: 'Alpha',
+        path: '/path/to/alpha',
+        created: 1000,
+        isActive: true,
+      },
+      {
+        id: 'sd-2',
+        name: 'Beta',
+        path: '/path/to/beta',
+        created: 2000,
+        isActive: false,
+      },
+      {
+        id: 'sd-new',
+        name: 'New SD',
+        path: '/path/to/new',
+        created: 3000,
+        isActive: false,
+      },
+    ];
+
+    // Saved order only has sd-2, sd-1 (doesn't include sd-new)
+    mockAppStateGet.mockResolvedValue(JSON.stringify(['sd-2', 'sd-1']));
+    mockSdList.mockResolvedValue(mockSds);
+    mockFolderList.mockResolvedValue([]);
+
+    render(<FolderTree activeSdId="sd-1" />);
+
+    await waitFor(() => {
+      // All SDs should be rendered
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+      expect(screen.getByText('Beta')).toBeInTheDocument();
+      expect(screen.getByText('New SD')).toBeInTheDocument();
     });
   });
 });

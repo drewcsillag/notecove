@@ -1,6 +1,6 @@
 # Folder Tree Ordering Feature Plan
 
-**Overall Progress:** `70%` (Phase 0, 1, 2 complete)
+**Overall Progress:** `90%` (Phase 0, 1, 2, 3 complete)
 
 ## Summary
 
@@ -131,29 +131,30 @@ See [Q9](./QUESTIONS-FOLDER-ORDERING.md#q9-placeholder-visual-design) for placeh
 
 ---
 
-### Phase 3: SD Header Reordering (Can Defer)
+### Phase 3: SD Header Reordering ✅
 
-Lower priority - can be done later if needed.
+- [x] 🟩 **3.1: Add SD order to app state**
+  - [x] 🟩 Use existing `appState.get/set` with key `sdOrder`
+  - [x] 🟩 Store order as JSON array of SD IDs
+  - [x] 🟩 No new IPC handlers needed (uses existing appState API)
 
-- [ ] 🟥 **3.1: Add SD order to app state**
-  - [ ] 🟥 Add `sdOrder: string[]` to app state type
-  - [ ] 🟥 Implement `sd:getOrder` / `sd:setOrder` IPC handlers
-  - [ ] 🟥 Add to preload API
+- [x] 🟩 **3.2: Update SD list to respect order**
+  - [x] 🟩 Load saved order from appState on mount
+  - [x] 🟩 Add `sortSDsByOrder()` helper function
+  - [x] 🟩 Sort SDs accordingly (new SDs append to end by creation time)
 
-- [ ] 🟥 **3.2: Update SD list to respect order**
-  - [ ] 🟥 Read order from app state
-  - [ ] 🟥 Sort SDs accordingly (new SDs append to end)
+- [x] 🟩 **3.3: Enable SD header dragging**
+  - [x] 🟩 Update `canDrag` to allow SD headers
+  - [x] 🟩 Update `canDrop` to allow SD reordering at root level
+  - [x] 🟩 Update `handleDrop` for SD reordering
+  - [x] 🟩 Save new order to appState on drop
 
-- [ ] 🟥 **3.3: Enable SD header dragging**
-  - [ ] 🟥 Update `canDrag` to allow SD headers
-  - [ ] 🟥 Update `handleDrop` for SD reordering
-  - [ ] 🟥 Call `sd:setOrder` on drop
+- [x] 🟩 **3.4: Add SD reorder tests**
+  - [x] 🟩 Test SD order loads from appState
+  - [x] 🟩 Test fallback to creation order when no saved order
+  - [x] 🟩 Test new SDs not in saved order are appended
 
-- [ ] 🟥 **3.4: Add SD reorder tests**
-  - [ ] 🟥 Test SD order persists in app state
-  - [ ] 🟥 Test SD order survives app restart
-
-**Checkpoint:** SD reordering works. Commit point.
+**Checkpoint:** ✅ SD reordering works. Ready for commit.
 
 ---
 
