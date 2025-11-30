@@ -84,6 +84,8 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track previous SD ID to detect actual SD changes (not initial load)
+  const previousSdIdRef = useRef<string | undefined>(undefined);
 
   // Multi-select state
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
@@ -446,14 +448,23 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     setSelectedFolderId('all-notes');
     void loadFolders();
 
-    // Clear search when SD changes
-    setSearchQuery('');
-    void saveSearchQuery('');
-    setIsSearching(false);
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-      searchTimeoutRef.current = null;
+    // Only clear search when SD actually changes (not on initial load)
+    // Skip when: previousSdIdRef.current is undefined (first render)
+    const isActualSdChange =
+      previousSdIdRef.current !== undefined && previousSdIdRef.current !== activeSdId;
+
+    if (isActualSdChange) {
+      setSearchQuery('');
+      void saveSearchQuery('');
+      setIsSearching(false);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
     }
+
+    // Update the ref to track the current SD
+    previousSdIdRef.current = activeSdId;
   }, [activeSdId, loadFolders, saveSearchQuery]);
 
   // Fetch notes when selected folder, active SD, or tag filters change (only if not searching)

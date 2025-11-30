@@ -47,8 +47,8 @@ test.describe('Note History', () => {
 
   // Helper function to open history panel
   async function openHistoryPanel() {
-    // Use keyboard shortcut (Cmd+Y on Mac, Ctrl+Y on Windows/Linux)
-    await window.keyboard.press(process.platform === 'darwin' ? 'Meta+y' : 'Control+y');
+    // Use keyboard shortcut (Cmd+Alt+H on Mac, Ctrl+Alt+H on Windows/Linux)
+    await window.keyboard.press(process.platform === 'darwin' ? 'Meta+Alt+h' : 'Control+Alt+h');
     await window.waitForTimeout(1000);
 
     // Wait for history panel header to be visible - use role to be more specific

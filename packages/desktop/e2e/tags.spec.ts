@@ -603,8 +603,8 @@ test.describe('Tags System - Autocomplete', () => {
     await page.waitForTimeout(1000); // Wait for autocomplete
 
     // The suggestion should show the tag with count (2)
-    // Format is: #counted (2)
-    const countedWithCount = page.getByText('#counted (2)', { exact: false });
+    // Format in autocomplete: #counted(2) - no space between tag and count
+    const countedWithCount = page.getByText('#counted(2)', { exact: false });
     await expect(countedWithCount).toBeVisible({ timeout: 3000 });
   });
 
@@ -672,14 +672,15 @@ test.describe('Tags System - Tag Panel', () => {
     const tagPanelHeader = page.getByText('Tags').first();
     await expect(tagPanelHeader).toBeVisible();
 
-    // Tags should be displayed as chips in the panel with counts
+    // Tags should be displayed as chips in the panel with counts (mini-badge format)
+    // The count appears as a mini-badge next to the tag name, resulting in text like "#panel12"
     const panel1Chip = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#panel1 \(2\)/ })
+      .filter({ hasText: /^#panel12$/ })
       .first();
     const panel2Chip = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#panel2 \(1\)/ })
+      .filter({ hasText: /^#panel21$/ })
       .first();
     await expect(panel1Chip).toBeVisible();
     await expect(panel2Chip).toBeVisible();
@@ -714,10 +715,10 @@ test.describe('Tags System - Tag Panel', () => {
     const countBefore = await notesListBefore.count();
     expect(countBefore).toBeGreaterThanOrEqual(2);
 
-    // Click the #filterme tag chip in the tag panel (more specific selector)
+    // Click the #filterme tag chip in the tag panel (mini-badge format)
     const filtermeTagChip = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#filterme \(/ })
+      .filter({ hasText: /^#filterme\d+$/ })
       .first();
     await filtermeTagChip.click();
     await page.waitForTimeout(500);
@@ -740,11 +741,11 @@ test.describe('Tags System - Tag Panel', () => {
     await page.keyboard.type('Note A: #multi1 #multi2');
     await page.waitForTimeout(3000);
 
-    // Wait for #multi1 tag to appear in the tag panel
+    // Wait for #multi1 tag to appear in the tag panel (mini-badge format)
     await expect(
       page
         .locator('[role="button"]')
-        .filter({ hasText: /^#multi1 \(/ })
+        .filter({ hasText: /^#multi1\d+$/ })
         .first()
     ).toBeVisible({ timeout: 5000 });
 
@@ -756,11 +757,11 @@ test.describe('Tags System - Tag Panel', () => {
     await page.keyboard.type('Note B: #multi2 only');
     await page.waitForTimeout(3000);
 
-    // Wait for #multi2 count to update
+    // Wait for #multi2 count to update (mini-badge format: #multi22)
     await expect(
       page
         .locator('[role="button"]')
-        .filter({ hasText: /^#multi2 \(2\)/ })
+        .filter({ hasText: /^#multi22$/ })
         .first()
     ).toBeVisible({ timeout: 5000 });
 
@@ -772,11 +773,11 @@ test.describe('Tags System - Tag Panel', () => {
     await page.keyboard.type('Note C: #multi3');
     await page.waitForTimeout(3000);
 
-    // Wait for #multi3 tag to appear in the tag panel
+    // Wait for #multi3 tag to appear in the tag panel (mini-badge format)
     await expect(
       page
         .locator('[role="button"]')
-        .filter({ hasText: /^#multi3 \(/ })
+        .filter({ hasText: /^#multi3\d+$/ })
         .first()
     ).toBeVisible({ timeout: 5000 });
 
@@ -819,11 +820,11 @@ test.describe('Tags System - Tag Panel', () => {
       timeout: 5000,
     });
 
-    // Verify notes were created by checking the tag panel for our tags
+    // Verify notes were created by checking the tag panel for our tags (mini-badge format)
     await expect(
       page
         .locator('[role="button"]')
-        .filter({ hasText: /^#multi1 \(/ })
+        .filter({ hasText: /^#multi1\d+$/ })
         .first()
     ).toBeVisible({
       timeout: 5000,
@@ -831,7 +832,7 @@ test.describe('Tags System - Tag Panel', () => {
     await expect(
       page
         .locator('[role="button"]')
-        .filter({ hasText: /^#multi2 \(/ })
+        .filter({ hasText: /^#multi2\d+$/ })
         .first()
     ).toBeVisible({
       timeout: 5000,
@@ -839,24 +840,24 @@ test.describe('Tags System - Tag Panel', () => {
     await expect(
       page
         .locator('[role="button"]')
-        .filter({ hasText: /^#multi3 \(/ })
+        .filter({ hasText: /^#multi3\d+$/ })
         .first()
     ).toBeVisible({
       timeout: 5000,
     });
 
-    // Click first tag chip in tag panel (include #multi1)
+    // Click first tag chip in tag panel (include #multi1, mini-badge format)
     const multi1TagChip = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#multi1 \(/ })
+      .filter({ hasText: /^#multi1\d+$/ })
       .first();
     await multi1TagChip.click();
     await page.waitForTimeout(500);
 
-    // Click second tag chip (include #multi2, requires AND logic)
+    // Click second tag chip (include #multi2, requires AND logic, mini-badge format)
     const multi2TagChip = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#multi2 \(/ })
+      .filter({ hasText: /^#multi2\d+$/ })
       .first();
     await multi2TagChip.click();
     await page.waitForTimeout(500);
@@ -904,10 +905,10 @@ test.describe('Tags System - Tag Panel', () => {
     await page.getByRole('button', { name: /All Notes/ }).click();
     await page.waitForTimeout(500);
 
-    // Click a tag chip to filter
+    // Click a tag chip to filter (mini-badge format)
     const clearTag1Chip = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#cleartag1 \(/ })
+      .filter({ hasText: /^#cleartag1\d+$/ })
       .first();
     await clearTag1Chip.click();
     await page.waitForTimeout(500);
@@ -949,10 +950,10 @@ test.describe('Tags System - Tag Panel', () => {
     await page.getByRole('button', { name: /All Notes/ }).click();
     await page.waitForTimeout(500);
 
-    // Click a tag chip to include it (first click → include)
+    // Click a tag chip to include it (first click → include, mini-badge format)
     const toggleTagChip = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#toggle1 \(/ })
+      .filter({ hasText: /^#toggle1\d+$/ })
       .first();
     await toggleTagChip.click();
     await page.waitForTimeout(500);
@@ -990,10 +991,10 @@ test.describe('Tags System - Tag Panel', () => {
     await page.keyboard.type('Update count test #updatecount');
     await page.waitForTimeout(2500);
 
-    // Verify tag appears in tag panel with count (1)
+    // Verify tag appears in tag panel with count (1) - mini-badge format: #updatecount1
     const tagChipInitial = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#updatecount \(1\)/ })
+      .filter({ hasText: /^#updatecount1$/ })
       .first();
     await expect(tagChipInitial).toBeVisible();
 
@@ -1006,10 +1007,10 @@ test.describe('Tags System - Tag Panel', () => {
     await page.keyboard.type('Second note with #updatecount');
     await page.waitForTimeout(2500);
 
-    // The count should update to 2
+    // The count should update to 2 - mini-badge format: #updatecount2
     const tagChipUpdated = page
       .locator('[role="button"]')
-      .filter({ hasText: /^#updatecount \(2\)/ })
+      .filter({ hasText: /^#updatecount2$/ })
       .first();
     await expect(tagChipUpdated).toBeVisible();
   });

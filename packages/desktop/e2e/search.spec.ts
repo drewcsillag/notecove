@@ -192,7 +192,8 @@ test.describe('Note Search Functionality', () => {
 
     await searchInput.click();
     await searchInput.fill('persistent search');
-    await page.waitForTimeout(1000);
+    // Wait longer for search query to be persisted to appState
+    await page.waitForTimeout(2000);
 
     // Close and reopen app
     await electronApp.close();
@@ -210,7 +211,8 @@ test.describe('Note Search Functionality', () => {
 
     page = await electronApp.firstWindow();
     await page.waitForSelector('text=Folders', { timeout: 10000 });
-    await page.waitForTimeout(1000);
+    // Wait longer for app to fully initialize and load search query from appState
+    await page.waitForTimeout(2000);
 
     // Check that search query persisted
     const newMiddlePanel = page.locator('#middle-panel');
