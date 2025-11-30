@@ -109,7 +109,9 @@
       "Bash(pnpm:*)",
       "Bash(git restore:*)",
       "Bash(xxd:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npx jest:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []
