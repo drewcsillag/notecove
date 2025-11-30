@@ -57,7 +57,7 @@ export function clearNoteTitleCache(noteId?: string): void {
  * Custom find suggestion match function for [[ trigger
  * Based on TipTap's default findSuggestionMatch but modified for [[ pattern
  */
-function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch | null {
+function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch {
   // Get the text before the current position
   // We search within the current text block (paragraph)
   const textFrom = $position.before();
@@ -399,7 +399,7 @@ async function fetchNoteTitle(noteId: string, editorView?: EditorView | null): P
       const tr = (editorView.state as any).tr;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       tr.setMeta('forceDecoration', true);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       editorView.dispatch(tr);
     }
   } catch (error) {
@@ -413,7 +413,7 @@ async function fetchNoteTitle(noteId: string, editorView?: EditorView | null): P
       const tr = (editorView.state as any).tr;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       tr.setMeta('forceDecoration', true);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       editorView.dispatch(tr);
     }
   }

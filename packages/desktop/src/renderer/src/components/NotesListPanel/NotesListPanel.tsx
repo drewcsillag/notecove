@@ -235,7 +235,6 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         let notesList: Note[];
         const sdId = activeSdId ?? DEFAULT_SD_ID;
 
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         if (folderId === 'all-notes' || folderId?.startsWith('all-notes:') || folderId === null) {
           // Fetch all notes for the SD
           notesList = await window.electronAPI.note.list(sdId);
@@ -506,7 +505,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     const unsubscribeCreated = window.electronAPI.note.onCreated((data) => {
       console.log('[NotesListPanel] Note created:', data);
       // Refresh notes if it's in the current folder
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+
       if (
         selectedFolderId === 'all-notes' ||
         (data.folderId != null && selectedFolderId === data.folderId)

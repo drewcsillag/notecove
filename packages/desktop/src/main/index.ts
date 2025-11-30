@@ -495,7 +495,7 @@ async function ensureDefaultNote(
 
   // No notes exist in database, but CRDT files might exist
   // Load the note to check if it already has content from sync directory
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
   await crdtMgr.loadNote(DEFAULT_NOTE_ID, DEFAULT_SD_ID);
 
   // Get the document to check/insert initial content
@@ -632,7 +632,7 @@ async function setupSDWatchers(
 
   // Register the activity logger with CRDT Manager
   // Type assertion needed due to TypeScript module resolution quirk between dist and src
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   crdtManager.setActivityLogger(sdId, activityLogger as any);
 
   // Store logger for periodic compaction
@@ -1717,7 +1717,6 @@ void app.whenReady().then(async () => {
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] App ready, starting initialization...');
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         await fs.appendFile(
           '/var/tmp/electron-env.log',
           `\n=== New Launch ===\nNODE_ENV: ${process.env['NODE_ENV']}\nTEST_DB_PATH: ${process.env['TEST_DB_PATH']}\n`
@@ -1959,9 +1958,9 @@ void app.whenReady().then(async () => {
     database = await initializeDatabase(selectedProfileId ?? undefined);
 
     // Clean up orphaned data from deleted SDs
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+
     const cleanupPromise = database.cleanupOrphanedData();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
     cleanupPromise
       .then(() => {
         console.log('[Database] Orphaned data cleanup completed');
@@ -2291,12 +2290,11 @@ void app.whenReady().then(async () => {
     );
 
     // Set up broadcast callback for CRDT manager to send updates to renderer
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- crdtManager is definitely assigned by this point
+
     crdtManager.setBroadcastCallback((noteId: string, update: Uint8Array) => {
       ipcHandlers?.broadcastToAll('note:updated', noteId, update);
     });
     if (process.env['NODE_ENV'] === 'test') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',
         `${new Date().toISOString()} [Init] IPC handlers created\n`
@@ -2320,7 +2318,6 @@ void app.whenReady().then(async () => {
       database
     );
     if (process.env['NODE_ENV'] === 'test') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',
         `${new Date().toISOString()} [Init] Default note ensured\n`
@@ -2330,7 +2327,6 @@ void app.whenReady().then(async () => {
     // Run auto-cleanup for old deleted notes (30-day threshold)
     console.log('[Init] Running auto-cleanup for old deleted notes...');
     if (process.env['NODE_ENV'] === 'test') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',
         `${new Date().toISOString()} [Init] About to run auto-cleanup\n`
@@ -2338,7 +2334,6 @@ void app.whenReady().then(async () => {
     }
     await ipcHandlers.runAutoCleanup(30);
     if (process.env['NODE_ENV'] === 'test') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',
         `${new Date().toISOString()} [Init] Auto-cleanup completed\n`

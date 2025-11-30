@@ -49,6 +49,19 @@ export default tseslint.config(
     },
   },
   {
+    files: ['**/__tests__/**/*.ts', '**/__tests__/**/*.tsx', '**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
     ignores: [
       '**/dist/**',
       '**/dist-electron/**',
@@ -57,8 +70,6 @@ export default tseslint.config(
       '**/*.js',
       '!eslint.config.js',
       '**/__manual__/**',
-      'src/main/backup-manager.ts',
-      'src/main/diagnostics-manager.ts',
     ],
   }
 );

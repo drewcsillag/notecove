@@ -4,12 +4,6 @@
  * Tests for folder CRUD operations via IPC handlers.
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 // Mock ipcMain before importing handlers
 jest.mock('electron', () => ({
   ipcMain: {
@@ -23,7 +17,7 @@ jest.mock('electron', () => ({
 
 // Mock Node.js crypto module
 let uuidCounter = 0;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
   randomUUID: jest.fn((): string => {
@@ -37,7 +31,7 @@ jest.mock('crypto', () => ({
 // Reset counter before each test
 beforeEach(() => {
   uuidCounter = 0;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const crypto = require('crypto');
   (crypto.randomUUID as jest.Mock).mockClear();
 });

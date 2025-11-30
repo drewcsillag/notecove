@@ -2,9 +2,6 @@
  * Recovery Settings Tests
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { RecoverySettings } from '../RecoverySettings';

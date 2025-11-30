@@ -2,8 +2,6 @@
  * Tests for Structured Logger
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
 import { StructuredLogger, LogLevel, createLogger, configureLogger, getLogger } from '../logger';
 
 describe('StructuredLogger', () => {

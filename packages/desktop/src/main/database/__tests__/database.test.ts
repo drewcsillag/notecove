@@ -2,10 +2,7 @@
  * Database tests
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import { rm } from 'fs/promises';
 import { join } from 'path';

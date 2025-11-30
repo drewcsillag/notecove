@@ -6,7 +6,7 @@
  * than async alternatives in Node.js.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports
 const BetterSqlite3 = require('better-sqlite3');
 import type { DatabaseAdapter } from '@notecove/shared';
 import type BetterSqlite3Type from 'better-sqlite3';

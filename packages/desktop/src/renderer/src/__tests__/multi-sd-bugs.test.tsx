@@ -6,9 +6,6 @@
  * 2. Folder structure shared between SDs
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
 // Mock i18n before any imports
 jest.mock('../i18n', () => ({}));
 

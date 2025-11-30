@@ -491,7 +491,7 @@ export class IPCHandlers {
           );
 
           // Get existing links for this note
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
           const existingLinks: UUID[] = await this.database.getLinksFromNote(noteId);
           const existingLinksSet = new Set<UUID>(existingLinks);
 
@@ -507,14 +507,14 @@ export class IPCHandlers {
           // Process removals
           for (const linkId of linksToRemove) {
             console.log(`[IPC] Removing link ${noteId} -> ${linkId}`);
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
             await this.database.removeLink(noteId, linkId);
           }
 
           // Process additions
           for (const linkId of linksToAdd) {
             console.log(`[IPC] Adding link ${noteId} -> ${linkId}`);
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
             await this.database.addLink(noteId, linkId);
           }
         }
@@ -1336,7 +1336,7 @@ export class IPCHandlers {
         console.log(`[IPC] Extracted ${links.length} inter-note links from note ${noteId}`);
 
         // Get existing links for this note
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
         const existingLinks: UUID[] = await this.database.getLinksFromNote(noteId);
         const existingLinksSet = new Set<UUID>(existingLinks);
 
@@ -1352,14 +1352,14 @@ export class IPCHandlers {
         // Process removals
         for (const linkId of linksToRemove) {
           console.log(`[IPC] Removing link ${noteId} -> ${linkId}`);
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
           await this.database.removeLink(noteId, linkId);
         }
 
         // Process additions
         for (const linkId of linksToAdd) {
           console.log(`[IPC] Adding link ${noteId} -> ${linkId}`);
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
           await this.database.addLink(noteId, linkId);
         }
 
@@ -2302,7 +2302,6 @@ export class IPCHandlers {
     _event: IpcMainInvokeEvent,
     noteId: string
   ): Promise<NoteCache[]> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
     return await this.database.getBacklinks(noteId);
   }
 

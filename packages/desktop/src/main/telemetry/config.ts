@@ -122,14 +122,12 @@ export class TelemetryManager {
       console.log('[Telemetry] Local mode only - remote metrics disabled');
     }
 
-    /* eslint-disable @typescript-eslint/no-unsafe-assignment */
     // Create SDK with configuration (NodeSDK type is not fully typed)
     // Pass all metric readers to avoid deprecation warning
     this.sdk = new NodeSDK({
       resource,
       metricReaders,
     });
-    /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
     try {
       this.sdk.start();
