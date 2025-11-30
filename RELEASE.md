@@ -9,12 +9,14 @@ The version number is defined in the root `package.json` and synced to all other
 Edit the version **only** in `/package.json`. The sync scripts will propagate it to:
 
 **package.json files:**
+
 - `packages/desktop/package.json`
 - `packages/shared/package.json`
 - `website/package.json`
 - `tools/package.json`
 
 **Hardcoded references:**
+
 - `packages/desktop/src/main/telemetry/__tests__/config.test.ts`
 - `packages/desktop/src/main/telemetry/__tests__/logger.test.ts`
 - `packages/desktop/src/main/telemetry/logger.example.ts`

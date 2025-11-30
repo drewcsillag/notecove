@@ -15,7 +15,7 @@
     "build:linux": "pnpm build && electron-builder --linux",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "eslint src",
     "pretest": "pnpm rebuild:node",
     "test": "jest",
     "test:coverage": "jest --coverage",
