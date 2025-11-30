@@ -2049,26 +2049,18 @@ test.describe('cross-machine sync - new note creation', () => {
 
     // === Wait for file sync + activity detection ===
     console.log('[LiveNewNote] Waiting for file sync and activity detection...');
-    // Give time for:
-    // 1. CRDT log to be written (immediate)
-    // 2. Activity log to be written (immediate)
-    // 3. Files to sync to SD2 (0.5-1s)
-    // 4. Instance 2's activity watcher to detect (polls every few seconds)
-    // 5. Instance 2 to reload the note
-    await window1.waitForTimeout(15000);
-
-    // === Check if Instance 2 sees the new note ===
-    const finalNoteCount2 = await notesList2.count();
-    console.log(`[LiveNewNote] Instance 2 note count after sync: ${finalNoteCount2}`);
+    // Use retrying assertions instead of fixed wait + one-shot check
+    // This handles timing variability in file sync and activity watcher
 
     // This is THE KEY ASSERTION - does the new note appear without restart?
-    expect(finalNoteCount2).toBe(2);
+    // Use toHaveCount which retries until condition is met or timeout
+    await expect(notesList2).toHaveCount(2, { timeout: 30000 });
+    console.log('[LiveNewNote] Instance 2 note count after sync: 2');
 
     // Also verify the title is correct
     const noteWithTitle = window2.locator(`[data-testid="notes-list"] li:has-text("${testTitle}")`);
-    const hasNewNote = await noteWithTitle.count();
-    console.log(`[LiveNewNote] Instance 2 has note with title: ${hasNewNote > 0}`);
-    expect(hasNewNote).toBeGreaterThan(0);
+    await expect(noteWithTitle).toHaveCount(1, { timeout: 5000 });
+    console.log('[LiveNewNote] Instance 2 has note with title: true');
 
     console.log('[LiveNewNote] ✅ Live new note sync test passed!');
   });
@@ -3091,7 +3083,11 @@ test.describe('cross-machine sync - new note creation', () => {
 
     // Find the Work folder in the dialog and click it
     // Use label since folders are radio options
-    const folderRadio = moveDialog.locator('label:has-text("Work")').first();
+    // Filter to exclude subfolders (which contain "/") - e.g., "Work / Projects"
+    const folderRadio = moveDialog
+      .locator('label:has-text("Work")')
+      .filter({ hasNotText: '/' })
+      .first();
     await folderRadio.click();
     await window1.waitForTimeout(500);
 
