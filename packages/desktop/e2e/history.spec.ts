@@ -47,7 +47,8 @@ test.describe('Note History', () => {
 
   // Helper function to open history panel
   async function openHistoryPanel() {
-    // Use keyboard shortcut (Cmd+Alt+H on Mac, Ctrl+Alt+H on Windows/Linux)
+    // Use keyboard shortcut (Cmd+Option+H on Mac, Ctrl+Alt+H on Windows/Linux)
+    // Note: Cmd+Y was changed to Cmd+Option+H because Cmd+Y is reserved for redo
     await window.keyboard.press(process.platform === 'darwin' ? 'Meta+Alt+h' : 'Control+Alt+h');
     await window.waitForTimeout(1000);
 
