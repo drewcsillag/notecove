@@ -117,10 +117,19 @@ export class FolderTreeDoc {
   }
 
   /**
-   * Get all non-deleted folders
+   * Get all non-deleted folders, sorted by order field (with name as secondary sort)
    */
   getActiveFolders(): FolderData[] {
-    return this.getAllFolders().filter((f) => !f.deleted);
+    return this.getAllFolders()
+      .filter((f) => !f.deleted)
+      .sort((a, b) => {
+        // Primary sort by order
+        if (a.order !== b.order) {
+          return a.order - b.order;
+        }
+        // Secondary sort by name (case-insensitive) for stability
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
   }
 
   /**
@@ -142,6 +151,67 @@ export class FolderTreeDoc {
    */
   deleteFolder(folderId: UUID): void {
     this.updateFolder(folderId, { deleted: true });
+  }
+
+  /**
+   * Get siblings of a folder (folders with the same parentId, including itself)
+   */
+  getSiblings(folderId: UUID): FolderData[] {
+    const folder = this.getFolder(folderId);
+    if (!folder) {
+      return [];
+    }
+
+    return this.getActiveFolders().filter((f) => f.parentId === folder.parentId);
+  }
+
+  /**
+   * Reorder a folder to a new position among its siblings.
+   * This renumbers all siblings to maintain consecutive order values (0, 1, 2, ...).
+   *
+   * @param folderId The folder to reorder
+   * @param newIndex The new position (0-based) among siblings
+   */
+  reorderFolder(folderId: UUID, newIndex: number): void {
+    const folder = this.getFolder(folderId);
+    if (!folder) {
+      throw new Error(`Folder ${folderId} not found`);
+    }
+
+    // Get all siblings (including this folder), sorted by current order
+    const siblings = this.getSiblings(folderId).sort((a, b) => a.order - b.order);
+
+    if (siblings.length <= 1) {
+      // Single folder or no siblings - ensure order is 0
+      this.updateFolder(folderId, { order: 0 });
+      return;
+    }
+
+    // Clamp newIndex to valid range
+    const clampedIndex = Math.max(0, Math.min(newIndex, siblings.length - 1));
+
+    // Remove the folder from its current position
+    const currentIndex = siblings.findIndex((f) => f.id === folderId);
+    if (currentIndex === -1) {
+      return; // Shouldn't happen, but safety check
+    }
+
+    // Create new order by removing and inserting at new position
+    const reordered = [...siblings];
+    const [removed] = reordered.splice(currentIndex, 1);
+    if (removed) {
+      reordered.splice(clampedIndex, 0, removed);
+    }
+
+    // Update all siblings with consecutive order values
+    this.doc.transact(() => {
+      reordered.forEach((sibling, index) => {
+        const folderMap = this.folders.get(sibling.id);
+        if (folderMap && folderMap.get('order') !== index) {
+          folderMap.set('order', index);
+        }
+      });
+    });
   }
 
   /**

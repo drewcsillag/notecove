@@ -163,6 +163,7 @@ export class IPCHandlers {
     ipcMain.handle('folder:delete', this.handleDeleteFolder.bind(this));
     ipcMain.handle('folder:move', this.handleMoveFolder.bind(this));
     ipcMain.handle('folder:emitSelected', this.handleEmitFolderSelected.bind(this));
+    ipcMain.handle('folder:reorder', this.handleReorderFolder.bind(this));
 
     // Storage Directory operations
     ipcMain.handle('sd:list', this.handleListStorageDirs.bind(this));
@@ -1507,9 +1508,19 @@ export class IPCHandlers {
     // Generate new folder ID
     const folderId = crypto.randomUUID();
 
-    // Determine order (last in the list)
+    // Find alphabetical insertion position among siblings (case-insensitive)
+    const sortedSiblings = [...siblings].sort((a, b) =>
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+    );
+    const insertIndex = sortedSiblings.findIndex(
+      (f) => f.name.toLowerCase().localeCompare(trimmedName.toLowerCase()) > 0
+    );
+    const alphabeticalPosition = insertIndex === -1 ? sortedSiblings.length : insertIndex;
+
+    // Create folder with a temporary order (will be corrected by reorder)
+    // Use max + 1 initially to avoid conflicts during creation
     const maxOrder = siblings.reduce((max, f) => Math.max(max, f.order), -1);
-    const order = maxOrder + 1;
+    const tempOrder = maxOrder + 1;
 
     // Create folder data
     const folderData: import('@notecove/shared').FolderData = {
@@ -1517,22 +1528,26 @@ export class IPCHandlers {
       name: trimmedName,
       parentId,
       sdId,
-      order,
+      order: tempOrder,
       deleted: false,
     };
 
     // Update CRDT
     folderTree.createFolder(folderData);
 
-    // Update SQLite cache
-    await this.database.upsertFolder({
-      id: folderId,
-      name: trimmedName,
-      parentId,
-      sdId,
-      order,
-      deleted: false,
-    });
+    // Now reorder to the alphabetical position (this renumbers all siblings)
+    if (siblings.length > 0) {
+      folderTree.reorderFolder(folderId, alphabeticalPosition);
+    }
+
+    // Update SQLite cache for all siblings (reorder may have changed their orders)
+    const updatedFolder = folderTree.getFolder(folderId);
+    if (updatedFolder) {
+      const allSiblings = folderTree.getSiblings(folderId);
+      for (const sibling of allSiblings) {
+        await this.database.upsertFolder(sibling);
+      }
+    }
 
     // Broadcast folder update to all windows
     this.broadcastToAll('folder:updated', { sdId, operation: 'create', folderId });
@@ -1671,6 +1686,30 @@ export class IPCHandlers {
    */
   private handleEmitFolderSelected(_event: IpcMainInvokeEvent, folderId: string): void {
     this.broadcastToAll('folder:selected', folderId);
+  }
+
+  private async handleReorderFolder(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string,
+    newIndex: number
+  ): Promise<void> {
+    const folderTree = await this.crdtManager.loadFolderTree(sdId);
+
+    // Reorder in CRDT (this also renumbers all siblings)
+    folderTree.reorderFolder(folderId, newIndex);
+
+    // Update SQLite cache for all affected siblings
+    const folder = folderTree.getFolder(folderId);
+    if (folder) {
+      const siblings = folderTree.getSiblings(folderId);
+      for (const sibling of siblings) {
+        await this.database.upsertFolder(sibling);
+      }
+    }
+
+    // Broadcast folder update to all windows
+    this.broadcastToAll('folder:updated', { sdId, operation: 'reorder', folderId });
   }
 
   private async handleGetAppState(_event: IpcMainInvokeEvent, key: string): Promise<string | null> {
@@ -1966,6 +2005,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('folder:delete');
     ipcMain.removeHandler('folder:move');
     ipcMain.removeHandler('folder:emitSelected');
+    ipcMain.removeHandler('folder:reorder');
     ipcMain.removeHandler('sd:list');
     ipcMain.removeHandler('sd:create');
     ipcMain.removeHandler('sd:setActive');
