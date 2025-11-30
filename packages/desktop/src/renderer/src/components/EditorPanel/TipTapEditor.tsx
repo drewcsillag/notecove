@@ -64,6 +64,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
   // Track updates we've sent to main process so we can skip them when they bounce back
   const pendingUpdatesRef = useRef<Set<string>>(new Set());
+  // Track if we should focus the editor after loading completes (for newly created notes)
+  const shouldFocusAfterLoadRef = useRef(false);
+  // Track if we've already scheduled/attempted focus (to prevent cancellation)
+  const focusAttemptedRef = useRef(false);
 
   const editor = useEditor({
     extensions: [
@@ -401,7 +405,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           // For new notes, clear any default content and set H1 format
           editor.commands.setContent('');
           editor.commands.setHeading({ level: 1 });
-          editor.commands.focus();
+
+          // Mark that we should focus after loading completes
+          // Using ref because isNewlyCreated will be cleared by onNoteLoaded
+          shouldFocusAfterLoadRef.current = true;
+          focusAttemptedRef.current = false; // Reset so we can attempt focus
         }
 
         // IMPORTANT: Clear loading flag AFTER all content manipulation to prevent
@@ -490,6 +498,25 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       void window.electronAPI.note.unload(noteId);
     };
   }, [noteId, editor, yDoc, isNewlyCreated, onNoteLoaded, readOnly]);
+
+  // Focus editor after loading completes for newly created notes
+  // This is separate from the loading effect because isNewlyCreated changes
+  // during loading (cleared by onNoteLoaded), causing the loading effect to re-run.
+  // Using refs ensures we capture the "should focus" intent before it's cleared,
+  // and only attempt focus once per new note.
+  useEffect(() => {
+    if (!isLoading && editor && shouldFocusAfterLoadRef.current && !focusAttemptedRef.current) {
+      focusAttemptedRef.current = true;
+
+      // Delay focus to ensure React has finished rendering
+      // Query DOM directly since editor reference may be stale after remounts
+      setTimeout(() => {
+        const proseMirrorEl = document.querySelector<HTMLElement>('.ProseMirror');
+        proseMirrorEl?.focus();
+        shouldFocusAfterLoadRef.current = false;
+      }, 100);
+    }
+  }, [isLoading, editor]);
 
   return (
     <Box
