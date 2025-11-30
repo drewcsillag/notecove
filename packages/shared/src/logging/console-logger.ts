@@ -60,7 +60,6 @@ export class ConsoleLogger implements Logger {
       context,
     };
 
-    // eslint-disable-next-line no-console
     console.log(this.formatMessage(entry));
   }
 
@@ -74,7 +73,6 @@ export class ConsoleLogger implements Logger {
       context,
     };
 
-    // eslint-disable-next-line no-console
     console.log(this.formatMessage(entry));
   }
 
@@ -88,7 +86,6 @@ export class ConsoleLogger implements Logger {
       context,
     };
 
-    // eslint-disable-next-line no-console
     console.warn(this.formatMessage(entry));
   }
 
@@ -103,7 +100,6 @@ export class ConsoleLogger implements Logger {
       error,
     };
 
-    // eslint-disable-next-line no-console
     console.error(this.formatMessage(entry));
   }
 

@@ -63,7 +63,6 @@ interface NoteCoveBridge {
 
 // Initialize the global bridge object
 declare global {
-  // eslint-disable-next-line no-var
   var NoteCoveBridge: NoteCoveBridge | undefined;
   interface Window {
     NoteCoveBridge: NoteCoveBridge;

@@ -1,1 +1,1 @@
-{ "approvedPackages": ["better-sqlite3", "electron", "esbuild"] }
+{ "approvedPackages": ["@swc/core", "better-sqlite3", "electron", "esbuild"] }
