@@ -9,6 +9,7 @@ import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import cors from '@fastify/cors';
 import { TLSCredentials } from './tls';
 import { AuthManager, RequestHeaders, QueryParams } from './auth';
+import { registerRoutes } from './routes';
 
 /**
  * Web server configuration
@@ -158,6 +159,9 @@ export class WebServer {
     this.fastify.get('/health', () => {
       return { status: 'ok', timestamp: Date.now() };
     });
+
+    // Register API routes
+    registerRoutes(this.fastify);
 
     // Start listening
     const address = await this.fastify.listen({
