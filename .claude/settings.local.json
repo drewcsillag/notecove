@@ -111,7 +111,13 @@
       "Bash(xxd:*)",
       "Bash(git push:*)",
       "Bash(npx jest:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebFetch(domain:docs.yjs.dev)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx jest:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:codesandbox.io)",
+      "WebFetch(domain:minop1205.github.io)"
     ],
     "deny": [],
     "ask": []
