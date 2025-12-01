@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "build:browser": "vite build --config vite.browser.config.ts && mv dist-browser/index-browser.html dist-browser/index.html",
     "build:all": "pnpm build && electron-builder --mac --win --linux",
     "build:mac": "pnpm build && electron-builder --mac",
     "build:win": "pnpm build && electron-builder --win",
