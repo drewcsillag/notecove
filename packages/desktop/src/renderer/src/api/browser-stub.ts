@@ -8,16 +8,9 @@
  * This file is used during the Phase 0 spike to prove the build works.
  */
 
-type StubFunction = (...args: unknown[]) => never;
 type StubAsyncFunction = (...args: unknown[]) => Promise<never>;
 
 const notImplemented = (method: string): StubAsyncFunction => {
-  return async () => {
-    throw new Error(`[Browser] ${method} not yet implemented. Web client coming in Phase 4.`);
-  };
-};
-
-const notImplementedSync = (method: string): StubFunction => {
   return () => {
     throw new Error(`[Browser] ${method} not yet implemented. Web client coming in Phase 4.`);
   };
@@ -224,7 +217,7 @@ export const browserApiStub: typeof window.electronAPI = {
  * Call this early in the app bootstrap before any components try to use the API.
  */
 export function initBrowserApiStub(): void {
-  if (typeof window !== 'undefined' && !window.electronAPI) {
+  if (typeof window !== 'undefined' && typeof window.electronAPI === 'undefined') {
     console.log('[Browser] Installing electronAPI stub');
     window.electronAPI = browserApiStub;
   }

@@ -1,6 +1,6 @@
 # Web Interface Feature Implementation Plan
 
-**Overall Progress:** `5%` (Phase 0 complete)
+**Overall Progress:** `20%` (Phase 0-1 complete)
 
 ## Summary
 
@@ -8,26 +8,26 @@ Add a web server to the Electron desktop app that allows browser access (includi
 
 ## Key Decisions (from Q&A)
 
-| Aspect | Decision |
-|--------|----------|
-| Access | Remote (LAN), configurable port |
-| Concurrent use | Yes, existing sync handles it |
-| Features | Notes, folders, tags, search, history, diagnostics |
-| Excluded | Settings, SD management, export, profile switching |
-| Server lifecycle | On-demand (menu/setting), shuts down with app |
-| Auth | Token-based (typable), QR code for setup, login page fallback |
-| HTTPS | Self-signed (default) or user-provided cert |
-| Discovery | Manual URL + mDNS/Bonjour (optional) + QR code |
-| iPad UI | Defer responsive design; landscape likely fine |
-| Package location | `packages/desktop` (not separate package) |
+| Aspect           | Decision                                                      |
+| ---------------- | ------------------------------------------------------------- |
+| Access           | Remote (LAN), configurable port                               |
+| Concurrent use   | Yes, existing sync handles it                                 |
+| Features         | Notes, folders, tags, search, history, diagnostics            |
+| Excluded         | Settings, SD management, export, profile switching            |
+| Server lifecycle | On-demand (menu/setting), shuts down with app                 |
+| Auth             | Token-based (typable), QR code for setup, login page fallback |
+| HTTPS            | Self-signed (default) or user-provided cert                   |
+| Discovery        | Manual URL + mDNS/Bonjour (optional) + QR code                |
+| iPad UI          | Defer responsive design; landscape likely fine                |
+| Package location | `packages/desktop` (not separate package)                     |
 
 ## Review Checkpoints
 
-| After Phase | Checkpoint |
-|-------------|------------|
-| Phase 2 | 🔲 API working (testable via curl) |
-| Phase 4 | 🔲 Browser client works end-to-end |
-| Phase 8 | 🔲 Feature complete |
+| After Phase | Checkpoint                         |
+| ----------- | ---------------------------------- |
+| Phase 2     | 🔲 API working (testable via curl) |
+| Phase 4     | 🔲 Browser client works end-to-end |
+| Phase 8     | 🔲 Feature complete                |
 
 ---
 
@@ -50,25 +50,25 @@ Add a web server to the Electron desktop app that allows browser access (includi
 
 ### Phase 1: Core Server Infrastructure
 
-- [ ] 🟥 **1.1: HTTP Server Foundation**
-  - [ ] 🟥 Write tests for server startup/shutdown lifecycle
-  - [ ] 🟥 Add Fastify as dependency (lightweight, TypeScript-native)
-  - [ ] 🟥 Create `src/main/web-server/server.ts` with start/stop methods
-  - [ ] 🟥 Integrate server lifecycle with Electron app lifecycle
+- [x] 🟩 **1.1: HTTP Server Foundation**
+  - [x] 🟩 Write tests for server startup/shutdown lifecycle (17 tests)
+  - [x] 🟩 Add Fastify as dependency (lightweight, TypeScript-native)
+  - [x] 🟩 Create `src/main/web-server/server.ts` with start/stop methods
+  - [ ] 🟥 Integrate server lifecycle with Electron app lifecycle (deferred to Phase 5)
 
-- [ ] 🟥 **1.2: TLS/HTTPS Support**
-  - [ ] 🟥 Write tests for certificate loading and self-signed generation
-  - [ ] 🟥 Create `src/main/web-server/tls.ts` for cert management
-  - [ ] 🟥 Generate self-signed cert on first run (store in userData)
-  - [ ] 🟥 Support user-provided cert via config
-  - [ ] 🟥 Research mkcert for iOS-friendly local CA (document findings)
+- [x] 🟩 **1.2: TLS/HTTPS Support**
+  - [x] 🟩 Write tests for certificate loading and self-signed generation (14 tests)
+  - [x] 🟩 Create `src/main/web-server/tls.ts` for cert management
+  - [x] 🟩 Generate self-signed cert (using node-forge, works in jsdom tests)
+  - [x] 🟩 Support user-provided cert via config
+  - [ ] 🟨 Research mkcert for iOS-friendly local CA (document findings) - deferred
 
-- [ ] 🟥 **1.3: Authentication**
-  - [ ] 🟥 Write tests for token generation, validation, middleware
-  - [ ] 🟥 Create `src/main/web-server/auth.ts` with token logic
-  - [ ] 🟥 Generate typable token (e.g., 6 words or short alphanumeric)
-  - [ ] 🟥 Add auth middleware to protect all API routes
-  - [ ] 🟥 Store token in config, regenerate on demand
+- [x] 🟩 **1.3: Authentication**
+  - [x] 🟩 Write tests for token generation, validation, middleware (22 tests)
+  - [x] 🟩 Create `src/main/web-server/auth.ts` with token logic
+  - [x] 🟩 Generate typable token (alphanumeric, excludes confusing chars)
+  - [x] 🟩 Add auth middleware to protect all API routes (6 tests)
+  - [ ] 🟨 Store token in config, regenerate on demand (deferred to Phase 5)
 
 ---
 
@@ -282,15 +282,15 @@ packages/desktop/src/renderer/src/utils/
 
 ## Dependencies to Add
 
-| Package | Purpose |
-|---------|---------|
-| `fastify` | HTTP server |
-| `@fastify/websocket` | WebSocket support |
-| `@fastify/static` | Static file serving |
-| `@fastify/cors` | CORS for browser requests |
-| `selfsigned` | Self-signed certificate generation |
-| `qrcode` | QR code generation |
-| `bonjour-service` | mDNS/Bonjour advertisement (optional) |
+| Package              | Purpose                               |
+| -------------------- | ------------------------------------- |
+| `fastify`            | HTTP server                           |
+| `@fastify/websocket` | WebSocket support                     |
+| `@fastify/static`    | Static file serving                   |
+| `@fastify/cors`      | CORS for browser requests             |
+| `selfsigned`         | Self-signed certificate generation    |
+| `qrcode`             | QR code generation                    |
+| `bonjour-service`    | mDNS/Bonjour advertisement (optional) |
 
 ---
 

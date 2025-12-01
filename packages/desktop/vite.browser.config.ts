@@ -34,6 +34,6 @@ export default defineConfig({
 
   define: {
     // Flag to detect browser vs Electron at runtime
-    '__IS_BROWSER__': JSON.stringify(true),
+    __IS_BROWSER__: JSON.stringify(true),
   },
 });

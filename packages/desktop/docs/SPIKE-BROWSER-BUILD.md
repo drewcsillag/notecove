@@ -18,6 +18,7 @@ Verified that the NoteCove renderer can be built for standalone browser executio
 ### 2. Build Configuration ✅
 
 Created `vite.browser.config.ts`:
+
 - Uses standard Vite (not electron-vite)
 - Outputs to `dist-browser/`
 - Defines `__IS_BROWSER__` flag for runtime detection
@@ -26,6 +27,7 @@ Created `vite.browser.config.ts`:
 ### 3. API Stub ✅
 
 Created `src/renderer/src/api/browser-stub.ts`:
+
 - Provides stub implementation of `window.electronAPI`
 - All methods throw "not implemented" errors
 - Event subscriptions return no-op unsubscribers
@@ -34,6 +36,7 @@ Created `src/renderer/src/api/browser-stub.ts`:
 ### 4. Browser Entry Point ✅
 
 Created separate entry point for browser:
+
 - `src/renderer/index-browser.html`
 - `src/renderer/src/main-browser.tsx`
 - Initializes API stub before loading App
@@ -52,12 +55,12 @@ dist-browser/assets/index.js   1,348.88 kB │ gzip: 410.84 kB
 
 ## Files Created
 
-| File | Purpose |
-|------|---------|
-| `vite.browser.config.ts` | Browser build configuration |
-| `src/renderer/index-browser.html` | Browser HTML entry point |
-| `src/renderer/src/main-browser.tsx` | Browser JS entry point |
-| `src/renderer/src/api/browser-stub.ts` | API stub for browser |
+| File                                   | Purpose                     |
+| -------------------------------------- | --------------------------- |
+| `vite.browser.config.ts`               | Browser build configuration |
+| `src/renderer/index-browser.html`      | Browser HTML entry point    |
+| `src/renderer/src/main-browser.tsx`    | Browser JS entry point      |
+| `src/renderer/src/api/browser-stub.ts` | API stub for browser        |
 
 ## No Blockers Found
 
