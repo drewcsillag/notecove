@@ -8,6 +8,7 @@
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
+import fastifyStatic from '@fastify/static';
 import type { WebSocket } from 'ws';
 import { TLSCredentials } from './tls';
 import { AuthManager, RequestHeaders, QueryParams } from './auth';
@@ -27,6 +28,8 @@ export interface WebServerConfig {
   tlsCredentials?: TLSCredentials;
   /** Auth manager for protecting API routes */
   authManager?: AuthManager;
+  /** Path to static files to serve (browser bundle) */
+  staticFilesPath?: string;
 }
 
 /**
@@ -205,6 +208,24 @@ export class WebServer {
 
     // Register API routes
     registerRoutes(this.fastify);
+
+    // Register static file serving if path provided
+    if (this.config.staticFilesPath) {
+      await this.fastify.register(fastifyStatic, {
+        root: this.config.staticFilesPath,
+        prefix: '/',
+        wildcard: false,
+      });
+
+      // Fallback to index.html for SPA routing
+      this.fastify.setNotFoundHandler((request, reply) => {
+        // Don't serve index.html for API or WebSocket routes
+        if (request.url.startsWith('/api') || request.url.startsWith('/ws')) {
+          return reply.status(404).send({ error: 'Not Found' });
+        }
+        return reply.sendFile('index.html');
+      });
+    }
 
     // Start listening
     const address = await this.fastify.listen({

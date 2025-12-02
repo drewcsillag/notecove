@@ -188,4 +188,78 @@ export function registerNoteRoutes(fastify: FastifyInstance): void {
       }
     }
   );
+
+  // Load note (prepare for editing)
+  fastify.post<{ Params: NoteParams }>(
+    '/api/notes/:id/load',
+    async (_request: FastifyRequest<{ Params: NoteParams }>, _reply: FastifyReply) => {
+      // In the browser client, this is a no-op since we don't manage CRDT state on server
+      return { success: true };
+    }
+  );
+
+  // Unload note
+  fastify.post<{ Params: NoteParams }>(
+    '/api/notes/:id/unload',
+    async (_request: FastifyRequest<{ Params: NoteParams }>, _reply: FastifyReply) => {
+      // No-op for browser client
+      return { success: true };
+    }
+  );
+
+  // Get note state (CRDT state)
+  fastify.get<{ Params: NoteParams }>(
+    '/api/notes/:id/state',
+    async (request: FastifyRequest<{ Params: NoteParams }>, reply: FastifyReply) => {
+      if (!hasServices()) {
+        return sendError(reply, 503, 'Service Unavailable', 'Services not configured');
+      }
+
+      const { id } = request.params;
+
+      try {
+        const services = getServices();
+        const state = await services.noteGetState(id);
+        return { state: Array.from(state) };
+      } catch (err) {
+        return handleServiceError(reply, err);
+      }
+    }
+  );
+
+  // Update note title
+  fastify.post<{ Params: NoteParams; Body: { title?: string; contentText?: string } }>(
+    '/api/notes/:id/title',
+    async (
+      _request: FastifyRequest<{
+        Params: NoteParams;
+        Body: { title?: string; contentText?: string };
+      }>,
+      _reply: FastifyReply
+    ) => {
+      // For the mock server, just acknowledge the update
+      // In real implementation, this would update the note's title metadata
+      return { success: true };
+    }
+  );
+
+  // Restore deleted note
+  fastify.post<{ Params: NoteParams }>(
+    '/api/notes/:id/restore',
+    async (request: FastifyRequest<{ Params: NoteParams }>, reply: FastifyReply) => {
+      if (!hasServices()) {
+        return sendError(reply, 503, 'Service Unavailable', 'Services not configured');
+      }
+
+      const { id } = request.params;
+
+      try {
+        const services = getServices();
+        await services.noteRestore(id);
+        return { success: true };
+      } catch (err) {
+        return handleServiceError(reply, err);
+      }
+    }
+  );
 }

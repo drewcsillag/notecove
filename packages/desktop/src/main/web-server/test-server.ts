@@ -6,16 +6,30 @@
  * Run with: npx ts-node src/main/web-server/test-server.ts
  */
 
+import path from 'path';
+import * as Y from 'yjs';
 import { WebServer } from './server';
 import { AuthManager } from './auth';
 import { setRouteContext, ServiceHandlers } from './routes/context';
+
+/**
+ * Create a minimal valid Y.js document state with some content
+ */
+function createMockYjsState(content: string): Uint8Array {
+  const doc = new Y.Doc();
+  const xmlFragment = doc.getXmlFragment('default');
+  const paragraph = new Y.XmlElement('paragraph');
+  paragraph.insert(0, [new Y.XmlText(content)]);
+  xmlFragment.insert(0, [paragraph]);
+  return Y.encodeStateAsUpdate(doc);
+}
 
 // Mock data
 const mockNotes = [
   {
     id: 'note-1',
     title: 'Welcome to NoteCove',
-    preview: 'This is a sample note...',
+    contentPreview: 'This is a sample note...',
     folderId: null,
     sdId: 'sd-1',
     created: Date.now() - 86400000,
@@ -25,7 +39,7 @@ const mockNotes = [
   {
     id: 'note-2',
     title: 'Getting Started',
-    preview: 'Learn how to use the app...',
+    contentPreview: 'Learn how to use the app...',
     folderId: 'folder-1',
     sdId: 'sd-1',
     created: Date.now() - 172800000,
@@ -70,6 +84,12 @@ const mockStorageDirectories = [
   },
 ];
 
+// Pre-generate Y.js states for mock notes
+const mockNoteStates: Record<string, Uint8Array> = {
+  'note-1': createMockYjsState('This is a sample note with some content. Welcome to NoteCove!'),
+  'note-2': createMockYjsState('Learn how to use the app. Getting started guide.'),
+};
+
 // Mock services
 const mockServices: ServiceHandlers = {
   noteList: async (sdId, folderId) => {
@@ -86,9 +106,17 @@ const mockServices: ServiceHandlers = {
     if (!note) throw new Error('Note not found');
     return { ...note, deleted: false };
   },
-  noteGetState: async () => {
+  noteGetState: async (noteId) => {
+    console.log(`[Mock] noteGetState(noteId=${noteId})`);
     await Promise.resolve();
-    return new Uint8Array();
+    // Return the pre-generated state for this note, or create a new empty doc state
+    if (mockNoteStates[noteId]) {
+      return mockNoteStates[noteId];
+    }
+    // Return empty doc state for unknown notes
+    const emptyDoc = new Y.Doc();
+    emptyDoc.getXmlFragment('default'); // Initialize the fragment
+    return Y.encodeStateAsUpdate(emptyDoc);
   },
   noteApplyUpdate: async () => {
     await Promise.resolve();
@@ -118,7 +146,7 @@ const mockServices: ServiceHandlers = {
       .map((n) => ({
         noteId: n.id,
         title: n.title,
-        preview: n.preview,
+        contentPreview: n.contentPreview,
         sdId: n.sdId,
         folderId: n.folderId,
         score: 1,
@@ -204,11 +232,15 @@ async function main() {
   const authManager = new AuthManager();
   const token = authManager.regenerateToken();
 
+  // Path to browser bundle
+  const distBrowserPath = path.resolve(__dirname, '../../../dist-browser');
+
   // Start server
   const server = new WebServer({
     port: 3456,
     host: '127.0.0.1',
     authManager,
+    staticFilesPath: distBrowserPath,
   });
 
   await server.start();

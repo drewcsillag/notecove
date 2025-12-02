@@ -71,7 +71,7 @@ describe('Note API Routes', () => {
     {
       id: 'note-1',
       title: 'Test Note 1',
-      preview: 'This is the preview...',
+      contentPreview: 'This is the preview...',
       folderId: null,
       sdId: 'sd-1',
       created: Date.now() - 10000,
@@ -81,7 +81,7 @@ describe('Note API Routes', () => {
     {
       id: 'note-2',
       title: 'Test Note 2',
-      preview: 'Another preview...',
+      contentPreview: 'Another preview...',
       folderId: 'folder-1',
       sdId: 'sd-1',
       created: Date.now() - 20000,

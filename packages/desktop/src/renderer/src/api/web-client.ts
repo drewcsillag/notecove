@@ -56,7 +56,6 @@ async function apiRequest<T>(method: string, path: string, body?: unknown): Prom
   const url = `${getServerUrl()}${path}`;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
-    'Content-Type': 'application/json',
   };
 
   const options: RequestInit = {
@@ -64,7 +63,9 @@ async function apiRequest<T>(method: string, path: string, body?: unknown): Prom
     headers,
   };
 
+  // Only set Content-Type and body if we have something to send
   if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
 
@@ -77,10 +78,12 @@ async function apiRequest<T>(method: string, path: string, body?: unknown): Prom
     throw new Error(error.message ?? `HTTP ${response.status}`);
   }
 
-  // Handle empty responses
+  // Handle empty responses - return empty object/array instead of undefined
   const text = await response.text();
   if (!text) {
-    return undefined as T;
+    // For empty responses, return an empty array as a safe default
+    // This prevents "Cannot read properties of undefined" errors
+    return [] as unknown as T;
   }
 
   return JSON.parse(text) as T;
@@ -88,6 +91,12 @@ async function apiRequest<T>(method: string, path: string, body?: unknown): Prom
 
 // WebSocket connection for real-time updates
 let ws: WebSocket | null = null;
+let wsConnecting = false;
+let wsReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+let wsReconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY = 2000;
+
 const eventListeners: Map<string, Set<(...args: unknown[]) => void>> = new Map<
   string,
   Set<(...args: unknown[]) => void>
@@ -97,13 +106,32 @@ const eventListeners: Map<string, Set<(...args: unknown[]) => void>> = new Map<
  * Connect to WebSocket for real-time updates
  */
 function connectWebSocket(): void {
+  // Don't connect if already connected or connecting
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  if (wsConnecting) return;
+
   const token = getToken();
   if (!token) return;
+
+  // Clear any pending reconnect
+  if (wsReconnectTimeout) {
+    clearTimeout(wsReconnectTimeout);
+    wsReconnectTimeout = null;
+  }
+
+  wsConnecting = true;
 
   const serverUrl = getServerUrl();
   const wsUrl = serverUrl.replace(/^http/, 'ws') + `/ws?token=${token}`;
 
+  console.log('[WebClient] Connecting to WebSocket...');
   ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    console.log('[WebClient] WebSocket connected');
+    wsConnecting = false;
+    wsReconnectAttempts = 0; // Reset on successful connection
+  };
 
   ws.onmessage = (event) => {
     try {
@@ -120,13 +148,35 @@ function connectWebSocket(): void {
     }
   };
 
-  ws.onclose = () => {
-    // Reconnect after a delay
-    setTimeout(connectWebSocket, 5000);
+  ws.onclose = (event) => {
+    wsConnecting = false;
+    ws = null;
+
+    // Don't reconnect if closed intentionally or too many attempts
+    if (wsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.warn('[WebClient] Max reconnect attempts reached, giving up');
+      return;
+    }
+
+    // Don't reconnect on auth failure (code 1008 = policy violation, often used for auth)
+    if (event.code === 1008) {
+      console.warn('[WebClient] WebSocket auth failed, not reconnecting');
+      return;
+    }
+
+    // Exponential backoff for reconnection
+    wsReconnectAttempts++;
+    const delay = RECONNECT_BASE_DELAY * Math.pow(2, wsReconnectAttempts - 1);
+    console.log(
+      `[WebClient] WebSocket closed, reconnecting in ${delay}ms (attempt ${wsReconnectAttempts})`
+    );
+    wsReconnectTimeout = setTimeout(connectWebSocket, delay);
   };
 
-  ws.onerror = (err) => {
-    console.error('[WebClient] WebSocket error:', err);
+  ws.onerror = () => {
+    // Error will be followed by close, so just mark as not connecting
+    wsConnecting = false;
+    // Don't log here - the error event doesn't have useful info and close will handle it
   };
 }
 
@@ -226,48 +276,80 @@ export const webClient: typeof window.electronAPI = {
       await apiRequest('POST', `/api/notes/${noteId}/title`, { title, contentText });
     },
     list: async (sdId: string, folderId?: string | null) => {
-      const params = new URLSearchParams({ sdId });
-      if (folderId !== undefined && folderId !== null) {
-        params.append('folderId', folderId);
+      try {
+        const params = new URLSearchParams({ sdId });
+        if (folderId !== undefined && folderId !== null) {
+          params.append('folderId', folderId);
+        }
+        return await apiRequest<
+          {
+            id: string;
+            title: string;
+            sdId: string;
+            folderId: string | null;
+            created: number;
+            modified: number;
+            deleted: boolean;
+            pinned: boolean;
+            contentPreview: string;
+            contentText: string;
+          }[]
+        >('GET', `/api/notes?${params.toString()}`);
+      } catch {
+        return [];
       }
-      return apiRequest('GET', `/api/notes?${params.toString()}`);
     },
     search: async (query: string, limit?: number) => {
-      const params = new URLSearchParams({ q: query });
-      if (limit !== undefined) {
-        params.append('limit', limit.toString());
+      try {
+        const params = new URLSearchParams({ q: query });
+        if (limit !== undefined) {
+          params.append('limit', limit.toString());
+        }
+        return await apiRequest<
+          {
+            noteId: string;
+            title: string;
+            snippet: string;
+            rank: number;
+          }[]
+        >('GET', `/api/search?${params.toString()}`);
+      } catch {
+        return [];
       }
-      return apiRequest('GET', `/api/search?${params.toString()}`);
     },
     getCountForFolder: async (sdId: string, folderId: string | null) => {
-      const params = new URLSearchParams({ sdId });
-      if (folderId !== null) {
-        params.append('folderId', folderId);
+      // Note counts not exposed via API - calculate from list
+      try {
+        const params = new URLSearchParams({ sdId });
+        if (folderId !== null) {
+          params.append('folderId', folderId);
+        }
+        const notes = await apiRequest<unknown[]>('GET', `/api/notes?${params.toString()}`);
+        return notes.length;
+      } catch {
+        return 0;
       }
-      const response = await apiRequest<{ count: number }>(
-        'GET',
-        `/api/notes/count?${params.toString()}`
-      );
-      return response.count;
     },
     getAllNotesCount: async (sdId: string) => {
-      const response = await apiRequest<{ count: number }>(
-        'GET',
-        `/api/notes/count/all?sdId=${sdId}`
-      );
-      return response.count;
+      // Count all notes by listing them
+      try {
+        const notes = await apiRequest<unknown[]>('GET', `/api/notes?sdId=${sdId}`);
+        return notes.length;
+      } catch {
+        return 0;
+      }
     },
-    getDeletedNoteCount: async (sdId: string) => {
-      const response = await apiRequest<{ count: number }>(
-        'GET',
-        `/api/notes/count/deleted?sdId=${sdId}`
-      );
-      return response.count;
+    getDeletedNoteCount: async (_sdId: string) => {
+      // Deleted notes not exposed via web API
+      await Promise.resolve();
+      return 0;
     },
     createSnapshot: browserNotAvailable('note.createSnapshot'),
     checkExistsInSD: browserNotAvailable('note.checkExistsInSD'),
-    getInfo: async (noteId: string) => {
-      return apiRequest('GET', `/api/notes/${noteId}/info`);
+    getInfo: async (_noteId: string) => {
+      // Note info endpoint not exposed - return null (not available in web client)
+      await Promise.resolve();
+      return null;
     },
     reloadFromCRDTLogs: browserNotAvailable('note.reloadFromCRDTLogs'),
     onUpdated: (callback) =>
@@ -323,28 +405,87 @@ export const webClient: typeof window.electronAPI = {
 
   tag: {
     getAll: async () => {
-      return apiRequest('GET', '/api/tags');
+      try {
+        return await apiRequest<{ id: string; name: string; count: number }[]>('GET', '/api/tags');
+      } catch {
+        return [];
+      }
     },
   },
 
   link: {
-    getBacklinks: async (noteId: string) => {
-      return apiRequest('GET', `/api/notes/${noteId}/backlinks`);
+    getBacklinks: async (_noteId: string) => {
+      // Backlinks not exposed via web API
+      await Promise.resolve();
+      return [];
     },
     searchNotesForAutocomplete: async (query: string) => {
-      return apiRequest('GET', `/api/notes/autocomplete?q=${encodeURIComponent(query)}`);
+      // Use search API for autocomplete
+      try {
+        const results = await apiRequest<
+          { noteId: string; title: string; preview: string; sdId: string }[]
+        >('GET', `/api/search?q=${encodeURIComponent(query)}&limit=10`);
+        return results.map((r) => ({
+          id: r.noteId,
+          title: r.title,
+          sdId: r.sdId,
+          folderId: null,
+          folderPath: '',
+          created: 0,
+          modified: 0,
+        }));
+      } catch {
+        return [];
+      }
     },
   },
 
   folder: {
     list: async (sdId: string) => {
-      return apiRequest('GET', `/api/folders?sdId=${sdId}`);
+      try {
+        return await apiRequest<
+          {
+            id: string;
+            name: string;
+            parentId: string | null;
+            sdId: string;
+            order: number;
+            deleted: boolean;
+          }[]
+        >('GET', `/api/folders?sdId=${sdId}`);
+      } catch {
+        return [];
+      }
     },
     listAll: async () => {
-      return apiRequest('GET', '/api/folders/all');
+      // listAll not exposed - get active SD and list its folders
+      try {
+        const response = await apiRequest<{ id: string | null }>(
+          'GET',
+          '/api/storage-directories/active'
+        );
+        const activeSD = response.id;
+        if (!activeSD) return [];
+        return await apiRequest('GET', `/api/folders?sdId=${activeSD}`);
+      } catch {
+        return [];
+      }
     },
     get: async (sdId: string, folderId: string) => {
-      return apiRequest('GET', `/api/folders/${sdId}/${folderId}`);
+      // Individual folder get not exposed - find in list
+      const folders = await apiRequest<
+        {
+          id: string;
+          name: string;
+          parentId: string | null;
+          sdId: string;
+          order: number;
+          deleted: boolean;
+        }[]
+      >('GET', `/api/folders?sdId=${sdId}`);
+      const folder = folders.find((f) => f.id === folderId);
+      if (!folder) return null;
+      return folder;
     },
     create: async (sdId: string, parentId: string | null, name: string) => {
       const response = await apiRequest<{ folderId: string }>('POST', '/api/folders', {
@@ -386,12 +527,32 @@ export const webClient: typeof window.electronAPI = {
 
   sd: {
     list: async () => {
-      return apiRequest('GET', '/api/storage-directories');
+      try {
+        return await apiRequest<
+          {
+            id: string;
+            name: string;
+            path: string;
+            created: number;
+            isActive: boolean;
+          }[]
+        >('GET', '/api/storage-directories');
+      } catch {
+        return [];
+      }
     },
     create: browserNotAvailable('sd.create'),
     setActive: browserNotAvailable('sd.setActive'),
     getActive: async () => {
-      return apiRequest('GET', '/api/storage-directories/active');
+      try {
+        const response = await apiRequest<{ id: string | null }>(
+          'GET',
+          '/api/storage-directories/active'
+        );
+        return response.id;
+      } catch {
+        return null;
+      }
     },
     delete: browserNotAvailable('sd.delete'),
     selectPath: browserNotAvailable('sd.selectPath'),

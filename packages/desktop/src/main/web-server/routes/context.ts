@@ -27,7 +27,7 @@ export interface ApiNoteMetadata {
 export interface ApiNoteListItem {
   id: string;
   title: string;
-  preview: string;
+  contentPreview: string;
   folderId: string | null;
   sdId: string;
   created: number;
@@ -65,7 +65,7 @@ export interface ApiStorageDirectory {
 export interface ApiSearchResult {
   noteId: string;
   title: string;
-  preview: string;
+  contentPreview: string;
   sdId: string;
   folderId: string | null;
   score: number;

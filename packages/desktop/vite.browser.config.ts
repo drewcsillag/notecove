@@ -16,6 +16,7 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'dist-browser'),
     emptyDirBeforeWrite: true,
+    sourcemap: true,
     rollupOptions: {
       input: {
         index: resolve(__dirname, 'src/renderer/index-browser.html'),
