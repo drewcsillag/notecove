@@ -21,7 +21,12 @@ import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
+import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
 import { SearchPanel } from './SearchPanel';
+import { LinkPopover } from './LinkPopover';
+import { LinkInputPopover } from './LinkInputPopover';
+import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
+import tippy, { type Instance as TippyInstance } from 'tippy.js';
 
 export interface TipTapEditorProps {
   noteId: string | null;
@@ -68,6 +73,61 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const shouldFocusAfterLoadRef = useRef(false);
   // Track if we've already scheduled/attempted focus (to prevent cancellation)
   const focusAttemptedRef = useRef(false);
+  // Link popover state (for viewing/editing existing links)
+  const [linkPopoverData, setLinkPopoverData] = useState<{
+    href: string;
+    element: HTMLElement;
+    from: number;
+    to: number;
+  } | null>(null);
+  const linkPopoverRef = useRef<TippyInstance | null>(null);
+
+  // Link input popover state (for creating new links with selection)
+  const [linkInputPopoverData, setLinkInputPopoverData] = useState<{
+    element: HTMLElement;
+    selectionFrom: number;
+    selectionTo: number;
+  } | null>(null);
+  const linkInputPopoverRef = useRef<TippyInstance | null>(null);
+
+  // Text+URL input popover state (for creating new links without selection)
+  const [textAndUrlPopoverData, setTextAndUrlPopoverData] = useState<{
+    element: HTMLElement;
+    insertPosition: number;
+  } | null>(null);
+  const textAndUrlPopoverRef = useRef<TippyInstance | null>(null);
+
+  // Ref to store the Cmd+K handler (updated when editor is available)
+  const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
+
+  // Set up WebLink callbacks
+  // This must be done before useEditor to ensure callbacks are available
+  useEffect(() => {
+    setWebLinkCallbacks({
+      onSingleClick: (href: string, element: HTMLElement, from: number, to: number) => {
+        console.log(
+          '[WebLink] Single-click callback, showing popover for:',
+          href,
+          'at',
+          from,
+          '-',
+          to
+        );
+        setLinkPopoverData({ href, element, from, to });
+      },
+      onCmdK: () => {
+        console.log('[WebLink] Cmd+K pressed');
+        // Find the ProseMirror element to anchor the popover
+        const proseMirrorEl = document.querySelector<HTMLElement>('.ProseMirror');
+        if (!proseMirrorEl) return;
+
+        // Call the handler if it's set
+        if (handleCmdKRef.current) {
+          handleCmdKRef.current(proseMirrorEl);
+        }
+      },
+    });
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -121,6 +181,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }),
       // Add SearchAndReplace extension for in-note search
       SearchAndReplace,
+      // Add WebLink extension for http/https links
+      WebLink,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
@@ -302,6 +364,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }
     }
   }, [editor, yDoc]);
+
+  // Note: Paste detection for URL linkification of selected text is implemented
+  // but currently disabled due to testing limitations with Playwright/Electron.
+  // The keydown handler approach (catching Cmd+V) was attempted but couldn't be
+  // properly tested because Playwright's keyboard simulation bypasses DOM events
+  // when Electron's menu accelerators handle the shortcut.
+  // TODO: Re-enable paste detection when a testable solution is found.
 
   // Keep noteIdRef in sync with noteId prop and handle note deselection
   useEffect(() => {
@@ -589,6 +658,347 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     }
   }, [isLoading, editor]);
 
+  // Manage link popover using tippy.js
+  useEffect(() => {
+    // Clean up existing popover
+    if (linkPopoverRef.current) {
+      linkPopoverRef.current.destroy();
+      linkPopoverRef.current = null;
+    }
+
+    // If no data, nothing to show
+    if (!linkPopoverData) {
+      return;
+    }
+
+    // Create a container for the React component
+    const container = document.createElement('div');
+
+    // Create the popover using tippy.js
+    const instance = tippy(linkPopoverData.element, {
+      content: container,
+      trigger: 'manual',
+      interactive: true,
+      placement: 'bottom-start',
+      appendTo: () => document.body,
+      onHide: () => {
+        setLinkPopoverData(null);
+      },
+      onClickOutside: () => {
+        instance.hide();
+      },
+    });
+
+    // Capture current values for use in callbacks
+    // (linkPopoverData is guaranteed non-null at this point, and we check editor below)
+    const { href, from, to } = linkPopoverData;
+
+    // If editor is not available, don't render edit/remove options
+    if (!editor) {
+      return;
+    }
+    const currentEditor = editor;
+
+    // Render the React component into the container
+    // Using ReactDOM.createRoot for React 18
+    void import('react-dom/client').then(({ createRoot }) => {
+      const root = createRoot(container);
+      root.render(
+        <LinkPopover
+          href={href}
+          onClose={() => {
+            instance.hide();
+            setLinkPopoverData(null);
+          }}
+          onEdit={(newHref: string) => {
+            console.log('[TipTapEditor] Editing link, new href:', newHref);
+            // Select the link range and update the href
+            currentEditor
+              .chain()
+              .focus()
+              .setTextSelection({ from, to })
+              .extendMarkRange('link')
+              .setLink({ href: newHref })
+              .run();
+          }}
+          onRemove={() => {
+            console.log('[TipTapEditor] Removing link at:', from, '-', to);
+            // Select the link range and remove the link mark
+            currentEditor
+              .chain()
+              .focus()
+              .setTextSelection({ from, to })
+              .extendMarkRange('link')
+              .unsetLink()
+              .run();
+          }}
+        />
+      );
+    });
+
+    // Show the popover
+    instance.show();
+    linkPopoverRef.current = instance;
+
+    // Cleanup on unmount
+    return () => {
+      if (linkPopoverRef.current) {
+        linkPopoverRef.current.destroy();
+        linkPopoverRef.current = null;
+      }
+    };
+  }, [linkPopoverData, editor]);
+
+  // Manage link input popover (for creating new links)
+  useEffect(() => {
+    // Clean up existing popover
+    if (linkInputPopoverRef.current) {
+      linkInputPopoverRef.current.destroy();
+      linkInputPopoverRef.current = null;
+    }
+
+    // If no data, nothing to show
+    if (!linkInputPopoverData || !editor) {
+      return;
+    }
+
+    // Create a container for the React component
+    const container = document.createElement('div');
+
+    // Capture current values
+    const { element, selectionFrom, selectionTo } = linkInputPopoverData;
+
+    // Create the popover using tippy.js
+    const instance = tippy(element, {
+      content: container,
+      trigger: 'manual',
+      interactive: true,
+      placement: 'bottom-start',
+      appendTo: () => document.body,
+      onHide: () => {
+        setLinkInputPopoverData(null);
+      },
+      onClickOutside: () => {
+        instance.hide();
+      },
+    });
+
+    // Render the React component into the container
+    void import('react-dom/client').then(({ createRoot }) => {
+      const root = createRoot(container);
+      root.render(
+        <LinkInputPopover
+          onSubmit={(url: string) => {
+            console.log('[TipTapEditor] Creating link with URL:', url);
+            // Select the original selection and apply link
+            editor
+              .chain()
+              .focus()
+              .setTextSelection({ from: selectionFrom, to: selectionTo })
+              .setLink({ href: url })
+              .run();
+            instance.hide();
+            setLinkInputPopoverData(null);
+          }}
+          onCancel={() => {
+            instance.hide();
+            setLinkInputPopoverData(null);
+          }}
+        />
+      );
+    });
+
+    // Show the popover
+    instance.show();
+    linkInputPopoverRef.current = instance;
+
+    // Cleanup on unmount
+    return () => {
+      if (linkInputPopoverRef.current) {
+        linkInputPopoverRef.current.destroy();
+        linkInputPopoverRef.current = null;
+      }
+    };
+  }, [linkInputPopoverData, editor]);
+
+  // Manage text+URL input popover (for creating new links without selection)
+  useEffect(() => {
+    // Clean up existing popover
+    if (textAndUrlPopoverRef.current) {
+      textAndUrlPopoverRef.current.destroy();
+      textAndUrlPopoverRef.current = null;
+    }
+
+    // If no data, nothing to show
+    if (!textAndUrlPopoverData || !editor) {
+      return;
+    }
+
+    // Create a container for the React component
+    const container = document.createElement('div');
+
+    // Capture current values
+    const { element, insertPosition } = textAndUrlPopoverData;
+
+    // Create the popover using tippy.js
+    const instance = tippy(element, {
+      content: container,
+      trigger: 'manual',
+      interactive: true,
+      placement: 'bottom-start',
+      appendTo: () => document.body,
+      onHide: () => {
+        setTextAndUrlPopoverData(null);
+      },
+      onClickOutside: () => {
+        instance.hide();
+      },
+    });
+
+    // Render the React component into the container
+    void import('react-dom/client').then(({ createRoot }) => {
+      const root = createRoot(container);
+      root.render(
+        <TextAndUrlInputPopover
+          onSubmit={(text: string, url: string) => {
+            console.log('[TipTapEditor] Creating link with text and URL:', { text, url });
+            // Insert text with link mark at the cursor position
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(insertPosition, {
+                type: 'text',
+                text,
+                marks: [{ type: 'link', attrs: { href: url } }],
+              })
+              .run();
+            instance.hide();
+            setTextAndUrlPopoverData(null);
+          }}
+          onCancel={() => {
+            instance.hide();
+            setTextAndUrlPopoverData(null);
+          }}
+        />
+      );
+    });
+
+    // Show the popover
+    instance.show();
+    textAndUrlPopoverRef.current = instance;
+
+    // Cleanup on unmount
+    return () => {
+      if (textAndUrlPopoverRef.current) {
+        textAndUrlPopoverRef.current.destroy();
+        textAndUrlPopoverRef.current = null;
+      }
+    };
+  }, [textAndUrlPopoverData, editor]);
+
+  /**
+   * Handle link button click from toolbar
+   * - If cursor is in existing link: show edit popover
+   * - If text is selected: show URL input popover
+   */
+  const handleLinkButtonClick = (buttonElement: HTMLElement) => {
+    if (!editor) return;
+
+    // Check if cursor is in an existing link
+    if (editor.isActive('link')) {
+      // Get link mark attributes
+      const { href } = editor.getAttributes('link') as { href: string };
+      const { from, to } = editor.state.selection;
+
+      console.log('[TipTapEditor] Link button clicked while in link:', href);
+
+      // Show the edit popover
+      setLinkPopoverData({
+        href,
+        element: buttonElement,
+        from,
+        to,
+      });
+      return;
+    }
+
+    // Check if there's a text selection
+    const { from, to } = editor.state.selection;
+    if (from !== to) {
+      console.log('[TipTapEditor] Link button clicked with selection:', from, '-', to);
+
+      // Show URL input popover
+      setLinkInputPopoverData({
+        element: buttonElement,
+        selectionFrom: from,
+        selectionTo: to,
+      });
+      return;
+    }
+
+    // No selection and not in link - show text+URL dialog
+    console.log('[TipTapEditor] Link button clicked with no selection, showing text+URL dialog');
+    setTextAndUrlPopoverData({
+      element: buttonElement,
+      insertPosition: from,
+    });
+  };
+
+  /**
+   * Handle Cmd+K keyboard shortcut
+   * Similar to handleLinkButtonClick but triggered from keyboard
+   */
+  const handleCmdK = (anchorElement: HTMLElement) => {
+    if (!editor) return;
+
+    // Check if cursor is in an existing link
+    if (editor.isActive('link')) {
+      const { href } = editor.getAttributes('link') as { href: string };
+      const { from, to } = editor.state.selection;
+
+      console.log('[TipTapEditor] Cmd+K pressed while in link:', href);
+
+      setLinkPopoverData({
+        href,
+        element: anchorElement,
+        from,
+        to,
+      });
+      return;
+    }
+
+    // Check if there's a text selection
+    const { from, to } = editor.state.selection;
+    if (from !== to) {
+      console.log('[TipTapEditor] Cmd+K pressed with selection:', from, '-', to);
+
+      setLinkInputPopoverData({
+        element: anchorElement,
+        selectionFrom: from,
+        selectionTo: to,
+      });
+      return;
+    }
+
+    // No selection and not in link - show text+URL dialog
+    console.log('[TipTapEditor] Cmd+K pressed with no selection, showing text+URL dialog');
+    setTextAndUrlPopoverData({
+      element: anchorElement,
+      insertPosition: from,
+    });
+  };
+
+  // Update handleCmdKRef when editor is available
+  useEffect(() => {
+    if (editor) {
+      handleCmdKRef.current = handleCmdK;
+    }
+    return () => {
+      handleCmdKRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleCmdK is intentionally captured via ref pattern
+  }, [editor]);
+
   return (
     <Box
       sx={{
@@ -682,6 +1092,20 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           // Hide the original [[note-id]] text when displaying title
           '& .inter-note-link-hidden': {
             display: 'none',
+          },
+          // Web link styling (external http/https links)
+          // Blue and underlined to distinguish from internal links (which are dotted)
+          '& a.web-link': {
+            color: theme.palette.info.main,
+            textDecoration: 'underline',
+            cursor: 'pointer',
+            '&:hover': {
+              color: theme.palette.info.dark,
+              textDecoration: 'underline',
+            },
+            '&:visited': {
+              color: theme.palette.info.main,
+            },
           },
           // Search result highlighting
           '& .search-result': {
@@ -784,7 +1208,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         },
       }}
     >
-      <EditorToolbar editor={editor} />
+      <EditorToolbar editor={editor} onLinkButtonClick={handleLinkButtonClick} />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>
         <Chip

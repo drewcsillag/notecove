@@ -2,7 +2,7 @@
  * Electron Main Process
  */
 
-import { app, BrowserWindow, Menu, shell, ipcMain, powerMonitor } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain, powerMonitor, clipboard } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
@@ -2425,6 +2425,15 @@ void app.whenReady().then(async () => {
     // Register shell IPC handler for opening external URLs (for About dialog license link)
     ipcMain.handle('shell:openExternal', async (_event, url: string) => {
       await shell.openExternal(url);
+    });
+
+    // Register clipboard IPC handlers (for copy functionality and testing)
+    ipcMain.handle('clipboard:writeText', (_event, text: string) => {
+      clipboard.writeText(text);
+    });
+
+    ipcMain.handle('clipboard:readText', () => {
+      return clipboard.readText();
     });
 
     // Create menu

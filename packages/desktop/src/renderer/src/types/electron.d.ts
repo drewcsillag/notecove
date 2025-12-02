@@ -513,6 +513,11 @@ declare global {
       shell: {
         openExternal: (url: string) => Promise<void>;
       };
+
+      clipboard: {
+        writeText: (text: string) => Promise<void>;
+        readText: () => Promise<string>;
+      };
     };
   }
 }

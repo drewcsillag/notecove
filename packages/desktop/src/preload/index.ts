@@ -1253,6 +1253,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (url: string): Promise<void> =>
       ipcRenderer.invoke('shell:openExternal', url) as Promise<void>,
   },
+
+  // Clipboard operations (for testing and copy functionality)
+  clipboard: {
+    writeText: (text: string): Promise<void> =>
+      ipcRenderer.invoke('clipboard:writeText', text) as Promise<void>,
+    readText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText') as Promise<string>,
+  },
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection

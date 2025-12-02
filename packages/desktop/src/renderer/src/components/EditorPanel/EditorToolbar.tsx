@@ -19,17 +19,32 @@ import {
   Undo,
   Redo,
   CheckBoxOutlineBlank,
+  Link,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
 
 export interface EditorToolbarProps {
   editor: Editor | null;
+  /**
+   * Callback when the link button is clicked
+   * Called with the button element for popover positioning
+   */
+  onLinkButtonClick?: (buttonElement: HTMLElement) => void;
 }
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, onLinkButtonClick }) => {
   if (!editor) {
     return null;
   }
+
+  /**
+   * Handle link button click
+   */
+  const handleLinkClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (onLinkButtonClick) {
+      onLinkButtonClick(event.currentTarget);
+    }
+  };
 
   return (
     <Box
@@ -91,6 +106,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor }) => {
           color={editor.isActive('code') ? 'primary' : 'default'}
         >
           <Code fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Insert link (⌘K)">
+        <IconButton
+          size="small"
+          onClick={handleLinkClick}
+          color={editor.isActive('link') ? 'primary' : 'default'}
+          aria-label="Insert link"
+        >
+          <Link fontSize="small" />
         </IconButton>
       </Tooltip>
 
