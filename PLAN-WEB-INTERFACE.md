@@ -1,6 +1,6 @@
 # Web Interface Feature Implementation Plan
 
-**Overall Progress:** `50%` (Phase 0-4 complete)
+**Overall Progress:** `70%` (Phase 0-5 complete)
 
 ## Summary
 
@@ -164,31 +164,36 @@ Add a web server to the Electron desktop app that allows browser access (includi
 
 ---
 
-### Phase 5: Server Management UI
+### Phase 5: Server Management UI ✅
 
-- [ ] 🟥 **5.1: Server Control Menu**
-  - [ ] 🟥 Add "Start Web Server" / "Stop Web Server" menu item
-  - [ ] 🟥 Show server status in menu (running/stopped, port)
-  - [ ] 🟥 Add keyboard shortcut
+- [x] 🟩 **5.1: IPC Handlers & Server Control**
+  - [x] 🟩 Add IPC handlers for webServer:start, webServer:stop, webServer:getStatus
+  - [x] 🟩 Add IPC handlers for token regeneration
+  - [x] 🟩 Create WebServerManager class in main/web-server/manager.ts
+  - [x] 🟩 Integrate with Electron app lifecycle (init on ready, cleanup on quit)
+  - [ ] 🟨 Menu item deferred (settings panel switch is sufficient)
 
-- [ ] 🟥 **5.2: Server Settings Panel**
-  - [ ] 🟥 Add web server section to settings UI
-  - [ ] 🟥 Port configuration input
-  - [ ] 🟥 Token display with regenerate button
-  - [ ] 🟥 Certificate status/path display
+- [x] 🟩 **5.2: Server Settings Panel**
+  - [x] 🟩 Add web server section to settings UI (WebServerSettings.tsx)
+  - [x] 🟩 Port configuration input with validation (1024-65535)
+  - [x] 🟩 Token display with show/hide toggle and regenerate button
+  - [x] 🟩 Start/Stop server via switch control
+  - [x] 🟩 Server status display (running/stopped, port, client count)
+  - [ ] 🟨 Certificate status/path display deferred
 
-- [ ] 🟥 **5.3: QR Code Display**
-  - [ ] 🟥 Write tests for QR code generation
-  - [ ] 🟥 Add QR code library (qrcode)
-  - [ ] 🟥 Generate QR with URL + auth token
-  - [ ] 🟥 Display QR in server settings panel
-  - [ ] 🟥 Show plain URL alongside QR
+- [x] 🟩 **5.3: QR Code Display**
+  - [x] 🟩 Add qrcode library
+  - [x] 🟩 Generate QR with URL + auth token
+  - [x] 🟩 Display QR in server settings panel (200x200px)
+  - [x] 🟩 Show full URL alongside QR with copy button
+  - [ ] 🟨 QR code generation tests deferred (manual testing sufficient)
 
-- [ ] 🟥 **5.4: Active Connections View**
-  - [ ] 🟥 Track connected clients (IP, user-agent, connect time)
-  - [ ] 🟥 Display active connections in settings panel
-  - [ ] 🟥 Add "Disconnect" button per client
-  - [ ] 🟥 Add "Disconnect All" button
+- [x] 🟩 **5.4: Active Connections View**
+  - [x] 🟩 Track connected clients (IP, user-agent, connect time)
+  - [x] 🟩 Display active connections in settings panel with polling (5s)
+  - [x] 🟩 Add "Disconnect" button per client
+  - [x] 🟩 Add "Disconnect All" button
+  - [x] 🟩 Format connection duration (seconds/minutes/hours)
 
 ---
 
