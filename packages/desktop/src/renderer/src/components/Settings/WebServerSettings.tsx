@@ -26,6 +26,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import QRCode from 'qrcode';
 
 interface WebServerStatus {
   running: boolean;
@@ -42,6 +43,7 @@ export function WebServerSettings(): React.ReactElement {
   const [portInput, setPortInput] = useState('8765');
   const [showToken, setShowToken] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -60,6 +62,32 @@ export function WebServerSettings(): React.ReactElement {
   useEffect(() => {
     void loadStatus();
   }, [loadStatus]);
+
+  // Generate QR code when server is running with valid URL and token
+  useEffect(() => {
+    const generateQR = async () => {
+      if (status?.running && status.url && status.token) {
+        try {
+          const fullUrl = `${status.url}?token=${status.token}`;
+          const dataUrl = await QRCode.toDataURL(fullUrl, {
+            width: 200,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#ffffff',
+            },
+          });
+          setQrCodeDataUrl(dataUrl);
+        } catch (error) {
+          console.error('Failed to generate QR code:', error);
+          setQrCodeDataUrl(null);
+        }
+      } else {
+        setQrCodeDataUrl(null);
+      }
+    };
+    void generateQR();
+  }, [status?.running, status?.url, status?.token]);
 
   const handleStart = async () => {
     try {
@@ -313,33 +341,68 @@ export function WebServerSettings(): React.ReactElement {
         <>
           <Divider sx={{ my: 3 }} />
 
-          {/* Full URL with Token */}
+          {/* Quick Connect with QR Code */}
           <Typography variant="subtitle1" gutterBottom>
-            Quick Connect URL
+            Quick Connect
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Use this URL to connect directly (includes authentication token):
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Scan this QR code with your mobile device to connect instantly, or use the URL below.
           </Typography>
-          <Box display="flex" alignItems="center" gap={1}>
-            <TextField
-              value={
-                showToken ? `${status.url}?token=${status.token}` : `${status.url}?token=••••••••`
-              }
-              InputProps={{ readOnly: true }}
-              size="small"
-              fullWidth
-              sx={{ fontFamily: 'monospace' }}
-            />
-            <Tooltip title={copySuccess === 'fullUrl' ? 'Copied!' : 'Copy full URL'}>
-              <IconButton
-                onClick={() => {
-                  if (status.url && status.token)
-                    void copyToClipboard(`${status.url}?token=${status.token}`, 'fullUrl');
+
+          <Box display="flex" gap={3} alignItems="flex-start" mb={2}>
+            {/* QR Code */}
+            {qrCodeDataUrl && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'white',
                 }}
               >
-                <ContentCopyIcon />
-              </IconButton>
-            </Tooltip>
+                <img
+                  src={qrCodeDataUrl}
+                  alt="QR code to connect to web server"
+                  style={{ width: 180, height: 180 }}
+                />
+              </Paper>
+            )}
+
+            {/* URL and instructions */}
+            <Box flex={1}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Or enter this URL manually (includes authentication token):
+              </Typography>
+              <Box display="flex" alignItems="center" gap={1}>
+                <TextField
+                  value={
+                    showToken
+                      ? `${status.url}?token=${status.token}`
+                      : `${status.url}?token=••••••••`
+                  }
+                  InputProps={{ readOnly: true }}
+                  size="small"
+                  fullWidth
+                  sx={{ fontFamily: 'monospace' }}
+                />
+                <Tooltip title={copySuccess === 'fullUrl' ? 'Copied!' : 'Copy full URL'}>
+                  <IconButton
+                    onClick={() => {
+                      if (status.url && status.token) {
+                        void copyToClipboard(`${status.url}?token=${status.token}`, 'fullUrl');
+                      }
+                    }}
+                  >
+                    <ContentCopyIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Note: You may need to accept a security warning for the self-signed certificate.
+              </Typography>
+            </Box>
           </Box>
         </>
       )}
