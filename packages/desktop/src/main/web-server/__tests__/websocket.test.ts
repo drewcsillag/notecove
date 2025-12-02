@@ -25,10 +25,12 @@ describe('WebSocket Support', () => {
   });
 
   afterEach(async () => {
+    // Disconnect all clients first to ensure clean shutdown
+    server.disconnectAllClients();
     if (server.isRunning()) {
       await server.stop();
     }
-  });
+  }, 10000);
 
   describe('Connection', () => {
     it('should accept WebSocket connection with valid token in query', (done) => {
@@ -125,7 +127,9 @@ describe('WebSocket Support', () => {
       const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${validToken}`);
 
       await new Promise<void>((resolve) => {
-        ws.on('open', () => resolve());
+        ws.on('open', () => {
+          resolve();
+        });
       });
 
       expect(server.getConnectedClientCount()).toBe(1);
@@ -143,8 +147,16 @@ describe('WebSocket Support', () => {
       const ws2 = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${validToken}`);
 
       await Promise.all([
-        new Promise<void>((resolve) => ws1.on('open', () => resolve())),
-        new Promise<void>((resolve) => ws2.on('open', () => resolve())),
+        new Promise<void>((resolve) =>
+          ws1.on('open', () => {
+            resolve();
+          })
+        ),
+        new Promise<void>((resolve) =>
+          ws2.on('open', () => {
+            resolve();
+          })
+        ),
       ]);
 
       expect(server.getConnectedClientCount()).toBe(2);
@@ -170,8 +182,16 @@ describe('WebSocket Support', () => {
       const ws2 = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${validToken}`);
 
       await Promise.all([
-        new Promise<void>((resolve) => ws1.on('open', () => resolve())),
-        new Promise<void>((resolve) => ws2.on('open', () => resolve())),
+        new Promise<void>((resolve) =>
+          ws1.on('open', () => {
+            resolve();
+          })
+        ),
+        new Promise<void>((resolve) =>
+          ws2.on('open', () => {
+            resolve();
+          })
+        ),
       ]);
 
       const messages1: string[] = [];
@@ -215,7 +235,9 @@ describe('WebSocket Support', () => {
       const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${validToken}`);
 
       await new Promise<void>((resolve) => {
-        ws.on('open', () => resolve());
+        ws.on('open', () => {
+          resolve();
+        });
       });
 
       expect(server.getConnectedClientCount()).toBe(1);
@@ -227,18 +249,20 @@ describe('WebSocket Support', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(server.getConnectedClientCount()).toBe(0);
-    });
+    }, 10000);
 
     it('should allow server to disconnect a specific client', async () => {
       const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${validToken}`);
-      let closeCode: number | undefined;
+      let closed = false;
 
       await new Promise<void>((resolve) => {
-        ws.on('open', () => resolve());
+        ws.on('open', () => {
+          resolve();
+        });
       });
 
-      ws.on('close', (code: number) => {
-        closeCode = code;
+      ws.on('close', () => {
+        closed = true;
       });
 
       expect(server.getConnectedClientCount()).toBe(1);
@@ -250,7 +274,7 @@ describe('WebSocket Support', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(server.getConnectedClientCount()).toBe(0);
-      expect(closeCode).toBeDefined();
-    });
+      expect(closed).toBe(true);
+    }, 10000);
   });
 });

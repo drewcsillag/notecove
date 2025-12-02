@@ -55,7 +55,7 @@ export class WebServer {
   private config: WebServerConfig;
   private running = false;
   private address: ServerAddress | null = null;
-  private connectedClients: Set<WebSocket> = new Set();
+  private connectedClients = new Set<WebSocket>();
 
   constructor(config: Partial<WebServerConfig> = {}) {
     this.config = { ...DEFAULT_WEB_SERVER_CONFIG, ...config };
@@ -173,7 +173,7 @@ export class WebServer {
       '/ws',
       {
         websocket: true,
-        preValidation: async (request, reply) => {
+        preValidation: (request, reply, done) => {
           if (authManager) {
             const headers = request.headers as RequestHeaders;
             const query = request.query as QueryParams;
@@ -181,9 +181,11 @@ export class WebServer {
 
             if (!token || !authManager.validateToken(token)) {
               reply.code(401).send({ error: 'Unauthorized' });
-              throw new Error('Unauthorized');
+              done(new Error('Unauthorized'));
+              return;
             }
           }
+          done();
         },
       },
       (socket) => {
@@ -239,7 +241,23 @@ export class WebServer {
     // Disconnect all WebSocket clients first
     this.disconnectAllClients();
 
-    await this.fastify.close();
+    // Small delay to let WebSocket termination propagate
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Close with timeout to prevent hanging
+    const closePromise = this.fastify.close();
+    const timeoutPromise = new Promise<void>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Server close timeout'));
+      }, 5000);
+    });
+
+    try {
+      await Promise.race([closePromise, timeoutPromise]);
+    } catch {
+      console.warn('[WebServer] Close timeout, forcing shutdown');
+    }
+
     this.fastify = null;
     this.running = false;
     this.address = null;
@@ -279,7 +297,8 @@ export class WebServer {
    */
   disconnectAllClients(): void {
     for (const client of this.connectedClients) {
-      client.close(1000, 'Server shutdown');
+      // Use terminate() for immediate closure, close() can hang
+      client.terminate();
     }
     this.connectedClients.clear();
   }

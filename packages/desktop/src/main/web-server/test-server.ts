@@ -74,33 +74,45 @@ const mockStorageDirectories = [
 const mockServices: ServiceHandlers = {
   noteList: async (sdId, folderId) => {
     console.log(`[Mock] noteList(sdId=${sdId}, folderId=${folderId})`);
+    await Promise.resolve();
     return folderId
       ? mockNotes.filter((n) => n.folderId === folderId)
       : mockNotes.filter((n) => n.sdId === sdId);
   },
   noteGetMetadata: async (noteId) => {
     console.log(`[Mock] noteGetMetadata(noteId=${noteId})`);
+    await Promise.resolve();
     const note = mockNotes.find((n) => n.id === noteId);
     if (!note) throw new Error('Note not found');
     return { ...note, deleted: false };
   },
-  noteGetState: async () => new Uint8Array(),
-  noteApplyUpdate: async () => {},
+  noteGetState: async () => {
+    await Promise.resolve();
+    return new Uint8Array();
+  },
+  noteApplyUpdate: async () => {
+    await Promise.resolve();
+  },
   noteCreate: async (sdId, folderId) => {
     console.log(`[Mock] noteCreate(sdId=${sdId}, folderId=${folderId})`);
+    await Promise.resolve();
     return `note-${Date.now()}`;
   },
   noteDelete: async (noteId) => {
     console.log(`[Mock] noteDelete(noteId=${noteId})`);
+    await Promise.resolve();
   },
   noteRestore: async (noteId) => {
     console.log(`[Mock] noteRestore(noteId=${noteId})`);
+    await Promise.resolve();
   },
   noteMove: async (noteId, folderId) => {
     console.log(`[Mock] noteMove(noteId=${noteId}, folderId=${folderId})`);
+    await Promise.resolve();
   },
   noteSearch: async (query, limit) => {
     console.log(`[Mock] noteSearch(query=${query}, limit=${limit})`);
+    await Promise.resolve();
     return mockNotes
       .filter((n) => n.title.toLowerCase().includes(query.toLowerCase()))
       .map((n) => ({
@@ -114,38 +126,50 @@ const mockServices: ServiceHandlers = {
   },
   folderList: async (sdId) => {
     console.log(`[Mock] folderList(sdId=${sdId})`);
+    await Promise.resolve();
     return mockFolders.filter((f) => f.sdId === sdId);
   },
   folderCreate: async (sdId, parentId, name) => {
     console.log(`[Mock] folderCreate(sdId=${sdId}, parentId=${parentId}, name=${name})`);
+    await Promise.resolve();
     return `folder-${Date.now()}`;
   },
   folderRename: async (sdId, folderId, newName) => {
     console.log(`[Mock] folderRename(sdId=${sdId}, folderId=${folderId}, newName=${newName})`);
+    await Promise.resolve();
   },
   folderDelete: async (sdId, folderId) => {
     console.log(`[Mock] folderDelete(sdId=${sdId}, folderId=${folderId})`);
+    await Promise.resolve();
   },
   folderMove: async (sdId, folderId, newParentId) => {
-    console.log(`[Mock] folderMove(sdId=${sdId}, folderId=${folderId}, newParentId=${newParentId})`);
+    console.log(
+      `[Mock] folderMove(sdId=${sdId}, folderId=${folderId}, newParentId=${newParentId})`
+    );
+    await Promise.resolve();
   },
   folderReorder: async (sdId, folderId, newOrder) => {
     console.log(`[Mock] folderReorder(sdId=${sdId}, folderId=${folderId}, newOrder=${newOrder})`);
+    await Promise.resolve();
   },
   tagGetAll: async () => {
     console.log(`[Mock] tagGetAll()`);
+    await Promise.resolve();
     return mockTags;
   },
   sdList: async () => {
     console.log(`[Mock] sdList()`);
+    await Promise.resolve();
     return mockStorageDirectories;
   },
   sdGetActive: async () => {
     console.log(`[Mock] sdGetActive()`);
+    await Promise.resolve();
     return 'sd-1';
   },
   historyGetTimeline: async (noteId) => {
     console.log(`[Mock] historyGetTimeline(noteId=${noteId})`);
+    await Promise.resolve();
     return [
       { timestamp: Date.now() - 3600000, type: 'edit', size: 150 },
       { timestamp: Date.now() - 7200000, type: 'edit', size: 200 },
@@ -153,6 +177,7 @@ const mockServices: ServiceHandlers = {
   },
   historyGetStats: async (noteId) => {
     console.log(`[Mock] historyGetStats(noteId=${noteId})`);
+    await Promise.resolve();
     return {
       totalUpdates: 25,
       totalSessions: 5,
@@ -162,6 +187,7 @@ const mockServices: ServiceHandlers = {
   },
   diagnosticsGetStatus: async () => {
     console.log(`[Mock] diagnosticsGetStatus()`);
+    await Promise.resolve();
     return {
       duplicateNotes: 0,
       orphanedFiles: 2,
@@ -199,24 +225,36 @@ async function main() {
   console.log(`# API info`);
   console.log(`curl -H "Authorization: Bearer ${token}" http://127.0.0.1:3456/api/info\n`);
   console.log(`# List notes`);
-  console.log(`curl -H "Authorization: Bearer ${token}" "http://127.0.0.1:3456/api/notes?sdId=sd-1"\n`);
+  console.log(
+    `curl -H "Authorization: Bearer ${token}" "http://127.0.0.1:3456/api/notes?sdId=sd-1"\n`
+  );
   console.log(`# List folders`);
-  console.log(`curl -H "Authorization: Bearer ${token}" "http://127.0.0.1:3456/api/folders?sdId=sd-1"\n`);
+  console.log(
+    `curl -H "Authorization: Bearer ${token}" "http://127.0.0.1:3456/api/folders?sdId=sd-1"\n`
+  );
   console.log(`# Search notes`);
-  console.log(`curl -H "Authorization: Bearer ${token}" "http://127.0.0.1:3456/api/search?q=welcome"\n`);
+  console.log(
+    `curl -H "Authorization: Bearer ${token}" "http://127.0.0.1:3456/api/search?q=welcome"\n`
+  );
   console.log(`# Create a note`);
-  console.log(`curl -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"sdId":"sd-1","folderId":null}' http://127.0.0.1:3456/api/notes\n`);
+  console.log(
+    `curl -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"sdId":"sd-1","folderId":null}' http://127.0.0.1:3456/api/notes\n`
+  );
   console.log(`# Get tags`);
   console.log(`curl -H "Authorization: Bearer ${token}" http://127.0.0.1:3456/api/tags\n`);
   console.log(`# Get storage directories`);
-  console.log(`curl -H "Authorization: Bearer ${token}" http://127.0.0.1:3456/api/storage-directories\n`);
+  console.log(
+    `curl -H "Authorization: Bearer ${token}" http://127.0.0.1:3456/api/storage-directories\n`
+  );
   console.log('Press Ctrl+C to stop the server.\n');
 
   // Handle shutdown
-  process.on('SIGINT', async () => {
-    console.log('\nShutting down...');
-    await server.stop();
-    process.exit(0);
+  process.on('SIGINT', () => {
+    void (async () => {
+      console.log('\nShutting down...');
+      await server.stop();
+      process.exit(0);
+    })();
   });
 }
 

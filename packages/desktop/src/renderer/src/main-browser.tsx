@@ -2,18 +2,17 @@
  * Browser Entry Point
  *
  * This is the entry point for the browser build (web interface).
- * It initializes the API stub before loading the main app.
+ * It initializes the API adapter before loading the main app.
  */
 
-import { initBrowserApiStub } from './api/browser-stub';
-
-// Initialize the browser API stub before anything else
-initBrowserApiStub();
-
-// Now load the regular app
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import { initApi } from './api';
+import BrowserApp from './BrowserApp';
+
+// Initialize the API adapter before anything else
+// This will use the stub if not authenticated, or the web client if authenticated
+initApi();
 
 const root = document.getElementById('root');
 
@@ -23,6 +22,6 @@ if (!root) {
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <App />
+    <BrowserApp />
   </React.StrictMode>
 );

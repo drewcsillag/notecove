@@ -4,7 +4,12 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { initApi } from './api';
 import App from './App';
+
+// Initialize the API adapter before rendering
+// This detects Electron vs browser and sets up window.electronAPI
+initApi();
 
 const root = document.getElementById('root');
 
