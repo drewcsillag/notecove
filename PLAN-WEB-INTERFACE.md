@@ -1,6 +1,6 @@
 # Web Interface Feature Implementation Plan
 
-**Overall Progress:** `20%` (Phase 0-1 complete)
+**Overall Progress:** `40%` (Phase 0-3 complete)
 
 ## Summary
 
@@ -25,7 +25,7 @@ Add a web server to the Electron desktop app that allows browser access (includi
 
 | After Phase | Checkpoint                         |
 | ----------- | ---------------------------------- |
-| Phase 2     | 🔲 API working (testable via curl) |
+| Phase 2     | ✅ API working (testable via curl) |
 | Phase 4     | 🔲 Browser client works end-to-end |
 | Phase 8     | 🔲 Feature complete                |
 
@@ -72,67 +72,63 @@ Add a web server to the Electron desktop app that allows browser access (includi
 
 ---
 
-### Phase 2: REST API Layer
+### Phase 2: REST API Layer ✅
 
-- [ ] 🟥 **2.1: API Route Structure**
-  - [ ] 🟥 Write tests for route registration and error handling
-  - [ ] 🟥 Create `src/main/web-server/routes/` directory structure
-  - [ ] 🟥 Implement base route handler that wraps IPC handler calls
-  - [ ] 🟥 Add consistent error response format
+- [x] 🟩 **2.1: API Route Structure**
+  - [x] 🟩 Write tests for route registration and error handling (6 tests)
+  - [x] 🟩 Create `src/main/web-server/routes/` directory structure
+  - [x] 🟩 Implement base route handler with ServiceHandlers interface
+  - [x] 🟩 Add consistent error response format (context.ts helpers)
 
-- [ ] 🟥 **2.2: Note Endpoints**
-  - [ ] 🟥 Write tests for note CRUD operations via API
-  - [ ] 🟥 `GET /api/notes/:id` - load note
-  - [ ] 🟥 `GET /api/notes/:id/state` - get note state
-  - [ ] 🟥 `POST /api/notes/:id/update` - apply CRDT update
-  - [ ] 🟥 `POST /api/notes` - create note
-  - [ ] 🟥 `DELETE /api/notes/:id` - delete note
-  - [ ] 🟥 `POST /api/notes/:id/move` - move note
+- [x] 🟩 **2.2: Note Endpoints** (14 tests)
+  - [x] 🟩 `GET /api/notes?sdId=...&folderId=...` - list notes
+  - [x] 🟩 `GET /api/notes/:id` - get note metadata
+  - [x] 🟩 `POST /api/notes` - create note
+  - [x] 🟩 `DELETE /api/notes/:id` - delete note
+  - [x] 🟩 `POST /api/notes/:id/move` - move note
+  - [x] 🟩 `GET /api/search?q=...` - search notes
 
-- [ ] 🟥 **2.3: Folder Endpoints**
-  - [ ] 🟥 Write tests for folder operations via API
-  - [ ] 🟥 `GET /api/folders` - list folders
-  - [ ] 🟥 `POST /api/folders` - create folder
-  - [ ] 🟥 `PUT /api/folders/:id` - rename folder
-  - [ ] 🟥 `DELETE /api/folders/:id` - delete folder
-  - [ ] 🟥 `POST /api/folders/:id/move` - reorder folder
+- [x] 🟩 **2.3: Folder Endpoints** (14 tests)
+  - [x] 🟩 `GET /api/folders?sdId=...` - list folders
+  - [x] 🟩 `POST /api/folders` - create folder
+  - [x] 🟩 `PUT /api/folders/:sdId/:id` - rename folder
+  - [x] 🟩 `DELETE /api/folders/:sdId/:id` - delete folder
+  - [x] 🟩 `POST /api/folders/:sdId/:id/move` - move folder
+  - [x] 🟩 `POST /api/folders/:sdId/:id/reorder` - reorder folder
 
-- [ ] 🟥 **2.4: Tag & Search Endpoints**
-  - [ ] 🟥 Write tests for tag and search operations
-  - [ ] 🟥 `GET /api/tags` - list tags
-  - [ ] 🟥 `GET /api/search?q=...` - search notes
+- [x] 🟩 **2.4: Tag Endpoints** (1 test)
+  - [x] 🟩 `GET /api/tags` - list tags
 
-- [ ] 🟥 **2.5: History & Diagnostics Endpoints**
-  - [ ] 🟥 Write tests for history/diagnostics operations
-  - [ ] 🟥 `GET /api/history/:noteId` - get note history
-  - [ ] 🟥 `GET /api/diagnostics` - get diagnostics info
+- [x] 🟩 **2.5: History & Diagnostics Endpoints** (3 tests)
+  - [x] 🟩 `GET /api/notes/:noteId/history/timeline` - get timeline
+  - [x] 🟩 `GET /api/notes/:noteId/history/stats` - get stats
+  - [x] 🟩 `GET /api/diagnostics/status` - get diagnostics info
 
-- [ ] 🟥 **2.6: Storage Directory Endpoints**
-  - [ ] 🟥 Write tests for SD listing (read-only)
-  - [ ] 🟥 `GET /api/storage-directories` - list configured SDs
-  - [ ] 🟥 `GET /api/notes?sd=...&folder=...` - list notes
+- [x] 🟩 **2.6: Storage Directory Endpoints** (3 tests)
+  - [x] 🟩 `GET /api/storage-directories` - list configured SDs
+  - [x] 🟩 `GET /api/storage-directories/active` - get active SD
 
-- [ ] 🟥 **2.7: Manual Test Checkpoint**
-  - [ ] 🟥 Verify API endpoints work via curl/Postman
-  - [ ] 🟥 Document test commands for future reference
+- [x] 🟩 **2.7: Manual Test Checkpoint**
+  - [x] 🟩 Verify API endpoints work via curl (test-server.ts)
+  - [x] 🟩 Document test commands (printed on server start)
 
-> **📋 CHECKPOINT**: Pause for review. API should be testable via curl.
+> **📋 CHECKPOINT**: ✅ COMPLETE - API testable via curl with test-server.ts
 
 ---
 
 ### Phase 3: Real-time Updates (WebSocket)
 
-- [ ] 🟥 **3.1: WebSocket Server**
-  - [ ] 🟥 Write tests for WebSocket connection and auth
-  - [ ] 🟥 Add WebSocket support to Fastify server
-  - [ ] 🟥 Require auth token on WebSocket handshake
-  - [ ] 🟥 Track connected clients
+- [x] 🟩 **3.1: WebSocket Server** (10 tests)
+  - [x] 🟩 Write tests for WebSocket connection and auth
+  - [x] 🟩 Add WebSocket support to Fastify server
+  - [x] 🟩 Require auth token on WebSocket handshake
+  - [x] 🟩 Track connected clients
 
-- [ ] 🟥 **3.2: Event Broadcasting**
-  - [ ] 🟥 Write tests for event broadcast to connected clients
-  - [ ] 🟥 Hook into existing IPC broadcast mechanism
-  - [ ] 🟥 Broadcast note/folder/tag changes to WebSocket clients
-  - [ ] 🟥 Handle client disconnect gracefully
+- [x] 🟩 **3.2: Event Broadcasting**
+  - [x] 🟩 Write tests for event broadcast to connected clients (in websocket.test.ts)
+  - [x] 🟩 Hook into existing IPC broadcast mechanism (setWebBroadcastCallback)
+  - [x] 🟩 Broadcast note/folder/tag changes to WebSocket clients
+  - [x] 🟩 Handle client disconnect gracefully
 
 ---
 

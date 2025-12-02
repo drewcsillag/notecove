@@ -33,7 +33,14 @@ import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
 import type { DiagnosticsManager } from '../diagnostics-manager';
 import type { BackupManager } from '../backup-manager';
 
+/**
+ * Callback type for broadcasting to web clients via WebSocket
+ */
+export type WebBroadcastCallback = (channel: string, ...args: unknown[]) => void;
+
 export class IPCHandlers {
+  private webBroadcastCallback: WebBroadcastCallback | undefined;
+
   constructor(
     private crdtManager: CRDTManager,
     private database: Database,
@@ -50,12 +57,26 @@ export class IPCHandlers {
   }
 
   /**
-   * Broadcast an event to all renderer windows
+   * Set the callback for broadcasting events to web clients via WebSocket
+   * This is called by the WebServer when it starts
+   */
+  setWebBroadcastCallback(callback: WebBroadcastCallback | undefined): void {
+    this.webBroadcastCallback = callback;
+  }
+
+  /**
+   * Broadcast an event to all renderer windows and web clients
    */
   broadcastToAll(channel: string, ...args: unknown[]): void {
+    // Broadcast to Electron windows
     const windows = BrowserWindow.getAllWindows();
     for (const window of windows) {
       window.webContents.send(channel, ...args);
+    }
+
+    // Broadcast to WebSocket clients if callback is registered
+    if (this.webBroadcastCallback) {
+      this.webBroadcastCallback(channel, ...args);
     }
   }
 

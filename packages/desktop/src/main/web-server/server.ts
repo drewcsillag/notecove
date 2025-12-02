@@ -7,6 +7,8 @@
 
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
+import websocket from '@fastify/websocket';
+import type { WebSocket } from 'ws';
 import { TLSCredentials } from './tls';
 import { AuthManager, RequestHeaders, QueryParams } from './auth';
 import { registerRoutes } from './routes';
@@ -53,6 +55,7 @@ export class WebServer {
   private config: WebServerConfig;
   private running = false;
   private address: ServerAddress | null = null;
+  private connectedClients: Set<WebSocket> = new Set();
 
   constructor(config: Partial<WebServerConfig> = {}) {
     this.config = { ...DEFAULT_WEB_SERVER_CONFIG, ...config };
@@ -125,6 +128,9 @@ export class WebServer {
       credentials: true,
     });
 
+    // Register WebSocket support
+    await this.fastify.register(websocket);
+
     // Add authentication middleware for /api/* routes
     if (this.config.authManager) {
       this.fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -159,6 +165,41 @@ export class WebServer {
     this.fastify.get('/health', () => {
       return { status: 'ok', timestamp: Date.now() };
     });
+
+    // WebSocket endpoint with authentication
+    // Use preValidation to reject connections before upgrade
+    const authManager = this.config.authManager;
+    this.fastify.get(
+      '/ws',
+      {
+        websocket: true,
+        preValidation: async (request, reply) => {
+          if (authManager) {
+            const headers = request.headers as RequestHeaders;
+            const query = request.query as QueryParams;
+            const token = authManager.extractToken(headers, query);
+
+            if (!token || !authManager.validateToken(token)) {
+              reply.code(401).send({ error: 'Unauthorized' });
+              throw new Error('Unauthorized');
+            }
+          }
+        },
+      },
+      (socket) => {
+        // Track connected client
+        this.connectedClients.add(socket);
+
+        // Handle client disconnect
+        socket.on('close', () => {
+          this.connectedClients.delete(socket);
+        });
+
+        socket.on('error', () => {
+          this.connectedClients.delete(socket);
+        });
+      }
+    );
 
     // Register API routes
     registerRoutes(this.fastify);
@@ -195,6 +236,9 @@ export class WebServer {
       return;
     }
 
+    // Disconnect all WebSocket clients first
+    this.disconnectAllClients();
+
     await this.fastify.close();
     this.fastify = null;
     this.running = false;
@@ -208,5 +252,35 @@ export class WebServer {
    */
   getFastify(): FastifyInstance | null {
     return this.fastify;
+  }
+
+  /**
+   * Get the number of connected WebSocket clients
+   */
+  getConnectedClientCount(): number {
+    return this.connectedClients.size;
+  }
+
+  /**
+   * Broadcast a message to all connected WebSocket clients
+   */
+  broadcast(message: unknown): void {
+    const data = JSON.stringify(message);
+    for (const client of this.connectedClients) {
+      if (client.readyState === 1) {
+        // WebSocket.OPEN
+        client.send(data);
+      }
+    }
+  }
+
+  /**
+   * Disconnect all connected WebSocket clients
+   */
+  disconnectAllClients(): void {
+    for (const client of this.connectedClients) {
+      client.close(1000, 'Server shutdown');
+    }
+    this.connectedClients.clear();
   }
 }

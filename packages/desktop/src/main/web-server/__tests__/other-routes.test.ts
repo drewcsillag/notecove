@@ -1,4 +1,8 @@
 /**
+ * @jest-environment node
+ */
+
+/**
  * Tests for Tags, Storage Directories, History, and Diagnostics API Routes
  */
 
