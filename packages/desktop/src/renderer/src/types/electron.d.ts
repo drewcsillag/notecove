@@ -274,6 +274,25 @@ declare global {
         setDatabasePath: (path: string) => Promise<void>;
       };
 
+      webServer: {
+        start: (port?: number) => Promise<{
+          running: boolean;
+          port: number | null;
+          url: string | null;
+          token: string | null;
+          connectedClients: number;
+        }>;
+        stop: () => Promise<void>;
+        getStatus: () => Promise<{
+          running: boolean;
+          port: number | null;
+          url: string | null;
+          token: string | null;
+          connectedClients: number;
+        }>;
+        regenerateToken: () => Promise<string>;
+      };
+
       telemetry: {
         getSettings: () => Promise<{
           consoleMetricsEnabled: boolean;

@@ -207,6 +207,13 @@ export const browserApiStub: typeof window.electronAPI = {
     getInfo: notImplemented('app.getInfo'),
   },
 
+  webServer: {
+    start: notImplemented('webServer.start'),
+    stop: notImplemented('webServer.stop'),
+    getStatus: notImplemented('webServer.getStatus'),
+    regenerateToken: notImplemented('webServer.regenerateToken'),
+  },
+
   shell: {
     openExternal: notImplemented('shell.openExternal'),
   },

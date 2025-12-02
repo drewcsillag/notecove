@@ -696,6 +696,14 @@ export const webClient: typeof window.electronAPI = {
     },
   },
 
+  webServer: {
+    // Web server control is not available from browser client
+    start: browserNotAvailable('webServer.start'),
+    stop: browserNotAvailable('webServer.stop'),
+    getStatus: browserNotAvailable('webServer.getStatus'),
+    regenerateToken: browserNotAvailable('webServer.regenerateToken'),
+  },
+
   shell: {
     openExternal: async (url: string) => {
       await Promise.resolve();

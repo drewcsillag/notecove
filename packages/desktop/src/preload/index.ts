@@ -1229,6 +1229,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
+  // Web Server operations
+  webServer: {
+    start: (
+      port?: number
+    ): Promise<{
+      running: boolean;
+      port: number | null;
+      url: string | null;
+      token: string | null;
+      connectedClients: number;
+    }> =>
+      ipcRenderer.invoke('webServer:start', port) as Promise<{
+        running: boolean;
+        port: number | null;
+        url: string | null;
+        token: string | null;
+        connectedClients: number;
+      }>,
+    stop: (): Promise<void> => ipcRenderer.invoke('webServer:stop') as Promise<void>,
+    getStatus: (): Promise<{
+      running: boolean;
+      port: number | null;
+      url: string | null;
+      token: string | null;
+      connectedClients: number;
+    }> =>
+      ipcRenderer.invoke('webServer:getStatus') as Promise<{
+        running: boolean;
+        port: number | null;
+        url: string | null;
+        token: string | null;
+        connectedClients: number;
+      }>,
+    regenerateToken: (): Promise<string> =>
+      ipcRenderer.invoke('webServer:regenerateToken') as Promise<string>,
+  },
+
   // Profile operations (for debugging)
   profile: {
     getInfo: (): Promise<{
