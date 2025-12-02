@@ -5,7 +5,7 @@
  */
 
 export { WebServer, DEFAULT_WEB_SERVER_CONFIG } from './server';
-export type { WebServerConfig, ServerAddress } from './server';
+export type { WebServerConfig, ServerAddress, ConnectedClientInfo } from './server';
 
 export { TLSManager, DEFAULT_TLS_CONFIG } from './tls';
 export type {

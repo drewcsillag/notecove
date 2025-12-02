@@ -7,7 +7,7 @@
 
 import { join } from 'path';
 import { app } from 'electron';
-import { WebServer } from './server';
+import { WebServer, ConnectedClientInfo } from './server';
 import { AuthManager } from './auth';
 import { setRouteContext, ServiceHandlers } from './routes/context';
 import { ConfigManager } from '../config/manager';
@@ -165,6 +165,27 @@ export class WebServerManager {
    */
   isRunning(): boolean {
     return this.server?.isRunning() ?? false;
+  }
+
+  /**
+   * Get list of connected clients with their info
+   */
+  getConnectedClients(): ConnectedClientInfo[] {
+    return this.server?.getConnectedClients() ?? [];
+  }
+
+  /**
+   * Disconnect a specific client by ID
+   */
+  disconnectClient(clientId: string): boolean {
+    return this.server?.disconnectClient(clientId) ?? false;
+  }
+
+  /**
+   * Disconnect all connected clients
+   */
+  disconnectAllClients(): void {
+    this.server?.disconnectAllClients();
   }
 
   /**

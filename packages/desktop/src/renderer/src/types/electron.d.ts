@@ -291,6 +291,16 @@ declare global {
           connectedClients: number;
         }>;
         regenerateToken: () => Promise<string>;
+        getConnectedClients: () => Promise<
+          {
+            id: string;
+            ip: string;
+            userAgent: string;
+            connectedAt: number;
+          }[]
+        >;
+        disconnectClient: (clientId: string) => Promise<boolean>;
+        disconnectAllClients: () => Promise<void>;
       };
 
       telemetry: {

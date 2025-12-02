@@ -19,6 +19,10 @@ import {
   CircularProgress,
   Chip,
   Paper,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -26,6 +30,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
 import QRCode from 'qrcode';
 
 interface WebServerStatus {
@@ -36,6 +41,13 @@ interface WebServerStatus {
   connectedClients: number;
 }
 
+interface ConnectedClientInfo {
+  id: string;
+  ip: string;
+  userAgent: string;
+  connectedAt: number;
+}
+
 export function WebServerSettings(): React.ReactElement {
   const [status, setStatus] = useState<WebServerStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +56,7 @@ export function WebServerSettings(): React.ReactElement {
   const [showToken, setShowToken] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [connectedClients, setConnectedClients] = useState<ConnectedClientInfo[]>([]);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -88,6 +101,32 @@ export function WebServerSettings(): React.ReactElement {
     };
     void generateQR();
   }, [status?.running, status?.url, status?.token]);
+
+  // Load connected clients when server is running (poll every 5 seconds)
+  useEffect(() => {
+    if (!status?.running) {
+      setConnectedClients([]);
+      return;
+    }
+
+    const loadClients = async () => {
+      try {
+        const clients = await window.electronAPI.webServer.getConnectedClients();
+        setConnectedClients(clients);
+      } catch (error) {
+        console.error('Failed to load connected clients:', error);
+      }
+    };
+
+    void loadClients();
+    const interval = setInterval(() => {
+      void loadClients();
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [status?.running]);
 
   const handleStart = async () => {
     try {
@@ -139,6 +178,35 @@ export function WebServerSettings(): React.ReactElement {
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
     }
+  };
+
+  const handleDisconnectClient = async (clientId: string) => {
+    try {
+      await window.electronAPI.webServer.disconnectClient(clientId);
+      // Refresh clients list
+      const clients = await window.electronAPI.webServer.getConnectedClients();
+      setConnectedClients(clients);
+    } catch (error) {
+      console.error('Failed to disconnect client:', error);
+    }
+  };
+
+  const handleDisconnectAllClients = async () => {
+    try {
+      await window.electronAPI.webServer.disconnectAllClients();
+      setConnectedClients([]);
+    } catch (error) {
+      console.error('Failed to disconnect all clients:', error);
+    }
+  };
+
+  const formatDuration = (connectedAt: number): string => {
+    const seconds = Math.floor((Date.now() - connectedAt) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m`;
   };
 
   if (loading) {
@@ -404,6 +472,89 @@ export function WebServerSettings(): React.ReactElement {
               </Typography>
             </Box>
           </Box>
+        </>
+      )}
+
+      {/* Active Connections */}
+      {isRunning && (
+        <>
+          <Divider sx={{ my: 3 }} />
+
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+            <Typography variant="subtitle1">
+              Active Connections ({connectedClients.length})
+            </Typography>
+            {connectedClients.length > 0 && (
+              <Button
+                variant="outlined"
+                size="small"
+                color="error"
+                startIcon={<LinkOffIcon />}
+                onClick={() => {
+                  void handleDisconnectAllClients();
+                }}
+              >
+                Disconnect All
+              </Button>
+            )}
+          </Box>
+
+          {connectedClients.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No clients currently connected.
+            </Typography>
+          ) : (
+            <Paper variant="outlined">
+              <List dense>
+                {connectedClients.map((client) => (
+                  <ListItem key={client.id} divider>
+                    <ListItemText
+                      primary={
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {client.ip}
+                          </Typography>
+                          <Chip
+                            label={`Connected ${formatDuration(client.connectedAt)}`}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </Box>
+                      }
+                      secondary={
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{
+                            display: 'block',
+                            maxWidth: '400px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {client.userAgent}
+                        </Typography>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      <Tooltip title="Disconnect">
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={() => {
+                            void handleDisconnectClient(client.id);
+                          }}
+                        >
+                          <LinkOffIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          )}
         </>
       )}
     </Box>

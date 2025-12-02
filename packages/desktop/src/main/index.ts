@@ -2560,6 +2560,27 @@ void app.whenReady().then(async () => {
       return await webServerManager.regenerateToken();
     });
 
+    ipcMain.handle('webServer:getConnectedClients', () => {
+      if (!webServerManager) {
+        return [];
+      }
+      return webServerManager.getConnectedClients();
+    });
+
+    ipcMain.handle('webServer:disconnectClient', (_event, clientId: string) => {
+      if (!webServerManager) {
+        return false;
+      }
+      return webServerManager.disconnectClient(clientId);
+    });
+
+    ipcMain.handle('webServer:disconnectAllClients', () => {
+      if (!webServerManager) {
+        return;
+      }
+      webServerManager.disconnectAllClients();
+    });
+
     // Create menu
     createMenu();
 

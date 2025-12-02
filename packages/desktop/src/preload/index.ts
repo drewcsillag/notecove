@@ -1264,6 +1264,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }>,
     regenerateToken: (): Promise<string> =>
       ipcRenderer.invoke('webServer:regenerateToken') as Promise<string>,
+    getConnectedClients: (): Promise<
+      {
+        id: string;
+        ip: string;
+        userAgent: string;
+        connectedAt: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('webServer:getConnectedClients') as Promise<
+        {
+          id: string;
+          ip: string;
+          userAgent: string;
+          connectedAt: number;
+        }[]
+      >,
+    disconnectClient: (clientId: string): Promise<boolean> =>
+      ipcRenderer.invoke('webServer:disconnectClient', clientId) as Promise<boolean>,
+    disconnectAllClients: (): Promise<void> =>
+      ipcRenderer.invoke('webServer:disconnectAllClients') as Promise<void>,
   },
 
   // Profile operations (for debugging)

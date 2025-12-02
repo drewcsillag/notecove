@@ -212,6 +212,9 @@ export const browserApiStub: typeof window.electronAPI = {
     stop: notImplemented('webServer.stop'),
     getStatus: notImplemented('webServer.getStatus'),
     regenerateToken: notImplemented('webServer.regenerateToken'),
+    getConnectedClients: notImplemented('webServer.getConnectedClients'),
+    disconnectClient: notImplemented('webServer.disconnectClient'),
+    disconnectAllClients: notImplemented('webServer.disconnectAllClients'),
   },
 
   shell: {

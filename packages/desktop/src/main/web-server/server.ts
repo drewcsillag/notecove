@@ -51,6 +51,16 @@ export interface ServerAddress {
 }
 
 /**
+ * Information about a connected client
+ */
+export interface ConnectedClientInfo {
+  id: string;
+  ip: string;
+  userAgent: string;
+  connectedAt: number;
+}
+
+/**
  * Web server class that manages the HTTP server lifecycle
  */
 export class WebServer {
@@ -58,7 +68,8 @@ export class WebServer {
   private config: WebServerConfig;
   private running = false;
   private address: ServerAddress | null = null;
-  private connectedClients = new Set<WebSocket>();
+  private connectedClients = new Map<string, { socket: WebSocket; info: ConnectedClientInfo }>();
+  private clientIdCounter = 0;
 
   constructor(config: Partial<WebServerConfig> = {}) {
     this.config = { ...DEFAULT_WEB_SERVER_CONFIG, ...config };
@@ -191,17 +202,33 @@ export class WebServer {
           done();
         },
       },
-      (socket) => {
-        // Track connected client
-        this.connectedClients.add(socket);
+      (socket, request) => {
+        // Generate unique client ID
+        const clientId = `client-${++this.clientIdCounter}`;
+
+        // Extract client info
+        const forwardedFor = request.headers['x-forwarded-for'] as string | undefined;
+        const ip = forwardedFor?.split(',')[0]?.trim() ?? request.ip;
+        const userAgent = request.headers['user-agent'] ?? 'unknown';
+
+        // Track connected client with info
+        this.connectedClients.set(clientId, {
+          socket,
+          info: {
+            id: clientId,
+            ip,
+            userAgent,
+            connectedAt: Date.now(),
+          },
+        });
 
         // Handle client disconnect
         socket.on('close', () => {
-          this.connectedClients.delete(socket);
+          this.connectedClients.delete(clientId);
         });
 
         socket.on('error', () => {
-          this.connectedClients.delete(socket);
+          this.connectedClients.delete(clientId);
         });
       }
     );
@@ -301,25 +328,45 @@ export class WebServer {
   }
 
   /**
+   * Get list of connected clients with their info
+   */
+  getConnectedClients(): ConnectedClientInfo[] {
+    return Array.from(this.connectedClients.values()).map((c) => c.info);
+  }
+
+  /**
    * Broadcast a message to all connected WebSocket clients
    */
   broadcast(message: unknown): void {
     const data = JSON.stringify(message);
-    for (const client of this.connectedClients) {
-      if (client.readyState === 1) {
+    for (const { socket } of this.connectedClients.values()) {
+      if (socket.readyState === 1) {
         // WebSocket.OPEN
-        client.send(data);
+        socket.send(data);
       }
     }
+  }
+
+  /**
+   * Disconnect a specific client by ID
+   */
+  disconnectClient(clientId: string): boolean {
+    const client = this.connectedClients.get(clientId);
+    if (client) {
+      client.socket.terminate();
+      this.connectedClients.delete(clientId);
+      return true;
+    }
+    return false;
   }
 
   /**
    * Disconnect all connected WebSocket clients
    */
   disconnectAllClients(): void {
-    for (const client of this.connectedClients) {
+    for (const { socket } of this.connectedClients.values()) {
       // Use terminate() for immediate closure, close() can hang
-      client.terminate();
+      socket.terminate();
     }
     this.connectedClients.clear();
   }
