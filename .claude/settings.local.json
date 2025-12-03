@@ -117,7 +117,8 @@
       "Bash(npx jest:*)",
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:codesandbox.io)",
-      "WebFetch(domain:minop1205.github.io)"
+      "WebFetch(domain:minop1205.github.io)",
+      "Bash(timeout 10 pnpm dev:*)"
     ],
     "deny": [],
     "ask": []

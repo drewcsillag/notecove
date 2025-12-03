@@ -84,7 +84,7 @@ function initializeLogging() {
   configureLogger({
     minLevel: process.env['NODE_ENV'] === 'production' ? LogLevel.INFO : LogLevel.DEBUG,
     defaultContext: {
-      app_version: '0.1.1',
+      app_version: '0.1.2',
       environment: process.env['NODE_ENV'] ?? 'development',
     },
   });
