@@ -1,6 +1,6 @@
 # Web Interface Feature Implementation Plan
 
-**Overall Progress:** `70%` (Phase 0-5 complete)
+**Overall Progress:** `85%` (Phase 0-7 complete, Phase 6 skipped)
 
 ## Summary
 
@@ -197,29 +197,34 @@ Add a web server to the Electron desktop app that allows browser access (includi
 
 ---
 
-### Phase 6: Network Discovery (mDNS/Bonjour)
+### Phase 6: Network Discovery (mDNS/Bonjour) ⏭️ SKIPPED
 
-> **Note**: mDNS is optional with graceful degradation. Focus on macOS; other platforms best-effort.
+> **Note**: mDNS was deemed unnecessary for initial release. QR code + manual URL entry is sufficient.
 
-- [ ] 🟥 **6.1: mDNS Advertisement**
-  - [ ] 🟥 Write tests for mDNS service registration (mock on failure)
-  - [ ] 🟥 Add bonjour-service library
-  - [ ] 🟥 Advertise service when server starts (catch errors gracefully)
-  - [ ] 🟥 Stop advertisement when server stops
-  - [ ] 🟥 Use discoverable name (e.g., `NoteCove on [hostname]`)
-  - [ ] 🟥 Log warning if mDNS unavailable, continue without it
+- [ ] 🟨 **6.1: mDNS Advertisement** (deferred)
+  - [ ] 🟨 Write tests for mDNS service registration (mock on failure)
+  - [ ] 🟨 Add bonjour-service library
+  - [ ] 🟨 Advertise service when server starts (catch errors gracefully)
+  - [ ] 🟨 Stop advertisement when server stops
+  - [ ] 🟨 Use discoverable name (e.g., `NoteCove on [hostname]`)
+  - [ ] 🟨 Log warning if mDNS unavailable, continue without it
 
 ---
 
-### Phase 7: Feature Gating for Browser
+### Phase 7: Feature Gating for Browser ✅
 
-- [ ] 🟥 **7.1: Disable Unsupported Features**
-  - [ ] 🟥 Write tests for feature detection
-  - [ ] 🟥 Create `src/renderer/src/utils/platform.ts`
-  - [ ] 🟥 Hide/disable export menu in browser
-  - [ ] 🟥 Hide/disable SD management in browser
-  - [ ] 🟥 Hide/disable settings that require Electron
-  - [ ] 🟥 Hide/disable profile switching in browser
+- [x] 🟩 **7.1: Disable Unsupported Features**
+  - [x] 🟩 Create `src/renderer/src/utils/platform.ts` with isElectron/isBrowser detection
+  - [x] 🟩 Hide export menu in browser (requires file save dialog)
+  - [x] 🟩 Hide Settings tabs that require Electron:
+    - Storage Directories (needs file picker)
+    - Database (needs filesystem access)
+    - Recovery (needs database access)
+    - Web Server (browser is already a client)
+    - Telemetry (config stored via Electron)
+  - [x] 🟩 SD management hidden (only accessible via Electron app menu)
+  - [x] 🟩 Profile switching hidden (only accessible via Electron app menu)
+  - [ ] 🟨 Tests for feature detection (deferred - manual testing sufficient)
 
 ---
 
