@@ -1,6 +1,6 @@
 # Stale Sync UX & Non-Blocking Startup
 
-**Overall Progress:** `30%`
+**Overall Progress:** `35%`
 
 ## Summary
 
@@ -33,7 +33,7 @@ When activity log entries reference CRDT sequences that will never arrive (due t
   - [ ] 🟡 2.2 Add IPC for sync status (pending count, notes affected)
   - [ ] 🟡 2.3 Add subtle spinner/indicator in UI when syncs pending
 
-### Phase 2: Profile Presence Files
+### Phase 2: Profile Presence Files ✅ COMPLETE
 
 - [x] 🟢 **Step 3: Define profile presence schema**
   - [x] 🟢 3.1 Create TypeScript types for profile presence
@@ -45,10 +45,10 @@ When activity log entries reference CRDT sequences that will never arrive (due t
   - [x] 🟢 4.3 Implement presence writer (first connect, setting changes, version upgrade)
   - [x] 🟢 4.4 Detect hostname change on startup
 
-- [ ] 🟡 **Step 5: Read and cache presence files** (DB infrastructure done)
-  - [ ] 🟥 5.1 Write test: presence info cached in local DB
-  - [ ] 🟥 5.2 Write test: partial/corrupt JSON uses cached value
-  - [ ] 🟥 5.3 Implement presence reader with fallback to cache
+- [x] 🟢 **Step 5: Read and cache presence files**
+  - [x] 🟢 5.1 Write test: presence info cached in local DB
+  - [x] 🟢 5.2 Write test: partial/corrupt JSON uses cached value
+  - [x] 🟢 5.3 Implement presence reader with fallback to cache
   - [x] 🟢 5.4 Add DB table for cached profile presence
 
 ### Phase 3: Stale Sync Detection
