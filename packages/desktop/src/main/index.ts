@@ -524,9 +524,11 @@ async function ensureDefaultNote(
         );
         console.log('[ensureDefaultNote] Waiting for content to sync from other instances...');
 
-        // Poll for content to arrive (max 10 seconds in 500ms intervals)
-        const maxWaitMs = 10000;
-        const pollIntervalMs = 500;
+        // Poll for content to arrive (max 2 seconds in 200ms intervals)
+        // Keep this short to avoid blocking startup - stale syncs will be handled
+        // by the background sync mechanism
+        const maxWaitMs = 2000;
+        const pollIntervalMs = 200;
         const startTime = Date.now();
 
         while (Date.now() - startTime < maxWaitMs) {
@@ -608,7 +610,20 @@ async function ensureDefaultNote(
 // App lifecycle
 // Create application menu
 /**
- * Set up file watchers and activity sync for a Storage Directory
+ * Result of setting up SD watchers
+ */
+interface SetupSDWatchersResult {
+  /**
+   * Function to run the initial sync. Can be awaited for blocking behavior
+   * or called without await for background sync.
+   */
+  runInitialSync: () => Promise<void>;
+}
+
+/**
+ * Set up file watchers and activity sync for a Storage Directory.
+ * Returns an object with a runInitialSync function that performs the initial sync.
+ * This allows the caller to decide whether to block on sync or run it in background.
  */
 async function setupSDWatchers(
   sdId: string,
@@ -618,7 +633,7 @@ async function setupSDWatchers(
   storageManager: AppendLogManager,
   crdtManager: CRDTManager,
   db: Database
-): Promise<void> {
+): Promise<SetupSDWatchersResult> {
   console.log(`[Init] Setting up watchers for SD: ${sdId} at ${sdPath}`);
 
   const folderLogsPath = join(sdPath, 'folders', 'logs');
@@ -1261,81 +1276,32 @@ async function setupSDWatchers(
 
   sdActivityWatchers.set(sdId, activityWatcher);
 
-  // Perform initial sync from other instances on startup
-  console.log(`[Init] Performing initial sync from other instances for SD: ${sdId}`);
-  try {
-    const affectedNotes = await activitySync.syncFromOtherInstances();
+  console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
 
-    // Wait for all pending syncs to complete before broadcasting
-    await activitySync.waitForPendingSyncs();
-
-    console.log(
-      `[Init] Initial sync complete for SD: ${sdId}, affected notes:`,
-      affectedNotes.size
-    );
-
-    // Reindex tags for affected notes
-    if (affectedNotes.size > 0) {
-      await reindexTagsForNotes(affectedNotes, crdtManager, db);
-    }
-
-    // Broadcast updates to all windows for affected notes
-    if (affectedNotes.size > 0) {
-      const noteIds = Array.from(affectedNotes);
-      for (const window of BrowserWindow.getAllWindows()) {
-        window.webContents.send('note:external-update', {
-          operation: 'sync',
-          noteIds,
-        });
-      }
-    }
-  } catch (error) {
-    console.error(`[Init] Failed to perform initial sync for SD: ${sdId}:`, error);
-  } finally {
-    // Mark startup as complete to allow file watcher to process subsequent changes
-    // This prevents race conditions where file watcher triggers during initial sync
-    startupComplete = true;
-    console.log(`[Init] Startup grace period ended for SD: ${sdId}`);
-
-    // Broadcast to renderer for test instrumentation
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send('test:grace-period-ended', { sdId });
-    }
-  }
-
-  // Set up polling backup for activity sync
-  // Chokidar may miss/coalesce rapid file changes, so poll every 3 seconds as backup
-  let pollCount = 0;
-  const pollInterval = setInterval(() => {
-    void (async () => {
-      pollCount++;
+  // Return a function that performs the initial sync
+  // This allows the caller to decide whether to await it (blocking) or run in background
+  return {
+    runInitialSync: async () => {
+      // Perform initial sync from other instances on startup
+      console.log(`[Init] Performing initial sync from other instances for SD: ${sdId}`);
       try {
-        // Log watermarks every 10th poll (30 seconds) for debugging
-        if (pollCount % 10 === 0) {
-          const watermarks = activitySync.getWatermarks();
-          console.log(`[ActivitySync Poll ${sdId}] Watermarks:`, Object.fromEntries(watermarks));
-        }
-
         const affectedNotes = await activitySync.syncFromOtherInstances();
 
+        // Wait for all pending syncs to complete before broadcasting
+        await activitySync.waitForPendingSyncs();
+
+        console.log(
+          `[Init] Initial sync complete for SD: ${sdId}, affected notes:`,
+          affectedNotes.size
+        );
+
+        // Reindex tags for affected notes
         if (affectedNotes.size > 0) {
-          console.log(
-            `[ActivitySync Poll ${sdId}] Found changes via poll:`,
-            Array.from(affectedNotes)
-          );
-          // Also log watermarks when changes found
-          console.log(
-            `[ActivitySync Poll ${sdId}] Watermarks after sync:`,
-            Object.fromEntries(activitySync.getWatermarks())
-          );
-
-          // Wait for pending syncs to complete
-          await activitySync.waitForPendingSyncs();
-
-          // Reindex tags for affected notes
           await reindexTagsForNotes(affectedNotes, crdtManager, db);
+        }
 
-          // Broadcast updates to all windows
+        // Broadcast updates to all windows for affected notes
+        if (affectedNotes.size > 0) {
           const noteIds = Array.from(affectedNotes);
           for (const window of BrowserWindow.getAllWindows()) {
             window.webContents.send('note:external-update', {
@@ -1345,18 +1311,81 @@ async function setupSDWatchers(
           }
         }
       } catch (error) {
-        // Don't log every poll failure, just errors
-        if (!String(error).includes('ENOENT')) {
-          console.error(`[ActivitySync Poll ${sdId}] Poll failed:`, error);
+        console.error(`[Init] Failed to perform initial sync for SD: ${sdId}:`, error);
+      } finally {
+        // Mark startup as complete to allow file watcher to process subsequent changes
+        // This prevents race conditions where file watcher triggers during initial sync
+        startupComplete = true;
+        console.log(`[Init] Startup grace period ended for SD: ${sdId}`);
+
+        // Broadcast to renderer for test instrumentation
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('test:grace-period-ended', { sdId });
+        }
+
+        // Broadcast sync complete for UI status tracking
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('sync:initial-sync-complete', { sdId });
         }
       }
-    })();
-  }, 3000);
 
-  // Store interval for cleanup
-  sdActivityPollIntervals.set(sdId, pollInterval);
+      // Set up polling backup for activity sync AFTER initial sync completes
+      // Chokidar may miss/coalesce rapid file changes, so poll every 3 seconds as backup
+      let pollCount = 0;
+      const pollInterval = setInterval(() => {
+        void (async () => {
+          pollCount++;
+          try {
+            // Log watermarks every 10th poll (30 seconds) for debugging
+            if (pollCount % 10 === 0) {
+              const watermarks = activitySync.getWatermarks();
+              console.log(
+                `[ActivitySync Poll ${sdId}] Watermarks:`,
+                Object.fromEntries(watermarks)
+              );
+            }
 
-  console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
+            const affectedNotes = await activitySync.syncFromOtherInstances();
+
+            if (affectedNotes.size > 0) {
+              console.log(
+                `[ActivitySync Poll ${sdId}] Found changes via poll:`,
+                Array.from(affectedNotes)
+              );
+              // Also log watermarks when changes found
+              console.log(
+                `[ActivitySync Poll ${sdId}] Watermarks after sync:`,
+                Object.fromEntries(activitySync.getWatermarks())
+              );
+
+              // Wait for pending syncs to complete
+              await activitySync.waitForPendingSyncs();
+
+              // Reindex tags for affected notes
+              await reindexTagsForNotes(affectedNotes, crdtManager, db);
+
+              // Broadcast updates to all windows
+              const noteIds = Array.from(affectedNotes);
+              for (const window of BrowserWindow.getAllWindows()) {
+                window.webContents.send('note:external-update', {
+                  operation: 'sync',
+                  noteIds,
+                });
+              }
+            }
+          } catch (error) {
+            // Don't log every poll failure, just errors
+            if (!String(error).includes('ENOENT')) {
+              console.error(`[ActivitySync Poll ${sdId}] Poll failed:`, error);
+            }
+          }
+        })();
+      }, 3000);
+
+      // Store interval for cleanup
+      sdActivityPollIntervals.set(sdId, pollInterval);
+    },
+  };
 }
 
 function createMenu(): void {
@@ -2114,7 +2143,7 @@ void app.whenReady().then(async () => {
         // 5. Set up watchers for this SD
         sendProgress(5, 6, 'Setting up file watchers...');
         console.log(`[Init] Step 5: Setting up watchers`);
-        await setupSDWatchers(
+        const sdWatcherResult = await setupSDWatchers(
           sdId,
           sdPath,
           fsAdapter,
@@ -2123,7 +2152,10 @@ void app.whenReady().then(async () => {
           crdtManager,
           database
         );
-        console.log(`[Init] Step 5: Watchers set up successfully`);
+        // For runtime SD addition, run initial sync immediately (blocking)
+        // since the user is actively waiting for the SD to be ready
+        await sdWatcherResult.runInitialSync();
+        console.log(`[Init] Step 5: Watchers set up and initial sync complete`);
 
         // 6. Scan for existing notes on disk and load them into database
         console.log(`[Init] Step 6: Scanning for existing notes`);
@@ -2306,9 +2338,12 @@ void app.whenReady().then(async () => {
     // activity sync imports empty note files before welcome note is created
     await ensureDefaultNote(database, crdtManager, storageDir, instanceId);
 
+    // Collect initial sync functions to run in background after window creation
+    const initialSyncFunctions: (() => Promise<void>)[] = [];
+
     // Set up watchers for default SD AFTER ensureDefaultNote
     // This ensures the welcome note is created before activity sync runs
-    await setupSDWatchers(
+    const defaultSDResult = await setupSDWatchers(
       'default',
       storageDir,
       fsAdapter,
@@ -2317,6 +2352,8 @@ void app.whenReady().then(async () => {
       crdtManager,
       database
     );
+    initialSyncFunctions.push(defaultSDResult.runInitialSync);
+
     if (process.env['NODE_ENV'] === 'test') {
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',
@@ -2324,29 +2361,8 @@ void app.whenReady().then(async () => {
       );
     }
 
-    // Run auto-cleanup for old deleted notes (30-day threshold)
-    console.log('[Init] Running auto-cleanup for old deleted notes...');
-    if (process.env['NODE_ENV'] === 'test') {
-      await fs.appendFile(
-        '/var/tmp/auto-cleanup.log',
-        `${new Date().toISOString()} [Init] About to run auto-cleanup\n`
-      );
-    }
-    await ipcHandlers.runAutoCleanup(30);
-    if (process.env['NODE_ENV'] === 'test') {
-      await fs.appendFile(
-        '/var/tmp/auto-cleanup.log',
-        `${new Date().toISOString()} [Init] Auto-cleanup completed\n`
-      );
-    }
-
-    // Recover incomplete cross-SD note moves
-    console.log('[Init] Checking for incomplete note moves...');
-    await noteMoveManager.recoverIncompleteMoves();
-    await noteMoveManager.cleanupOldMoves();
-    console.log('[Init] Note move recovery completed');
-
     // Set up watchers for all other registered SDs (only if fully initialized)
+    // Don't run initial sync yet - will run in background after window creation
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
         // Check if SD has basic structure (notes directory)
@@ -2362,7 +2378,7 @@ void app.whenReady().then(async () => {
           }
 
           console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
-          await setupSDWatchers(
+          const sdResult = await setupSDWatchers(
             sd.id,
             sd.path,
             fsAdapter,
@@ -2371,6 +2387,7 @@ void app.whenReady().then(async () => {
             crdtManager,
             database
           );
+          initialSyncFunctions.push(sdResult.runInitialSync);
         } else {
           console.log(
             `[Init] Skipping watchers for SD: ${sd.id} (not fully initialized: ${sd.path})`
@@ -2439,7 +2456,44 @@ void app.whenReady().then(async () => {
     // Create menu
     createMenu();
 
+    // Create window FIRST - before running initial syncs
+    // This ensures the app appears quickly regardless of sync status
     createWindow();
+
+    // Run initial syncs in background (non-blocking)
+    // This allows the window to appear immediately while sync happens in background
+    console.log(`[Init] Starting background sync for ${initialSyncFunctions.length} SD(s)...`);
+    void Promise.all(initialSyncFunctions.map((fn) => fn())).then(async () => {
+      console.log('[Init] All initial syncs complete');
+
+      // Run cleanup and recovery AFTER syncs complete
+      // These operations may depend on sync state being up-to-date
+      console.log('[Init] Running auto-cleanup for old deleted notes...');
+      if (process.env['NODE_ENV'] === 'test') {
+        await fs.appendFile(
+          '/var/tmp/auto-cleanup.log',
+          `${new Date().toISOString()} [Init] About to run auto-cleanup\n`
+        );
+      }
+      await ipcHandlers?.runAutoCleanup(30);
+      if (process.env['NODE_ENV'] === 'test') {
+        await fs.appendFile(
+          '/var/tmp/auto-cleanup.log',
+          `${new Date().toISOString()} [Init] Auto-cleanup completed\n`
+        );
+      }
+
+      // Recover incomplete cross-SD note moves
+      console.log('[Init] Checking for incomplete note moves...');
+      await noteMoveManager?.recoverIncompleteMoves();
+      await noteMoveManager?.cleanupOldMoves();
+      console.log('[Init] Note move recovery completed');
+
+      // Broadcast that all initial syncs are complete
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('sync:all-initial-syncs-complete');
+      }
+    });
 
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] Window created successfully');
