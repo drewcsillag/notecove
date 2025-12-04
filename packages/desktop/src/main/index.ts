@@ -38,6 +38,8 @@ import { DiagnosticsManager } from './diagnostics-manager';
 import { BackupManager } from './backup-manager';
 import { showProfilePicker, getProfileStorage } from './profile-picker';
 import { parseCliArgs } from './cli/cli-parser';
+import { ProfilePresenceManager } from './profile-presence-manager';
+import * as os from 'os';
 
 let mainWindow: BrowserWindow | null = null;
 let database: Database | null = null;
@@ -53,6 +55,7 @@ let diagnosticsManager: DiagnosticsManager | null = null;
 let backupManager: BackupManager | null = null;
 let sdMarker: SDMarker | null = null;
 let profileLock: ProfileLock | null = null;
+let profilePresenceManager: ProfilePresenceManager | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -2080,6 +2083,22 @@ void app.whenReady().then(async () => {
     // This ensures demo folders are created while we know the updates directory exists
     await crdtManager.loadFolderTree('default');
 
+    // Initialize ProfilePresenceManager for writing presence files to SDs
+    // This enables the Stale Sync UI to show meaningful device/user names
+    const platform = process.platform as 'darwin' | 'win32' | 'linux';
+    profilePresenceManager = new ProfilePresenceManager(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      fsAdapter as any,
+      database,
+      {
+        profileId: selectedProfileId ?? instanceId,
+        profileName: selectedProfileName ?? 'Default',
+        hostname: os.hostname(),
+        platform,
+        appVersion: app.getVersion(),
+      }
+    );
+
     // Handler for when new SD is created (for IPC)
     const handleNewStorageDir = async (sdId: string, sdPath: string): Promise<void> => {
       if (!database) {
@@ -2156,6 +2175,12 @@ void app.whenReady().then(async () => {
         // since the user is actively waiting for the SD to be ready
         await sdWatcherResult.runInitialSync();
         console.log(`[Init] Step 5: Watchers set up and initial sync complete`);
+
+        // 5.5 Write profile presence to the new SD
+        if (profilePresenceManager) {
+          await profilePresenceManager.writePresence(sdPath);
+          console.log(`[Init] Step 5.5: Profile presence written`);
+        }
 
         // 6. Scan for existing notes on disk and load them into database
         console.log(`[Init] Step 6: Scanning for existing notes`);
@@ -2395,6 +2420,14 @@ void app.whenReady().then(async () => {
         }
       }
     }
+
+    // Write profile presence to all SDs on startup
+    // This enables other devices to see who is using each SD
+    const allSDPaths = [
+      storageDir,
+      ...allSDs.filter((sd) => sd.id !== 'default').map((sd) => sd.path),
+    ];
+    await profilePresenceManager.writePresenceToAllSDs(allSDPaths);
 
     // Periodic compaction of activity logs for all SDs (every 5 minutes)
     compactionInterval = setInterval(

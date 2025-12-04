@@ -1,6 +1,6 @@
 # Stale Sync UX & Non-Blocking Startup
 
-**Overall Progress:** `15%`
+**Overall Progress:** `30%`
 
 ## Summary
 
@@ -35,21 +35,21 @@ When activity log entries reference CRDT sequences that will never arrive (due t
 
 ### Phase 2: Profile Presence Files
 
-- [ ] 🟥 **Step 3: Define profile presence schema**
-  - [ ] 🟥 3.1 Create TypeScript types for profile presence
-  - [ ] 🟥 3.2 Add to SD structure: `{SD}/profiles/{profileId}.json`
+- [x] 🟢 **Step 3: Define profile presence schema**
+  - [x] 🟢 3.1 Create TypeScript types for profile presence
+  - [x] 🟢 3.2 Add to SD structure: `{SD}/profiles/{profileId}.json`
 
-- [ ] 🟥 **Step 4: Write presence file on significant events**
-  - [ ] 🟥 4.1 Write test: presence file created on first SD connect
-  - [ ] 🟥 4.2 Write test: presence file updated when @user changes
-  - [ ] 🟥 4.3 Implement presence writer (first connect, setting changes, version upgrade)
-  - [ ] 🟥 4.4 Detect hostname change on startup
+- [x] 🟢 **Step 4: Write presence file on significant events**
+  - [x] 🟢 4.1 Write test: presence file created on first SD connect
+  - [x] 🟢 4.2 Write test: presence file updated when @user changes
+  - [x] 🟢 4.3 Implement presence writer (first connect, setting changes, version upgrade)
+  - [x] 🟢 4.4 Detect hostname change on startup
 
-- [ ] 🟥 **Step 5: Read and cache presence files**
+- [ ] 🟡 **Step 5: Read and cache presence files** (DB infrastructure done)
   - [ ] 🟥 5.1 Write test: presence info cached in local DB
   - [ ] 🟥 5.2 Write test: partial/corrupt JSON uses cached value
   - [ ] 🟥 5.3 Implement presence reader with fallback to cache
-  - [ ] 🟥 5.4 Add DB table for cached profile presence
+  - [x] 🟢 5.4 Add DB table for cached profile presence
 
 ### Phase 3: Stale Sync Detection
 
