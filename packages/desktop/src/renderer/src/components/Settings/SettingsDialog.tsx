@@ -5,9 +5,11 @@
  * - Storage Directory management
  * - User settings (username, handle)
  * - Appearance settings (dark mode)
+ *
+ * In browser mode, some tabs are hidden as they require Electron features.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -27,6 +29,7 @@ import { DatabaseSettings } from './DatabaseSettings';
 import { TelemetrySettings } from './TelemetrySettings';
 import { RecoverySettings } from './RecoverySettings';
 import { WebServerSettings } from './WebServerSettings';
+import { isElectron } from '../../utils/platform';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -64,6 +67,16 @@ export interface SettingsDialogProps {
   onThemeChange: (mode: 'light' | 'dark') => void;
 }
 
+/**
+ * Tab configuration for settings dialog.
+ * Some tabs are only available in Electron mode.
+ */
+interface TabConfig {
+  label: string;
+  electronOnly: boolean;
+  component: React.ReactNode;
+}
+
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   open,
   onClose,
@@ -71,6 +84,55 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   onThemeChange,
 }) => {
   const [tabValue, setTabValue] = useState(0);
+  const inElectron = isElectron();
+
+  // Define all tabs with their Electron-only status
+  const allTabs: TabConfig[] = useMemo(
+    () => [
+      {
+        label: 'Storage Directories',
+        electronOnly: true,
+        component: <StorageDirectorySettings />,
+      },
+      {
+        label: 'User',
+        electronOnly: false,
+        component: <UserSettings />,
+      },
+      {
+        label: 'Appearance',
+        electronOnly: false,
+        component: <AppearanceSettings themeMode={themeMode} onThemeChange={onThemeChange} />,
+      },
+      {
+        label: 'Telemetry',
+        electronOnly: true,
+        component: <TelemetrySettings />,
+      },
+      {
+        label: 'Database',
+        electronOnly: true,
+        component: <DatabaseSettings />,
+      },
+      {
+        label: 'Web Server',
+        electronOnly: true,
+        component: <WebServerSettings />,
+      },
+      {
+        label: 'Recovery',
+        electronOnly: true,
+        component: <RecoverySettings />,
+      },
+    ],
+    [themeMode, onThemeChange]
+  );
+
+  // Filter tabs based on platform
+  const visibleTabs = useMemo(
+    () => (inElectron ? allTabs : allTabs.filter((tab) => !tab.electronOnly)),
+    [allTabs, inElectron]
+  );
 
   // Reset to first tab when dialog closes
   useEffect(() => {
@@ -116,36 +178,16 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       <DialogContent dividers>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
-            <Tab label="Storage Directories" {...a11yProps(0)} />
-            <Tab label="User" {...a11yProps(1)} />
-            <Tab label="Appearance" {...a11yProps(2)} />
-            <Tab label="Telemetry" {...a11yProps(3)} />
-            <Tab label="Database" {...a11yProps(4)} />
-            <Tab label="Web Server" {...a11yProps(5)} />
-            <Tab label="Recovery" {...a11yProps(6)} />
+            {visibleTabs.map((tab, index) => (
+              <Tab key={tab.label} label={tab.label} {...a11yProps(index)} />
+            ))}
           </Tabs>
         </Box>
-        <TabPanel value={tabValue} index={0}>
-          <StorageDirectorySettings />
-        </TabPanel>
-        <TabPanel value={tabValue} index={1}>
-          <UserSettings />
-        </TabPanel>
-        <TabPanel value={tabValue} index={2}>
-          <AppearanceSettings themeMode={themeMode} onThemeChange={onThemeChange} />
-        </TabPanel>
-        <TabPanel value={tabValue} index={3}>
-          <TelemetrySettings />
-        </TabPanel>
-        <TabPanel value={tabValue} index={4}>
-          <DatabaseSettings />
-        </TabPanel>
-        <TabPanel value={tabValue} index={5}>
-          <WebServerSettings />
-        </TabPanel>
-        <TabPanel value={tabValue} index={6}>
-          <RecoverySettings />
-        </TabPanel>
+        {visibleTabs.map((tab, index) => (
+          <TabPanel key={tab.label} value={tabValue} index={index}>
+            {tab.component}
+          </TabPanel>
+        ))}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Close</Button>
