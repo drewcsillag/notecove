@@ -61,6 +61,8 @@ interface MockCRDTManager {
   unloadNote: jest.Mock;
   applyUpdate: jest.Mock;
   loadFolderTree: jest.Mock;
+  setActivityLogger: jest.Mock;
+  recordMoveActivity: jest.Mock;
 }
 
 interface MockDatabase {
@@ -157,6 +159,8 @@ describe('IPCHandlers - Folder CRUD', () => {
       unloadNote: jest.fn(),
       applyUpdate: jest.fn(),
       loadFolderTree: jest.fn().mockResolvedValue(mockFolderTree),
+      setActivityLogger: jest.fn(),
+      recordMoveActivity: jest.fn().mockResolvedValue(undefined),
     };
 
     // Create mock database
@@ -911,6 +915,8 @@ describe('IPCHandlers - SD Management', () => {
       unloadNote: jest.fn(),
       applyUpdate: jest.fn(),
       loadFolderTree: jest.fn().mockResolvedValue(mockFolderTree),
+      setActivityLogger: jest.fn(),
+      recordMoveActivity: jest.fn().mockResolvedValue(undefined),
     };
 
     // Create mock database

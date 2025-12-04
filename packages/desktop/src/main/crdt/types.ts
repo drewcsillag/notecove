@@ -81,6 +81,15 @@ export interface CRDTManager {
   setActivityLogger(sdId: string, logger: import('@shared/storage').ActivityLogger): void;
 
   /**
+   * Record activity for a note that was moved to this SD from another SD.
+   * This notifies other instances (on other machines) that a new note exists
+   * in this SD, so they can discover and import it.
+   * @param noteId The note ID
+   * @param targetSdId The target SD where the note was moved to
+   */
+  recordMoveActivity(noteId: string, targetSdId: string): Promise<void>;
+
+  /**
    * Reload a note from disk (re-apply all updates)
    * @param noteId Note ID
    */

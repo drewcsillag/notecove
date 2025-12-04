@@ -432,6 +432,35 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Record activity for a note that was moved to this SD from another SD.
+   *
+   * This notifies other instances (on other machines) that a new note exists
+   * in this SD, so they can discover and import it.
+   *
+   * @param noteId - The note ID
+   * @param targetSdId - The target SD where the note was moved to
+   */
+  async recordMoveActivity(noteId: string, targetSdId: string): Promise<void> {
+    const activityLogger = this.activityLoggers.get(targetSdId);
+    if (!activityLogger) {
+      console.warn(
+        `[CRDT Manager] No activity logger found for SD ${targetSdId} when recording move activity for note ${noteId}`
+      );
+      return;
+    }
+
+    try {
+      // Use sequence 1 as a signal that this is a newly moved note
+      // Other instances will see this activity and check if they have this note
+      console.log(`[CRDT Manager] Recording move activity for note ${noteId} in SD ${targetSdId}`);
+      await activityLogger.recordNoteActivity(noteId, 1);
+    } catch (error) {
+      // Don't let activity logging errors break the move
+      console.error(`[CRDT Manager] Failed to record move activity for note ${noteId}:`, error);
+    }
+  }
+
+  /**
    * Load folder tree for an SD (async - waits for data to load from disk)
    */
   async loadFolderTree(sdId: string): Promise<FolderTreeDoc> {

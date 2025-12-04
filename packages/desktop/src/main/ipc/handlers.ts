@@ -1040,6 +1040,11 @@ export class IPCHandlers {
       throw new Error(result.error ?? 'Move failed');
     }
 
+    // Record activity in target SD to notify other instances about the moved note
+    // This is critical for cross-machine sync - without this, other machines
+    // with only the target SD won't discover the moved note
+    await this.crdtManager.recordMoveActivity(noteId, targetSdId);
+
     // Broadcast consistent events for cross-SD moves
     // Use note:deleted for the source and note:created for the target
     this.broadcastToAll('note:deleted', noteId);
