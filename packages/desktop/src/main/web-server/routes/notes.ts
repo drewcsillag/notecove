@@ -227,6 +227,34 @@ export function registerNoteRoutes(fastify: FastifyInstance): void {
     }
   );
 
+  // Apply CRDT update to note
+  fastify.post<{ Params: NoteParams; Body: { update?: number[] } }>(
+    '/api/notes/:id/update',
+    async (
+      request: FastifyRequest<{ Params: NoteParams; Body: { update?: number[] } }>,
+      reply: FastifyReply
+    ) => {
+      if (!hasServices()) {
+        return sendError(reply, 503, 'Service Unavailable', 'Services not configured');
+      }
+
+      const { id } = request.params;
+      const { update } = request.body;
+
+      if (!update || !Array.isArray(update)) {
+        return sendError(reply, 400, 'Bad Request', 'update array is required in request body');
+      }
+
+      try {
+        const services = getServices();
+        await services.noteApplyUpdate(id, new Uint8Array(update));
+        return { success: true };
+      } catch (err) {
+        return handleServiceError(reply, err);
+      }
+    }
+  );
+
   // Update note title
   fastify.post<{ Params: NoteParams; Body: { title?: string; contentText?: string } }>(
     '/api/notes/:id/title',

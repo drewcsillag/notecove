@@ -281,6 +281,9 @@ declare global {
           url: string | null;
           token: string | null;
           connectedClients: number;
+          localhostOnly: boolean;
+          tlsMode: 'off' | 'self-signed' | 'custom';
+          tlsEnabled: boolean;
         }>;
         stop: () => Promise<void>;
         getStatus: () => Promise<{
@@ -289,7 +292,24 @@ declare global {
           url: string | null;
           token: string | null;
           connectedClients: number;
+          localhostOnly: boolean;
+          tlsMode: 'off' | 'self-signed' | 'custom';
+          tlsEnabled: boolean;
         }>;
+        getSettings: () => Promise<{
+          port: number;
+          localhostOnly: boolean;
+          tlsMode: 'off' | 'self-signed' | 'custom';
+          customCertPath?: string;
+          customKeyPath?: string;
+        }>;
+        setSettings: (settings: {
+          port?: number;
+          localhostOnly?: boolean;
+          tlsMode?: 'off' | 'self-signed' | 'custom';
+          customCertPath?: string;
+          customKeyPath?: string;
+        }) => Promise<void>;
         regenerateToken: () => Promise<string>;
         getConnectedClients: () => Promise<
           {

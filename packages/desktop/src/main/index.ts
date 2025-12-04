@@ -2544,14 +2544,49 @@ void app.whenReady().then(async () => {
       if (!webServerManager) {
         return {
           running: false,
-          port: null,
+          port: 8765,
           url: null,
           token: null,
           connectedClients: 0,
+          localhostOnly: false,
+          tlsMode: 'self-signed' as const,
+          tlsEnabled: true,
         };
       }
       return webServerManager.getStatus();
     });
+
+    ipcMain.handle('webServer:getSettings', () => {
+      if (!webServerManager) {
+        return {
+          port: 8765,
+          localhostOnly: false,
+          tlsMode: 'self-signed' as const,
+          customCertPath: undefined,
+          customKeyPath: undefined,
+        };
+      }
+      return webServerManager.getSettings();
+    });
+
+    ipcMain.handle(
+      'webServer:setSettings',
+      async (
+        _event,
+        settings: {
+          port?: number;
+          localhostOnly?: boolean;
+          tlsMode?: 'off' | 'self-signed' | 'custom';
+          customCertPath?: string;
+          customKeyPath?: string;
+        }
+      ) => {
+        if (!webServerManager) {
+          throw new Error('WebServerManager not initialized');
+        }
+        await webServerManager.setSettings(settings);
+      }
+    );
 
     ipcMain.handle('webServer:regenerateToken', async () => {
       if (!webServerManager) {

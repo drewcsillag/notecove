@@ -1239,6 +1239,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       url: string | null;
       token: string | null;
       connectedClients: number;
+      localhostOnly: boolean;
+      tlsMode: 'off' | 'self-signed' | 'custom';
+      tlsEnabled: boolean;
     }> =>
       ipcRenderer.invoke('webServer:start', port) as Promise<{
         running: boolean;
@@ -1246,6 +1249,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         url: string | null;
         token: string | null;
         connectedClients: number;
+        localhostOnly: boolean;
+        tlsMode: 'off' | 'self-signed' | 'custom';
+        tlsEnabled: boolean;
       }>,
     stop: (): Promise<void> => ipcRenderer.invoke('webServer:stop') as Promise<void>,
     getStatus: (): Promise<{
@@ -1254,6 +1260,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       url: string | null;
       token: string | null;
       connectedClients: number;
+      localhostOnly: boolean;
+      tlsMode: 'off' | 'self-signed' | 'custom';
+      tlsEnabled: boolean;
     }> =>
       ipcRenderer.invoke('webServer:getStatus') as Promise<{
         running: boolean;
@@ -1261,7 +1270,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
         url: string | null;
         token: string | null;
         connectedClients: number;
+        localhostOnly: boolean;
+        tlsMode: 'off' | 'self-signed' | 'custom';
+        tlsEnabled: boolean;
       }>,
+    getSettings: (): Promise<{
+      port: number;
+      localhostOnly: boolean;
+      tlsMode: 'off' | 'self-signed' | 'custom';
+      customCertPath?: string;
+      customKeyPath?: string;
+    }> =>
+      ipcRenderer.invoke('webServer:getSettings') as Promise<{
+        port: number;
+        localhostOnly: boolean;
+        tlsMode: 'off' | 'self-signed' | 'custom';
+        customCertPath?: string;
+        customKeyPath?: string;
+      }>,
+    setSettings: (settings: {
+      port?: number;
+      localhostOnly?: boolean;
+      tlsMode?: 'off' | 'self-signed' | 'custom';
+      customCertPath?: string;
+      customKeyPath?: string;
+    }): Promise<void> => ipcRenderer.invoke('webServer:setSettings', settings) as Promise<void>,
     regenerateToken: (): Promise<string> =>
       ipcRenderer.invoke('webServer:regenerateToken') as Promise<string>,
     getConnectedClients: (): Promise<

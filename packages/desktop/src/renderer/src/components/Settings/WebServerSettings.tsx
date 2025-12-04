@@ -1,7 +1,7 @@
 /**
  * Web Server Settings Component
  *
- * Allows users to view and configure the web server for browser access.
+ * Allows users to configure and control the web server for browser access.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -23,15 +23,22 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
+  Select,
+  MenuItem as MuiMenuItem,
+  FormControl,
+  InputLabel,
+  Link,
+  Collapse,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import StopIcon from '@mui/icons-material/Stop';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import QRCode from 'qrcode';
+
+type TLSMode = 'off' | 'self-signed' | 'custom';
 
 interface WebServerStatus {
   running: boolean;
@@ -39,6 +46,17 @@ interface WebServerStatus {
   url: string | null;
   token: string | null;
   connectedClients: number;
+  localhostOnly: boolean;
+  tlsMode: TLSMode;
+  tlsEnabled: boolean;
+}
+
+interface WebServerSettings {
+  port: number;
+  localhostOnly: boolean;
+  tlsMode: TLSMode;
+  customCertPath?: string;
+  customKeyPath?: string;
 }
 
 interface ConnectedClientInfo {
@@ -50,22 +68,25 @@ interface ConnectedClientInfo {
 
 export function WebServerSettings(): React.ReactElement {
   const [status, setStatus] = useState<WebServerStatus | null>(null);
+  const [settings, setSettings] = useState<WebServerSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [portInput, setPortInput] = useState('8765');
-  const [showToken, setShowToken] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [connectedClients, setConnectedClients] = useState<ConnectedClientInfo[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const loadStatus = useCallback(async () => {
     try {
-      const serverStatus = await window.electronAPI.webServer.getStatus();
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+      const serverStatus: WebServerStatus = await window.electronAPI.webServer.getStatus();
+      const serverSettings: WebServerSettings = await window.electronAPI.webServer.getSettings();
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
       setStatus(serverStatus);
-      if (serverStatus.port) {
-        setPortInput(String(serverStatus.port));
-      }
-    } catch (error) {
+      setSettings(serverSettings);
+      setPortInput(String(serverSettings.port));
+    } catch (error: unknown) {
       console.error('Failed to load web server status:', error);
     } finally {
       setLoading(false);
@@ -91,7 +112,7 @@ export function WebServerSettings(): React.ReactElement {
             },
           });
           setQrCodeDataUrl(dataUrl);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to generate QR code:', error);
           setQrCodeDataUrl(null);
         }
@@ -113,7 +134,7 @@ export function WebServerSettings(): React.ReactElement {
       try {
         const clients = await window.electronAPI.webServer.getConnectedClients();
         setConnectedClients(clients);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to load connected clients:', error);
       }
     };
@@ -128,31 +149,33 @@ export function WebServerSettings(): React.ReactElement {
     };
   }, [status?.running]);
 
-  const handleStart = async () => {
+  const handleToggleServer = async () => {
     try {
       setActionLoading(true);
-      const port = parseInt(portInput, 10);
-      if (isNaN(port) || port < 1024 || port > 65535) {
-        return;
+      if (status?.running) {
+        await window.electronAPI.webServer.stop();
+      } else {
+        const port = parseInt(portInput, 10);
+        if (isNaN(port) || port < 1024 || port > 65535) {
+          return;
+        }
+        await window.electronAPI.webServer.start(port);
       }
-      const newStatus = await window.electronAPI.webServer.start(port);
-      setStatus(newStatus);
-    } catch (error) {
-      console.error('Failed to start web server:', error);
+      await loadStatus();
+    } catch (error: unknown) {
+      console.error('Failed to toggle web server:', error);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleStop = async () => {
+  const handleSettingsChange = async (newSettings: Partial<WebServerSettings>) => {
     try {
-      setActionLoading(true);
-      await window.electronAPI.webServer.stop();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await window.electronAPI.webServer.setSettings(newSettings);
       await loadStatus();
-    } catch (error) {
-      console.error('Failed to stop web server:', error);
-    } finally {
-      setActionLoading(false);
+    } catch (error: unknown) {
+      console.error('Failed to update settings:', error);
     }
   };
 
@@ -161,7 +184,7 @@ export function WebServerSettings(): React.ReactElement {
       setActionLoading(true);
       await window.electronAPI.webServer.regenerateToken();
       await loadStatus();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to regenerate token:', error);
     } finally {
       setActionLoading(false);
@@ -175,18 +198,24 @@ export function WebServerSettings(): React.ReactElement {
       setTimeout(() => {
         setCopySuccess(null);
       }, 2000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to copy to clipboard:', error);
+    }
+  };
+
+  const handleOpenInBrowser = () => {
+    if (status?.url && status.token) {
+      const fullUrl = `${status.url}?token=${status.token}`;
+      void window.electronAPI.shell.openExternal(fullUrl);
     }
   };
 
   const handleDisconnectClient = async (clientId: string) => {
     try {
       await window.electronAPI.webServer.disconnectClient(clientId);
-      // Refresh clients list
       const clients = await window.electronAPI.webServer.getConnectedClients();
       setConnectedClients(clients);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to disconnect client:', error);
     }
   };
@@ -195,7 +224,7 @@ export function WebServerSettings(): React.ReactElement {
     try {
       await window.electronAPI.webServer.disconnectAllClients();
       setConnectedClients([]);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to disconnect all clients:', error);
     }
   };
@@ -209,7 +238,7 @@ export function WebServerSettings(): React.ReactElement {
     return `${hours}h ${minutes % 60}m`;
   };
 
-  if (loading) {
+  if (loading || !settings) {
     return (
       <Box display="flex" justifyContent="center" p={3}>
         <CircularProgress size={24} />
@@ -223,6 +252,8 @@ export function WebServerSettings(): React.ReactElement {
     parseInt(portInput, 10) >= 1024 &&
     parseInt(portInput, 10) <= 65535;
 
+  const fullUrl = status?.url && status.token ? `${status.url}?token=${status.token}` : null;
+
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
@@ -230,194 +261,134 @@ export function WebServerSettings(): React.ReactElement {
       </Typography>
 
       <Alert severity="info" sx={{ mb: 3 }}>
-        The web server allows you to access your notes from a web browser on any device on your
-        local network.
+        Access your notes from a web browser on any device on your local network.
       </Alert>
 
-      {/* Server Status */}
+      {/* Server Control */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-          <Box display="flex" alignItems="center" gap={1}>
-            <Typography variant="subtitle1">Server Status:</Typography>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box display="flex" alignItems="center" gap={2}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isRunning}
+                  onChange={() => {
+                    handleToggleServer().catch((err: unknown) => {
+                      console.error('Error toggling server:', err);
+                    });
+                  }}
+                  disabled={actionLoading || (!isRunning && !portValid)}
+                />
+              }
+              label={
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Typography>Server</Typography>
+                  <Chip
+                    label={isRunning ? 'Running' : 'Stopped'}
+                    color={isRunning ? 'success' : 'default'}
+                    size="small"
+                  />
+                </Box>
+              }
+            />
+          </Box>
+          {isRunning && (
             <Chip
-              label={isRunning ? 'Running' : 'Stopped'}
-              color={isRunning ? 'success' : 'default'}
+              label={`${status?.connectedClients ?? 0} connection${(status?.connectedClients ?? 0) !== 1 ? 's' : ''}`}
+              variant="outlined"
               size="small"
             />
-            {isRunning && status?.connectedClients !== undefined && (
-              <Chip
-                label={`${status.connectedClients} client${status.connectedClients !== 1 ? 's' : ''}`}
-                variant="outlined"
-                size="small"
-              />
-            )}
-          </Box>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={isRunning}
-                onChange={() => {
-                  if (isRunning) {
-                    void handleStop();
-                  } else {
-                    void handleStart();
-                  }
-                }}
-                disabled={actionLoading || (!isRunning && !portValid)}
-              />
-            }
-            label={isRunning ? 'Stop' : 'Start'}
-          />
+          )}
         </Box>
 
-        {isRunning && status?.url && (
-          <Box display="flex" alignItems="center" gap={1} mb={1}>
-            <Typography variant="body2" color="text.secondary">
-              URL:
-            </Typography>
-            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-              {status.url}
-            </Typography>
-            <Tooltip title={copySuccess === 'url' ? 'Copied!' : 'Copy URL'}>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  if (status.url) {
-                    void copyToClipboard(status.url, 'url');
+        {/* Configuration (only when stopped) */}
+        {!isRunning && (
+          <Box mt={2}>
+            <Divider sx={{ mb: 2 }} />
+            <Box display="flex" flexWrap="wrap" gap={2} alignItems="flex-start">
+              <TextField
+                label="Port"
+                value={portInput}
+                onChange={(e) => {
+                  setPortInput(e.target.value);
+                  const port = parseInt(e.target.value, 10);
+                  if (!isNaN(port) && port >= 1024 && port <= 65535) {
+                    void handleSettingsChange({ port });
                   }
                 }}
-              >
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+                type="number"
+                inputProps={{ min: 1024, max: 65535 }}
+                size="small"
+                error={!portValid}
+                helperText={!portValid ? 'Port must be 1024-65535' : ''}
+                sx={{ width: 120 }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={settings.localhostOnly}
+                    onChange={(e) => {
+                      void handleSettingsChange({ localhostOnly: e.target.checked });
+                    }}
+                    size="small"
+                  />
+                }
+                label="Localhost only"
+              />
+
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>TLS</InputLabel>
+                <Select
+                  value={settings.tlsMode}
+                  label="TLS"
+                  onChange={(e) => {
+                    void handleSettingsChange({ tlsMode: e.target.value as TLSMode });
+                  }}
+                >
+                  <MuiMenuItem value="off">Off (HTTP)</MuiMenuItem>
+                  <MuiMenuItem value="self-signed">Self-signed</MuiMenuItem>
+                  <MuiMenuItem value="custom">Custom cert</MuiMenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            {settings.tlsMode === 'custom' && (
+              <Box mt={2} display="flex" flexDirection="column" gap={1}>
+                <TextField
+                  label="Certificate path"
+                  value={settings.customCertPath ?? ''}
+                  onChange={(e) => {
+                    void handleSettingsChange({ customCertPath: e.target.value });
+                  }}
+                  size="small"
+                  fullWidth
+                  placeholder="/path/to/cert.pem"
+                />
+                <TextField
+                  label="Key path"
+                  value={settings.customKeyPath ?? ''}
+                  onChange={(e) => {
+                    void handleSettingsChange({ customKeyPath: e.target.value });
+                  }}
+                  size="small"
+                  fullWidth
+                  placeholder="/path/to/key.pem"
+                />
+              </Box>
+            )}
           </Box>
         )}
       </Paper>
 
-      {/* Port Configuration */}
-      <Typography variant="subtitle1" gutterBottom>
-        Port Configuration
-      </Typography>
-      <Box display="flex" alignItems="flex-start" gap={2} mb={3}>
-        <TextField
-          label="Port"
-          value={portInput}
-          onChange={(e) => {
-            setPortInput(e.target.value);
-          }}
-          type="number"
-          inputProps={{ min: 1024, max: 65535 }}
-          size="small"
-          error={!portValid}
-          helperText={!portValid ? 'Port must be between 1024 and 65535' : ''}
-          disabled={isRunning}
-          sx={{ width: 150 }}
-        />
-        {!isRunning && (
-          <Button
-            variant="contained"
-            startIcon={<PlayArrowIcon />}
-            onClick={() => {
-              void handleStart();
-            }}
-            disabled={actionLoading || !portValid}
-          >
-            Start Server
-          </Button>
-        )}
-        {isRunning && (
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<StopIcon />}
-            onClick={() => {
-              void handleStop();
-            }}
-            disabled={actionLoading}
-          >
-            Stop Server
-          </Button>
-        )}
-      </Box>
-
-      <Divider sx={{ my: 3 }} />
-
-      {/* Authentication Token */}
-      <Typography variant="subtitle1" gutterBottom>
-        Authentication Token
-      </Typography>
-      <Alert severity="warning" sx={{ mb: 2 }}>
-        This token is required to access the web interface. Keep it secure and do not share it
-        publicly.
-      </Alert>
-      <Box display="flex" alignItems="center" gap={1} mb={2}>
-        <TextField
-          label="Token"
-          value={showToken ? (status?.token ?? '') : '••••••••••••••••'}
-          InputProps={{
-            readOnly: true,
-            endAdornment: (
-              <Box display="flex" gap={0.5}>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setShowToken(!showToken);
-                  }}
-                  edge="end"
-                  aria-label={showToken ? 'Hide token' : 'Show token'}
-                >
-                  {showToken ? (
-                    <VisibilityOffIcon fontSize="small" />
-                  ) : (
-                    <VisibilityIcon fontSize="small" />
-                  )}
-                </IconButton>
-                <Tooltip title={copySuccess === 'token' ? 'Copied!' : 'Copy token'}>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      if (status?.token) {
-                        void copyToClipboard(status.token, 'token');
-                      }
-                    }}
-                    edge="end"
-                    disabled={!status?.token}
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            ),
-          }}
-          sx={{ flexGrow: 1, fontFamily: showToken ? 'monospace' : undefined }}
-        />
-        <Tooltip title="Generate a new token (invalidates the current one)">
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={() => {
-              void handleRegenerateToken();
-            }}
-            disabled={actionLoading}
-          >
-            Regenerate
-          </Button>
-        </Tooltip>
-      </Box>
-
-      {isRunning && status?.url && status.token && (
-        <>
-          <Divider sx={{ my: 3 }} />
-
-          {/* Quick Connect with QR Code */}
+      {/* Quick Connect (only when running) */}
+      {isRunning && fullUrl && (
+        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
             Quick Connect
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Scan this QR code with your mobile device to connect instantly, or use the URL below.
-          </Typography>
 
-          <Box display="flex" gap={3} alignItems="flex-start" mb={2}>
+          <Box display="flex" gap={3} alignItems="flex-start">
             {/* QR Code */}
             {qrCodeDataUrl && (
               <Paper
@@ -428,58 +399,101 @@ export function WebServerSettings(): React.ReactElement {
                   alignItems: 'center',
                   justifyContent: 'center',
                   bgcolor: 'white',
+                  flexShrink: 0,
                 }}
               >
                 <img
                   src={qrCodeDataUrl}
-                  alt="QR code to connect to web server"
-                  style={{ width: 180, height: 180 }}
+                  alt="QR code to connect"
+                  style={{ width: 160, height: 160 }}
                 />
               </Paper>
             )}
 
-            {/* URL and instructions */}
+            {/* URL and actions */}
             <Box flex={1}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Or enter this URL manually (includes authentication token):
+                Scan the QR code or click to open in browser:
               </Typography>
-              <Box display="flex" alignItems="center" gap={1}>
-                <TextField
-                  value={
-                    showToken
-                      ? `${status.url}?token=${status.token}`
-                      : `${status.url}?token=••••••••`
-                  }
-                  InputProps={{ readOnly: true }}
-                  size="small"
-                  fullWidth
-                  sx={{ fontFamily: 'monospace' }}
-                />
-                <Tooltip title={copySuccess === 'fullUrl' ? 'Copied!' : 'Copy full URL'}>
+
+              <Box display="flex" alignItems="center" gap={1} mb={2}>
+                <Link
+                  component="button"
+                  variant="body2"
+                  onClick={handleOpenInBrowser}
+                  sx={{
+                    fontFamily: 'monospace',
+                    textAlign: 'left',
+                    wordBreak: 'break-all',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {fullUrl}
+                </Link>
+                <Tooltip title="Open in browser">
+                  <IconButton size="small" onClick={handleOpenInBrowser}>
+                    <OpenInNewIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={copySuccess === 'url' ? 'Copied!' : 'Copy URL'}>
                   <IconButton
+                    size="small"
                     onClick={() => {
-                      if (status.url && status.token) {
-                        void copyToClipboard(`${status.url}?token=${status.token}`, 'fullUrl');
-                      }
+                      void copyToClipboard(fullUrl, 'url');
                     }}
                   >
-                    <ContentCopyIcon />
+                    <ContentCopyIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                Note: You may need to accept a security warning for the self-signed certificate.
-              </Typography>
+
+              {status?.tlsEnabled && (
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Note: You may need to accept a security warning for the self-signed certificate.
+                </Typography>
+              )}
+
+              {/* Advanced options */}
+              <Box mt={2}>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setShowAdvanced(!showAdvanced);
+                  }}
+                  endIcon={showAdvanced ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Advanced
+                </Button>
+                <Collapse in={showAdvanced}>
+                  <Box mt={1}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<RefreshIcon />}
+                      onClick={() => {
+                        handleRegenerateToken().catch((err: unknown) => {
+                          console.error('Error regenerating token:', err);
+                        });
+                      }}
+                      disabled={actionLoading}
+                    >
+                      Regenerate access token
+                    </Button>
+                    <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                      This will disconnect all existing sessions and invalidate the current URL.
+                    </Typography>
+                  </Box>
+                </Collapse>
+              </Box>
             </Box>
           </Box>
-        </>
+        </Paper>
       )}
 
       {/* Active Connections */}
       {isRunning && (
-        <>
-          <Divider sx={{ my: 3 }} />
-
+        <Paper variant="outlined" sx={{ p: 2 }}>
           <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
             <Typography variant="subtitle1">
               Active Connections ({connectedClients.length})
@@ -504,58 +518,56 @@ export function WebServerSettings(): React.ReactElement {
               No clients currently connected.
             </Typography>
           ) : (
-            <Paper variant="outlined">
-              <List dense>
-                {connectedClients.map((client) => (
-                  <ListItem key={client.id} divider>
-                    <ListItemText
-                      primary={
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                            {client.ip}
-                          </Typography>
-                          <Chip
-                            label={`Connected ${formatDuration(client.connectedAt)}`}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </Box>
-                      }
-                      secondary={
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{
-                            display: 'block',
-                            maxWidth: '400px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {client.userAgent}
+            <List dense disablePadding>
+              {connectedClients.map((client) => (
+                <ListItem key={client.id} divider sx={{ px: 0 }}>
+                  <ListItemText
+                    primary={
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          {client.ip}
                         </Typography>
-                      }
-                    />
-                    <ListItemSecondaryAction>
-                      <Tooltip title="Disconnect">
-                        <IconButton
-                          edge="end"
+                        <Chip
+                          label={formatDuration(client.connectedAt)}
                           size="small"
-                          onClick={() => {
-                            void handleDisconnectClient(client.id);
-                          }}
-                        >
-                          <LinkOffIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
+                          variant="outlined"
+                        />
+                      </Box>
+                    }
+                    secondary={
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: 'block',
+                          maxWidth: '350px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {client.userAgent}
+                      </Typography>
+                    }
+                  />
+                  <ListItemSecondaryAction>
+                    <Tooltip title="Disconnect">
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={() => {
+                          void handleDisconnectClient(client.id);
+                        }}
+                      >
+                        <LinkOffIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
           )}
-        </>
+        </Paper>
       )}
     </Box>
   );

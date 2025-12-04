@@ -6,17 +6,24 @@
  */
 
 import { join } from 'path';
+import * as fs from 'fs';
 import { app } from 'electron';
 import { WebServer, ConnectedClientInfo } from './server';
 import { AuthManager } from './auth';
+import { TLSManager, TLSCredentials } from './tls';
 import { setRouteContext, ServiceHandlers } from './routes/context';
-import { ConfigManager } from '../config/manager';
+import {
+  ConfigManager,
+  TLSMode,
+  WebServerConfig as StoredWebServerConfig,
+} from '../config/manager';
 import type { Database, NoteCache, FolderCache, SearchResult } from '@notecove/shared';
 import type { CRDTManager } from '../crdt';
 import type { IPCHandlers } from '../ipc/handlers';
 import * as Y from 'yjs';
 
 const DEFAULT_PORT = 8765;
+const DEFAULT_TLS_MODE: TLSMode = 'self-signed';
 
 export interface WebServerManagerConfig {
   database: Database;
@@ -31,6 +38,20 @@ export interface WebServerStatus {
   url: string | null;
   token: string | null;
   connectedClients: number;
+  localhostOnly: boolean;
+  tlsMode: TLSMode;
+  tlsEnabled: boolean;
+}
+
+/**
+ * Settings that can be changed by the user
+ */
+export interface WebServerSettings {
+  port: number;
+  localhostOnly: boolean;
+  tlsMode: TLSMode;
+  customCertPath?: string;
+  customKeyPath?: string;
 }
 
 /**
@@ -39,10 +60,12 @@ export interface WebServerStatus {
 export class WebServerManager {
   private server: WebServer | null = null;
   private authManager: AuthManager;
+  private tlsManager: TLSManager;
   private database: Database;
   private crdtManager: CRDTManager;
   private ipcHandlers: IPCHandlers;
   private configManager: ConfigManager;
+  private cachedConfig: StoredWebServerConfig = {};
 
   constructor(config: WebServerManagerConfig) {
     this.database = config.database;
@@ -50,21 +73,31 @@ export class WebServerManager {
     this.ipcHandlers = config.ipcHandlers;
     this.configManager = config.configManager;
     this.authManager = new AuthManager();
+
+    // Initialize TLS manager with cert directory in userData
+    const certDir = join(app.getPath('userData'), 'certs');
+    this.tlsManager = new TLSManager({ certDir });
   }
 
   /**
-   * Initialize the manager and restore token from config if available
+   * Initialize the manager and restore config from storage
    */
   async initialize(): Promise<void> {
-    const webConfig = await this.configManager.getWebServerConfig();
-    if (webConfig.token) {
+    this.cachedConfig = await this.configManager.getWebServerConfig();
+
+    if (this.cachedConfig.token) {
       // Restore saved token
-      this.authManager.setCurrentToken(webConfig.token);
+      this.authManager.setCurrentToken(this.cachedConfig.token);
     } else {
       // Generate and save new token
       const token = this.authManager.regenerateToken();
+      this.cachedConfig.token = token;
       await this.configManager.setWebServerConfig({ token });
     }
+
+    // Set defaults for new options if not present
+    this.cachedConfig.localhostOnly ??= false;
+    this.cachedConfig.tlsMode ??= DEFAULT_TLS_MODE;
   }
 
   /**
@@ -75,43 +108,88 @@ export class WebServerManager {
       return this.getStatus();
     }
 
-    // Get port from config or use default
-    const webConfig = await this.configManager.getWebServerConfig();
-    const serverPort = port ?? webConfig.port ?? DEFAULT_PORT;
+    // Get settings from cached config
+    const serverPort = port ?? this.cachedConfig.port ?? DEFAULT_PORT;
+    const localhostOnly = this.cachedConfig.localhostOnly ?? false;
+    const tlsMode = this.cachedConfig.tlsMode ?? DEFAULT_TLS_MODE;
 
     // Set up service handlers for the routes
     const services = this.createServiceHandlers();
     setRouteContext({ services });
 
     // Path to browser bundle
+    // In dev: __dirname is dist-electron/main/, so ../../ goes to packages/desktop/
     const distBrowserPath = app.isPackaged
       ? join(process.resourcesPath, 'dist-browser')
-      : join(__dirname, '../../../dist-browser');
+      : join(__dirname, '../../dist-browser');
+
+    // Determine host based on localhostOnly setting
+    const host = localhostOnly ? '127.0.0.1' : '0.0.0.0';
+
+    // Get TLS credentials based on mode
+    let tlsCredentials: TLSCredentials | undefined;
+    const useHttps = tlsMode !== 'off';
+
+    if (tlsMode === 'self-signed') {
+      // Generate or load self-signed certificate
+      tlsCredentials = this.tlsManager.ensureCertificate({
+        commonName: 'NoteCove Local Server',
+        altNames: ['localhost', '127.0.0.1'],
+      });
+    } else if (tlsMode === 'custom') {
+      // Load user-provided certificate
+      const certPath = this.cachedConfig.customCertPath;
+      const keyPath = this.cachedConfig.customKeyPath;
+      if (certPath && keyPath && fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+        tlsCredentials = {
+          cert: fs.readFileSync(certPath, 'utf8'),
+          key: fs.readFileSync(keyPath, 'utf8'),
+        };
+      } else {
+        console.warn('[WebServerManager] Custom cert/key not found, falling back to self-signed');
+        tlsCredentials = this.tlsManager.ensureCertificate({
+          commonName: 'NoteCove Local Server',
+          altNames: ['localhost', '127.0.0.1'],
+        });
+      }
+    }
 
     // Create and start server
     this.server = new WebServer({
       port: serverPort,
-      host: '0.0.0.0', // Allow LAN access
+      host,
+      https: useHttps,
+      ...(tlsCredentials ? { tlsCredentials } : {}),
       authManager: this.authManager,
       staticFilesPath: distBrowserPath,
     });
 
-    // Register broadcast callback with IPC handlers
-    // Note: WebSocket broadcast is handled separately through the WebSocket routes
+    // Register broadcast callback with IPC handlers to forward to WebSocket clients
     this.ipcHandlers.setWebBroadcastCallback((channel, ...args) => {
-      // TODO: Implement WebSocket broadcast in Phase 6
-      console.log(`[WebServerManager] Broadcast to web clients: ${channel}`, args.length, 'args');
+      if (this.server) {
+        // Convert Uint8Array to regular arrays for JSON serialization
+        // (JSON.stringify turns Uint8Array into {"0":1,"1":2,...} not [1,2,...])
+        const serializedArgs = args.map((arg) =>
+          arg instanceof Uint8Array ? Array.from(arg) : arg
+        );
+        // Send in format expected by web-client.ts: { channel, args }
+        this.server.broadcast({ channel, args: serializedArgs });
+      }
     });
 
     await this.server.start();
 
-    // Save port to config
+    // Save config
+    this.cachedConfig.enabled = true;
+    this.cachedConfig.port = serverPort;
     await this.configManager.setWebServerConfig({
       enabled: true,
       port: serverPort,
     });
 
-    console.log(`[WebServerManager] Server started on port ${serverPort}`);
+    console.log(
+      `[WebServerManager] Server started on port ${serverPort} (TLS: ${tlsMode}, localhost-only: ${localhostOnly})`
+    );
     return this.getStatus();
   }
 
@@ -142,13 +220,76 @@ export class WebServerManager {
    * Get current server status
    */
   getStatus(): WebServerStatus {
+    const tlsMode = this.cachedConfig.tlsMode ?? DEFAULT_TLS_MODE;
     return {
       running: this.server?.isRunning() ?? false,
-      port: this.server?.getPort() ?? null,
+      port: this.server?.getPort() ?? this.cachedConfig.port ?? DEFAULT_PORT,
       url: this.server?.getUrl() ?? null,
       token: this.authManager.getCurrentToken(),
       connectedClients: this.server?.getConnectedClientCount() ?? 0,
+      localhostOnly: this.cachedConfig.localhostOnly ?? false,
+      tlsMode,
+      tlsEnabled: tlsMode !== 'off',
     };
+  }
+
+  /**
+   * Get current settings (can be called when server is stopped)
+   */
+  getSettings(): WebServerSettings {
+    const settings: WebServerSettings = {
+      port: this.cachedConfig.port ?? DEFAULT_PORT,
+      localhostOnly: this.cachedConfig.localhostOnly ?? false,
+      tlsMode: this.cachedConfig.tlsMode ?? DEFAULT_TLS_MODE,
+    };
+    if (this.cachedConfig.customCertPath !== undefined) {
+      settings.customCertPath = this.cachedConfig.customCertPath;
+    }
+    if (this.cachedConfig.customKeyPath !== undefined) {
+      settings.customKeyPath = this.cachedConfig.customKeyPath;
+    }
+    return settings;
+  }
+
+  /**
+   * Update settings (must stop and restart server for changes to take effect)
+   */
+  async setSettings(settings: Partial<WebServerSettings>): Promise<void> {
+    // Update cached config
+    if (settings.port !== undefined) {
+      this.cachedConfig.port = settings.port;
+    }
+    if (settings.localhostOnly !== undefined) {
+      this.cachedConfig.localhostOnly = settings.localhostOnly;
+    }
+    if (settings.tlsMode !== undefined) {
+      this.cachedConfig.tlsMode = settings.tlsMode;
+    }
+    if (settings.customCertPath !== undefined) {
+      this.cachedConfig.customCertPath = settings.customCertPath;
+    }
+    if (settings.customKeyPath !== undefined) {
+      this.cachedConfig.customKeyPath = settings.customKeyPath;
+    }
+
+    // Persist to config file
+    const configToSave: Partial<StoredWebServerConfig> = {};
+    if (this.cachedConfig.port !== undefined) {
+      configToSave.port = this.cachedConfig.port;
+    }
+    if (this.cachedConfig.localhostOnly !== undefined) {
+      configToSave.localhostOnly = this.cachedConfig.localhostOnly;
+    }
+    if (this.cachedConfig.tlsMode !== undefined) {
+      configToSave.tlsMode = this.cachedConfig.tlsMode;
+    }
+    if (this.cachedConfig.customCertPath !== undefined) {
+      configToSave.customCertPath = this.cachedConfig.customCertPath;
+    }
+    if (this.cachedConfig.customKeyPath !== undefined) {
+      configToSave.customKeyPath = this.cachedConfig.customKeyPath;
+    }
+    await this.configManager.setWebServerConfig(configToSave);
   }
 
   /**

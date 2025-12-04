@@ -10,10 +10,16 @@ import { app } from 'electron';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
 
+export type TLSMode = 'off' | 'self-signed' | 'custom';
+
 export interface WebServerConfig {
   enabled?: boolean;
   port?: number;
   token?: string;
+  localhostOnly?: boolean;
+  tlsMode?: TLSMode;
+  customCertPath?: string;
+  customKeyPath?: string;
 }
 
 export interface AppConfig {
