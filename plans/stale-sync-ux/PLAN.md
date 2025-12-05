@@ -1,6 +1,6 @@
 # Stale Sync UX & Non-Blocking Startup
 
-**Overall Progress:** `40%`
+**Overall Progress:** `55%`
 
 ## Summary
 
@@ -53,22 +53,22 @@ When activity log entries reference CRDT sequences that will never arrive (due t
 
 ### Phase 3: Stale Sync Detection
 
-- [ ] 🟥 **Step 6: Detect stale activity entries**
-  - [ ] 🟥 6.1 Write test: entry with large sequence gap detected as stale
-  - [ ] 🟥 6.2 Define stale threshold (e.g., expectedSeq - highestSeq > 50)
-  - [ ] 🟥 6.3 Skip stale entries immediately instead of retrying 10x
-  - [ ] 🟥 6.4 Track stale entries for UI display
+- [x] 🟢 **Step 6: Detect stale activity entries** ✅ COMPLETE
+  - [x] 🟢 6.1 Write test: entry with large sequence gap detected as stale
+  - [x] 🟢 6.2 Define stale threshold (STALE_SEQUENCE_GAP_THRESHOLD = 50)
+  - [x] 🟢 6.3 Skip stale entries immediately instead of retrying 10x
+  - [x] 🟢 6.4 Track stale entries for UI display (getStaleEntries method)
 
-- [ ] 🟥 **Step 7: Self-heal own stale entries**
-  - [ ] 🟥 7.1 Write test: own stale entry auto-cleaned on detection
-  - [ ] 🟥 7.2 If sourceProfileId === currentProfileId AND entry is stale, delete it
-  - [ ] 🟥 7.3 Log self-healing action for debugging
-  - [ ] 🟥 7.4 No user intervention needed for own broken promises
+- [x] 🟢 **Step 7: Self-heal own stale entries** ✅ COMPLETE
+  - [x] 🟢 7.1 Write test: own stale entry auto-cleaned on detection
+  - [x] 🟢 7.2 If sourceInstanceId === ownInstanceId AND entry is stale, delete it
+  - [x] 🟢 7.3 Log self-healing action for debugging
+  - [x] 🟢 7.4 cleanupOwnStaleEntries() method implemented
 
-- [ ] 🟥 **Step 8: Expose stale sync state to renderer**
-  - [ ] 🟥 8.1 Add IPC: `sync:getStaleSyncs` returns stale entry details
-  - [ ] 🟥 8.2 Add IPC: `sync:skipStaleEntry` to accept data loss
-  - [ ] 🟥 8.3 Add IPC: `sync:retryStaleEntry` to force retry
+- [ ] 🟡 **Step 8: Expose stale sync state to renderer** (IN PROGRESS)
+  - [x] 🟢 8.1 Add IPC types: StaleSyncEntry interface defined
+  - [ ] 🟡 8.2 Add IPC handlers: getStaleSyncs, skipStaleEntry, retryStaleEntry
+  - [ ] 🟥 8.3 Add preload API and renderer type definitions
   - [ ] 🟥 8.4 Include profile presence info in stale sync data
 
 ### Phase 4: Stale Sync Toast

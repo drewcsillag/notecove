@@ -8,6 +8,25 @@
 import type { FileSystemAdapter } from './types';
 
 /**
+ * Default threshold for detecting stale entries.
+ * If the gap between an entry's sequence and the highest sequence from that instance
+ * exceeds this threshold, the entry is considered stale.
+ */
+export const STALE_SEQUENCE_GAP_THRESHOLD = 50;
+
+/**
+ * Information about a stale sync entry
+ */
+export interface StaleEntry {
+  noteId: string;
+  sourceInstanceId: string;
+  expectedSequence: number;
+  highestSequenceFromInstance: number;
+  gap: number;
+  detectedAt: number;
+}
+
+/**
  * Metrics callback interface for sync telemetry
  */
 export interface SyncMetricsCallbacks {
@@ -88,6 +107,9 @@ export class ActivitySync {
   private pendingSyncs = new Map<string, Promise<void>>(); // noteId -> pending sync promise
   private highestPendingSequence = new Map<string, { instanceSeq: string; sequence: number }>(); // noteId -> highest sequence
 
+  // Stale entries tracking for UI display
+  private staleEntries: StaleEntry[] = [];
+
   constructor(
     private fs: FileSystemAdapter,
     private instanceId: string,
@@ -124,6 +146,30 @@ export class ActivitySync {
    */
   getPendingNoteIds(): string[] {
     return Array.from(this.pendingSyncs.keys());
+  }
+
+  /**
+   * Get list of stale entries detected during sync
+   * Used by the UI to show which entries are stuck
+   */
+  getStaleEntries(): StaleEntry[] {
+    return [...this.staleEntries];
+  }
+
+  /**
+   * Clear stale entries (e.g., after user acknowledges them)
+   */
+  clearStaleEntries(): void {
+    this.staleEntries = [];
+  }
+
+  /**
+   * Remove a specific stale entry (e.g., after user skips it)
+   */
+  removeStaleEntry(noteId: string, sourceInstanceId: string): void {
+    this.staleEntries = this.staleEntries.filter(
+      (e) => !(e.noteId === noteId && e.sourceInstanceId === sourceInstanceId)
+    );
   }
 
   /**
@@ -184,6 +230,21 @@ export class ActivitySync {
             continue;
           }
 
+          // FIRST PASS: Find the highest sequence from this instance across ALL lines
+          // This is needed to detect stale entries (entries with sequence far behind the highest)
+          let highestSeqFromInstance = 0;
+          for (const line of lines) {
+            const parts = line.split('|');
+            if (parts.length < 2) continue;
+            const instanceSeq = parts[1];
+            if (!instanceSeq) continue;
+            const seqParts = instanceSeq.split('_');
+            const seq = parseInt(seqParts[1] ?? '0');
+            if (seq > highestSeqFromInstance) {
+              highestSeqFromInstance = seq;
+            }
+          }
+
           // Process only NEW lines (those beyond what we've already seen)
           // This correctly handles interleaved entries from different notes
           const newLines = lines.slice(lastSeenCount);
@@ -198,6 +259,31 @@ export class ActivitySync {
 
             const seqParts = instanceSeq.split('_');
             const sequence = parseInt(seqParts[1] ?? '0');
+
+            // STALE DETECTION: Check if this entry is too far behind the highest sequence
+            const gap = highestSeqFromInstance - sequence;
+            if (gap > STALE_SEQUENCE_GAP_THRESHOLD) {
+              console.warn(
+                `[ActivitySync] Stale entry detected: note ${noteId} at seq ${sequence}, highest from ${otherInstanceId} is ${highestSeqFromInstance} (gap=${gap})`
+              );
+              // Track this stale entry for UI display
+              // Avoid duplicates
+              const existingStale = this.staleEntries.find(
+                (e) => e.noteId === noteId && e.sourceInstanceId === otherInstanceId
+              );
+              if (!existingStale) {
+                this.staleEntries.push({
+                  noteId,
+                  sourceInstanceId: otherInstanceId,
+                  expectedSequence: sequence,
+                  highestSequenceFromInstance: highestSeqFromInstance,
+                  gap,
+                  detectedAt: Date.now(),
+                });
+              }
+              // Skip syncing this stale entry - it will never arrive
+              continue;
+            }
 
             affectedNotes.add(noteId);
 
@@ -479,6 +565,101 @@ export class ActivitySync {
     // No-op for now - FileSystemAdapter doesn't have stat() or deleteFile()
     // methods for listing file metadata or selective deletion.
     // This is not critical as orphaned logs are small and harmless.
+  }
+
+  /**
+   * Clean up our own stale activity log entries
+   *
+   * This is "self-healing" - when we detect our own broken promises (entries
+   * that reference sequences far behind our current sequence), we can safely
+   * remove them since they will never be fulfilled.
+   *
+   * @returns Array of cleaned entries (noteId, sequence pairs)
+   */
+  async cleanupOwnStaleEntries(): Promise<Array<{ noteId: string; sequence: number }>> {
+    const cleaned: Array<{ noteId: string; sequence: number }> = [];
+
+    try {
+      const filePath = this.fs.joinPath(this.activityDir, `${this.instanceId}.log`);
+
+      // Check if our activity log exists
+      const exists = await this.fs.exists(filePath);
+      if (!exists) {
+        return cleaned;
+      }
+
+      const data = await this.fs.readFile(filePath);
+      const content = new TextDecoder().decode(data);
+
+      // Parse lines
+      const allLines = content.split('\n');
+      const hasTrailingNewline = content.endsWith('\n');
+      const lines = hasTrailingNewline
+        ? allLines.filter((l) => l.length > 0)
+        : allLines.slice(0, -1).filter((l) => l.length > 0);
+
+      if (lines.length === 0) {
+        return cleaned;
+      }
+
+      // Find highest sequence in our log
+      let highestSeq = 0;
+      for (const line of lines) {
+        const parts = line.split('|');
+        if (parts.length < 2) continue;
+        const instanceSeq = parts[1];
+        if (!instanceSeq) continue;
+        const seqParts = instanceSeq.split('_');
+        const seq = parseInt(seqParts[1] ?? '0');
+        if (seq > highestSeq) {
+          highestSeq = seq;
+        }
+      }
+
+      // Filter out stale entries
+      const nonStaleLines: string[] = [];
+      for (const line of lines) {
+        const parts = line.split('|');
+        if (parts.length < 2) {
+          nonStaleLines.push(line);
+          continue;
+        }
+
+        const noteId = parts[0];
+        const instanceSeq = parts[1];
+        if (!noteId || !instanceSeq) {
+          nonStaleLines.push(line);
+          continue;
+        }
+
+        const seqParts = instanceSeq.split('_');
+        const seq = parseInt(seqParts[1] ?? '0');
+        const gap = highestSeq - seq;
+
+        if (gap > STALE_SEQUENCE_GAP_THRESHOLD) {
+          // This is a stale entry - clean it up
+          console.log(
+            `[ActivitySync] Self-healing own stale entry: note ${noteId} at seq ${seq} (gap=${gap})`
+          );
+          cleaned.push({ noteId, sequence: seq });
+        } else {
+          nonStaleLines.push(line);
+        }
+      }
+
+      // Write compacted log if we removed any entries
+      if (cleaned.length > 0) {
+        const newContent = nonStaleLines.map((l) => l + '\n').join('');
+        await this.fs.writeFile(filePath, new TextEncoder().encode(newContent));
+        console.log(
+          `[ActivitySync] Self-healed ${cleaned.length} stale entries, compacted log to ${nonStaleLines.length} entries`
+        );
+      }
+    } catch (error) {
+      console.error('[ActivitySync] Failed to cleanup own stale entries:', error);
+    }
+
+    return cleaned;
   }
 
   /**
