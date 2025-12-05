@@ -92,3 +92,45 @@ function generateProfileId(): string {
     return v.toString(16);
   });
 }
+
+/**
+ * Profile Presence - identifies a profile to other devices
+ *
+ * Each profile writes a presence file to the SD when it connects,
+ * enabling the Stale Sync UI to show meaningful device/user names
+ * instead of UUIDs.
+ *
+ * File location: {SD}/profiles/{profileId}.json
+ *
+ * @see PROFILE-PRESENCE.md for full design
+ */
+export interface ProfilePresence {
+  /** Profile UUID (same as activity log filename and Profile.id) */
+  profileId: string;
+
+  /** Display name for the profile (e.g., "Personal", "Work") */
+  profileName: string;
+
+  /** @mention handle (e.g., "@drew") */
+  user: string;
+
+  /** Display name (e.g., "Drew Colthorp") */
+  username: string;
+
+  /** Machine hostname (e.g., "Drews-MacBook-Pro.local") */
+  hostname: string;
+
+  /** Operating system platform */
+  platform: 'darwin' | 'win32' | 'linux' | 'ios';
+
+  /** App version (e.g., "0.1.2") */
+  appVersion: string;
+
+  /** Timestamp when the presence file was last updated (ms since epoch) */
+  lastUpdated: number;
+}
+
+/**
+ * Supported platform types for ProfilePresence
+ */
+export type ProfilePresencePlatform = ProfilePresence['platform'];

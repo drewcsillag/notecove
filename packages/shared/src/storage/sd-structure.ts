@@ -29,6 +29,7 @@ export class SyncDirectoryStructure {
       notes: this.fs.joinPath(this.config.path, 'notes'),
       folders: this.fs.joinPath(this.config.path, 'folders'),
       activity: this.fs.joinPath(this.config.path, 'activity'),
+      profiles: this.fs.joinPath(this.config.path, 'profiles'),
     };
   }
 
@@ -71,6 +72,7 @@ export class SyncDirectoryStructure {
     await this.fs.mkdir(paths.notes);
     await this.fs.mkdir(paths.folders);
     await this.fs.mkdir(paths.activity);
+    await this.fs.mkdir(paths.profiles);
 
     // Create folder structure
     const folderPaths = this.getFolderPaths();
@@ -177,5 +179,21 @@ export class SyncDirectoryStructure {
   getPackFilePath(noteId: UUID, filename: string): string {
     const packsPath = this.getPacksPath(noteId);
     return this.fs.joinPath(packsPath, filename);
+  }
+
+  /**
+   * Get profiles directory path
+   */
+  getProfilesPath(): string {
+    return this.getPaths().profiles;
+  }
+
+  /**
+   * Get profile presence file path for a specific profile
+   * File format: {SD}/profiles/{profileId}.json
+   */
+  getProfilePresenceFilePath(profileId: string): string {
+    const profilesPath = this.getProfilesPath();
+    return this.fs.joinPath(profilesPath, `${profileId}.json`);
   }
 }

@@ -17,6 +17,7 @@ import type {
   FolderSyncState,
   ActivityLogState,
   SequenceState,
+  CachedProfilePresence,
 } from './schema';
 import type { UUID } from '../types';
 
@@ -481,6 +482,37 @@ export interface SequenceStateOperations {
 }
 
 /**
+ * Profile presence cache operations
+ * @see plans/stale-sync-ux/PROFILE-PRESENCE.md
+ */
+export interface ProfilePresenceCacheOperations {
+  /**
+   * Get cached presence for a profile in an SD
+   */
+  getProfilePresenceCache(profileId: string, sdId: string): Promise<CachedProfilePresence | null>;
+
+  /**
+   * Get all cached presence entries for an SD
+   */
+  getProfilePresenceCacheBySd(sdId: string): Promise<CachedProfilePresence[]>;
+
+  /**
+   * Insert or update cached profile presence
+   */
+  upsertProfilePresenceCache(presence: CachedProfilePresence): Promise<void>;
+
+  /**
+   * Delete cached profile presence
+   */
+  deleteProfilePresenceCache(profileId: string, sdId: string): Promise<void>;
+
+  /**
+   * Delete all cached presence for an SD
+   */
+  deleteProfilePresenceCacheBySd(sdId: string): Promise<void>;
+}
+
+/**
  * Migration result
  */
 export enum MigrationResult {
@@ -507,7 +539,8 @@ export interface Database
     StorageDirOperations,
     SchemaVersionOperations,
     NoteSyncStateOperations,
-    FolderSyncStateOperations {
+    FolderSyncStateOperations,
+    ProfilePresenceCacheOperations {
   /**
    * Get the underlying adapter
    */

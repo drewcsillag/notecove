@@ -23,6 +23,7 @@ import {
   ProfileLock,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
+import type { SyncStatus, StaleSyncEntry } from './ipc/types';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
@@ -39,6 +40,8 @@ import { BackupManager } from './backup-manager';
 import { showProfilePicker, getProfileStorage } from './profile-picker';
 import { parseCliArgs } from './cli/cli-parser';
 import { WebServerManager } from './web-server/manager';
+import { ProfilePresenceManager } from './profile-presence-manager';
+import * as os from 'os';
 
 let mainWindow: BrowserWindow | null = null;
 let webServerManager: WebServerManager | null = null;
@@ -55,6 +58,7 @@ let diagnosticsManager: DiagnosticsManager | null = null;
 let backupManager: BackupManager | null = null;
 let sdMarker: SDMarker | null = null;
 let profileLock: ProfileLock | null = null;
+let profilePresenceManager: ProfilePresenceManager | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -526,9 +530,11 @@ async function ensureDefaultNote(
         );
         console.log('[ensureDefaultNote] Waiting for content to sync from other instances...');
 
-        // Poll for content to arrive (max 10 seconds in 500ms intervals)
-        const maxWaitMs = 10000;
-        const pollIntervalMs = 500;
+        // Poll for content to arrive (max 2 seconds in 200ms intervals)
+        // Keep this short to avoid blocking startup - stale syncs will be handled
+        // by the background sync mechanism
+        const maxWaitMs = 2000;
+        const pollIntervalMs = 200;
         const startTime = Date.now();
 
         while (Date.now() - startTime < maxWaitMs) {
@@ -610,7 +616,20 @@ async function ensureDefaultNote(
 // App lifecycle
 // Create application menu
 /**
- * Set up file watchers and activity sync for a Storage Directory
+ * Result of setting up SD watchers
+ */
+interface SetupSDWatchersResult {
+  /**
+   * Function to run the initial sync. Can be awaited for blocking behavior
+   * or called without await for background sync.
+   */
+  runInitialSync: () => Promise<void>;
+}
+
+/**
+ * Set up file watchers and activity sync for a Storage Directory.
+ * Returns an object with a runInitialSync function that performs the initial sync.
+ * This allows the caller to decide whether to block on sync or run it in background.
  */
 async function setupSDWatchers(
   sdId: string,
@@ -620,7 +639,7 @@ async function setupSDWatchers(
   storageManager: AppendLogManager,
   crdtManager: CRDTManager,
   db: Database
-): Promise<void> {
+): Promise<SetupSDWatchersResult> {
   console.log(`[Init] Setting up watchers for SD: ${sdId} at ${sdPath}`);
 
   const folderLogsPath = join(sdPath, 'folders', 'logs');
@@ -1263,81 +1282,32 @@ async function setupSDWatchers(
 
   sdActivityWatchers.set(sdId, activityWatcher);
 
-  // Perform initial sync from other instances on startup
-  console.log(`[Init] Performing initial sync from other instances for SD: ${sdId}`);
-  try {
-    const affectedNotes = await activitySync.syncFromOtherInstances();
+  console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
 
-    // Wait for all pending syncs to complete before broadcasting
-    await activitySync.waitForPendingSyncs();
-
-    console.log(
-      `[Init] Initial sync complete for SD: ${sdId}, affected notes:`,
-      affectedNotes.size
-    );
-
-    // Reindex tags for affected notes
-    if (affectedNotes.size > 0) {
-      await reindexTagsForNotes(affectedNotes, crdtManager, db);
-    }
-
-    // Broadcast updates to all windows for affected notes
-    if (affectedNotes.size > 0) {
-      const noteIds = Array.from(affectedNotes);
-      for (const window of BrowserWindow.getAllWindows()) {
-        window.webContents.send('note:external-update', {
-          operation: 'sync',
-          noteIds,
-        });
-      }
-    }
-  } catch (error) {
-    console.error(`[Init] Failed to perform initial sync for SD: ${sdId}:`, error);
-  } finally {
-    // Mark startup as complete to allow file watcher to process subsequent changes
-    // This prevents race conditions where file watcher triggers during initial sync
-    startupComplete = true;
-    console.log(`[Init] Startup grace period ended for SD: ${sdId}`);
-
-    // Broadcast to renderer for test instrumentation
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send('test:grace-period-ended', { sdId });
-    }
-  }
-
-  // Set up polling backup for activity sync
-  // Chokidar may miss/coalesce rapid file changes, so poll every 3 seconds as backup
-  let pollCount = 0;
-  const pollInterval = setInterval(() => {
-    void (async () => {
-      pollCount++;
+  // Return a function that performs the initial sync
+  // This allows the caller to decide whether to await it (blocking) or run in background
+  return {
+    runInitialSync: async () => {
+      // Perform initial sync from other instances on startup
+      console.log(`[Init] Performing initial sync from other instances for SD: ${sdId}`);
       try {
-        // Log watermarks every 10th poll (30 seconds) for debugging
-        if (pollCount % 10 === 0) {
-          const watermarks = activitySync.getWatermarks();
-          console.log(`[ActivitySync Poll ${sdId}] Watermarks:`, Object.fromEntries(watermarks));
-        }
-
         const affectedNotes = await activitySync.syncFromOtherInstances();
 
+        // Wait for all pending syncs to complete before broadcasting
+        await activitySync.waitForPendingSyncs();
+
+        console.log(
+          `[Init] Initial sync complete for SD: ${sdId}, affected notes:`,
+          affectedNotes.size
+        );
+
+        // Reindex tags for affected notes
         if (affectedNotes.size > 0) {
-          console.log(
-            `[ActivitySync Poll ${sdId}] Found changes via poll:`,
-            Array.from(affectedNotes)
-          );
-          // Also log watermarks when changes found
-          console.log(
-            `[ActivitySync Poll ${sdId}] Watermarks after sync:`,
-            Object.fromEntries(activitySync.getWatermarks())
-          );
-
-          // Wait for pending syncs to complete
-          await activitySync.waitForPendingSyncs();
-
-          // Reindex tags for affected notes
           await reindexTagsForNotes(affectedNotes, crdtManager, db);
+        }
 
-          // Broadcast updates to all windows
+        // Broadcast updates to all windows for affected notes
+        if (affectedNotes.size > 0) {
           const noteIds = Array.from(affectedNotes);
           for (const window of BrowserWindow.getAllWindows()) {
             window.webContents.send('note:external-update', {
@@ -1347,18 +1317,81 @@ async function setupSDWatchers(
           }
         }
       } catch (error) {
-        // Don't log every poll failure, just errors
-        if (!String(error).includes('ENOENT')) {
-          console.error(`[ActivitySync Poll ${sdId}] Poll failed:`, error);
+        console.error(`[Init] Failed to perform initial sync for SD: ${sdId}:`, error);
+      } finally {
+        // Mark startup as complete to allow file watcher to process subsequent changes
+        // This prevents race conditions where file watcher triggers during initial sync
+        startupComplete = true;
+        console.log(`[Init] Startup grace period ended for SD: ${sdId}`);
+
+        // Broadcast to renderer for test instrumentation
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('test:grace-period-ended', { sdId });
+        }
+
+        // Broadcast sync complete for UI status tracking
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('sync:initial-sync-complete', { sdId });
         }
       }
-    })();
-  }, 3000);
 
-  // Store interval for cleanup
-  sdActivityPollIntervals.set(sdId, pollInterval);
+      // Set up polling backup for activity sync AFTER initial sync completes
+      // Chokidar may miss/coalesce rapid file changes, so poll every 3 seconds as backup
+      let pollCount = 0;
+      const pollInterval = setInterval(() => {
+        void (async () => {
+          pollCount++;
+          try {
+            // Log watermarks every 10th poll (30 seconds) for debugging
+            if (pollCount % 10 === 0) {
+              const watermarks = activitySync.getWatermarks();
+              console.log(
+                `[ActivitySync Poll ${sdId}] Watermarks:`,
+                Object.fromEntries(watermarks)
+              );
+            }
 
-  console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
+            const affectedNotes = await activitySync.syncFromOtherInstances();
+
+            if (affectedNotes.size > 0) {
+              console.log(
+                `[ActivitySync Poll ${sdId}] Found changes via poll:`,
+                Array.from(affectedNotes)
+              );
+              // Also log watermarks when changes found
+              console.log(
+                `[ActivitySync Poll ${sdId}] Watermarks after sync:`,
+                Object.fromEntries(activitySync.getWatermarks())
+              );
+
+              // Wait for pending syncs to complete
+              await activitySync.waitForPendingSyncs();
+
+              // Reindex tags for affected notes
+              await reindexTagsForNotes(affectedNotes, crdtManager, db);
+
+              // Broadcast updates to all windows
+              const noteIds = Array.from(affectedNotes);
+              for (const window of BrowserWindow.getAllWindows()) {
+                window.webContents.send('note:external-update', {
+                  operation: 'sync',
+                  noteIds,
+                });
+              }
+            }
+          } catch (error) {
+            // Don't log every poll failure, just errors
+            if (!String(error).includes('ENOENT')) {
+              console.error(`[ActivitySync Poll ${sdId}] Poll failed:`, error);
+            }
+          }
+        })();
+      }, 3000);
+
+      // Store interval for cleanup
+      sdActivityPollIntervals.set(sdId, pollInterval);
+    },
+  };
 }
 
 function createMenu(): void {
@@ -1605,6 +1638,15 @@ function createMenu(): void {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.send('menu:viewHistory');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Sync Status',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:syncStatus');
             }
           },
         },
@@ -2136,6 +2178,22 @@ void app.whenReady().then(async () => {
     // This ensures demo folders are created while we know the updates directory exists
     await crdtManager.loadFolderTree('default');
 
+    // Initialize ProfilePresenceManager for writing presence files to SDs
+    // This enables the Stale Sync UI to show meaningful device/user names
+    const platform = process.platform as 'darwin' | 'win32' | 'linux';
+    profilePresenceManager = new ProfilePresenceManager(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      fsAdapter as any,
+      database,
+      {
+        profileId: selectedProfileId ?? instanceId,
+        profileName: selectedProfileName ?? 'Default',
+        hostname: os.hostname(),
+        platform,
+        appVersion: app.getVersion(),
+      }
+    );
+
     // Handler for when new SD is created (for IPC)
     const handleNewStorageDir = async (sdId: string, sdPath: string): Promise<void> => {
       if (!database) {
@@ -2199,7 +2257,7 @@ void app.whenReady().then(async () => {
         // 5. Set up watchers for this SD
         sendProgress(5, 6, 'Setting up file watchers...');
         console.log(`[Init] Step 5: Setting up watchers`);
-        await setupSDWatchers(
+        const sdWatcherResult = await setupSDWatchers(
           sdId,
           sdPath,
           fsAdapter,
@@ -2208,7 +2266,16 @@ void app.whenReady().then(async () => {
           crdtManager,
           database
         );
-        console.log(`[Init] Step 5: Watchers set up successfully`);
+        // For runtime SD addition, run initial sync immediately (blocking)
+        // since the user is actively waiting for the SD to be ready
+        await sdWatcherResult.runInitialSync();
+        console.log(`[Init] Step 5: Watchers set up and initial sync complete`);
+
+        // 5.5 Write profile presence to the new SD
+        if (profilePresenceManager) {
+          await profilePresenceManager.writePresence(sdPath);
+          console.log(`[Init] Step 5.5: Profile presence written`);
+        }
 
         // 6. Scan for existing notes on disk and load them into database
         console.log(`[Init] Step 6: Scanning for existing notes`);
@@ -2371,7 +2438,143 @@ void app.whenReady().then(async () => {
       backupManager,
       createWindow,
       handleNewStorageDir,
-      (sdId: string) => sdDeletionLoggers.get(sdId)
+      (sdId: string) => sdDeletionLoggers.get(sdId),
+      // getSyncStatus callback - returns sync status for UI indicator
+      (): SyncStatus => {
+        const perSd: SyncStatus['perSd'] = [];
+        let totalPending = 0;
+
+        for (const [sdId, activitySync] of sdActivitySyncs.entries()) {
+          const count = activitySync.getPendingSyncCount();
+          const noteIds = activitySync.getPendingNoteIds();
+          totalPending += count;
+          // We don't have easy access to SD names here, so use sdId for now
+          // The UI can look up the name if needed
+          perSd.push({
+            sdId,
+            sdName: sdId, // Will be resolved in UI
+            pendingCount: count,
+            pendingNoteIds: noteIds,
+          });
+        }
+
+        return {
+          pendingCount: totalPending,
+          perSd,
+          isSyncing: totalPending > 0,
+        };
+      },
+      // getStaleSyncs callback - returns stale sync entries for UI display
+      async (): Promise<StaleSyncEntry[]> => {
+        const result: StaleSyncEntry[] = [];
+
+        // Database may not be initialized yet
+        if (!database) {
+          return result;
+        }
+
+        for (const [sdId, activitySync] of sdActivitySyncs.entries()) {
+          const staleEntries = activitySync.getStaleEntries();
+
+          // Get SD name for display
+          const sd = await database.getStorageDir(sdId);
+          const sdName = sd?.name ?? sdId;
+
+          for (const entry of staleEntries) {
+            // Look up note title from database
+            const noteCache = await database.getNote(entry.noteId);
+
+            // Look up source profile from presence cache
+            const profilePresence = await database.getProfilePresenceCache(
+              entry.sourceInstanceId,
+              sdId
+            );
+            const sourceProfile = profilePresence
+              ? {
+                  profileId: profilePresence.profileId,
+                  profileName: profilePresence.profileName ?? 'Unknown',
+                  hostname: profilePresence.hostname ?? 'Unknown Device',
+                  lastSeen: profilePresence.lastUpdated ?? profilePresence.cachedAt,
+                }
+              : undefined;
+
+            // Build the entry, only including optional fields if they have values
+            const staleSyncEntry: StaleSyncEntry = {
+              sdId,
+              sdName,
+              noteId: entry.noteId,
+              sourceInstanceId: entry.sourceInstanceId,
+              expectedSequence: entry.expectedSequence,
+              highestSequenceFromInstance: entry.highestSequenceFromInstance,
+              gap: entry.gap,
+              detectedAt: entry.detectedAt,
+            };
+
+            // Add optional fields only if they have values
+            if (noteCache?.title) {
+              staleSyncEntry.noteTitle = noteCache.title;
+            }
+            if (sourceProfile) {
+              staleSyncEntry.sourceProfile = sourceProfile;
+            }
+
+            result.push(staleSyncEntry);
+          }
+        }
+
+        return result;
+      },
+      // skipStaleEntry callback - skip a stale entry (accept data loss)
+      (
+        sdId: string,
+        noteId: string,
+        sourceInstanceId: string
+      ): Promise<{ success: boolean; error?: string }> => {
+        const activitySync = sdActivitySyncs.get(sdId);
+        if (!activitySync) {
+          return Promise.resolve({
+            success: false,
+            error: `Storage directory ${sdId} not found`,
+          });
+        }
+
+        try {
+          activitySync.removeStaleEntry(noteId, sourceInstanceId);
+          // TODO: Update watermark to skip past missing sequences
+          console.log(
+            `[Stale Sync] Skipped stale entry: sdId=${sdId}, noteId=${noteId}, sourceInstanceId=${sourceInstanceId}`
+          );
+          return Promise.resolve({ success: true });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return Promise.resolve({ success: false, error: errorMessage });
+        }
+      },
+      // retryStaleEntry callback - retry syncing a stale entry
+      async (
+        sdId: string,
+        noteId: string,
+        sourceInstanceId: string
+      ): Promise<{ success: boolean; error?: string }> => {
+        const activitySync = sdActivitySyncs.get(sdId);
+        if (!activitySync) {
+          return { success: false, error: `Storage directory ${sdId} not found` };
+        }
+
+        try {
+          // Remove from stale entries so it can be retried
+          activitySync.removeStaleEntry(noteId, sourceInstanceId);
+          // Force a sync cycle
+          await activitySync.syncFromOtherInstances();
+          console.log(
+            `[Stale Sync] Retried stale entry: sdId=${sdId}, noteId=${noteId}, sourceInstanceId=${sourceInstanceId}`
+          );
+          return { success: true };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return { success: false, error: errorMessage };
+        }
+      }
     );
 
     // Set up broadcast callback for CRDT manager to send updates to renderer
@@ -2401,9 +2604,12 @@ void app.whenReady().then(async () => {
     // activity sync imports empty note files before welcome note is created
     await ensureDefaultNote(database, crdtManager, storageDir, instanceId);
 
+    // Collect initial sync functions to run in background after window creation
+    const initialSyncFunctions: (() => Promise<void>)[] = [];
+
     // Set up watchers for default SD AFTER ensureDefaultNote
     // This ensures the welcome note is created before activity sync runs
-    await setupSDWatchers(
+    const defaultSDResult = await setupSDWatchers(
       'default',
       storageDir,
       fsAdapter,
@@ -2412,6 +2618,8 @@ void app.whenReady().then(async () => {
       crdtManager,
       database
     );
+    initialSyncFunctions.push(defaultSDResult.runInitialSync);
+
     if (process.env['NODE_ENV'] === 'test') {
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',
@@ -2419,29 +2627,8 @@ void app.whenReady().then(async () => {
       );
     }
 
-    // Run auto-cleanup for old deleted notes (30-day threshold)
-    console.log('[Init] Running auto-cleanup for old deleted notes...');
-    if (process.env['NODE_ENV'] === 'test') {
-      await fs.appendFile(
-        '/var/tmp/auto-cleanup.log',
-        `${new Date().toISOString()} [Init] About to run auto-cleanup\n`
-      );
-    }
-    await ipcHandlers.runAutoCleanup(30);
-    if (process.env['NODE_ENV'] === 'test') {
-      await fs.appendFile(
-        '/var/tmp/auto-cleanup.log',
-        `${new Date().toISOString()} [Init] Auto-cleanup completed\n`
-      );
-    }
-
-    // Recover incomplete cross-SD note moves
-    console.log('[Init] Checking for incomplete note moves...');
-    await noteMoveManager.recoverIncompleteMoves();
-    await noteMoveManager.cleanupOldMoves();
-    console.log('[Init] Note move recovery completed');
-
     // Set up watchers for all other registered SDs (only if fully initialized)
+    // Don't run initial sync yet - will run in background after window creation
     for (const sd of allSDs) {
       if (sd.id !== 'default') {
         // Check if SD has basic structure (notes directory)
@@ -2457,7 +2644,7 @@ void app.whenReady().then(async () => {
           }
 
           console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
-          await setupSDWatchers(
+          const sdResult = await setupSDWatchers(
             sd.id,
             sd.path,
             fsAdapter,
@@ -2466,6 +2653,7 @@ void app.whenReady().then(async () => {
             crdtManager,
             database
           );
+          initialSyncFunctions.push(sdResult.runInitialSync);
         } else {
           console.log(
             `[Init] Skipping watchers for SD: ${sd.id} (not fully initialized: ${sd.path})`
@@ -2473,6 +2661,14 @@ void app.whenReady().then(async () => {
         }
       }
     }
+
+    // Write profile presence to all SDs on startup
+    // This enables other devices to see who is using each SD
+    const allSDPaths = [
+      storageDir,
+      ...allSDs.filter((sd) => sd.id !== 'default').map((sd) => sd.path),
+    ];
+    await profilePresenceManager.writePresenceToAllSDs(allSDPaths);
 
     // Periodic compaction of activity logs for all SDs (every 5 minutes)
     compactionInterval = setInterval(
@@ -2628,7 +2824,44 @@ void app.whenReady().then(async () => {
     // Create menu
     createMenu();
 
+    // Create window FIRST - before running initial syncs
+    // This ensures the app appears quickly regardless of sync status
     createWindow();
+
+    // Run initial syncs in background (non-blocking)
+    // This allows the window to appear immediately while sync happens in background
+    console.log(`[Init] Starting background sync for ${initialSyncFunctions.length} SD(s)...`);
+    void Promise.all(initialSyncFunctions.map((fn) => fn())).then(async () => {
+      console.log('[Init] All initial syncs complete');
+
+      // Run cleanup and recovery AFTER syncs complete
+      // These operations may depend on sync state being up-to-date
+      console.log('[Init] Running auto-cleanup for old deleted notes...');
+      if (process.env['NODE_ENV'] === 'test') {
+        await fs.appendFile(
+          '/var/tmp/auto-cleanup.log',
+          `${new Date().toISOString()} [Init] About to run auto-cleanup\n`
+        );
+      }
+      await ipcHandlers?.runAutoCleanup(30);
+      if (process.env['NODE_ENV'] === 'test') {
+        await fs.appendFile(
+          '/var/tmp/auto-cleanup.log',
+          `${new Date().toISOString()} [Init] Auto-cleanup completed\n`
+        );
+      }
+
+      // Recover incomplete cross-SD note moves
+      console.log('[Init] Checking for incomplete note moves...');
+      await noteMoveManager?.recoverIncompleteMoves();
+      await noteMoveManager?.cleanupOldMoves();
+      console.log('[Init] Note move recovery completed');
+
+      // Broadcast that all initial syncs are complete
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('sync:all-initial-syncs-complete');
+      }
+    });
 
     if (process.env['NODE_ENV'] === 'test') {
       console.log('[TEST MODE] Window created successfully');

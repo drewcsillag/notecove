@@ -80,6 +80,17 @@ const mockElectronAPI = {
   },
   sync: {
     onProgress: jest.fn(() => () => {}),
+    getStatus: jest.fn().mockResolvedValue({
+      pendingCount: 0,
+      perSd: [],
+      isSyncing: false,
+    }),
+    onStatusChanged: jest.fn(() => () => {}),
+    getStaleSyncs: jest.fn().mockResolvedValue([]),
+    onStaleEntriesChanged: jest.fn(() => () => {}),
+    skipStaleEntry: jest.fn().mockResolvedValue({ success: true }),
+    retryStaleEntry: jest.fn().mockResolvedValue({ success: true }),
+    exportDiagnostics: jest.fn().mockResolvedValue({ success: true }),
   },
   appState: {
     get: jest.fn().mockResolvedValue(null),
@@ -101,6 +112,7 @@ const mockElectronAPI = {
     onExportAllNotes: jest.fn(() => () => {}),
     onReloadFromCRDTLogs: jest.fn(() => () => {}),
     onReindexNotes: jest.fn(() => () => {}),
+    onSyncStatus: jest.fn(() => () => {}),
   },
   export: {
     selectDirectory: jest.fn(() => Promise.resolve(null)),

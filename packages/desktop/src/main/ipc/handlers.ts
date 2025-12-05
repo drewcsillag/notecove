@@ -13,7 +13,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
-import type { NoteMetadata } from './types';
+import type { NoteMetadata, SyncStatus, StaleSyncEntry } from './types';
 import type { Database, NoteCache, AppendLogManager, UUID, DeletionLogger } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags, extractLinks } from '@notecove/shared';
@@ -22,6 +22,34 @@ import { extractTags, extractLinks } from '@notecove/shared';
  * Callback type for getting deletion logger by SD
  */
 export type GetDeletionLoggerFn = (sdId: string) => DeletionLogger | undefined;
+
+/**
+ * Callback type for getting sync status
+ */
+export type GetSyncStatusFn = () => SyncStatus;
+
+/**
+ * Callback type for getting stale sync entries
+ */
+export type GetStaleSyncsFn = () => Promise<StaleSyncEntry[]>;
+
+/**
+ * Callback type for skipping a stale sync entry
+ */
+export type SkipStaleEntryFn = (
+  sdId: string,
+  noteId: string,
+  sourceInstanceId: string
+) => Promise<{ success: boolean; error?: string }>;
+
+/**
+ * Callback type for retrying a stale sync entry
+ */
+export type RetryStaleEntryFn = (
+  sdId: string,
+  noteId: string,
+  sourceInstanceId: string
+) => Promise<{ success: boolean; error?: string }>;
 import {
   type ActivitySession,
   type ReconstructionPoint,
@@ -51,7 +79,11 @@ export class IPCHandlers {
     private backupManager: BackupManager,
     private createWindowFn?: (options?: { noteId?: string; minimal?: boolean }) => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>,
-    private getDeletionLogger?: GetDeletionLoggerFn
+    private getDeletionLogger?: GetDeletionLoggerFn,
+    private getSyncStatus?: GetSyncStatusFn,
+    private getStaleSyncs?: GetStaleSyncsFn,
+    private skipStaleEntry?: SkipStaleEntryFn,
+    private retryStaleEntry?: RetryStaleEntryFn
   ) {
     this.registerHandlers();
   }
@@ -198,6 +230,13 @@ export class IPCHandlers {
     // App state operations
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
     ipcMain.handle('appState:set', this.handleSetAppState.bind(this));
+
+    // Sync status operations
+    ipcMain.handle('sync:getStatus', this.handleGetSyncStatus.bind(this));
+    ipcMain.handle('sync:getStaleSyncs', this.handleGetStaleSyncs.bind(this));
+    ipcMain.handle('sync:skipStaleEntry', this.handleSkipStaleEntry.bind(this));
+    ipcMain.handle('sync:retryStaleEntry', this.handleRetryStaleEntry.bind(this));
+    ipcMain.handle('sync:exportDiagnostics', this.handleExportSyncDiagnostics.bind(this));
 
     // Config operations
     ipcMain.handle('config:getDatabasePath', this.handleGetDatabasePath.bind(this));
@@ -1748,6 +1787,108 @@ export class IPCHandlers {
     value: string
   ): Promise<void> {
     await this.database.setState(key, value);
+  }
+
+  // ============================================================================
+  // Sync Status Handlers
+  // ============================================================================
+
+  private async handleGetSyncStatus(): Promise<SyncStatus> {
+    if (!this.getSyncStatus) {
+      return {
+        pendingCount: 0,
+        perSd: [],
+        isSyncing: false,
+      };
+    }
+    return this.getSyncStatus();
+  }
+
+  private async handleGetStaleSyncs(): Promise<StaleSyncEntry[]> {
+    if (!this.getStaleSyncs) {
+      return [];
+    }
+    return this.getStaleSyncs();
+  }
+
+  private async handleSkipStaleEntry(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    noteId: string,
+    sourceInstanceId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.skipStaleEntry) {
+      return { success: false, error: 'Skip stale entry not available' };
+    }
+    return this.skipStaleEntry(sdId, noteId, sourceInstanceId);
+  }
+
+  private async handleRetryStaleEntry(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    noteId: string,
+    sourceInstanceId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.retryStaleEntry) {
+      return { success: false, error: 'Retry stale entry not available' };
+    }
+    return this.retryStaleEntry(sdId, noteId, sourceInstanceId);
+  }
+
+  private async handleExportSyncDiagnostics(
+    _event: IpcMainInvokeEvent
+  ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+    try {
+      // Show save dialog
+      const focusedWindow = BrowserWindow.getFocusedWindow();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const defaultFilename = `notecove-sync-diagnostics-${timestamp}.json`;
+
+      const dialogOptions = {
+        title: 'Export Sync Diagnostics',
+        defaultPath: defaultFilename,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      };
+
+      const { filePath, canceled } = focusedWindow
+        ? await dialog.showSaveDialog(focusedWindow, dialogOptions)
+        : await dialog.showSaveDialog(dialogOptions);
+
+      if (canceled || !filePath) {
+        return { success: false, error: 'Export cancelled' };
+      }
+
+      // Collect diagnostics data
+      // Note: Profile presence info is included in staleEntries.sourceProfile
+      const { app } = await import('electron');
+      const diagnostics: {
+        exportedAt: string;
+        appVersion: string;
+        platform: string;
+        osVersion: string;
+        staleEntries: StaleSyncEntry[];
+        storageDirs: { id: string; name: string; path: string }[];
+      } = {
+        exportedAt: new Date().toISOString(),
+        appVersion: app.getVersion(),
+        platform: os.platform(),
+        osVersion: os.release(),
+        staleEntries: this.getStaleSyncs ? await this.getStaleSyncs() : [],
+        storageDirs: (await this.database.getAllStorageDirs()).map((sd) => ({
+          id: sd.id,
+          name: sd.name,
+          path: sd.path,
+        })),
+      };
+
+      // Write to file
+      await fs.writeFile(filePath, JSON.stringify(diagnostics, null, 2), 'utf-8');
+
+      return { success: true, filePath };
+    } catch (err) {
+      console.error('[IPCHandlers] Failed to export sync diagnostics:', err);
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
   }
 
   // ============================================================================

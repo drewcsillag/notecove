@@ -111,7 +111,14 @@ export const browserApiStub: typeof window.electronAPI = {
   },
 
   sync: {
+    getStatus: notImplemented('sync.getStatus'),
+    getStaleSyncs: notImplemented('sync.getStaleSyncs'),
+    skipStaleEntry: notImplemented('sync.skipStaleEntry'),
+    retryStaleEntry: notImplemented('sync.retryStaleEntry'),
+    exportDiagnostics: notImplemented('sync.exportDiagnostics'),
     onProgress: stubEventSubscription,
+    onStatusChanged: stubEventSubscription,
+    onStaleEntriesChanged: stubEventSubscription,
   },
 
   appState: {
@@ -181,6 +188,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onExportAllNotes: stubEventSubscription,
     onReloadFromCRDTLogs: stubEventSubscription,
     onReindexNotes: stubEventSubscription,
+    onSyncStatus: stubEventSubscription,
   },
 
   tools: {
@@ -221,6 +229,11 @@ export const browserApiStub: typeof window.electronAPI = {
 
   shell: {
     openExternal: notImplemented('shell.openExternal'),
+  },
+
+  clipboard: {
+    writeText: notImplemented('clipboard.writeText'),
+    readText: notImplemented('clipboard.readText'),
   },
 };
 

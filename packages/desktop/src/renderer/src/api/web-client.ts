@@ -568,7 +568,14 @@ export const webClient: typeof window.electronAPI = {
   },
 
   sync: {
+    getStatus: async () => ({ pendingCount: 0, perSd: [], isSyncing: false }),
+    getStaleSyncs: async () => [],
+    skipStaleEntry: async () => ({ success: true }),
+    retryStaleEntry: async () => ({ success: true }),
+    exportDiagnostics: async () => ({ success: false, error: 'Not supported in web mode' }),
     onProgress: noopSubscription,
+    onStatusChanged: noopSubscription,
+    onStaleEntriesChanged: noopSubscription,
   },
 
   appState: {
@@ -662,6 +669,7 @@ export const webClient: typeof window.electronAPI = {
     onExportAllNotes: noopSubscription,
     onReloadFromCRDTLogs: noopSubscription,
     onReindexNotes: noopSubscription,
+    onSyncStatus: noopSubscription,
   },
 
   tools: {
@@ -713,6 +721,15 @@ export const webClient: typeof window.electronAPI = {
     openExternal: async (url: string) => {
       await Promise.resolve();
       window.open(url, '_blank');
+    },
+  },
+
+  clipboard: {
+    writeText: async (text: string) => {
+      await navigator.clipboard.writeText(text);
+    },
+    readText: async () => {
+      return navigator.clipboard.readText();
     },
   },
 };

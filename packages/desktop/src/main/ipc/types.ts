@@ -33,6 +33,20 @@ export interface IPCCommands {
   // App state operations
   'appState:get': (key: string) => Promise<string | null>;
   'appState:set': (key: string, value: string) => Promise<void>;
+
+  // Sync status operations
+  'sync:getStatus': () => Promise<SyncStatus>;
+  'sync:getStaleSyncs': () => Promise<StaleSyncEntry[]>;
+  'sync:skipStaleEntry': (
+    sdId: string,
+    noteId: string,
+    sourceInstanceId: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  'sync:retryStaleEntry': (
+    sdId: string,
+    noteId: string,
+    sourceInstanceId: string
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 /**
@@ -48,6 +62,8 @@ export interface IPCEvents {
 
   // Sync events
   'sync:progress': (sdId: string, progress: SyncProgress) => void;
+  'sync:status-changed': (status: SyncStatus) => void;
+  'sync:stale-entries-changed': (entries: StaleSyncEntry[]) => void;
 }
 
 /**
@@ -70,4 +86,52 @@ export interface SyncProgress {
   totalFiles: number;
   processedFiles: number;
   phase: 'scanning' | 'indexing' | 'complete';
+}
+
+/**
+ * Sync status information for UI status indicator
+ */
+export interface SyncStatus {
+  /** Total pending sync count across all SDs */
+  pendingCount: number;
+  /** Per-SD sync status */
+  perSd: {
+    sdId: string;
+    sdName: string;
+    pendingCount: number;
+    pendingNoteIds: string[];
+  }[];
+  /** Whether any sync is in progress */
+  isSyncing: boolean;
+}
+
+/**
+ * Stale sync entry information for UI display
+ */
+export interface StaleSyncEntry {
+  /** Storage directory ID */
+  sdId: string;
+  /** Storage directory name */
+  sdName: string;
+  /** Note ID affected by the stale entry */
+  noteId: string;
+  /** Note title (if available) */
+  noteTitle?: string;
+  /** Instance ID that created the stale entry */
+  sourceInstanceId: string;
+  /** Expected sequence number that will never arrive */
+  expectedSequence: number;
+  /** Highest sequence from that instance */
+  highestSequenceFromInstance: number;
+  /** Sequence gap */
+  gap: number;
+  /** When the stale entry was detected */
+  detectedAt: number;
+  /** Profile info for the source instance (if available from presence files) */
+  sourceProfile?: {
+    profileId: string;
+    profileName: string;
+    hostname: string;
+    lastSeen: number;
+  };
 }

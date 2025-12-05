@@ -214,6 +214,23 @@ export interface SequenceState {
 }
 
 /**
+ * Cached profile presence from SD presence files
+ * @see plans/stale-sync-ux/PROFILE-PRESENCE.md
+ */
+export interface CachedProfilePresence {
+  profileId: string;
+  sdId: string;
+  profileName: string | null;
+  user: string | null;
+  username: string | null;
+  hostname: string | null;
+  platform: string | null;
+  appVersion: string | null;
+  lastUpdated: number | null;
+  cachedAt: number;
+}
+
+/**
  * Database schema version
  *
  * Version history:
@@ -507,5 +524,28 @@ export const SCHEMA_SQL = {
     );
 
     CREATE INDEX IF NOT EXISTS idx_sequence_state_sd_id ON sequence_state(sd_id);
+  `,
+
+  /**
+   * Profile presence cache table
+   * Caches profile presence info from SDs for the Stale Sync UI
+   * @see plans/stale-sync-ux/PROFILE-PRESENCE.md
+   */
+  profilePresenceCache: `
+    CREATE TABLE IF NOT EXISTS profile_presence_cache (
+      profile_id TEXT NOT NULL,
+      sd_id TEXT NOT NULL,
+      profile_name TEXT,
+      user TEXT,
+      username TEXT,
+      hostname TEXT,
+      platform TEXT,
+      app_version TEXT,
+      last_updated INTEGER,
+      cached_at INTEGER NOT NULL,
+      PRIMARY KEY (profile_id, sd_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_profile_presence_cache_sd_id ON profile_presence_cache(sd_id);
   `,
 };

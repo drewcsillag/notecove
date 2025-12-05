@@ -122,6 +122,8 @@ describe('SyncDirectoryStructure', () => {
       expect(paths.root).toBe('/test/sd');
       expect(paths.notes).toBe('/test/sd/notes');
       expect(paths.folders).toBe('/test/sd/folders');
+      expect(paths.activity).toBe('/test/sd/activity');
+      expect(paths.profiles).toBe('/test/sd/profiles');
     });
   });
 
@@ -155,6 +157,8 @@ describe('SyncDirectoryStructure', () => {
       expect(fs.getDir('/test/sd/folders')).toBe(true);
       expect(fs.getDir('/test/sd/folders/updates')).toBe(true);
       expect(fs.getDir('/test/sd/folders/meta')).toBe(true);
+      expect(fs.getDir('/test/sd/activity')).toBe(true);
+      expect(fs.getDir('/test/sd/profiles')).toBe(true);
     });
   });
 
@@ -247,6 +251,21 @@ describe('SyncDirectoryStructure', () => {
 
       const filePath = sdStructure.getFolderUpdateFilePath(filename);
       expect(filePath).toBe('/test/sd/folders/updates/inst-1_folder-tree_sd-test_1234567890.yjson');
+    });
+  });
+
+  describe('getProfilesPath', () => {
+    it('should return correct profiles directory path', () => {
+      const profilesPath = sdStructure.getProfilesPath();
+      expect(profilesPath).toBe('/test/sd/profiles');
+    });
+  });
+
+  describe('getProfilePresenceFilePath', () => {
+    it('should return correct profile presence file path', () => {
+      const profileId = '2379a4cf-1234-5678-9abc-def012345678';
+      const filePath = sdStructure.getProfilePresenceFilePath(profileId);
+      expect(filePath).toBe('/test/sd/profiles/2379a4cf-1234-5678-9abc-def012345678.json');
     });
   });
 });
