@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "build:browser": "vite build --config vite.browser.config.ts && mv dist-browser/index-browser.html dist-browser/index.html",
     "build:all": "pnpm build && electron-builder --mac --win --linux",
     "build:mac": "pnpm build && electron-builder --mac",
     "build:win": "pnpm build && electron-builder --win",
@@ -32,6 +33,9 @@
     "@electron-toolkit/utils": "^3.0.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
+    "@fastify/cors": "^11.1.0",
+    "@fastify/static": "^8.3.0",
+    "@fastify/websocket": "^11.2.0",
     "@minoru/react-dnd-treeview": "^3.5.3",
     "@mongodb-js/zstd": "^2.0.1",
     "@mui/icons-material": "^5.15.0",
@@ -61,7 +65,10 @@
     "better-sqlite3": "^12.4.1",
     "chokidar": "^3.6.0",
     "date-fns": "^4.1.0",
+    "fastify": "^5.6.2",
     "i18next": "^23.7.0",
+    "node-forge": "^1.3.2",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
@@ -81,8 +88,11 @@
     "@testing-library/react": "^14.1.2",
     "@types/better-sqlite3": "^7.6.8",
     "@types/jest": "^29.5.11",
+    "@types/node-forge": "^1.3.14",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.2.46",
     "@types/react-dom": "^18.2.18",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "@vitejs/plugin-react": "^4.2.1",
@@ -100,6 +110,7 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.21.0",
-    "vite": "^5.0.10"
+    "vite": "^5.0.10",
+    "ws": "^8.18.3"
   }
 }

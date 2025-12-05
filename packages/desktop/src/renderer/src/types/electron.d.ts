@@ -274,6 +274,55 @@ declare global {
         setDatabasePath: (path: string) => Promise<void>;
       };
 
+      webServer: {
+        start: (port?: number) => Promise<{
+          running: boolean;
+          port: number | null;
+          url: string | null;
+          token: string | null;
+          connectedClients: number;
+          localhostOnly: boolean;
+          tlsMode: 'off' | 'self-signed' | 'custom';
+          tlsEnabled: boolean;
+        }>;
+        stop: () => Promise<void>;
+        getStatus: () => Promise<{
+          running: boolean;
+          port: number | null;
+          url: string | null;
+          token: string | null;
+          connectedClients: number;
+          localhostOnly: boolean;
+          tlsMode: 'off' | 'self-signed' | 'custom';
+          tlsEnabled: boolean;
+        }>;
+        getSettings: () => Promise<{
+          port: number;
+          localhostOnly: boolean;
+          tlsMode: 'off' | 'self-signed' | 'custom';
+          customCertPath?: string;
+          customKeyPath?: string;
+        }>;
+        setSettings: (settings: {
+          port?: number;
+          localhostOnly?: boolean;
+          tlsMode?: 'off' | 'self-signed' | 'custom';
+          customCertPath?: string;
+          customKeyPath?: string;
+        }) => Promise<void>;
+        regenerateToken: () => Promise<string>;
+        getConnectedClients: () => Promise<
+          {
+            id: string;
+            ip: string;
+            userAgent: string;
+            connectedAt: number;
+          }[]
+        >;
+        disconnectClient: (clientId: string) => Promise<boolean>;
+        disconnectAllClients: () => Promise<void>;
+      };
+
       telemetry: {
         getSettings: () => Promise<{
           consoleMetricsEnabled: boolean;

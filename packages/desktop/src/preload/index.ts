@@ -1229,6 +1229,96 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
+  // Web Server operations
+  webServer: {
+    start: (
+      port?: number
+    ): Promise<{
+      running: boolean;
+      port: number | null;
+      url: string | null;
+      token: string | null;
+      connectedClients: number;
+      localhostOnly: boolean;
+      tlsMode: 'off' | 'self-signed' | 'custom';
+      tlsEnabled: boolean;
+    }> =>
+      ipcRenderer.invoke('webServer:start', port) as Promise<{
+        running: boolean;
+        port: number | null;
+        url: string | null;
+        token: string | null;
+        connectedClients: number;
+        localhostOnly: boolean;
+        tlsMode: 'off' | 'self-signed' | 'custom';
+        tlsEnabled: boolean;
+      }>,
+    stop: (): Promise<void> => ipcRenderer.invoke('webServer:stop') as Promise<void>,
+    getStatus: (): Promise<{
+      running: boolean;
+      port: number | null;
+      url: string | null;
+      token: string | null;
+      connectedClients: number;
+      localhostOnly: boolean;
+      tlsMode: 'off' | 'self-signed' | 'custom';
+      tlsEnabled: boolean;
+    }> =>
+      ipcRenderer.invoke('webServer:getStatus') as Promise<{
+        running: boolean;
+        port: number | null;
+        url: string | null;
+        token: string | null;
+        connectedClients: number;
+        localhostOnly: boolean;
+        tlsMode: 'off' | 'self-signed' | 'custom';
+        tlsEnabled: boolean;
+      }>,
+    getSettings: (): Promise<{
+      port: number;
+      localhostOnly: boolean;
+      tlsMode: 'off' | 'self-signed' | 'custom';
+      customCertPath?: string;
+      customKeyPath?: string;
+    }> =>
+      ipcRenderer.invoke('webServer:getSettings') as Promise<{
+        port: number;
+        localhostOnly: boolean;
+        tlsMode: 'off' | 'self-signed' | 'custom';
+        customCertPath?: string;
+        customKeyPath?: string;
+      }>,
+    setSettings: (settings: {
+      port?: number;
+      localhostOnly?: boolean;
+      tlsMode?: 'off' | 'self-signed' | 'custom';
+      customCertPath?: string;
+      customKeyPath?: string;
+    }): Promise<void> => ipcRenderer.invoke('webServer:setSettings', settings) as Promise<void>,
+    regenerateToken: (): Promise<string> =>
+      ipcRenderer.invoke('webServer:regenerateToken') as Promise<string>,
+    getConnectedClients: (): Promise<
+      {
+        id: string;
+        ip: string;
+        userAgent: string;
+        connectedAt: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('webServer:getConnectedClients') as Promise<
+        {
+          id: string;
+          ip: string;
+          userAgent: string;
+          connectedAt: number;
+        }[]
+      >,
+    disconnectClient: (clientId: string): Promise<boolean> =>
+      ipcRenderer.invoke('webServer:disconnectClient', clientId) as Promise<boolean>,
+    disconnectAllClients: (): Promise<void> =>
+      ipcRenderer.invoke('webServer:disconnectAllClients') as Promise<void>,
+  },
+
   // Profile operations (for debugging)
   profile: {
     getInfo: (): Promise<{

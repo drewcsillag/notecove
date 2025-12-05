@@ -114,7 +114,6 @@
       "Bash(echo:*)",
       "WebFetch(domain:docs.yjs.dev)",
       "Bash(npx ts-node:*)",
-      "Bash(npx jest:*)",
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:codesandbox.io)",
       "WebFetch(domain:minop1205.github.io)",

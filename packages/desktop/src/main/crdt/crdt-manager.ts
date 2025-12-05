@@ -98,6 +98,10 @@ export class CRDTManagerImpl implements CRDTManager {
       }
 
       const updatePromise = this.handleUpdate(noteId, update)
+        .then(() => {
+          // Broadcast to all windows and web clients after successful disk write
+          this.broadcastUpdate(noteId, update);
+        })
         .catch((error: Error) => {
           console.error(`Failed to handle update for note ${noteId}:`, error);
         })
@@ -198,6 +202,10 @@ export class CRDTManagerImpl implements CRDTManager {
     try {
       await writePromise;
       console.log(`[CRDT Manager] Update written to disk for note ${noteId}`);
+
+      // Broadcast update to renderer windows so they can apply it
+      // This is critical for web→desktop sync
+      this.broadcastUpdate(noteId, update);
     } finally {
       // Remove from pending set when complete
       this.pendingUpdates.delete(writePromise);

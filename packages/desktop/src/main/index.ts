@@ -38,8 +38,10 @@ import { DiagnosticsManager } from './diagnostics-manager';
 import { BackupManager } from './backup-manager';
 import { showProfilePicker, getProfileStorage } from './profile-picker';
 import { parseCliArgs } from './cli/cli-parser';
+import { WebServerManager } from './web-server/manager';
 
 let mainWindow: BrowserWindow | null = null;
+let webServerManager: WebServerManager | null = null;
 let database: Database | null = null;
 let configManager: ConfigManager | null = null;
 let selectedProfileId: string | null = null;
@@ -1629,6 +1631,89 @@ function createMenu(): void {
             }
           },
         },
+        { type: 'separator' },
+        {
+          label: 'Web Server',
+          submenu: [
+            {
+              id: 'web-server-toggle',
+              label: webServerManager?.isRunning() ? 'Stop Server' : 'Start Server',
+              click: () => {
+                void (async () => {
+                  if (!webServerManager) return;
+                  if (webServerManager.isRunning()) {
+                    await webServerManager.stop();
+                    console.log('[Menu] Web server stopped');
+                  } else {
+                    const status = await webServerManager.start();
+                    console.log(`[Menu] Web server started at ${status.url}`);
+                    // Copy connection info to clipboard
+                    if (mainWindow && status.url && status.token) {
+                      const { clipboard } = await import('electron');
+                      const connectionUrl = `${status.url}?token=${status.token}`;
+                      clipboard.writeText(connectionUrl);
+                      mainWindow.webContents.send('notification:show', {
+                        title: 'Web Server Started',
+                        body: `URL copied to clipboard: ${status.url}`,
+                      });
+                    }
+                  }
+                  // Refresh menu to update label
+                  createMenu();
+                })();
+              },
+            },
+            { type: 'separator' as const },
+            {
+              label: 'Show Connection Info',
+              enabled: webServerManager?.isRunning() ?? false,
+              click: () => {
+                if (mainWindow && webServerManager?.isRunning()) {
+                  const status = webServerManager.getStatus();
+                  mainWindow.webContents.send('menu:webServerInfo', status);
+                }
+              },
+            },
+            {
+              label: 'Copy Connection URL',
+              enabled: webServerManager?.isRunning() ?? false,
+              click: () => {
+                void (async () => {
+                  if (webServerManager?.isRunning()) {
+                    const status = webServerManager.getStatus();
+                    const { clipboard } = await import('electron');
+                    const connectionUrl = `${status.url}?token=${status.token}`;
+                    clipboard.writeText(connectionUrl);
+                    if (mainWindow) {
+                      mainWindow.webContents.send('notification:show', {
+                        title: 'Connection URL Copied',
+                        body: 'URL with token copied to clipboard',
+                      });
+                    }
+                  }
+                })();
+              },
+            },
+            { type: 'separator' as const },
+            {
+              label: 'Regenerate Token',
+              enabled: webServerManager !== null,
+              click: () => {
+                void (async () => {
+                  if (webServerManager) {
+                    await webServerManager.regenerateToken();
+                    if (mainWindow) {
+                      mainWindow.webContents.send('notification:show', {
+                        title: 'Token Regenerated',
+                        body: 'A new access token has been generated. All connected clients will need to reconnect.',
+                      });
+                    }
+                  }
+                })();
+              },
+            },
+          ],
+        },
       ],
     },
     {
@@ -2301,6 +2386,16 @@ void app.whenReady().then(async () => {
       );
     }
 
+    // Initialize WebServerManager
+    webServerManager = new WebServerManager({
+      database,
+      crdtManager,
+      ipcHandlers,
+      configManager,
+    });
+    await webServerManager.initialize();
+    console.log('[Init] WebServerManager initialized');
+
     // Create default note if none exists
     // IMPORTANT: Do this BEFORE setupSDWatchers to prevent race condition where
     // activity sync imports empty note files before welcome note is created
@@ -2434,6 +2529,100 @@ void app.whenReady().then(async () => {
 
     ipcMain.handle('clipboard:readText', () => {
       return clipboard.readText();
+    });
+
+    // Register web server IPC handlers
+    ipcMain.handle('webServer:start', async (_event, port?: number) => {
+      if (!webServerManager) {
+        throw new Error('WebServerManager not initialized');
+      }
+      const status = await webServerManager.start(port);
+      createMenu(); // Refresh menu to update label
+      return status;
+    });
+
+    ipcMain.handle('webServer:stop', async () => {
+      if (!webServerManager) {
+        throw new Error('WebServerManager not initialized');
+      }
+      await webServerManager.stop();
+      createMenu(); // Refresh menu to update label
+    });
+
+    ipcMain.handle('webServer:getStatus', () => {
+      if (!webServerManager) {
+        return {
+          running: false,
+          port: 8765,
+          url: null,
+          token: null,
+          connectedClients: 0,
+          localhostOnly: false,
+          tlsMode: 'self-signed' as const,
+          tlsEnabled: true,
+        };
+      }
+      return webServerManager.getStatus();
+    });
+
+    ipcMain.handle('webServer:getSettings', () => {
+      if (!webServerManager) {
+        return {
+          port: 8765,
+          localhostOnly: false,
+          tlsMode: 'self-signed' as const,
+          customCertPath: undefined,
+          customKeyPath: undefined,
+        };
+      }
+      return webServerManager.getSettings();
+    });
+
+    ipcMain.handle(
+      'webServer:setSettings',
+      async (
+        _event,
+        settings: {
+          port?: number;
+          localhostOnly?: boolean;
+          tlsMode?: 'off' | 'self-signed' | 'custom';
+          customCertPath?: string;
+          customKeyPath?: string;
+        }
+      ) => {
+        if (!webServerManager) {
+          throw new Error('WebServerManager not initialized');
+        }
+        await webServerManager.setSettings(settings);
+      }
+    );
+
+    ipcMain.handle('webServer:regenerateToken', async () => {
+      if (!webServerManager) {
+        throw new Error('WebServerManager not initialized');
+      }
+      return await webServerManager.regenerateToken();
+    });
+
+    ipcMain.handle('webServer:getConnectedClients', () => {
+      if (!webServerManager) {
+        return [];
+      }
+      return webServerManager.getConnectedClients();
+    });
+
+    ipcMain.handle('webServer:disconnectClient', (_event, clientId: string) => {
+      if (!webServerManager) {
+        return false;
+      }
+      return webServerManager.disconnectClient(clientId);
+    });
+
+    ipcMain.handle('webServer:disconnectAllClients', () => {
+      if (!webServerManager) {
+        return;
+      }
+      webServerManager.disconnectAllClients();
     });
 
     // Create menu
@@ -2580,7 +2769,14 @@ app.on('will-quit', (event) => {
         manager.destroy();
       }
 
-      // 3. Destroy IPC handlers
+      // 3. Stop web server if running
+      if (webServerManager?.isRunning()) {
+        console.log('[App] Stopping web server...');
+        await webServerManager.stop();
+        console.log('[App] Web server stopped');
+      }
+
+      // 4. Destroy IPC handlers
       if (ipcHandlers) {
         console.log('[App] Destroying IPC handlers...');
         ipcHandlers.destroy();

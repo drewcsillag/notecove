@@ -37,6 +37,7 @@ import {
   type FolderInfo,
 } from '../../services/export-service';
 import type { ExportProgress } from '../../utils/markdown-export';
+import { isElectron } from '../../utils/platform';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -1430,11 +1431,14 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
               <MenuItem onClick={handleDeleteFromMenu}>
                 {selectedNoteIds.size > 0 ? `Delete ${selectedNoteIds.size} notes` : 'Delete'}
               </MenuItem>
-              <MenuItem onClick={() => void handleExportFromMenu()}>
-                {selectedNoteIds.size > 0
-                  ? `Export ${selectedNoteIds.size} notes to Markdown`
-                  : 'Export to Markdown'}
-              </MenuItem>
+              {/* Export is only available in Electron (requires file save dialog) */}
+              {isElectron() && (
+                <MenuItem onClick={() => void handleExportFromMenu()}>
+                  {selectedNoteIds.size > 0
+                    ? `Export ${selectedNoteIds.size} notes to Markdown`
+                    : 'Export to Markdown'}
+                </MenuItem>
+              )}
             </>
           )}
         </Menu>

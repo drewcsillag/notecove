@@ -10,8 +10,21 @@ import { app } from 'electron';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
 
+export type TLSMode = 'off' | 'self-signed' | 'custom';
+
+export interface WebServerConfig {
+  enabled?: boolean;
+  port?: number;
+  token?: string;
+  localhostOnly?: boolean;
+  tlsMode?: TLSMode;
+  customCertPath?: string;
+  customKeyPath?: string;
+}
+
 export interface AppConfig {
   databasePath?: string;
+  webServer?: WebServerConfig;
 }
 
 export class ConfigManager {
@@ -93,5 +106,22 @@ export class ConfigManager {
    */
   async setDatabasePath(path: string): Promise<void> {
     await this.set('databasePath', path);
+  }
+
+  /**
+   * Get web server configuration
+   */
+  async getWebServerConfig(): Promise<WebServerConfig> {
+    const config = await this.load();
+    return config.webServer ?? {};
+  }
+
+  /**
+   * Update web server configuration (merges with existing)
+   */
+  async setWebServerConfig(webServerConfig: Partial<WebServerConfig>): Promise<void> {
+    const config = await this.load();
+    config.webServer = { ...config.webServer, ...webServerConfig };
+    await this.save(config);
   }
 }
