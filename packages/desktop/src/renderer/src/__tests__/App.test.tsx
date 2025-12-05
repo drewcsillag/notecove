@@ -83,6 +83,13 @@ const mockElectronAPI = {
     onStatusChanged: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    getStaleSyncs: jest.fn().mockResolvedValue([]),
+    onStaleEntriesChanged: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    skipStaleEntry: jest.fn().mockResolvedValue({ success: true }),
+    retryStaleEntry: jest.fn().mockResolvedValue({ success: true }),
+    exportDiagnostics: jest.fn().mockResolvedValue({ success: true }),
   },
   appState: {
     get: jest.fn().mockResolvedValue(null),
@@ -132,6 +139,9 @@ const mockElectronAPI = {
       /* unsubscribe */
     }),
     onReindexNotes: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onSyncStatus: jest.fn(() => () => {
       /* unsubscribe */
     }),
   },

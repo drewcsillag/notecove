@@ -2,7 +2,12 @@
  * Electron API Type Definitions for Renderer
  */
 
-import type { NoteMetadata, SyncProgress, SyncStatus } from '../../../main/ipc/types';
+import type {
+  NoteMetadata,
+  SyncProgress,
+  SyncStatus,
+  StaleSyncEntry,
+} from '../../../main/ipc/types';
 
 declare global {
   interface Window {
@@ -257,8 +262,21 @@ declare global {
 
       sync: {
         getStatus: () => Promise<SyncStatus>;
+        getStaleSyncs: () => Promise<StaleSyncEntry[]>;
+        skipStaleEntry: (
+          sdId: string,
+          noteId: string,
+          sourceInstanceId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        retryStaleEntry: (
+          sdId: string,
+          noteId: string,
+          sourceInstanceId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        exportDiagnostics: () => Promise<{ success: boolean; filePath?: string; error?: string }>;
         onProgress: (callback: (sdId: string, progress: SyncProgress) => void) => () => void;
         onStatusChanged: (callback: (status: SyncStatus) => void) => () => void;
+        onStaleEntriesChanged: (callback: (entries: StaleSyncEntry[]) => void) => () => void;
       };
 
       appState: {
@@ -463,6 +481,7 @@ declare global {
         onExportAllNotes: (callback: () => void) => () => void;
         onReloadFromCRDTLogs: (callback: () => void) => () => void;
         onReindexNotes: (callback: () => void) => () => void;
+        onSyncStatus: (callback: () => void) => () => void;
       };
 
       tools: {

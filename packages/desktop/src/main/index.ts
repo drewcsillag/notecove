@@ -23,7 +23,7 @@ import {
   ProfileLock,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
-import type { SyncStatus } from './ipc/types';
+import type { SyncStatus, StaleSyncEntry } from './ipc/types';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
@@ -1641,6 +1641,15 @@ function createMenu(): void {
         },
         { type: 'separator' },
         {
+          label: 'Sync Status',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:syncStatus');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'Advanced',
           submenu: [
             {
@@ -2369,6 +2378,117 @@ void app.whenReady().then(async () => {
           perSd,
           isSyncing: totalPending > 0,
         };
+      },
+      // getStaleSyncs callback - returns stale sync entries for UI display
+      async (): Promise<StaleSyncEntry[]> => {
+        const result: StaleSyncEntry[] = [];
+
+        // Database may not be initialized yet
+        if (!database) {
+          return result;
+        }
+
+        for (const [sdId, activitySync] of sdActivitySyncs.entries()) {
+          const staleEntries = activitySync.getStaleEntries();
+
+          // Get SD name for display
+          const sd = await database.getStorageDir(sdId);
+          const sdName = sd?.name ?? sdId;
+
+          for (const entry of staleEntries) {
+            // Look up note title from database
+            const noteCache = await database.getNote(entry.noteId);
+
+            // Look up source profile from presence cache
+            const profilePresence = await database.getProfilePresenceCache(
+              entry.sourceInstanceId,
+              sdId
+            );
+            const sourceProfile = profilePresence
+              ? {
+                  profileId: profilePresence.profileId,
+                  profileName: profilePresence.profileName ?? 'Unknown',
+                  hostname: profilePresence.hostname ?? 'Unknown Device',
+                  lastSeen: profilePresence.lastUpdated ?? profilePresence.cachedAt,
+                }
+              : undefined;
+
+            // Build the entry, only including optional fields if they have values
+            const staleSyncEntry: StaleSyncEntry = {
+              sdId,
+              sdName,
+              noteId: entry.noteId,
+              sourceInstanceId: entry.sourceInstanceId,
+              expectedSequence: entry.expectedSequence,
+              highestSequenceFromInstance: entry.highestSequenceFromInstance,
+              gap: entry.gap,
+              detectedAt: entry.detectedAt,
+            };
+
+            // Add optional fields only if they have values
+            if (noteCache?.title) {
+              staleSyncEntry.noteTitle = noteCache.title;
+            }
+            if (sourceProfile) {
+              staleSyncEntry.sourceProfile = sourceProfile;
+            }
+
+            result.push(staleSyncEntry);
+          }
+        }
+
+        return result;
+      },
+      // skipStaleEntry callback - skip a stale entry (accept data loss)
+      (
+        sdId: string,
+        noteId: string,
+        sourceInstanceId: string
+      ): Promise<{ success: boolean; error?: string }> => {
+        const activitySync = sdActivitySyncs.get(sdId);
+        if (!activitySync) {
+          return Promise.resolve({
+            success: false,
+            error: `Storage directory ${sdId} not found`,
+          });
+        }
+
+        try {
+          activitySync.removeStaleEntry(noteId, sourceInstanceId);
+          // TODO: Update watermark to skip past missing sequences
+          console.log(
+            `[Stale Sync] Skipped stale entry: sdId=${sdId}, noteId=${noteId}, sourceInstanceId=${sourceInstanceId}`
+          );
+          return Promise.resolve({ success: true });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return Promise.resolve({ success: false, error: errorMessage });
+        }
+      },
+      // retryStaleEntry callback - retry syncing a stale entry
+      async (
+        sdId: string,
+        noteId: string,
+        sourceInstanceId: string
+      ): Promise<{ success: boolean; error?: string }> => {
+        const activitySync = sdActivitySyncs.get(sdId);
+        if (!activitySync) {
+          return { success: false, error: `Storage directory ${sdId} not found` };
+        }
+
+        try {
+          // Remove from stale entries so it can be retried
+          activitySync.removeStaleEntry(noteId, sourceInstanceId);
+          // Force a sync cycle
+          await activitySync.syncFromOtherInstances();
+          console.log(
+            `[Stale Sync] Retried stale entry: sdId=${sdId}, noteId=${noteId}, sourceInstanceId=${sourceInstanceId}`
+          );
+          return { success: true };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return { success: false, error: errorMessage };
+        }
       }
     );
 

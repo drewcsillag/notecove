@@ -18,6 +18,8 @@ import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownPr
 import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgressDialog';
 import { NoteInfoDialog } from './components/NoteInfoDialog';
 import { AboutDialog } from './components/AboutDialog/AboutDialog';
+import { StaleSyncToast } from './components/StaleSyncToast';
+import { SyncStatusPanel } from './components/SyncStatusPanel';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
@@ -64,6 +66,8 @@ function App(): React.ReactElement {
   const [minimalMode, setMinimalMode] = useState(false);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
+  // Sync status panel
+  const [syncStatusOpen, setSyncStatusOpen] = useState(false);
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
@@ -458,6 +462,11 @@ function App(): React.ReactElement {
       void window.electronAPI.tools.reindexNotes();
     });
 
+    // Sync Status
+    const cleanupSyncStatus = window.electronAPI.menu.onSyncStatus(() => {
+      setSyncStatusOpen(true);
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -474,6 +483,7 @@ function App(): React.ReactElement {
       cleanupExportAll();
       cleanupReloadFromCRDTLogs();
       cleanupReindexNotes();
+      cleanupSyncStatus();
     };
   }, [selectedNoteId]);
 
@@ -651,6 +661,17 @@ function App(): React.ReactElement {
           current={reindexProgress.current}
           total={reindexProgress.total}
           {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
+        />
+        <StaleSyncToast
+          onViewDetails={() => {
+            setSyncStatusOpen(true);
+          }}
+        />
+        <SyncStatusPanel
+          open={syncStatusOpen}
+          onClose={() => {
+            setSyncStatusOpen(false);
+          }}
         />
       </DndProvider>
     </ThemeProvider>

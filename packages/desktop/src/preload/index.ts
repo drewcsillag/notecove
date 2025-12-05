@@ -6,7 +6,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import type { NoteMetadata, SyncProgress, SyncStatus } from '../main/ipc/types';
+import type { NoteMetadata, SyncProgress, SyncStatus, StaleSyncEntry } from '../main/ipc/types';
 import type { NoteCache } from '@notecove/shared';
 
 // Expose IPC API to renderer
@@ -524,6 +524,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sync: {
     getStatus: (): Promise<SyncStatus> =>
       ipcRenderer.invoke('sync:getStatus') as Promise<SyncStatus>,
+    getStaleSyncs: (): Promise<StaleSyncEntry[]> =>
+      ipcRenderer.invoke('sync:getStaleSyncs') as Promise<StaleSyncEntry[]>,
+    skipStaleEntry: (
+      sdId: string,
+      noteId: string,
+      sourceInstanceId: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('sync:skipStaleEntry', sdId, noteId, sourceInstanceId) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+    retryStaleEntry: (
+      sdId: string,
+      noteId: string,
+      sourceInstanceId: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('sync:retryStaleEntry', sdId, noteId, sourceInstanceId) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+    exportDiagnostics: (): Promise<{ success: boolean; filePath?: string; error?: string }> =>
+      ipcRenderer.invoke('sync:exportDiagnostics') as Promise<{
+        success: boolean;
+        filePath?: string;
+        error?: string;
+      }>,
     onProgress: (callback: (sdId: string, progress: SyncProgress) => void): (() => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
@@ -544,6 +570,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('sync:status-changed', listener);
       return () => {
         ipcRenderer.removeListener('sync:status-changed', listener);
+      };
+    },
+    onStaleEntriesChanged: (callback: (entries: StaleSyncEntry[]) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, entries: StaleSyncEntry[]): void => {
+        callback(entries);
+      };
+      ipcRenderer.on('sync:stale-entries-changed', listener);
+      return () => {
+        ipcRenderer.removeListener('sync:stale-entries-changed', listener);
       };
     },
   },
@@ -1073,6 +1108,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('menu:reindexNotes', listener);
       return () => {
         ipcRenderer.removeListener('menu:reindexNotes', listener);
+      };
+    },
+    onSyncStatus: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:syncStatus', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:syncStatus', listener);
       };
     },
   },
