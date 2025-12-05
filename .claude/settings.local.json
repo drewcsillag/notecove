@@ -117,7 +117,16 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:codesandbox.io)",
       "WebFetch(domain:minop1205.github.io)",
-      "Bash(timeout 10 pnpm dev:*)"
+      "Bash(timeout 10 pnpm dev:*)",
+      "Bash(for dir in /Users/drew/Library/Application Support/@notecove/desktop/profiles/*/)",
+      "Bash(do echo '=== $dir ===' ls -la $dir)",
+      "Bash(awk:*)",
+      "Bash(EXIT_CODE=$?)",
+      "Bash(~/bin/tlc:*)",
+      "Bash(git rm:*)",
+      "Bash(ls:*)",
+      "Bash(for i in {1..15})",
+      "Bash(do sleep 5)"
     ],
     "deny": [],
     "ask": []

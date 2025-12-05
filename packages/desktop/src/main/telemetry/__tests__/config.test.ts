@@ -10,7 +10,7 @@ import { TelemetryManager, DEFAULT_TELEMETRY_CONFIG } from '../config';
 // Mock Electron app
 jest.mock('electron', () => ({
   app: {
-    getVersion: jest.fn(() => '0.1.2'),
+    getVersion: jest.fn(() => '0.1.3'),
   },
 }));
 
