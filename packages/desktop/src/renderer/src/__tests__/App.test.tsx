@@ -75,6 +75,14 @@ const mockElectronAPI = {
   },
   sync: {
     onProgress: jest.fn(),
+    getStatus: jest.fn().mockResolvedValue({
+      pendingCount: 0,
+      perSd: [],
+      isSyncing: false,
+    }),
+    onStatusChanged: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   appState: {
     get: jest.fn().mockResolvedValue(null),

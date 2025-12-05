@@ -1,6 +1,6 @@
 # Stale Sync UX & Non-Blocking Startup
 
-**Overall Progress:** `35%`
+**Overall Progress:** `40%`
 
 ## Summary
 
@@ -28,10 +28,10 @@ When activity log entries reference CRDT sequences that will never arrive (due t
   - [x] 🟢 1.3 Add background sync status tracking
   - [x] 🟢 1.4 Broadcast sync-complete event when background sync finishes
 
-- [ ] 🟡 **Step 2: Add sync status indicator** (DEFERRED - nice to have)
-  - [ ] 🟡 2.1 Write test: status bar shows pending sync count
-  - [ ] 🟡 2.2 Add IPC for sync status (pending count, notes affected)
-  - [ ] 🟡 2.3 Add subtle spinner/indicator in UI when syncs pending
+- [x] 🟢 **Step 2: Add sync status indicator** ✅ COMPLETE
+  - [x] 🟢 2.1 Add IPC for sync status (pending count, notes affected)
+  - [x] 🟢 2.2 Add subtle spinner/indicator in UI when syncs pending
+  - [x] 🟢 2.3 Write e2e tests for sync status IPC and indicator visibility
 
 ### Phase 2: Profile Presence Files ✅ COMPLETE
 

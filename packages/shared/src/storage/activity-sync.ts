@@ -111,6 +111,22 @@ export class ActivitySync {
   }
 
   /**
+   * Get the number of pending syncs
+   * Used by the UI to show sync status indicator
+   */
+  getPendingSyncCount(): number {
+    return this.pendingSyncs.size;
+  }
+
+  /**
+   * Get the IDs of notes with pending syncs
+   * Used by the UI to show which notes are syncing
+   */
+  getPendingNoteIds(): string[] {
+    return Array.from(this.pendingSyncs.keys());
+  }
+
+  /**
    * Sync from other instances' activity logs
    *
    * Returns a set of note IDs that were affected by the sync.

@@ -13,7 +13,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
-import type { NoteMetadata } from './types';
+import type { NoteMetadata, SyncStatus } from './types';
 import type { Database, NoteCache, AppendLogManager, UUID, DeletionLogger } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { extractTags, extractLinks } from '@notecove/shared';
@@ -22,6 +22,11 @@ import { extractTags, extractLinks } from '@notecove/shared';
  * Callback type for getting deletion logger by SD
  */
 export type GetDeletionLoggerFn = (sdId: string) => DeletionLogger | undefined;
+
+/**
+ * Callback type for getting sync status
+ */
+export type GetSyncStatusFn = () => SyncStatus;
 import {
   type ActivitySession,
   type ReconstructionPoint,
@@ -44,7 +49,8 @@ export class IPCHandlers {
     private backupManager: BackupManager,
     private createWindowFn?: (options?: { noteId?: string; minimal?: boolean }) => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>,
-    private getDeletionLogger?: GetDeletionLoggerFn
+    private getDeletionLogger?: GetDeletionLoggerFn,
+    private getSyncStatus?: GetSyncStatusFn
   ) {
     this.registerHandlers();
   }
@@ -177,6 +183,9 @@ export class IPCHandlers {
     // App state operations
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
     ipcMain.handle('appState:set', this.handleSetAppState.bind(this));
+
+    // Sync status operations
+    ipcMain.handle('sync:getStatus', this.handleGetSyncStatus.bind(this));
 
     // Config operations
     ipcMain.handle('config:getDatabasePath', this.handleGetDatabasePath.bind(this));
@@ -1727,6 +1736,21 @@ export class IPCHandlers {
     value: string
   ): Promise<void> {
     await this.database.setState(key, value);
+  }
+
+  // ============================================================================
+  // Sync Status Handlers
+  // ============================================================================
+
+  private async handleGetSyncStatus(): Promise<SyncStatus> {
+    if (!this.getSyncStatus) {
+      return {
+        pendingCount: 0,
+        perSd: [],
+        isSyncing: false,
+      };
+    }
+    return this.getSyncStatus();
   }
 
   // ============================================================================

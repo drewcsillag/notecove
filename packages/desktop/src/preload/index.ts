@@ -6,7 +6,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import type { NoteMetadata, SyncProgress } from '../main/ipc/types';
+import type { NoteMetadata, SyncProgress, SyncStatus } from '../main/ipc/types';
 import type { NoteCache } from '@notecove/shared';
 
 // Expose IPC API to renderer
@@ -522,6 +522,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Sync operations
   sync: {
+    getStatus: (): Promise<SyncStatus> =>
+      ipcRenderer.invoke('sync:getStatus') as Promise<SyncStatus>,
     onProgress: (callback: (sdId: string, progress: SyncProgress) => void): (() => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
@@ -533,6 +535,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('sync:progress', listener);
       return () => {
         ipcRenderer.removeListener('sync:progress', listener);
+      };
+    },
+    onStatusChanged: (callback: (status: SyncStatus) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: SyncStatus): void => {
+        callback(status);
+      };
+      ipcRenderer.on('sync:status-changed', listener);
+      return () => {
+        ipcRenderer.removeListener('sync:status-changed', listener);
       };
     },
   },

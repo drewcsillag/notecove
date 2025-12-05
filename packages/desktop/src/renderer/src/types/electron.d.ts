@@ -2,7 +2,7 @@
  * Electron API Type Definitions for Renderer
  */
 
-import type { NoteMetadata, SyncProgress } from '../../../main/ipc/types';
+import type { NoteMetadata, SyncProgress, SyncStatus } from '../../../main/ipc/types';
 
 declare global {
   interface Window {
@@ -256,7 +256,9 @@ declare global {
       };
 
       sync: {
+        getStatus: () => Promise<SyncStatus>;
         onProgress: (callback: (sdId: string, progress: SyncProgress) => void) => () => void;
+        onStatusChanged: (callback: (status: SyncStatus) => void) => () => void;
       };
 
       appState: {

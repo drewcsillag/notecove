@@ -33,6 +33,9 @@ export interface IPCCommands {
   // App state operations
   'appState:get': (key: string) => Promise<string | null>;
   'appState:set': (key: string, value: string) => Promise<void>;
+
+  // Sync status operations
+  'sync:getStatus': () => Promise<SyncStatus>;
 }
 
 /**
@@ -48,6 +51,7 @@ export interface IPCEvents {
 
   // Sync events
   'sync:progress': (sdId: string, progress: SyncProgress) => void;
+  'sync:status-changed': (status: SyncStatus) => void;
 }
 
 /**
@@ -70,4 +74,21 @@ export interface SyncProgress {
   totalFiles: number;
   processedFiles: number;
   phase: 'scanning' | 'indexing' | 'complete';
+}
+
+/**
+ * Sync status information for UI status indicator
+ */
+export interface SyncStatus {
+  /** Total pending sync count across all SDs */
+  pendingCount: number;
+  /** Per-SD sync status */
+  perSd: {
+    sdId: string;
+    sdName: string;
+    pendingCount: number;
+    pendingNoteIds: string[];
+  }[];
+  /** Whether any sync is in progress */
+  isSyncing: boolean;
 }

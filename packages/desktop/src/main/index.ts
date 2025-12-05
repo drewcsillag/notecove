@@ -23,6 +23,7 @@ import {
   ProfileLock,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
+import type { SyncStatus } from './ipc/types';
 import { CRDTManagerImpl, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
@@ -2343,7 +2344,32 @@ void app.whenReady().then(async () => {
       backupManager,
       createWindow,
       handleNewStorageDir,
-      (sdId: string) => sdDeletionLoggers.get(sdId)
+      (sdId: string) => sdDeletionLoggers.get(sdId),
+      // getSyncStatus callback - returns sync status for UI indicator
+      (): SyncStatus => {
+        const perSd: SyncStatus['perSd'] = [];
+        let totalPending = 0;
+
+        for (const [sdId, activitySync] of sdActivitySyncs.entries()) {
+          const count = activitySync.getPendingSyncCount();
+          const noteIds = activitySync.getPendingNoteIds();
+          totalPending += count;
+          // We don't have easy access to SD names here, so use sdId for now
+          // The UI can look up the name if needed
+          perSd.push({
+            sdId,
+            sdName: sdId, // Will be resolved in UI
+            pendingCount: count,
+            pendingNoteIds: noteIds,
+          });
+        }
+
+        return {
+          pendingCount: totalPending,
+          perSd,
+          isSyncing: totalPending > 0,
+        };
+      }
     );
 
     // Set up broadcast callback for CRDT manager to send updates to renderer
