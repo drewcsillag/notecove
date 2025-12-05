@@ -18,6 +18,11 @@
       "from": "resources",
       "to": "resources",
       "filter": ["**/*"]
+    },
+    {
+      "from": "dist-browser",
+      "to": "dist-browser",
+      "filter": ["**/*"]
     }
   ],
   "mac": {

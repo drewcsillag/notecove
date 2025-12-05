@@ -79,10 +79,8 @@ export function WebServerSettings(): React.ReactElement {
 
   const loadStatus = useCallback(async () => {
     try {
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
       const serverStatus: WebServerStatus = await window.electronAPI.webServer.getStatus();
       const serverSettings: WebServerSettings = await window.electronAPI.webServer.getSettings();
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
       setStatus(serverStatus);
       setSettings(serverSettings);
       setPortInput(String(serverSettings.port));
@@ -171,7 +169,6 @@ export function WebServerSettings(): React.ReactElement {
 
   const handleSettingsChange = async (newSettings: Partial<WebServerSettings>) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       await window.electronAPI.webServer.setSettings(newSettings);
       await loadStatus();
     } catch (error: unknown) {

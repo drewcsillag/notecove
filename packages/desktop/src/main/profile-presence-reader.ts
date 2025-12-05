@@ -55,6 +55,7 @@ export class ProfilePresenceReader {
       // Cache the presence data
       const cachedPresence: CachedProfilePresence = {
         profileId: presence.profileId,
+        instanceId: presence.instanceId,
         sdId,
         profileName: presence.profileName,
         user: presence.user,

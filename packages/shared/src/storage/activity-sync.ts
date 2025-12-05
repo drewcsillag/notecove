@@ -95,6 +95,18 @@ export interface ActivitySyncCallbacks {
    * Optional metrics callbacks for telemetry
    */
   metrics?: SyncMetricsCallbacks;
+
+  /**
+   * Get list of previously skipped stale entries (loaded from persistence)
+   * Returns array of "noteId:sourceInstanceId" strings
+   */
+  getSkippedStaleEntries?: () => Promise<string[]>;
+
+  /**
+   * Persist a skipped stale entry
+   * Called when user clicks "Skip" on a stale entry
+   */
+  onSkipStaleEntry?: (noteId: string, sourceInstanceId: string) => Promise<void>;
 }
 
 export class ActivitySync {
@@ -110,6 +122,10 @@ export class ActivitySync {
   // Stale entries tracking for UI display
   private staleEntries: StaleEntry[] = [];
 
+  // Skipped stale entries (persisted) - "noteId:sourceInstanceId" format
+  private skippedEntries = new Set<string>();
+  private skippedEntriesLoaded = false;
+
   constructor(
     private fs: FileSystemAdapter,
     private instanceId: string,
@@ -117,6 +133,34 @@ export class ActivitySync {
     private sdId: string,
     private callbacks: ActivitySyncCallbacks
   ) {}
+
+  /**
+   * Load previously skipped entries from persistence
+   * Should be called once during initialization
+   */
+  async loadSkippedEntries(): Promise<void> {
+    if (this.skippedEntriesLoaded) return;
+
+    if (this.callbacks.getSkippedStaleEntries) {
+      try {
+        const entries = await this.callbacks.getSkippedStaleEntries();
+        for (const entry of entries) {
+          this.skippedEntries.add(entry);
+        }
+        console.log(`[ActivitySync] Loaded ${entries.length} skipped stale entries`);
+      } catch (error) {
+        console.error('[ActivitySync] Failed to load skipped entries:', error);
+      }
+    }
+    this.skippedEntriesLoaded = true;
+  }
+
+  /**
+   * Check if a stale entry has been skipped
+   */
+  private isSkipped(noteId: string, sourceInstanceId: string): boolean {
+    return this.skippedEntries.has(`${noteId}:${sourceInstanceId}`);
+  }
 
   /**
    * Wait for all pending syncs to complete
@@ -166,10 +210,20 @@ export class ActivitySync {
   /**
    * Remove a specific stale entry (e.g., after user skips it)
    */
-  removeStaleEntry(noteId: string, sourceInstanceId: string): void {
+  async removeStaleEntry(noteId: string, sourceInstanceId: string): Promise<void> {
+    // Remove from in-memory list
     this.staleEntries = this.staleEntries.filter(
       (e) => !(e.noteId === noteId && e.sourceInstanceId === sourceInstanceId)
     );
+
+    // Add to skipped set (prevents re-detection)
+    const key = `${noteId}:${sourceInstanceId}`;
+    this.skippedEntries.add(key);
+
+    // Persist the skip
+    if (this.callbacks.onSkipStaleEntry) {
+      await this.callbacks.onSkipStaleEntry(noteId, sourceInstanceId);
+    }
   }
 
   /**
@@ -263,6 +317,12 @@ export class ActivitySync {
             // STALE DETECTION: Check if this entry is too far behind the highest sequence
             const gap = highestSeqFromInstance - sequence;
             if (gap > STALE_SEQUENCE_GAP_THRESHOLD) {
+              // Check if this entry was previously skipped by the user
+              if (this.isSkipped(noteId, otherInstanceId)) {
+                // User already skipped this - don't show it again
+                continue;
+              }
+
               console.warn(
                 `[ActivitySync] Stale entry detected: note ${noteId} at seq ${sequence}, highest from ${otherInstanceId} is ${highestSeqFromInstance} (gap=${gap})`
               );
@@ -412,6 +472,14 @@ export class ActivitySync {
       `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}, sourceInstance: ${sourceInstanceId}, expectedSeq: ${expectedSequence}`
     );
 
+    // Check if this entry was skipped by the user (stale sync they chose to ignore)
+    if (this.isSkipped(noteId, sourceInstanceId)) {
+      console.log(
+        `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} was skipped by user, aborting sync`
+      );
+      return true; // Return true to update watermark and skip this entry
+    }
+
     // Check if note was permanently deleted before starting retry loop
     // This prevents blocking app startup when activity log has orphaned entries
     if (this.callbacks.checkNoteExists) {
@@ -426,6 +494,13 @@ export class ActivitySync {
     const startTime = Date.now();
 
     for (let attempt = 0; attempt < delays.length; attempt++) {
+      // Check if skipped between retry attempts (user may have skipped during polling)
+      if (this.isSkipped(noteId, sourceInstanceId)) {
+        console.log(
+          `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} was skipped during retry, aborting sync`
+        );
+        return true;
+      }
       const delay = delays[attempt] ?? 0;
       console.log(
         `[ActivitySync] Attempt ${attempt + 1}/${delays.length} for note ${noteId}, sequence ${instanceSeq}`

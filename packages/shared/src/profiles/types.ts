@@ -105,8 +105,11 @@ function generateProfileId(): string {
  * @see PROFILE-PRESENCE.md for full design
  */
 export interface ProfilePresence {
-  /** Profile UUID (same as activity log filename and Profile.id) */
+  /** Profile UUID (Profile.id) */
   profileId: string;
+
+  /** Instance UUID (unique per app installation, used in activity logs) */
+  instanceId: string;
 
   /** Display name for the profile (e.g., "Personal", "Work") */
   profileName: string;

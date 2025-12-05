@@ -139,11 +139,12 @@ export const StaleSyncToast: React.FC<StaleSyncToastProps> = ({
   }, []);
 
   const handleViewDetails = useCallback(() => {
+    // Open sync status window via IPC
+    void window.electronAPI.sync.openWindow();
+    // Also call the legacy callback if provided (for backwards compatibility)
     if (onViewDetails) {
       onViewDetails();
     }
-    // For now, just log - the Sync Status panel will be implemented in Phase 5
-    console.log('[StaleSyncToast] View Details clicked');
   }, [onViewDetails]);
 
   // Don't render anything if no entries or dismissed

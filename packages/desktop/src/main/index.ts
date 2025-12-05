@@ -41,6 +41,7 @@ import { showProfilePicker, getProfileStorage } from './profile-picker';
 import { parseCliArgs } from './cli/cli-parser';
 import { WebServerManager } from './web-server/manager';
 import { ProfilePresenceManager } from './profile-presence-manager';
+import { ProfilePresenceReader } from './profile-presence-reader';
 import * as os from 'os';
 
 let mainWindow: BrowserWindow | null = null;
@@ -59,6 +60,8 @@ let backupManager: BackupManager | null = null;
 let sdMarker: SDMarker | null = null;
 let profileLock: ProfileLock | null = null;
 let profilePresenceManager: ProfilePresenceManager | null = null;
+let profilePresenceReader: ProfilePresenceReader | null = null;
+let syncStatusWindow: BrowserWindow | null = null;
 const allWindows: BrowserWindow[] = [];
 
 // Multi-SD support: Store watchers and activity syncs per SD
@@ -181,11 +184,21 @@ function getWindowTitle(): string {
   return `${devPrefix}NoteCove${profileSuffix}`;
 }
 
-function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
+function createWindow(options?: {
+  noteId?: string;
+  minimal?: boolean;
+  syncStatus?: boolean;
+}): void {
+  // If requesting sync status window and one already exists, just focus it
+  if (options?.syncStatus && syncStatusWindow && !syncStatusWindow.isDestroyed()) {
+    syncStatusWindow.focus();
+    return;
+  }
+
   // Create the browser window
   const newWindow = new BrowserWindow({
-    width: options?.minimal ? 800 : 1200,
-    height: 800,
+    width: options?.syncStatus ? 950 : options?.minimal ? 800 : 1200,
+    height: options?.syncStatus ? 600 : 800,
     show: false,
     autoHideMenuBar: false,
     title: getWindowTitle(),
@@ -213,6 +226,10 @@ function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
     if (mainWindow === newWindow) {
       mainWindow = null;
     }
+    // Clear sync status window reference if this was it
+    if (syncStatusWindow === newWindow) {
+      syncStatusWindow = null;
+    }
   });
 
   // Track window
@@ -220,6 +237,11 @@ function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
 
   // If this is the first window, set it as main
   mainWindow ??= newWindow;
+
+  // Track sync status window specially
+  if (options?.syncStatus) {
+    syncStatusWindow = newWindow;
+  }
 
   // Build URL with parameters
   let url: string;
@@ -229,6 +251,9 @@ function createWindow(options?: { noteId?: string; minimal?: boolean }): void {
   }
   if (options?.minimal) {
     params.set('minimal', 'true');
+  }
+  if (options?.syncStatus) {
+    params.set('syncStatus', 'true');
   }
 
   const queryString = params.toString();
@@ -987,6 +1012,35 @@ async function setupSDWatchers(
         });
       },
     },
+
+    // Persistence callbacks for skipped stale entries
+    getSkippedStaleEntries: async (): Promise<string[]> => {
+      const stateKey = `skippedStaleEntries:${sdId}`;
+      const stored = await db.getState(stateKey);
+      if (!stored) return [];
+      try {
+        return JSON.parse(stored) as string[];
+      } catch {
+        return [];
+      }
+    },
+    onSkipStaleEntry: async (noteId: string, sourceInstanceId: string): Promise<void> => {
+      const stateKey = `skippedStaleEntries:${sdId}`;
+      const stored = await db.getState(stateKey);
+      let entries: string[] = [];
+      if (stored) {
+        try {
+          entries = JSON.parse(stored) as string[];
+        } catch {
+          entries = [];
+        }
+      }
+      const key = `${noteId}:${sourceInstanceId}`;
+      if (!entries.includes(key)) {
+        entries.push(key);
+        await db.setState(stateKey, JSON.stringify(entries));
+      }
+    },
   };
 
   const activitySync = new ActivitySync(
@@ -996,6 +1050,9 @@ async function setupSDWatchers(
     sdId,
     activitySyncCallbacks
   );
+
+  // Load previously skipped stale entries from persistence
+  await activitySync.loadSkippedEntries();
 
   // Clean up orphaned activity logs on startup
   await activitySync.cleanupOrphanedLogs();
@@ -1283,6 +1340,17 @@ async function setupSDWatchers(
   sdActivityWatchers.set(sdId, activityWatcher);
 
   console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
+
+  // Read and cache profile presence files from this SD
+  // This enables the Stale Sync UI to show meaningful device names
+  if (profilePresenceReader) {
+    try {
+      const presences = await profilePresenceReader.readAllPresenceFiles(sdPath, sdId);
+      console.log(`[Init] Cached ${presences.length} profile presence files for SD: ${sdId}`);
+    } catch (error) {
+      console.error(`[Init] Failed to read profile presence files for SD: ${sdId}`, error);
+    }
+  }
 
   // Return a function that performs the initial sync
   // This allows the caller to decide whether to await it (blocking) or run in background
@@ -2187,11 +2255,20 @@ void app.whenReady().then(async () => {
       database,
       {
         profileId: selectedProfileId ?? instanceId,
+        instanceId: instanceId,
         profileName: selectedProfileName ?? 'Default',
         hostname: os.hostname(),
         platform,
         appVersion: app.getVersion(),
       }
+    );
+
+    // Initialize ProfilePresenceReader for reading and caching presence files from SDs
+    // This populates the cache that getStaleSyncs uses to show meaningful device names
+    profilePresenceReader = new ProfilePresenceReader(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      fsAdapter as any,
+      database
     );
 
     // Handler for when new SD is created (for IPC)
@@ -2485,10 +2562,18 @@ void app.whenReady().then(async () => {
             const noteCache = await database.getNote(entry.noteId);
 
             // Look up source profile from presence cache
-            const profilePresence = await database.getProfilePresenceCache(
+            // First try by instanceId (new method), then fall back to profileId (for backwards compatibility)
+            let profilePresence = await database.getProfilePresenceCacheByInstanceId(
               entry.sourceInstanceId,
               sdId
             );
+            // Fall back to lookup by profileId for older presence files without instanceId
+            // (In current design, instanceId === profileId for most cases)
+            profilePresence ??= await database.getProfilePresenceCache(
+              entry.sourceInstanceId,
+              sdId
+            );
+
             const sourceProfile = profilePresence
               ? {
                   profileId: profilePresence.profileId,
@@ -2539,7 +2624,7 @@ void app.whenReady().then(async () => {
         }
 
         try {
-          activitySync.removeStaleEntry(noteId, sourceInstanceId);
+          void activitySync.removeStaleEntry(noteId, sourceInstanceId);
           // TODO: Update watermark to skip past missing sequences
           console.log(
             `[Stale Sync] Skipped stale entry: sdId=${sdId}, noteId=${noteId}, sourceInstanceId=${sourceInstanceId}`
@@ -2563,7 +2648,7 @@ void app.whenReady().then(async () => {
 
         try {
           // Remove from stale entries so it can be retried
-          activitySync.removeStaleEntry(noteId, sourceInstanceId);
+          void activitySync.removeStaleEntry(noteId, sourceInstanceId);
           // Force a sync cycle
           await activitySync.syncFromOtherInstances();
           console.log(
@@ -2716,6 +2801,11 @@ void app.whenReady().then(async () => {
     // Register shell IPC handler for opening external URLs (for About dialog license link)
     ipcMain.handle('shell:openExternal', async (_event, url: string) => {
       await shell.openExternal(url);
+    });
+
+    // Register IPC handler for opening sync status window
+    ipcMain.handle('sync:openWindow', () => {
+      createWindow({ syncStatus: true });
     });
 
     // Register clipboard IPC handlers (for copy functionality and testing)

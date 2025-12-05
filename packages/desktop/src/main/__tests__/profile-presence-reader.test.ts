@@ -94,6 +94,7 @@ describe('ProfilePresenceReader', () => {
 
   const validPresence: ProfilePresence = {
     profileId: 'profile-123',
+    instanceId: 'instance-123',
     profileName: 'Test Profile',
     user: '@testuser',
     username: 'Test User',
@@ -183,6 +184,7 @@ describe('ProfilePresenceReader', () => {
       // Set up cached value in database
       const cachedPresence: CachedProfilePresence = {
         profileId: 'profile-123',
+        instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile',
         user: '@cacheduser',
@@ -212,6 +214,7 @@ describe('ProfilePresenceReader', () => {
       // Set up cached value
       const cachedPresence: CachedProfilePresence = {
         profileId: 'profile-123',
+        instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile',
         user: '@cacheduser',
@@ -238,6 +241,7 @@ describe('ProfilePresenceReader', () => {
       // Set up cached value
       const cachedPresence: CachedProfilePresence = {
         profileId: 'profile-123',
+        instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile',
         user: '@cacheduser',
@@ -291,6 +295,7 @@ describe('ProfilePresenceReader', () => {
       // Set up cached value for corrupt file
       const cachedPresence: CachedProfilePresence = {
         profileId: 'profile-2',
+        instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile 2',
         user: '@cached2',
@@ -324,6 +329,7 @@ describe('ProfilePresenceReader', () => {
       // Set up older cached value
       const cachedPresence: CachedProfilePresence = {
         profileId: 'profile-123',
+        instanceId: null,
         sdId: testSdId,
         profileName: 'Old Cached Name',
         user: '@olduser',
@@ -366,6 +372,7 @@ describe('ProfilePresenceReader', () => {
       // Set up cached values
       const cached1: CachedProfilePresence = {
         profileId: 'profile-1',
+        instanceId: null,
         sdId: testSdId,
         profileName: 'Profile 1',
         user: '@user1',
@@ -378,6 +385,7 @@ describe('ProfilePresenceReader', () => {
       };
       const cached2: CachedProfilePresence = {
         profileId: 'profile-2',
+        instanceId: null,
         sdId: testSdId,
         profileName: 'Profile 2',
         user: '@user2',

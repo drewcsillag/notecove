@@ -23,6 +23,7 @@ import { AppStateKey } from '@notecove/shared';
  */
 export interface ProfilePresenceConfig {
   profileId: string;
+  instanceId: string;
   profileName: string;
   hostname: string;
   platform: ProfilePresencePlatform;
@@ -81,6 +82,7 @@ export class ProfilePresenceManager {
 
     const presence: ProfilePresence = {
       profileId: this.config.profileId,
+      instanceId: this.config.instanceId,
       profileName: this.config.profileName,
       user: userHandle,
       username: username,

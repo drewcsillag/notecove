@@ -47,6 +47,7 @@ describe('ProfilePresenceManager', () => {
 
   const testConfig = {
     profileId: 'test-profile-123',
+    instanceId: 'test-instance-456',
     profileName: 'Test Profile',
     hostname: 'test-host.local',
     platform: 'darwin' as const,

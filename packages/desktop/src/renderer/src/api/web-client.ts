@@ -568,11 +568,15 @@ export const webClient: typeof window.electronAPI = {
   },
 
   sync: {
-    getStatus: async () => ({ pendingCount: 0, perSd: [], isSyncing: false }),
-    getStaleSyncs: async () => [],
-    skipStaleEntry: async () => ({ success: true }),
-    retryStaleEntry: async () => ({ success: true }),
-    exportDiagnostics: async () => ({ success: false, error: 'Not supported in web mode' }),
+    openWindow: async () => {
+      // No-op in web mode - sync status is not applicable
+    },
+    getStatus: () => Promise.resolve({ pendingCount: 0, perSd: [], isSyncing: false }),
+    getStaleSyncs: () => Promise.resolve([]),
+    skipStaleEntry: () => Promise.resolve({ success: true }),
+    retryStaleEntry: () => Promise.resolve({ success: true }),
+    exportDiagnostics: () =>
+      Promise.resolve({ success: false, error: 'Not supported in web mode' }),
     onProgress: noopSubscription,
     onStatusChanged: noopSubscription,
     onStaleEntriesChanged: noopSubscription,

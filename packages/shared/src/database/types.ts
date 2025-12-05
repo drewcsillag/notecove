@@ -492,6 +492,15 @@ export interface ProfilePresenceCacheOperations {
   getProfilePresenceCache(profileId: string, sdId: string): Promise<CachedProfilePresence | null>;
 
   /**
+   * Get cached presence by instanceId in an SD
+   * Used for mapping activity log entries to profile info
+   */
+  getProfilePresenceCacheByInstanceId(
+    instanceId: string,
+    sdId: string
+  ): Promise<CachedProfilePresence | null>;
+
+  /**
    * Get all cached presence entries for an SD
    */
   getProfilePresenceCacheBySd(sdId: string): Promise<CachedProfilePresence[]>;

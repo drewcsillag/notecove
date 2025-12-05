@@ -261,6 +261,7 @@ declare global {
       };
 
       sync: {
+        openWindow: () => Promise<void>;
         getStatus: () => Promise<SyncStatus>;
         getStaleSyncs: () => Promise<StaleSyncEntry[]>;
         skipStaleEntry: (

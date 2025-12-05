@@ -177,13 +177,60 @@ export class SqliteDatabase implements Database {
     const currentVersion = await this.getCurrentVersion();
 
     if (currentVersion === null) {
-      // First time setup
+      // First time setup - run all migrations to ensure indexes etc are created
+      // Migrations are idempotent so this is safe
+      await this.runMigrations(0);
       await this.recordVersion(SCHEMA_VERSION, 'Initial schema');
-    } else if (currentVersion !== SCHEMA_VERSION) {
-      // TODO: Implement migration logic when schema version changes
-      // For now, just record the new version
-      await this.recordVersion(SCHEMA_VERSION, `Migration to v${SCHEMA_VERSION}`);
+    } else if (currentVersion < SCHEMA_VERSION) {
+      // Run migrations sequentially
+      await this.runMigrations(currentVersion);
     }
+  }
+
+  /**
+   * Run migrations from currentVersion to SCHEMA_VERSION
+   */
+  private async runMigrations(fromVersion: number): Promise<void> {
+    console.log(`[Database] Running migrations from v${fromVersion} to v${SCHEMA_VERSION}`);
+
+    // Migration v6 -> v7: Add instance_id column to profile_presence_cache
+    if (fromVersion < 7) {
+      await this.migrateToVersion7();
+    }
+
+    // Add future migrations here following the pattern:
+    // if (fromVersion < N) { await this.migrateToVersionN(); }
+  }
+
+  /**
+   * Migration to version 7:
+   * - Add instance_id column to profile_presence_cache table
+   * - Add index on (instance_id, sd_id) for efficient lookups
+   */
+  private async migrateToVersion7(): Promise<void> {
+    console.log('[Database] Migrating to v7: Adding instance_id to profile_presence_cache');
+
+    // Check if the column already exists (idempotent migration)
+    const tableInfo = await this.adapter.all<{ name: string }>(
+      "PRAGMA table_info('profile_presence_cache')"
+    );
+    const hasInstanceId = tableInfo.some((col) => col.name === 'instance_id');
+
+    if (!hasInstanceId) {
+      // Add the instance_id column
+      await this.adapter.exec('ALTER TABLE profile_presence_cache ADD COLUMN instance_id TEXT');
+      console.log('[Database] Added instance_id column to profile_presence_cache');
+    }
+
+    // Create the index if it doesn't exist (CREATE INDEX IF NOT EXISTS is safe)
+    await this.adapter.exec(
+      'CREATE INDEX IF NOT EXISTS idx_profile_presence_cache_instance_id ON profile_presence_cache(instance_id, sd_id)'
+    );
+    console.log('[Database] Created/verified idx_profile_presence_cache_instance_id index');
+
+    // Record the migration
+    await this.recordVersion(7, 'Added instance_id column and index to profile_presence_cache');
+    console.log('[Database] Migration to v7 complete');
   }
 
   // ============================================================================
@@ -1216,6 +1263,7 @@ export class SqliteDatabase implements Database {
   ): Promise<CachedProfilePresence | null> {
     const row = await this.adapter.get<{
       profile_id: string;
+      instance_id: string | null;
       sd_id: string;
       profile_name: string | null;
       user: string | null;
@@ -1234,6 +1282,45 @@ export class SqliteDatabase implements Database {
 
     return {
       profileId: row.profile_id,
+      instanceId: row.instance_id,
+      sdId: row.sd_id,
+      profileName: row.profile_name,
+      user: row.user,
+      username: row.username,
+      hostname: row.hostname,
+      platform: row.platform,
+      appVersion: row.app_version,
+      lastUpdated: row.last_updated,
+      cachedAt: row.cached_at,
+    };
+  }
+
+  async getProfilePresenceCacheByInstanceId(
+    instanceId: string,
+    sdId: string
+  ): Promise<CachedProfilePresence | null> {
+    const row = await this.adapter.get<{
+      profile_id: string;
+      instance_id: string | null;
+      sd_id: string;
+      profile_name: string | null;
+      user: string | null;
+      username: string | null;
+      hostname: string | null;
+      platform: string | null;
+      app_version: string | null;
+      last_updated: number | null;
+      cached_at: number;
+    }>('SELECT * FROM profile_presence_cache WHERE instance_id = ? AND sd_id = ?', [
+      instanceId,
+      sdId,
+    ]);
+
+    if (!row) return null;
+
+    return {
+      profileId: row.profile_id,
+      instanceId: row.instance_id,
       sdId: row.sd_id,
       profileName: row.profile_name,
       user: row.user,
@@ -1249,6 +1336,7 @@ export class SqliteDatabase implements Database {
   async getProfilePresenceCacheBySd(sdId: string): Promise<CachedProfilePresence[]> {
     const rows = await this.adapter.all<{
       profile_id: string;
+      instance_id: string | null;
       sd_id: string;
       profile_name: string | null;
       user: string | null;
@@ -1262,6 +1350,7 @@ export class SqliteDatabase implements Database {
 
     return rows.map((row) => ({
       profileId: row.profile_id,
+      instanceId: row.instance_id,
       sdId: row.sd_id,
       profileName: row.profile_name,
       user: row.user,
@@ -1277,10 +1366,11 @@ export class SqliteDatabase implements Database {
   async upsertProfilePresenceCache(presence: CachedProfilePresence): Promise<void> {
     await this.adapter.exec(
       `INSERT INTO profile_presence_cache (
-        profile_id, sd_id, profile_name, user, username, hostname,
+        profile_id, instance_id, sd_id, profile_name, user, username, hostname,
         platform, app_version, last_updated, cached_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(profile_id, sd_id) DO UPDATE SET
+        instance_id = excluded.instance_id,
         profile_name = excluded.profile_name,
         user = excluded.user,
         username = excluded.username,
@@ -1291,6 +1381,7 @@ export class SqliteDatabase implements Database {
         cached_at = excluded.cached_at`,
       [
         presence.profileId,
+        presence.instanceId,
         presence.sdId,
         presence.profileName,
         presence.user,

@@ -219,6 +219,7 @@ export interface SequenceState {
  */
 export interface CachedProfilePresence {
   profileId: string;
+  instanceId: string | null;
   sdId: string;
   profileName: string | null;
   user: string | null;
@@ -240,13 +241,14 @@ export interface CachedProfilePresence {
  * - v4: Added note_links table for inter-note links
  * - v5: Added checkboxes table for tri-state task tracking
  * - v6: Added note_sync_state, folder_sync_state, activity_log_state, sequence_state tables for new append-only log format
+ * - v7: Added instance_id column and index to profile_presence_cache for proper activity log lookups
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
  * - User data tables (tags, note_tags, note_links, checkboxes, app_state): Migrate with version-specific logic
  * - Sync state tables: Safe to recreate (will rebuild from files)
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /**
  * SQL schema definitions
@@ -530,6 +532,10 @@ export const SCHEMA_SQL = {
    * Profile presence cache table
    * Caches profile presence info from SDs for the Stale Sync UI
    * @see plans/stale-sync-ux/PROFILE-PRESENCE.md
+   *
+   * Note: instance_id column and its index are added via migration (v7) to support
+   * existing databases. For new databases, the migration also runs to ensure the
+   * index is created.
    */
   profilePresenceCache: `
     CREATE TABLE IF NOT EXISTS profile_presence_cache (

@@ -522,6 +522,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Sync operations
   sync: {
+    openWindow: (): Promise<void> => ipcRenderer.invoke('sync:openWindow') as Promise<void>,
     getStatus: (): Promise<SyncStatus> =>
       ipcRenderer.invoke('sync:getStatus') as Promise<SyncStatus>,
     getStaleSyncs: (): Promise<StaleSyncEntry[]> =>

@@ -64,10 +64,10 @@ function App(): React.ReactElement {
   }>({ open: false, current: 0, total: 0 });
   // Minimal mode (for linked note windows)
   const [minimalMode, setMinimalMode] = useState(false);
+  // Sync status window mode (dedicated window for sync status panel)
+  const [syncStatusMode, setSyncStatusMode] = useState(false);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
-  // Sync status panel
-  const [syncStatusOpen, setSyncStatusOpen] = useState(false);
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
@@ -79,12 +79,14 @@ function App(): React.ReactElement {
       const searchParams = new URLSearchParams(window.location.search);
       let noteIdParam = searchParams.get('noteId');
       let minimalParam = searchParams.get('minimal');
+      let syncStatusParam = searchParams.get('syncStatus');
 
       // If not in search, try hash (for file:// protocol)
-      if (!noteIdParam && !minimalParam && window.location.hash) {
+      if (!noteIdParam && !minimalParam && !syncStatusParam && window.location.hash) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         noteIdParam = hashParams.get('noteId');
         minimalParam = hashParams.get('minimal');
+        syncStatusParam = hashParams.get('syncStatus');
       }
 
       if (noteIdParam) {
@@ -95,6 +97,11 @@ function App(): React.ReactElement {
       if (minimalParam === 'true') {
         console.log('[App] Enabling minimal mode from URL parameter');
         setMinimalMode(true);
+      }
+
+      if (syncStatusParam === 'true') {
+        console.log('[App] Enabling sync status mode from URL parameter');
+        setSyncStatusMode(true);
       }
     } catch (error) {
       console.error('[App] Error parsing URL parameters:', error);
@@ -462,9 +469,9 @@ function App(): React.ReactElement {
       void window.electronAPI.tools.reindexNotes();
     });
 
-    // Sync Status
+    // Sync Status - open in dedicated window
     const cleanupSyncStatus = window.electronAPI.menu.onSyncStatus(() => {
-      setSyncStatusOpen(true);
+      void window.electronAPI.sync.openWindow();
     });
 
     return () => {
@@ -526,6 +533,31 @@ function App(): React.ReactElement {
   const handleClearTagFilters = (): void => {
     setTagFilters({});
   };
+
+  // Render sync status window (standalone window for sync status panel)
+  if (syncStatusMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <SyncStatusPanel
+            open={true}
+            onClose={() => {
+              // Close the window
+              window.close();
+            }}
+          />
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   // Render minimal layout (just editor, no sidebars)
   if (minimalMode) {
@@ -662,17 +694,7 @@ function App(): React.ReactElement {
           total={reindexProgress.total}
           {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
         />
-        <StaleSyncToast
-          onViewDetails={() => {
-            setSyncStatusOpen(true);
-          }}
-        />
-        <SyncStatusPanel
-          open={syncStatusOpen}
-          onClose={() => {
-            setSyncStatusOpen(false);
-          }}
-        />
+        <StaleSyncToast />
       </DndProvider>
     </ThemeProvider>
   );
