@@ -228,6 +228,129 @@ describe('Other API Routes', () => {
         expect(body.missingFiles).toBe(1);
         expect(mockServices.diagnosticsGetStatus).toHaveBeenCalled();
       });
+
+      it('should return 500 when service fails with generic error', async () => {
+        (mockServices.diagnosticsGetStatus as jest.Mock).mockRejectedValue(
+          new Error('Database error')
+        );
+
+        const response = await makeRequest('GET', '/api/diagnostics/status', { token: validToken });
+        expect(response.statusCode).toBe(500);
+      });
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should return 500 when tag service fails with generic error', async () => {
+      (mockServices.tagGetAll as jest.Mock).mockRejectedValue(new Error('Service error'));
+
+      const response = await makeRequest('GET', '/api/tags', { token: validToken });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when sd list fails with generic error', async () => {
+      (mockServices.sdList as jest.Mock).mockRejectedValue(new Error('Service error'));
+
+      const response = await makeRequest('GET', '/api/storage-directories', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when active sd fails with generic error', async () => {
+      (mockServices.sdGetActive as jest.Mock).mockRejectedValue(new Error('Service error'));
+
+      const response = await makeRequest('GET', '/api/storage-directories/active', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 404 when history timeline fails with not found', async () => {
+      (mockServices.historyGetTimeline as jest.Mock).mockRejectedValue(new Error('Note not found'));
+
+      const response = await makeRequest('GET', '/api/notes/note-1/history/timeline', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should return 404 when history stats fails with not found', async () => {
+      (mockServices.historyGetStats as jest.Mock).mockRejectedValue(new Error('Note not found'));
+
+      const response = await makeRequest('GET', '/api/notes/note-1/history/stats', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should return 500 when history timeline fails with generic error', async () => {
+      (mockServices.historyGetTimeline as jest.Mock).mockRejectedValue(new Error('Database error'));
+
+      const response = await makeRequest('GET', '/api/notes/note-1/history/timeline', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when history stats fails with generic error', async () => {
+      (mockServices.historyGetStats as jest.Mock).mockRejectedValue(new Error('Database error'));
+
+      const response = await makeRequest('GET', '/api/notes/note-1/history/stats', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(500);
+    });
+  });
+
+  describe('Services Not Configured', () => {
+    beforeEach(async () => {
+      // Clear services to trigger 503 responses
+      if (server.isRunning()) {
+        await server.stop();
+      }
+      setRouteContext({ services: null });
+      server = new WebServer({ port: 0, authManager });
+      await server.start();
+      port = server.getPort()!;
+    });
+
+    it('should return 503 when services not configured for tags', async () => {
+      const response = await makeRequest('GET', '/api/tags', { token: validToken });
+      expect(response.statusCode).toBe(503);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe('Services not configured');
+    });
+
+    it('should return 503 when services not configured for storage directories', async () => {
+      const response = await makeRequest('GET', '/api/storage-directories', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for active sd', async () => {
+      const response = await makeRequest('GET', '/api/storage-directories/active', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for history timeline', async () => {
+      const response = await makeRequest('GET', '/api/notes/note-1/history/timeline', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for history stats', async () => {
+      const response = await makeRequest('GET', '/api/notes/note-1/history/stats', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for diagnostics', async () => {
+      const response = await makeRequest('GET', '/api/diagnostics/status', { token: validToken });
+      expect(response.statusCode).toBe(503);
     });
   });
 });

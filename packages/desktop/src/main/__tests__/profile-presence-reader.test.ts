@@ -405,4 +405,73 @@ describe('ProfilePresenceReader', () => {
       expect(mockDb.getProfilePresenceCacheBySd).toHaveBeenCalledWith(testSdId);
     });
   });
+
+  describe('getCachedPresence', () => {
+    it('should return cached presence for specific profile', async () => {
+      const cachedPresence: CachedProfilePresence = {
+        profileId: 'profile-123',
+        instanceId: null,
+        sdId: testSdId,
+        profileName: 'Test Profile',
+        user: '@testuser',
+        username: 'Test User',
+        hostname: 'test-host.local',
+        platform: 'darwin',
+        appVersion: '0.1.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+      mockDb.cache.set('profile-123:test-sd-id', cachedPresence);
+
+      const result = await reader.getCachedPresence('profile-123', testSdId);
+
+      expect(result).toBeDefined();
+      expect(result?.profileName).toBe('Test Profile');
+      expect(mockDb.getProfilePresenceCache).toHaveBeenCalledWith('profile-123', testSdId);
+    });
+
+    it('should return null when no cached presence exists', async () => {
+      const result = await reader.getCachedPresence('non-existent', testSdId);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('readAllPresenceFiles error handling', () => {
+    it('should fall back to cached presences when listFiles throws', async () => {
+      // Set up profiles directory to exist
+      mockFs.existingPaths.add('/test/sd/profiles');
+
+      // Make listFiles throw an error
+      (mockFs.listFiles as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+
+      // Set up cached values
+      const cachedPresence: CachedProfilePresence = {
+        profileId: 'profile-1',
+        instanceId: null,
+        sdId: testSdId,
+        profileName: 'Cached Profile',
+        user: '@cached',
+        username: 'Cached User',
+        hostname: 'cached.local',
+        platform: 'darwin',
+        appVersion: '0.1.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+      mockDb.cache.set('profile-1:test-sd-id', cachedPresence);
+
+      // Suppress console.error for this test
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const results = await reader.readAllPresenceFiles(testSdPath, testSdId);
+
+      // Should fall back to cached presences
+      expect(results).toHaveLength(1);
+      expect(results[0].profileName).toBe('Cached Profile');
+      expect(mockDb.getProfilePresenceCacheBySd).toHaveBeenCalledWith(testSdId);
+
+      consoleSpy.mockRestore();
+    });
+  });
 });

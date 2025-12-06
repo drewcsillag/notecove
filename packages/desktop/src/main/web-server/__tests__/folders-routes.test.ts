@@ -257,4 +257,119 @@ describe('Folder API Routes', () => {
       expect(mockServices.folderReorder).toHaveBeenCalledWith('sd-1', 'folder-2', 0);
     });
   });
+
+  describe('Error Handling', () => {
+    it('should return 500 when folder list fails with generic error', async () => {
+      (mockServices.folderList as jest.Mock).mockRejectedValue(new Error('Database error'));
+
+      const response = await makeRequest('GET', '/api/folders?sdId=sd-1', { token: validToken });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when folder create fails with generic error', async () => {
+      (mockServices.folderCreate as jest.Mock).mockRejectedValue(new Error('Failed to create'));
+
+      const response = await makeRequest('POST', '/api/folders', {
+        token: validToken,
+        body: { sdId: 'sd-1', name: 'Test' },
+      });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 404 when folder rename fails with not found', async () => {
+      (mockServices.folderRename as jest.Mock).mockRejectedValue(new Error('Folder not found'));
+
+      const response = await makeRequest('PUT', '/api/folders/sd-1/folder-1', {
+        token: validToken,
+        body: { name: 'New Name' },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should return 404 when folder delete fails with not found', async () => {
+      (mockServices.folderDelete as jest.Mock).mockRejectedValue(new Error('Folder not found'));
+
+      const response = await makeRequest('DELETE', '/api/folders/sd-1/folder-1', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should return 500 when folder move fails with generic error', async () => {
+      (mockServices.folderMove as jest.Mock).mockRejectedValue(new Error('Cannot move'));
+
+      const response = await makeRequest('POST', '/api/folders/sd-1/folder-1/move', {
+        token: validToken,
+        body: { parentId: 'folder-2' },
+      });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when folder reorder fails with generic error', async () => {
+      (mockServices.folderReorder as jest.Mock).mockRejectedValue(new Error('Failed to reorder'));
+
+      const response = await makeRequest('POST', '/api/folders/sd-1/folder-1/reorder', {
+        token: validToken,
+        body: { order: 1 },
+      });
+      expect(response.statusCode).toBe(500);
+    });
+  });
+
+  describe('Services Not Configured', () => {
+    beforeEach(async () => {
+      // Clear services to trigger 503 responses
+      if (server.isRunning()) {
+        await server.stop();
+      }
+      setRouteContext({ services: null });
+      server = new WebServer({ port: 0, authManager });
+      await server.start();
+      port = server.getPort()!;
+    });
+
+    it('should return 503 when services not configured for folder list', async () => {
+      const response = await makeRequest('GET', '/api/folders?sdId=sd-1', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for folder create', async () => {
+      const response = await makeRequest('POST', '/api/folders', {
+        token: validToken,
+        body: { sdId: 'sd-1', name: 'Test' },
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for folder rename', async () => {
+      const response = await makeRequest('PUT', '/api/folders/sd-1/folder-1', {
+        token: validToken,
+        body: { name: 'New Name' },
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for folder delete', async () => {
+      const response = await makeRequest('DELETE', '/api/folders/sd-1/folder-1', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for folder move', async () => {
+      const response = await makeRequest('POST', '/api/folders/sd-1/folder-1/move', {
+        token: validToken,
+        body: { parentId: 'folder-2' },
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for folder reorder', async () => {
+      const response = await makeRequest('POST', '/api/folders/sd-1/folder-1/reorder', {
+        token: validToken,
+        body: { order: 1 },
+      });
+      expect(response.statusCode).toBe(503);
+    });
+  });
 });
