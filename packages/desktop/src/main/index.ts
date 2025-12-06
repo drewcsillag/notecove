@@ -2911,6 +2911,13 @@ void app.whenReady().then(async () => {
       webServerManager.disconnectAllClients();
     });
 
+    ipcMain.handle('webServer:getCertificateInfo', () => {
+      if (!webServerManager) {
+        return null;
+      }
+      return webServerManager.getCertificateInfo();
+    });
+
     // Create menu
     createMenu();
 

@@ -1,0 +1,746 @@
+================================================================================
+ANNOTATED: NoteCoveSync.tla
+================================================================================
+This is the main specification file for the NoteCove sync system.
+It models how notes synchronize across multiple devices via cloud storage.
+================================================================================
+
+---- MODULE NoteCoveSync ----
+
+    Declares the module name. Must match the filename.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* TLA+ Specification for NoteCove Sync System
+\*
+\* Models the synchronization of notes across multiple instances via
+\* cloud storage. Abstracts Yjs CRDT as set union (black box).
+\*
+\* Step 2: Minimal sync model (folder-style direct watching) - DONE
+\* Step 3: Activity log mechanism (note-style polling) - CURRENT
+\*
+\* See:
+\*   - SYNC-ARCHITECTURE.md for implementation details
+\*   - MODEL-DESIGN.md for design rationale
+\***********************************************************************
+
+    Documentation comment explaining the spec's purpose.
+    The Yjs CRDT (Conflict-free Replicated Data Type) is abstracted as
+    simple set union - we just track which updates have been applied.
+
+--------------------------------------------------------------------------------
+
+EXTENDS NoteCoveSyncTypes, TLC
+
+    Import the types module we defined, plus TLC (the model checker utilities).
+    TLC provides things like Print() for debugging during model checking.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* State Variables
+\***********************************************************************
+
+VARIABLES
+    \* --- Per-Node State ---
+    localDoc,           \* [Node -> SUBSET UpdateId] - applied updates
+    vectorClock,        \* [Node -> VectorClock] - what we've seen from CRDT logs
+    nextSeq,            \* [Node -> Nat] - next sequence number to use
+    dbCache,            \* [Node -> DbCache] - persisted snapshot
+    running,            \* [Node -> BOOLEAN] - is node running?
+    watermark,          \* [Node -> [Node -> Nat]] - last seen activity seq per other node
+
+    \* --- Cloud State: CRDT Logs ---
+    pendingLogs,        \* [Node -> Seq(LogEntry)] - written, not yet synced
+    syncedLogs,         \* [Node -> Seq(LogEntry)] - synced to cloud
+
+    \* --- Cloud State: Activity Logs ---
+    pendingActivity,    \* [Node -> Seq(ActivityEntry)] - activity written, not synced
+    syncedActivity,     \* [Node -> Seq(ActivityEntry)] - activity synced to cloud
+
+    \* --- Global State ---
+    nextUpdateId        \* Nat - counter for unique update IDs
+
+    VARIABLES declares the state variables of the system.
+    These are the things that change over time as the system runs.
+
+    Each variable's type annotation in the comment:
+        [A -> B] means a function from A to B
+        SUBSET X means a subset of X (power set element)
+        Seq(X) means a sequence (ordered list) of X elements
+
+    Key concepts:
+        - localDoc: What updates each node has applied (the document state)
+        - vectorClock: What each node knows it has seen from all other nodes
+        - watermark: What activity log entries each node has processed
+        - pending vs synced: Models the cloud sync delay (local write -> cloud visible)
+
+--------------------------------------------------------------------------------
+
+\* All variables for stuttering
+vars == <<localDoc, vectorClock, nextSeq, dbCache, running, watermark,
+          pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    << >> creates a tuple (ordered sequence).
+    vars is a tuple of all variables, used in the spec definition.
+    "Stuttering" refers to steps where nothing changes (important for refinement).
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Type Invariant
+\***********************************************************************
+
+TypeOK ==
+    /\ localDoc \in [Node -> SUBSET UpdateId]
+    /\ vectorClock \in [Node -> [Node -> Nat]]
+    /\ nextSeq \in [Node -> Nat]
+    /\ dbCache \in [Node -> [doc: SUBSET UpdateId, clock: [Node -> Nat]]]
+    /\ running \in [Node -> BOOLEAN]
+    /\ watermark \in [Node -> [Node -> Nat]]
+    /\ \A n \in Node : IsLogSeq(pendingLogs[n])
+    /\ \A n \in Node : IsLogSeq(syncedLogs[n])
+    /\ \A n \in Node : IsActivitySeq(pendingActivity[n])
+    /\ \A n \in Node : IsActivitySeq(syncedActivity[n])
+    /\ nextUpdateId \in Nat
+
+    TypeOK is the TYPE INVARIANT - a predicate that should always be true.
+    It specifies the expected types of all variables.
+
+    The model checker verifies this holds in every reachable state.
+    If TypeOK fails, there's likely a bug in the spec.
+
+    x \in S means "x is an element of set S".
+    [A -> B] is the set of all functions from A to B.
+    [field: Type] is the set of all records with that field/type.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Initial State
+\***********************************************************************
+
+Init ==
+    /\ localDoc = [n \in Node |-> {}]
+    /\ vectorClock = [n \in Node |-> EmptyVectorClock]
+    /\ nextSeq = [n \in Node |-> 1]
+    /\ dbCache = [n \in Node |-> EmptyDbCache]
+    /\ running = [n \in Node |-> TRUE]
+    /\ watermark = [n \in Node |-> EmptyVectorClock]
+    /\ pendingLogs = [n \in Node |-> <<>>]
+    /\ syncedLogs = [n \in Node |-> <<>>]
+    /\ pendingActivity = [n \in Node |-> <<>>]
+    /\ syncedActivity = [n \in Node |-> <<>>]
+    /\ nextUpdateId = 1
+
+    Init defines the INITIAL STATE predicate.
+    All variables must be assigned their starting values.
+
+    [n \in Node |-> expr] creates a function mapping each node to expr.
+    <<>> is the empty sequence.
+    {} is the empty set.
+
+    Initial state:
+        - All docs empty (no updates applied)
+        - All clocks at zero (nothing seen)
+        - Sequence numbers start at 1
+        - All nodes running
+        - All logs empty
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Actions
+\***********************************************************************
+
+    An ACTION in TLA+ describes how the system can transition from one state
+    to another. Each action is a predicate that relates the current state
+    (unprimed variables) to the next state (primed variables like x').
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* Edit: User makes a change on a node
+\*
+\* In the real system, this:
+\* 1. Updates the Yjs document
+\* 2. Writes to CRDT log
+\* 3. Writes to activity log
+\*
+\* We model steps 2 & 3 as writing to pending queues.
+\* -----------------------------------------------------------------------
+Edit(n) ==
+    /\ running[n]                           \* Node must be running
+    /\ nextUpdateId <= MaxUpdates           \* Bound model checking
+    /\ LET logEntry == [updateId |-> nextUpdateId, origin |-> n, seq |-> nextSeq[n]]
+           actEntry == [origin |-> n, seq |-> nextSeq[n]]
+       IN
+        \* Update local document
+        /\ localDoc' = [localDoc EXCEPT ![n] = @ \union {nextUpdateId}]
+        \* Update vector clock
+        /\ vectorClock' = [vectorClock EXCEPT ![n][n] = nextSeq[n]]
+        \* Increment sequence
+        /\ nextSeq' = [nextSeq EXCEPT ![n] = @ + 1]
+        \* Add to pending CRDT logs (will be synced later)
+        /\ pendingLogs' = [pendingLogs EXCEPT ![n] = Append(@, logEntry)]
+        \* Add to pending activity logs (mode-dependent)
+        /\ pendingActivity' = [pendingActivity EXCEPT ![n] =
+            IF ActivityMode = "append" THEN Append(@, actEntry)
+            ELSE <<actEntry>>  \* Replace mode: only keep latest
+           ]
+        \* Increment global update counter
+        /\ nextUpdateId' = nextUpdateId + 1
+    /\ UNCHANGED <<dbCache, running, watermark, syncedLogs, syncedActivity>>
+
+    This is the most complex action. Let's break it down:
+
+    PRECONDITIONS (guards):
+        running[n] - node must be running to edit
+        nextUpdateId <= MaxUpdates - bounded for model checking
+
+    LET ... IN - local definitions for convenience
+
+    PRIMED VARIABLES (x' means "x in the next state"):
+        localDoc' = ... - how localDoc changes
+
+    EXCEPT syntax for functional updates:
+        [f EXCEPT ![key] = newValue]
+            Creates a new function like f, but with f[key] changed to newValue.
+        @ refers to the OLD value at that position.
+
+        So [localDoc EXCEPT ![n] = @ \union {nextUpdateId}]
+        means "localDoc, but with localDoc[n] updated to localDoc[n] union {nextUpdateId}"
+
+    \union is set union.
+
+    UNCHANGED <<a, b, c>> is shorthand for /\ a' = a /\ b' = b /\ c' = c
+    It declares which variables stay the same.
+
+    The ActivityMode check shows conditional logic based on config.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* CloudSyncLog: A pending CRDT log entry becomes visible to all nodes
+\* -----------------------------------------------------------------------
+CloudSyncLog(n) ==
+    /\ Len(pendingLogs[n]) > 0              \* Has pending entries
+    /\ LET entry == Head(pendingLogs[n])
+       IN
+        \* Move from pending to synced
+        /\ syncedLogs' = [syncedLogs EXCEPT ![n] = Append(@, entry)]
+        /\ pendingLogs' = [pendingLogs EXCEPT ![n] = Tail(@)]
+    /\ UNCHANGED <<localDoc, vectorClock, nextSeq, dbCache, running, watermark,
+                   pendingActivity, syncedActivity, nextUpdateId>>
+
+    Models the cloud syncing a log entry.
+
+    Head(seq) returns the first element.
+    Tail(seq) returns everything except the first element.
+    Append(seq, elem) adds elem to the end.
+
+    This moves one entry from pending to synced (first-in-first-out).
+    Other nodes can only see syncedLogs, not pendingLogs.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* CloudSyncActivity: A pending activity log entry becomes visible
+\* -----------------------------------------------------------------------
+CloudSyncActivity(n) ==
+    /\ Len(pendingActivity[n]) > 0          \* Has pending entries
+    /\ LET entry == Head(pendingActivity[n])
+       IN
+        \* Move from pending to synced (mode-dependent)
+        /\ syncedActivity' = [syncedActivity EXCEPT ![n] =
+            IF ActivityMode = "append" THEN Append(@, entry)
+            ELSE <<entry>>  \* Replace mode: only keep latest
+           ]
+        /\ pendingActivity' = [pendingActivity EXCEPT ![n] = Tail(@)]
+    /\ UNCHANGED <<localDoc, vectorClock, nextSeq, dbCache, running, watermark,
+                   pendingLogs, syncedLogs, nextUpdateId>>
+
+    Same pattern as CloudSyncLog, but for activity entries.
+    In "replace" mode, syncing overwrites rather than appends.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* ReloadDirect: Node loads updates from synced logs (folder-style)
+\*
+\* This models the simpler folder sync: detect file change, reload all.
+\* Used for folders which watch the logs directory directly.
+\* -----------------------------------------------------------------------
+ReloadDirect(n) ==
+    /\ running[n]
+    \* Check if there are any new updates to apply
+    /\ \E m \in Node :
+        LET newUpdates == NewEntriesInLog(syncedLogs[m], m, vectorClock[n][m])
+        IN newUpdates /= {}
+    \* Apply all new updates from all nodes
+    /\ LET allNewUpdates == UNION {
+            {e.updateId : e \in NewEntriesInLog(syncedLogs[m], m, vectorClock[n][m])}
+            : m \in Node
+           }
+           newClock == [m \in Node |->
+               LET maxSeen == MaxSeqInLog(syncedLogs[m], m)
+               IN IF maxSeen > vectorClock[n][m] THEN maxSeen ELSE vectorClock[n][m]
+           ]
+       IN
+        /\ localDoc' = [localDoc EXCEPT ![n] = @ \union allNewUpdates]
+        /\ vectorClock' = [vectorClock EXCEPT ![n] = newClock]
+    /\ UNCHANGED <<nextSeq, dbCache, running, watermark,
+                   pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    This models a node directly watching cloud logs (like filesystem watching).
+
+    PRECONDITION:
+        \E m \in Node : ... means "there exists some node m such that..."
+        We only reload if there ARE new updates to apply.
+
+    UNION {...} computes the union of a set of sets.
+    UNION {{1,2}, {3}, {2,4}} = {1,2,3,4}
+
+    The newClock computation takes the max of current clock and what's in logs.
+    IF-THEN-ELSE is conditional expression.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* PollActivity: Node polls activity logs and discovers changes
+\*
+\* This models the note sync mechanism:
+\* 1. Read other instances' activity logs
+\* 2. Find entries with seq > watermark
+\* 3. Update watermark
+\* 4. (The actual reload is a separate action)
+\*
+\* In real system: polls every 3 seconds as backup to chokidar
+\* -----------------------------------------------------------------------
+PollActivity(n) ==
+    /\ running[n]
+    \* Check if there's new activity from any other node
+    /\ \E m \in Node \ {n} :
+        HasNewActivity(syncedActivity[m], m, watermark[n][m])
+    \* Update watermarks to reflect what we've seen
+    /\ watermark' = [watermark EXCEPT ![n] =
+        [m \in Node |->
+            IF m = n THEN @[m]  \* Don't track our own activity
+            ELSE LET maxAct == MaxSeqInActivity(syncedActivity[m], m)
+                 IN IF maxAct > @[m] THEN maxAct ELSE @[m]
+        ]]
+    /\ UNCHANGED <<localDoc, vectorClock, nextSeq, dbCache, running,
+                   pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    Node \ {n} means "Node minus the set {n}" - all nodes except n.
+
+    This action ONLY updates watermarks - it doesn't load the actual data.
+    The watermark tracks "I know there are updates up to seq X from node M".
+    The actual loading is done by ReloadFromActivity.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* ReloadFromActivity: Node reloads after detecting activity
+\*
+\* This models the note sync reload triggered by activity detection.
+\* Precondition: watermark indicates we know about updates we haven't loaded yet
+\* -----------------------------------------------------------------------
+ReloadFromActivity(n) ==
+    /\ running[n]
+    \* Check if watermark shows updates we haven't loaded (via vectorClock)
+    /\ \E m \in Node \ {n} :
+        watermark[n][m] > vectorClock[n][m]
+    \* Check that the CRDT log has actually synced (not just activity log)
+    \* This models the exponential backoff retry - we only reload when ready
+    /\ \A m \in Node \ {n} :
+        watermark[n][m] <= MaxSeqInLog(syncedLogs[m], m)
+    \* Apply all new updates from all nodes
+    /\ LET allNewUpdates == UNION {
+            {e.updateId : e \in NewEntriesInLog(syncedLogs[m], m, vectorClock[n][m])}
+            : m \in Node
+           }
+           newClock == [m \in Node |->
+               LET maxSeen == MaxSeqInLog(syncedLogs[m], m)
+               IN IF maxSeen > vectorClock[n][m] THEN maxSeen ELSE vectorClock[n][m]
+           ]
+       IN
+        /\ localDoc' = [localDoc EXCEPT ![n] = @ \union allNewUpdates]
+        /\ vectorClock' = [vectorClock EXCEPT ![n] = newClock]
+    /\ UNCHANGED <<nextSeq, dbCache, running, watermark,
+                   pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    KEY INSIGHT: There are TWO preconditions that must both be true:
+
+    1. watermark[n][m] > vectorClock[n][m]
+       "I know about updates I haven't loaded yet"
+
+    2. watermark[n][m] <= MaxSeqInLog(syncedLogs[m], m)
+       "The CRDT log has caught up to what activity told me about"
+
+    This models the real scenario where activity log might sync before
+    the actual CRDT data. The node retries until the data is available.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* CompactActivity: Cloud compacts activity log (keeps last N entries)
+\*
+\* This models periodic compaction that removes old entries.
+\* Other nodes must detect the gap and fall back to full scan.
+\* -----------------------------------------------------------------------
+CompactActivity(n) ==
+    /\ Len(syncedActivity[n]) > MaxLogSize  \* Only compact if too long
+    /\ syncedActivity' = [syncedActivity EXCEPT ![n] =
+        \* Keep only the last MaxLogSize/2 entries (aggressive compaction)
+        SubSeq(@, Len(@) - (MaxLogSize \div 2) + 1, Len(@))
+       ]
+    /\ UNCHANGED <<localDoc, vectorClock, nextSeq, dbCache, running, watermark,
+                   pendingLogs, syncedLogs, pendingActivity, nextUpdateId>>
+
+    SubSeq(s, start, end) extracts a subsequence from index start to end.
+    \div is integer division.
+
+    This models cloud storage compaction - old activity entries get deleted.
+    When this happens, other nodes might have "gaps" in their watermarks.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* FullScanFallback: Node detects activity gap and falls back to direct reload
+\*
+\* This models the recovery when compaction causes gaps in activity log.
+\* The node uses ReloadDirect-style logic to sync from CRDT logs directly.
+\* -----------------------------------------------------------------------
+FullScanFallback(n) ==
+    /\ running[n]
+    \* Check if there's a gap in any other node's activity log
+    /\ \E m \in Node \ {n} :
+        HasActivityGap(syncedActivity[m], m, watermark[n][m])
+    \* Reset watermarks and do full reload from CRDT logs
+    /\ LET allNewUpdates == UNION {
+            {e.updateId : e \in NewEntriesInLog(syncedLogs[m], m, vectorClock[n][m])}
+            : m \in Node
+           }
+           newClock == [m \in Node |->
+               LET maxSeen == MaxSeqInLog(syncedLogs[m], m)
+               IN IF maxSeen > vectorClock[n][m] THEN maxSeen ELSE vectorClock[n][m]
+           ]
+           \* Update watermarks to current max in activity logs
+           newWatermark == [m \in Node |->
+               IF m = n THEN watermark[n][m]
+               ELSE MaxSeqInActivity(syncedActivity[m], m)
+           ]
+       IN
+        /\ localDoc' = [localDoc EXCEPT ![n] = @ \union allNewUpdates]
+        /\ vectorClock' = [vectorClock EXCEPT ![n] = newClock]
+        /\ watermark' = [watermark EXCEPT ![n] = newWatermark]
+    /\ UNCHANGED <<nextSeq, dbCache, running,
+                   pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    When a gap is detected (compaction deleted entries we need),
+    the node falls back to directly scanning the CRDT logs.
+    It also resets watermarks to the current state.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* SaveSnapshot: Node saves current state to DB cache
+\* -----------------------------------------------------------------------
+SaveSnapshot(n) ==
+    /\ running[n]
+    /\ dbCache' = [dbCache EXCEPT ![n] = [doc |-> localDoc[n], clock |-> vectorClock[n]]]
+    /\ UNCHANGED <<localDoc, vectorClock, nextSeq, running, watermark,
+                   pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    Simple action: persist current state to the cache.
+    This is what allows recovery after crash.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* Crash: Node crashes (loses in-memory state)
+\* -----------------------------------------------------------------------
+Crash(n) ==
+    /\ running[n]
+    /\ running' = [running EXCEPT ![n] = FALSE]
+    \* Note: pendingLogs and pendingActivity for this node are NOT lost (they're "on disk")
+    \* But any in-flight operation is lost
+    /\ UNCHANGED <<localDoc, vectorClock, nextSeq, dbCache, watermark,
+                   pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    Crash just sets running to FALSE.
+
+    IMPORTANT: pendingLogs/pendingActivity are NOT cleared.
+    They model files written to local disk, not RAM.
+    The crash loses the in-memory state (localDoc, vectorClock, etc.)
+    but the recovery process (Restart) will restore from dbCache and logs.
+
+--------------------------------------------------------------------------------
+
+\* -----------------------------------------------------------------------
+\* Restart: Node restarts from DB cache AND reloads from logs
+\*
+\* This models the real behavior: on startup, load DB cache, then
+\* apply any CRDT log entries not covered by the cached vector clock.
+\*
+\* Key insight: The node CAN read its OWN pending logs (they're on local disk)
+\* but cannot read OTHER nodes' pending logs (those haven't synced yet).
+\* -----------------------------------------------------------------------
+Restart(n) ==
+    /\ ~running[n]                          \* Node must be crashed
+    /\ running' = [running EXCEPT ![n] = TRUE]
+    \* Restore from DB cache, then apply new log entries
+    /\ LET cachedDoc == dbCache[n].doc
+           cachedClock == dbCache[n].clock
+           \* Get updates from synced logs (from other nodes)
+           syncedUpdates == UNION {
+               {e.updateId : e \in NewEntriesInLog(syncedLogs[m], m, cachedClock[m])}
+               : m \in Node
+           }
+           \* Also get our OWN pending logs (they're on our local disk!)
+           ownPendingUpdates == {pendingLogs[n][idx].updateId : idx \in DOMAIN pendingLogs[n]}
+           allNewUpdates == syncedUpdates \union ownPendingUpdates
+           \* Compute new clock based on synced logs (we'll update for pending separately)
+           newClock == [m \in Node |->
+               IF m = n THEN
+                   \* For ourselves, include pending logs
+                   LET syncedMax == MaxSeqInLog(syncedLogs[n], n)
+                       pendingMax == MaxSeqInLog(pendingLogs[n], n)
+                   IN IF pendingMax > syncedMax THEN pendingMax
+                      ELSE IF syncedMax > cachedClock[n] THEN syncedMax
+                      ELSE cachedClock[n]
+               ELSE
+                   \* For others, only synced logs
+                   LET maxSeen == MaxSeqInLog(syncedLogs[m], m)
+                   IN IF maxSeen > cachedClock[m] THEN maxSeen ELSE cachedClock[m]
+           ]
+       IN
+        /\ localDoc' = [localDoc EXCEPT ![n] = cachedDoc \union allNewUpdates]
+        /\ vectorClock' = [vectorClock EXCEPT ![n] = newClock]
+    \* Sequence continues from where we left off (tracked in our own logs - both synced and pending)
+    /\ LET syncedMax == MaxSeqInLog(syncedLogs[n], n)
+           pendingMax == MaxSeqInLog(pendingLogs[n], n)
+       IN nextSeq' = [nextSeq EXCEPT ![n] = (IF pendingMax > syncedMax THEN pendingMax ELSE syncedMax) + 1]
+    \* Reset watermark on restart (we don't know what activity we've seen)
+    /\ watermark' = [watermark EXCEPT ![n] = EmptyVectorClock]
+    /\ UNCHANGED <<dbCache, pendingLogs, syncedLogs, pendingActivity, syncedActivity, nextUpdateId>>
+
+    ~running[n] means "NOT running[n]" (~ is negation).
+
+    This is the most complex action. On restart:
+    1. Load cached document state
+    2. Apply any updates from synced logs newer than cached clock
+    3. ALSO apply our own pending logs (local disk is still there)
+    4. Update vector clock appropriately
+    5. Continue sequence numbering from where we left off
+    6. Reset watermark (we lost memory of what activity we'd seen)
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Next State Relation
+\***********************************************************************
+
+Next ==
+    \/ \E n \in Node : Edit(n)
+    \/ \E n \in Node : CloudSyncLog(n)
+    \/ \E n \in Node : CloudSyncActivity(n)
+    \/ \E n \in Node : ReloadDirect(n)
+    \/ \E n \in Node : PollActivity(n)
+    \/ \E n \in Node : ReloadFromActivity(n)
+    \/ \E n \in Node : CompactActivity(n)
+    \/ \E n \in Node : FullScanFallback(n)
+    \/ \E n \in Node : SaveSnapshot(n)
+    \/ \E n \in Node : Crash(n)
+    \/ \E n \in Node : Restart(n)
+
+    Next defines ALL possible state transitions.
+
+    \/ is logical OR (disjunction).
+    \E n \in Node : Action(n) means "there exists some node n where Action(n) is possible"
+
+    A step of the system is ANY of these actions happening for SOME node.
+    The model checker explores all possibilities.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Fairness (for liveness properties)
+\***********************************************************************
+
+Fairness ==
+    /\ \A n \in Node : WF_vars(CloudSyncLog(n))        \* CRDT logs eventually sync
+    /\ \A n \in Node : WF_vars(CloudSyncActivity(n))  \* Activity logs eventually sync
+    /\ \A n \in Node : WF_vars(ReloadDirect(n))       \* Direct reload eventually happens
+    /\ \A n \in Node : WF_vars(PollActivity(n))       \* Nodes eventually poll
+    /\ \A n \in Node : WF_vars(ReloadFromActivity(n)) \* Activity-triggered reload happens
+    /\ \A n \in Node : WF_vars(FullScanFallback(n))   \* Gap recovery eventually happens
+    \* Note: CompactActivity is NOT fair (compaction may never happen)
+
+    FAIRNESS conditions constrain infinite behaviors.
+    Without fairness, the model checker might find "bugs" where the system
+    just stops doing anything forever - which isn't realistic.
+
+    WF_vars(Action) means "Weak Fairness": if Action is continuously enabled,
+    it eventually happens. This models "the system doesn't just stop".
+
+    SF would be "Strong Fairness": if Action is repeatedly enabled (even if
+    not continuously), it eventually happens.
+
+    CompactActivity is NOT fair - compaction is optional and might never happen.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Specification
+\***********************************************************************
+
+Spec == Init /\ [][Next]_vars /\ Fairness
+
+    This is THE SPECIFICATION - the complete behavioral constraint.
+
+    Init /\ [][Next]_vars means:
+        - Start in a state satisfying Init
+        - Every step either satisfies Next OR is a "stuttering step" (vars unchanged)
+
+    [][Next]_vars is read as "always, either Next or vars unchanged".
+    The _vars subscript allows stuttering (important for refinement).
+
+    /\ Fairness adds the fairness constraints.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Invariants (Safety Properties)
+\***********************************************************************
+
+    INVARIANTS are predicates that must be TRUE in every reachable state.
+    If the model checker finds a state where an invariant is FALSE,
+    it reports a counterexample (a path to that state).
+
+--------------------------------------------------------------------------------
+
+\* Vector clocks are monotonic within a run
+\* (Note: this is checked by observing no decreases between states)
+VectorClockMonotonic ==
+    \A n \in Node : \A m \in Node :
+        vectorClock[n][m] >= 0
+
+    This is a weak invariant - just checking non-negativity.
+    True monotonicity would need to compare across states (harder to express).
+
+--------------------------------------------------------------------------------
+
+\* Sequence numbers in logs are contiguous per origin
+SequenceContiguous ==
+    \A n \in Node :
+        LET seqs == {syncedLogs[n][i].seq : i \in 1..Len(syncedLogs[n])}
+        IN seqs = {} \/ seqs = 1..Cardinality(seqs)
+
+    This checks that synced log sequence numbers are 1, 2, 3, ... with no gaps.
+    Cardinality(S) returns the number of elements in set S.
+    1..k creates {1, 2, ..., k}.
+
+--------------------------------------------------------------------------------
+
+\* Local doc only contains valid update IDs
+ValidUpdates ==
+    \A n \in Node : localDoc[n] \subseteq 1..(nextUpdateId - 1)
+
+    \subseteq is subset-or-equal.
+    This ensures we only have updates that were actually created.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Quiescence and Convergence
+\***********************************************************************
+
+\* System is quiescent: no pending syncs, all nodes running
+Quiescent ==
+    /\ \A n \in Node : running[n]
+    /\ \A n \in Node : pendingLogs[n] = <<>>
+    /\ \A n \in Node : pendingActivity[n] = <<>>
+
+    "Quiescent" means the system has settled - nothing in flight.
+    All nodes running, no pending syncs.
+
+--------------------------------------------------------------------------------
+
+\* All nodes have the same document state
+Converged ==
+    \A n1, n2 \in Node : localDoc[n1] = localDoc[n2]
+
+    "Converged" means all replicas are identical.
+    This is the eventual goal of any sync system.
+
+--------------------------------------------------------------------------------
+
+\* System is fully synchronized: quiescent AND all nodes have seen all updates
+FullySynced ==
+    /\ Quiescent
+    /\ \A n \in Node : \A m \in Node :
+        vectorClock[n][m] = MaxSeqInLog(syncedLogs[m], m)
+
+    "Fully synced" is stronger than quiescent:
+    Every node's vector clock matches what's actually in the synced logs.
+    This means everyone has loaded everything.
+
+--------------------------------------------------------------------------------
+
+\* Main convergence property: full sync implies convergence
+\* This IS a valid invariant - if fully synced, must be converged
+ConvergenceInvariant ==
+    FullySynced => Converged
+
+    => is logical implication: A => B means "if A then B".
+
+    This is THE KEY SAFETY PROPERTY:
+    If the system reaches FullySynced state, all nodes MUST have the same data.
+
+    If this invariant fails, there's a bug - the sync protocol loses data
+    or diverges even when it thinks it's done.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Liveness Properties (Temporal)
+\***********************************************************************
+
+    LIVENESS properties say "something good eventually happens".
+    They're checked over infinite behaviors (using fairness).
+
+--------------------------------------------------------------------------------
+
+\* Eventually quiescent (if no more edits)
+EventuallyQuiescent == <>Quiescent
+
+    <> is "eventually" (diamond operator).
+    <>P means "P will become true at some point in the future".
+
+    This property says the system eventually settles down.
+    Note: This only holds if edits stop happening!
+
+--------------------------------------------------------------------------------
+
+\* If fully synced, must be converged
+\* This is equivalent to ConvergenceInvariant as a temporal property
+AlwaysConvergesWhenFullySynced == [](FullySynced => Converged)
+
+    [] is "always" (box operator).
+    []P means "P is true in every state".
+
+    [](A => B) means "in every state, if A then B".
+    This is the temporal form of the convergence invariant.
+
+--------------------------------------------------------------------------------
+
+====
+
+    End of module.
+
+================================================================================
+END OF ANNOTATED FILE
+================================================================================

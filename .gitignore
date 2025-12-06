@@ -99,4 +99,8 @@ temp/
 app-data/
 test-data/
 test-sds/
-.vitepress/cache
+**/.vitepress/cache
+
+# Claude Code local state (transient, not shared)
+.claude/state/
+.claude/settings.local.json

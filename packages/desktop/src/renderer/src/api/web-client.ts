@@ -719,6 +719,7 @@ export const webClient: typeof window.electronAPI = {
     getConnectedClients: browserNotAvailable('webServer.getConnectedClients'),
     disconnectClient: browserNotAvailable('webServer.disconnectClient'),
     disconnectAllClients: browserNotAvailable('webServer.disconnectAllClients'),
+    getCertificateInfo: browserNotAvailable('webServer.getCertificateInfo'),
   },
 
   shell: {
