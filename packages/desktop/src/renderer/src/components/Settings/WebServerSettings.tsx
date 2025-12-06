@@ -66,6 +66,15 @@ interface ConnectedClientInfo {
   connectedAt: number;
 }
 
+interface CertificateInfo {
+  commonName: string;
+  validFrom: string;
+  validTo: string;
+  isSelfSigned: boolean;
+  fingerprint: string;
+  path: string;
+}
+
 export function WebServerSettings(): React.ReactElement {
   const [status, setStatus] = useState<WebServerStatus | null>(null);
   const [settings, setSettings] = useState<WebServerSettings | null>(null);
@@ -76,14 +85,19 @@ export function WebServerSettings(): React.ReactElement {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [connectedClients, setConnectedClients] = useState<ConnectedClientInfo[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [certInfo, setCertInfo] = useState<CertificateInfo | null>(null);
 
   const loadStatus = useCallback(async () => {
     try {
       const serverStatus: WebServerStatus = await window.electronAPI.webServer.getStatus();
       const serverSettings: WebServerSettings = await window.electronAPI.webServer.getSettings();
+      const certificateInfo: CertificateInfo | null =
+        await window.electronAPI.webServer.getCertificateInfo();
       setStatus(serverStatus);
       setSettings(serverSettings);
       setPortInput(String(serverSettings.port));
+      setCertInfo(certificateInfo);
     } catch (error: unknown) {
       console.error('Failed to load web server status:', error);
     } finally {
@@ -150,18 +164,28 @@ export function WebServerSettings(): React.ReactElement {
   const handleToggleServer = async () => {
     try {
       setActionLoading(true);
+      setError(null); // Clear previous error
       if (status?.running) {
         await window.electronAPI.webServer.stop();
       } else {
         const port = parseInt(portInput, 10);
         if (isNaN(port) || port < 1024 || port > 65535) {
+          setError('Port must be between 1024 and 65535');
           return;
         }
         await window.electronAPI.webServer.start(port);
       }
       await loadStatus();
-    } catch (error: unknown) {
-      console.error('Failed to toggle web server:', error);
+    } catch (err: unknown) {
+      console.error('Failed to toggle web server:', err);
+      // Extract error message for display
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'An unknown error occurred';
+      setError(message);
     } finally {
       setActionLoading(false);
     }
@@ -260,6 +284,19 @@ export function WebServerSettings(): React.ReactElement {
       <Alert severity="info" sx={{ mb: 3 }}>
         Access your notes from a web browser on any device on your local network.
       </Alert>
+
+      {/* Error Display */}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3 }}
+          onClose={() => {
+            setError(null);
+          }}
+        >
+          {error}
+        </Alert>
+      )}
 
       {/* Server Control */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
@@ -480,6 +517,66 @@ export function WebServerSettings(): React.ReactElement {
                     <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                       This will disconnect all existing sessions and invalidate the current URL.
                     </Typography>
+
+                    {/* Certificate Info */}
+                    {certInfo && status?.tlsEnabled && (
+                      <Box mt={2}>
+                        <Divider sx={{ mb: 1 }} />
+                        <Typography variant="subtitle2" gutterBottom>
+                          TLS Certificate
+                        </Typography>
+                        <Box
+                          sx={{
+                            bgcolor: 'action.hover',
+                            borderRadius: 1,
+                            p: 1,
+                            fontFamily: 'monospace',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          <Typography variant="caption" component="div">
+                            <strong>Type:</strong> {certInfo.isSelfSigned ? 'Self-signed' : 'CA-signed'}
+                          </Typography>
+                          <Typography variant="caption" component="div">
+                            <strong>Valid until:</strong>{' '}
+                            {new Date(certInfo.validTo).toLocaleDateString()}
+                            {new Date(certInfo.validTo) < new Date() && (
+                              <Chip label="Expired" color="error" size="small" sx={{ ml: 1 }} />
+                            )}
+                            {new Date(certInfo.validTo) > new Date() &&
+                              new Date(certInfo.validTo).getTime() - Date.now() <
+                                30 * 24 * 60 * 60 * 1000 && (
+                                <Chip
+                                  label="Expiring soon"
+                                  color="warning"
+                                  size="small"
+                                  sx={{ ml: 1 }}
+                                />
+                              )}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            component="div"
+                            sx={{
+                              wordBreak: 'break-all',
+                              mt: 0.5,
+                            }}
+                          >
+                            <strong>Fingerprint:</strong> {certInfo.fingerprint.substring(0, 40)}...
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            component="div"
+                            sx={{
+                              wordBreak: 'break-all',
+                              mt: 0.5,
+                            }}
+                          >
+                            <strong>Path:</strong> {certInfo.path}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
                   </Box>
                 </Collapse>
               </Box>

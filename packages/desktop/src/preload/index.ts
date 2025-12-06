@@ -1373,6 +1373,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('webServer:disconnectClient', clientId) as Promise<boolean>,
     disconnectAllClients: (): Promise<void> =>
       ipcRenderer.invoke('webServer:disconnectAllClients') as Promise<void>,
+    getCertificateInfo: (): Promise<{
+      commonName: string;
+      validFrom: string;
+      validTo: string;
+      isSelfSigned: boolean;
+      fingerprint: string;
+      path: string;
+    } | null> => ipcRenderer.invoke('webServer:getCertificateInfo'),
   },
 
   // Profile operations (for debugging)

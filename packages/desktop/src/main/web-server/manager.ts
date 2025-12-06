@@ -10,7 +10,8 @@ import * as fs from 'fs';
 import { app } from 'electron';
 import { WebServer, ConnectedClientInfo } from './server';
 import { AuthManager } from './auth';
-import { TLSManager, TLSCredentials } from './tls';
+import { TLSManager, TLSCredentials, CertificateInfo } from './tls';
+import { MDNSManager } from './mdns';
 import { setRouteContext, ServiceHandlers } from './routes/context';
 import {
   ConfigManager,
@@ -61,6 +62,7 @@ export class WebServerManager {
   private server: WebServer | null = null;
   private authManager: AuthManager;
   private tlsManager: TLSManager;
+  private mdnsManager: MDNSManager;
   private database: Database;
   private crdtManager: CRDTManager;
   private ipcHandlers: IPCHandlers;
@@ -73,6 +75,7 @@ export class WebServerManager {
     this.ipcHandlers = config.ipcHandlers;
     this.configManager = config.configManager;
     this.authManager = new AuthManager();
+    this.mdnsManager = new MDNSManager();
 
     // Initialize TLS manager with cert directory in userData
     const certDir = join(app.getPath('userData'), 'certs');
@@ -130,28 +133,43 @@ export class WebServerManager {
     let tlsCredentials: TLSCredentials | undefined;
     const useHttps = tlsMode !== 'off';
 
-    if (tlsMode === 'self-signed') {
-      // Generate or load self-signed certificate
-      tlsCredentials = this.tlsManager.ensureCertificate({
-        commonName: 'NoteCove Local Server',
-        altNames: ['localhost', '127.0.0.1'],
-      });
-    } else if (tlsMode === 'custom') {
-      // Load user-provided certificate
-      const certPath = this.cachedConfig.customCertPath;
-      const keyPath = this.cachedConfig.customKeyPath;
-      if (certPath && keyPath && fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-        tlsCredentials = {
-          cert: fs.readFileSync(certPath, 'utf8'),
-          key: fs.readFileSync(keyPath, 'utf8'),
-        };
-      } else {
-        console.warn('[WebServerManager] Custom cert/key not found, falling back to self-signed');
+    try {
+      if (tlsMode === 'self-signed') {
+        // Generate or load self-signed certificate
         tlsCredentials = this.tlsManager.ensureCertificate({
           commonName: 'NoteCove Local Server',
           altNames: ['localhost', '127.0.0.1'],
         });
+      } else if (tlsMode === 'custom') {
+        // Load user-provided certificate
+        const certPath = this.cachedConfig.customCertPath;
+        const keyPath = this.cachedConfig.customKeyPath;
+        if (!certPath || !keyPath) {
+          throw new Error(
+            'Custom TLS mode requires both certificate and key paths to be configured.'
+          );
+        }
+        if (!fs.existsSync(certPath)) {
+          throw new Error(`Certificate file not found: ${certPath}`);
+        }
+        if (!fs.existsSync(keyPath)) {
+          throw new Error(`Key file not found: ${keyPath}`);
+        }
+        try {
+          tlsCredentials = {
+            cert: fs.readFileSync(certPath, 'utf8'),
+            key: fs.readFileSync(keyPath, 'utf8'),
+          };
+        } catch (readError) {
+          throw new Error(
+            `Failed to read certificate files: ${readError instanceof Error ? readError.message : 'Unknown error'}`
+          );
+        }
       }
+    } catch (certError) {
+      throw new Error(
+        `TLS certificate error: ${certError instanceof Error ? certError.message : 'Unknown error'}`
+      );
     }
 
     // Create and start server
@@ -190,6 +208,15 @@ export class WebServerManager {
     console.log(
       `[WebServerManager] Server started on port ${serverPort} (TLS: ${tlsMode}, localhost-only: ${localhostOnly})`
     );
+
+    // Start mDNS advertisement (non-blocking, failures are logged but don't fail server start)
+    if (!localhostOnly) {
+      this.mdnsManager.start({
+        port: serverPort,
+        tlsEnabled: useHttps,
+      });
+    }
+
     return this.getStatus();
   }
 
@@ -212,6 +239,9 @@ export class WebServerManager {
 
     // Update config
     await this.configManager.setWebServerConfig({ enabled: false });
+
+    // Stop mDNS advertisement
+    this.mdnsManager.stop();
 
     console.log('[WebServerManager] Server stopped');
   }
@@ -327,6 +357,20 @@ export class WebServerManager {
    */
   disconnectAllClients(): void {
     this.server?.disconnectAllClients();
+  }
+
+  /**
+   * Get certificate information
+   */
+  getCertificateInfo(): (CertificateInfo & { path: string }) | null {
+    const info = this.tlsManager.getCertificateInfo();
+    if (!info) {
+      return null;
+    }
+    return {
+      ...info,
+      path: this.tlsManager.getCertPath(),
+    };
   }
 
   /**
