@@ -25,13 +25,10 @@ export default {
   ],
   coverageThreshold: {
     global: {
-      // Adjusted to match current coverage after iOS storage refactoring
-      // New versioning module has 100% coverage
-      // TODO: Gradually increase these as more tests are added
-      branches: 45,
-      functions: 60,
-      lines: 53,
-      statements: 53,
+      statements: 80,
+      branches: 66,
+      functions: 78,
+      lines: 80,
     },
   },
   coverageDirectory: 'coverage',

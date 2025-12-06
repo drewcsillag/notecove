@@ -20,7 +20,7 @@ import type { UUID } from '../../types';
 describe('Database Schema', () => {
   describe('SCHEMA_VERSION', () => {
     it('should be defined', () => {
-      expect(SCHEMA_VERSION).toBe(6);
+      expect(SCHEMA_VERSION).toBe(7);
     });
   });
 
