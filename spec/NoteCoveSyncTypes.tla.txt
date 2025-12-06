@@ -1,0 +1,352 @@
+================================================================================
+ANNOTATED: NoteCoveSyncTypes.tla
+================================================================================
+This module defines the data types and helper functions used by the main spec.
+Think of it like a "types.h" or "types.ts" file - it establishes the vocabulary.
+================================================================================
+
+---- MODULE NoteCoveSyncTypes ----
+
+    This line declares a new TLA+ module named "NoteCoveSyncTypes".
+    Every TLA+ file starts with "---- MODULE Name ----" and ends with "====".
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Type definitions and constants for NoteCove sync specification
+\*
+\* This module defines the basic types used throughout the spec.
+\* See MODEL-DESIGN.md for rationale.
+\***********************************************************************
+
+    Lines starting with \* are comments. The asterisk borders are just decoration.
+    TLA+ also supports (* block comments *).
+
+--------------------------------------------------------------------------------
+
+EXTENDS Naturals, Sequences, FiniteSets
+
+    EXTENDS imports other modules, similar to "import" in other languages.
+
+    - Naturals: Gives us natural numbers (0, 1, 2, ...) and operators like +, -, >, <
+    - Sequences: Gives us sequences (ordered lists) like <<1, 2, 3>> and operators
+                 like Len(), Head(), Tail(), Append(), SubSeq()
+    - FiniteSets: Gives us Cardinality() to count elements in finite sets
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Constants (configured in .cfg file)
+\***********************************************************************
+
+CONSTANTS
+    Node,           \* Set of node identifiers, e.g., {n1, n2}
+    MaxUpdates,     \* Maximum number of updates to model
+    MaxLogSize,     \* Maximum activity log size before compaction
+    ActivityMode    \* "append" or "replace" - activity log write mode
+
+    CONSTANTS declares values that are fixed for any particular model run.
+    These are set in the .cfg file, e.g.:
+        Node = {n1, n2}
+        MaxUpdates = 5
+
+    This allows us to run the same spec with different configurations.
+    Node is a set of identifiers (could be any values).
+    MaxUpdates bounds the model to make it finite for model checking.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Derived Constants
+\***********************************************************************
+
+\* All possible update IDs
+UpdateId == 1..MaxUpdates
+
+    The == operator defines a named expression (like a constant or macro).
+    1..MaxUpdates creates the set {1, 2, 3, ..., MaxUpdates}.
+    So UpdateId is the set of all possible update identifiers.
+
+--------------------------------------------------------------------------------
+
+\* Sequence numbers start at 1
+SeqNum == 1..MaxUpdates
+
+    SeqNum is also the set 1..MaxUpdates.
+    This represents valid sequence numbers that nodes can use.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Record Types
+\***********************************************************************
+
+\* A CRDT log entry: one Yjs update
+LogEntry == [
+    updateId: UpdateId,     \* Unique ID for this update
+    origin: Node,           \* Node that created this update
+    seq: SeqNum             \* Sequence number from origin
+]
+
+    This defines the shape of a log entry record (like a struct/interface).
+
+    [field1: Type1, field2: Type2] defines a record type.
+
+    Actually, this defines the SET of all possible records with those fields.
+    LogEntry is the set of all records where:
+        - updateId is in UpdateId (1..MaxUpdates)
+        - origin is in Node
+        - seq is in SeqNum
+
+    Example value: [updateId |-> 3, origin |-> n1, seq |-> 2]
+
+    The |-> syntax is used when constructing actual record values.
+    The : syntax is used when defining record types.
+
+--------------------------------------------------------------------------------
+
+\* An activity log entry: notification that a note changed
+ActivityEntry == [
+    origin: Node,           \* Node that made the change
+    seq: SeqNum             \* Sequence number of the change
+]
+
+    Same pattern - defines the set of all valid activity entries.
+    These are lighter-weight than LogEntry (no updateId).
+
+--------------------------------------------------------------------------------
+
+\* Vector clock entry: what we've seen from one instance
+ClockEntry == [
+    seq: Nat                \* Highest sequence number seen (0 = nothing)
+]
+
+    A single entry in a vector clock.
+    Nat is the set of all natural numbers (0, 1, 2, ...).
+
+    Note: This type isn't directly used below - the actual vector clocks
+    use a simpler [Node -> Nat] function type.
+
+--------------------------------------------------------------------------------
+
+\* A vector clock: what we've seen from all instances
+VectorClock == [Node -> Nat]
+
+    This is a FUNCTION type, not a record type.
+    [A -> B] means "a function from elements of A to elements of B".
+
+    So VectorClock is the set of all functions that:
+        - Take a Node as input
+        - Return a Nat as output
+
+    Example: If Node = {n1, n2}, a VectorClock might be:
+        [n1 |-> 3, n2 |-> 5]
+    Meaning: "I've seen up to sequence 3 from n1 and sequence 5 from n2"
+
+--------------------------------------------------------------------------------
+
+\* DB cache: persisted snapshot
+DbCache == [
+    doc: SUBSET UpdateId,   \* Document state (set of applied updates)
+    clock: VectorClock      \* Vector clock at snapshot time
+]
+
+    SUBSET S means "the power set of S" - all possible subsets.
+    SUBSET UpdateId includes {}, {1}, {2}, {1,2}, etc.
+
+    So DbCache is a record with:
+        - doc: any subset of update IDs (the updates applied to this doc)
+        - clock: a vector clock
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Type Predicates
+\***********************************************************************
+
+\* Check if a value is a valid log entry
+IsLogEntry(e) ==
+    /\ e.updateId \in UpdateId
+    /\ e.origin \in Node
+    /\ e.seq \in SeqNum
+
+    This defines a BOOLEAN FUNCTION (predicate).
+
+    /\ is logical AND (conjunction). Multiple /\ lines are all AND'd together.
+    \/ would be logical OR (disjunction).
+
+    e.updateId accesses the updateId field of record e.
+    \in tests set membership (like "in" in Python, "includes" conceptually).
+
+    So IsLogEntry(e) returns TRUE if e has valid field values.
+
+--------------------------------------------------------------------------------
+
+\* Check if a value is a valid activity entry
+IsActivityEntry(e) ==
+    /\ e.origin \in Node
+    /\ e.seq \in SeqNum
+
+    Same pattern for activity entries.
+
+--------------------------------------------------------------------------------
+
+\* Check if a value is a valid vector clock
+IsVectorClock(vc) ==
+    /\ DOMAIN vc = Node
+    /\ \A n \in Node : vc[n] \in Nat
+
+    DOMAIN f returns the domain (set of valid inputs) of function f.
+    vc[n] is function application - looking up key n in function/map vc.
+
+    \A is "for all" (universal quantifier):
+        \A x \in S : P(x) means "for all x in S, P(x) is true"
+
+    So this checks:
+        1. vc is defined exactly for all Nodes
+        2. Every value in vc is a natural number
+
+--------------------------------------------------------------------------------
+
+\* Check if a sequence contains only log entries
+IsLogSeq(s) ==
+    \A i \in 1..Len(s) : IsLogEntry(s[i])
+
+    Len(s) returns the length of sequence s.
+    1..Len(s) creates the set of valid indices {1, 2, ..., length}.
+    s[i] accesses element at index i (TLA+ sequences are 1-indexed).
+
+    This says: "every element in the sequence is a valid LogEntry"
+
+--------------------------------------------------------------------------------
+
+\* Check if a sequence contains only activity entries
+IsActivitySeq(s) ==
+    \A i \in 1..Len(s) : IsActivityEntry(s[i])
+
+    Same pattern for activity sequences.
+
+--------------------------------------------------------------------------------
+
+\***********************************************************************
+\* Helper Functions
+\***********************************************************************
+
+\* Empty vector clock (haven't seen anything)
+EmptyVectorClock == [n \in Node |-> 0]
+
+    This constructs an actual function value (not a type).
+    [x \in S |-> expr] creates a function that maps each x in S to expr.
+
+    So this creates a vector clock where every node maps to 0.
+    If Node = {n1, n2}, this produces [n1 |-> 0, n2 |-> 0].
+
+--------------------------------------------------------------------------------
+
+\* Empty DB cache
+EmptyDbCache == [doc |-> {}, clock |-> EmptyVectorClock]
+
+    Constructs a record value with:
+        - doc = {} (empty set - no updates applied)
+        - clock = EmptyVectorClock (haven't seen anything)
+
+--------------------------------------------------------------------------------
+
+\* Get all update IDs from a log sequence
+UpdatesInLog(log) ==
+    {log[idx].updateId : idx \in DOMAIN log}
+
+    This is SET COMPREHENSION (also called set builder notation).
+    {expr : x \in S} creates a set by evaluating expr for each x in S.
+
+    DOMAIN log for a sequence returns 1..Len(log).
+
+    So this extracts all updateId values from the log into a set.
+    Example: <<[updateId |-> 1, ...], [updateId |-> 3, ...]>> produces {1, 3}
+
+--------------------------------------------------------------------------------
+
+\* Get highest sequence number for a node in a log
+MaxSeqInLog(log, node) ==
+    LET nodeEntries == {log[idx].seq : idx \in {j \in DOMAIN log : log[j].origin = node}}
+    IN IF nodeEntries = {} THEN 0 ELSE CHOOSE s \in nodeEntries : \A t \in nodeEntries : s >= t
+
+    LET ... IN ... introduces local definitions.
+
+    Breaking down nodeEntries:
+        {j \in DOMAIN log : log[j].origin = node}
+            - Filter: indices where the origin matches node
+        {log[idx].seq : idx \in ...}
+            - Map: extract seq values from those entries
+
+    CHOOSE x \in S : P(x) picks an arbitrary element from S satisfying P.
+    Here: pick an s that is >= all other elements (i.e., the maximum).
+
+    The IF-THEN-ELSE handles the empty case (return 0 if no entries).
+
+--------------------------------------------------------------------------------
+
+\* Filter log entries with seq > threshold for a given origin
+NewEntriesInLog(log, origin, threshold) ==
+    {log[idx] : idx \in {j \in DOMAIN log : log[j].origin = origin /\ log[j].seq > threshold}}
+
+    Set comprehension with filtering:
+        - Inner set: indices where origin matches AND seq > threshold
+        - Outer set: the actual log entries at those indices
+
+    This finds all entries from a specific origin that are "newer" than threshold.
+
+--------------------------------------------------------------------------------
+
+\* Get highest sequence number in an activity log for a given origin
+MaxSeqInActivity(log, origin) ==
+    LET entries == {log[idx].seq : idx \in {j \in DOMAIN log : log[j].origin = origin}}
+    IN IF entries = {} THEN 0 ELSE CHOOSE s \in entries : \A t \in entries : s >= t
+
+    Same pattern as MaxSeqInLog, but for activity logs.
+
+--------------------------------------------------------------------------------
+
+\* Check if activity log has entries with seq > threshold for an origin
+HasNewActivity(log, origin, threshold) ==
+    \E idx \in DOMAIN log : log[idx].origin = origin /\ log[idx].seq > threshold
+
+    \E is "there exists" (existential quantifier):
+        \E x \in S : P(x) means "there exists at least one x in S where P(x) is true"
+
+    This returns TRUE if there's any entry from origin with seq > threshold.
+
+--------------------------------------------------------------------------------
+
+\* Get minimum sequence number in an activity log for a given origin
+MinSeqInActivity(log, origin) ==
+    LET entries == {log[idx].seq : idx \in {j \in DOMAIN log : log[j].origin = origin}}
+    IN IF entries = {} THEN 0 ELSE CHOOSE s \in entries : \A t \in entries : s <= t
+
+    Same pattern as max, but finds minimum (s <= t instead of s >= t).
+
+--------------------------------------------------------------------------------
+
+\* Check if there's a gap in activity log (compaction happened)
+\* Gap exists if min seq in log > watermark + 1
+HasActivityGap(log, origin, watermark) ==
+    LET minSeq == MinSeqInActivity(log, origin)
+    IN minSeq > 0 /\ minSeq > watermark + 1
+
+    A "gap" means we missed some entries due to compaction.
+
+    If watermark is 5 (we've seen up to seq 5), and the minimum seq in the
+    log is 8, then entries 6 and 7 were compacted away - there's a gap.
+
+    The minSeq > 0 check ensures there are actually entries in the log.
+
+--------------------------------------------------------------------------------
+
+====
+
+    The ==== line marks the end of the module.
+    Everything after this line is ignored.
+
+================================================================================
+END OF ANNOTATED FILE
+================================================================================
