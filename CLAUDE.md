@@ -4,35 +4,31 @@
 
 Canaries detect when you've forgotten instructions. By including one, you AFFIRM you've followed that rule.
 
+**Format**: Use environment variable prefix style for Claude Code allowlist compatibility.
+
 ### Required Canaries
 
-| Canary | When Required | What You're Affirming |
-|--------|--------------|----------------------|
-| `nc-canary` | ALL bash commands | "I remember CLAUDE.md" |
-| `nc-ci-passed` | `git commit` | "CI passed before this commit" |
-| `nc-user-said-push` | `git push` | "User explicitly told me to push" |
-
-### Situational Canaries
-
-| Canary | When Appropriate | What You're Affirming |
-|--------|-----------------|----------------------|
-| `nc-test-first` | Running tests for a bug fix | "I wrote a failing test first" |
-| `nc-checked-mistakes` | After recovering from a failure | "I checked .claude/MISTAKES.md" |
+| Canary                | When Required                 | What You're Affirming             |
+| --------------------- | ----------------------------- | --------------------------------- |
+| `nc_canary=1`         | ALL bash commands (as prefix) | "I remember CLAUDE.md"            |
+| `nc_ci_passed=1`      | `git commit`                  | "CI passed before this commit"    |
+| `nc_user_said_push=1` | `git push`                    | "User explicitly told me to push" |
 
 ### Examples
 
 ```bash
-# Basic command
-ls -la # nc-canary
+# Basic command - canary as prefix
+nc_canary=1 ls -la
 
 # Commit (affirms CI was run and passed)
-git commit -m "feat: add feature" # nc-canary nc-ci-passed
+nc_canary=1 nc_ci_passed=1 git commit -m "feat: add feature"
 
 # Push (affirms user gave permission)
-git push origin main # nc-canary nc-user-said-push
+nc_canary=1 nc_user_said_push=1 git push origin main
 
-# Chained commands - canary at end
-git add . && git commit -m "fix: bug" # nc-canary nc-ci-passed
+# Chained commands - canary prefix still works
+nc_canary=1 git add . && git status
+nc_canary=1 nc_ci_passed=1 git add . && git commit -m "fix: bug"
 ```
 
 ### If You Forget
