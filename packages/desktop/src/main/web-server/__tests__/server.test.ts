@@ -378,4 +378,39 @@ describe('WebServer', () => {
       expect(response.statusCode).toBe(404);
     });
   });
+
+  describe('Fastify Instance Access', () => {
+    it('should return null getFastify when not started', () => {
+      server = new WebServer({ port: 0 });
+      expect(server.getFastify()).toBeNull();
+    });
+
+    it('should return FastifyInstance after start', async () => {
+      server = new WebServer({ port: 0 });
+      await server.start();
+      const fastify = server.getFastify();
+      expect(fastify).toBeDefined();
+      expect(fastify).not.toBeNull();
+    });
+  });
+
+  describe('WebSocket Client Management', () => {
+    it('should return empty array when no clients connected', async () => {
+      server = new WebServer({ port: 0 });
+      await server.start();
+      expect(server.getConnectedClients()).toEqual([]);
+    });
+
+    it('should return false when disconnecting non-existent client', async () => {
+      server = new WebServer({ port: 0 });
+      await server.start();
+      expect(server.disconnectClient('non-existent-client')).toBe(false);
+    });
+
+    it('should return 0 for connected client count initially', async () => {
+      server = new WebServer({ port: 0 });
+      await server.start();
+      expect(server.getConnectedClientCount()).toBe(0);
+    });
+  });
 });

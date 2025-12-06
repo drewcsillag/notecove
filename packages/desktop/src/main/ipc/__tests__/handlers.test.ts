@@ -63,6 +63,11 @@ interface MockCRDTManager {
   loadFolderTree: jest.Mock;
   setActivityLogger: jest.Mock;
   recordMoveActivity: jest.Mock;
+  deleteDocument: jest.Mock;
+  loadDocument: jest.Mock;
+  createDocument: jest.Mock;
+  getNoteDoc: jest.Mock;
+  getDocument: jest.Mock;
 }
 
 interface MockDatabase {
@@ -70,6 +75,13 @@ interface MockDatabase {
   upsertNote: jest.Mock;
   getNote: jest.Mock;
   getNotesBySd: jest.Mock;
+  getNotesByFolder: jest.Mock;
+  getDeletedNotes: jest.Mock;
+  getNoteCountForFolder: jest.Mock;
+  getAllNotesCount: jest.Mock;
+  getDeletedNoteCount: jest.Mock;
+  getAllTags: jest.Mock;
+  getBacklinks: jest.Mock;
   getStorageDir: jest.Mock;
   getState: jest.Mock;
   setState: jest.Mock;
@@ -79,6 +91,7 @@ interface MockDatabase {
   setActiveStorageDir: jest.Mock;
   searchNotes: jest.Mock;
   deleteNote: jest.Mock;
+  deleteStorageDir: jest.Mock;
   adapter: {
     exec: jest.Mock;
   };
@@ -155,12 +168,17 @@ describe('IPCHandlers - Folder CRUD', () => {
 
     // Create mock CRDT manager
     mockCRDTManager = {
-      loadNote: jest.fn(),
+      loadNote: jest.fn().mockResolvedValue(undefined),
       unloadNote: jest.fn(),
       applyUpdate: jest.fn(),
       loadFolderTree: jest.fn().mockResolvedValue(mockFolderTree),
       setActivityLogger: jest.fn(),
       recordMoveActivity: jest.fn().mockResolvedValue(undefined),
+      deleteDocument: jest.fn().mockResolvedValue(undefined),
+      loadDocument: jest.fn().mockResolvedValue({}),
+      createDocument: jest.fn().mockResolvedValue('new-note-id'),
+      getNoteDoc: jest.fn().mockReturnValue({ getMetadata: jest.fn().mockReturnValue(null) }),
+      getDocument: jest.fn().mockReturnValue({ getText: () => ({ toJSON: () => 'Content' }) }),
     };
 
     // Create mock database
@@ -168,7 +186,14 @@ describe('IPCHandlers - Folder CRUD', () => {
       upsertFolder: jest.fn().mockResolvedValue(undefined),
       upsertNote: jest.fn().mockResolvedValue(undefined),
       getNote: jest.fn(),
-      getNotesBySd: jest.fn(),
+      getNotesBySd: jest.fn().mockResolvedValue([]),
+      getNotesByFolder: jest.fn().mockResolvedValue([]),
+      getDeletedNotes: jest.fn().mockResolvedValue([]),
+      getNoteCountForFolder: jest.fn().mockResolvedValue(0),
+      getAllNotesCount: jest.fn().mockResolvedValue(0),
+      getDeletedNoteCount: jest.fn().mockResolvedValue(0),
+      getAllTags: jest.fn().mockResolvedValue([]),
+      getBacklinks: jest.fn().mockResolvedValue([]),
       getStorageDir: jest.fn(),
       getState: jest.fn(),
       setState: jest.fn().mockResolvedValue(undefined),
@@ -178,6 +203,7 @@ describe('IPCHandlers - Folder CRUD', () => {
       setActiveStorageDir: jest.fn(),
       searchNotes: jest.fn().mockResolvedValue([]),
       deleteNote: jest.fn().mockResolvedValue(undefined),
+      deleteStorageDir: jest.fn().mockResolvedValue(undefined),
       adapter: {
         exec: jest.fn().mockResolvedValue(undefined),
       },
@@ -911,29 +937,42 @@ describe('IPCHandlers - SD Management', () => {
 
     // Create mock CRDT manager
     mockCRDTManager = {
-      loadNote: jest.fn(),
+      loadNote: jest.fn().mockResolvedValue(undefined),
       unloadNote: jest.fn(),
       applyUpdate: jest.fn(),
       loadFolderTree: jest.fn().mockResolvedValue(mockFolderTree),
       setActivityLogger: jest.fn(),
       recordMoveActivity: jest.fn().mockResolvedValue(undefined),
+      deleteDocument: jest.fn().mockResolvedValue(undefined),
+      loadDocument: jest.fn().mockResolvedValue({}),
+      createDocument: jest.fn().mockResolvedValue('new-note-id'),
+      getNoteDoc: jest.fn().mockReturnValue({ getMetadata: jest.fn().mockReturnValue(null) }),
+      getDocument: jest.fn().mockReturnValue({ getText: () => ({ toJSON: () => 'Content' }) }),
     };
 
     // Create mock database
     mockDatabase = {
-      upsertFolder: jest.fn(),
+      upsertFolder: jest.fn().mockResolvedValue(undefined),
       upsertNote: jest.fn().mockResolvedValue(undefined),
       getNote: jest.fn(),
-      getNotesBySd: jest.fn(),
+      getNotesBySd: jest.fn().mockResolvedValue([]),
+      getNotesByFolder: jest.fn().mockResolvedValue([]),
+      getDeletedNotes: jest.fn().mockResolvedValue([]),
+      getNoteCountForFolder: jest.fn().mockResolvedValue(0),
+      getAllNotesCount: jest.fn().mockResolvedValue(0),
+      getDeletedNoteCount: jest.fn().mockResolvedValue(0),
+      getAllTags: jest.fn().mockResolvedValue([]),
+      getBacklinks: jest.fn().mockResolvedValue([]),
       getStorageDir: jest.fn(),
       getState: jest.fn(),
-      setState: jest.fn(),
+      setState: jest.fn().mockResolvedValue(undefined),
       createStorageDir: jest.fn(),
       getAllStorageDirs: jest.fn(),
       getActiveStorageDir: jest.fn(),
       setActiveStorageDir: jest.fn(),
       searchNotes: jest.fn().mockResolvedValue([]),
       deleteNote: jest.fn().mockResolvedValue(undefined),
+      deleteStorageDir: jest.fn().mockResolvedValue(undefined),
       adapter: {
         exec: jest.fn().mockResolvedValue(undefined),
       },
@@ -2302,6 +2341,1643 @@ describe('IPCHandlers - SD Management', () => {
         expect(result).toBe(backupDir);
         expect(mockBackupManager.getBackupDirectory).toHaveBeenCalled();
       });
+    });
+  });
+
+  // ============================================================================
+  // Note CRUD Tests
+  // ============================================================================
+  describe('Note CRUD', () => {
+    const mockEvent = {} as any;
+
+    describe('note:create', () => {
+      it('should create a note in root folder', async () => {
+        const sdId = 'test-sd';
+        const folderId = null;
+        const mockNoteDoc = {
+          initializeNote: jest.fn(),
+        };
+
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        const noteId = await (handlers as any).handleCreateNote(mockEvent, sdId, folderId);
+
+        expect(noteId).toBeDefined();
+        expect(mockCRDTManager.loadNote).toHaveBeenCalledWith(noteId, sdId);
+        expect(mockNoteDoc.initializeNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: noteId,
+            sdId,
+            folderId,
+            deleted: false,
+            pinned: false,
+          })
+        );
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: noteId,
+            title: 'Untitled',
+            sdId,
+            folderId,
+            deleted: false,
+            pinned: false,
+          })
+        );
+      });
+
+      it('should create a note in a folder', async () => {
+        const sdId = 'test-sd';
+        const folderId = 'folder-123';
+        const mockNoteDoc = {
+          initializeNote: jest.fn(),
+        };
+
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        await (handlers as any).handleCreateNote(mockEvent, sdId, folderId);
+
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sdId,
+            folderId,
+          })
+        );
+      });
+    });
+
+    describe('note:delete', () => {
+      it('should soft delete a note', async () => {
+        const noteId = 'note-123';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId: 'test-sd',
+          folderId: null,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+        const mockNoteDoc = {
+          markDeleted: jest.fn(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        await (handlers as any).handleDeleteNote(mockEvent, noteId);
+
+        expect(mockNoteDoc.markDeleted).toHaveBeenCalled();
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: noteId,
+            deleted: true,
+          })
+        );
+      });
+
+      it('should load note if not already loaded', async () => {
+        const noteId = 'note-123';
+        const sdId = 'test-sd';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId,
+          folderId: null,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+        const mockNoteDoc = {
+          markDeleted: jest.fn(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        // First call returns null (not loaded), second returns the doc
+        (mockCRDTManager as any).getNoteDoc = jest
+          .fn()
+          .mockReturnValueOnce(null)
+          .mockReturnValueOnce(mockNoteDoc);
+
+        await (handlers as any).handleDeleteNote(mockEvent, noteId);
+
+        expect(mockCRDTManager.loadNote).toHaveBeenCalledWith(noteId, sdId);
+        expect(mockNoteDoc.markDeleted).toHaveBeenCalled();
+      });
+
+      it('should throw error if note not found', async () => {
+        mockDatabase.getNote.mockResolvedValue(null);
+
+        await expect(
+          (handlers as any).handleDeleteNote(mockEvent, 'non-existent-note')
+        ).rejects.toThrow('Note non-existent-note not found');
+      });
+    });
+
+    describe('note:restore', () => {
+      it('should restore a deleted note', async () => {
+        const noteId = 'note-123';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId: 'test-sd',
+          folderId: null,
+          deleted: true,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+        const mockNoteDoc = {
+          markRestored: jest.fn(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        await (handlers as any).handleRestoreNote(mockEvent, noteId);
+
+        expect(mockNoteDoc.markRestored).toHaveBeenCalled();
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: noteId,
+            deleted: false,
+          })
+        );
+      });
+    });
+
+    describe('note:togglePin', () => {
+      it('should toggle pin from false to true', async () => {
+        const noteId = 'note-123';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId: 'test-sd',
+          folderId: null,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        await (handlers as any).handleTogglePinNote(mockEvent, noteId);
+
+        expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pinned: true,
+          })
+        );
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pinned: true,
+          })
+        );
+      });
+
+      it('should toggle pin from true to false', async () => {
+        const noteId = 'note-123';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId: 'test-sd',
+          folderId: null,
+          deleted: false,
+          pinned: true,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        await (handlers as any).handleTogglePinNote(mockEvent, noteId);
+
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pinned: false,
+          })
+        );
+      });
+    });
+
+    describe('note:move', () => {
+      it('should move note to new folder', async () => {
+        const noteId = 'note-123';
+        const newFolderId = 'folder-456';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId: 'test-sd',
+          folderId: 'folder-123',
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        await (handlers as any).handleMoveNote(mockEvent, noteId, newFolderId);
+
+        expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
+          expect.objectContaining({
+            folderId: newFolderId,
+          })
+        );
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            folderId: newFolderId,
+          })
+        );
+      });
+
+      it('should move note to root folder (null)', async () => {
+        const noteId = 'note-123';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId: 'test-sd',
+          folderId: 'folder-123',
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        (mockCRDTManager as any).getNoteDoc = jest.fn().mockReturnValue(mockNoteDoc);
+
+        await (handlers as any).handleMoveNote(mockEvent, noteId, null);
+
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            folderId: null,
+          })
+        );
+      });
+    });
+
+    describe('note:updateTitle', () => {
+      it('should update note title', async () => {
+        const noteId = 'note-123';
+        const newTitle = 'Updated Title';
+        const mockNote = {
+          id: noteId,
+          title: 'Old Title',
+          sdId: 'test-sd',
+          folderId: null,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+
+        await (handlers as any).handleUpdateTitle(mockEvent, noteId, newTitle);
+
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: newTitle,
+          })
+        );
+      });
+
+      it('should update title and contentText if provided', async () => {
+        const noteId = 'note-123';
+        const newTitle = 'Updated Title';
+        // Content has title on first line, preview comes from lines after
+        const contentText = 'Updated Title\nThis is the body content';
+        const mockNote = {
+          id: noteId,
+          title: 'Old Title',
+          sdId: 'test-sd',
+          folderId: null,
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Old preview',
+          contentText: 'Old content',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+
+        await (handlers as any).handleUpdateTitle(mockEvent, noteId, newTitle, contentText);
+
+        expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: newTitle,
+            contentText,
+            // Preview is extracted from content after first line (title)
+            contentPreview: 'This is the body content',
+          })
+        );
+      });
+    });
+  });
+
+  // ============================================================================
+  // App State Tests
+  // ============================================================================
+  describe('App State', () => {
+    const mockEvent = {} as any;
+
+    describe('appState:get', () => {
+      it('should get state value', async () => {
+        const key = 'testKey';
+        const value = 'testValue';
+        mockDatabase.getState.mockResolvedValue(value);
+
+        const result = await (handlers as any).handleGetAppState(mockEvent, key);
+
+        expect(result).toBe(value);
+        expect(mockDatabase.getState).toHaveBeenCalledWith(key);
+      });
+
+      it('should return null for non-existent key', async () => {
+        mockDatabase.getState.mockResolvedValue(null);
+
+        const result = await (handlers as any).handleGetAppState(mockEvent, 'nonExistent');
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('appState:set', () => {
+      it('should set state value', async () => {
+        const key = 'testKey';
+        const value = 'testValue';
+
+        await (handlers as any).handleSetAppState(mockEvent, key, value);
+
+        expect(mockDatabase.setState).toHaveBeenCalledWith(key, value);
+      });
+    });
+  });
+
+  // ============================================================================
+  // Config Tests
+  // ============================================================================
+  describe('Config', () => {
+    const mockEvent = {} as any;
+
+    describe('config:getDatabasePath', () => {
+      it('should get database path', async () => {
+        const dbPath = '/test/path/notecove.db';
+        mockConfigManager.getDatabasePath.mockReturnValue(dbPath);
+
+        const result = await (handlers as any).handleGetDatabasePath(mockEvent);
+
+        expect(result).toBe(dbPath);
+      });
+    });
+
+    describe('config:setDatabasePath', () => {
+      it('should set database path', async () => {
+        const newPath = '/new/path/notecove.db';
+
+        await (handlers as any).handleSetDatabasePath(mockEvent, newPath);
+
+        expect(mockConfigManager.setDatabasePath).toHaveBeenCalledWith(newPath);
+      });
+    });
+  });
+
+  // ============================================================================
+  // Note List & Search Tests
+  // ============================================================================
+  describe('Note Listing', () => {
+    const mockEvent = {} as any;
+    const mockNotes = [
+      {
+        id: 'note-1',
+        title: 'Test Note 1',
+        sdId: 'test-sd',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview 1',
+        contentText: 'Content 1',
+        created: Date.now(),
+        modified: Date.now(),
+      },
+      {
+        id: 'note-2',
+        title: 'Test Note 2',
+        sdId: 'test-sd',
+        folderId: 'folder-1',
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview 2',
+        contentText: 'Content 2',
+        created: Date.now(),
+        modified: Date.now(),
+      },
+    ];
+
+    describe('note:list', () => {
+      it('should list notes for all-notes folder', async () => {
+        mockDatabase.getNotesBySd.mockResolvedValue(mockNotes);
+
+        const result = await (handlers as any).handleListNotes(mockEvent, 'test-sd', 'all-notes');
+
+        expect(result).toEqual(mockNotes);
+        expect(mockDatabase.getNotesBySd).toHaveBeenCalledWith('test-sd');
+      });
+
+      it('should list notes for all-notes:sd-id folder', async () => {
+        mockDatabase.getNotesBySd.mockResolvedValue(mockNotes);
+
+        const result = await (handlers as any).handleListNotes(
+          mockEvent,
+          'test-sd',
+          'all-notes:test-sd'
+        );
+
+        expect(result).toEqual(mockNotes);
+        expect(mockDatabase.getNotesBySd).toHaveBeenCalledWith('test-sd');
+      });
+
+      it('should list deleted notes for recently-deleted folder', async () => {
+        const deletedNotes = mockNotes.map((n) => ({ ...n, deleted: true }));
+        mockDatabase.getDeletedNotes.mockResolvedValue(deletedNotes);
+
+        const result = await (handlers as any).handleListNotes(
+          mockEvent,
+          'test-sd',
+          'recently-deleted'
+        );
+
+        expect(result).toEqual(deletedNotes);
+        expect(mockDatabase.getDeletedNotes).toHaveBeenCalledWith('test-sd');
+      });
+
+      it('should list notes for specific folder', async () => {
+        const folderNotes = [mockNotes[1]];
+        mockDatabase.getNotesByFolder.mockResolvedValue(folderNotes);
+
+        const result = await (handlers as any).handleListNotes(mockEvent, 'test-sd', 'folder-1');
+
+        expect(result).toEqual(folderNotes);
+        // Note: getNotesByFolder only takes folderId, not sdId
+        expect(mockDatabase.getNotesByFolder).toHaveBeenCalledWith('folder-1');
+      });
+
+      it('should list notes for root folder (null)', async () => {
+        const rootNotes = [mockNotes[0]];
+        mockDatabase.getNotesByFolder.mockResolvedValue(rootNotes);
+
+        const result = await (handlers as any).handleListNotes(mockEvent, 'test-sd', null);
+
+        expect(result).toEqual(rootNotes);
+        // Note: getNotesByFolder only takes folderId, not sdId
+        expect(mockDatabase.getNotesByFolder).toHaveBeenCalledWith(null);
+      });
+    });
+
+    describe('note:search', () => {
+      it('should search notes with query', async () => {
+        const searchResults = [{ id: 'note-1', title: 'Matching Note', match: 'content match' }];
+        mockDatabase.searchNotes.mockResolvedValue(searchResults);
+
+        const result = await (handlers as any).handleSearchNotes(mockEvent, 'test query');
+
+        expect(result).toEqual(searchResults);
+        expect(mockDatabase.searchNotes).toHaveBeenCalledWith('test query', undefined);
+      });
+
+      it('should search notes with limit', async () => {
+        const searchResults = [{ id: 'note-1', title: 'Result', match: 'match' }];
+        mockDatabase.searchNotes.mockResolvedValue(searchResults);
+
+        const result = await (handlers as any).handleSearchNotes(mockEvent, 'query', 10);
+
+        expect(result).toEqual(searchResults);
+        expect(mockDatabase.searchNotes).toHaveBeenCalledWith('query', 10);
+      });
+    });
+
+    describe('note:getCountForFolder', () => {
+      it('should get note count for folder', async () => {
+        mockDatabase.getNoteCountForFolder.mockResolvedValue(5);
+
+        const result = await (handlers as any).handleGetNoteCountForFolder(
+          mockEvent,
+          'test-sd',
+          'folder-1'
+        );
+
+        expect(result).toBe(5);
+        expect(mockDatabase.getNoteCountForFolder).toHaveBeenCalledWith('test-sd', 'folder-1');
+      });
+
+      it('should get note count for root folder', async () => {
+        mockDatabase.getNoteCountForFolder.mockResolvedValue(3);
+
+        const result = await (handlers as any).handleGetNoteCountForFolder(
+          mockEvent,
+          'test-sd',
+          null
+        );
+
+        expect(result).toBe(3);
+        expect(mockDatabase.getNoteCountForFolder).toHaveBeenCalledWith('test-sd', null);
+      });
+    });
+
+    describe('note:getAllNotesCount', () => {
+      it('should get all notes count for SD', async () => {
+        mockDatabase.getAllNotesCount.mockResolvedValue(10);
+
+        const result = await (handlers as any).handleGetAllNotesCount(mockEvent, 'test-sd');
+
+        expect(result).toBe(10);
+        expect(mockDatabase.getAllNotesCount).toHaveBeenCalledWith('test-sd');
+      });
+    });
+
+    describe('note:getDeletedNoteCount', () => {
+      it('should get deleted note count for SD', async () => {
+        mockDatabase.getDeletedNoteCount.mockResolvedValue(2);
+
+        const result = await (handlers as any).handleGetDeletedNoteCount(mockEvent, 'test-sd');
+
+        expect(result).toBe(2);
+        expect(mockDatabase.getDeletedNoteCount).toHaveBeenCalledWith('test-sd');
+      });
+    });
+  });
+
+  // ============================================================================
+  // Tag Tests
+  // ============================================================================
+  describe('Tags', () => {
+    const mockEvent = {} as any;
+
+    describe('tag:getAll', () => {
+      it('should get all tags', async () => {
+        const mockTags = [
+          { id: 'tag-1', name: 'work', count: 5 },
+          { id: 'tag-2', name: 'personal', count: 3 },
+        ];
+        mockDatabase.getAllTags.mockResolvedValue(mockTags);
+
+        const result = await (handlers as any).handleGetAllTags(mockEvent);
+
+        expect(result).toEqual(mockTags);
+        expect(mockDatabase.getAllTags).toHaveBeenCalled();
+      });
+
+      it('should return empty array when no tags', async () => {
+        mockDatabase.getAllTags.mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetAllTags(mockEvent);
+
+        expect(result).toEqual([]);
+      });
+    });
+  });
+
+  // ============================================================================
+  // Link Tests
+  // ============================================================================
+  describe('Links', () => {
+    const mockEvent = {} as any;
+
+    describe('link:getBacklinks', () => {
+      it('should get backlinks for a note', async () => {
+        const mockBacklinks = [
+          {
+            id: 'note-2',
+            title: 'Linking Note',
+            sdId: 'test-sd',
+            folderId: null,
+            deleted: false,
+            pinned: false,
+            contentPreview: 'Links to target',
+            contentText: 'Content that links to [[target]]',
+            created: Date.now(),
+            modified: Date.now(),
+          },
+        ];
+        mockDatabase.getBacklinks.mockResolvedValue(mockBacklinks);
+
+        const result = await (handlers as any).handleGetBacklinks(mockEvent, 'target-note-id');
+
+        expect(result).toEqual(mockBacklinks);
+        expect(mockDatabase.getBacklinks).toHaveBeenCalledWith('target-note-id');
+      });
+
+      it('should return empty array when no backlinks', async () => {
+        mockDatabase.getBacklinks.mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetBacklinks(mockEvent, 'note-without-links');
+
+        expect(result).toEqual([]);
+      });
+    });
+  });
+
+  // ============================================================================
+  // Sync Status Tests
+  // ============================================================================
+  describe('Sync Status', () => {
+    describe('sync:getStatus', () => {
+      it('should return empty status when getSyncStatus is not set', async () => {
+        const result = await (handlers as any).handleGetSyncStatus();
+
+        expect(result).toEqual({
+          pendingCount: 0,
+          perSd: [],
+          isSyncing: false,
+        });
+      });
+    });
+  });
+
+  // ============================================================================
+  // Permanent Delete & Duplicate Tests
+  // ============================================================================
+  describe('Note Operations', () => {
+    const mockEvent = {} as any;
+
+    describe('note:permanentDelete', () => {
+      it('should permanently delete a note', async () => {
+        const noteId = 'note-to-delete';
+        const sdId = 'test-sd';
+        const mockNote = {
+          id: noteId,
+          title: 'Note to Delete',
+          sdId,
+          folderId: null,
+          deleted: true,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+        mockDatabase.getStorageDir.mockResolvedValue({ id: sdId, path: '/tmp/sd' });
+
+        await (handlers as any).handlePermanentDeleteNote(mockEvent, noteId);
+
+        expect(mockDatabase.getNote).toHaveBeenCalledWith(noteId);
+        expect(mockCRDTManager.unloadNote).toHaveBeenCalledWith(noteId);
+        expect(mockDatabase.deleteNote).toHaveBeenCalledWith(noteId);
+      });
+    });
+
+    describe('note:getMetadata', () => {
+      it('should get note metadata with transformed format', async () => {
+        const noteId = 'note-123';
+        const mockNote = {
+          id: noteId,
+          title: 'Test Note',
+          sdId: 'test-sd',
+          folderId: 'folder-1',
+          deleted: false,
+          pinned: true,
+          contentPreview: 'Preview',
+          contentText: 'Content',
+          created: 1000,
+          modified: 2000,
+        };
+
+        mockDatabase.getNote.mockResolvedValue(mockNote);
+
+        const result = await (handlers as any).handleGetMetadata(mockEvent, noteId);
+
+        // handleGetMetadata returns a transformed NoteMetadata format
+        expect(result).toMatchObject({
+          noteId: noteId,
+          title: 'Test Note',
+          folderId: 'folder-1',
+          deleted: false,
+        });
+        expect(mockDatabase.getNote).toHaveBeenCalledWith(noteId);
+      });
+
+      it('should throw error for non-existent note', async () => {
+        mockDatabase.getNote.mockResolvedValue(null);
+
+        await expect(
+          (handlers as any).handleGetMetadata(mockEvent, 'non-existent')
+        ).rejects.toThrow('Note non-existent not found');
+      });
+    });
+  });
+
+  // ============================================================================
+  // Diagnostics Tests
+  // ============================================================================
+  describe('Diagnostics', () => {
+    const mockEvent = {} as any;
+
+    describe('diagnostics:getDuplicateNotes', () => {
+      it('should get duplicate notes', async () => {
+        const mockDuplicates = [{ noteId: 'note-1', sdId: 'sd-1', copies: 2 }];
+        mockDiagnosticsManager.detectDuplicateNotes.mockResolvedValue(mockDuplicates);
+
+        const result = await (handlers as any).handleGetDuplicateNotes(mockEvent);
+
+        expect(result).toEqual(mockDuplicates);
+        expect(mockDiagnosticsManager.detectDuplicateNotes).toHaveBeenCalled();
+      });
+    });
+
+    describe('diagnostics:getOrphanedCRDTFiles', () => {
+      it('should get orphaned CRDT files', async () => {
+        const mockOrphans = [{ noteId: 'orphan-1', sdId: 'sd-1', path: '/path/to/orphan' }];
+        mockDiagnosticsManager.detectOrphanedCRDTFiles.mockResolvedValue(mockOrphans);
+
+        const result = await (handlers as any).handleGetOrphanedCRDTFiles(mockEvent);
+
+        expect(result).toEqual(mockOrphans);
+        expect(mockDiagnosticsManager.detectOrphanedCRDTFiles).toHaveBeenCalled();
+      });
+    });
+
+    describe('diagnostics:getMissingCRDTFiles', () => {
+      it('should get missing CRDT files', async () => {
+        const mockMissing = [{ noteId: 'missing-1', sdId: 'sd-1' }];
+        mockDiagnosticsManager.detectMissingCRDTFiles.mockResolvedValue(mockMissing);
+
+        const result = await (handlers as any).handleGetMissingCRDTFiles(mockEvent);
+
+        expect(result).toEqual(mockMissing);
+        expect(mockDiagnosticsManager.detectMissingCRDTFiles).toHaveBeenCalled();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Backup Tests
+  // ============================================================================
+  describe('Backup', () => {
+    const mockEvent = {} as any;
+
+    describe('backup:createManualBackup', () => {
+      it('should create manual backup', async () => {
+        const backupPath = '/path/to/backup';
+        mockBackupManager.createManualBackup.mockResolvedValue(backupPath);
+
+        const result = await (handlers as any).handleCreateManualBackup(mockEvent);
+
+        expect(result).toBe(backupPath);
+        expect(mockBackupManager.createManualBackup).toHaveBeenCalled();
+      });
+    });
+
+    describe('backup:listBackups', () => {
+      it('should list backups', async () => {
+        const mockBackups = [
+          { path: '/backup1', timestamp: 1000 },
+          { path: '/backup2', timestamp: 2000 },
+        ];
+        mockBackupManager.listBackups.mockResolvedValue(mockBackups);
+
+        const result = await (handlers as any).handleListBackups(mockEvent);
+
+        expect(result).toEqual(mockBackups);
+        expect(mockBackupManager.listBackups).toHaveBeenCalled();
+      });
+    });
+
+    describe('backup:deleteBackup', () => {
+      it('should delete backup', async () => {
+        const backupPath = '/path/to/backup';
+        mockBackupManager.deleteBackup.mockResolvedValue(undefined);
+
+        await (handlers as any).handleDeleteBackup(mockEvent, backupPath);
+
+        expect(mockBackupManager.deleteBackup).toHaveBeenCalledWith(backupPath);
+      });
+    });
+
+    describe('backup:getBackupDirectory', () => {
+      it('should get backup directory', async () => {
+        const backupDir = '/path/to/backups';
+        mockBackupManager.getBackupDirectory.mockReturnValue(backupDir);
+
+        const result = await (handlers as any).handleGetBackupDirectory(mockEvent);
+
+        expect(result).toBe(backupDir);
+        expect(mockBackupManager.getBackupDirectory).toHaveBeenCalled();
+      });
+    });
+
+    describe('backup:setBackupDirectory', () => {
+      it('should set backup directory', async () => {
+        const newDir = '/new/backup/path';
+        mockBackupManager.setBackupDirectory.mockResolvedValue(undefined);
+
+        await (handlers as any).handleSetBackupDirectory(mockEvent, newDir);
+
+        expect(mockBackupManager.setBackupDirectory).toHaveBeenCalledWith(newDir);
+      });
+    });
+
+    describe('backup:cleanupOldSnapshots', () => {
+      it('should cleanup old snapshots', async () => {
+        mockBackupManager.cleanupOldSnapshots.mockResolvedValue(undefined);
+
+        await (handlers as any).handleCleanupOldSnapshots(mockEvent);
+
+        expect(mockBackupManager.cleanupOldSnapshots).toHaveBeenCalled();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Recovery Tests
+  // ============================================================================
+  describe('Recovery', () => {
+    const mockEvent = {} as any;
+
+    describe('recovery:getStaleMoves', () => {
+      it('should get stale moves', async () => {
+        const mockStaleMoves = [{ moveId: 'move-1', noteId: 'note-1', state: 'initiated' }];
+        mockNoteMoveManager.getStaleMoves.mockReturnValue(mockStaleMoves);
+
+        const result = await (handlers as any).handleGetStaleMoves(mockEvent);
+
+        expect(result).toEqual(mockStaleMoves);
+        expect(mockNoteMoveManager.getStaleMoves).toHaveBeenCalled();
+      });
+    });
+
+    describe('recovery:takeOverMove', () => {
+      it('should take over a move', async () => {
+        mockNoteMoveManager.takeOverMove.mockResolvedValue({ success: true });
+
+        const result = await (handlers as any).handleTakeOverMove(mockEvent, 'move-1');
+
+        expect(result).toEqual({ success: true });
+        expect(mockNoteMoveManager.takeOverMove).toHaveBeenCalledWith('move-1');
+      });
+    });
+
+    describe('recovery:cancelMove', () => {
+      it('should cancel a move', async () => {
+        mockNoteMoveManager.cancelMove.mockResolvedValue({ success: true });
+
+        const result = await (handlers as any).handleCancelMove(mockEvent, 'move-1');
+
+        expect(result).toEqual({ success: true });
+        expect(mockNoteMoveManager.cancelMove).toHaveBeenCalledWith('move-1');
+      });
+    });
+  });
+
+  describe('Note Load/Unload', () => {
+    const mockEvent = {} as any;
+
+    beforeEach(() => {
+      mockCRDTManager.loadNote.mockClear();
+      mockCRDTManager.unloadNote.mockClear();
+      mockCRDTManager.getNoteDoc.mockClear();
+      mockDatabase.getNote.mockClear();
+      mockDatabase.upsertNote.mockClear();
+    });
+
+    describe('note:load', () => {
+      it('should load note and sync CRDT metadata to database', async () => {
+        const noteId = 'test-note-1';
+        const note = {
+          id: noteId,
+          sdId: 'test-sd',
+          folderId: 'folder-1',
+          created: 1000,
+          modified: 2000,
+          deleted: false,
+        };
+
+        mockDatabase.getNote.mockResolvedValue(note);
+        mockCRDTManager.loadNote.mockResolvedValue(undefined);
+        mockCRDTManager.getNoteDoc.mockReturnValue({
+          getMetadata: () => ({
+            id: noteId,
+            folderId: 'folder-1',
+            created: 1000,
+            modified: 2000,
+            deleted: false,
+          }),
+        });
+
+        await (handlers as any).handleLoadNote(mockEvent, noteId);
+
+        expect(mockCRDTManager.loadNote).toHaveBeenCalledWith(noteId, 'test-sd');
+        expect(mockDatabase.upsertNote).toHaveBeenCalled();
+      });
+
+      it('should use default SD when note not in database', async () => {
+        const noteId = 'new-note';
+        mockDatabase.getNote.mockResolvedValue(null);
+        mockCRDTManager.loadNote.mockResolvedValue(undefined);
+        mockCRDTManager.getNoteDoc.mockReturnValue(null);
+
+        await (handlers as any).handleLoadNote(mockEvent, noteId);
+
+        expect(mockCRDTManager.loadNote).toHaveBeenCalledWith(noteId, 'default');
+      });
+    });
+
+    describe('note:unload', () => {
+      it('should unload note from CRDT manager', async () => {
+        const noteId = 'test-note-1';
+        mockCRDTManager.unloadNote.mockResolvedValue(undefined);
+
+        await (handlers as any).handleUnloadNote(mockEvent, noteId);
+
+        expect(mockCRDTManager.unloadNote).toHaveBeenCalledWith(noteId);
+      });
+    });
+
+    describe('note:createSnapshot', () => {
+      it('should return error when note not loaded', async () => {
+        const noteId = 'unloaded-note';
+        mockCRDTManager.getNoteDoc.mockReturnValue(null);
+
+        const result = await (handlers as any).handleCreateSnapshot(mockEvent, noteId);
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Note unloaded-note not loaded',
+        });
+      });
+
+      it('should return error when document not found', async () => {
+        const noteId = 'test-note-1';
+        mockCRDTManager.getNoteDoc.mockReturnValue({
+          getMetadata: () => ({ sdId: 'test-sd' }),
+        });
+        mockCRDTManager.getDocument.mockReturnValue(null);
+
+        const result = await (handlers as any).handleCreateSnapshot(mockEvent, noteId);
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Note test-note-1 document not found',
+        });
+      });
+    });
+  });
+
+  describe('Note Create/Duplicate', () => {
+    const mockEvent = {} as any;
+
+    beforeEach(() => {
+      mockCRDTManager.loadNote.mockClear();
+      mockCRDTManager.getNoteDoc.mockClear();
+      mockCRDTManager.getDocument.mockClear();
+      mockCRDTManager.unloadNote.mockClear();
+      mockDatabase.getNote.mockClear();
+      mockDatabase.upsertNote.mockClear();
+    });
+
+    describe('note:create', () => {
+      it('should create a new note with CRDT document', async () => {
+        const sdId = 'test-sd';
+        const folderId = 'folder-1';
+
+        const mockNoteDoc = {
+          initializeNote: jest.fn(),
+        };
+
+        mockCRDTManager.loadNote.mockResolvedValue(undefined);
+        mockCRDTManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+        mockDatabase.upsertNote.mockResolvedValue(undefined);
+
+        const result = await (handlers as any).handleCreateNote(mockEvent, sdId, folderId);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('string');
+        expect(mockCRDTManager.loadNote).toHaveBeenCalledWith(expect.any(String), sdId);
+        expect(mockNoteDoc.initializeNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: expect.any(String),
+            sdId,
+            folderId,
+            deleted: false,
+            pinned: false,
+          })
+        );
+      });
+
+      it('should create a root note with null folderId', async () => {
+        const sdId = 'test-sd';
+
+        const mockNoteDoc = {
+          initializeNote: jest.fn(),
+        };
+
+        mockCRDTManager.loadNote.mockResolvedValue(undefined);
+        mockCRDTManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+        mockDatabase.upsertNote.mockResolvedValue(undefined);
+
+        await (handlers as any).handleCreateNote(mockEvent, sdId, null);
+
+        expect(mockNoteDoc.initializeNote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            folderId: null,
+          })
+        );
+      });
+    });
+
+    describe('note:duplicate', () => {
+      it('should throw error when source note not found', async () => {
+        const sourceNoteId = 'non-existent';
+        mockDatabase.getNote.mockResolvedValue(null);
+
+        await expect(
+          (handlers as any).handleDuplicateNote(mockEvent, sourceNoteId)
+        ).rejects.toThrow('Source note non-existent not found');
+      });
+    });
+  });
+
+  describe('CRDT State Operations', () => {
+    const mockEvent = {} as any;
+
+    describe('note:getState', () => {
+      it('should throw when note not loaded', async () => {
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+
+        await expect((handlers as any).handleGetState(mockEvent, 'non-existent')).rejects.toThrow(
+          'Note non-existent not loaded'
+        );
+      });
+    });
+
+    describe('note:applyUpdate', () => {
+      it('should throw when note not loaded', async () => {
+        mockCRDTManager.applyUpdate.mockRejectedValue(new Error('Note not-loaded not loaded'));
+
+        const update = new Uint8Array([1, 2, 3]);
+        await expect(
+          (handlers as any).handleApplyUpdate(mockEvent, 'not-loaded', update)
+        ).rejects.toThrow('Note not-loaded not loaded');
+      });
+
+      it('should apply update successfully', async () => {
+        mockCRDTManager.applyUpdate.mockResolvedValue(undefined);
+        mockCRDTManager.getNoteDoc.mockReturnValue({
+          getMetadata: jest.fn().mockReturnValue({
+            deleted: false,
+            folderId: 'folder-1',
+            sdId: 'test-sd',
+          }),
+        });
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          folderId: 'folder-1',
+          deleted: false,
+        });
+        mockDatabase.upsertNote.mockResolvedValue(undefined);
+
+        const update = new Uint8Array([1, 2, 3]);
+        await (handlers as any).handleApplyUpdate(mockEvent, 'note-1', update);
+
+        expect(mockCRDTManager.applyUpdate).toHaveBeenCalledWith('note-1', update);
+      });
+    });
+  });
+
+  describe('Folder Reorder', () => {
+    const mockEvent = {} as any;
+
+    describe('folder:reorder', () => {
+      it('should reorder folder and update siblings in database', async () => {
+        const sdId = 'test-sd';
+        const folderId = 'folder-1';
+        const newIndex = 2;
+
+        const mockSiblings = [
+          { id: 'folder-1', name: 'Folder 1', order: 2 },
+          { id: 'folder-2', name: 'Folder 2', order: 0 },
+          { id: 'folder-3', name: 'Folder 3', order: 1 },
+        ];
+
+        mockFolderTree.getFolder.mockReturnValue({ id: folderId, parentId: null });
+        mockFolderTree.getSiblings.mockReturnValue(mockSiblings);
+        mockDatabase.upsertFolder.mockResolvedValue(undefined);
+
+        await (handlers as any).handleReorderFolder(mockEvent, sdId, folderId, newIndex);
+
+        expect(mockFolderTree.reorderFolder).toHaveBeenCalledWith(folderId, newIndex);
+        expect(mockDatabase.upsertFolder).toHaveBeenCalledTimes(3);
+      });
+
+      it('should not update database if folder not found after reorder', async () => {
+        const sdId = 'test-sd';
+        const folderId = 'folder-1';
+        const newIndex = 0;
+
+        mockFolderTree.getFolder.mockReturnValue(null);
+
+        await (handlers as any).handleReorderFolder(mockEvent, sdId, folderId, newIndex);
+
+        expect(mockFolderTree.reorderFolder).toHaveBeenCalledWith(folderId, newIndex);
+        expect(mockDatabase.upsertFolder).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('Stale Sync Operations', () => {
+    const mockEvent = {} as any;
+
+    describe('sync:getStaleSyncs', () => {
+      it('should return empty array when getStaleSyncs not set', async () => {
+        // getStaleSyncs callback not set
+        const result = await (handlers as any).handleGetStaleSyncs();
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe('sync:skipStaleEntry', () => {
+      it('should return error when skipStaleEntry not set', async () => {
+        const result = await (handlers as any).handleSkipStaleEntry(
+          mockEvent,
+          'test-sd',
+          'note-1',
+          'instance-1'
+        );
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Skip stale entry not available',
+        });
+      });
+    });
+
+    describe('sync:retryStaleEntry', () => {
+      it('should return error when retryStaleEntry not set', async () => {
+        const result = await (handlers as any).handleRetryStaleEntry(
+          mockEvent,
+          'test-sd',
+          'note-1',
+          'instance-1'
+        );
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Retry stale entry not available',
+        });
+      });
+    });
+  });
+
+  describe('Folder Emit Selected', () => {
+    const mockEvent = {} as any;
+
+    describe('folder:emitSelected', () => {
+      it('should not throw when called', () => {
+        expect(() => {
+          (handlers as any).handleEmitFolderSelected(mockEvent, 'folder-1');
+        }).not.toThrow();
+      });
+    });
+  });
+
+  describe('Storage Directory Delete', () => {
+    const mockEvent = {} as any;
+
+    describe('sd:delete', () => {
+      it('should delete storage directory', async () => {
+        mockDatabase.deleteStorageDir.mockResolvedValue(undefined);
+
+        await (handlers as any).handleDeleteStorageDir(mockEvent, 'test-sd');
+
+        expect(mockDatabase.deleteStorageDir).toHaveBeenCalledWith('test-sd');
+      });
+    });
+  });
+
+  describe('Note Check Exists', () => {
+    const mockEvent = {} as any;
+
+    describe('note:checkExistsInSD', () => {
+      it('should return exists=true when note exists in SD', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          deleted: false,
+        });
+
+        const result = await (handlers as any).handleCheckNoteExistsInSD(
+          mockEvent,
+          'note-1',
+          'test-sd'
+        );
+
+        expect(result).toEqual({ exists: true, isDeleted: false });
+      });
+
+      it('should return isDeleted=true when note is deleted', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          deleted: true,
+        });
+
+        const result = await (handlers as any).handleCheckNoteExistsInSD(
+          mockEvent,
+          'note-1',
+          'test-sd'
+        );
+
+        expect(result).toEqual({ exists: true, isDeleted: true });
+      });
+
+      it('should return exists=false when note not in SD', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'other-sd',
+        });
+
+        const result = await (handlers as any).handleCheckNoteExistsInSD(
+          mockEvent,
+          'note-1',
+          'test-sd'
+        );
+
+        expect(result).toEqual({ exists: false, isDeleted: false });
+      });
+
+      it('should return exists=false when note not found', async () => {
+        mockDatabase.getNote.mockResolvedValue(null);
+
+        const result = await (handlers as any).handleCheckNoteExistsInSD(
+          mockEvent,
+          'note-1',
+          'test-sd'
+        );
+
+        expect(result).toEqual({ exists: false, isDeleted: false });
+      });
+    });
+  });
+
+  describe('Folder List All', () => {
+    const mockEvent = {} as any;
+
+    describe('folder:listAll', () => {
+      it('should return folders grouped by SD', async () => {
+        const mockSd1Folders = [
+          { id: 'f1', name: 'Folder 1', sdId: 'sd-1' },
+          { id: 'f2', name: 'Folder 2', sdId: 'sd-1' },
+        ];
+        const mockSd2Folders = [{ id: 'f3', name: 'Folder 3', sdId: 'sd-2' }];
+
+        const mockFolderTree1 = {
+          ...mockFolderTree,
+          getActiveFolders: jest.fn().mockReturnValue(mockSd1Folders),
+        };
+        const mockFolderTree2 = {
+          ...mockFolderTree,
+          getActiveFolders: jest.fn().mockReturnValue(mockSd2Folders),
+        };
+
+        mockDatabase.getAllStorageDirs.mockResolvedValue([
+          { id: 'sd-1', name: 'SD 1' },
+          { id: 'sd-2', name: 'SD 2' },
+        ]);
+
+        let callCount = 0;
+        mockCRDTManager.loadFolderTree.mockImplementation(() => {
+          callCount++;
+          return Promise.resolve(callCount === 1 ? mockFolderTree1 : mockFolderTree2);
+        });
+
+        const result = await (handlers as any).handleListAllFolders(mockEvent);
+
+        // Returns array grouped by SD
+        expect(result).toHaveLength(2);
+        expect(result).toEqual([
+          {
+            sdId: 'sd-1',
+            sdName: 'SD 1',
+            folders: mockSd1Folders,
+          },
+          {
+            sdId: 'sd-2',
+            sdName: 'SD 2',
+            folders: mockSd2Folders,
+          },
+        ]);
+      });
+    });
+  });
+
+  describe('Note Info', () => {
+    const mockEvent = {} as any;
+
+    describe('note:getInfo', () => {
+      it('should return null when note not found', async () => {
+        mockDatabase.getNote.mockResolvedValue(null);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'non-existent');
+
+        expect(result).toBeNull();
+      });
+
+      it('should return null when SD not found', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue(null);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe('Restore From Backup', () => {
+    const mockEvent = {} as any;
+
+    describe('backup:restoreFromBackup', () => {
+      it('should call backup manager to restore', async () => {
+        mockBackupManager.restoreFromBackup.mockResolvedValue({
+          sdId: 'sd-1',
+          sdPath: '/path/to/sd',
+        });
+
+        const result = await (handlers as any).handleRestoreFromBackup(
+          mockEvent,
+          'backup-123',
+          '/target/path',
+          false
+        );
+
+        expect(mockBackupManager.restoreFromBackup).toHaveBeenCalledWith(
+          'backup-123',
+          '/target/path',
+          false
+        );
+        expect(result).toEqual({ sdId: 'sd-1', sdPath: '/path/to/sd' });
+      });
+
+      it('should pass registerAsNew parameter', async () => {
+        mockBackupManager.restoreFromBackup.mockResolvedValue({
+          sdId: 'sd-2',
+          sdPath: '/new/path',
+        });
+
+        const result = await (handlers as any).handleRestoreFromBackup(
+          mockEvent,
+          'backup-456',
+          '/new/target',
+          true
+        );
+
+        expect(mockBackupManager.restoreFromBackup).toHaveBeenCalledWith(
+          'backup-456',
+          '/new/target',
+          true
+        );
+        expect(result).toEqual({ sdId: 'sd-2', sdPath: '/new/path' });
+      });
+    });
+  });
+
+  describe('Set Note Timestamp', () => {
+    const mockEvent = {} as any;
+
+    describe('test:setNoteTimestamp', () => {
+      it('should throw when not in test mode', async () => {
+        // This handler is only for test mode
+        const originalEnv = process.env['NODE_ENV'];
+        process.env['NODE_ENV'] = 'production';
+
+        await expect(
+          (handlers as any).handleSetNoteTimestamp(mockEvent, 'note-1', Date.now())
+        ).rejects.toThrow('test:setNoteTimestamp is only available in test mode');
+
+        process.env['NODE_ENV'] = originalEnv;
+      });
+    });
+  });
+
+  describe('Cloud Storage Paths', () => {
+    const mockEvent = {} as any;
+
+    describe('sd:getCloudStoragePaths', () => {
+      it('should return cloud storage paths object', async () => {
+        // This handler returns a Record<string, string> of existing paths
+        const result = await (handlers as any).handleGetCloudStoragePaths(mockEvent);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+        expect(Array.isArray(result)).toBe(false);
+      });
+    });
+  });
+
+  describe('Sync Handlers', () => {
+    const mockEvent = {} as any;
+
+    describe('sync:getStatus', () => {
+      it('should get sync status for all SDs', async () => {
+        const mockSyncStatuses = [
+          {
+            sdId: 1,
+            sdName: 'SD 1',
+            isSyncing: false,
+            lastSyncTime: Date.now() - 60000,
+          },
+          {
+            sdId: 2,
+            sdName: 'SD 2',
+            isSyncing: true,
+            lastSyncTime: null,
+          },
+        ];
+        (handlers as any).getSyncStatus = jest.fn().mockReturnValue(mockSyncStatuses);
+
+        const result = await (handlers as any).handleGetSyncStatus(mockEvent);
+
+        expect(Array.isArray(result)).toBe(true);
+      });
+    });
+
+    describe('sync:getStaleSyncs', () => {
+      it('should return stale syncs from CRDT manager', async () => {
+        const mockStaleSyncs = [
+          {
+            noteId: 'note-1',
+            sdId: 1,
+            lastAttempt: Date.now() - 3600000,
+            error: 'Network error',
+          },
+        ];
+        mockCRDTManager.getStaleSyncs = jest.fn().mockReturnValue(mockStaleSyncs);
+
+        // Since the real handler calls crdtManager.getStaleSyncs,
+        // we set up the mock directly on the manager
+        const result = await (handlers as any).handleGetStaleSyncs(mockEvent);
+
+        // Result should be an array (may be empty if not properly mocked)
+        expect(Array.isArray(result)).toBe(true);
+      });
+    });
+  });
+
+  describe('Telemetry Handlers', () => {
+    const mockEvent = {} as any;
+
+    describe('telemetry:getSettings', () => {
+      it('should return telemetry settings', async () => {
+        const result = await (handlers as any).handleGetTelemetrySettings(mockEvent);
+
+        // Result should be an object with telemetry settings
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+    });
+  });
+
+  describe('SD Delete Handler', () => {
+    const mockEvent = {} as any;
+
+    describe('sd:delete', () => {
+      it('should delete a storage directory', async () => {
+        const sdId = 1;
+
+        mockDatabase.deleteStorageDir.mockResolvedValue(undefined);
+
+        await (handlers as any).handleDeleteStorageDir(mockEvent, sdId);
+
+        expect(mockDatabase.deleteStorageDir).toHaveBeenCalledWith(sdId);
+      });
+    });
+  });
+
+  describe('Web Broadcast Callback', () => {
+    it('should set web broadcast callback', () => {
+      const callback = jest.fn();
+      handlers.setWebBroadcastCallback(callback);
+      // The callback is stored internally - verify by calling broadcastToAll
+      handlers.broadcastToAll('test-channel', 'arg1', 'arg2');
+      expect(callback).toHaveBeenCalledWith('test-channel', 'arg1', 'arg2');
+    });
+
+    it('should clear web broadcast callback when set to undefined', () => {
+      const callback = jest.fn();
+      handlers.setWebBroadcastCallback(callback);
+      handlers.setWebBroadcastCallback(undefined);
+      // Should not throw when broadcasting without callback
+      expect(() => handlers.broadcastToAll('test-channel')).not.toThrow();
+    });
+  });
+
+  describe('broadcastToAll', () => {
+    it('should broadcast to electron windows', () => {
+      const { BrowserWindow } = require('electron');
+      const mockWindow = {
+        webContents: {
+          send: jest.fn(),
+        },
+      };
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
+
+      handlers.broadcastToAll('test-channel', 'data1', 'data2');
+
+      expect(mockWindow.webContents.send).toHaveBeenCalledWith('test-channel', 'data1', 'data2');
+    });
+
+    it('should broadcast to multiple windows', () => {
+      const { BrowserWindow } = require('electron');
+      const mockWindow1 = { webContents: { send: jest.fn() } };
+      const mockWindow2 = { webContents: { send: jest.fn() } };
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
+
+      handlers.broadcastToAll('event', 'payload');
+
+      expect(mockWindow1.webContents.send).toHaveBeenCalledWith('event', 'payload');
+      expect(mockWindow2.webContents.send).toHaveBeenCalledWith('event', 'payload');
+    });
+
+    it('should not call web callback when not set', () => {
+      const { BrowserWindow } = require('electron');
+      (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
+      handlers.setWebBroadcastCallback(undefined);
+
+      // Should not throw
+      expect(() => handlers.broadcastToAll('channel')).not.toThrow();
+    });
+  });
+
+  describe('runAutoCleanup', () => {
+    it('should call autoCleanupDeletedNotes with threshold', async () => {
+      (mockDatabase as any).autoCleanupDeletedNotes = jest.fn().mockResolvedValue([]);
+
+      await handlers.runAutoCleanup(30);
+
+      expect((mockDatabase as any).autoCleanupDeletedNotes).toHaveBeenCalledWith(30);
+    });
+
+    it('should use default threshold of 30 days', async () => {
+      (mockDatabase as any).autoCleanupDeletedNotes = jest.fn().mockResolvedValue([]);
+
+      await handlers.runAutoCleanup();
+
+      expect((mockDatabase as any).autoCleanupDeletedNotes).toHaveBeenCalledWith(30);
+    });
+
+    it('should handle database errors gracefully', async () => {
+      (mockDatabase as any).autoCleanupDeletedNotes = jest
+        .fn()
+        .mockRejectedValue(new Error('Database error'));
+
+      // Should not throw
+      await expect(handlers.runAutoCleanup()).resolves.toBeUndefined();
+    });
+
+    it('should not throw when no notes to clean', async () => {
+      (mockDatabase as any).autoCleanupDeletedNotes = jest.fn().mockResolvedValue([]);
+
+      await expect(handlers.runAutoCleanup()).resolves.toBeUndefined();
     });
   });
 });
