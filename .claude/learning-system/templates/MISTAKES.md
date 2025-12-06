@@ -17,6 +17,7 @@ When you make a mistake and figure out the fix, add it here using `/learn-mistak
 ## Recorded Patterns
 
 ### Template (copy this for new entries)
+
 - **Wrong approach**: [What was done incorrectly]
 - **Why wrong**: [Why this approach failed or was suboptimal]
 - **Correct approach**: [What should be done instead]
@@ -26,4 +27,3 @@ When you make a mistake and figure out the fix, add it here using `/learn-mistak
 ---
 
 <!-- New mistakes go below this line -->
-

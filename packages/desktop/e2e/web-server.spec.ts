@@ -154,7 +154,10 @@ test.describe('Web Server', () => {
     await electronPage.waitForSelector('text=Running', { timeout: 10000 });
 
     // Get the full URL with token
-    const urlElement = electronPage.locator('a').filter({ hasText: /https:\/\/.*\?token=/ }).first();
+    const urlElement = electronPage
+      .locator('a')
+      .filter({ hasText: /https:\/\/.*\?token=/ })
+      .first();
     const fullUrl = await urlElement.textContent();
 
     if (!fullUrl) {
@@ -186,7 +189,10 @@ test.describe('Web Server', () => {
     await expect(electronPage.locator('text=0 connections')).toBeVisible();
 
     // Get the full URL with token and connect browser
-    const urlElement = electronPage.locator('a').filter({ hasText: /https:\/\/.*\?token=/ }).first();
+    const urlElement = electronPage
+      .locator('a')
+      .filter({ hasText: /https:\/\/.*\?token=/ })
+      .first();
     const fullUrl = await urlElement.textContent();
 
     if (!fullUrl) {
@@ -211,7 +217,10 @@ test.describe('Web Server', () => {
     await electronPage.waitForSelector('text=Running', { timeout: 10000 });
 
     // Get URL and connect browser
-    const urlElement = electronPage.locator('a').filter({ hasText: /https:\/\/.*\?token=/ }).first();
+    const urlElement = electronPage
+      .locator('a')
+      .filter({ hasText: /https:\/\/.*\?token=/ })
+      .first();
     const fullUrl = await urlElement.textContent();
 
     if (!fullUrl) {
@@ -277,7 +286,10 @@ test.describe('Web Server - Collaborative Editing', () => {
     // Get URL and connect browser
     await electronPage.keyboard.press('Meta+,');
     await electronPage.click('text=Web Server');
-    const urlElement = electronPage.locator('a').filter({ hasText: /https:\/\/.*\?token=/ }).first();
+    const urlElement = electronPage
+      .locator('a')
+      .filter({ hasText: /https:\/\/.*\?token=/ })
+      .first();
     const fullUrl = await urlElement.textContent();
     await electronPage.keyboard.press('Escape');
 

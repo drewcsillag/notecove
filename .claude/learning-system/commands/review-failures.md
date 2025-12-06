@@ -19,12 +19,14 @@ Time to review unresolved failures and extract any lessons.
 ## Distinguishing Mistakes from Normal Iteration
 
 **IS a recordable mistake:**
+
 - Ran wrong command when I should have known the right one
 - Forgot to check something before acting
 - Used wrong approach when project conventions specify otherwise
 - Made same error I've made before
 
 **Is NOT a recordable mistake (just iteration):**
+
 - Test failed during TDD (expected)
 - Build error while developing (normal)
 - Typo in a command (not a pattern)
