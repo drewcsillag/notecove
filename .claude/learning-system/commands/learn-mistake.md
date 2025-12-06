@@ -17,6 +17,7 @@ I need to record a mistake pattern to prevent it in future sessions.
 
 ```markdown
 ### [Short descriptive title]
+
 - **Wrong approach**: What I did that was wrong
 - **Why wrong**: Why this was the wrong approach
 - **Correct approach**: What I should have done instead
@@ -45,6 +46,7 @@ If I ran `pnpm ci-local` when I should have run targeted tests:
 
 ```markdown
 ### Running full CI during feature development
+
 - **Wrong approach**: Running `pnpm ci-local` while still developing a feature
 - **Why wrong**: Wastes time testing incomplete code; should iterate quickly
 - **Correct approach**: Run targeted tests (`pnpm test <specific-test>`) during development, full CI only before commit

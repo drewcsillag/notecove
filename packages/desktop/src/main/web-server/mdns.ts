@@ -42,7 +42,7 @@ export class MDNSManager {
       this.bonjour = new Bonjour();
 
       // Determine service name
-      const deviceName = config.name ?? hostname() ?? 'NoteCove';
+      const deviceName = config.name ?? hostname();
       const serviceName = `NoteCove on ${deviceName}`;
 
       // Use _http._tcp or _https._tcp depending on TLS mode
@@ -98,8 +98,10 @@ export class MDNSManager {
   private cleanup(): void {
     if (this.service) {
       try {
-        // Service.stop may not exist on all versions, use optional chaining
-        if (typeof this.service.stop === 'function') {
+        // Service.stop may not exist on all versions, check before calling
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        if ('stop' in this.service && typeof this.service.stop === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           this.service.stop();
         }
       } catch {

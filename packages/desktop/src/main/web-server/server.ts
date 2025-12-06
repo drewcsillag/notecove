@@ -261,22 +261,22 @@ export class WebServer {
         host: this.config.host,
       });
 
-    // Parse the address
-    const addressInfo = this.fastify.server.address();
-    if (typeof addressInfo === 'string' || !addressInfo) {
-      throw new Error('Failed to get server address');
-    }
+      // Parse the address
+      const addressInfo = this.fastify.server.address();
+      if (typeof addressInfo === 'string' || !addressInfo) {
+        throw new Error('Failed to get server address');
+      }
 
-    this.address = {
-      port: addressInfo.port,
-      host: addressInfo.address,
-      family: addressInfo.family,
-    };
+      this.address = {
+        port: addressInfo.port,
+        host: addressInfo.address,
+        family: addressInfo.family,
+      };
 
-    this.running = true;
-    console.log(`[WebServer] Started on ${address}`);
+      this.running = true;
+      console.log(`[WebServer] Started on ${address}`);
 
-    return this.address;
+      return this.address;
     } catch (error: unknown) {
       // Clean up fastify instance on failure
       this.fastify = null;
@@ -284,10 +284,14 @@ export class WebServer {
       // Provide user-friendly error messages
       const err = error as NodeJS.ErrnoException;
       if (err.code === 'EADDRINUSE') {
-        throw new Error(`Port ${this.config.port} is already in use. Please choose a different port or stop the application using it.`);
+        throw new Error(
+          `Port ${this.config.port} is already in use. Please choose a different port or stop the application using it.`
+        );
       }
       if (err.code === 'EACCES') {
-        throw new Error(`Permission denied to use port ${this.config.port}. Ports below 1024 require elevated privileges.`);
+        throw new Error(
+          `Permission denied to use port ${this.config.port}. Ports below 1024 require elevated privileges.`
+        );
       }
       if (err.code === 'EADDRNOTAVAIL') {
         throw new Error(`The address ${this.config.host} is not available on this system.`);

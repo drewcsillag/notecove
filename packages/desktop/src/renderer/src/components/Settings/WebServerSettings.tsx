@@ -535,7 +535,8 @@ export function WebServerSettings(): React.ReactElement {
                           }}
                         >
                           <Typography variant="caption" component="div">
-                            <strong>Type:</strong> {certInfo.isSelfSigned ? 'Self-signed' : 'CA-signed'}
+                            <strong>Type:</strong>{' '}
+                            {certInfo.isSelfSigned ? 'Self-signed' : 'CA-signed'}
                           </Typography>
                           <Typography variant="caption" component="div">
                             <strong>Valid until:</strong>{' '}
