@@ -321,6 +321,14 @@ declare global {
         >;
         disconnectClient: (clientId: string) => Promise<boolean>;
         disconnectAllClients: () => Promise<void>;
+        getCertificateInfo: () => Promise<{
+          commonName: string;
+          validFrom: string;
+          validTo: string;
+          isSelfSigned: boolean;
+          fingerprint: string;
+          path: string;
+        } | null>;
       };
 
       telemetry: {

@@ -707,12 +707,22 @@ export const webClient: typeof window.electronAPI = {
     getConnectedClients: browserNotAvailable('webServer.getConnectedClients'),
     disconnectClient: browserNotAvailable('webServer.disconnectClient'),
     disconnectAllClients: browserNotAvailable('webServer.disconnectAllClients'),
+    getCertificateInfo: browserNotAvailable('webServer.getCertificateInfo'),
   },
 
   shell: {
     openExternal: async (url: string) => {
       await Promise.resolve();
       window.open(url, '_blank');
+    },
+  },
+
+  clipboard: {
+    writeText: async (text: string) => {
+      await navigator.clipboard.writeText(text);
+    },
+    readText: async () => {
+      return navigator.clipboard.readText();
     },
   },
 };

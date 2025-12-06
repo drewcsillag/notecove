@@ -255,10 +255,11 @@ export class WebServer {
     }
 
     // Start listening
-    const address = await this.fastify.listen({
-      port: this.config.port,
-      host: this.config.host,
-    });
+    try {
+      const address = await this.fastify.listen({
+        port: this.config.port,
+        host: this.config.host,
+      });
 
     // Parse the address
     const addressInfo = this.fastify.server.address();
@@ -276,6 +277,24 @@ export class WebServer {
     console.log(`[WebServer] Started on ${address}`);
 
     return this.address;
+    } catch (error: unknown) {
+      // Clean up fastify instance on failure
+      this.fastify = null;
+
+      // Provide user-friendly error messages
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === 'EADDRINUSE') {
+        throw new Error(`Port ${this.config.port} is already in use. Please choose a different port or stop the application using it.`);
+      }
+      if (err.code === 'EACCES') {
+        throw new Error(`Permission denied to use port ${this.config.port}. Ports below 1024 require elevated privileges.`);
+      }
+      if (err.code === 'EADDRNOTAVAIL') {
+        throw new Error(`The address ${this.config.host} is not available on this system.`);
+      }
+      // Re-throw with original message for other errors
+      throw error;
+    }
   }
 
   /**
