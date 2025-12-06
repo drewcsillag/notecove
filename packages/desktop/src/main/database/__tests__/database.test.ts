@@ -9,7 +9,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { BetterSqliteAdapter } from '../adapter';
 import { SqliteDatabase } from '../database';
-import type { NoteCache, FolderCache, User } from '@notecove/shared';
+import type { NoteCache, FolderCache, User, UUID } from '@notecove/shared';
 
 describe('SqliteDatabase', () => {
   let db: SqliteDatabase;
@@ -564,6 +564,857 @@ describe('SqliteDatabase', () => {
 
       const value = await db.getState('key1');
       expect(value).toBe('original');
+    });
+  });
+
+  describe('Storage Directories', () => {
+    let sdTestDir: string;
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-test-${Date.now()}-${Math.random()}`);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should create a storage directory', async () => {
+      const sd = await db.createStorageDir('sd-1', 'My Storage', sdTestDir);
+      expect(sd.id).toBe('sd-1');
+      expect(sd.name).toBe('My Storage');
+      expect(sd.path).toBe(sdTestDir);
+      // First storage directory is automatically made active
+      expect(sd.isActive).toBe(true);
+    });
+
+    it('should get storage directory by id', async () => {
+      await db.createStorageDir('sd-1', 'My Storage', sdTestDir);
+      const sd = await db.getStorageDir('sd-1');
+      expect(sd).not.toBeNull();
+      expect(sd?.name).toBe('My Storage');
+    });
+
+    it('should return null for non-existent storage directory', async () => {
+      const sd = await db.getStorageDir('non-existent');
+      expect(sd).toBeNull();
+    });
+
+    it('should get all storage directories', async () => {
+      const sd1Path = join(sdTestDir, 'sd1');
+      const sd2Path = join(sdTestDir, 'sd2');
+      await db.createStorageDir('sd-1', 'Storage 1', sd1Path);
+      await db.createStorageDir('sd-2', 'Storage 2', sd2Path);
+      const sds = await db.getAllStorageDirs();
+      expect(sds.length).toBe(2);
+    });
+
+    it('should set and get active storage directory', async () => {
+      const sd1Path = join(sdTestDir, 'sd1');
+      const sd2Path = join(sdTestDir, 'sd2');
+      await db.createStorageDir('sd-1', 'Storage 1', sd1Path);
+      await db.createStorageDir('sd-2', 'Storage 2', sd2Path);
+
+      await db.setActiveStorageDir('sd-1');
+      const active = await db.getActiveStorageDir();
+      expect(active?.id).toBe('sd-1');
+
+      // Change active
+      await db.setActiveStorageDir('sd-2');
+      const newActive = await db.getActiveStorageDir();
+      expect(newActive?.id).toBe('sd-2');
+    });
+
+    it('should delete storage directory', async () => {
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+      await db.deleteStorageDir('sd-1');
+      const sd = await db.getStorageDir('sd-1');
+      expect(sd).toBeNull();
+    });
+
+    it('should update storage directory path', async () => {
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+      const newPath = '/new/path/to/storage';
+      await db.updateStorageDirPath('sd-1', newPath);
+      const sd = await db.getStorageDir('sd-1');
+      expect(sd?.path).toBe(newPath);
+    });
+
+    it('should get storage directory by UUID', async () => {
+      const sd = await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+      const found = await db.getStorageDirByUuid(sd.uuid);
+      expect(found?.id).toBe('sd-1');
+    });
+  });
+
+  describe('Note Counts', () => {
+    let sdTestDir: string;
+    const now = Date.now();
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-count-test-${Date.now()}-${Math.random()}`);
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should get note count for folder', async () => {
+      await db.upsertNote({
+        id: 'note-1' as UUID,
+        title: 'Note 1',
+        sdId: 'sd-1',
+        folderId: 'folder-1' as UUID,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+      await db.upsertNote({
+        id: 'note-2' as UUID,
+        title: 'Note 2',
+        sdId: 'sd-1',
+        folderId: 'folder-1' as UUID,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      const count = await db.getNoteCountForFolder('sd-1', 'folder-1');
+      expect(count).toBe(2);
+    });
+
+    it('should get all notes count for SD', async () => {
+      await db.upsertNote({
+        id: 'note-1' as UUID,
+        title: 'Note 1',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+      await db.upsertNote({
+        id: 'note-2' as UUID,
+        title: 'Note 2',
+        sdId: 'sd-1',
+        folderId: 'folder-1' as UUID,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      const count = await db.getAllNotesCount('sd-1');
+      expect(count).toBe(2);
+    });
+
+    it('should get deleted note count', async () => {
+      await db.upsertNote({
+        id: 'note-1' as UUID,
+        title: 'Note 1',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: true,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+      await db.upsertNote({
+        id: 'note-2' as UUID,
+        title: 'Note 2',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      const count = await db.getDeletedNoteCount('sd-1');
+      expect(count).toBe(1);
+    });
+  });
+
+  describe('Links', () => {
+    let sdTestDir: string;
+    const now = Date.now();
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-link-test-${Date.now()}-${Math.random()}`);
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+      await db.upsertNote({
+        id: 'note-1' as UUID,
+        title: 'Source Note',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+      await db.upsertNote({
+        id: 'note-2' as UUID,
+        title: 'Target Note',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should add a link between notes', async () => {
+      await db.addLink('note-1', 'note-2');
+      const links = await db.getLinksFromNote('note-1');
+      expect(links).toContain('note-2');
+    });
+
+    it('should get links to a note', async () => {
+      await db.addLink('note-1', 'note-2');
+      const links = await db.getLinksToNote('note-2');
+      expect(links).toContain('note-1');
+    });
+
+    it('should remove a link', async () => {
+      await db.addLink('note-1', 'note-2');
+      await db.removeLink('note-1', 'note-2');
+      const links = await db.getLinksFromNote('note-1');
+      expect(links).not.toContain('note-2');
+    });
+
+    it('should remove all links from a note', async () => {
+      await db.upsertNote({
+        id: 'note-3' as UUID,
+        title: 'Third Note',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+      await db.addLink('note-1', 'note-2');
+      await db.addLink('note-1', 'note-3');
+      await db.removeAllLinksFromNote('note-1');
+      const links = await db.getLinksFromNote('note-1');
+      expect(links.length).toBe(0);
+    });
+
+    it('should remove all links to a note', async () => {
+      await db.upsertNote({
+        id: 'note-3' as UUID,
+        title: 'Third Note',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+      await db.addLink('note-1', 'note-2');
+      await db.addLink('note-3', 'note-2');
+      await db.removeAllLinksToNote('note-2');
+      const linksFrom1 = await db.getLinksFromNote('note-1');
+      const linksFrom3 = await db.getLinksFromNote('note-3');
+      expect(linksFrom1).not.toContain('note-2');
+      expect(linksFrom3).not.toContain('note-2');
+    });
+
+    it('should get backlinks for a note', async () => {
+      // Add a third note that also links to note-2
+      await db.upsertNote({
+        id: 'note-3' as UUID,
+        title: 'Third Note',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      // Create links: note-1 -> note-2, note-3 -> note-2
+      await db.addLink('note-1', 'note-2');
+      await db.addLink('note-3', 'note-2');
+
+      // Get backlinks to note-2 (should return note-1 and note-3)
+      const backlinks = await db.getBacklinks('note-2' as UUID);
+
+      expect(backlinks).toHaveLength(2);
+      expect(backlinks.map((n) => n.id)).toContain('note-1');
+      expect(backlinks.map((n) => n.id)).toContain('note-3');
+    });
+
+    it('should not include deleted notes in backlinks', async () => {
+      // Create a deleted note that links to note-2
+      await db.upsertNote({
+        id: 'note-deleted' as UUID,
+        title: 'Deleted Note',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: true,
+        pinned: false,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      // Create links
+      await db.addLink('note-1', 'note-2');
+      await db.addLink('note-deleted', 'note-2');
+
+      // Get backlinks (should only return note-1, not deleted note)
+      const backlinks = await db.getBacklinks('note-2' as UUID);
+
+      expect(backlinks).toHaveLength(1);
+      expect(backlinks[0]?.id).toBe('note-1');
+    });
+
+    it('should return empty array when no backlinks exist', async () => {
+      const backlinks = await db.getBacklinks('note-2' as UUID);
+      expect(backlinks).toEqual([]);
+    });
+  });
+
+  describe('Note Sync State', () => {
+    let sdTestDir: string;
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-sync-test-${Date.now()}-${Math.random()}`);
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should upsert and get note sync state', async () => {
+      await db.upsertNoteSyncState({
+        noteId: 'note-1',
+        sdId: 'sd-1',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([1, 2, 3]),
+        updatedAt: Date.now(),
+      });
+
+      const state = await db.getNoteSyncState('note-1', 'sd-1');
+      expect(state).not.toBeNull();
+      expect(state?.noteId).toBe('note-1');
+    });
+
+    it('should get note sync states by SD', async () => {
+      await db.upsertNoteSyncState({
+        noteId: 'note-1',
+        sdId: 'sd-1',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([1, 2, 3]),
+        updatedAt: Date.now(),
+      });
+      await db.upsertNoteSyncState({
+        noteId: 'note-2',
+        sdId: 'sd-1',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([4, 5, 6]),
+        updatedAt: Date.now(),
+      });
+
+      const states = await db.getNoteSyncStatesBySd('sd-1');
+      expect(states.length).toBe(2);
+    });
+
+    it('should delete note sync state', async () => {
+      await db.upsertNoteSyncState({
+        noteId: 'note-1',
+        sdId: 'sd-1',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([1, 2, 3]),
+        updatedAt: Date.now(),
+      });
+      await db.deleteNoteSyncState('note-1', 'sd-1');
+      const state = await db.getNoteSyncState('note-1', 'sd-1');
+      expect(state).toBeNull();
+    });
+
+    it('should delete all note sync states by SD', async () => {
+      await db.upsertNoteSyncState({
+        noteId: 'note-1',
+        sdId: 'sd-1',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([1, 2, 3]),
+        updatedAt: Date.now(),
+      });
+      await db.deleteNoteSyncStatesBySd('sd-1');
+      const states = await db.getNoteSyncStatesBySd('sd-1');
+      expect(states.length).toBe(0);
+    });
+  });
+
+  describe('Folder Sync State', () => {
+    let sdTestDir: string;
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-folder-sync-test-${Date.now()}-${Math.random()}`);
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should upsert and get folder sync state', async () => {
+      await db.upsertFolderSyncState({
+        sdId: 'sd-1',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([1, 2, 3]),
+        updatedAt: Date.now(),
+      });
+
+      const state = await db.getFolderSyncState('sd-1');
+      expect(state).not.toBeNull();
+      expect(state?.sdId).toBe('sd-1');
+    });
+
+    it('should delete folder sync state', async () => {
+      await db.upsertFolderSyncState({
+        sdId: 'sd-1',
+        vectorClock: JSON.stringify({}),
+        documentState: new Uint8Array([1, 2, 3]),
+        updatedAt: Date.now(),
+      });
+      await db.deleteFolderSyncState('sd-1');
+      const state = await db.getFolderSyncState('sd-1');
+      expect(state).toBeNull();
+    });
+  });
+
+  describe('Get Note', () => {
+    let sdTestDir: string;
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-get-note-test-${Date.now()}-${Math.random()}`);
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should get a note by id', async () => {
+      const now = Date.now();
+      await db.upsertNote({
+        id: 'note-1' as UUID,
+        title: 'Test Note',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: true,
+        created: now,
+        modified: now,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      const note = await db.getNote('note-1');
+      expect(note).not.toBeNull();
+      expect(note?.title).toBe('Test Note');
+      expect(note?.pinned).toBe(true);
+    });
+
+    it('should return null for non-existent note', async () => {
+      const note = await db.getNote('non-existent');
+      expect(note).toBeNull();
+    });
+  });
+
+  describe('Auto Cleanup Deleted Notes', () => {
+    let sdTestDir: string;
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-cleanup-test-${Date.now()}-${Math.random()}`);
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should identify notes deleted beyond threshold', async () => {
+      const oldDate = Date.now() - 31 * 24 * 60 * 60 * 1000; // 31 days ago
+      await db.upsertNote({
+        id: 'old-deleted-note' as UUID,
+        title: 'Old Deleted',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: true,
+        pinned: false,
+        created: oldDate,
+        modified: oldDate,
+        deletedAt: oldDate,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      const recentDate = Date.now() - 5 * 24 * 60 * 60 * 1000; // 5 days ago
+      await db.upsertNote({
+        id: 'recent-deleted-note' as UUID,
+        title: 'Recent Deleted',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: true,
+        pinned: false,
+        created: recentDate,
+        modified: recentDate,
+        deletedAt: recentDate,
+        contentPreview: 'Test content',
+        contentText: 'Test content',
+      });
+
+      // autoCleanupDeletedNotes only returns IDs, it doesn't delete
+      const noteIdsToCleanup = await db.autoCleanupDeletedNotes(30);
+      expect(noteIdsToCleanup).toContain('old-deleted-note');
+      expect(noteIdsToCleanup).not.toContain('recent-deleted-note');
+    });
+  });
+
+  describe('Schema Version', () => {
+    it('should get current version', async () => {
+      const version = await db.getCurrentVersion();
+      expect(version).toBe(7);
+    });
+
+    it('should get version history', async () => {
+      const history = await db.getVersionHistory();
+      expect(history.length).toBeGreaterThan(0);
+      expect(history.some((v) => v.version === 7)).toBe(true);
+    });
+  });
+
+  describe('Orphaned Data Cleanup', () => {
+    let sdTestDir1: string;
+
+    beforeEach(async () => {
+      sdTestDir1 = join(tmpdir(), `sd-cleanup-test1-${Date.now()}-${Math.random()}`);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir1, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should return cleanup stats even when no orphaned data exists', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      // Create an SD with notes and folders
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir1);
+      await db.upsertNote({
+        id: 'note-1' as UUID,
+        title: 'Note 1',
+        sdId: 'sd-1',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: Date.now(),
+        modified: Date.now(),
+        contentPreview: 'Test',
+        contentText: 'Test',
+      });
+
+      // Run cleanup (should find nothing to clean)
+      const result = await db.cleanupOrphanedData();
+
+      expect(result.notesDeleted).toBe(0);
+      expect(result.foldersDeleted).toBe(0);
+      expect(result.tagAssociationsDeleted).toBe(0);
+      expect(result.unusedTagsDeleted).toBe(0);
+
+      // Should have logged the cleanup message
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[Database] Cleaning up'));
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle cleanup with logging', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      // Run cleanup on empty database
+      const result = await db.cleanupOrphanedData();
+
+      // Verify result structure
+      expect(typeof result.notesDeleted).toBe('number');
+      expect(typeof result.foldersDeleted).toBe('number');
+      expect(typeof result.tagAssociationsDeleted).toBe('number');
+      expect(typeof result.unusedTagsDeleted).toBe('number');
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('Profile Presence Cache', () => {
+    let sdTestDir: string;
+
+    beforeEach(async () => {
+      sdTestDir = join(tmpdir(), `sd-presence-test-${Date.now()}-${Math.random()}`);
+      await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+    });
+
+    afterEach(async () => {
+      try {
+        await rm(sdTestDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    it('should upsert and get profile presence cache', async () => {
+      const presence = {
+        profileId: 'profile-1',
+        instanceId: 'instance-1',
+        sdId: 'sd-1',
+        profileName: 'Test Profile',
+        user: '@testuser',
+        username: 'Test User',
+        hostname: 'test-host',
+        platform: 'darwin',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+
+      await db.upsertProfilePresenceCache(presence);
+      const retrieved = await db.getProfilePresenceCache('profile-1', 'sd-1');
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.profileId).toBe('profile-1');
+      expect(retrieved?.instanceId).toBe('instance-1');
+      expect(retrieved?.profileName).toBe('Test Profile');
+      expect(retrieved?.user).toBe('@testuser');
+      expect(retrieved?.hostname).toBe('test-host');
+    });
+
+    it('should return null for non-existent presence cache', async () => {
+      const retrieved = await db.getProfilePresenceCache('non-existent', 'sd-1');
+      expect(retrieved).toBeNull();
+    });
+
+    it('should get presence cache by instance ID', async () => {
+      const presence = {
+        profileId: 'profile-1',
+        instanceId: 'instance-123',
+        sdId: 'sd-1',
+        profileName: 'Test Profile',
+        user: '@testuser',
+        username: 'Test User',
+        hostname: 'test-host',
+        platform: 'darwin',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+
+      await db.upsertProfilePresenceCache(presence);
+      const retrieved = await db.getProfilePresenceCacheByInstanceId('instance-123', 'sd-1');
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.instanceId).toBe('instance-123');
+      expect(retrieved?.profileId).toBe('profile-1');
+    });
+
+    it('should return null for non-existent instance ID', async () => {
+      const retrieved = await db.getProfilePresenceCacheByInstanceId('non-existent', 'sd-1');
+      expect(retrieved).toBeNull();
+    });
+
+    it('should get all presence caches for an SD', async () => {
+      const presence1 = {
+        profileId: 'profile-1',
+        instanceId: 'instance-1',
+        sdId: 'sd-1',
+        profileName: 'Profile 1',
+        user: '@user1',
+        username: 'User 1',
+        hostname: 'host-1',
+        platform: 'darwin',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+      const presence2 = {
+        profileId: 'profile-2',
+        instanceId: 'instance-2',
+        sdId: 'sd-1',
+        profileName: 'Profile 2',
+        user: '@user2',
+        username: 'User 2',
+        hostname: 'host-2',
+        platform: 'win32',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+
+      await db.upsertProfilePresenceCache(presence1);
+      await db.upsertProfilePresenceCache(presence2);
+
+      const presences = await db.getProfilePresenceCacheBySd('sd-1');
+      expect(presences).toHaveLength(2);
+      expect(presences.map((p) => p.profileId)).toContain('profile-1');
+      expect(presences.map((p) => p.profileId)).toContain('profile-2');
+    });
+
+    it('should return empty array for SD with no presence caches', async () => {
+      const presences = await db.getProfilePresenceCacheBySd('sd-1');
+      expect(presences).toEqual([]);
+    });
+
+    it('should update existing presence on upsert', async () => {
+      const presence = {
+        profileId: 'profile-1',
+        instanceId: 'instance-1',
+        sdId: 'sd-1',
+        profileName: 'Original Name',
+        user: '@user',
+        username: 'User',
+        hostname: 'host',
+        platform: 'darwin',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+
+      await db.upsertProfilePresenceCache(presence);
+
+      // Update the presence
+      const updatedPresence = {
+        ...presence,
+        profileName: 'Updated Name',
+        hostname: 'new-host',
+      };
+      await db.upsertProfilePresenceCache(updatedPresence);
+
+      const retrieved = await db.getProfilePresenceCache('profile-1', 'sd-1');
+      expect(retrieved?.profileName).toBe('Updated Name');
+      expect(retrieved?.hostname).toBe('new-host');
+    });
+
+    it('should delete profile presence cache', async () => {
+      const presence = {
+        profileId: 'profile-1',
+        instanceId: 'instance-1',
+        sdId: 'sd-1',
+        profileName: 'Test Profile',
+        user: '@user',
+        username: 'User',
+        hostname: 'host',
+        platform: 'darwin',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+
+      await db.upsertProfilePresenceCache(presence);
+      await db.deleteProfilePresenceCache('profile-1', 'sd-1');
+
+      const retrieved = await db.getProfilePresenceCache('profile-1', 'sd-1');
+      expect(retrieved).toBeNull();
+    });
+
+    it('should delete all presence caches for an SD', async () => {
+      const presence1 = {
+        profileId: 'profile-1',
+        instanceId: 'instance-1',
+        sdId: 'sd-1',
+        profileName: 'Profile 1',
+        user: '@user1',
+        username: 'User 1',
+        hostname: 'host-1',
+        platform: 'darwin',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+      const presence2 = {
+        profileId: 'profile-2',
+        instanceId: 'instance-2',
+        sdId: 'sd-1',
+        profileName: 'Profile 2',
+        user: '@user2',
+        username: 'User 2',
+        hostname: 'host-2',
+        platform: 'win32',
+        appVersion: '1.0.0',
+        lastUpdated: Date.now(),
+        cachedAt: Date.now(),
+      };
+
+      await db.upsertProfilePresenceCache(presence1);
+      await db.upsertProfilePresenceCache(presence2);
+
+      await db.deleteProfilePresenceCacheBySd('sd-1');
+
+      const presences = await db.getProfilePresenceCacheBySd('sd-1');
+      expect(presences).toEqual([]);
     });
   });
 });

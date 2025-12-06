@@ -1,6 +1,6 @@
 # Desktop Coverage & Refactoring Plan
 
-**Overall Progress:** `20%`
+**Overall Progress:** `35%`
 
 **Branch:** `desktop-coverage-and-refactor`
 
@@ -200,12 +200,14 @@ Revised strategy: Add tests to establish safety net, then refactor with test sup
 
 | File/Area            | Before | Current | Target | Cap |
 | -------------------- | ------ | ------- | ------ | --- |
-| Overall Desktop      | 27%    | 29%     | 37%+   | -   |
-| handlers.ts          | 29%    | 40%     | 45%+   | 80% |
+| Overall Desktop      | 27%    | 30.42%  | 37%+   | -   |
+| handlers.ts          | 29%    | 48.87%  | 45%+   | 80% |
 | note-move-manager.ts | 68%    | 68%     | 80%    | 80% |
-| database.ts          | 55%    | 55%     | 70%+   | 80% |
-| crdt-manager.ts      | 0%     | 31%     | 40%+   | 80% |
+| database.ts          | 55%    | 55.55%  | 70%+   | 80% |
+| crdt-manager.ts      | 0%     | 31.42%  | 40%+   | 80% |
 | main/index.ts        | 0%     | 0%      | 20%+   | 80% |
+| events.ts            | 0%     | 100%    | -      | -   |
+| app-state.ts         | 0%     | 100%    | -      | -   |
 | FolderTree.tsx       | 41%    | 41%     | 55%+   | 80% |
 | NotesListPanel.tsx   | 37%    | 37%     | 50%+   | 80% |
 | TipTapEditor.tsx     | 4%     | 4%      | 25%+   | 80% |

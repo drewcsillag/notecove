@@ -258,4 +258,237 @@ describe('Note API Routes', () => {
       expect(mockServices.noteSearch).toHaveBeenCalledWith('test', 10);
     });
   });
+
+  describe('POST /api/notes/:id/load', () => {
+    it('should acknowledge load request (no-op)', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/load', { token: validToken });
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/notes/:id/unload', () => {
+    it('should acknowledge unload request (no-op)', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/unload', { token: validToken });
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+    });
+  });
+
+  describe('GET /api/notes/:id/state', () => {
+    it('should get note CRDT state', async () => {
+      mockServices.noteGetState = jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3, 4]));
+
+      const response = await makeRequest('GET', '/api/notes/note-1/state', { token: validToken });
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.body);
+      expect(body.state).toEqual([1, 2, 3, 4]);
+      expect(mockServices.noteGetState).toHaveBeenCalledWith('note-1');
+    });
+
+    it('should return error when service fails', async () => {
+      mockServices.noteGetState = jest.fn().mockRejectedValue(new Error('Note not found'));
+
+      const response = await makeRequest('GET', '/api/notes/non-existent/state', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe('POST /api/notes/:id/update', () => {
+    it('should apply CRDT update', async () => {
+      mockServices.noteApplyUpdate = jest.fn().mockResolvedValue(undefined);
+
+      const response = await makeRequest('POST', '/api/notes/note-1/update', {
+        token: validToken,
+        body: { update: [1, 2, 3, 4] },
+      });
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(mockServices.noteApplyUpdate).toHaveBeenCalled();
+    });
+
+    it('should return 400 if update is missing', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/update', {
+        token: validToken,
+        body: {},
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should return 400 if update is not an array', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/update', {
+        token: validToken,
+        body: { update: 'not-an-array' },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe('POST /api/notes/:id/title', () => {
+    it('should acknowledge title update (no-op)', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/title', {
+        token: validToken,
+        body: { title: 'New Title', contentText: 'Updated content' },
+      });
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/notes/:id/restore', () => {
+    it('should restore a deleted note', async () => {
+      mockServices.noteRestore = jest.fn().mockResolvedValue(undefined);
+
+      const response = await makeRequest('POST', '/api/notes/note-1/restore', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.body);
+      expect(body.success).toBe(true);
+      expect(mockServices.noteRestore).toHaveBeenCalledWith('note-1');
+    });
+
+    it('should return error when restore fails', async () => {
+      mockServices.noteRestore = jest.fn().mockRejectedValue(new Error('Note not found'));
+
+      const response = await makeRequest('POST', '/api/notes/non-existent/restore', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe('Additional Error Handling', () => {
+    it('should return 500 when note list fails with generic error', async () => {
+      (mockServices.noteList as jest.Mock).mockRejectedValue(new Error('Database error'));
+
+      const response = await makeRequest('GET', '/api/notes?sdId=sd-1', { token: validToken });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when note create fails with generic error', async () => {
+      (mockServices.noteCreate as jest.Mock).mockRejectedValue(new Error('Failed to create'));
+
+      const response = await makeRequest('POST', '/api/notes', {
+        token: validToken,
+        body: { sdId: 'sd-1' },
+      });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 404 when note delete fails with not found', async () => {
+      (mockServices.noteDelete as jest.Mock).mockRejectedValue(new Error('Note not found'));
+
+      const response = await makeRequest('DELETE', '/api/notes/non-existent', {
+        token: validToken,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should return 500 when note move fails with generic error', async () => {
+      (mockServices.noteMove as jest.Mock).mockRejectedValue(new Error('Cannot move'));
+
+      const response = await makeRequest('POST', '/api/notes/note-1/move', {
+        token: validToken,
+        body: { folderId: 'folder-1' },
+      });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when search fails with generic error', async () => {
+      (mockServices.noteSearch as jest.Mock).mockRejectedValue(new Error('Search failed'));
+
+      const response = await makeRequest('GET', '/api/search?q=test', { token: validToken });
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should return 500 when note update fails with generic error', async () => {
+      mockServices.noteApplyUpdate = jest.fn().mockRejectedValue(new Error('Update failed'));
+
+      const response = await makeRequest('POST', '/api/notes/note-1/update', {
+        token: validToken,
+        body: { update: [1, 2, 3] },
+      });
+      expect(response.statusCode).toBe(500);
+    });
+  });
+
+  describe('Services Not Configured', () => {
+    beforeEach(async () => {
+      // Clear services to trigger 503 responses
+      if (server.isRunning()) {
+        await server.stop();
+      }
+      setRouteContext({ services: null });
+      server = new WebServer({ port: 0, authManager });
+      await server.start();
+      port = server.getPort()!;
+    });
+
+    it('should return 503 when services not configured for note list', async () => {
+      const response = await makeRequest('GET', '/api/notes?sdId=sd-1', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for note get', async () => {
+      const response = await makeRequest('GET', '/api/notes/note-1', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for note create', async () => {
+      const response = await makeRequest('POST', '/api/notes', {
+        token: validToken,
+        body: { sdId: 'sd-1' },
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for note delete', async () => {
+      const response = await makeRequest('DELETE', '/api/notes/note-1', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for note move', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/move', {
+        token: validToken,
+        body: { folderId: 'folder-1' },
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for search', async () => {
+      const response = await makeRequest('GET', '/api/search?q=test', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for note state', async () => {
+      const response = await makeRequest('GET', '/api/notes/note-1/state', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for note update', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/update', {
+        token: validToken,
+        body: { update: [1, 2, 3] },
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('should return 503 when services not configured for note restore', async () => {
+      const response = await makeRequest('POST', '/api/notes/note-1/restore', { token: validToken });
+      expect(response.statusCode).toBe(503);
+    });
+  });
 });

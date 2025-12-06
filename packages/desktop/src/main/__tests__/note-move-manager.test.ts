@@ -676,4 +676,208 @@ describe('NoteMoveManager', () => {
       expect(currentState).toBe('rolled_back');
     });
   });
+
+  describe('takeOverMove', () => {
+    it('should return error when move record is not found', async () => {
+      mockAdapter.get.mockResolvedValue(null);
+
+      const result = await noteMoveManager.takeOverMove('non-existent-move');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Move record not found');
+    });
+
+    it('should return error when move is already in terminal state', async () => {
+      const moveId = 'test-move-terminal';
+      mockAdapter.get.mockResolvedValue({
+        id: moveId,
+        note_id: 'note-1',
+        source_sd_uuid: 'sd-source',
+        target_sd_uuid: 'sd-target',
+        target_folder_id: null,
+        state: 'completed',
+        initiated_by: 'other-instance',
+        initiated_at: Date.now(),
+        last_modified: Date.now(),
+        source_sd_path: '/source',
+        target_sd_path: '/target',
+        error: null,
+      });
+
+      const result = await noteMoveManager.takeOverMove(moveId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('terminal state');
+    });
+
+    it('should return error when source SD is not accessible', async () => {
+      const moveId = 'test-move-no-source';
+      mockAdapter.get.mockResolvedValue({
+        id: moveId,
+        note_id: 'note-1',
+        source_sd_uuid: 'sd-source',
+        target_sd_uuid: 'sd-target',
+        target_folder_id: null,
+        state: 'initiated',
+        initiated_by: 'other-instance',
+        initiated_at: Date.now(),
+        last_modified: Date.now(),
+        source_sd_path: '/source',
+        target_sd_path: '/target',
+        error: null,
+      });
+      mockDatabase.getStorageDirByUuid.mockResolvedValue(null);
+
+      const result = await noteMoveManager.takeOverMove(moveId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Cannot access');
+      expect(result.error).toContain('source');
+    });
+
+    it('should return error when target SD is not accessible', async () => {
+      const moveId = 'test-move-no-target';
+      mockAdapter.get.mockResolvedValue({
+        id: moveId,
+        note_id: 'note-1',
+        source_sd_uuid: 'sd-source',
+        target_sd_uuid: 'sd-target',
+        target_folder_id: null,
+        state: 'initiated',
+        initiated_by: 'other-instance',
+        initiated_at: Date.now(),
+        last_modified: Date.now(),
+        source_sd_path: '/source',
+        target_sd_path: '/target',
+        error: null,
+      });
+      mockDatabase.getStorageDirByUuid.mockImplementation(async (uuid: string) => {
+        if (uuid === 'sd-source') {
+          return { id: 'source-id', uuid: 'sd-source', name: 'Source', path: '/source' };
+        }
+        return null;
+      });
+
+      const result = await noteMoveManager.takeOverMove(moveId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Cannot access');
+      expect(result.error).toContain('target');
+    });
+  });
+
+  describe('cancelMove', () => {
+    it('should return error when move record is not found', async () => {
+      mockAdapter.get.mockResolvedValue(null);
+
+      const result = await noteMoveManager.cancelMove('non-existent-move');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Move record not found');
+    });
+
+    it('should return error when move is already in terminal state', async () => {
+      const moveId = 'test-move-completed';
+      mockAdapter.get.mockResolvedValue({
+        id: moveId,
+        note_id: 'note-1',
+        source_sd_uuid: 'sd-source',
+        target_sd_uuid: 'sd-target',
+        target_folder_id: null,
+        state: 'rolled_back',
+        initiated_by: instanceId,
+        initiated_at: Date.now(),
+        last_modified: Date.now(),
+        source_sd_path: '/source',
+        target_sd_path: '/target',
+        error: null,
+      });
+
+      const result = await noteMoveManager.cancelMove(moveId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('terminal state');
+    });
+
+    it('should successfully cancel a move in initiated state', async () => {
+      const moveId = 'test-move-cancel';
+      const sourcePath = join(testDir, 'source-sd');
+      const targetPath = join(testDir, 'target-sd');
+
+      await mkdir(sourcePath, { recursive: true });
+      await mkdir(targetPath, { recursive: true });
+
+      mockAdapter.get.mockResolvedValue({
+        id: moveId,
+        note_id: 'note-1',
+        source_sd_uuid: 'sd-source',
+        target_sd_uuid: 'sd-target',
+        target_folder_id: null,
+        state: 'initiated',
+        initiated_by: instanceId,
+        initiated_at: Date.now(),
+        last_modified: Date.now(),
+        source_sd_path: sourcePath,
+        target_sd_path: targetPath,
+        error: null,
+      });
+
+      mockDatabase.getStorageDirByUuid.mockImplementation(async (uuid: string) => {
+        if (uuid === 'sd-source') {
+          return { id: 'source-id', uuid: 'sd-source', name: 'Source', path: sourcePath };
+        }
+        if (uuid === 'sd-target') {
+          return { id: 'target-id', uuid: 'sd-target', name: 'Target', path: targetPath };
+        }
+        return null;
+      });
+      mockDatabase.getNote.mockResolvedValue(null);
+
+      const result = await noteMoveManager.cancelMove(moveId);
+
+      expect(result.success).toBe(true);
+      expect(result.moveId).toBe(moveId);
+    });
+
+    it('should cleanup temp directory if it exists', async () => {
+      const moveId = 'test-move-cleanup';
+      const sourcePath = join(testDir, 'source-sd');
+      const targetPath = join(testDir, 'target-sd');
+      const tempPath = join(targetPath, 'notes', '.moving-note-1');
+
+      await mkdir(tempPath, { recursive: true });
+      fs.writeFileSync(join(tempPath, 'snapshot.yjs'), 'test');
+
+      mockAdapter.get.mockResolvedValue({
+        id: moveId,
+        note_id: 'note-1',
+        source_sd_uuid: 'sd-source',
+        target_sd_uuid: 'sd-target',
+        target_folder_id: null,
+        state: 'initiated',
+        initiated_by: instanceId,
+        initiated_at: Date.now(),
+        last_modified: Date.now(),
+        source_sd_path: sourcePath,
+        target_sd_path: targetPath,
+        error: null,
+      });
+
+      mockDatabase.getStorageDirByUuid.mockImplementation(async (uuid: string) => {
+        if (uuid === 'sd-source') {
+          return { id: 'source-id', uuid: 'sd-source', name: 'Source', path: sourcePath };
+        }
+        if (uuid === 'sd-target') {
+          return { id: 'target-id', uuid: 'sd-target', name: 'Target', path: targetPath };
+        }
+        return null;
+      });
+      mockDatabase.getNote.mockResolvedValue(null);
+
+      const result = await noteMoveManager.cancelMove(moveId);
+
+      expect(result.success).toBe(true);
+      expect(fs.existsSync(tempPath)).toBe(false);
+    });
+  });
 });
