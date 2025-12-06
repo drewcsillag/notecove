@@ -217,10 +217,16 @@ export const browserApiStub: typeof window.electronAPI = {
     getConnectedClients: notImplemented('webServer.getConnectedClients'),
     disconnectClient: notImplemented('webServer.disconnectClient'),
     disconnectAllClients: notImplemented('webServer.disconnectAllClients'),
+    getCertificateInfo: notImplemented('webServer.getCertificateInfo'),
   },
 
   shell: {
     openExternal: notImplemented('shell.openExternal'),
+  },
+
+  clipboard: {
+    writeText: notImplemented('clipboard.writeText'),
+    readText: notImplemented('clipboard.readText'),
   },
 };
 
