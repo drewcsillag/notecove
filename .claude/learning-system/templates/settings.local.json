@@ -1,58 +1,7 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/bash-canary.sh",
-            "statusMessage": "Checking memory canaries..."
-          }
-        ]
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/edit-canary.sh",
-            "statusMessage": "Checking read-before-edit..."
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/edit-canary.sh",
-            "statusMessage": "Checking read-before-write..."
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/post-bash.sh",
-            "statusMessage": "Logging command result..."
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/track-read.sh",
-            "statusMessage": "Tracking file read..."
-          }
-        ]
-      }
-    ]
+  "permissions": {
+    "allow": [],
+    "deny": [],
+    "ask": []
   }
 }

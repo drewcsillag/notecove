@@ -1,6 +1,11 @@
 #!/bin/bash
 # Memory Canary Check for Bash Commands
 # Detects when Claude has forgotten CLAUDE.md instructions by checking for canary markers
+#
+# Uses environment variable prefix style for better Claude Code allowlist compatibility:
+#   nc_canary=1 git status
+#   nc_canary=1 nc_ci_passed=1 git commit -m "..."
+#   nc_canary=1 nc_user_said_push=1 git push
 
 set -euo pipefail
 
@@ -21,33 +26,33 @@ fi
 MISSING=""
 WARNINGS=""
 
-# === REQUIRED CANARIES ===
+# === REQUIRED CANARIES (prefix style: VAR=1 command) ===
 
-# nc-canary: Always required - proves CLAUDE.md is remembered
-if ! echo "$COMMAND" | grep -q "nc-canary"; then
-  MISSING="nc-canary"
+# nc_canary=1: Always required as prefix - proves CLAUDE.md is remembered
+if ! echo "$COMMAND" | grep -qE "^nc_canary=1 "; then
+  MISSING="nc_canary=1"
   WARNINGS="You may have forgotten CLAUDE.md instructions."
 fi
 
-# nc-ci-passed: Required for git commit - affirms CI was run
+# nc_ci_passed=1: Required for git commit - affirms CI was run
 if echo "$COMMAND" | grep -qE "git commit"; then
-  if ! echo "$COMMAND" | grep -q "nc-ci-passed"; then
+  if ! echo "$COMMAND" | grep -qE "nc_ci_passed=1 "; then
     if [ -n "$MISSING" ]; then
-      MISSING="$MISSING, nc-ci-passed"
+      MISSING="$MISSING, nc_ci_passed=1"
     else
-      MISSING="nc-ci-passed"
+      MISSING="nc_ci_passed=1"
     fi
     WARNINGS="$WARNINGS Did you run CI first? (CLAUDE.md requires ci-runner before commits)"
   fi
 fi
 
-# nc-user-said-push: Required for git push - affirms user permission
+# nc_user_said_push=1: Required for git push - affirms user permission
 if echo "$COMMAND" | grep -qE "git push"; then
-  if ! echo "$COMMAND" | grep -q "nc-user-said-push"; then
+  if ! echo "$COMMAND" | grep -qE "nc_user_said_push=1 "; then
     if [ -n "$MISSING" ]; then
-      MISSING="$MISSING, nc-user-said-push"
+      MISSING="$MISSING, nc_user_said_push=1"
     else
-      MISSING="nc-user-said-push"
+      MISSING="nc_user_said_push=1"
     fi
     WARNINGS="$WARNINGS Did user explicitly say to push? (CLAUDE.md forbids pushing without permission)"
   fi
@@ -62,7 +67,7 @@ if [ -n "$MISSING" ]; then
 
   cat <<EOF
 {
-  "additionalContext": "CANARY CHECK FAILED - Missing: $MISSING_JSON\n\n$WARNINGS_JSON\n\nSTOP. Re-read CLAUDE.md and check $SHARED_MISTAKES_FILE for learned patterns.\nThen retry your command WITH the appropriate canaries.\n\nCanary reference:\n- nc-canary: Always required (proves you remember instructions)\n- nc-ci-passed: Required for git commit (affirms CI passed)\n- nc-user-said-push: Required for git push (affirms user permission)\n- nc-test-first: For tests when fixing bugs (affirms TDD)\n- nc-checked-mistakes: After recovering from failure (affirms you checked MISTAKES.md)"
+  "additionalContext": "CANARY CHECK FAILED - Missing: $MISSING_JSON\n\n$WARNINGS_JSON\n\nSTOP. Re-read CLAUDE.md and check $SHARED_MISTAKES_FILE for learned patterns.\nThen retry your command WITH the appropriate canary prefix.\n\nCanary format (env var prefix style):\n  nc_canary=1 git status\n  nc_canary=1 nc_ci_passed=1 git commit -m '...'\n  nc_canary=1 nc_user_said_push=1 git push\n\nCanary reference:\n- nc_canary=1: Always required as prefix (proves you remember instructions)\n- nc_ci_passed=1: Required for git commit (affirms CI passed)\n- nc_user_said_push=1: Required for git push (affirms user permission)"
 }
 EOF
 else
