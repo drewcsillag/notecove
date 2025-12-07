@@ -19,13 +19,14 @@ import {
   type EditorState,
   serializeWindowStates,
   deserializeWindowStates,
+  type ImageCache,
 } from '../schema';
 import type { UUID } from '../../types';
 
 describe('Database Schema', () => {
   describe('SCHEMA_VERSION', () => {
     it('should be defined', () => {
-      expect(SCHEMA_VERSION).toBe(7);
+      expect(SCHEMA_VERSION).toBe(8);
     });
   });
 
@@ -48,6 +49,12 @@ describe('Database Schema', () => {
         'CREATE TABLE IF NOT EXISTS activity_log_state'
       );
       expect(SCHEMA_SQL.sequenceState).toContain('CREATE TABLE IF NOT EXISTS sequence_state');
+      // Images table
+      expect(SCHEMA_SQL.images).toContain('CREATE TABLE IF NOT EXISTS images');
+    });
+
+    it('should create indices for images table', () => {
+      expect(SCHEMA_SQL.images).toContain('CREATE INDEX IF NOT EXISTS idx_images_sd_id');
     });
 
     it('should create indices for notes table', () => {
@@ -339,6 +346,40 @@ describe('Database Schema', () => {
 
       expect(windowState.isMaximized).toBe(true);
       expect(windowState.isFullScreen).toBe(false);
+    });
+
+    it('should accept valid ImageCache', () => {
+      const image: ImageCache = {
+        id: 'img-abc123' as UUID,
+        sdId: 'sd-456',
+        filename: 'img-abc123.png',
+        mimeType: 'image/png',
+        width: 1920,
+        height: 1080,
+        size: 1024000,
+        created: Date.now(),
+      };
+
+      expect(image.id).toBe('img-abc123');
+      expect(image.mimeType).toBe('image/png');
+      expect(image.width).toBe(1920);
+      expect(image.height).toBe(1080);
+    });
+
+    it('should accept ImageCache with null dimensions', () => {
+      const image: ImageCache = {
+        id: 'img-def456' as UUID,
+        sdId: 'sd-789',
+        filename: 'img-def456.jpg',
+        mimeType: 'image/jpeg',
+        width: null,
+        height: null,
+        size: 512000,
+        created: Date.now(),
+      };
+
+      expect(image.width).toBeNull();
+      expect(image.height).toBeNull();
     });
   });
 

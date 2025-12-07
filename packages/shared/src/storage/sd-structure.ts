@@ -30,6 +30,7 @@ export class SyncDirectoryStructure {
       folders: this.fs.joinPath(this.config.path, 'folders'),
       activity: this.fs.joinPath(this.config.path, 'activity'),
       profiles: this.fs.joinPath(this.config.path, 'profiles'),
+      media: this.fs.joinPath(this.config.path, 'media'),
     };
   }
 
@@ -73,6 +74,7 @@ export class SyncDirectoryStructure {
     await this.fs.mkdir(paths.folders);
     await this.fs.mkdir(paths.activity);
     await this.fs.mkdir(paths.profiles);
+    await this.fs.mkdir(paths.media);
 
     // Create folder structure
     const folderPaths = this.getFolderPaths();
@@ -110,6 +112,13 @@ export class SyncDirectoryStructure {
    */
   getActivityPath(): string {
     return this.getPaths().activity;
+  }
+
+  /**
+   * Get media directory path (for images, future: videos, audio)
+   */
+  getMediaPath(): string {
+    return this.getPaths().media;
   }
 
   /**

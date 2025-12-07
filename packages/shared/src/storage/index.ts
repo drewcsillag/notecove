@@ -14,6 +14,12 @@ export {
 export { DeletionLogger } from './deletion-logger';
 export { DeletionSync, type DeletionSyncCallbacks } from './deletion-sync';
 export { SdUuidManager, type SdIdFile, type SdUuidInitResult } from './sd-uuid';
+export {
+  ImageStorage,
+  type SaveImageResult,
+  type ImageInfo,
+  type ParsedImageFilename,
+} from './image-storage';
 
 // New append-only log format (Phase 1-5)
 export * from './binary-format';

@@ -263,6 +263,21 @@ export interface ActivityLogState {
 }
 
 /**
+ * Image cache entry
+ * Tracks image metadata for images stored in sync directories
+ */
+export interface ImageCache {
+  id: UUID; // UUID (same as filename without extension)
+  sdId: string; // Which sync directory this image belongs to
+  filename: string; // Full filename with extension (e.g., "abc123.png")
+  mimeType: string; // e.g., "image/png"
+  width: number | null; // Original width in pixels (nullable until analyzed)
+  height: number | null; // Original height in pixels (nullable until analyzed)
+  size: number; // File size in bytes
+  created: number; // Timestamp when image was added
+}
+
+/**
  * Sequence state for tracking write position
  */
 export interface SequenceState {
@@ -302,13 +317,14 @@ export interface CachedProfilePresence {
  * - v5: Added checkboxes table for tri-state task tracking
  * - v6: Added note_sync_state, folder_sync_state, activity_log_state, sequence_state tables for new append-only log format
  * - v7: Added instance_id column and index to profile_presence_cache for proper activity log lookups
+ * - v8: Added images table for image metadata caching
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
  * - User data tables (tags, note_tags, note_links, checkboxes, app_state): Migrate with version-specific logic
  * - Sync state tables: Safe to recreate (will rebuild from files)
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * SQL schema definitions
@@ -613,5 +629,26 @@ export const SCHEMA_SQL = {
     );
 
     CREATE INDEX IF NOT EXISTS idx_profile_presence_cache_sd_id ON profile_presence_cache(sd_id);
+  `,
+
+  /**
+   * Images table
+   * Tracks metadata for images stored in sync directory media folders
+   * @see plans/add-images/PLAN-PHASE-1.md
+   */
+  images: `
+    CREATE TABLE IF NOT EXISTS images (
+      id TEXT PRIMARY KEY,
+      sd_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      size INTEGER NOT NULL,
+      created INTEGER NOT NULL,
+      FOREIGN KEY (sd_id) REFERENCES storage_dirs(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_images_sd_id ON images(sd_id);
   `,
 };

@@ -625,6 +625,41 @@ declare global {
           editorState?: { scrollTop: number; cursorPosition: number };
         } | null>;
       };
+
+      image: {
+        save: (
+          sdId: string,
+          data: Uint8Array,
+          mimeType: string
+        ) => Promise<{ imageId: string; filename: string }>;
+        getDataUrl: (sdId: string, imageId: string) => Promise<string | null>;
+        getPath: (sdId: string, imageId: string) => Promise<string | null>;
+        delete: (sdId: string, imageId: string) => Promise<void>;
+        exists: (sdId: string, imageId: string) => Promise<boolean>;
+        getMetadata: (imageId: string) => Promise<{
+          id: string;
+          sdId: string;
+          filename: string;
+          mimeType: string;
+          width: number | null;
+          height: number | null;
+          size: number;
+          created: number;
+        } | null>;
+        list: (sdId: string) => Promise<
+          {
+            id: string;
+            sdId: string;
+            filename: string;
+            mimeType: string;
+            width: number | null;
+            height: number | null;
+            size: number;
+            created: number;
+          }[]
+        >;
+        getStorageStats: (sdId: string) => Promise<{ totalSize: number; imageCount: number }>;
+      };
     };
   }
 }

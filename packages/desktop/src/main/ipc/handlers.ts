@@ -14,9 +14,16 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata, SyncStatus, StaleSyncEntry } from './types';
-import type { Database, NoteCache, AppendLogManager, UUID, DeletionLogger } from '@notecove/shared';
+import type {
+  Database,
+  NoteCache,
+  AppendLogManager,
+  UUID,
+  DeletionLogger,
+  ImageCache,
+} from '@notecove/shared';
+import { extractTags, extractLinks, ImageStorage, SyncDirectoryStructure } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
-import { extractTags, extractLinks } from '@notecove/shared';
 
 /**
  * Callback type for getting deletion logger by SD
@@ -302,6 +309,16 @@ export class IPCHandlers {
 
     // Tools operations
     ipcMain.handle('tools:reindexNotes', this.handleReindexNotes.bind(this));
+
+    // Image operations
+    ipcMain.handle('image:save', this.handleImageSave.bind(this));
+    ipcMain.handle('image:getDataUrl', this.handleImageGetDataUrl.bind(this));
+    ipcMain.handle('image:getPath', this.handleImageGetPath.bind(this));
+    ipcMain.handle('image:delete', this.handleImageDelete.bind(this));
+    ipcMain.handle('image:exists', this.handleImageExists.bind(this));
+    ipcMain.handle('image:getMetadata', this.handleImageGetMetadata.bind(this));
+    ipcMain.handle('image:list', this.handleImageList.bind(this));
+    ipcMain.handle('image:getStorageStats', this.handleImageGetStorageStats.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -2893,6 +2910,194 @@ export class IPCHandlers {
   ): Promise<NoteCache | null> {
     const note = await this.database.getNote(noteId);
     return note;
+  }
+
+  // ============================================================================
+  // Image Handlers
+  // ============================================================================
+
+  /**
+   * Save an image to the media folder and database
+   */
+  private async handleImageSave(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    data: Uint8Array,
+    mimeType: string
+  ): Promise<{ imageId: string; filename: string }> {
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Validate MIME type
+    if (!ImageStorage.isSupportedMimeType(mimeType)) {
+      throw new Error(`Unsupported image MIME type: ${mimeType}`);
+    }
+
+    // Create ImageStorage instance
+    const fsAdapter = new NodeFileSystemAdapter();
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: sdId,
+      path: sd.path,
+      label: sd.name,
+    });
+    const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+
+    // Save the image
+    const result = await imageStorage.saveImage(data, mimeType);
+
+    // Add to database cache
+    await this.database.upsertImage({
+      id: result.imageId,
+      sdId,
+      filename: result.filename,
+      mimeType,
+      width: null, // Will be populated when we add dimension detection
+      height: null,
+      size: data.length,
+      created: Date.now(),
+    });
+
+    // Log for debugging
+    console.log('[Image] Saved:', {
+      imageId: result.imageId,
+      sdId,
+      mimeType,
+      size: `${(data.length / 1024).toFixed(1)} KB`,
+    });
+
+    return result;
+  }
+
+  /**
+   * Get an image as a base64 data URL
+   */
+  private async handleImageGetDataUrl(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      return null;
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return null;
+    }
+
+    // Get the file path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    try {
+      // Read file and convert to base64
+      const data = await fs.readFile(imagePath);
+      const base64 = data.toString('base64');
+      return `data:${image.mimeType};base64,${base64}`;
+    } catch {
+      // File not found on disk
+      return null;
+    }
+  }
+
+  /**
+   * Get the file path for an image
+   */
+  private async handleImageGetPath(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      return null;
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return null;
+    }
+
+    return path.join(sd.path, 'media', image.filename);
+  }
+
+  /**
+   * Delete an image from disk and database
+   */
+  private async handleImageDelete(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      // Image not in database, nothing to delete
+      return;
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return;
+    }
+
+    // Delete file from disk
+    const imagePath = path.join(sd.path, 'media', image.filename);
+    await fs.rm(imagePath, { force: true });
+
+    // Delete from database
+    await this.database.deleteImage(imageId);
+
+    // Log for debugging
+    console.log('[Image] Deleted:', { imageId, sdId, filename: image.filename });
+  }
+
+  /**
+   * Check if an image exists in the database
+   */
+  private async handleImageExists(
+    _event: IpcMainInvokeEvent,
+    _sdId: string,
+    imageId: string
+  ): Promise<boolean> {
+    return await this.database.imageExists(imageId);
+  }
+
+  /**
+   * Get image metadata from database
+   */
+  private async handleImageGetMetadata(
+    _event: IpcMainInvokeEvent,
+    imageId: string
+  ): Promise<ImageCache | null> {
+    return await this.database.getImage(imageId);
+  }
+
+  /**
+   * List all images in an SD
+   */
+  private async handleImageList(_event: IpcMainInvokeEvent, sdId: string): Promise<ImageCache[]> {
+    return await this.database.getImagesBySd(sdId);
+  }
+
+  /**
+   * Get storage stats for images in an SD
+   */
+  private async handleImageGetStorageStats(
+    _event: IpcMainInvokeEvent,
+    sdId: string
+  ): Promise<{ totalSize: number; imageCount: number }> {
+    const totalSize = await this.database.getImageStorageSize(sdId);
+    const imageCount = await this.database.getImageCount(sdId);
+    return { totalSize, imageCount };
   }
 
   // ============================================================================

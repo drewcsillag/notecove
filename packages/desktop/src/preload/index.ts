@@ -1453,6 +1453,129 @@ contextBridge.exposeInMainWorld('electronAPI', {
         editorState?: { scrollTop: number; cursorPosition: number };
       } | null>,
   },
+
+  // Image operations
+  image: {
+    /**
+     * Save an image to the storage directory
+     * @param sdId Storage directory ID
+     * @param data Image binary data
+     * @param mimeType MIME type (e.g., 'image/png', 'image/jpeg')
+     * @returns { imageId, filename }
+     */
+    save: (
+      sdId: string,
+      data: Uint8Array,
+      mimeType: string
+    ): Promise<{ imageId: string; filename: string }> =>
+      ipcRenderer.invoke('image:save', sdId, data, mimeType) as Promise<{
+        imageId: string;
+        filename: string;
+      }>,
+
+    /**
+     * Get image data as base64 data URL for display
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     * @returns Base64 data URL (e.g., 'data:image/png;base64,...') or null if not found
+     */
+    getDataUrl: (sdId: string, imageId: string): Promise<string | null> =>
+      ipcRenderer.invoke('image:getDataUrl', sdId, imageId) as Promise<string | null>,
+
+    /**
+     * Get the file system path for an image
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     * @returns File path or null if not found
+     */
+    getPath: (sdId: string, imageId: string): Promise<string | null> =>
+      ipcRenderer.invoke('image:getPath', sdId, imageId) as Promise<string | null>,
+
+    /**
+     * Delete an image
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     */
+    delete: (sdId: string, imageId: string): Promise<void> =>
+      ipcRenderer.invoke('image:delete', sdId, imageId) as Promise<void>,
+
+    /**
+     * Check if an image exists
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     */
+    exists: (sdId: string, imageId: string): Promise<boolean> =>
+      ipcRenderer.invoke('image:exists', sdId, imageId) as Promise<boolean>,
+
+    /**
+     * Get image metadata from database
+     * @param imageId Image ID
+     * @returns Image metadata or null if not found
+     */
+    getMetadata: (
+      imageId: string
+    ): Promise<{
+      id: string;
+      sdId: string;
+      filename: string;
+      mimeType: string;
+      width: number | null;
+      height: number | null;
+      size: number;
+      created: number;
+    } | null> =>
+      ipcRenderer.invoke('image:getMetadata', imageId) as Promise<{
+        id: string;
+        sdId: string;
+        filename: string;
+        mimeType: string;
+        width: number | null;
+        height: number | null;
+        size: number;
+        created: number;
+      } | null>,
+
+    /**
+     * List all images in a storage directory
+     * @param sdId Storage directory ID
+     */
+    list: (
+      sdId: string
+    ): Promise<
+      {
+        id: string;
+        sdId: string;
+        filename: string;
+        mimeType: string;
+        width: number | null;
+        height: number | null;
+        size: number;
+        created: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('image:list', sdId) as Promise<
+        {
+          id: string;
+          sdId: string;
+          filename: string;
+          mimeType: string;
+          width: number | null;
+          height: number | null;
+          size: number;
+          created: number;
+        }[]
+      >,
+
+    /**
+     * Get storage statistics for images in a storage directory
+     * @param sdId Storage directory ID
+     */
+    getStorageStats: (sdId: string): Promise<{ totalSize: number; imageCount: number }> =>
+      ipcRenderer.invoke('image:getStorageStats', sdId) as Promise<{
+        totalSize: number;
+        imageCount: number;
+      }>,
+  },
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection

@@ -14,6 +14,8 @@ export interface SyncDirectoryPaths {
   activity: string;
   /** Profile presence files - identifies who is using this SD */
   profiles: string;
+  /** Media files (images, future: videos, audio) */
+  media: string;
 }
 
 /**

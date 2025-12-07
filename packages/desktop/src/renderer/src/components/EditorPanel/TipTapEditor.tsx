@@ -22,6 +22,7 @@ import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
+import { NotecoveImage } from './extensions/Image';
 import { SearchPanel } from './SearchPanel';
 import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
@@ -201,6 +202,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       SearchAndReplace,
       // Add WebLink extension for http/https links
       WebLink,
+      // Add NotecoveImage extension for image display
+      NotecoveImage,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
@@ -1235,6 +1238,119 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             },
             '&:visited': {
               color: theme.palette.info.main,
+            },
+          },
+          // NotecoveImage styling
+          '& figure.notecove-image': {
+            margin: '16px 0',
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            // Alignment variations
+            '&[data-alignment="left"]': {
+              alignItems: 'flex-start',
+            },
+            '&[data-alignment="right"]': {
+              alignItems: 'flex-end',
+            },
+            '&[data-alignment="center"]': {
+              alignItems: 'center',
+            },
+            // Selected state
+            '&.ProseMirror-selectednode': {
+              outline: `2px solid ${theme.palette.primary.main}`,
+              outlineOffset: '4px',
+              borderRadius: '4px',
+            },
+          },
+          '& .notecove-image-container': {
+            position: 'relative',
+            display: 'inline-flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '100px',
+            minWidth: '100px',
+            backgroundColor: theme.palette.action.hover,
+            borderRadius: '4px',
+            overflow: 'hidden',
+          },
+          '& .notecove-image-element': {
+            maxWidth: '100%',
+            height: 'auto',
+            display: 'block',
+            borderRadius: '4px',
+          },
+          '& .notecove-image-loading': {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '24px',
+            color: theme.palette.text.secondary,
+            fontSize: '0.875rem',
+          },
+          '& .notecove-image-spinner': {
+            width: '24px',
+            height: '24px',
+            animation: 'notecove-spin 1s linear infinite',
+          },
+          '& .notecove-spinner-circle': {
+            stroke: theme.palette.primary.main,
+            strokeLinecap: 'round',
+            strokeDasharray: '50 50',
+          },
+          '@keyframes notecove-spin': {
+            from: { transform: 'rotate(0deg)' },
+            to: { transform: 'rotate(360deg)' },
+          },
+          '& .notecove-image-error': {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '24px',
+            color: theme.palette.error.main,
+            fontSize: '0.875rem',
+          },
+          '& .notecove-image-broken': {
+            width: '32px',
+            height: '32px',
+            color: theme.palette.error.main,
+          },
+          '& .notecove-image-caption': {
+            marginTop: '8px',
+            fontSize: '0.875rem',
+            color: theme.palette.text.secondary,
+            fontStyle: 'italic',
+            textAlign: 'center',
+            maxWidth: '100%',
+          },
+          // Dev-mode tooltip (only visible in development)
+          '& .notecove-image-dev-tooltip': {
+            position: 'absolute',
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: '8px',
+            padding: '8px 12px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            color: '#fff',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            borderRadius: '4px',
+            whiteSpace: 'nowrap',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          },
+          '& .notecove-dev-tooltip-row': {
+            padding: '2px 0',
+            '& strong': {
+              color: '#8be9fd',
+              marginRight: '8px',
             },
           },
           // Search result highlighting
