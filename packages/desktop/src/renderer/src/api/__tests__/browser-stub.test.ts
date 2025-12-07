@@ -49,7 +49,9 @@ describe('Browser API Stub', () => {
       });
 
       it('should throw not implemented error for folder.create', () => {
-        expect(() => browserApiStub.folder.create('sd1', null, 'name')).toThrow('not yet implemented');
+        expect(() => browserApiStub.folder.create('sd1', null, 'name')).toThrow(
+          'not yet implemented'
+        );
       });
 
       it('should return no-op function for folder event subscriptions', () => {
@@ -200,7 +202,9 @@ describe('Browser API Stub', () => {
       initBrowserApiStub();
 
       expect(window.electronAPI).toBe(browserApiStub);
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Installing electronAPI stub'));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Installing electronAPI stub')
+      );
 
       consoleSpy.mockRestore();
     });

@@ -480,9 +480,7 @@ describe('Web Client', () => {
         (global.fetch as jest.Mock).mockResolvedValueOnce({
           ok: true,
           text: () =>
-            Promise.resolve(
-              JSON.stringify([{ id: 'note-1', title: 'Test Note', sdId: 'sd-1' }])
-            ),
+            Promise.resolve(JSON.stringify([{ id: 'note-1', title: 'Test Note', sdId: 'sd-1' }])),
         });
 
         const notes = await webClient.note.list('sd-1', 'folder-1');
@@ -525,8 +523,7 @@ describe('Web Client', () => {
       it('should get note count for folder', async () => {
         (global.fetch as jest.Mock).mockResolvedValueOnce({
           ok: true,
-          text: () =>
-            Promise.resolve(JSON.stringify([{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }])),
+          text: () => Promise.resolve(JSON.stringify([{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }])),
         });
 
         const count = await webClient.note.getCountForFolder('sd-1', 'folder-1');

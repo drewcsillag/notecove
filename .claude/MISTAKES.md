@@ -29,6 +29,7 @@ When you make a mistake and figure out the fix, add it here using `/learn-mistak
 <!-- New mistakes go below this line -->
 
 ### Forgetting to include CI-generated fixes in the commit
+
 - **Wrong approach**: Running CI, having it auto-fix lint/type issues, then committing only the original changes without the fixes
 - **Why wrong**: Leaves the codebase with uncommitted fixes that the CI runner made; next CI run may fail or show different results
 - **Correct approach**: After CI runs and makes fixes, include those fixes in the commit we're preparing (the whole point of running CI was to validate this commit)

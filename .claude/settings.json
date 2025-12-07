@@ -54,5 +54,22 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(nc_canary=1 prettier:*)",
+      "Bash(nc_canary=1 tail:*)",
+      "Bash(nc_canary=1 git status:*)",
+      "Bash(nc_canary=1 git diff:*)",
+      "Bash(nc_canary=1 git checkout:*)",
+      "Bash(nc_canary=1 npx jest:*)",
+      "Bash(nc_canary=1 git add:*)",
+      "Bash(nc_canary=1 ls:*)",
+      "Bash(nc_canary=1 nc_ci_passed=1 git commit:*)",
+      "Bash(nc_canary=1 git log:*)",
+      "Bash(tee:*)"
+    ],
+    "deny": [],
+    "ask": []
   }
 }

@@ -113,9 +113,7 @@ describe('Export Service Utilities', () => {
     });
 
     it('should sanitize folder names with special characters', () => {
-      const folders: FolderInfo[] = [
-        { id: 'f1', name: 'Test<>:"/\\|?*Folder', parentId: null },
-      ];
+      const folders: FolderInfo[] = [{ id: 'f1', name: 'Test<>:"/\\|?*Folder', parentId: null }];
 
       const paths = buildFolderPaths(folders);
 
@@ -129,9 +127,7 @@ describe('Export Service Utilities', () => {
     });
 
     it('should handle folder with non-existent parent', () => {
-      const folders: FolderInfo[] = [
-        { id: 'f1', name: 'Orphan', parentId: 'non-existent' },
-      ];
+      const folders: FolderInfo[] = [{ id: 'f1', name: 'Orphan', parentId: 'non-existent' }];
 
       const paths = buildFolderPaths(folders);
 

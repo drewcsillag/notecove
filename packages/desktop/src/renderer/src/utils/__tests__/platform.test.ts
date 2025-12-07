@@ -2,12 +2,7 @@
  * Tests for Platform Detection Utilities
  */
 
-import {
-  isElectron,
-  isBrowser,
-  isFeatureAvailable,
-  ELECTRON_ONLY_FEATURES,
-} from '../platform';
+import { isElectron, isBrowser, isFeatureAvailable, ELECTRON_ONLY_FEATURES } from '../platform';
 
 describe('Platform Detection Utilities', () => {
   // Store original window.electronAPI state
