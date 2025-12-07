@@ -2,7 +2,16 @@
  * Electron Main Process
  */
 
-import { app, BrowserWindow, Menu, shell, ipcMain, powerMonitor, clipboard } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  shell,
+  ipcMain,
+  powerMonitor,
+  clipboard,
+  screen,
+} from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { BetterSqliteAdapter, SqliteDatabase } from './database';
@@ -42,6 +51,7 @@ import { parseCliArgs } from './cli/cli-parser';
 import { WebServerManager } from './web-server/manager';
 import { ProfilePresenceManager } from './profile-presence-manager';
 import { ProfilePresenceReader } from './profile-presence-reader';
+import { WindowStateManager } from './window-state-manager';
 import * as os from 'os';
 
 let mainWindow: BrowserWindow | null = null;
@@ -61,8 +71,10 @@ let sdMarker: SDMarker | null = null;
 let profileLock: ProfileLock | null = null;
 let profilePresenceManager: ProfilePresenceManager | null = null;
 let profilePresenceReader: ProfilePresenceReader | null = null;
+let windowStateManager: WindowStateManager | null = null;
 let syncStatusWindow: BrowserWindow | null = null;
 const allWindows: BrowserWindow[] = [];
+let freshStartRequested = false;
 
 // Multi-SD support: Store watchers and activity syncs per SD
 const sdFileWatchers = new Map<string, NodeFileWatcher>();
@@ -188,17 +200,25 @@ function createWindow(options?: {
   noteId?: string;
   minimal?: boolean;
   syncStatus?: boolean;
-}): void {
+  sdId?: string;
+  bounds?: { x: number; y: number; width: number; height: number };
+  isMaximized?: boolean;
+  isFullScreen?: boolean;
+}): BrowserWindow {
   // If requesting sync status window and one already exists, just focus it
   if (options?.syncStatus && syncStatusWindow && !syncStatusWindow.isDestroyed()) {
     syncStatusWindow.focus();
-    return;
+    return syncStatusWindow;
   }
 
-  // Create the browser window
-  const newWindow = new BrowserWindow({
-    width: options?.syncStatus ? 950 : options?.minimal ? 800 : 1200,
-    height: options?.syncStatus ? 600 : 800,
+  // Determine window dimensions
+  const defaultWidth = options?.syncStatus ? 950 : options?.minimal ? 800 : 1200;
+  const defaultHeight = options?.syncStatus ? 600 : 800;
+
+  // Create the browser window with saved bounds or defaults
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
+    width: options?.bounds?.width ?? defaultWidth,
+    height: options?.bounds?.height ?? defaultHeight,
     show: false,
     autoHideMenuBar: false,
     title: getWindowTitle(),
@@ -208,11 +228,46 @@ function createWindow(options?: {
       contextIsolation: true,
       nodeIntegration: false,
     },
-  });
+  };
+
+  // Conditionally add x/y position (only if bounds provided)
+  if (options?.bounds?.x !== undefined) {
+    windowOptions.x = options.bounds.x;
+  }
+  if (options?.bounds?.y !== undefined) {
+    windowOptions.y = options.bounds.y;
+  }
+
+  const newWindow = new BrowserWindow(windowOptions);
+
+  // Determine window type for state tracking
+  const windowType: 'main' | 'minimal' | 'syncStatus' = options?.syncStatus
+    ? 'syncStatus'
+    : options?.minimal
+      ? 'minimal'
+      : 'main';
+
+  // Register window with state manager (if available)
+  let windowId: string | undefined;
+  if (windowStateManager) {
+    windowId = windowStateManager.registerWindow(
+      newWindow,
+      windowType,
+      options?.noteId,
+      options?.sdId
+    );
+  }
 
   newWindow.on('ready-to-show', () => {
     // Don't show window in test mode (headless E2E tests)
     if (process.env['NODE_ENV'] !== 'test') {
+      // Apply maximized/fullscreen state before showing
+      if (options?.isMaximized) {
+        newWindow.maximize();
+      }
+      if (options?.isFullScreen) {
+        newWindow.setFullScreen(true);
+      }
       newWindow.show();
     }
   });
@@ -230,6 +285,7 @@ function createWindow(options?: {
     if (syncStatusWindow === newWindow) {
       syncStatusWindow = null;
     }
+    // Note: WindowStateManager automatically unregisters on 'closed' event
   });
 
   // Track window
@@ -246,6 +302,9 @@ function createWindow(options?: {
   // Build URL with parameters
   let url: string;
   const params = new URLSearchParams();
+  if (windowId) {
+    params.set('windowId', windowId);
+  }
   if (options?.noteId) {
     params.set('noteId', options.noteId);
   }
@@ -268,6 +327,101 @@ function createWindow(options?: {
     url = process.env['ELECTRON_RENDERER_URL'] + hash;
     void newWindow.loadURL(url);
   }
+
+  return newWindow;
+}
+
+/**
+ * Restore windows from saved state
+ *
+ * Loads saved window states and creates windows with their previous positions,
+ * sizes, and states. Validates positions against current display configuration.
+ *
+ * @returns True if windows were restored, false if no saved state
+ */
+async function restoreWindows(): Promise<boolean> {
+  if (!windowStateManager) {
+    console.log('[WindowState] No manager available, skipping restoration');
+    return false;
+  }
+
+  if (!database) {
+    console.log('[WindowState] No database available, skipping restoration');
+    return false;
+  }
+
+  // Load saved state
+  const savedStates = await windowStateManager.loadState();
+  if (savedStates.length === 0) {
+    console.log('[WindowState] No saved window states found');
+    return false;
+  }
+
+  console.log(`[WindowState] Restoring ${savedStates.length} window(s)...`);
+
+  // Get current display configuration for position validation
+  const displays = screen.getAllDisplays();
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const primaryBounds = primaryDisplay.bounds;
+
+  let restoredCount = 0;
+
+  // Restore each window
+  for (const state of savedStates) {
+    // Step 11: Validate SD exists and is accessible
+    const sdValid = await windowStateManager.validateSDForRestore(
+      state.sdId,
+      database,
+      (path: string) => fs.access(path)
+    );
+
+    if (!sdValid) {
+      console.log(`[WindowState] Skipping window with invalid SD: ${state.sdId}`);
+      continue;
+    }
+
+    // Step 10: Validate note exists and is not deleted
+    const { noteId: validatedNoteId, sdId: validatedSdId } =
+      await windowStateManager.validateNoteForRestore(state.noteId, state.sdId, database);
+
+    // Validate position against current displays
+    const validatedState = windowStateManager.validateWindowState(
+      state,
+      displays.map((d) => ({ bounds: d.bounds })),
+      primaryBounds
+    );
+
+    // Determine window type options
+    const minimal = state.type === 'minimal';
+    const syncStatus = state.type === 'syncStatus';
+
+    console.log(
+      `[WindowState] Restoring ${state.type} window at (${validatedState.bounds.x}, ${validatedState.bounds.y})`
+    );
+
+    // Create window with restored state
+    // Build options, only including noteId/sdId if defined
+    const windowOpts: Parameters<typeof createWindow>[0] = {
+      minimal,
+      syncStatus,
+      bounds: validatedState.bounds,
+      isMaximized: validatedState.isMaximized,
+      isFullScreen: validatedState.isFullScreen,
+    };
+    if (validatedNoteId !== undefined) {
+      windowOpts.noteId = validatedNoteId;
+    }
+    if (validatedSdId !== undefined) {
+      windowOpts.sdId = validatedSdId;
+    }
+    createWindow(windowOpts);
+    restoredCount++;
+  }
+
+  console.log(
+    `[WindowState] Window restoration complete: ${restoredCount}/${savedStates.length} windows restored`
+  );
+  return restoredCount > 0;
 }
 
 /**
@@ -1730,6 +1884,49 @@ function createMenu(): void {
                 }
               },
             },
+            ...(is.dev
+              ? [
+                  { type: 'separator' as const },
+                  {
+                    label: 'Show Window States (Debug)',
+                    click: () => {
+                      // Debug: Show current window state info
+                      const windowInfo = allWindows.map((win, index) => {
+                        const bounds = win.getBounds();
+                        const isMaximized = win.isMaximized();
+                        const isFullScreen = win.isFullScreen();
+                        const url = win.webContents.getURL();
+                        const urlParams = new URL(url).searchParams;
+                        return {
+                          index,
+                          id: win.id,
+                          isMain: win === mainWindow,
+                          isSyncStatus: win === syncStatusWindow,
+                          bounds,
+                          isMaximized,
+                          isFullScreen,
+                          noteId: urlParams.get('noteId'),
+                          minimal: urlParams.get('minimal') === 'true',
+                          syncStatus: urlParams.get('syncStatus') === 'true',
+                        };
+                      });
+                      console.log(
+                        '[WindowState Debug] Current windows:',
+                        JSON.stringify(windowInfo, null, 2)
+                      );
+                      // Also show in a dialog for easy viewing
+                      // eslint-disable-next-line @typescript-eslint/no-require-imports
+                      const { dialog } = require('electron') as typeof import('electron');
+                      void dialog.showMessageBox({
+                        type: 'info',
+                        title: 'Window States (Debug)',
+                        message: `${allWindows.length} window(s) open`,
+                        detail: JSON.stringify(windowInfo, null, 2),
+                      });
+                    },
+                  },
+                ]
+              : []),
           ],
         },
         { type: 'separator' },
@@ -1839,6 +2036,22 @@ function createMenu(): void {
               { role: 'window' as const },
             ]
           : [{ role: 'close' as const }]),
+        { type: 'separator' as const },
+        {
+          label: 'Start Fresh...',
+          click: () => {
+            // Clear saved window states and restart the app
+            void (async () => {
+              if (windowStateManager) {
+                await windowStateManager.clearState();
+                console.log('[WindowState] Cleared saved states for fresh start');
+              }
+              // Relaunch the app with --fresh flag to skip any residual state
+              app.relaunch({ args: [...process.argv.slice(1), '--fresh'] });
+              app.quit();
+            })();
+          },
+        },
       ],
     },
     {
@@ -1891,6 +2104,12 @@ void app.whenReady().then(async () => {
   try {
     // Parse CLI arguments
     const cliArgs = parseCliArgs(process.argv);
+
+    // Check for --fresh flag (skip window state restoration)
+    if (cliArgs.freshStart) {
+      freshStartRequested = true;
+      console.log('[WindowState] Fresh start requested via --fresh flag');
+    }
 
     // Check for --debug-profiles flag
     if (cliArgs.debugProfiles) {
@@ -2151,6 +2370,10 @@ void app.whenReady().then(async () => {
 
     // Initialize database (with profile ID if selected)
     database = await initializeDatabase(selectedProfileId ?? undefined);
+
+    // Initialize window state manager for session restoration
+    windowStateManager = new WindowStateManager(database);
+    console.log('[WindowState] Manager initialized');
 
     // Clean up orphaned data from deleted SDs
 
@@ -2817,6 +3040,43 @@ void app.whenReady().then(async () => {
       return clipboard.readText();
     });
 
+    // Register window state IPC handlers (for session restoration)
+    ipcMain.handle(
+      'windowState:reportCurrentNote',
+      (_event, windowId: string, noteId: string, sdId?: string) => {
+        if (windowStateManager) {
+          windowStateManager.updateNoteId(windowId, noteId, sdId);
+        }
+      }
+    );
+
+    ipcMain.handle(
+      'windowState:reportEditorState',
+      (_event, windowId: string, editorState: { scrollTop: number; cursorPosition: number }) => {
+        if (windowStateManager) {
+          windowStateManager.updateEditorState(windowId, editorState);
+        }
+      }
+    );
+
+    ipcMain.handle('windowState:getSavedState', async (_event, windowId: string) => {
+      // Get saved state for a specific window from the last session
+      // This is used when a restored window wants to know its previous state
+      if (!windowStateManager) {
+        return null;
+      }
+      const states = await windowStateManager.loadState();
+      const state = states.find((s) => s.id === windowId);
+      if (!state) {
+        return null;
+      }
+      return {
+        noteId: state.noteId,
+        sdId: state.sdId,
+        editorState: state.editorState,
+      };
+    });
+
     // Register web server IPC handlers
     ipcMain.handle('webServer:start', async (_event, port?: number) => {
       if (!webServerManager) {
@@ -2921,9 +3181,18 @@ void app.whenReady().then(async () => {
     // Create menu
     createMenu();
 
-    // Create window FIRST - before running initial syncs
+    // Restore windows or create default - before running initial syncs
     // This ensures the app appears quickly regardless of sync status
-    createWindow();
+    let windowsRestored = false;
+    if (freshStartRequested) {
+      console.log('[WindowState] Skipping restoration due to fresh start');
+    } else {
+      windowsRestored = await restoreWindows();
+    }
+    if (!windowsRestored) {
+      // No saved state or fresh start, create default window
+      createWindow();
+    }
 
     // Run initial syncs in background (non-blocking)
     // This allows the window to appear immediately while sync happens in background
@@ -3033,8 +3302,39 @@ powerMonitor.on('resume', () => {
 });
 
 // Clean up on app quit
-// Note: We use will-quit with async cleanup to ensure CRDT updates are flushed
+// Note: We use before-quit for window state (before windows close)
+// and will-quit for async cleanup (after windows close)
 let isQuitting = false;
+
+// Save window state BEFORE windows close
+// The before-quit event fires before any windows are destroyed
+let windowStateSaved = false;
+app.on('before-quit', (event) => {
+  if (isQuitting || windowStateSaved) return; // Already saved or in shutdown
+
+  // Save window state - this must complete before windows close
+  if (windowStateManager) {
+    // Prevent quit until we've saved state
+    event.preventDefault();
+    windowStateSaved = true;
+
+    console.log('[App] Saving window state (before-quit)...');
+    const states = windowStateManager.getCurrentState();
+    console.log(`[App] Captured ${states.length} window state(s)`);
+
+    // Save to database then continue quit
+    void (async () => {
+      try {
+        await windowStateManager.saveState();
+        console.log('[App] Window state saved to database');
+      } catch (error) {
+        console.error('[App] Failed to save window state:', error);
+      }
+      // Continue with quit now that state is saved
+      app.quit();
+    })();
+  }
+});
 
 app.on('will-quit', (event) => {
   if (isQuitting) {
@@ -3060,6 +3360,12 @@ app.on('will-quit', (event) => {
   // Perform async cleanup
   void (async () => {
     try {
+      // 0. Dispose window state manager (state already saved in before-quit)
+      if (windowStateManager) {
+        windowStateManager.dispose();
+        windowStateManager = null;
+      }
+
       // 1. Flush all pending CRDT updates to disk
       const manager = crdtManager;
       if (manager) {

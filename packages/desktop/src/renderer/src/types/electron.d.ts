@@ -597,6 +597,33 @@ declare global {
         writeText: (text: string) => Promise<void>;
         readText: () => Promise<string>;
       };
+
+      windowState: {
+        /**
+         * Report the current note being viewed in this window.
+         * Called when user navigates to a new note.
+         */
+        reportCurrentNote: (windowId: string, noteId: string, sdId?: string) => Promise<void>;
+
+        /**
+         * Report the current editor state (scroll/cursor position).
+         * Called periodically (debounced) and on beforeunload.
+         */
+        reportEditorState: (
+          windowId: string,
+          editorState: { scrollTop: number; cursorPosition: number }
+        ) => Promise<void>;
+
+        /**
+         * Get the saved window state for this window (used for restoration).
+         * Returns the saved state including editor scroll/cursor position.
+         */
+        getSavedState: (windowId: string) => Promise<{
+          noteId?: string;
+          sdId?: string;
+          editorState?: { scrollTop: number; cursorPosition: number };
+        } | null>;
+      };
     };
   }
 }

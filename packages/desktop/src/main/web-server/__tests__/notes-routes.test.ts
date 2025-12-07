@@ -487,7 +487,9 @@ describe('Note API Routes', () => {
     });
 
     it('should return 503 when services not configured for note restore', async () => {
-      const response = await makeRequest('POST', '/api/notes/note-1/restore', { token: validToken });
+      const response = await makeRequest('POST', '/api/notes/note-1/restore', {
+        token: validToken,
+      });
       expect(response.statusCode).toBe(503);
     });
   });

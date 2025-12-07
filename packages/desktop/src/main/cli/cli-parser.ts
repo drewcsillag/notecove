@@ -15,6 +15,8 @@ export interface CliArgs {
   debugProfiles: boolean;
   /** Reset the "don't ask again" preference and show picker */
   resetPicker: boolean;
+  /** Skip window state restoration (fresh start) */
+  freshStart: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     skipPicker: false,
     debugProfiles: false,
     resetPicker: false,
+    freshStart: false,
   };
 
   for (const arg of argv) {
@@ -60,6 +63,11 @@ export function parseCliArgs(argv: string[]): CliArgs {
     // Parse --reset-picker
     if (arg === '--reset-picker') {
       result.resetPicker = true;
+    }
+
+    // Parse --fresh (skip window state restoration)
+    if (arg === '--fresh') {
+      result.freshStart = true;
     }
   }
 

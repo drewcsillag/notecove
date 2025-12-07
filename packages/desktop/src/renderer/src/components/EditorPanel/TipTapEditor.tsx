@@ -27,6 +27,7 @@ import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
+import { useWindowState } from '../../hooks/useWindowState';
 
 export interface TipTapEditorProps {
   noteId: string | null;
@@ -99,6 +100,23 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
+
+  // Ref for the scrollable editor container (for scroll position tracking)
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Window state hook for session restoration
+  const {
+    windowId,
+    reportCurrentNote,
+    reportScrollPosition,
+    reportCursorPosition,
+    getSavedState,
+    reportFinalState,
+  } = useWindowState();
+
+  // Track saved state for restoration after note loads
+  const savedStateRef = useRef<{ scrollTop: number; cursorPosition: number } | null>(null);
+  const hasRestoredStateRef = useRef(false);
 
   // Set up WebLink callbacks
   // This must be done before useEditor to ensure callbacks are available
@@ -657,6 +675,118 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }, 100);
     }
   }, [isLoading, editor]);
+
+  // Report current note to window state manager when note changes
+  useEffect(() => {
+    if (noteId && windowId) {
+      // Get sdId from metadata if available (could enhance later)
+      reportCurrentNote(noteId);
+    }
+  }, [noteId, windowId, reportCurrentNote]);
+
+  // Load saved state when note loads (for session restoration)
+  useEffect(() => {
+    if (!noteId || isLoading) return;
+
+    // Only attempt restoration once per note load
+    if (hasRestoredStateRef.current) return;
+    hasRestoredStateRef.current = true;
+
+    const loadSavedState = async () => {
+      const savedState = await getSavedState();
+      if (savedState) {
+        savedStateRef.current = savedState;
+        console.log('[TipTapEditor] Loaded saved state for restoration:', savedState);
+      }
+    };
+
+    void loadSavedState();
+  }, [noteId, isLoading, getSavedState]);
+
+  // Restore scroll and cursor position after note content is ready
+  useEffect(() => {
+    if (!editor || isLoading || !savedStateRef.current) return;
+
+    const savedState = savedStateRef.current;
+
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      // Restore scroll position
+      if (editorContainerRef.current && savedState.scrollTop > 0) {
+        console.log('[TipTapEditor] Restoring scroll position:', savedState.scrollTop);
+        editorContainerRef.current.scrollTop = savedState.scrollTop;
+      }
+
+      // Restore cursor position
+      if (savedState.cursorPosition > 0) {
+        try {
+          const docLength = editor.state.doc.content.size;
+          const safePosition = Math.min(savedState.cursorPosition, docLength - 1);
+          if (safePosition > 0) {
+            console.log('[TipTapEditor] Restoring cursor position:', safePosition);
+            editor.commands.setTextSelection(safePosition);
+          }
+        } catch (error) {
+          console.warn('[TipTapEditor] Failed to restore cursor position:', error);
+        }
+      }
+
+      // Clear saved state after restoration
+      savedStateRef.current = null;
+    }, 150); // Delay to ensure content is rendered
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [editor, isLoading]);
+
+  // Track scroll position changes
+  useEffect(() => {
+    const container = editorContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      reportScrollPosition(container.scrollTop);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [reportScrollPosition]);
+
+  // Track cursor position changes
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleSelectionUpdate = () => {
+      const { from } = editor.state.selection;
+      reportCursorPosition(from);
+    };
+
+    editor.on('selectionUpdate', handleSelectionUpdate);
+    return () => {
+      editor.off('selectionUpdate', handleSelectionUpdate);
+    };
+  }, [editor, reportCursorPosition]);
+
+  // Report final state on unmount
+  useEffect(() => {
+    const containerRef = editorContainerRef.current;
+    return () => {
+      if (containerRef && editor) {
+        const scrollTop = containerRef.scrollTop;
+        const cursorPosition = editor.state.selection.from;
+        reportFinalState(scrollTop, cursorPosition);
+      }
+    };
+  }, [editor, reportFinalState]);
+
+  // Reset restoration flag when note changes
+  useEffect(() => {
+    hasRestoredStateRef.current = false;
+    savedStateRef.current = null;
+  }, [noteId]);
 
   // Manage link popover using tippy.js
   useEffect(() => {
@@ -1248,6 +1378,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         </Box>
       </Fade>
       <Box
+        ref={editorContainerRef}
         sx={{ flex: 1, overflow: 'auto', padding: 2, cursor: isLoading ? 'wait' : 'text' }}
         onClick={(e) => {
           // Only handle clicks on the Box itself (empty space), not on the editor content

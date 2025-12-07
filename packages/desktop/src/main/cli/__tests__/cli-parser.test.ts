@@ -16,6 +16,7 @@ describe('CLI Parser', () => {
         skipPicker: false,
         debugProfiles: false,
         resetPicker: false,
+        freshStart: false,
       });
     });
 
@@ -52,6 +53,11 @@ describe('CLI Parser', () => {
     it('parses --reset-picker flag', () => {
       const result = parseCliArgs(['--reset-picker']);
       expect(result.resetPicker).toBe(true);
+    });
+
+    it('parses --fresh flag', () => {
+      const result = parseCliArgs(['--fresh']);
+      expect(result.freshStart).toBe(true);
     });
 
     it('parses multiple flags together', () => {

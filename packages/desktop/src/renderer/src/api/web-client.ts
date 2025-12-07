@@ -737,6 +737,21 @@ export const webClient: typeof window.electronAPI = {
       return navigator.clipboard.readText();
     },
   },
+
+  // Window state is not applicable in web client (no multi-window support)
+  windowState: {
+    reportCurrentNote: async () => {
+      // No-op in web client - single window only
+    },
+    reportEditorState: async () => {
+      // No-op in web client - no session restoration
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    getSavedState: async () => {
+      // No saved state in web client
+      return null;
+    },
+  },
 };
 
 /**
