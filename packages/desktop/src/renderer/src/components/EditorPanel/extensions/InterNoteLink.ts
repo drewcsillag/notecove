@@ -56,11 +56,18 @@ export function clearNoteTitleCache(noteId?: string): void {
 /**
  * Custom find suggestion match function for [[ trigger
  * Based on TipTap's default findSuggestionMatch but modified for [[ pattern
+ *
+ * @param $position - The resolved position in the document where the cursor is
+ * @returns A SuggestionMatch with the range to replace and query text, or null if no match
  */
-function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch {
-  // Get the text before the current position
-  // We search within the current text block (paragraph)
-  const textFrom = $position.before();
+export function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch {
+  // Get the text before the current position within the current text block.
+  // IMPORTANT: Use $position.start() not $position.before()
+  // - $position.before() returns position BEFORE the parent node (includes opening tag)
+  // - $position.start() returns position at the START of the parent node's content
+  // Using before() caused the "link-eats-space" bug where range.from was off by 1,
+  // causing preceding whitespace/newlines to be deleted when inserting links.
+  const textFrom = $position.start();
   const textTo = $position.pos;
   const text = $position.doc.textBetween(textFrom, textTo, '\0', '\0');
 
