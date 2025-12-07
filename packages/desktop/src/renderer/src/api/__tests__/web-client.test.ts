@@ -233,7 +233,7 @@ describe('Web Client', () => {
       });
 
       it('should throw for backup.createManualBackup', () => {
-        expect(() => webClient.backup.createManualBackup('sd1', false)).toThrow(
+        expect(() => webClient.backup.createManualBackup('sd-1', false)).toThrow(
           'not available in browser mode'
         );
       });
@@ -325,12 +325,12 @@ describe('Web Client', () => {
 
     describe('sync stub methods', () => {
       it('should return empty result for skipStaleEntry', async () => {
-        const result = await webClient.sync.skipStaleEntry('sd1', 'note1', 'instance1');
+        const result = await webClient.sync.skipStaleEntry('sd-1', 'note-1', 'instance-1');
         expect(result).toEqual({ success: true });
       });
 
       it('should return empty result for retryStaleEntry', async () => {
-        const result = await webClient.sync.retryStaleEntry('sd1', 'note1', 'instance1');
+        const result = await webClient.sync.retryStaleEntry('sd-1', 'note-1', 'instance-1');
         expect(result).toEqual({ success: true });
       });
 
@@ -350,7 +350,7 @@ describe('Web Client', () => {
       });
 
       it('should throw for telemetry.updateSettings', () => {
-        expect(() => webClient.telemetry.updateSettings({ remoteMetricsEnabled: true })).toThrow(
+        expect(() => webClient.telemetry.updateSettings({ consoleMetricsEnabled: true })).toThrow(
           'not available in browser mode'
         );
       });
@@ -499,7 +499,7 @@ describe('Web Client', () => {
         const notes = await webClient.note.list('sd-1', 'folder-1');
 
         expect(notes).toHaveLength(1);
-        expect(notes[0]!.id).toBe('note-1');
+        expect(notes[0]?.id).toBe('note-1');
       });
 
       it('should return empty array when note list fails', async () => {
@@ -522,7 +522,7 @@ describe('Web Client', () => {
         const results = await webClient.note.search('test query', 10);
 
         expect(results).toHaveLength(1);
-        expect(results[0]!.noteId).toBe('note-1');
+        expect(results[0]?.noteId).toBe('note-1');
       });
 
       it('should return empty array when search fails', async () => {
@@ -712,14 +712,7 @@ describe('Web Client', () => {
           ok: true,
           text: () =>
             Promise.resolve(
-              JSON.stringify({
-                noteId: 'note-1',
-                title: 'Test',
-                folderId: 'folder-1',
-                createdAt: 12345,
-                modifiedAt: 67890,
-                deleted: false,
-              })
+              JSON.stringify({ id: 'note-1', title: 'Test', created: 12345, modified: 67890 })
             ),
         });
 

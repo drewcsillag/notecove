@@ -1099,6 +1099,45 @@ export class SqliteDatabase implements Database {
     await this.adapter.exec('UPDATE storage_dirs SET path = ? WHERE id = ?', [newPath, id]);
   }
 
+  /**
+   * Rename a storage directory
+   * @param id Storage directory ID
+   * @param newName New name (1-255 chars, will be trimmed)
+   * @throws Error if name is empty, whitespace-only, too long, already exists, or SD not found
+   */
+  async updateStorageDirName(id: string, newName: string): Promise<void> {
+    // Trim whitespace from name
+    const trimmedName = newName.trim();
+
+    // Validate: non-empty
+    if (trimmedName.length === 0) {
+      throw new Error('Storage directory name cannot be empty');
+    }
+
+    // Validate: max length
+    if (trimmedName.length > 255) {
+      throw new Error('Storage directory name cannot exceed 255 characters');
+    }
+
+    // Check that the SD exists
+    const existing = await this.getStorageDir(id);
+    if (!existing) {
+      throw new Error('Storage directory not found');
+    }
+
+    // Check for duplicate name (excluding self)
+    const duplicate = await this.adapter.get<{ id: string }>(
+      'SELECT id FROM storage_dirs WHERE name = ? AND id != ?',
+      [trimmedName, id]
+    );
+    if (duplicate) {
+      throw new Error('A storage directory with this name already exists');
+    }
+
+    // Update the name
+    await this.adapter.exec('UPDATE storage_dirs SET name = ? WHERE id = ?', [trimmedName, id]);
+  }
+
   private mapStorageDirRow(row: {
     id: string;
     name: string;

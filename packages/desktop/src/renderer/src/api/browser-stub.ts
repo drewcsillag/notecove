@@ -101,6 +101,7 @@ export const browserApiStub: typeof window.electronAPI = {
     setActive: notImplemented('sd.setActive'),
     getActive: notImplemented('sd.getActive'),
     delete: notImplemented('sd.delete'),
+    rename: notImplemented('sd.rename'),
     selectPath: notImplemented('sd.selectPath'),
     getCloudStoragePaths: notImplemented('sd.getCloudStoragePaths'),
     onOpenSettings: stubEventSubscription,

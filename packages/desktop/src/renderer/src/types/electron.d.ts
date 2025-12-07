@@ -249,6 +249,7 @@ declare global {
         setActive: (sdId: string) => Promise<void>;
         getActive: () => Promise<string | null>;
         delete: (sdId: string) => Promise<void>;
+        rename: (sdId: string, newName: string) => Promise<void>;
         selectPath: (defaultPath?: string) => Promise<string | null>;
         getCloudStoragePaths: () => Promise<Record<string, string>>;
         onOpenSettings: (callback: () => void) => () => void;

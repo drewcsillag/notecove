@@ -468,7 +468,7 @@ describe('ProfilePresenceReader', () => {
 
       // Should fall back to cached presences
       expect(results).toHaveLength(1);
-      expect(results[0]!.profileName).toBe('Cached Profile');
+      expect(results[0]?.profileName).toBe('Cached Profile');
       expect(mockDb.getProfilePresenceCacheBySd).toHaveBeenCalledWith(testSdId);
 
       consoleSpy.mockRestore();

@@ -28,12 +28,16 @@ import {
   Alert,
   CircularProgress,
   ButtonGroup,
+  Menu,
+  MenuItem,
+  Snackbar,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloudIcon from '@mui/icons-material/Cloud';
+import EditIcon from '@mui/icons-material/Edit';
 
 interface StorageDirectory {
   id: string;
@@ -53,6 +57,32 @@ export const StorageDirectorySettings: React.FC = () => {
   const [newSdName, setNewSdName] = useState('');
   const [newSdPath, setNewSdPath] = useState('');
   const [cloudPaths, setCloudPaths] = useState<Record<string, string>>({});
+
+  // Context menu state for SD items
+  const [contextMenu, setContextMenu] = useState<{
+    anchorEl: HTMLElement;
+    sd: StorageDirectory;
+  } | null>(null);
+
+  // Rename dialog state
+  const [renameDialog, setRenameDialog] = useState<{
+    open: boolean;
+    sd: StorageDirectory | null;
+    newName: string;
+  }>({
+    open: false,
+    sd: null,
+    newName: '',
+  });
+
+  // Snackbar state for rename errors
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+  }>({
+    open: false,
+    message: '',
+  });
 
   // Load SDs on mount
   useEffect(() => {
@@ -157,6 +187,66 @@ export const StorageDirectorySettings: React.FC = () => {
     const noteCovePath = `${basePath}/NoteCove`;
     setNewSdPath(noteCovePath);
     setAddDialogOpen(true);
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (event: React.MouseEvent<HTMLElement>, sd: StorageDirectory) => {
+    event.preventDefault();
+    setContextMenu({
+      anchorEl: event.currentTarget,
+      sd,
+    });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  // Rename handlers
+  const handleRenameClick = () => {
+    if (!contextMenu) return;
+    setRenameDialog({
+      open: true,
+      sd: contextMenu.sd,
+      newName: contextMenu.sd.name,
+    });
+    handleCloseContextMenu();
+  };
+
+  const handleRenameConfirm = async () => {
+    if (!renameDialog.sd) return;
+
+    const trimmedName = renameDialog.newName.trim();
+
+    // Skip if name hasn't changed
+    if (trimmedName === renameDialog.sd.name) {
+      handleRenameCancel();
+      return;
+    }
+
+    try {
+      await window.electronAPI.sd.rename(renameDialog.sd.id, trimmedName);
+      await loadSds();
+      handleRenameCancel();
+    } catch (err) {
+      console.error('Failed to rename SD:', err);
+      // Show error in snackbar
+      const message = err instanceof Error ? err.message : 'Failed to rename Storage Directory';
+      setSnackbar({ open: true, message });
+      handleRenameCancel();
+    }
+  };
+
+  const handleRenameCancel = () => {
+    setRenameDialog({
+      open: false,
+      sd: null,
+      newName: '',
+    });
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar({ open: false, message: '' });
   };
 
   if (loading) {
@@ -266,6 +356,10 @@ export const StorageDirectorySettings: React.FC = () => {
                 borderColor: 'divider',
                 borderRadius: 1,
                 mb: 1,
+                cursor: 'context-menu',
+              }}
+              onContextMenu={(e) => {
+                handleContextMenu(e, sd);
               }}
             >
               <FolderIcon sx={{ mr: 2, color: 'primary.main' }} />
@@ -400,6 +494,68 @@ export const StorageDirectorySettings: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Context Menu for SD items */}
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorEl={contextMenu?.anchorEl}
+      >
+        <MenuItem onClick={handleRenameClick}>
+          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          Rename
+        </MenuItem>
+      </Menu>
+
+      {/* Rename SD Dialog */}
+      <Dialog open={renameDialog.open} onClose={handleRenameCancel} maxWidth="xs" fullWidth>
+        <DialogTitle>Rename Storage Directory</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Name"
+            type="text"
+            fullWidth
+            value={renameDialog.newName}
+            onChange={(e) => {
+              setRenameDialog({ ...renameDialog, newName: e.target.value });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && renameDialog.newName.trim()) {
+                void handleRenameConfirm();
+              } else if (e.key === 'Escape') {
+                handleRenameCancel();
+              }
+            }}
+            onFocus={(e) => {
+              // Select all text when focused
+              e.target.select();
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleRenameCancel}>Cancel</Button>
+          <Button
+            onClick={() => {
+              void handleRenameConfirm();
+            }}
+            variant="contained"
+            disabled={!renameDialog.newName.trim()}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Error Snackbar for rename failures */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={handleSnackbarClose}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 };

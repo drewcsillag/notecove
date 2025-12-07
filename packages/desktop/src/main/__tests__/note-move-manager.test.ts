@@ -759,7 +759,7 @@ describe('NoteMoveManager', () => {
             name: 'Source',
             path: '/source',
             created: Date.now(),
-            isActive: true,
+            isActive: false,
           };
         }
         return null;
@@ -837,7 +837,7 @@ describe('NoteMoveManager', () => {
             name: 'Source',
             path: sourcePath,
             created: Date.now(),
-            isActive: true,
+            isActive: false,
           };
         }
         if (uuid === 'sd-target') {
@@ -847,7 +847,7 @@ describe('NoteMoveManager', () => {
             name: 'Target',
             path: targetPath,
             created: Date.now(),
-            isActive: true,
+            isActive: false,
           };
         }
         return null;
@@ -892,7 +892,7 @@ describe('NoteMoveManager', () => {
             name: 'Source',
             path: sourcePath,
             created: Date.now(),
-            isActive: true,
+            isActive: false,
           };
         }
         if (uuid === 'sd-target') {
@@ -902,7 +902,7 @@ describe('NoteMoveManager', () => {
             name: 'Target',
             path: targetPath,
             created: Date.now(),
-            isActive: true,
+            isActive: false,
           };
         }
         return null;

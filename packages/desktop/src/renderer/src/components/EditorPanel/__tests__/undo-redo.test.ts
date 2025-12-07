@@ -57,8 +57,7 @@ describe('TipTap Undo/Redo with Yjs Collaboration', () => {
       console.log(
         'trackedOrigins:',
         Array.from(um.trackedOrigins).map((o) =>
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-          typeof o === 'object' ? o.constructor?.name || 'PluginKey' : String(o)
+          typeof o === 'object' ? (o.constructor?.name ?? 'PluginKey') : String(o)
         )
       );
 
@@ -357,8 +356,7 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     console.log(
       'After load - trackedOrigins:',
       Array.from(um.trackedOrigins).map((o) =>
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        typeof o === 'object' ? o.constructor?.name || 'object' : String(o)
+        typeof o === 'object' ? (o.constructor?.name ?? 'object') : String(o)
       )
     );
     console.log('After load - undoStack:', um.undoStack.length);
@@ -564,10 +562,9 @@ describe('UndoManager with React StrictMode simulation', () => {
     console.log('After 1st mount - trackedOrigins size:', um1?.trackedOrigins.size);
     console.log(
       'After 1st mount - trackedOrigins:',
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      Array.from(um1?.trackedOrigins || []).map((o) =>
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        typeof o === 'object' ? o.constructor?.name || 'object' : String(o)
+
+      Array.from(um1?.trackedOrigins ?? []).map((o) =>
+        typeof o === 'object' ? (o.constructor?.name ?? 'object') : String(o)
       )
     );
 
@@ -591,10 +588,9 @@ describe('UndoManager with React StrictMode simulation', () => {
     console.log('After 2nd mount - trackedOrigins size:', um2?.trackedOrigins.size);
     console.log(
       'After 2nd mount - trackedOrigins:',
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      Array.from(um2?.trackedOrigins || []).map((o) =>
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        typeof o === 'object' ? o.constructor?.name || 'object' : String(o)
+
+      Array.from(um2?.trackedOrigins ?? []).map((o) =>
+        typeof o === 'object' ? (o.constructor?.name ?? 'object') : String(o)
       )
     );
 

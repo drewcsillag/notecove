@@ -555,6 +555,7 @@ export const webClient: typeof window.electronAPI = {
       }
     },
     delete: browserNotAvailable('sd.delete'),
+    rename: browserNotAvailable('sd.rename'),
     selectPath: browserNotAvailable('sd.selectPath'),
     getCloudStoragePaths: browserNotAvailable('sd.getCloudStoragePaths'),
     onOpenSettings: noopSubscription,

@@ -456,6 +456,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getActive: (): Promise<string | null> =>
       ipcRenderer.invoke('sd:getActive') as Promise<string | null>,
     delete: (sdId: string): Promise<void> => ipcRenderer.invoke('sd:delete', sdId) as Promise<void>,
+    rename: (sdId: string, newName: string): Promise<void> =>
+      ipcRenderer.invoke('sd:rename', sdId, newName) as Promise<void>,
     selectPath: (defaultPath?: string): Promise<string | null> =>
       ipcRenderer.invoke('sd:selectPath', defaultPath) as Promise<string | null>,
     getCloudStoragePaths: (): Promise<Record<string, string>> =>

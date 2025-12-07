@@ -224,6 +224,7 @@ export class IPCHandlers {
     ipcMain.handle('sd:setActive', this.handleSetActiveStorageDir.bind(this));
     ipcMain.handle('sd:getActive', this.handleGetActiveStorageDir.bind(this));
     ipcMain.handle('sd:delete', this.handleDeleteStorageDir.bind(this));
+    ipcMain.handle('sd:rename', this.handleRenameStorageDir.bind(this));
     ipcMain.handle('sd:selectPath', this.handleSelectSDPath.bind(this));
     ipcMain.handle('sd:getCloudStoragePaths', this.handleGetCloudStoragePaths.bind(this));
 
@@ -1972,6 +1973,22 @@ export class IPCHandlers {
     this.broadcastToAll('sd:updated', { operation: 'delete', sdId });
   }
 
+  /**
+   * Rename a storage directory
+   * @param sdId Storage directory ID
+   * @param newName New name for the directory
+   */
+  private async handleRenameStorageDir(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    newName: string
+  ): Promise<void> {
+    await this.database.updateStorageDirName(sdId, newName);
+
+    // Broadcast SD update to all windows
+    this.broadcastToAll('sd:updated', { operation: 'rename', sdId });
+  }
+
   private async handleSelectSDPath(
     event: IpcMainInvokeEvent,
     defaultPath?: string
@@ -2100,6 +2117,7 @@ export class IPCHandlers {
 
     // Load the CRDT document (or get it if already loaded)
     let noteDoc = this.crdtManager.getNoteDoc(noteId);
+
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const wasLoaded = noteDoc !== null;
     if (!noteDoc) {
@@ -2177,6 +2195,8 @@ export class IPCHandlers {
     ipcMain.removeHandler('sd:create');
     ipcMain.removeHandler('sd:setActive');
     ipcMain.removeHandler('sd:getActive');
+    ipcMain.removeHandler('sd:delete');
+    ipcMain.removeHandler('sd:rename');
     ipcMain.removeHandler('appState:get');
     ipcMain.removeHandler('appState:set');
     ipcMain.removeHandler('config:getDatabasePath');

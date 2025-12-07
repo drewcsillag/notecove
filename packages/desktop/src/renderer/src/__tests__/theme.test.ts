@@ -35,12 +35,10 @@ describe('Theme', () => {
       const cssBaseline = appTheme.components?.MuiCssBaseline;
       expect(cssBaseline).toBeDefined();
 
-      const styleOverrides = cssBaseline?.styleOverrides as
-        | Record<string, Record<string, unknown>>
-        | undefined;
-      expect(styleOverrides?.['body']?.['margin']).toBe(0);
-      expect(styleOverrides?.['body']?.['padding']).toBe(0);
-      expect(styleOverrides?.['body']?.['overflow']).toBe('hidden');
+      const styleOverrides = cssBaseline?.styleOverrides as Record<string, Record<string, unknown>>;
+      expect(styleOverrides['body']?.['margin']).toBe(0);
+      expect(styleOverrides['body']?.['padding']).toBe(0);
+      expect(styleOverrides['body']?.['overflow']).toBe('hidden');
     });
   });
 
