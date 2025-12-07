@@ -19,6 +19,7 @@ import {
   Button,
   ListItemButton,
   ListItemText,
+  Snackbar,
 } from '@mui/material';
 import { Tree, type NodeModel, type DropOptions } from '@minoru/react-dnd-treeview';
 import { DroppableFolderNode } from './DroppableFolderNode';
@@ -377,6 +378,35 @@ export const FolderTree: FC<FolderTreeProps> = ({
     folderId: string;
   } | null>(null);
 
+  // SD context menu state (separate from folder context menu)
+  const [sdContextMenu, setSdContextMenu] = useState<{
+    anchorEl: HTMLElement;
+    sdId: string;
+    sdName: string;
+  } | null>(null);
+
+  // SD rename dialog state
+  const [sdRenameDialog, setSdRenameDialog] = useState<{
+    open: boolean;
+    sdId: string;
+    currentName: string;
+    newName: string;
+  }>({
+    open: false,
+    sdId: '',
+    currentName: '',
+    newName: '',
+  });
+
+  // SD rename error snackbar state
+  const [sdRenameSnackbar, setSdRenameSnackbar] = useState<{
+    open: boolean;
+    message: string;
+  }>({
+    open: false,
+    message: '',
+  });
+
   // Force remount when expandedFolderIds changes from empty to populated (initial load)
   useEffect(() => {
     if (previousExpandedLength.current === 0 && expandedFolderIds.length > 0) {
@@ -657,6 +687,70 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   const handleCloseContextMenu = (): void => {
     setContextMenu(null);
+  };
+
+  // SD context menu handlers
+  const handleSdContextMenu = (
+    event: MouseEvent<HTMLElement>,
+    sdId: string,
+    sdName: string
+  ): void => {
+    event.preventDefault();
+    setSdContextMenu({
+      anchorEl: event.currentTarget,
+      sdId,
+      sdName,
+    });
+  };
+
+  const handleCloseSdContextMenu = (): void => {
+    setSdContextMenu(null);
+  };
+
+  const handleSdRenameClick = (): void => {
+    if (!sdContextMenu) return;
+    setSdRenameDialog({
+      open: true,
+      sdId: sdContextMenu.sdId,
+      currentName: sdContextMenu.sdName,
+      newName: sdContextMenu.sdName,
+    });
+    handleCloseSdContextMenu();
+  };
+
+  const handleSdRenameConfirm = async (): Promise<void> => {
+    const trimmedName = sdRenameDialog.newName.trim();
+
+    // Skip if name hasn't changed
+    if (trimmedName === sdRenameDialog.currentName) {
+      handleSdRenameCancel();
+      return;
+    }
+
+    try {
+      await window.electronAPI.sd.rename(sdRenameDialog.sdId, trimmedName);
+      handleSdRenameCancel();
+      // Trigger refresh to reload SD list with new name
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to rename SD:', err);
+      const message = err instanceof Error ? err.message : 'Failed to rename Storage Directory';
+      setSdRenameSnackbar({ open: true, message });
+      handleSdRenameCancel();
+    }
+  };
+
+  const handleSdRenameCancel = (): void => {
+    setSdRenameDialog({
+      open: false,
+      sdId: '',
+      currentName: '',
+      newName: '',
+    });
+  };
+
+  const handleSdRenameSnackbarClose = (): void => {
+    setSdRenameSnackbar({ open: false, message: '' });
   };
 
   const handleRenameClick = (): void => {
@@ -1467,7 +1561,13 @@ export const FolderTree: FC<FolderTreeProps> = ({
                   handleSelect(node);
                 }}
                 onContextMenu={(e) => {
-                  if (!isSDNode) {
+                  if (isSDNode) {
+                    // SD nodes get their own context menu with Rename option
+                    const sdId = (node.data as { sdId?: string }).sdId;
+                    if (sdId) {
+                      handleSdContextMenu(e, sdId, node.text);
+                    }
+                  } else {
                     handleContextMenu(e, String(node.id));
                   }
                 }}
@@ -1656,6 +1756,65 @@ export const FolderTree: FC<FolderTreeProps> = ({
           onCancel={handleCrossSDCancel}
         />
       )}
+
+      {/* SD Context Menu */}
+      <Menu
+        open={sdContextMenu !== null}
+        onClose={handleCloseSdContextMenu}
+        anchorEl={sdContextMenu?.anchorEl}
+      >
+        <MenuItem onClick={handleSdRenameClick}>Rename</MenuItem>
+      </Menu>
+
+      {/* SD Rename Dialog */}
+      <Dialog open={sdRenameDialog.open} onClose={handleSdRenameCancel} maxWidth="xs" fullWidth>
+        <DialogTitle>Rename Storage Directory</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Name"
+            type="text"
+            fullWidth
+            value={sdRenameDialog.newName}
+            onChange={(e) => {
+              setSdRenameDialog({ ...sdRenameDialog, newName: e.target.value });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && sdRenameDialog.newName.trim()) {
+                void handleSdRenameConfirm();
+              } else if (e.key === 'Escape') {
+                handleSdRenameCancel();
+              }
+            }}
+            onFocus={(e) => {
+              // Select all text when focused
+              e.target.select();
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleSdRenameCancel}>Cancel</Button>
+          <Button
+            onClick={() => {
+              void handleSdRenameConfirm();
+            }}
+            variant="contained"
+            disabled={!sdRenameDialog.newName.trim()}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* SD Rename Error Snackbar */}
+      <Snackbar
+        open={sdRenameSnackbar.open}
+        autoHideDuration={5000}
+        onClose={handleSdRenameSnackbarClose}
+        message={sdRenameSnackbar.message}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 };

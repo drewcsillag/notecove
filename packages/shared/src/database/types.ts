@@ -349,6 +349,14 @@ export interface StorageDirOperations {
    * Update the path of a storage directory
    */
   updateStorageDirPath(id: string, newPath: string): Promise<void>;
+
+  /**
+   * Rename a storage directory
+   * @param id Storage directory ID
+   * @param newName New name (1-255 chars, will be trimmed)
+   * @throws Error if name is empty, too long, or already exists
+   */
+  updateStorageDirName(id: string, newName: string): Promise<void>;
 }
 
 /**

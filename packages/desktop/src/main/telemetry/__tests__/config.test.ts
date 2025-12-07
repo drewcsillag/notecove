@@ -3,7 +3,6 @@
  */
 
 /* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable @typescript-eslint/no-confusing-void-expression */
 
 import { TelemetryManager, DEFAULT_TELEMETRY_CONFIG } from '../config';
 
@@ -60,7 +59,9 @@ describe('TelemetryManager', () => {
 
   describe('Initialization', () => {
     it('should initialize successfully', () => {
-      expect(() => manager.initialize()).not.toThrow();
+      expect(() => {
+        manager.initialize();
+      }).not.toThrow();
       expect(manager.isInitialized()).toBe(true);
     });
 
@@ -183,7 +184,9 @@ describe('TelemetryManager', () => {
       manager.initialize();
       await manager.shutdown();
 
-      expect(() => manager.initialize()).not.toThrow();
+      expect(() => {
+        manager.initialize();
+      }).not.toThrow();
       expect(manager.isInitialized()).toBe(true);
     });
   });

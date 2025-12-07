@@ -645,8 +645,91 @@ describe('SqliteDatabase', () => {
 
     it('should get storage directory by UUID', async () => {
       const sd = await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
-      const found = await db.getStorageDirByUuid(sd.uuid);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const found = await db.getStorageDirByUuid(sd.uuid!);
       expect(found?.id).toBe('sd-1');
+    });
+
+    // =========================================================================
+    // Storage Directory Rename Tests (updateStorageDirName)
+    // =========================================================================
+
+    describe('updateStorageDirName', () => {
+      it('should rename a storage directory', async () => {
+        await db.createStorageDir('sd-1', 'Original Name', sdTestDir);
+        await db.updateStorageDirName('sd-1', 'New Name');
+        const sd = await db.getStorageDir('sd-1');
+        expect(sd?.name).toBe('New Name');
+      });
+
+      it('should trim whitespace from name', async () => {
+        await db.createStorageDir('sd-1', 'Original', sdTestDir);
+        await db.updateStorageDirName('sd-1', '  Trimmed Name  ');
+        const sd = await db.getStorageDir('sd-1');
+        expect(sd?.name).toBe('Trimmed Name');
+      });
+
+      it('should reject empty name', async () => {
+        await db.createStorageDir('sd-1', 'Original', sdTestDir);
+        await expect(db.updateStorageDirName('sd-1', '')).rejects.toThrow(
+          'Storage directory name cannot be empty'
+        );
+      });
+
+      it('should reject whitespace-only name', async () => {
+        await db.createStorageDir('sd-1', 'Original', sdTestDir);
+        await expect(db.updateStorageDirName('sd-1', '   ')).rejects.toThrow(
+          'Storage directory name cannot be empty'
+        );
+      });
+
+      it('should reject name longer than 255 characters', async () => {
+        await db.createStorageDir('sd-1', 'Original', sdTestDir);
+        const longName = 'a'.repeat(256);
+        await expect(db.updateStorageDirName('sd-1', longName)).rejects.toThrow(
+          'Storage directory name cannot exceed 255 characters'
+        );
+      });
+
+      it('should accept name exactly 255 characters', async () => {
+        await db.createStorageDir('sd-1', 'Original', sdTestDir);
+        const maxName = 'a'.repeat(255);
+        await db.updateStorageDirName('sd-1', maxName);
+        const sd = await db.getStorageDir('sd-1');
+        expect(sd?.name).toBe(maxName);
+      });
+
+      it('should reject duplicate name', async () => {
+        const sd1Path = join(sdTestDir, 'sd1');
+        const sd2Path = join(sdTestDir, 'sd2');
+        await db.createStorageDir('sd-1', 'First', sd1Path);
+        await db.createStorageDir('sd-2', 'Second', sd2Path);
+        await expect(db.updateStorageDirName('sd-2', 'First')).rejects.toThrow(
+          'A storage directory with this name already exists'
+        );
+      });
+
+      it('should allow renaming to same name (no-op)', async () => {
+        await db.createStorageDir('sd-1', 'Same Name', sdTestDir);
+        // Should not throw - renaming to same name is allowed
+        await db.updateStorageDirName('sd-1', 'Same Name');
+        const sd = await db.getStorageDir('sd-1');
+        expect(sd?.name).toBe('Same Name');
+      });
+
+      it('should allow renaming to same name with different whitespace', async () => {
+        await db.createStorageDir('sd-1', 'Trimmed', sdTestDir);
+        // After trimming, this is the same name - should succeed
+        await db.updateStorageDirName('sd-1', '  Trimmed  ');
+        const sd = await db.getStorageDir('sd-1');
+        expect(sd?.name).toBe('Trimmed');
+      });
+
+      it('should throw error for non-existent SD', async () => {
+        await expect(db.updateStorageDirName('non-existent', 'New Name')).rejects.toThrow(
+          'Storage directory not found'
+        );
+      });
     });
   });
 
@@ -1108,7 +1191,6 @@ describe('SqliteDatabase', () => {
         pinned: false,
         created: oldDate,
         modified: oldDate,
-        deletedAt: oldDate,
         contentPreview: 'Test content',
         contentText: 'Test content',
       });
@@ -1123,7 +1205,6 @@ describe('SqliteDatabase', () => {
         pinned: false,
         created: recentDate,
         modified: recentDate,
-        deletedAt: recentDate,
         contentPreview: 'Test content',
         contentText: 'Test content',
       });

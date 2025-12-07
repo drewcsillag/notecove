@@ -2,8 +2,7 @@
  * Tests for SyncMetrics
  */
 
-import { metrics } from '@opentelemetry/api';
-import { SyncMetrics, getSyncMetrics } from '../sync-metrics';
+import { getSyncMetrics, SyncMetrics } from '../sync-metrics';
 
 // Mock OpenTelemetry metrics
 const mockRecord = jest.fn();

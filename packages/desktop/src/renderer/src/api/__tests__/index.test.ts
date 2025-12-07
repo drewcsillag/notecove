@@ -21,27 +21,27 @@ jest.mock('../browser-stub', () => ({
 
 describe('Platform Adapter', () => {
   // Store original window.electronAPI
-  const originalElectronAPI = (window as unknown as Record<string, unknown>).electronAPI;
+  const originalElectronAPI = (window as unknown as Record<string, unknown>)['electronAPI'];
 
   afterEach(() => {
     // Restore original state
     if (originalElectronAPI !== undefined) {
-      (window as unknown as Record<string, unknown>).electronAPI = originalElectronAPI;
+      (window as unknown as Record<string, unknown>)['electronAPI'] = originalElectronAPI;
     } else {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
     }
     jest.clearAllMocks();
   });
 
   describe('isElectron', () => {
     it('should return true when electronAPI is present', () => {
-      (window as unknown as Record<string, unknown>).electronAPI = {};
+      (window as unknown as Record<string, unknown>)['electronAPI'] = {};
 
       expect(isElectron()).toBe(true);
     });
 
     it('should return false when electronAPI is not present', () => {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
 
       expect(isElectron()).toBe(false);
     });
@@ -49,13 +49,13 @@ describe('Platform Adapter', () => {
 
   describe('isBrowser', () => {
     it('should return false when electronAPI is present', () => {
-      (window as unknown as Record<string, unknown>).electronAPI = {};
+      (window as unknown as Record<string, unknown>)['electronAPI'] = {};
 
       expect(isBrowser()).toBe(false);
     });
 
     it('should return true when electronAPI is not present', () => {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
 
       expect(isBrowser()).toBe(true);
     });
@@ -63,7 +63,7 @@ describe('Platform Adapter', () => {
 
   describe('initApi', () => {
     it('should not initialize anything in Electron environment', () => {
-      (window as unknown as Record<string, unknown>).electronAPI = {};
+      (window as unknown as Record<string, unknown>)['electronAPI'] = {};
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       initApi();
@@ -76,7 +76,7 @@ describe('Platform Adapter', () => {
     });
 
     it('should initialize web client when authenticated in browser', () => {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
       (isAuthenticated as jest.Mock).mockReturnValue(true);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
@@ -92,7 +92,7 @@ describe('Platform Adapter', () => {
     });
 
     it('should initialize browser stub when not authenticated in browser', () => {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
       (isAuthenticated as jest.Mock).mockReturnValue(false);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 

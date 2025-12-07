@@ -46,7 +46,7 @@ describe('InterNoteLink - findDoubleBracketMatch', () => {
       expect(match?.text).toBe('[[');
       expect(match?.query).toBe('');
       // The range should only cover the [[ characters
-      expect(match?.range.to - match!.range.from).toBe(2);
+      expect(match!.range.to - match!.range.from).toBe(2);
     });
 
     it('should match [[ with query text', () => {
@@ -58,7 +58,7 @@ describe('InterNoteLink - findDoubleBracketMatch', () => {
       expect(match?.text).toBe('[[test');
       expect(match?.query).toBe('test');
       // The range should cover [[test (6 characters)
-      expect(match?.range.to - match!.range.from).toBe(6);
+      expect(match!.range.to - match!.range.from).toBe(6);
     });
 
     it('should preserve space before [[ - range must not include preceding space', () => {

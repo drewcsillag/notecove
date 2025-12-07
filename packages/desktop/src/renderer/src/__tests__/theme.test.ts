@@ -36,9 +36,9 @@ describe('Theme', () => {
       expect(cssBaseline).toBeDefined();
 
       const styleOverrides = cssBaseline?.styleOverrides as Record<string, Record<string, unknown>>;
-      expect(styleOverrides?.body?.margin).toBe(0);
-      expect(styleOverrides?.body?.padding).toBe(0);
-      expect(styleOverrides?.body?.overflow).toBe('hidden');
+      expect(styleOverrides['body']?.['margin']).toBe(0);
+      expect(styleOverrides['body']?.['padding']).toBe(0);
+      expect(styleOverrides['body']?.['overflow']).toBe('hidden');
     });
   });
 

@@ -6,14 +6,14 @@ import { browserApiStub, initBrowserApiStub } from '../browser-stub';
 
 describe('Browser API Stub', () => {
   // Store original window.electronAPI
-  const originalElectronAPI = (window as unknown as Record<string, unknown>).electronAPI;
+  const originalElectronAPI = (window as unknown as Record<string, unknown>)['electronAPI'];
 
   afterEach(() => {
     // Restore original state
     if (originalElectronAPI !== undefined) {
-      (window as unknown as Record<string, unknown>).electronAPI = originalElectronAPI;
+      (window as unknown as Record<string, unknown>)['electronAPI'] = originalElectronAPI;
     } else {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
     }
   });
 
@@ -28,7 +28,9 @@ describe('Browser API Stub', () => {
       });
 
       it('should throw not implemented error for note.create', () => {
-        expect(() => browserApiStub.note.create('sd1', null)).toThrow('not yet implemented');
+        expect(() => browserApiStub.note.create('sd1', 'folder1', '')).toThrow(
+          'not yet implemented'
+        );
       });
 
       it('should throw not implemented error for note.delete', () => {
@@ -36,10 +38,14 @@ describe('Browser API Stub', () => {
       });
 
       it('should return no-op function for event subscriptions', () => {
-        const unsubscribe = browserApiStub.note.onUpdated(() => {});
+        const unsubscribe = browserApiStub.note.onUpdated(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
         // Should not throw when called
-        expect(() => unsubscribe()).not.toThrow();
+        expect(() => {
+          unsubscribe();
+        }).not.toThrow();
       });
     });
 
@@ -55,7 +61,9 @@ describe('Browser API Stub', () => {
       });
 
       it('should return no-op function for folder event subscriptions', () => {
-        const unsubscribe = browserApiStub.folder.onUpdated(() => {});
+        const unsubscribe = browserApiStub.folder.onUpdated(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
     });
@@ -76,7 +84,9 @@ describe('Browser API Stub', () => {
       });
 
       it('should return no-op function for sync event subscriptions', () => {
-        const unsubscribe = browserApiStub.sync.onProgress(() => {});
+        const unsubscribe = browserApiStub.sync.onProgress(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
     });
@@ -131,7 +141,9 @@ describe('Browser API Stub', () => {
 
     describe('menu event subscriptions', () => {
       it('should return no-op function for menu event subscriptions', () => {
-        const unsubscribe = browserApiStub.menu.onNewNote(() => {});
+        const unsubscribe = browserApiStub.menu.onNewNote(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
     });
@@ -188,7 +200,9 @@ describe('Browser API Stub', () => {
 
     describe('shutdown event subscriptions', () => {
       it('should return no-op function for shutdown event subscriptions', () => {
-        const unsubscribe = browserApiStub.shutdown.onProgress(() => {});
+        const unsubscribe = browserApiStub.shutdown.onProgress(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
     });
@@ -196,7 +210,7 @@ describe('Browser API Stub', () => {
 
   describe('initBrowserApiStub', () => {
     it('should install stub when electronAPI is undefined', () => {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       initBrowserApiStub();
@@ -211,7 +225,7 @@ describe('Browser API Stub', () => {
 
     it('should not overwrite existing electronAPI', () => {
       const existingApi = { platform: 'electron' };
-      (window as unknown as Record<string, unknown>).electronAPI = existingApi;
+      (window as unknown as Record<string, unknown>)['electronAPI'] = existingApi;
 
       initBrowserApiStub();
 

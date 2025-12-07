@@ -2,6 +2,7 @@
  * Tests for Route Handler Context
  */
 
+import type { FastifyReply } from 'fastify';
 import {
   setRouteContext,
   getRouteContext,
@@ -13,15 +14,17 @@ import {
 } from '../context';
 
 // Mock FastifyReply
-const createMockReply = () => {
+interface MockReply extends FastifyReply {
+  status: jest.Mock;
+  send: jest.Mock;
+}
+
+const createMockReply = (): MockReply => {
   const reply = {
     status: jest.fn().mockReturnThis(),
     send: jest.fn().mockReturnThis(),
   };
-  return reply as unknown as ReturnType<typeof createMockReply> & {
-    status: jest.Mock;
-    send: jest.Mock;
-  };
+  return reply as unknown as MockReply;
 };
 
 describe('Route Handler Context', () => {
@@ -74,7 +77,7 @@ describe('Route Handler Context', () => {
     it('should send error response with status code and message', () => {
       const reply = createMockReply();
 
-      sendError(reply as any, 404, 'Not Found', 'Resource not found');
+      sendError(reply, 404, 'Not Found', 'Resource not found');
 
       expect(reply.status).toHaveBeenCalledWith(404);
       expect(reply.send).toHaveBeenCalledWith({
@@ -87,7 +90,7 @@ describe('Route Handler Context', () => {
     it('should use error as message when message is not provided', () => {
       const reply = createMockReply();
 
-      sendError(reply as any, 500, 'Internal Server Error');
+      sendError(reply, 500, 'Internal Server Error');
 
       expect(reply.send).toHaveBeenCalledWith({
         error: 'Internal Server Error',
@@ -107,7 +110,7 @@ describe('Route Handler Context', () => {
 
       testCases.forEach(({ code, error }) => {
         const reply = createMockReply();
-        sendError(reply as any, code, error);
+        sendError(reply, code, error);
         expect(reply.status).toHaveBeenCalledWith(code);
       });
     });
@@ -128,7 +131,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('Test error');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(consoleSpy).toHaveBeenCalledWith('[API] Service error:', error);
     });
@@ -137,7 +140,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('Resource not found');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(reply.status).toHaveBeenCalledWith(404);
       expect(reply.send).toHaveBeenCalledWith(
@@ -152,7 +155,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('Note Not found');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(reply.status).toHaveBeenCalledWith(404);
     });
@@ -161,7 +164,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('Resource already exists');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(reply.status).toHaveBeenCalledWith(409);
       expect(reply.send).toHaveBeenCalledWith(
@@ -176,7 +179,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('Naming conflict detected');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(reply.status).toHaveBeenCalledWith(409);
     });
@@ -185,7 +188,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('invalid parameter');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(reply.status).toHaveBeenCalledWith(400);
       expect(reply.send).toHaveBeenCalledWith(
@@ -200,7 +203,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('Invalid note ID format');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(reply.status).toHaveBeenCalledWith(400);
     });
@@ -209,7 +212,7 @@ describe('Route Handler Context', () => {
       const reply = createMockReply();
       const error = new Error('Some unexpected error');
 
-      handleServiceError(reply as any, error);
+      handleServiceError(reply, error);
 
       expect(reply.status).toHaveBeenCalledWith(500);
       expect(reply.send).toHaveBeenCalledWith(
@@ -224,7 +227,7 @@ describe('Route Handler Context', () => {
     it('should return 500 for non-Error objects', () => {
       const reply = createMockReply();
 
-      handleServiceError(reply as any, 'string error');
+      handleServiceError(reply, 'string error');
 
       expect(reply.status).toHaveBeenCalledWith(500);
     });
@@ -232,12 +235,12 @@ describe('Route Handler Context', () => {
     it('should return 500 for null/undefined errors', () => {
       const reply = createMockReply();
 
-      handleServiceError(reply as any, null);
+      handleServiceError(reply, null);
 
       expect(reply.status).toHaveBeenCalledWith(500);
 
       const reply2 = createMockReply();
-      handleServiceError(reply2 as any, undefined);
+      handleServiceError(reply2, undefined);
       expect(reply2.status).toHaveBeenCalledWith(500);
     });
   });

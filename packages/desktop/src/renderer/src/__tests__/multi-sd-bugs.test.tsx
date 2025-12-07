@@ -18,8 +18,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import App from '../App';
 
-/* eslint-disable @typescript-eslint/no-empty-function */
 // Mock window.electronAPI
+/* eslint-disable @typescript-eslint/no-empty-function */
 const mockElectronAPI = {
   platform: 'darwin',
   note: {

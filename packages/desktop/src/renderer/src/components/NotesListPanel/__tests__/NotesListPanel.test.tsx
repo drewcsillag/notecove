@@ -9,11 +9,11 @@ import { NotesListPanel } from '../NotesListPanel';
 // Mock i18n
 jest.mock('../../../i18n', () => ({}));
 
-/* eslint-disable @typescript-eslint/no-empty-function */
 // Store for folder.onSelected callbacks so tests can trigger them
 let folderSelectedCallbacks: ((folderId: string) => void)[] = [];
 
 // Mock window.electronAPI
+/* eslint-disable @typescript-eslint/no-empty-function */
 const mockElectronAPI = {
   note: {
     list: jest.fn().mockResolvedValue([]),
@@ -55,6 +55,7 @@ const mockElectronAPI = {
     set: jest.fn().mockResolvedValue(undefined),
   },
 };
+/* eslint-enable @typescript-eslint/no-empty-function */
 
 // Helper to simulate folder selection event
 const simulateFolderSelected = (folderId: string): void => {

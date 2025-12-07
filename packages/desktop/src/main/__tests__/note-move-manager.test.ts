@@ -753,7 +753,14 @@ describe('NoteMoveManager', () => {
       });
       mockDatabase.getStorageDirByUuid.mockImplementation(async (uuid: string) => {
         if (uuid === 'sd-source') {
-          return { id: 'source-id', uuid: 'sd-source', name: 'Source', path: '/source' };
+          return {
+            id: 'source-id',
+            uuid: 'sd-source',
+            name: 'Source',
+            path: '/source',
+            created: Date.now(),
+            isActive: false,
+          };
         }
         return null;
       });
@@ -824,10 +831,24 @@ describe('NoteMoveManager', () => {
 
       mockDatabase.getStorageDirByUuid.mockImplementation(async (uuid: string) => {
         if (uuid === 'sd-source') {
-          return { id: 'source-id', uuid: 'sd-source', name: 'Source', path: sourcePath };
+          return {
+            id: 'source-id',
+            uuid: 'sd-source',
+            name: 'Source',
+            path: sourcePath,
+            created: Date.now(),
+            isActive: false,
+          };
         }
         if (uuid === 'sd-target') {
-          return { id: 'target-id', uuid: 'sd-target', name: 'Target', path: targetPath };
+          return {
+            id: 'target-id',
+            uuid: 'sd-target',
+            name: 'Target',
+            path: targetPath,
+            created: Date.now(),
+            isActive: false,
+          };
         }
         return null;
       });
@@ -865,10 +886,24 @@ describe('NoteMoveManager', () => {
 
       mockDatabase.getStorageDirByUuid.mockImplementation(async (uuid: string) => {
         if (uuid === 'sd-source') {
-          return { id: 'source-id', uuid: 'sd-source', name: 'Source', path: sourcePath };
+          return {
+            id: 'source-id',
+            uuid: 'sd-source',
+            name: 'Source',
+            path: sourcePath,
+            created: Date.now(),
+            isActive: false,
+          };
         }
         if (uuid === 'sd-target') {
-          return { id: 'target-id', uuid: 'sd-target', name: 'Target', path: targetPath };
+          return {
+            id: 'target-id',
+            uuid: 'sd-target',
+            name: 'Target',
+            path: targetPath,
+            created: Date.now(),
+            isActive: false,
+          };
         }
         return null;
       });
