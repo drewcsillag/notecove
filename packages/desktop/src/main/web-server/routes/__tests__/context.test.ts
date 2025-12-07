@@ -2,6 +2,8 @@
  * Tests for Route Handler Context
  */
 
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import {
   setRouteContext,
   getRouteContext,
@@ -14,14 +16,11 @@ import {
 
 // Mock FastifyReply
 const createMockReply = () => {
-  const reply = {
+  const reply: { status: jest.Mock; send: jest.Mock } = {
     status: jest.fn().mockReturnThis(),
     send: jest.fn().mockReturnThis(),
   };
-  return reply as unknown as ReturnType<typeof createMockReply> & {
-    status: jest.Mock;
-    send: jest.Mock;
-  };
+  return reply;
 };
 
 describe('Route Handler Context', () => {

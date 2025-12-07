@@ -159,6 +159,66 @@ export enum AppStateKey {
   ThemeMode = 'themeMode', // 'light' or 'dark'
   Username = 'username', // User's display name
   UserHandle = 'userHandle', // User's @mention handle
+  WindowStates = 'windowStates', // Array of WindowState for session restoration
+}
+
+/**
+ * Window bounds (position and size)
+ */
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Editor state for a window (scroll and cursor position)
+ */
+export interface EditorState {
+  scrollTop: number;
+  cursorPosition: number; // Character offset in document
+}
+
+/**
+ * Window state for session restoration
+ * Stores position, size, and content state for each window
+ */
+export interface WindowState {
+  id: string; // Unique window ID (UUID)
+  type: 'main' | 'minimal' | 'syncStatus';
+  noteId?: string | undefined; // For minimal windows, or current note in main
+  sdId?: string | undefined; // Storage Directory ID for the note
+  bounds: WindowBounds;
+  isMaximized: boolean;
+  isFullScreen: boolean;
+  editorState?: EditorState | undefined; // Scroll/cursor position
+}
+
+/**
+ * Serialize window states array to JSON string for storage
+ */
+export function serializeWindowStates(states: WindowState[]): string {
+  return JSON.stringify(states);
+}
+
+/**
+ * Deserialize window states from JSON string
+ * Returns empty array if input is null, invalid, or not an array
+ */
+export function deserializeWindowStates(json: string | null): WindowState[] {
+  if (!json) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed as WindowState[];
+  } catch {
+    return [];
+  }
 }
 
 /**

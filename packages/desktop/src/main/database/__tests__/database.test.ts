@@ -645,7 +645,7 @@ describe('SqliteDatabase', () => {
 
     it('should get storage directory by UUID', async () => {
       const sd = await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
-      const found = await db.getStorageDirByUuid(sd.uuid);
+      const found = await db.getStorageDirByUuid(sd.uuid!);
       expect(found?.id).toBe('sd-1');
     });
   });
@@ -1108,7 +1108,6 @@ describe('SqliteDatabase', () => {
         pinned: false,
         created: oldDate,
         modified: oldDate,
-        deletedAt: oldDate,
         contentPreview: 'Test content',
         contentText: 'Test content',
       });
@@ -1123,7 +1122,6 @@ describe('SqliteDatabase', () => {
         pinned: false,
         created: recentDate,
         modified: recentDate,
-        deletedAt: recentDate,
         contentPreview: 'Test content',
         contentText: 'Test content',
       });

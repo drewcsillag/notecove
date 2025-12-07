@@ -2,7 +2,6 @@
  * Tests for SyncMetrics
  */
 
-import { metrics } from '@opentelemetry/api';
 import { SyncMetrics, getSyncMetrics } from '../sync-metrics';
 
 // Mock OpenTelemetry metrics

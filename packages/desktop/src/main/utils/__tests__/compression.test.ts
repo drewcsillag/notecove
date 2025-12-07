@@ -36,6 +36,7 @@ describe('compression utilities', () => {
     // Default implementation: just return the data after magic header
     mockDecompress.mockImplementation((buffer: Buffer) => {
       if (buffer.length >= 4) {
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
         return Promise.resolve(buffer.slice(4));
       }
       return Promise.resolve(buffer);

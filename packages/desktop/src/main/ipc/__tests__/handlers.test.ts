@@ -68,6 +68,7 @@ interface MockCRDTManager {
   createDocument: jest.Mock;
   getNoteDoc: jest.Mock;
   getDocument: jest.Mock;
+  getStaleSyncs?: jest.Mock;
 }
 
 interface MockDatabase {
@@ -3907,12 +3908,15 @@ describe('IPCHandlers - SD Management', () => {
       handlers.setWebBroadcastCallback(callback);
       handlers.setWebBroadcastCallback(undefined);
       // Should not throw when broadcasting without callback
-      expect(() => handlers.broadcastToAll('test-channel')).not.toThrow();
+      expect(() => {
+        handlers.broadcastToAll('test-channel');
+      }).not.toThrow();
     });
   });
 
   describe('broadcastToAll', () => {
     it('should broadcast to electron windows', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { BrowserWindow } = require('electron');
       const mockWindow = {
         webContents: {
@@ -3927,6 +3931,7 @@ describe('IPCHandlers - SD Management', () => {
     });
 
     it('should broadcast to multiple windows', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { BrowserWindow } = require('electron');
       const mockWindow1 = { webContents: { send: jest.fn() } };
       const mockWindow2 = { webContents: { send: jest.fn() } };
@@ -3939,12 +3944,15 @@ describe('IPCHandlers - SD Management', () => {
     });
 
     it('should not call web callback when not set', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { BrowserWindow } = require('electron');
       (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
       handlers.setWebBroadcastCallback(undefined);
 
       // Should not throw
-      expect(() => handlers.broadcastToAll('channel')).not.toThrow();
+      expect(() => {
+        handlers.broadcastToAll('channel');
+      }).not.toThrow();
     });
   });
 

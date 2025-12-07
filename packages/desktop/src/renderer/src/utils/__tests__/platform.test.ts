@@ -6,26 +6,26 @@ import { isElectron, isBrowser, isFeatureAvailable, ELECTRON_ONLY_FEATURES } fro
 
 describe('Platform Detection Utilities', () => {
   // Store original window.electronAPI state
-  const originalElectronAPI = (window as unknown as Record<string, unknown>).electronAPI;
+  const originalElectronAPI = (window as unknown as Record<string, unknown>)['electronAPI'];
 
   afterEach(() => {
     // Restore original state
     if (originalElectronAPI !== undefined) {
-      (window as unknown as Record<string, unknown>).electronAPI = originalElectronAPI;
+      (window as unknown as Record<string, unknown>)['electronAPI'] = originalElectronAPI;
     } else {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
     }
   });
 
   describe('isElectron', () => {
     it('should return true when electronAPI is present', () => {
-      (window as unknown as Record<string, unknown>).electronAPI = {};
+      (window as unknown as Record<string, unknown>)['electronAPI'] = {};
 
       expect(isElectron()).toBe(true);
     });
 
     it('should return false when electronAPI is not present', () => {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
 
       expect(isElectron()).toBe(false);
     });
@@ -33,13 +33,13 @@ describe('Platform Detection Utilities', () => {
 
   describe('isBrowser', () => {
     it('should return false when electronAPI is present', () => {
-      (window as unknown as Record<string, unknown>).electronAPI = {};
+      (window as unknown as Record<string, unknown>)['electronAPI'] = {};
 
       expect(isBrowser()).toBe(false);
     });
 
     it('should return true when electronAPI is not present', () => {
-      delete (window as unknown as Record<string, unknown>).electronAPI;
+      delete (window as unknown as Record<string, unknown>)['electronAPI'];
 
       expect(isBrowser()).toBe(true);
     });
@@ -60,7 +60,7 @@ describe('Platform Detection Utilities', () => {
   describe('isFeatureAvailable', () => {
     describe('in Electron environment', () => {
       beforeEach(() => {
-        (window as unknown as Record<string, unknown>).electronAPI = {};
+        (window as unknown as Record<string, unknown>)['electronAPI'] = {};
       });
 
       it('should return true for all features', () => {
@@ -76,7 +76,7 @@ describe('Platform Detection Utilities', () => {
 
     describe('in Browser environment', () => {
       beforeEach(() => {
-        delete (window as unknown as Record<string, unknown>).electronAPI;
+        delete (window as unknown as Record<string, unknown>)['electronAPI'];
       });
 
       it('should return false for electron-only features', () => {

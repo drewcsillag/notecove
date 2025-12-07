@@ -237,6 +237,12 @@ export const browserApiStub: typeof window.electronAPI = {
     writeText: notImplemented('clipboard.writeText'),
     readText: notImplemented('clipboard.readText'),
   },
+
+  windowState: {
+    reportCurrentNote: notImplemented('windowState.reportCurrentNote'),
+    reportEditorState: notImplemented('windowState.reportEditorState'),
+    getSavedState: notImplemented('windowState.getSavedState'),
+  },
 };
 
 /**

@@ -38,6 +38,7 @@ const localStorageMock = (() => {
       store[key] = value;
     },
     removeItem: (key: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete store[key];
     },
     clear: () => {
@@ -232,7 +233,7 @@ describe('Web Client', () => {
       });
 
       it('should throw for backup.createManualBackup', () => {
-        expect(() => webClient.backup.createManualBackup()).toThrow(
+        expect(() => webClient.backup.createManualBackup('sd1', false)).toThrow(
           'not available in browser mode'
         );
       });
@@ -248,28 +249,40 @@ describe('Web Client', () => {
 
     describe('noopSubscription handlers', () => {
       it('should return unsubscribe function for menu events', () => {
-        const unsubscribe = webClient.menu.onNewNote(() => {});
+        const unsubscribe = webClient.menu.onNewNote(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
-        expect(() => unsubscribe()).not.toThrow();
+        expect(() => {
+          unsubscribe();
+        }).not.toThrow();
       });
 
       it('should return unsubscribe function for sd events', () => {
-        const unsubscribe = webClient.sd.onOpenSettings(() => {});
+        const unsubscribe = webClient.sd.onOpenSettings(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
 
       it('should return unsubscribe function for shutdown events', () => {
-        const unsubscribe = webClient.shutdown.onProgress(() => {});
+        const unsubscribe = webClient.shutdown.onProgress(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
 
       it('should return unsubscribe function for tools events', () => {
-        const unsubscribe = webClient.tools.onReindexProgress(() => {});
+        const unsubscribe = webClient.tools.onReindexProgress(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
 
       it('should return unsubscribe function for sync events', () => {
-        const unsubscribe = webClient.sync.onProgress(() => {});
+        const unsubscribe = webClient.sync.onProgress(() => {
+          // No-op handler for testing
+        });
         expect(typeof unsubscribe).toBe('function');
       });
     });
@@ -312,12 +325,12 @@ describe('Web Client', () => {
 
     describe('sync stub methods', () => {
       it('should return empty result for skipStaleEntry', async () => {
-        const result = await webClient.sync.skipStaleEntry('entry-1');
+        const result = await webClient.sync.skipStaleEntry('sd1', 'note1', 'instance1');
         expect(result).toEqual({ success: true });
       });
 
       it('should return empty result for retryStaleEntry', async () => {
-        const result = await webClient.sync.retryStaleEntry('entry-1');
+        const result = await webClient.sync.retryStaleEntry('sd1', 'note1', 'instance1');
         expect(result).toEqual({ success: true });
       });
 
@@ -337,7 +350,7 @@ describe('Web Client', () => {
       });
 
       it('should throw for telemetry.updateSettings', () => {
-        expect(() => webClient.telemetry.updateSettings({ enabled: true })).toThrow(
+        expect(() => webClient.telemetry.updateSettings({ remoteMetricsEnabled: true })).toThrow(
           'not available in browser mode'
         );
       });
@@ -383,15 +396,15 @@ describe('Web Client', () => {
 
     describe('diagnostics browserNotAvailable', () => {
       it('should throw for diagnostics.removeStaleMigrationLock', () => {
-        expect(() => webClient.diagnostics.removeStaleMigrationLock('sd-1', 'note-1')).toThrow(
+        expect(() => webClient.diagnostics.removeStaleMigrationLock(1)).toThrow(
           'not available in browser mode'
         );
       });
 
       it('should throw for diagnostics.importOrphanedCRDT', () => {
-        expect(() =>
-          webClient.diagnostics.importOrphanedCRDT('sd-1', 'note-1', 'title', null)
-        ).toThrow('not available in browser mode');
+        expect(() => webClient.diagnostics.importOrphanedCRDT('note-1', 1)).toThrow(
+          'not available in browser mode'
+        );
       });
     });
 
@@ -486,7 +499,7 @@ describe('Web Client', () => {
         const notes = await webClient.note.list('sd-1', 'folder-1');
 
         expect(notes).toHaveLength(1);
-        expect(notes[0].id).toBe('note-1');
+        expect(notes[0]!.id).toBe('note-1');
       });
 
       it('should return empty array when note list fails', async () => {
@@ -509,7 +522,7 @@ describe('Web Client', () => {
         const results = await webClient.note.search('test query', 10);
 
         expect(results).toHaveLength(1);
-        expect(results[0].noteId).toBe('note-1');
+        expect(results[0]!.noteId).toBe('note-1');
       });
 
       it('should return empty array when search fails', async () => {
@@ -699,13 +712,20 @@ describe('Web Client', () => {
           ok: true,
           text: () =>
             Promise.resolve(
-              JSON.stringify({ id: 'note-1', title: 'Test', created: 12345, modified: 67890 })
+              JSON.stringify({
+                noteId: 'note-1',
+                title: 'Test',
+                folderId: 'folder-1',
+                createdAt: 12345,
+                modifiedAt: 67890,
+                deleted: false,
+              })
             ),
         });
 
         const metadata = await webClient.note.getMetadata('note-1');
 
-        expect(metadata.id).toBe('note-1');
+        expect(metadata.noteId).toBe('note-1');
         expect(metadata.title).toBe('Test');
       });
 
@@ -760,7 +780,7 @@ describe('Web Client', () => {
           text: () => Promise.resolve(JSON.stringify({ noteId: 'new-id' })),
         });
 
-        const noteId = await webClient.note.create('sd-1', null);
+        const noteId = await webClient.note.create('sd-1', 'folder-1', '');
 
         expect(noteId).toBe('new-id');
       });

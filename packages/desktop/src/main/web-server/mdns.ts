@@ -99,7 +99,6 @@ export class MDNSManager {
     if (this.service) {
       try {
         // Service.stop may not exist on all versions, check before calling
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         if ('stop' in this.service && typeof this.service.stop === 'function') {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           this.service.stop();

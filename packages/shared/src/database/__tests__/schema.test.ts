@@ -14,6 +14,11 @@ import {
   type FolderSyncState,
   type ActivityLogState,
   type SequenceState,
+  type WindowState,
+  type WindowBounds,
+  type EditorState,
+  serializeWindowStates,
+  deserializeWindowStates,
 } from '../schema';
 import type { UUID } from '../../types';
 
@@ -84,6 +89,10 @@ describe('Database Schema', () => {
       expect(AppStateKey.SearchText).toBe('searchText');
       expect(AppStateKey.WindowPosition).toBe('windowPosition');
       expect(AppStateKey.WindowSize).toBe('windowSize');
+    });
+
+    it('should have WindowStates key for window state retention', () => {
+      expect(AppStateKey.WindowStates).toBe('windowStates');
     });
   });
 
@@ -251,6 +260,204 @@ describe('Database Schema', () => {
 
       expect(seqState.currentSequence).toBe(42);
       expect(seqState.documentId).toBe('note-123');
+    });
+
+    it('should accept valid WindowBounds', () => {
+      const bounds: WindowBounds = {
+        x: 100,
+        y: 200,
+        width: 1200,
+        height: 800,
+      };
+
+      expect(bounds.x).toBe(100);
+      expect(bounds.width).toBe(1200);
+    });
+
+    it('should accept valid EditorState', () => {
+      const editorState: EditorState = {
+        scrollTop: 150,
+        cursorPosition: 42,
+      };
+
+      expect(editorState.scrollTop).toBe(150);
+      expect(editorState.cursorPosition).toBe(42);
+    });
+
+    it('should accept valid WindowState for main window', () => {
+      const windowState: WindowState = {
+        id: 'window-123',
+        type: 'main',
+        noteId: 'note-456',
+        sdId: 'sd-789',
+        bounds: { x: 0, y: 0, width: 1200, height: 800 },
+        isMaximized: false,
+        isFullScreen: false,
+        editorState: { scrollTop: 0, cursorPosition: 0 },
+      };
+
+      expect(windowState.type).toBe('main');
+      expect(windowState.noteId).toBe('note-456');
+    });
+
+    it('should accept valid WindowState for minimal window', () => {
+      const windowState: WindowState = {
+        id: 'window-456',
+        type: 'minimal',
+        noteId: 'note-123',
+        sdId: 'sd-456',
+        bounds: { x: 200, y: 100, width: 800, height: 600 },
+        isMaximized: false,
+        isFullScreen: false,
+      };
+
+      expect(windowState.type).toBe('minimal');
+      expect(windowState.editorState).toBeUndefined();
+    });
+
+    it('should accept valid WindowState for syncStatus window', () => {
+      const windowState: WindowState = {
+        id: 'window-sync',
+        type: 'syncStatus',
+        bounds: { x: 300, y: 200, width: 950, height: 600 },
+        isMaximized: false,
+        isFullScreen: false,
+      };
+
+      expect(windowState.type).toBe('syncStatus');
+      expect(windowState.noteId).toBeUndefined();
+    });
+
+    it('should accept maximized WindowState', () => {
+      const windowState: WindowState = {
+        id: 'window-max',
+        type: 'main',
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        isMaximized: true,
+        isFullScreen: false,
+      };
+
+      expect(windowState.isMaximized).toBe(true);
+      expect(windowState.isFullScreen).toBe(false);
+    });
+  });
+
+  describe('WindowState Serialization', () => {
+    it('should serialize empty window states array', () => {
+      const result = serializeWindowStates([]);
+      expect(result).toBe('[]');
+    });
+
+    it('should serialize single window state', () => {
+      const states: WindowState[] = [
+        {
+          id: 'win-1',
+          type: 'main',
+          noteId: 'note-1',
+          sdId: 'sd-1',
+          bounds: { x: 0, y: 0, width: 1200, height: 800 },
+          isMaximized: false,
+          isFullScreen: false,
+        },
+      ];
+
+      const serialized = serializeWindowStates(states);
+      expect(typeof serialized).toBe('string');
+
+      const parsed = JSON.parse(serialized) as WindowState[];
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0].id).toBe('win-1');
+    });
+
+    it('should serialize multiple window states', () => {
+      const states: WindowState[] = [
+        {
+          id: 'win-main',
+          type: 'main',
+          noteId: 'note-1',
+          bounds: { x: 0, y: 0, width: 1200, height: 800 },
+          isMaximized: false,
+          isFullScreen: false,
+          editorState: { scrollTop: 100, cursorPosition: 50 },
+        },
+        {
+          id: 'win-minimal',
+          type: 'minimal',
+          noteId: 'note-2',
+          sdId: 'sd-1',
+          bounds: { x: 100, y: 100, width: 800, height: 600 },
+          isMaximized: false,
+          isFullScreen: false,
+        },
+      ];
+
+      const serialized = serializeWindowStates(states);
+      const parsed = JSON.parse(serialized) as WindowState[];
+      expect(parsed).toHaveLength(2);
+    });
+
+    it('should deserialize empty array string', () => {
+      const result = deserializeWindowStates('[]');
+      expect(result).toEqual([]);
+    });
+
+    it('should deserialize null to empty array', () => {
+      const result = deserializeWindowStates(null);
+      expect(result).toEqual([]);
+    });
+
+    it('should deserialize valid window states', () => {
+      const input = JSON.stringify([
+        {
+          id: 'win-1',
+          type: 'main',
+          noteId: 'note-1',
+          bounds: { x: 0, y: 0, width: 1200, height: 800 },
+          isMaximized: true,
+          isFullScreen: false,
+        },
+      ]);
+
+      const result = deserializeWindowStates(input);
+      expect(result).toHaveLength(1);
+      expect(result[0].isMaximized).toBe(true);
+    });
+
+    it('should return empty array for invalid JSON', () => {
+      const result = deserializeWindowStates('invalid json');
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array for non-array JSON', () => {
+      const result = deserializeWindowStates('{"foo": "bar"}');
+      expect(result).toEqual([]);
+    });
+
+    it('should round-trip serialize and deserialize', () => {
+      const original: WindowState[] = [
+        {
+          id: 'win-1',
+          type: 'main',
+          noteId: 'note-abc',
+          sdId: 'sd-xyz',
+          bounds: { x: 50, y: 100, width: 1400, height: 900 },
+          isMaximized: false,
+          isFullScreen: true,
+          editorState: { scrollTop: 250, cursorPosition: 123 },
+        },
+        {
+          id: 'win-2',
+          type: 'syncStatus',
+          bounds: { x: 200, y: 150, width: 950, height: 600 },
+          isMaximized: false,
+          isFullScreen: false,
+        },
+      ];
+
+      const serialized = serializeWindowStates(original);
+      const deserialized = deserializeWindowStates(serialized);
+
+      expect(deserialized).toEqual(original);
     });
   });
 });

@@ -1414,6 +1414,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('clipboard:writeText', text) as Promise<void>,
     readText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText') as Promise<string>,
   },
+
+  // Window state operations (for session restoration)
+  windowState: {
+    /**
+     * Report the current note being viewed in this window.
+     * Called when user navigates to a new note.
+     */
+    reportCurrentNote: (windowId: string, noteId: string, sdId?: string): Promise<void> =>
+      ipcRenderer.invoke('windowState:reportCurrentNote', windowId, noteId, sdId) as Promise<void>,
+
+    /**
+     * Report the current editor state (scroll/cursor position).
+     * Called periodically (debounced) and on beforeunload.
+     */
+    reportEditorState: (
+      windowId: string,
+      editorState: { scrollTop: number; cursorPosition: number }
+    ): Promise<void> =>
+      ipcRenderer.invoke('windowState:reportEditorState', windowId, editorState) as Promise<void>,
+
+    /**
+     * Get the saved window state for this window (used for restoration).
+     * Returns the saved state including editor scroll/cursor position.
+     */
+    getSavedState: (
+      windowId: string
+    ): Promise<{
+      noteId?: string;
+      sdId?: string;
+      editorState?: { scrollTop: number; cursorPosition: number };
+    } | null> =>
+      ipcRenderer.invoke('windowState:getSavedState', windowId) as Promise<{
+        noteId?: string;
+        sdId?: string;
+        editorState?: { scrollTop: number; cursorPosition: number };
+      } | null>,
+  },
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection
