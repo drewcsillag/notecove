@@ -645,7 +645,7 @@ describe('SqliteDatabase', () => {
 
     it('should get storage directory by UUID', async () => {
       const sd = await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      expect(sd.uuid).toBeDefined();
       const found = await db.getStorageDirByUuid(sd.uuid!);
       expect(found?.id).toBe('sd-1');
     });
@@ -1621,9 +1621,9 @@ describe('SqliteDatabase', () => {
       const retrieved = await db.getImagesBySd(testSdId);
       expect(retrieved).toHaveLength(3);
       // Should be ordered by created DESC (newest first)
-      expect(retrieved[0].id).toBe('img-c');
-      expect(retrieved[1].id).toBe('img-b');
-      expect(retrieved[2].id).toBe('img-a');
+      expect(retrieved[0]?.id).toBe('img-c');
+      expect(retrieved[1]?.id).toBe('img-b');
+      expect(retrieved[2]?.id).toBe('img-a');
     });
 
     it('should delete an image', async () => {

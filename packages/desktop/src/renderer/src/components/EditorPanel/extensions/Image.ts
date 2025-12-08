@@ -128,17 +128,17 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
       imageId: {
         default: null,
         parseHTML: (element) => element.getAttribute('data-image-id'),
-        renderHTML: (attributes) => {
-          if (!attributes['imageId']) return {};
-          return { 'data-image-id': attributes['imageId'] };
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          if (!attributes.imageId) return {};
+          return { 'data-image-id': attributes.imageId };
         },
       },
       sdId: {
         default: null,
         parseHTML: (element) => element.getAttribute('data-sd-id'),
-        renderHTML: (attributes) => {
-          if (!attributes['sdId']) return {};
-          return { 'data-sd-id': attributes['sdId'] };
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          if (!attributes.sdId) return {};
+          return { 'data-sd-id': attributes.sdId };
         },
       },
       alt: {
@@ -147,8 +147,8 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           const img = element.querySelector('img');
           return img?.getAttribute('alt') ?? '';
         },
-        renderHTML: (attributes) => {
-          return { alt: attributes['alt'] || '' };
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          return { alt: attributes.alt };
         },
       },
       caption: {
@@ -157,9 +157,9 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           const figcaption = element.querySelector('figcaption');
           return figcaption?.textContent ?? '';
         },
-        renderHTML: (attributes) => {
-          if (!attributes['caption']) return {};
-          return { 'data-caption': attributes['caption'] };
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          if (!attributes.caption) return {};
+          return { 'data-caption': attributes.caption };
         },
       },
       alignment: {
@@ -169,24 +169,24 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           if (alignment === 'left' || alignment === 'right') return alignment;
           return 'center';
         },
-        renderHTML: (attributes) => {
-          return { 'data-alignment': attributes['alignment'] || 'center' };
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          return { 'data-alignment': attributes.alignment };
         },
       },
       width: {
         default: null,
         parseHTML: (element) => element.getAttribute('data-width'),
-        renderHTML: (attributes) => {
-          if (!attributes['width']) return {};
-          return { 'data-width': attributes['width'] };
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          if (!attributes.width) return {};
+          return { 'data-width': attributes.width };
         },
       },
       linkHref: {
         default: null,
         parseHTML: (element) => element.getAttribute('data-link-href'),
-        renderHTML: (attributes) => {
-          if (!attributes['linkHref']) return {};
-          return { 'data-link-href': attributes['linkHref'] };
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          if (!attributes.linkHref) return {};
+          return { 'data-link-href': attributes.linkHref };
         },
       },
     };
@@ -203,14 +203,15 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
   renderHTML({ HTMLAttributes }) {
     // Static HTML representation (for copy/paste, export, etc.)
     // The actual rendering is done by addNodeView
+    const attrs = HTMLAttributes as ImageNodeAttrs;
     return [
       'figure',
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         class: 'notecove-image',
       }),
-      ['img', { alt: HTMLAttributes['alt'] || '' }],
-      HTMLAttributes['caption']
-        ? ['figcaption', {}, HTMLAttributes['caption']]
+      ['img', { alt: attrs.alt }],
+      attrs.caption
+        ? ['figcaption', {}, attrs.caption]
         : ['figcaption', { style: 'display: none' }],
     ];
   },
@@ -307,7 +308,7 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         const { imageId, sdId, alt, caption: captionText, alignment, width } = nodeAttrs;
 
         // Update alignment
-        wrapper.dataset['alignment'] = alignment || 'center';
+        wrapper.dataset['alignment'] = alignment;
 
         // Update width
         if (width) {
@@ -335,11 +336,12 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           const cacheKey = `${sdId}:${imageId}`;
 
           // Check cache first
-          if (imageDataCache.has(cacheKey)) {
+          const cachedData = imageDataCache.get(cacheKey);
+          if (cachedData) {
             debugLog('Image loaded from cache:', { imageId, sdId });
             loadingPlaceholder.style.display = 'none';
             errorPlaceholder.style.display = 'none';
-            img.src = imageDataCache.get(cacheKey)!;
+            img.src = cachedData;
             img.style.display = '';
             return;
           }

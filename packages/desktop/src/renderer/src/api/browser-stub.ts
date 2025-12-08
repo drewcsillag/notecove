@@ -244,6 +244,17 @@ export const browserApiStub: typeof window.electronAPI = {
     reportEditorState: notImplemented('windowState.reportEditorState'),
     getSavedState: notImplemented('windowState.getSavedState'),
   },
+
+  image: {
+    save: notImplemented('image.save'),
+    getDataUrl: notImplemented('image.getDataUrl'),
+    getPath: notImplemented('image.getPath'),
+    delete: notImplemented('image.delete'),
+    exists: notImplemented('image.exists'),
+    getMetadata: notImplemented('image.getMetadata'),
+    list: notImplemented('image.list'),
+    getStorageStats: notImplemented('image.getStorageStats'),
+  },
 };
 
 /**

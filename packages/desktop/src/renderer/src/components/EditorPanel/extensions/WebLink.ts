@@ -133,8 +133,8 @@ export const WebLink = Link.extend({
 
   addOptions() {
     return {
-      // Parent is always defined when extending, but TypeScript doesn't know that
-
+      // Optional chaining required here - without it, the app fails to render (blank window bug)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       ...this.parent?.(),
       // Only allow http and https protocols
       protocols: ['http', 'https'],

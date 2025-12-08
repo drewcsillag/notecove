@@ -270,7 +270,24 @@ export const webClient: typeof window.electronAPI = {
     },
     moveToSD: browserNotAvailable('note.moveToSD'),
     getMetadata: async (noteId: string) => {
-      return apiRequest('GET', `/api/notes/${noteId}`);
+      const response = await apiRequest<{
+        id: string;
+        title: string;
+        folderId: string | null;
+        created: number;
+        modified: number;
+        deleted: boolean;
+      }>('GET', `/api/notes/${noteId}`);
+
+      // Map API response to IPC format
+      return {
+        noteId: response.id,
+        title: response.title,
+        folderId: response.folderId ?? '',
+        createdAt: response.created,
+        modifiedAt: response.modified,
+        deleted: response.deleted,
+      };
     },
     updateTitle: async (noteId: string, title: string, contentText?: string) => {
       await apiRequest('POST', `/api/notes/${noteId}/title`, { title, contentText });
@@ -751,6 +768,78 @@ export const webClient: typeof window.electronAPI = {
     getSavedState: async () => {
       // No saved state in web client
       return null;
+    },
+  },
+
+  // Image operations via REST API
+  image: {
+    save: async (sdId: string, data: Uint8Array, mimeType: string) => {
+      return apiRequest<{ imageId: string; filename: string }>('POST', `/api/images/${sdId}`, {
+        data: Array.from(data),
+        mimeType,
+      });
+    },
+    getDataUrl: async (sdId: string, imageId: string) => {
+      try {
+        const response = await apiRequest<{ dataUrl: string }>(
+          'GET',
+          `/api/images/${sdId}/${imageId}/data`
+        );
+        return response.dataUrl;
+      } catch {
+        return null;
+      }
+    },
+    getPath: async (_sdId: string, _imageId: string) => {
+      // File paths are not meaningful in browser context
+      return Promise.resolve(null);
+    },
+    delete: async (sdId: string, imageId: string) => {
+      await apiRequest('DELETE', `/api/images/${sdId}/${imageId}`);
+    },
+    exists: async (sdId: string, imageId: string) => {
+      try {
+        await apiRequest('HEAD', `/api/images/${sdId}/${imageId}`);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    getMetadata: async (imageId: string) => {
+      try {
+        return await apiRequest<{
+          id: string;
+          sdId: string;
+          filename: string;
+          mimeType: string;
+          width: number | null;
+          height: number | null;
+          size: number;
+          created: number;
+        }>('GET', `/api/images/metadata/${imageId}`);
+      } catch {
+        return null;
+      }
+    },
+    list: async (sdId: string) => {
+      return apiRequest<
+        {
+          id: string;
+          sdId: string;
+          filename: string;
+          mimeType: string;
+          width: number | null;
+          height: number | null;
+          size: number;
+          created: number;
+        }[]
+      >('GET', `/api/images/${sdId}`);
+    },
+    getStorageStats: async (sdId: string) => {
+      return apiRequest<{ totalSize: number; imageCount: number }>(
+        'GET',
+        `/api/images/${sdId}/stats`
+      );
     },
   },
 };

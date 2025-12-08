@@ -45,38 +45,41 @@ describe('NotecoveImage Extension', () => {
     it('should define image as a block node', () => {
       const imageType = editor.schema.nodes['notecoveImage'];
       expect(imageType).toBeDefined();
-      expect(imageType.spec.group).toBe('block');
+      expect(imageType?.spec.group).toBe('block');
     });
 
     it('should be an atom (not editable content)', () => {
       const imageType = editor.schema.nodes['notecoveImage'];
-      expect(imageType.spec.atom).toBe(true);
+      expect(imageType).toBeDefined();
+      expect(imageType?.spec.atom).toBe(true);
     });
 
     it('should have all required attributes with defaults', () => {
       const imageType = editor.schema.nodes['notecoveImage'];
-      const attrs = imageType.spec.attrs as Record<string, { default: unknown }>;
+      expect(imageType).toBeDefined();
+      const attrs = imageType?.spec.attrs as Record<string, { default: unknown }> | undefined;
+      expect(attrs).toBeDefined();
 
-      expect(attrs['imageId']).toBeDefined();
-      expect(attrs['imageId'].default).toBeNull();
+      expect(attrs?.['imageId']).toBeDefined();
+      expect(attrs?.['imageId']?.default).toBeNull();
 
-      expect(attrs['sdId']).toBeDefined();
-      expect(attrs['sdId'].default).toBeNull();
+      expect(attrs?.['sdId']).toBeDefined();
+      expect(attrs?.['sdId']?.default).toBeNull();
 
-      expect(attrs['alt']).toBeDefined();
-      expect(attrs['alt'].default).toBe('');
+      expect(attrs?.['alt']).toBeDefined();
+      expect(attrs?.['alt']?.default).toBe('');
 
-      expect(attrs['caption']).toBeDefined();
-      expect(attrs['caption'].default).toBe('');
+      expect(attrs?.['caption']).toBeDefined();
+      expect(attrs?.['caption']?.default).toBe('');
 
-      expect(attrs['alignment']).toBeDefined();
-      expect(attrs['alignment'].default).toBe('center');
+      expect(attrs?.['alignment']).toBeDefined();
+      expect(attrs?.['alignment']?.default).toBe('center');
 
-      expect(attrs['width']).toBeDefined();
-      expect(attrs['width'].default).toBeNull();
+      expect(attrs?.['width']).toBeDefined();
+      expect(attrs?.['width']?.default).toBeNull();
 
-      expect(attrs['linkHref']).toBeDefined();
-      expect(attrs['linkHref'].default).toBeNull();
+      expect(attrs?.['linkHref']).toBeDefined();
+      expect(attrs?.['linkHref']?.default).toBeNull();
     });
   });
 
