@@ -6,7 +6,7 @@
 
 /* eslint-disable @typescript-eslint/require-await */
 
-import { ipcMain, type IpcMainInvokeEvent, BrowserWindow, dialog } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent, BrowserWindow, dialog, net } from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
@@ -22,7 +22,14 @@ import type {
   DeletionLogger,
   ImageCache,
 } from '@notecove/shared';
-import { extractTags, extractLinks, ImageStorage, SyncDirectoryStructure } from '@notecove/shared';
+import {
+  extractTags,
+  extractLinks,
+  ImageStorage,
+  getMimeTypeFromExtension,
+  isSupportedMimeType,
+  SyncDirectoryStructure,
+} from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 
 /**
@@ -320,6 +327,7 @@ export class IPCHandlers {
     ipcMain.handle('image:list', this.handleImageList.bind(this));
     ipcMain.handle('image:getStorageStats', this.handleImageGetStorageStats.bind(this));
     ipcMain.handle('image:pickAndSave', this.handleImagePickAndSave.bind(this));
+    ipcMain.handle('image:downloadAndSave', this.handleImageDownloadAndSave.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -2933,7 +2941,7 @@ export class IPCHandlers {
     }
 
     // Validate MIME type
-    if (!ImageStorage.isSupportedMimeType(mimeType)) {
+    if (!isSupportedMimeType(mimeType)) {
       throw new Error(`Unsupported image MIME type: ${mimeType}`);
     }
 
@@ -3147,20 +3155,20 @@ export class IPCHandlers {
     for (const filePath of result.filePaths) {
       try {
         // Read file data
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
         const data = await fs.readFile(filePath);
 
         // Determine MIME type from extension
         const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
-        const mimeType = ImageStorage.getMimeTypeFromExtension(ext);
+        const mimeType = getMimeTypeFromExtension(ext);
 
-        if (!mimeType || !ImageStorage.isSupportedMimeType(mimeType)) {
+        if (!mimeType || !isSupportedMimeType(mimeType)) {
           console.warn(`[IPCHandlers] Skipping unsupported file type: ${filePath}`);
           continue;
         }
 
         // Save the image
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
         const saveResult = await imageStorage.saveImage(new Uint8Array(data), mimeType);
 
         // Add to database cache
@@ -3171,7 +3179,7 @@ export class IPCHandlers {
           mimeType,
           width: null,
           height: null,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
           size: data.length,
           created: Date.now(),
         });
@@ -3183,6 +3191,92 @@ export class IPCHandlers {
     }
 
     return imageIds;
+  }
+
+  /**
+   * Download an image from a URL and save it to the media folder
+   *
+   * Supports:
+   * - Remote URLs (http://, https://) - downloaded via Electron's net.fetch
+   * - Local file URLs (file://) - read from local filesystem
+   */
+  private async handleImageDownloadAndSave(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    url: string
+  ): Promise<string> {
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    let imageData: Uint8Array;
+    let mimeType: string | null = null;
+
+    // Handle file:// URLs by reading from local filesystem
+    if (url.startsWith('file://')) {
+      const filePath = url.slice(7); // Remove 'file://' prefix
+
+      const data = await fs.readFile(filePath);
+
+      imageData = new Uint8Array(data);
+
+      // Infer MIME type from extension
+      const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+      mimeType = getMimeTypeFromExtension(ext);
+    } else {
+      // Remote URL - use Electron's net.fetch to avoid CORS issues
+      const response = await net.fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+
+      // Get MIME type from Content-Type header or infer from URL
+      mimeType = response.headers.get('content-type');
+
+      // If no Content-Type, try to infer from URL extension
+      if (!mimeType) {
+        const urlPath = new URL(url).pathname;
+        const ext = urlPath.split('.').pop()?.toLowerCase() ?? '';
+        mimeType = getMimeTypeFromExtension(ext);
+      }
+
+      const buffer = await response.arrayBuffer();
+      imageData = new Uint8Array(buffer);
+    }
+
+    // Validate MIME type
+    if (!mimeType || !isSupportedMimeType(mimeType)) {
+      throw new Error(`Unsupported image type: ${mimeType ?? 'unknown'}`);
+    }
+
+    // Create ImageStorage instance
+    const fsAdapter = new NodeFileSystemAdapter();
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: sdId,
+      path: sd.path,
+      label: sd.name,
+    });
+    const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+
+    // Save the image
+    const saveResult = await imageStorage.saveImage(imageData, mimeType);
+
+    // Add to database cache
+    await this.database.upsertImage({
+      id: saveResult.imageId,
+      sdId,
+      filename: saveResult.filename,
+      mimeType,
+      width: null,
+      height: null,
+      size: imageData.length,
+      created: Date.now(),
+    });
+
+    return saveResult.imageId;
   }
 
   // ============================================================================

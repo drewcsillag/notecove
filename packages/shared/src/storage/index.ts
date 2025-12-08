@@ -16,6 +16,9 @@ export { DeletionSync, type DeletionSyncCallbacks } from './deletion-sync';
 export { SdUuidManager, type SdIdFile, type SdUuidInitResult } from './sd-uuid';
 export {
   ImageStorage,
+  getMimeTypeFromExtension,
+  isSupportedMimeType,
+  getExtensionFromMimeType,
   type SaveImageResult,
   type ImageInfo,
   type ParsedImageFilename,

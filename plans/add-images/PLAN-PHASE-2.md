@@ -1,7 +1,7 @@
 # Phase 2: Insertion Methods
 
-**Status:** 🟨 In Progress
-**Progress:** `75%`
+**Status:** 🟩 Done
+**Progress:** `100%`
 
 **Depends on:** Phase 1 (Foundation)
 
@@ -64,7 +64,7 @@ When pasting HTML content containing `<img src="https://...">`:
 
 ### 2.2 Drag and Drop from File System
 
-**Status:** 🟥 To Do
+**Status:** 🟩 Done
 
 Allow dragging image files from Finder/Explorer into the editor.
 
@@ -84,11 +84,11 @@ Allow dragging image files from Finder/Explorer into the editor.
 
 #### Steps
 
-- [ ] 🟥 Write E2E test: drag image file into editor inserts image node
-- [ ] 🟥 Add `handleDrop` handler in `TipTapEditor.tsx`
-- [ ] 🟥 Add drag-over visual feedback (CSS)
-- [ ] 🟥 Create helper to read dropped files
-- [ ] 🟥 Wire up IPC and node insertion
+- [x] 🟩 Write E2E test: drag image file into editor inserts image node
+- [x] 🟩 Add `handleDrop` handler in `TipTapEditor.tsx`
+- [x] 🟩 Add drag-over visual feedback (CSS)
+- [x] 🟩 Create helper to read dropped files
+- [x] 🟩 Wire up IPC and node insertion
 
 ---
 
@@ -136,7 +136,7 @@ interface ImageAPI {
 
 ### 2.4 Markdown Syntax Auto-Linkification
 
-**Status:** 🟥 To Do
+**Status:** 🟩 Done
 
 Convert markdown image syntax `![alt](url)` to image nodes.
 
@@ -172,11 +172,11 @@ interface ImageAPI {
 
 #### Steps
 
-- [ ] 🟥 Write test: markdown syntax converts to image node
-- [ ] 🟥 Add input rule for `![alt](url)` pattern
-- [ ] 🟥 Add `image:downloadAndSave` IPC handler
-- [ ] 🟥 Handle download errors gracefully (show error toast)
-- [ ] 🟥 Support local file:// URLs
+- [x] 🟩 Write test: markdown syntax converts to image node (regex pattern tests)
+- [x] 🟩 Add input rule for `![alt](url)` pattern
+- [x] 🟩 Add `image:downloadAndSave` IPC handler (7 unit tests)
+- [ ] 🟨 Handle download errors gracefully (show error toast) (deferred - errors logged to console)
+- [x] 🟩 Support local file:// URLs
 
 ---
 

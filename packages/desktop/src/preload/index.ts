@@ -1583,6 +1583,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     pickAndSave: (sdId: string): Promise<string[]> =>
       ipcRenderer.invoke('image:pickAndSave', sdId) as Promise<string[]>,
+
+    /**
+     * Download an image from a URL and save it to the media folder
+     * @param sdId Storage directory ID
+     * @param url Image URL (http://, https://, or file://)
+     * @returns The imageId of the saved image
+     */
+    downloadAndSave: (sdId: string, url: string): Promise<string> =>
+      ipcRenderer.invoke('image:downloadAndSave', sdId, url) as Promise<string>,
   },
 });
 

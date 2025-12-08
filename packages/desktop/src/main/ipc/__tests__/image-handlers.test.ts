@@ -19,6 +19,9 @@ jest.mock('electron', () => ({
     showOpenDialog: jest.fn(),
     showMessageBox: jest.fn(),
   },
+  net: {
+    fetch: jest.fn(),
+  },
 }));
 
 // Mock Node.js fs/promises
@@ -735,6 +738,145 @@ describe('IPCHandlers - Image Operations', () => {
 
       // Should return empty array since PDF is not a supported image type
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('image:downloadAndSave', () => {
+    it('should register the handler', () => {
+      expect(registeredHandlers.has('image:downloadAndSave')).toBe(true);
+    });
+
+    it('should download remote image and save it, returning imageId', async () => {
+      const { net } = await import('electron');
+      const sdId = 'sd-1';
+      const url = 'https://example.com/image.png';
+      const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+
+      // Mock net.fetch to return a successful response
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: {
+          get: jest.fn().mockReturnValue('image/png'),
+        },
+        arrayBuffer: jest.fn().mockResolvedValue(imageData.buffer),
+      };
+      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      // Mock fs operations
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:downloadAndSave');
+      const result = (await handler!({} as unknown, sdId, url)) as string;
+
+      // Verify fetch was called with the URL
+      expect(net.fetch).toHaveBeenCalledWith(url);
+
+      // Verify result is an imageId
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+
+      // Verify image was upserted to database
+      expect(mockDatabase.upsertImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sdId,
+          mimeType: 'image/png',
+        })
+      );
+    });
+
+    it('should infer mime type from URL extension if Content-Type is missing', async () => {
+      const { net } = await import('electron');
+      const sdId = 'sd-1';
+      const url = 'https://example.com/photo.jpg';
+      const imageData = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]); // JPEG magic bytes
+
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: {
+          get: jest.fn().mockReturnValue(null), // No Content-Type header
+        },
+        arrayBuffer: jest.fn().mockResolvedValue(imageData.buffer),
+      };
+      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:downloadAndSave');
+      const result = (await handler!({} as unknown, sdId, url)) as string;
+
+      expect(typeof result).toBe('string');
+      expect(mockDatabase.upsertImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mimeType: 'image/jpeg',
+        })
+      );
+    });
+
+    it('should read local file:// URLs from filesystem', async () => {
+      const sdId = 'sd-1';
+      const url = 'file:///Users/test/images/photo.png';
+      const imageData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+      // Mock fs.readFile for local file
+      (fs.readFile as jest.Mock).mockResolvedValue(imageData);
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:downloadAndSave');
+      const result = (await handler!({} as unknown, sdId, url)) as string;
+
+      // Should read from local filesystem, not use net.fetch
+      expect(fs.readFile).toHaveBeenCalledWith('/Users/test/images/photo.png');
+      expect(typeof result).toBe('string');
+    });
+
+    it('should throw if SD not found', async () => {
+      mockDatabase.getStorageDir.mockResolvedValue(null);
+
+      const handler = registeredHandlers.get('image:downloadAndSave');
+
+      await expect(
+        handler!({} as unknown, 'nonexistent-sd', 'https://example.com/image.png')
+      ).rejects.toThrow('Storage directory not found');
+    });
+
+    it('should throw on network failure', async () => {
+      const { net } = await import('electron');
+
+      const mockResponse = {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      };
+      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const handler = registeredHandlers.get('image:downloadAndSave');
+
+      await expect(
+        handler!({} as unknown, 'sd-1', 'https://example.com/missing.png')
+      ).rejects.toThrow('Failed to download image');
+    });
+
+    it('should throw on unsupported mime type', async () => {
+      const { net } = await import('electron');
+      const url = 'https://example.com/document.pdf';
+
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: {
+          get: jest.fn().mockReturnValue('application/pdf'),
+        },
+        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(4)),
+      };
+      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const handler = registeredHandlers.get('image:downloadAndSave');
+
+      await expect(handler!({} as unknown, 'sd-1', url)).rejects.toThrow('Unsupported image type');
     });
   });
 });

@@ -14,8 +14,16 @@
  * @see plans/add-images/PLAN-PHASE-1.md
  */
 
-import { Node, mergeAttributes } from '@tiptap/core';
+import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+
+/**
+ * Regex pattern for markdown image syntax: ![alt](url) followed by space
+ * Captures:
+ * - Group 1: Alt text (anything except [ and ])
+ * - Group 2: URL (http://, https://, or file://)
+ */
+const MARKDOWN_IMAGE_REGEX = /!\[([^[\]]*)\]\((https?:\/\/[^\s<>)]+|file:\/\/[^\s<>)]+)\) $/;
 
 // Debug logging enabled in development mode
 // Check for Vite's import.meta.env or fallback to process.env for Jest
@@ -232,6 +240,70 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           return commands.updateAttributes(this.name, attrs);
         },
     };
+  },
+
+  addInputRules() {
+    const editor = this.editor;
+    const imageNodeType = this.type;
+
+    // Input rule for markdown image syntax: ![alt](url) followed by space
+    const markdownImageRule = new InputRule({
+      find: MARKDOWN_IMAGE_REGEX,
+      handler: ({ state, range, match }) => {
+        const altText = match[1] ?? '';
+        const url = match[2];
+
+        if (!url) {
+          debugLog('Invalid markdown image match, missing URL');
+          return null;
+        }
+
+        debugLog(`Markdown image detected: alt="${altText}", url="${url}"`);
+
+        // Delete the markdown syntax immediately
+        const tr = state.tr.delete(range.from, range.to);
+        editor.view.dispatch(tr);
+
+        // Start the async download and insertion
+        void (async () => {
+          try {
+            // Get active SD
+            const sdId = await window.electronAPI.sd.getActive();
+            if (!sdId) {
+              console.error('[NotecoveImage] No active storage directory');
+              return;
+            }
+
+            debugLog('Downloading image from URL:', url);
+
+            // Download and save the image
+            const imageId = await window.electronAPI.image.downloadAndSave(sdId, url);
+
+            debugLog('Image downloaded successfully:', { imageId, altText });
+
+            // Insert the image node at the current cursor position
+            const insertTr = editor.state.tr;
+            const node = imageNodeType.create({
+              imageId,
+              sdId,
+              alt: altText,
+            });
+
+            // Insert at current selection
+            const pos = editor.state.selection.from;
+            insertTr.insert(pos, node);
+            editor.view.dispatch(insertTr);
+          } catch (error) {
+            console.error('[NotecoveImage] Failed to download image:', error);
+            // TODO: Show toast notification to user
+          }
+        })();
+
+        return null;
+      },
+    });
+
+    return [markdownImageRule];
   },
 
   addNodeView() {

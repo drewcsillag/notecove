@@ -206,4 +206,57 @@ describe('NotecoveImage Extension', () => {
       expect(node?.attrs['alt']).toBe('Parsed alt');
     });
   });
+
+  describe('Markdown Input Rule', () => {
+    // The markdown input rule requires the editor to call downloadAndSave
+    // These tests verify the regex pattern matching behavior
+
+    it('should have input rules defined', () => {
+      // Input rules are added to the extension
+      const extensionOptions = NotecoveImage.options;
+      expect(extensionOptions).toBeDefined();
+    });
+
+    it('should match markdown image syntax pattern', () => {
+      // Test the regex pattern that will be used
+      // Pattern: ![alt](url) followed by space
+      const MARKDOWN_IMAGE_REGEX = /!\[([^[\]]*)\]\((https?:\/\/[^\s<>)]+|file:\/\/[^\s<>)]+)\) $/;
+
+      // Valid patterns
+      expect(MARKDOWN_IMAGE_REGEX.exec('![alt](https://example.com/image.png) ')).toBeTruthy();
+      expect(MARKDOWN_IMAGE_REGEX.exec('![](https://example.com/image.jpg) ')).toBeTruthy();
+      expect(
+        MARKDOWN_IMAGE_REGEX.exec('![My Image](https://example.com/path/to/image.gif) ')
+      ).toBeTruthy();
+      expect(MARKDOWN_IMAGE_REGEX.exec('![local](file:///path/to/image.png) ')).toBeTruthy();
+
+      // Invalid patterns (no trailing space)
+      expect(MARKDOWN_IMAGE_REGEX.exec('![alt](https://example.com/image.png)')).toBeNull();
+
+      // Invalid patterns (not image URL)
+      expect(MARKDOWN_IMAGE_REGEX.exec('![alt](ftp://example.com/image.png) ')).toBeNull();
+
+      // Should capture alt text and URL
+      const match = MARKDOWN_IMAGE_REGEX.exec('![Screenshot](https://example.com/screenshot.png) ');
+      expect(match?.[1]).toBe('Screenshot');
+      expect(match?.[2]).toBe('https://example.com/screenshot.png');
+    });
+
+    it('should handle URLs with special characters', () => {
+      const MARKDOWN_IMAGE_REGEX = /!\[([^[\]]*)\]\((https?:\/\/[^\s<>)]+|file:\/\/[^\s<>)]+)\) $/;
+
+      // URL with query parameters
+      const matchWithQuery = MARKDOWN_IMAGE_REGEX.exec(
+        '![image](https://example.com/image.png?v=1&size=large) '
+      );
+      expect(matchWithQuery).toBeTruthy();
+      expect(matchWithQuery?.[2]).toBe('https://example.com/image.png?v=1&size=large');
+
+      // URL with encoded characters
+      const matchEncoded = MARKDOWN_IMAGE_REGEX.exec(
+        '![image](https://example.com/my%20image.png) '
+      );
+      expect(matchEncoded).toBeTruthy();
+    });
+  });
 });

@@ -18,7 +18,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@shared/(.*)$': '<rootDir>/../shared/src/$1',
-    '^@notecove/shared$': '<rootDir>/../shared/src/index.ts',
+    '^@notecove/shared$': '<rootDir>/../shared/dist/cjs/index.js',
     '^@minoru/react-dnd-treeview$': '<rootDir>/src/__mocks__/@minoru/react-dnd-treeview.tsx',
     '^react-dnd$': '<rootDir>/src/__mocks__/react-dnd.tsx',
     '^react-dnd-html5-backend$': '<rootDir>/src/__mocks__/react-dnd-html5-backend.tsx',

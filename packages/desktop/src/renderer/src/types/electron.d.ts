@@ -660,6 +660,7 @@ declare global {
         >;
         getStorageStats: (sdId: string) => Promise<{ totalSize: number; imageCount: number }>;
         pickAndSave: (sdId: string) => Promise<string[]>;
+        downloadAndSave: (sdId: string, url: string) => Promise<string>;
       };
     };
   }

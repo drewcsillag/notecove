@@ -67,6 +67,30 @@ export interface ParsedImageFilename {
 }
 
 /**
+ * Get MIME type for a file extension
+ * @param extension Extension (without dot, case-insensitive)
+ * @returns MIME type or null if unsupported
+ */
+export function getMimeTypeFromExtension(extension: string): string | null {
+  return EXTENSION_TO_MIME[extension.toLowerCase()] || null;
+}
+
+/**
+ * Check if a MIME type is supported
+ */
+export function isSupportedMimeType(mimeType: string): boolean {
+  return mimeType in MIME_TO_EXTENSION;
+}
+
+/**
+ * Get file extension for a MIME type
+ * @returns Extension (without dot) or null if unsupported
+ */
+export function getExtensionFromMimeType(mimeType: string): string | null {
+  return MIME_TO_EXTENSION[mimeType] || null;
+}
+
+/**
  * ImageStorage class
  * Handles file operations for images in sync directories
  */

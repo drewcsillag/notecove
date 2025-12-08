@@ -56,6 +56,38 @@ test.beforeEach(async () => {
 }, 90000);
 
 test.afterEach(async () => {
+  // Stop web server first to free the port
+  try {
+    // Open settings if not already open
+    try {
+      await electronPage.keyboard.press('Meta+,');
+      await electronPage.waitForSelector('text=Settings', { timeout: 2000 });
+    } catch {
+      // Settings already open or page not available
+    }
+
+    // Try to navigate to web server tab
+    try {
+      await electronPage.click('text=Web Server', { timeout: 2000 });
+      await electronPage.waitForTimeout(500);
+
+      // Check if server is running and stop it
+      const runningChip = electronPage.locator('text=Running');
+      const isVisible = await runningChip.isVisible().catch(() => false);
+
+      if (isVisible) {
+        const serverSwitch = electronPage.locator('input[type="checkbox"]').first();
+        await serverSwitch.click();
+        await electronPage.waitForSelector('text=Stopped', { timeout: 5000 });
+        console.log('[E2E] Stopped web server before cleanup');
+      }
+    } catch {
+      // Server wasn't running or couldn't be accessed
+    }
+  } catch (err) {
+    console.error('[E2E] Error stopping web server:', err);
+  }
+
   // Close browser
   try {
     await browserPage?.close();
@@ -82,6 +114,9 @@ test.afterEach(async () => {
   } catch (err) {
     console.error('[E2E] Failed to clean up test userData directory:', err);
   }
+
+  // Wait a bit to ensure port is fully released
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 });
 
 test.describe('Web Server', () => {
