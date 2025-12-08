@@ -319,6 +319,7 @@ export class IPCHandlers {
     ipcMain.handle('image:getMetadata', this.handleImageGetMetadata.bind(this));
     ipcMain.handle('image:list', this.handleImageList.bind(this));
     ipcMain.handle('image:getStorageStats', this.handleImageGetStorageStats.bind(this));
+    ipcMain.handle('image:pickAndSave', this.handleImagePickAndSave.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -3098,6 +3099,90 @@ export class IPCHandlers {
     const totalSize = await this.database.getImageStorageSize(sdId);
     const imageCount = await this.database.getImageCount(sdId);
     return { totalSize, imageCount };
+  }
+
+  /**
+   * Open native file picker and save selected images to storage directory.
+   * Returns array of imageIds for successfully saved images.
+   */
+  private async handleImagePickAndSave(
+    _event: IpcMainInvokeEvent,
+    sdId: string
+  ): Promise<string[]> {
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Show file picker dialog
+    const result = await dialog.showOpenDialog({
+      title: 'Select Images',
+      buttonLabel: 'Insert',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        {
+          name: 'Images',
+          extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'heic', 'heif'],
+        },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return [];
+    }
+
+    // Create ImageStorage instance
+    const fsAdapter = new NodeFileSystemAdapter();
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: sdId,
+      path: sd.path,
+      label: sd.name,
+    });
+    const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+
+    const imageIds: string[] = [];
+
+    // Process each selected file
+    for (const filePath of result.filePaths) {
+      try {
+        // Read file data
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const data = await fs.readFile(filePath);
+
+        // Determine MIME type from extension
+        const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+        const mimeType = ImageStorage.getMimeTypeFromExtension(ext);
+
+        if (!mimeType || !ImageStorage.isSupportedMimeType(mimeType)) {
+          console.warn(`[IPCHandlers] Skipping unsupported file type: ${filePath}`);
+          continue;
+        }
+
+        // Save the image
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        const saveResult = await imageStorage.saveImage(new Uint8Array(data), mimeType);
+
+        // Add to database cache
+        await this.database.upsertImage({
+          id: saveResult.imageId,
+          sdId,
+          filename: saveResult.filename,
+          mimeType,
+          width: null,
+          height: null,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          size: data.length,
+          created: Date.now(),
+        });
+
+        imageIds.push(saveResult.imageId);
+      } catch (err) {
+        console.error(`[IPCHandlers] Failed to save image from ${filePath}:`, err);
+      }
+    }
+
+    return imageIds;
   }
 
   // ============================================================================

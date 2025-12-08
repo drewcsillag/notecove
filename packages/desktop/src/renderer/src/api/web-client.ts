@@ -841,6 +841,11 @@ export const webClient: typeof window.electronAPI = {
         `/api/images/${sdId}/stats`
       );
     },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    pickAndSave: async (_sdId: string) => {
+      // File picker is not supported in web client
+      throw new Error('File picker is not supported in browser mode');
+    },
   },
 };
 

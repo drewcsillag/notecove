@@ -961,6 +961,67 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, [editor]);
 
+  // Keyboard shortcut for inserting images via file picker (Cmd+Shift+I / Ctrl+Shift+I)
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      // Check for Cmd+Shift+I (Mac) or Ctrl+Shift+I (Windows/Linux)
+      // eslint-disable-next-line @typescript-eslint/prefer-includes, @typescript-eslint/no-deprecated
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? event.metaKey : event.ctrlKey;
+
+      if (modifier && event.shiftKey && event.key.toLowerCase() === 'i') {
+        event.preventDefault();
+        event.stopPropagation();
+
+        try {
+          // Get the active SD
+          const sdId = await window.electronAPI.sd.getActive();
+          if (!sdId) {
+            console.error('[TipTapEditor] No active SD, cannot pick images');
+            return;
+          }
+
+          // Open file picker and save selected images
+          const imageIds = await window.electronAPI.image.pickAndSave(sdId);
+
+          if (imageIds.length === 0) {
+            // User canceled or no valid images selected
+            return;
+          }
+
+          // Insert image nodes for each saved image
+          const { state, dispatch } = editor.view;
+          const imageNode = state.schema.nodes['notecoveImage'];
+          if (!imageNode) return;
+
+          let { tr } = state;
+          for (const imageId of imageIds) {
+            const node = imageNode.create({ imageId, sdId });
+            tr = tr.replaceSelectionWith(node);
+          }
+          dispatch(tr);
+
+          console.log('[TipTapEditor] Inserted', imageIds.length, 'images from file picker');
+        } catch (err) {
+          console.error('[TipTapEditor] Failed to pick and insert images:', err);
+        }
+      }
+    };
+
+    // Add listener to the editor DOM element
+    const editorDom = editor.view.dom;
+    const wrappedHandler = (event: Event) => {
+      void handleKeyDown(event as KeyboardEvent);
+    };
+    editorDom.addEventListener('keydown', wrappedHandler);
+
+    return () => {
+      editorDom.removeEventListener('keydown', wrappedHandler);
+    };
+  }, [editor]);
+
   // Manage link popover using tippy.js
   useEffect(() => {
     // Clean up existing popover

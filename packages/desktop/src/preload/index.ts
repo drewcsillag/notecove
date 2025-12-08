@@ -1575,6 +1575,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         totalSize: number;
         imageCount: number;
       }>,
+
+    /**
+     * Open file picker dialog and save selected images
+     * @param sdId Storage directory ID
+     * @returns Array of imageIds for saved images
+     */
+    pickAndSave: (sdId: string): Promise<string[]> =>
+      ipcRenderer.invoke('image:pickAndSave', sdId) as Promise<string[]>,
   },
 });
 

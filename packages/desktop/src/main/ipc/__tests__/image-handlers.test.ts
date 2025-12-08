@@ -624,4 +624,117 @@ describe('IPCHandlers - Image Operations', () => {
       expect(result.imageCount).toBe(10);
     });
   });
+
+  describe('image:pickAndSave', () => {
+    it('should register the handler', () => {
+      expect(registeredHandlers.has('image:pickAndSave')).toBe(true);
+    });
+
+    it('should open file picker, save selected images, and return imageIds', async () => {
+      const { dialog } = await import('electron');
+      const sdId = 'sd-1';
+
+      // Mock dialog to return file paths
+      (dialog.showOpenDialog as jest.Mock).mockResolvedValue({
+        canceled: false,
+        filePaths: ['/path/to/image1.png', '/path/to/image2.jpg'],
+      });
+
+      // Mock fs.readFile to return image data
+      (fs.readFile as jest.Mock).mockImplementation((filePath: string) => {
+        if (filePath.endsWith('.png')) {
+          return Promise.resolve(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+        } else {
+          return Promise.resolve(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+        }
+      });
+
+      // Mock fs operations for save
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      // Set up mock save results in sequence
+      let callCount = 0;
+      mockSaveImageResult = { imageId: 'img-1', filename: 'img-1.png' };
+      const originalGetImagePath = jest.fn();
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      jest.spyOn(require('@notecove/shared'), 'ImageStorage').mockImplementation(() => ({
+        getMediaPath: () => '/test/sd/media',
+        getImagePath: originalGetImagePath,
+        initializeMediaDir: jest.fn().mockResolvedValue(undefined),
+        saveImage: jest.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            return Promise.resolve({ imageId: 'img-1', filename: 'img-1.png' });
+          } else {
+            return Promise.resolve({ imageId: 'img-2', filename: 'img-2.jpg' });
+          }
+        }),
+        readImage: jest.fn(),
+        deleteImage: jest.fn(),
+        imageExists: jest.fn(),
+      }));
+
+      const handler = registeredHandlers.get('image:pickAndSave');
+      const result = (await handler!({} as unknown, sdId)) as string[];
+
+      // Verify dialog was opened with correct filters
+      expect(dialog.showOpenDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.arrayContaining(['openFile', 'multiSelections']),
+          filters: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'Images',
+              extensions: expect.arrayContaining(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']),
+            }),
+          ]),
+        })
+      );
+
+      // Verify result is array of imageIds
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should return empty array if dialog is canceled', async () => {
+      const { dialog } = await import('electron');
+
+      (dialog.showOpenDialog as jest.Mock).mockResolvedValue({
+        canceled: true,
+        filePaths: [],
+      });
+
+      const handler = registeredHandlers.get('image:pickAndSave');
+      const result = (await handler!({} as unknown, 'sd-1')) as string[];
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw if SD not found', async () => {
+      mockDatabase.getStorageDir.mockResolvedValue(null);
+
+      const handler = registeredHandlers.get('image:pickAndSave');
+
+      await expect(handler!({} as unknown, 'nonexistent-sd')).rejects.toThrow(
+        'Storage directory not found'
+      );
+    });
+
+    it('should skip unsupported file types gracefully', async () => {
+      const { dialog } = await import('electron');
+
+      (dialog.showOpenDialog as jest.Mock).mockResolvedValue({
+        canceled: false,
+        filePaths: ['/path/to/document.pdf'], // PDF is not supported
+      });
+
+      (fs.readFile as jest.Mock).mockResolvedValue(Buffer.from([0x25, 0x50, 0x44, 0x46]));
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:pickAndSave');
+      const result = (await handler!({} as unknown, 'sd-1')) as string[];
+
+      // Should return empty array since PDF is not a supported image type
+      expect(result).toEqual([]);
+    });
+  });
 });
