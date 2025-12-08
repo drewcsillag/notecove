@@ -1,7 +1,7 @@
 # Phase 2: Insertion Methods
 
 **Status:** 🟨 In Progress
-**Progress:** `25%`
+**Progress:** `50%`
 
 **Depends on:** Phase 1 (Foundation)
 

@@ -252,16 +252,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
                 console.log('[TipTapEditor] Saving image, size:', data.length, 'type:', mimeType);
 
-                // Save the image via IPC
-                const imageId = await window.electronAPI.image.save(sdId, data, mimeType);
-                console.log('[TipTapEditor] Image saved with ID:', imageId);
+                // Save the image via IPC (returns {imageId, filename})
+                const result = await window.electronAPI.image.save(sdId, data, mimeType);
+                console.log('[TipTapEditor] Image saved with ID:', result.imageId);
 
                 // Insert the image node at current cursor position
                 const { state } = view;
                 const imageNode = state.schema.nodes['notecoveImage'];
                 if (imageNode) {
                   const node = imageNode.create({
-                    imageId,
+                    imageId: result.imageId,
                     sdId,
                   });
                   const tr = state.tr.replaceSelectionWith(node);
@@ -282,6 +282,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         // Let other handlers process non-image paste
         return false;
       },
+      // Note: Image drop is handled by a DOM-level event listener in a useEffect
+      // below. ProseMirror's handleDrop prop doesn't get triggered by synthetic
+      // events (from tests), so we use the DOM listener which works for both.
+
       // Custom clipboard text serializer to fix newline handling when copying
       // Default TipTap behavior adds too many newlines within lists.
       // We want:
@@ -853,6 +857,109 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     hasRestoredStateRef.current = false;
     savedStateRef.current = null;
   }, [noteId]);
+
+  // DOM-level drop handler for image files
+  // ProseMirror's handleDrop prop doesn't get triggered by synthetic events,
+  // so we add a DOM listener directly for both native and synthetic drops.
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleDomDrop = async (event: DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+      if (!dataTransfer) return;
+
+      // Check both files and items (items works better in some contexts like tests)
+      const files = dataTransfer.files;
+      const items = dataTransfer.items;
+
+      // Collect files to process
+      const imageFiles: File[] = [];
+
+      // First try files (preferred for native drops)
+      if (files.length > 0) {
+        for (const file of files) {
+          if (file.type.startsWith('image/')) {
+            imageFiles.push(file);
+          }
+        }
+      }
+
+      // If no files found, try items (works better in synthetic events)
+      if (imageFiles.length === 0 && items.length > 0) {
+        for (const item of items) {
+          if (item.kind === 'file' && item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) {
+              imageFiles.push(file);
+            }
+          }
+        }
+      }
+
+      if (imageFiles.length === 0) return;
+
+      // Prevent default drop handling
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Process each image file
+      for (const file of imageFiles) {
+        console.log(
+          '[TipTapEditor] DOM drop handler: Image detected, type:',
+          file.type,
+          'name:',
+          file.name
+        );
+
+        try {
+          // Read as ArrayBuffer and save via IPC
+          const buffer = await file.arrayBuffer();
+
+          // Get the active SD to save the image in
+          const sdId = await window.electronAPI.sd.getActive();
+          if (!sdId) {
+            console.error('[TipTapEditor] No active SD, cannot save dropped image');
+            return;
+          }
+
+          const data = new Uint8Array(buffer);
+          const mimeType = file.type;
+
+          console.log('[TipTapEditor] Saving dropped image, size:', data.length, 'type:', mimeType);
+
+          // Save the image via IPC (returns {imageId, filename})
+          const result = await window.electronAPI.image.save(sdId, data, mimeType);
+          console.log('[TipTapEditor] Dropped image saved with ID:', result.imageId);
+
+          // Insert the image node at current cursor position
+          const { state, dispatch } = editor.view;
+          const imageNode = state.schema.nodes['notecoveImage'];
+          if (imageNode) {
+            const node = imageNode.create({
+              imageId: result.imageId,
+              sdId,
+            });
+            const tr = state.tr.replaceSelectionWith(node);
+            dispatch(tr);
+            console.log('[TipTapEditor] Dropped image node inserted');
+          }
+        } catch (err) {
+          console.error('[TipTapEditor] Failed to save dropped image:', err);
+        }
+      }
+    };
+
+    // Get the editor's DOM element
+    const editorDom = editor.view.dom;
+    const wrappedHandler = (event: Event) => {
+      void handleDomDrop(event as DragEvent);
+    };
+    editorDom.addEventListener('drop', wrappedHandler);
+
+    return () => {
+      editorDom.removeEventListener('drop', wrappedHandler);
+    };
+  }, [editor]);
 
   // Manage link popover using tippy.js
   useEffect(() => {

@@ -49,10 +49,7 @@ async function writeTestImageToClipboard(electronApp: ElectronApplication): Prom
  * and doesn't trigger DOM paste events with clipboard data. This helper dispatches
  * a proper ClipboardEvent with image data directly to the ProseMirror editor.
  */
-async function pasteImageToEditor(
-  electronApp: ElectronApplication,
-  page: Page
-): Promise<void> {
+async function pasteImageToEditor(electronApp: ElectronApplication, page: Page): Promise<void> {
   // Get the PNG data from clipboard
   const pngBase64 = await electronApp.evaluate(async ({ clipboard }) => {
     const image = clipboard.readImage();
