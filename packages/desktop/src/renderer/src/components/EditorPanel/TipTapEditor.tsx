@@ -219,6 +219,69 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
       },
+      // Handle image paste from clipboard
+      handlePaste: (view, event, _slice) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+
+        // Look for image data in clipboard
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            console.log('[TipTapEditor] Image paste detected, type:', item.type);
+
+            // Get the image as a blob
+            const blob = item.getAsFile();
+            if (!blob) {
+              console.log('[TipTapEditor] Could not get blob from clipboard item');
+              continue;
+            }
+
+            // Read as ArrayBuffer and save via IPC
+            blob
+              .arrayBuffer()
+              .then(async (buffer) => {
+                // Get the active SD to save the image in
+                const sdId = await window.electronAPI.sd.getActive();
+                if (!sdId) {
+                  console.error('[TipTapEditor] No active SD, cannot save image');
+                  return;
+                }
+
+                const data = new Uint8Array(buffer);
+                const mimeType = item.type;
+
+                console.log('[TipTapEditor] Saving image, size:', data.length, 'type:', mimeType);
+
+                // Save the image via IPC
+                const imageId = await window.electronAPI.image.save(sdId, data, mimeType);
+                console.log('[TipTapEditor] Image saved with ID:', imageId);
+
+                // Insert the image node at current cursor position
+                const { state } = view;
+                const imageNode = state.schema.nodes['notecoveImage'];
+                if (imageNode) {
+                  const node = imageNode.create({
+                    imageId,
+                    sdId,
+                  });
+                  const tr = state.tr.replaceSelectionWith(node);
+                  view.dispatch(tr);
+                  console.log('[TipTapEditor] Image node inserted');
+                }
+              })
+              .catch((err) => {
+                console.error('[TipTapEditor] Failed to save pasted image:', err);
+              });
+
+            // Prevent default paste handling for this image
+            event.preventDefault();
+            return true;
+          }
+        }
+
+        // Let other handlers process non-image paste
+        return false;
+      },
       // Custom clipboard text serializer to fix newline handling when copying
       // Default TipTap behavior adds too many newlines within lists.
       // We want:

@@ -1,7 +1,7 @@
 # Phase 2: Insertion Methods
 
-**Status:** 🟥 To Do
-**Progress:** `0%`
+**Status:** 🟨 In Progress
+**Progress:** `25%`
 
 **Depends on:** Phase 1 (Foundation)
 
@@ -15,7 +15,7 @@ Enable users to add images to notes via paste, drag-drop, file picker, and markd
 
 ### 2.1 Paste Image from Clipboard
 
-**Status:** 🟥 To Do
+**Status:** 🟩 Done (basic paste)
 
 Detect image data on clipboard when user pastes (Cmd+V).
 
@@ -36,6 +36,8 @@ Detect image data on clipboard when user pastes (Cmd+V).
 
 #### Web Page Paste (HTML with remote images)
 
+**Status:** 🟥 Deferred - to be done in a later phase
+
 When pasting HTML content containing `<img src="https://...">`:
 
 1. Parse HTML for `<img>` tags
@@ -48,15 +50,15 @@ When pasting HTML content containing `<img src="https://...">`:
 
 #### Steps
 
-- [ ] 🟥 Write E2E test: paste image from clipboard inserts image node
-- [ ] 🟥 Write E2E test: paste HTML with remote images downloads and inserts them
-- [ ] 🟥 Add `handlePaste` handler in `TipTapEditor.tsx`
-- [ ] 🟥 Create helper to extract image from clipboard
-- [ ] 🟥 Create helper to parse HTML and extract remote image URLs
-- [ ] 🟥 Wire up IPC call to save image
-- [ ] 🟥 Wire up IPC call to download remote images
-- [ ] 🟥 Insert image node after successful save
-- [ ] 🟥 Handle download failures gracefully (skip image, show toast)
+- [x] 🟩 Write E2E test: paste image from clipboard inserts image node
+- [ ] 🟨 Write E2E test: paste HTML with remote images downloads and inserts them (skipped/deferred)
+- [x] 🟩 Add `handlePaste` handler in `TipTapEditor.tsx`
+- [x] 🟩 Create helper to extract image from clipboard (in handlePaste)
+- [ ] 🟨 Create helper to parse HTML and extract remote image URLs (deferred)
+- [x] 🟩 Wire up IPC call to save image
+- [ ] 🟨 Wire up IPC call to download remote images (deferred)
+- [x] 🟩 Insert image node after successful save
+- [ ] 🟨 Handle download failures gracefully (skip image, show toast) (deferred)
 
 ---
 
