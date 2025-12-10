@@ -661,6 +661,12 @@ declare global {
         getStorageStats: (sdId: string) => Promise<{ totalSize: number; imageCount: number }>;
         pickAndSave: (sdId: string) => Promise<string[]>;
         downloadAndSave: (sdId: string, url: string) => Promise<string>;
+        /** Copy image to clipboard */
+        copyToClipboard: (sdId: string, imageId: string) => Promise<void>;
+        /** Save image as... (with file dialog) */
+        saveAs: (sdId: string, imageId: string) => Promise<string | null>;
+        /** Open image in external application */
+        openExternal: (sdId: string, imageId: string) => Promise<void>;
       };
     };
   }

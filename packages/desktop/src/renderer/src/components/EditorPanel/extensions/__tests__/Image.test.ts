@@ -93,6 +93,7 @@ describe('NotecoveImage Extension', () => {
         alignment: 'center',
         width: '50%',
         linkHref: null,
+        display: 'block',
       };
 
       editor.commands.setContent({
@@ -204,6 +205,91 @@ describe('NotecoveImage Extension', () => {
       expect(node?.attrs['sdId']).toBe('sd-parsed');
       expect(node?.attrs['alignment']).toBe('right');
       expect(node?.attrs['alt']).toBe('Parsed alt');
+    });
+  });
+
+  describe('Display Modes', () => {
+    it('should default to block display mode', () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'test-image',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      const node = editor.state.doc.firstChild;
+      expect(node?.attrs['display']).toBe('block');
+    });
+
+    it('should accept inline display mode', () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'test-image',
+              sdId: 'sd-1',
+              display: 'inline',
+            },
+          },
+        ],
+      });
+
+      const node = editor.state.doc.firstChild;
+      expect(node?.attrs['display']).toBe('inline');
+    });
+
+    it('should serialize display attribute to HTML', () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'test-image',
+              sdId: 'sd-1',
+              display: 'inline',
+            },
+          },
+        ],
+      });
+
+      const html = editor.getHTML();
+      expect(html).toContain('data-display="inline"');
+    });
+
+    it('should parse display attribute from HTML', () => {
+      const html = `
+        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed" data-display="inline">
+          <img alt="Test" />
+        </figure>
+      `;
+
+      editor.commands.setContent(html);
+
+      const node = editor.state.doc.firstChild;
+      expect(node?.type.name).toBe('notecoveImage');
+      expect(node?.attrs['display']).toBe('inline');
+    });
+
+    it('should default to block display when parsing HTML without display attribute', () => {
+      const html = `
+        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed">
+          <img alt="Test" />
+        </figure>
+      `;
+
+      editor.commands.setContent(html);
+
+      const node = editor.state.doc.firstChild;
+      expect(node?.attrs['display']).toBe('block');
     });
   });
 

@@ -1592,6 +1592,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     downloadAndSave: (sdId: string, url: string): Promise<string> =>
       ipcRenderer.invoke('image:downloadAndSave', sdId, url) as Promise<string>,
+
+    /**
+     * Copy image to clipboard
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     */
+    copyToClipboard: (sdId: string, imageId: string): Promise<void> =>
+      ipcRenderer.invoke('image:copyToClipboard', sdId, imageId) as Promise<void>,
+
+    /**
+     * Save image as... (with file dialog)
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     * @returns The file path where the image was saved, or null if cancelled
+     */
+    saveAs: (sdId: string, imageId: string): Promise<string | null> =>
+      ipcRenderer.invoke('image:saveAs', sdId, imageId) as Promise<string | null>,
+
+    /**
+     * Open image in external application
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     */
+    openExternal: (sdId: string, imageId: string): Promise<void> =>
+      ipcRenderer.invoke('image:openExternal', sdId, imageId) as Promise<void>,
   },
 });
 

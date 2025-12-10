@@ -16,6 +16,8 @@
 
 import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { openLightbox } from '../ImageLightbox';
+import { openImageContextMenu } from '../ImageContextMenu';
 
 /**
  * Regex pattern for markdown image syntax: ![alt](url) followed by space
@@ -68,6 +70,8 @@ export interface ImageNodeAttrs {
   width: string | null;
   /** Optional link URL when image is clicked */
   linkHref: string | null;
+  /** Display mode: block (standalone) or inline (within text flow) */
+  display: 'block' | 'inline';
 }
 
 /**
@@ -195,6 +199,17 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         renderHTML: (attributes: ImageNodeAttrs) => {
           if (!attributes.linkHref) return {};
           return { 'data-link-href': attributes.linkHref };
+        },
+      },
+      display: {
+        default: 'block' as const,
+        parseHTML: (element) => {
+          const display = element.getAttribute('data-display');
+          if (display === 'inline') return 'inline';
+          return 'block';
+        },
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          return { 'data-display': attributes.display };
         },
       },
     };
@@ -351,9 +366,31 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         imageContainer.appendChild(devTooltip);
       }
 
+      // Resize handles container
+      const resizeHandlesContainer = document.createElement('div');
+      resizeHandlesContainer.className = 'notecove-image-resize-handles';
+
+      // Create corner resize handles
+      const corners = ['nw', 'ne', 'sw', 'se'] as const;
+      const resizeHandles: Record<string, HTMLDivElement> = {};
+      corners.forEach((corner) => {
+        const handle = document.createElement('div');
+        handle.className = `notecove-image-resize-handle notecove-image-resize-handle--${corner}`;
+        handle.dataset['corner'] = corner;
+        resizeHandles[corner] = handle;
+        resizeHandlesContainer.appendChild(handle);
+      });
+
+      // Resize dimension tooltip
+      const resizeTooltip = document.createElement('div');
+      resizeTooltip.className = 'notecove-image-resize-tooltip';
+      resizeTooltip.style.display = 'none';
+
       imageContainer.appendChild(loadingPlaceholder);
       imageContainer.appendChild(errorPlaceholder);
       imageContainer.appendChild(img);
+      imageContainer.appendChild(resizeHandlesContainer);
+      imageContainer.appendChild(resizeTooltip);
       wrapper.appendChild(imageContainer);
       wrapper.appendChild(caption);
 
@@ -377,7 +414,21 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
        * Update the visual state based on node attributes
        */
       const updateVisualState = async (nodeAttrs: ImageNodeAttrs): Promise<void> => {
-        const { imageId, sdId, alt, caption: captionText, alignment, width } = nodeAttrs;
+        const {
+          imageId,
+          sdId,
+          alt,
+          caption: captionText,
+          alignment,
+          width,
+          display,
+          linkHref,
+        } = nodeAttrs;
+
+        // Update display mode
+        wrapper.dataset['display'] = display;
+        wrapper.classList.toggle('notecove-image--inline', display === 'inline');
+        wrapper.classList.toggle('notecove-image--block', display === 'block');
 
         // Update alignment
         wrapper.dataset['alignment'] = alignment;
@@ -394,13 +445,21 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         // Update alt text
         img.alt = alt || '';
 
-        // Update caption
-        if (captionText) {
+        // Update caption (hidden in inline mode)
+        if (captionText && display === 'block') {
           caption.textContent = captionText;
           caption.style.display = '';
         } else {
           caption.textContent = '';
           caption.style.display = 'none';
+        }
+
+        // Update link indicator
+        wrapper.classList.toggle('notecove-image--linked', !!linkHref);
+        if (linkHref) {
+          wrapper.dataset['linkHref'] = linkHref;
+        } else {
+          delete wrapper.dataset['linkHref'];
         }
 
         // Load image if we have imageId and sdId
@@ -512,6 +571,267 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         imageContainer.addEventListener('mouseleave', hideDevTooltip);
       }
 
+      // ===== Resize handling =====
+      let isResizing = false;
+      let resizeStartX = 0;
+      let resizeStartY = 0;
+      let resizeStartWidth = 0;
+      let resizeStartHeight = 0;
+      let resizeCorner = '';
+      let aspectRatio = 1;
+
+      const startResize = (e: MouseEvent): void => {
+        const target = e.target as HTMLElement;
+        if (!target.classList.contains('notecove-image-resize-handle')) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        isResizing = true;
+        resizeCorner = target.dataset['corner'] ?? '';
+        resizeStartX = e.clientX;
+        resizeStartY = e.clientY;
+
+        // Get current image dimensions
+        const rect = img.getBoundingClientRect();
+        resizeStartWidth = rect.width;
+        resizeStartHeight = rect.height;
+        aspectRatio = resizeStartWidth / resizeStartHeight;
+
+        // Show resize tooltip
+        resizeTooltip.style.display = '';
+        updateResizeTooltip(resizeStartWidth, resizeStartHeight);
+
+        // Add class to indicate resizing
+        wrapper.classList.add('notecove-image--resizing');
+
+        // Add document-level listeners
+        document.addEventListener('mousemove', handleResize);
+        document.addEventListener('mouseup', endResize);
+      };
+
+      const updateResizeTooltip = (width: number, height: number): void => {
+        resizeTooltip.textContent = `${Math.round(width)} × ${Math.round(height)}`;
+      };
+
+      const handleResize = (e: MouseEvent): void => {
+        if (!isResizing) return;
+
+        const deltaX = e.clientX - resizeStartX;
+        const deltaY = e.clientY - resizeStartY;
+
+        // Calculate new dimensions based on corner being dragged
+        let newWidth = resizeStartWidth;
+        let newHeight = resizeStartHeight;
+
+        // Calculate the primary change (most significant movement)
+        const maintainAspect = !e.shiftKey;
+
+        if (resizeCorner === 'se') {
+          // Southeast: both dimensions increase with positive deltas
+          newWidth = resizeStartWidth + deltaX;
+          if (maintainAspect) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = resizeStartHeight + deltaY;
+          }
+        } else if (resizeCorner === 'sw') {
+          // Southwest: width decreases with positive deltaX, height increases with positive deltaY
+          newWidth = resizeStartWidth - deltaX;
+          if (maintainAspect) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = resizeStartHeight + deltaY;
+          }
+        } else if (resizeCorner === 'ne') {
+          // Northeast: width increases, height decreases
+          newWidth = resizeStartWidth + deltaX;
+          if (maintainAspect) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = resizeStartHeight - deltaY;
+          }
+        } else if (resizeCorner === 'nw') {
+          // Northwest: both dimensions decrease with positive deltas
+          newWidth = resizeStartWidth - deltaX;
+          if (maintainAspect) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = resizeStartHeight - deltaY;
+          }
+        }
+
+        // Enforce minimum size
+        const minSize = 50;
+        newWidth = Math.max(minSize, newWidth);
+        newHeight = Math.max(minSize, newHeight);
+
+        // Apply the preview dimensions
+        img.style.width = `${newWidth}px`;
+        img.style.height = maintainAspect ? 'auto' : `${newHeight}px`;
+        imageContainer.style.width = `${newWidth}px`;
+
+        updateResizeTooltip(newWidth, maintainAspect ? newWidth / aspectRatio : newHeight);
+      };
+
+      const endResize = (_e: MouseEvent): void => {
+        if (!isResizing) return;
+
+        isResizing = false;
+        wrapper.classList.remove('notecove-image--resizing');
+        resizeTooltip.style.display = 'none';
+
+        // Remove document-level listeners
+        document.removeEventListener('mousemove', handleResize);
+        document.removeEventListener('mouseup', endResize);
+
+        // Get the final width
+        const finalWidth = img.getBoundingClientRect().width;
+
+        // Get container width to calculate percentage
+        const containerWidth = wrapper.parentElement?.clientWidth ?? 800;
+        const widthPercentage = Math.round((finalWidth / containerWidth) * 100);
+
+        // Update the node's width attribute
+        if (typeof getPos === 'function') {
+          const pos = getPos();
+          if (typeof pos === 'number') {
+            const tr = editor.state.tr.setNodeMarkup(pos, undefined, {
+              ...node.attrs,
+              width: `${widthPercentage}%`,
+            });
+            editor.view.dispatch(tr);
+            debugLog('Image resized to:', `${widthPercentage}%`);
+          }
+        }
+      };
+
+      // Add mousedown listeners to resize handles
+      Object.values(resizeHandles).forEach((handle) => {
+        handle.addEventListener('mousedown', startResize);
+      });
+
+      // Click handler - opens link URL or lightbox
+      const handleImageClick = (e: MouseEvent): void => {
+        // Don't handle if clicking on a resize handle
+        if ((e.target as HTMLElement).classList.contains('notecove-image-resize-handle')) {
+          return;
+        }
+
+        // Don't handle during resize
+        if (isResizing) {
+          return;
+        }
+
+        const attrs = node.attrs as ImageNodeAttrs;
+        if (!attrs.imageId || !attrs.sdId) return;
+
+        // If image has a link and Cmd/Ctrl is NOT pressed, open the link
+        // Cmd/Ctrl+click opens lightbox even for linked images
+        if (attrs.linkHref && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          window.open(attrs.linkHref, '_blank', 'noopener,noreferrer');
+          return;
+        }
+
+        // Open lightbox (default behavior or Cmd/Ctrl+click for linked images)
+        // Gather all images in the document for navigation
+        const allImages: { imageId: string; sdId: string; alt?: string }[] = [];
+        editor.state.doc.descendants((n) => {
+          if (n.type.name === 'notecoveImage') {
+            const nodeAttrs = n.attrs as ImageNodeAttrs;
+            if (nodeAttrs.imageId && nodeAttrs.sdId) {
+              allImages.push({
+                imageId: nodeAttrs.imageId,
+                sdId: nodeAttrs.sdId,
+                alt: nodeAttrs.alt,
+              });
+            }
+          }
+        });
+
+        openLightbox({
+          imageId: attrs.imageId,
+          sdId: attrs.sdId,
+          alt: attrs.alt,
+          allImages: allImages.length > 1 ? allImages : undefined,
+        });
+      };
+
+      img.addEventListener('click', handleImageClick);
+      img.style.cursor = 'pointer';
+
+      // Right-click handler for context menu
+      const handleContextMenu = (e: MouseEvent): void => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Get current node position and attributes from the editor state
+        if (typeof getPos !== 'function') return;
+        const pos = getPos();
+        if (typeof pos !== 'number') return;
+
+        // Get the current node from the editor state (not the stale closure)
+        const currentNode = editor.state.doc.nodeAt(pos);
+        if (currentNode?.type.name !== 'notecoveImage') return;
+
+        const attrs = currentNode.attrs as ImageNodeAttrs;
+        if (!attrs.imageId || !attrs.sdId) return;
+
+        openImageContextMenu({
+          imageId: attrs.imageId,
+          sdId: attrs.sdId,
+          x: e.clientX,
+          y: e.clientY,
+          attrs: attrs,
+          onUpdateAttrs: (newAttrs) => {
+            // Re-fetch position in case document changed
+            const currentPos = getPos();
+            if (typeof currentPos !== 'number') return;
+
+            // Get current node again to merge with latest attrs
+            const nodeAtPos = editor.state.doc.nodeAt(currentPos);
+            if (!nodeAtPos) return;
+
+            const tr = editor.state.tr.setNodeMarkup(currentPos, undefined, {
+              ...nodeAtPos.attrs,
+              ...newAttrs,
+            });
+            editor.view.dispatch(tr);
+          },
+          onDelete: () => {
+            const currentPos = getPos();
+            if (typeof currentPos !== 'number') return;
+            const nodeAtPos = editor.state.doc.nodeAt(currentPos);
+            if (!nodeAtPos) return;
+            const tr = editor.state.tr.delete(currentPos, currentPos + nodeAtPos.nodeSize);
+            editor.view.dispatch(tr);
+          },
+        });
+      };
+
+      wrapper.addEventListener('contextmenu', handleContextMenu);
+
+      // Double-click handler to open in external app
+      const handleDoubleClick = (e: MouseEvent): void => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const attrs = node.attrs as ImageNodeAttrs;
+        const { imageId, sdId } = attrs;
+        if (!imageId || !sdId) return;
+
+        void (async () => {
+          try {
+            await window.electronAPI.image.openExternal(sdId, imageId);
+          } catch (error) {
+            console.error('[NotecoveImage] Failed to open image externally:', error);
+          }
+        })();
+      };
+
+      img.addEventListener('dblclick', handleDoubleClick);
+
       // Initial load
       void updateVisualState(node.attrs as ImageNodeAttrs);
 
@@ -553,6 +873,18 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
             imageContainer.removeEventListener('mouseenter', showDevTooltip);
             imageContainer.removeEventListener('mouseleave', hideDevTooltip);
           }
+          // Clean up resize listeners
+          Object.values(resizeHandles).forEach((handle) => {
+            handle.removeEventListener('mousedown', startResize);
+          });
+          document.removeEventListener('mousemove', handleResize);
+          document.removeEventListener('mouseup', endResize);
+          // Clean up click listener
+          img.removeEventListener('click', handleImageClick);
+          // Clean up context menu listener
+          wrapper.removeEventListener('contextmenu', handleContextMenu);
+          // Clean up double-click listener
+          img.removeEventListener('dblclick', handleDoubleClick);
         },
       };
     };

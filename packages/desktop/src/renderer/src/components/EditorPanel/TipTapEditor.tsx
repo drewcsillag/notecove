@@ -23,12 +23,53 @@ import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
 import { NotecoveImage } from './extensions/Image';
+import { ImageLightbox } from './ImageLightbox';
+import { ImageContextMenu } from './ImageContextMenu';
 import { SearchPanel } from './SearchPanel';
 import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { useWindowState } from '../../hooks/useWindowState';
+
+/**
+ * Map of file extensions to MIME types for image files.
+ * Used when file.type is empty (common when dropping files from Finder on macOS).
+ */
+const EXTENSION_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  heic: 'image/heic',
+  heif: 'image/heif',
+};
+
+/**
+ * Get MIME type from filename extension.
+ * Returns null if extension is not a supported image type.
+ */
+function getMimeTypeFromFilename(filename: string): string | null {
+  const lastDotIndex = filename.lastIndexOf('.');
+  if (lastDotIndex === -1) return null;
+  const extension = filename.slice(lastDotIndex + 1).toLowerCase();
+  return EXTENSION_TO_MIME[extension] ?? null;
+}
+
+/**
+ * Check if a file is an image, using both file.type and filename extension.
+ * Returns the MIME type if it's an image, or null otherwise.
+ */
+function getImageMimeType(file: File): string | null {
+  // First try the file's MIME type
+  if (file.type.startsWith('image/')) {
+    return file.type;
+  }
+  // Fall back to inferring from extension (common when dropping from Finder)
+  return getMimeTypeFromFilename(file.name);
+}
 
 export interface TipTapEditorProps {
   noteId: string | null;
@@ -227,7 +268,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         // Look for image data in clipboard
         for (const item of items) {
           if (item.type.startsWith('image/')) {
-            console.log('[TipTapEditor] Image paste detected, type:', item.type);
+            // IMPORTANT: Capture MIME type synchronously before any async operations.
+            // The clipboard DataTransferItem becomes invalid after the event handler returns,
+            // so item.type would be empty if read inside an async callback.
+            const mimeType = item.type;
+            console.log('[TipTapEditor] Image paste detected, type:', mimeType);
 
             // Get the image as a blob
             const blob = item.getAsFile();
@@ -248,7 +293,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                 }
 
                 const data = new Uint8Array(buffer);
-                const mimeType = item.type;
 
                 console.log('[TipTapEditor] Saving image, size:', data.length, 'type:', mimeType);
 
@@ -859,27 +903,69 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   }, [noteId]);
 
   // DOM-level drop handler for image files
-  // ProseMirror's handleDrop prop doesn't get triggered by synthetic events,
-  // so we add a DOM listener directly for both native and synthetic drops.
+  // We handle drops at the document level because:
+  // 1. ProseMirror's handleDrop prop doesn't get triggered by synthetic events
+  // 2. Native file drops from Finder often land on container elements, not the editor itself
+  // We check if the drop is within the editor container and handle it accordingly.
+  // If dropped in the container but below the editor content, append to the end.
   useEffect(() => {
     if (!editor) return;
 
-    const handleDomDrop = async (event: DragEvent) => {
+    // Reference to the editor DOM and container
+    const editorDom = editor.view.dom;
+    const dropZone = editorContainerRef.current; // The scrollable container with the editor
+
+    const handleDocumentDrop = async (event: DragEvent) => {
       const dataTransfer = event.dataTransfer;
       if (!dataTransfer) return;
+
+      // Check if the drop target is within the drop zone (editor container)
+      const target = event.target as HTMLElement;
+      const isInDropZone = dropZone?.contains(target);
+      const isDirectlyOnEditor = editorDom.contains(target);
+
+      console.log(
+        '[TipTapEditor] Document drop - target:',
+        target,
+        'isInDropZone:',
+        isInDropZone,
+        'isDirectlyOnEditor:',
+        isDirectlyOnEditor
+      );
+
+      if (!isInDropZone) {
+        console.log('[TipTapEditor] Drop not in drop zone, ignoring');
+        return;
+      }
+
+      // Determine where to insert: at cursor if on editor, at end if on container
+      const insertAtEnd = !isDirectlyOnEditor;
+      console.log('[TipTapEditor] Insert at end:', insertAtEnd);
 
       // Check both files and items (items works better in some contexts like tests)
       const files = dataTransfer.files;
       const items = dataTransfer.items;
 
-      // Collect files to process
-      const imageFiles: File[] = [];
+      // Debug logging
+      console.log('[TipTapEditor] Drop event - files:', files.length, 'items:', items.length);
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (f) {
+          console.log(`[TipTapEditor] File ${i}: name="${f.name}" type="${f.type}" size=${f.size}`);
+        }
+      }
+
+      // Collect files to process (with their MIME types)
+      // We use getImageMimeType which checks both file.type and filename extension,
+      // since files dropped from Finder on macOS often have empty file.type
+      const imageFiles: { file: File; mimeType: string }[] = [];
 
       // First try files (preferred for native drops)
       if (files.length > 0) {
         for (const file of files) {
-          if (file.type.startsWith('image/')) {
-            imageFiles.push(file);
+          const mimeType = getImageMimeType(file);
+          if (mimeType) {
+            imageFiles.push({ file, mimeType });
           }
         }
       }
@@ -887,10 +973,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       // If no files found, try items (works better in synthetic events)
       if (imageFiles.length === 0 && items.length > 0) {
         for (const item of items) {
-          if (item.kind === 'file' && item.type.startsWith('image/')) {
+          if (item.kind === 'file') {
             const file = item.getAsFile();
             if (file) {
-              imageFiles.push(file);
+              const mimeType = getImageMimeType(file);
+              if (mimeType) {
+                imageFiles.push({ file, mimeType });
+              }
             }
           }
         }
@@ -903,10 +992,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       event.stopPropagation();
 
       // Process each image file
-      for (const file of imageFiles) {
+      for (const { file, mimeType } of imageFiles) {
         console.log(
           '[TipTapEditor] DOM drop handler: Image detected, type:',
-          file.type,
+          mimeType,
           'name:',
           file.name
         );
@@ -923,7 +1012,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           }
 
           const data = new Uint8Array(buffer);
-          const mimeType = file.type;
 
           console.log('[TipTapEditor] Saving dropped image, size:', data.length, 'type:', mimeType);
 
@@ -931,7 +1019,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           const result = await window.electronAPI.image.save(sdId, data, mimeType);
           console.log('[TipTapEditor] Dropped image saved with ID:', result.imageId);
 
-          // Insert the image node at current cursor position
+          // Insert the image node
           const { state, dispatch } = editor.view;
           const imageNode = state.schema.nodes['notecoveImage'];
           if (imageNode) {
@@ -939,7 +1027,18 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               imageId: result.imageId,
               sdId,
             });
-            const tr = state.tr.replaceSelectionWith(node);
+
+            let tr;
+            if (insertAtEnd) {
+              // Insert at the end of the document
+              const endPos = state.doc.content.size;
+              tr = state.tr.insert(endPos, node);
+              console.log('[TipTapEditor] Inserting image at end, position:', endPos);
+            } else {
+              // Insert at current cursor position
+              tr = state.tr.replaceSelectionWith(node);
+              console.log('[TipTapEditor] Inserting image at cursor');
+            }
             dispatch(tr);
             console.log('[TipTapEditor] Dropped image node inserted');
           }
@@ -949,15 +1048,38 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }
     };
 
-    // Get the editor's DOM element
-    const editorDom = editor.view.dom;
-    const wrappedHandler = (event: Event) => {
-      void handleDomDrop(event as DragEvent);
+    // Wrap the async handler
+    const wrappedDropHandler = (event: Event) => {
+      void handleDocumentDrop(event as DragEvent);
     };
-    editorDom.addEventListener('drop', wrappedHandler);
+
+    // IMPORTANT: dragover must call preventDefault() for drop to fire
+    // We handle this at document level and check if over the drop zone
+    const handleDragOver = (event: DragEvent) => {
+      // Check if the drag contains files that might be images
+      const hasFiles = event.dataTransfer?.types.includes('Files');
+      if (!hasFiles) return;
+
+      // Check if over the drop zone (editor container)
+      const target = event.target as HTMLElement;
+      const isInDropZone = dropZone?.contains(target);
+
+      if (isInDropZone) {
+        event.preventDefault();
+        // Set dropEffect to show the user they can drop here
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = 'copy';
+        }
+      }
+    };
+
+    // Listen at document level to catch drops that land on container elements
+    document.addEventListener('drop', wrappedDropHandler);
+    document.addEventListener('dragover', handleDragOver);
 
     return () => {
-      editorDom.removeEventListener('drop', wrappedHandler);
+      document.removeEventListener('drop', wrappedDropHandler);
+      document.removeEventListener('dragover', handleDragOver);
     };
   }, [editor]);
 
@@ -1309,6 +1431,47 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle image button click from toolbar
+   * Opens file picker and inserts selected images
+   */
+  const handleImageButtonClick = async () => {
+    if (!editor) return;
+
+    try {
+      // Get the active SD
+      const sdId = await window.electronAPI.sd.getActive();
+      if (!sdId) {
+        console.error('[TipTapEditor] No active SD, cannot pick images');
+        return;
+      }
+
+      // Open file picker and save selected images
+      const imageIds = await window.electronAPI.image.pickAndSave(sdId);
+
+      if (imageIds.length === 0) {
+        // User canceled or no valid images selected
+        return;
+      }
+
+      // Insert image nodes for each saved image
+      const { state, dispatch } = editor.view;
+      const imageNode = state.schema.nodes['notecoveImage'];
+      if (!imageNode) return;
+
+      let { tr } = state;
+      for (const imageId of imageIds) {
+        const node = imageNode.create({ imageId, sdId });
+        tr = tr.replaceSelectionWith(node);
+      }
+      dispatch(tr);
+
+      console.log('[TipTapEditor] Inserted', imageIds.length, 'images from toolbar button');
+    } catch (err) {
+      console.error('[TipTapEditor] Failed to pick and insert images:', err);
+    }
+  };
+
+  /**
    * Handle Cmd+K keyboard shortcut
    * Similar to handleLinkButtonClick but triggered from keyboard
    */
@@ -1494,6 +1657,28 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               outlineOffset: '4px',
               borderRadius: '4px',
             },
+            // Block display mode (default)
+            '&.notecove-image--block': {
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+            },
+            // Inline display mode
+            '&.notecove-image--inline': {
+              display: 'inline-flex',
+              flexDirection: 'row',
+              margin: '0 4px',
+              verticalAlign: 'middle',
+              '& .notecove-image-container': {
+                minHeight: 'auto',
+                minWidth: 'auto',
+              },
+              '& .notecove-image-element': {
+                maxHeight: '200px',
+                width: 'auto',
+                maxWidth: '300px',
+              },
+            },
           },
           '& .notecove-image-container': {
             position: 'relative',
@@ -1582,6 +1767,104 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             '& strong': {
               color: '#8be9fd',
               marginRight: '8px',
+            },
+          },
+          // Resize handles container - only visible when image is selected
+          '& .notecove-image-resize-handles': {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'none',
+            opacity: 0,
+            transition: 'opacity 0.15s ease',
+          },
+          // Show resize handles when image is selected
+          '& figure.notecove-image.ProseMirror-selectednode .notecove-image-resize-handles': {
+            opacity: 1,
+          },
+          // Individual resize handle
+          '& .notecove-image-resize-handle': {
+            position: 'absolute',
+            width: '12px',
+            height: '12px',
+            backgroundColor: theme.palette.primary.main,
+            border: `2px solid ${theme.palette.background.paper}`,
+            borderRadius: '2px',
+            pointerEvents: 'auto',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            transition: 'transform 0.1s ease',
+            '&:hover': {
+              transform: 'scale(1.2)',
+            },
+          },
+          // Corner positions
+          '& .notecove-image-resize-handle--nw': {
+            top: '-6px',
+            left: '-6px',
+            cursor: 'nw-resize',
+          },
+          '& .notecove-image-resize-handle--ne': {
+            top: '-6px',
+            right: '-6px',
+            cursor: 'ne-resize',
+          },
+          '& .notecove-image-resize-handle--sw': {
+            bottom: '-6px',
+            left: '-6px',
+            cursor: 'sw-resize',
+          },
+          '& .notecove-image-resize-handle--se': {
+            bottom: '-6px',
+            right: '-6px',
+            cursor: 'se-resize',
+          },
+          // Resize dimension tooltip
+          '& .notecove-image-resize-tooltip': {
+            position: 'absolute',
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: '8px',
+            padding: '4px 8px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            color: '#fff',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            borderRadius: '4px',
+            whiteSpace: 'nowrap',
+            zIndex: 1001,
+            pointerEvents: 'none',
+          },
+          // Resizing state - show cursor and prevent selection
+          '& figure.notecove-image--resizing': {
+            userSelect: 'none',
+            cursor: 'nw-resize',
+            '& *': {
+              cursor: 'inherit',
+            },
+          },
+          // Linked image indicator - subtle border and link icon
+          '& figure.notecove-image--linked': {
+            '& .notecove-image-container': {
+              position: 'relative',
+              '&::after': {
+                content: '"\\1F517"', // Link emoji
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                fontSize: '16px',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                borderRadius: '4px',
+                padding: '2px 6px',
+                opacity: 0.8,
+                pointerEvents: 'none',
+              },
+            },
+            '& .notecove-image-element': {
+              outline: `2px solid ${theme.palette.info.main}`,
+              outlineOffset: '-2px',
             },
           },
           // Search result highlighting
@@ -1685,7 +1968,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         },
       }}
     >
-      <EditorToolbar editor={editor} onLinkButtonClick={handleLinkButtonClick} />
+      <EditorToolbar
+        editor={editor}
+        onLinkButtonClick={handleLinkButtonClick}
+        onImageButtonClick={() => void handleImageButtonClick()}
+      />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>
         <Chip
@@ -1746,6 +2033,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           onSearchTermChange={onSearchTermChange}
         />
       )}
+      {/* Image lightbox - renders via portal */}
+      <ImageLightbox />
+      {/* Image context menu */}
+      <ImageContextMenu />
     </Box>
   );
 };

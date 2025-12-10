@@ -6,7 +6,16 @@
 
 /* eslint-disable @typescript-eslint/require-await */
 
-import { ipcMain, type IpcMainInvokeEvent, BrowserWindow, dialog, net } from 'electron';
+import {
+  ipcMain,
+  type IpcMainInvokeEvent,
+  BrowserWindow,
+  dialog,
+  net,
+  shell,
+  clipboard,
+  nativeImage,
+} from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
@@ -328,6 +337,9 @@ export class IPCHandlers {
     ipcMain.handle('image:getStorageStats', this.handleImageGetStorageStats.bind(this));
     ipcMain.handle('image:pickAndSave', this.handleImagePickAndSave.bind(this));
     ipcMain.handle('image:downloadAndSave', this.handleImageDownloadAndSave.bind(this));
+    ipcMain.handle('image:copyToClipboard', this.handleImageCopyToClipboard.bind(this));
+    ipcMain.handle('image:saveAs', this.handleImageSaveAs.bind(this));
+    ipcMain.handle('image:openExternal', this.handleImageOpenExternal.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -3277,6 +3289,122 @@ export class IPCHandlers {
     });
 
     return saveResult.imageId;
+  }
+
+  /**
+   * Copy image to clipboard
+   */
+  private async handleImageCopyToClipboard(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      throw new Error(`Image not found: ${imageId}`);
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Get image path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    // Read image and copy to clipboard
+    const img = nativeImage.createFromPath(imagePath);
+    if (img.isEmpty()) {
+      throw new Error(`Failed to load image: ${imagePath}`);
+    }
+
+    clipboard.writeImage(img);
+    console.log(`[IPC] Image copied to clipboard: ${imageId}`);
+  }
+
+  /**
+   * Save image as... (with file dialog)
+   */
+  private async handleImageSaveAs(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      throw new Error(`Image not found: ${imageId}`);
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Get image path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    // Get file extension
+    const ext = path.extname(image.filename).slice(1);
+    const extFilter = ext ? { name: ext.toUpperCase(), extensions: [ext] } : undefined;
+
+    // Show save dialog
+    const dialogOptions: Electron.SaveDialogOptions = {
+      title: 'Save Image As',
+      defaultPath: image.filename,
+    };
+    if (extFilter) {
+      dialogOptions.filters = [extFilter, { name: 'All Files', extensions: ['*'] }];
+    }
+    const result = await dialog.showSaveDialog(dialogOptions);
+
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+
+    // Copy file to destination
+    await fs.copyFile(imagePath, result.filePath);
+    console.log(`[IPC] Image saved to: ${result.filePath}`);
+
+    return result.filePath;
+  }
+
+  /**
+   * Open image in external application
+   */
+  private async handleImageOpenExternal(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      throw new Error(`Image not found: ${imageId}`);
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Get image path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    // Check if file exists
+    try {
+      await fs.access(imagePath);
+    } catch {
+      throw new Error(`Image file not found: ${imagePath}`);
+    }
+
+    // Open in default application
+    await shell.openPath(imagePath);
+    console.log(`[IPC] Image opened in external app: ${imageId}`);
   }
 
   // ============================================================================

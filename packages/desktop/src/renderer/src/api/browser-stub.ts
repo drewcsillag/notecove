@@ -256,6 +256,9 @@ export const browserApiStub: typeof window.electronAPI = {
     getStorageStats: notImplemented('image.getStorageStats'),
     pickAndSave: notImplemented('image.pickAndSave'),
     downloadAndSave: notImplemented('image.downloadAndSave'),
+    copyToClipboard: notImplemented('image.copyToClipboard'),
+    saveAs: notImplemented('image.saveAs'),
+    openExternal: notImplemented('image.openExternal'),
   },
 };
 

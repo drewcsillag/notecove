@@ -851,6 +851,21 @@ export const webClient: typeof window.electronAPI = {
       // URL download is not supported in web client
       throw new Error('URL image download is not supported in browser mode');
     },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    copyToClipboard: async (_sdId: string, _imageId: string) => {
+      // Clipboard copy is not supported in web client
+      throw new Error('Clipboard copy is not supported in browser mode');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    saveAs: async (_sdId: string, _imageId: string) => {
+      // Save as is not supported in web client
+      throw new Error('Save as is not supported in browser mode');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    openExternal: async (_sdId: string, _imageId: string) => {
+      // Open external is not supported in web client
+      throw new Error('Open external is not supported in browser mode');
+    },
   },
 };
 
