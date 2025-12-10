@@ -43,7 +43,7 @@ interface StaleSyncEntry {
   noteTitle?: string;
   sourceInstanceId: string;
   expectedSequence: number;
-  highestSequenceFromInstance: number;
+  highestSequenceForNote: number;
   gap: number;
   detectedAt: number;
   sourceProfile?: {

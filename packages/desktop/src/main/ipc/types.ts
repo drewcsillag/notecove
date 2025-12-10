@@ -121,8 +121,8 @@ export interface StaleSyncEntry {
   sourceInstanceId: string;
   /** Expected sequence number that will never arrive */
   expectedSequence: number;
-  /** Highest sequence from that instance */
-  highestSequenceFromInstance: number;
+  /** Highest sequence for THIS note from that instance (not global) */
+  highestSequenceForNote: number;
   /** Sequence gap */
   gap: number;
   /** When the stale entry was detected */

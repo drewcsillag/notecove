@@ -2813,7 +2813,7 @@ void app.whenReady().then(async () => {
               noteId: entry.noteId,
               sourceInstanceId: entry.sourceInstanceId,
               expectedSequence: entry.expectedSequence,
-              highestSequenceFromInstance: entry.highestSequenceFromInstance,
+              highestSequenceForNote: entry.highestSequenceForNote,
               gap: entry.gap,
               detectedAt: entry.detectedAt,
             };

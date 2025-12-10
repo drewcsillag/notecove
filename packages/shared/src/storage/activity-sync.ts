@@ -9,8 +9,11 @@ import type { FileSystemAdapter } from './types';
 
 /**
  * Default threshold for detecting stale entries.
- * If the gap between an entry's sequence and the highest sequence from that instance
- * exceeds this threshold, the entry is considered stale.
+ * If the gap between an entry's sequence and the highest sequence for that specific
+ * note from that instance exceeds this threshold, the entry is considered stale.
+ *
+ * Note: Sequences are per-note-per-instance, so we compare against the highest
+ * sequence for the SAME note from the SAME instance, not globally across all notes.
  */
 export const STALE_SEQUENCE_GAP_THRESHOLD = 50;
 
@@ -21,7 +24,8 @@ export interface StaleEntry {
   noteId: string;
   sourceInstanceId: string;
   expectedSequence: number;
-  highestSequenceFromInstance: number;
+  /** Highest sequence seen for THIS note from THIS instance (not global) */
+  highestSequenceForNote: number;
   gap: number;
   detectedAt: number;
 }
@@ -284,18 +288,21 @@ export class ActivitySync {
             continue;
           }
 
-          // FIRST PASS: Find the highest sequence from this instance across ALL lines
-          // This is needed to detect stale entries (entries with sequence far behind the highest)
-          let highestSeqFromInstance = 0;
+          // FIRST PASS: Find the highest sequence per-note from this instance
+          // This is needed to detect stale entries (entries with sequence far behind the highest
+          // for that SAME note). Sequences are per-note-per-instance, not global per-instance.
+          const highestSeqPerNote = new Map<string, number>();
           for (const line of lines) {
             const parts = line.split('|');
             if (parts.length < 2) continue;
+            const noteId = parts[0];
             const instanceSeq = parts[1];
-            if (!instanceSeq) continue;
+            if (!noteId || !instanceSeq) continue;
             const seqParts = instanceSeq.split('_');
             const seq = parseInt(seqParts[1] ?? '0');
-            if (seq > highestSeqFromInstance) {
-              highestSeqFromInstance = seq;
+            const currentHighest = highestSeqPerNote.get(noteId) ?? 0;
+            if (seq > currentHighest) {
+              highestSeqPerNote.set(noteId, seq);
             }
           }
 
@@ -315,7 +322,9 @@ export class ActivitySync {
             const sequence = parseInt(seqParts[1] ?? '0');
 
             // STALE DETECTION: Check if this entry is too far behind the highest sequence
-            const gap = highestSeqFromInstance - sequence;
+            // for THIS SPECIFIC NOTE from this instance (not global across all notes)
+            const highestSeqForNote = highestSeqPerNote.get(noteId) ?? sequence;
+            const gap = highestSeqForNote - sequence;
             if (gap > STALE_SEQUENCE_GAP_THRESHOLD) {
               // Check if this entry was previously skipped by the user
               if (this.isSkipped(noteId, otherInstanceId)) {
@@ -324,7 +333,7 @@ export class ActivitySync {
               }
 
               console.warn(
-                `[ActivitySync] Stale entry detected: note ${noteId} at seq ${sequence}, highest from ${otherInstanceId} is ${highestSeqFromInstance} (gap=${gap})`
+                `[ActivitySync] Stale entry detected: note ${noteId} at seq ${sequence}, highest for this note from ${otherInstanceId} is ${highestSeqForNote} (gap=${gap})`
               );
               // Track this stale entry for UI display
               // Avoid duplicates
@@ -336,7 +345,7 @@ export class ActivitySync {
                   noteId,
                   sourceInstanceId: otherInstanceId,
                   expectedSequence: sequence,
-                  highestSequenceFromInstance: highestSeqFromInstance,
+                  highestSequenceForNote: highestSeqForNote,
                   gap,
                   detectedAt: Date.now(),
                 });
@@ -677,21 +686,24 @@ export class ActivitySync {
         return cleaned;
       }
 
-      // Find highest sequence in our log
-      let highestSeq = 0;
+      // Find highest sequence per-note in our log
+      // Sequences are per-note-per-instance, so we need to track them separately
+      const highestSeqPerNote = new Map<string, number>();
       for (const line of lines) {
         const parts = line.split('|');
         if (parts.length < 2) continue;
+        const noteId = parts[0];
         const instanceSeq = parts[1];
-        if (!instanceSeq) continue;
+        if (!noteId || !instanceSeq) continue;
         const seqParts = instanceSeq.split('_');
         const seq = parseInt(seqParts[1] ?? '0');
-        if (seq > highestSeq) {
-          highestSeq = seq;
+        const currentHighest = highestSeqPerNote.get(noteId) ?? 0;
+        if (seq > currentHighest) {
+          highestSeqPerNote.set(noteId, seq);
         }
       }
 
-      // Filter out stale entries
+      // Filter out stale entries (entries far behind the highest for that same note)
       const nonStaleLines: string[] = [];
       for (const line of lines) {
         const parts = line.split('|');
@@ -709,12 +721,13 @@ export class ActivitySync {
 
         const seqParts = instanceSeq.split('_');
         const seq = parseInt(seqParts[1] ?? '0');
-        const gap = highestSeq - seq;
+        const highestSeqForNote = highestSeqPerNote.get(noteId) ?? seq;
+        const gap = highestSeqForNote - seq;
 
         if (gap > STALE_SEQUENCE_GAP_THRESHOLD) {
           // This is a stale entry - clean it up
           console.log(
-            `[ActivitySync] Self-healing own stale entry: note ${noteId} at seq ${seq} (gap=${gap})`
+            `[ActivitySync] Self-healing own stale entry: note ${noteId} at seq ${seq}, highest for this note is ${highestSeqForNote} (gap=${gap})`
           );
           cleaned.push({ noteId, sequence: seq });
         } else {

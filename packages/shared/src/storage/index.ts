@@ -10,6 +10,7 @@ export {
   ActivitySync,
   type ActivitySyncCallbacks,
   type SyncMetricsCallbacks,
+  type StaleEntry,
 } from './activity-sync';
 export { DeletionLogger } from './deletion-logger';
 export { DeletionSync, type DeletionSyncCallbacks } from './deletion-sync';

@@ -356,12 +356,32 @@ describe('ActivitySync', () => {
   });
 
   describe('stale sync detection', () => {
-    it('should detect stale entries with large sequence gap and skip syncing them', async () => {
+    it('should detect stale entries with large sequence gap for SAME note and skip syncing them', async () => {
       mockFs.listFiles.mockResolvedValue(['other-instance.log']);
-      // Activity log has entries:
+      // Activity log has entries for the SAME note (note-1) with a large gap:
       // - note-1 at sequence 100 (very old - stale)
-      // - note-2 at sequence 200 (current)
-      // Gap of 100 means note-1's CRDT log will never arrive
+      // - note-1 at sequence 200 (current)
+      // Gap of 100 for the SAME note means the seq 100 CRDT log entry will never arrive
+      mockFs.readFile.mockResolvedValue(
+        new TextEncoder().encode('note-1|other-instance_100\nnote-1|other-instance_200\n')
+      );
+      mockFs.exists.mockResolvedValue(true);
+
+      await sync.syncFromOtherInstances();
+      await sleep(50);
+
+      // note-1 should be synced (to seq 200), but seq 100 entry should be skipped as stale
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
+    });
+
+    it('should NOT mark entry as stale when comparing DIFFERENT notes (per-note sequences)', async () => {
+      mockFs.listFiles.mockResolvedValue(['other-instance.log']);
+      // Activity log has entries for DIFFERENT notes:
+      // - note-1 at sequence 100
+      // - note-2 at sequence 200
+      // These are DIFFERENT notes, so sequence numbers are independent.
+      // note-1 at seq 100 is NOT stale just because note-2 has seq 200.
       mockFs.readFile.mockResolvedValue(
         new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_200\n')
       );
@@ -370,17 +390,21 @@ describe('ActivitySync', () => {
       await sync.syncFromOtherInstances();
       await sleep(50);
 
-      // note-1 should be detected as stale and skipped
-      // note-2 should be synced normally
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(1);
+      // BOTH notes should be synced - sequences are per-note, not global
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledTimes(2);
+      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
       expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2', 'test-sd');
-      expect(mockCallbacks.reloadNote).not.toHaveBeenCalledWith('note-1', 'test-sd');
+
+      // No stale entries since each note only has one sequence
+      const staleEntries = sync.getStaleEntries();
+      expect(staleEntries.length).toBe(0);
     });
 
     it('should track stale entries for UI display', async () => {
       mockFs.listFiles.mockResolvedValue(['other-instance.log']);
+      // Same note with large gap
       mockFs.readFile.mockResolvedValue(
-        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_200\n')
+        new TextEncoder().encode('note-1|other-instance_100\nnote-1|other-instance_200\n')
       );
       mockFs.exists.mockResolvedValue(true);
 
@@ -394,25 +418,24 @@ describe('ActivitySync', () => {
         noteId: 'note-1',
         sourceInstanceId: 'other-instance',
         expectedSequence: 100,
-        highestSequenceFromInstance: 200,
+        highestSequenceForNote: 200,
         gap: 100,
       });
     });
 
-    it('should not mark entry as stale when gap is small', async () => {
+    it('should not mark entry as stale when gap is small for same note', async () => {
       mockFs.listFiles.mockResolvedValue(['other-instance.log']);
-      // Gap of only 5 - not stale
+      // Same note with small gap of only 5 - not stale
       mockFs.readFile.mockResolvedValue(
-        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_105\n')
+        new TextEncoder().encode('note-1|other-instance_100\nnote-1|other-instance_105\n')
       );
       mockFs.exists.mockResolvedValue(true);
 
       await sync.syncFromOtherInstances();
       await sleep(50);
 
-      // Both notes should be synced
+      // note-1 should be synced (only once - to highest seq 105)
       expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-1', 'test-sd');
-      expect(mockCallbacks.reloadNote).toHaveBeenCalledWith('note-2', 'test-sd');
 
       // No stale entries
       const staleEntries = sync.getStaleEntries();
@@ -423,9 +446,9 @@ describe('ActivitySync', () => {
       jest.useFakeTimers();
 
       mockFs.listFiles.mockResolvedValue(['other-instance.log']);
-      // Large gap - stale entry
+      // Same note with large gap - stale entry
       mockFs.readFile.mockResolvedValue(
-        new TextEncoder().encode('note-1|other-instance_100\nnote-2|other-instance_200\n')
+        new TextEncoder().encode('note-1|other-instance_100\nnote-1|other-instance_200\n')
       );
       mockFs.exists.mockResolvedValue(true);
 
@@ -438,23 +461,24 @@ describe('ActivitySync', () => {
 
       await syncPromise;
 
-      // note-1 should NOT have been passed to reloadNote at all
-      // (no retry attempts for stale entries)
+      // note-1 SHOULD be synced (to seq 200), but the stale seq 100 entry
+      // should not trigger additional retry attempts
       const calls = mockCallbacks.reloadNote.mock.calls;
-      const note1Calls = calls.filter((c) => c[0] === 'note-1');
-      expect(note1Calls.length).toBe(0);
+      expect(calls.length).toBe(1);
+      expect(calls[0][0]).toBe('note-1');
 
       jest.useRealTimers();
     });
   });
 
   describe('self-heal own stale entries', () => {
-    it('should detect and clean up own stale entries automatically', async () => {
-      // Our own activity log has stale entries
+    it('should detect and clean up own stale entries for SAME note automatically', async () => {
+      // Our own activity log has stale entries for the SAME note
       mockFs.exists.mockResolvedValue(true);
       mockFs.listFiles.mockResolvedValue(['test-instance.log']);
+      // Same note (note-1) with large gap: seq 100 is stale, seq 200 is current
       mockFs.readFile.mockResolvedValue(
-        new TextEncoder().encode('note-1|test-instance_100\nnote-2|test-instance_200\n')
+        new TextEncoder().encode('note-1|test-instance_100\nnote-1|test-instance_200\n')
       );
       mockFs.writeFile.mockResolvedValue(undefined);
 
@@ -468,7 +492,7 @@ describe('ActivitySync', () => {
         sequence: 100,
       });
 
-      // Should have written the compacted log (only note-2 remains)
+      // Should have written the compacted log (only seq 200 remains)
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockFs.writeFile).toHaveBeenCalledWith(
         '/test/activity/test-instance.log',
@@ -478,15 +502,31 @@ describe('ActivitySync', () => {
       // Verify the written content only contains non-stale entry
       const writtenData = mockFs.writeFile.mock.calls[0][1] as Uint8Array;
       const writtenContent = new TextDecoder().decode(writtenData);
-      expect(writtenContent).toBe('note-2|test-instance_200\n');
+      expect(writtenContent).toBe('note-1|test-instance_200\n');
     });
 
-    it('should not clean entries when gap is small', async () => {
+    it('should NOT clean entries when comparing DIFFERENT notes (per-note sequences)', async () => {
       mockFs.exists.mockResolvedValue(true);
       mockFs.listFiles.mockResolvedValue(['test-instance.log']);
-      // Small gap - not stale
+      // DIFFERENT notes - sequences are independent, not stale
       mockFs.readFile.mockResolvedValue(
-        new TextEncoder().encode('note-1|test-instance_100\nnote-2|test-instance_105\n')
+        new TextEncoder().encode('note-1|test-instance_100\nnote-2|test-instance_200\n')
+      );
+
+      const cleaned = await sync.cleanupOwnStaleEntries();
+
+      // No entries should be cleaned - different notes have independent sequences
+      expect(cleaned.length).toBe(0);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should not clean entries when gap is small for same note', async () => {
+      mockFs.exists.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['test-instance.log']);
+      // Same note with small gap of only 5 - not stale
+      mockFs.readFile.mockResolvedValue(
+        new TextEncoder().encode('note-1|test-instance_100\nnote-1|test-instance_105\n')
       );
 
       const cleaned = await sync.cleanupOwnStaleEntries();
@@ -500,8 +540,9 @@ describe('ActivitySync', () => {
     it('should log self-healing action', async () => {
       mockFs.exists.mockResolvedValue(true);
       mockFs.listFiles.mockResolvedValue(['test-instance.log']);
+      // Same note with large gap
       mockFs.readFile.mockResolvedValue(
-        new TextEncoder().encode('note-1|test-instance_100\nnote-2|test-instance_200\n')
+        new TextEncoder().encode('note-1|test-instance_100\nnote-1|test-instance_200\n')
       );
       mockFs.writeFile.mockResolvedValue(undefined);
 
