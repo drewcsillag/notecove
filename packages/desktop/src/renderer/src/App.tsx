@@ -16,7 +16,7 @@ import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgressDialog';
 import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownProgressDialog';
 import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgressDialog';
-import { NoteInfoDialog } from './components/NoteInfoDialog';
+import { NoteInfoWindow } from './components/NoteInfoWindow';
 import { AboutDialog } from './components/AboutDialog/AboutDialog';
 import { StaleSyncToast } from './components/StaleSyncToast';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
@@ -29,7 +29,6 @@ function App(): React.ReactElement {
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [noteInfoOpen, setNoteInfoOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
@@ -66,6 +65,9 @@ function App(): React.ReactElement {
   const [minimalMode, setMinimalMode] = useState(false);
   // Sync status window mode (dedicated window for sync status panel)
   const [syncStatusMode, setSyncStatusMode] = useState(false);
+  // Note Info window mode (dedicated window for note information)
+  const [noteInfoMode, setNoteInfoMode] = useState(false);
+  const [noteInfoTargetNoteId, setNoteInfoTargetNoteId] = useState<string | null>(null);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
 
@@ -80,13 +82,23 @@ function App(): React.ReactElement {
       let noteIdParam = searchParams.get('noteId');
       let minimalParam = searchParams.get('minimal');
       let syncStatusParam = searchParams.get('syncStatus');
+      let noteInfoParam = searchParams.get('noteInfo');
+      let targetNoteIdParam = searchParams.get('targetNoteId');
 
       // If not in search, try hash (for file:// protocol)
-      if (!noteIdParam && !minimalParam && !syncStatusParam && window.location.hash) {
+      if (
+        !noteIdParam &&
+        !minimalParam &&
+        !syncStatusParam &&
+        !noteInfoParam &&
+        window.location.hash
+      ) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         noteIdParam = hashParams.get('noteId');
         minimalParam = hashParams.get('minimal');
         syncStatusParam = hashParams.get('syncStatus');
+        noteInfoParam = hashParams.get('noteInfo');
+        targetNoteIdParam = hashParams.get('targetNoteId');
       }
 
       if (noteIdParam) {
@@ -102,6 +114,12 @@ function App(): React.ReactElement {
       if (syncStatusParam === 'true') {
         console.log('[App] Enabling sync status mode from URL parameter');
         setSyncStatusMode(true);
+      }
+
+      if (noteInfoParam === 'true' && targetNoteIdParam) {
+        console.log('[App] Enabling note info mode from URL parameter, noteId:', targetNoteIdParam);
+        setNoteInfoMode(true);
+        setNoteInfoTargetNoteId(targetNoteIdParam);
       }
     } catch (error) {
       console.error('[App] Error parsing URL parameters:', error);
@@ -409,10 +427,14 @@ function App(): React.ReactElement {
       }
     });
 
-    // Note Info
+    // Note Info - opens a new window instead of a dialog
     const cleanupNoteInfo = window.electronAPI.menu.onNoteInfo(() => {
       if (selectedNoteId) {
-        setNoteInfoOpen(true);
+        void window.electronAPI.window.openNoteInfo(selectedNoteId).then((result) => {
+          if (!result.success) {
+            console.error('[Menu] Failed to open Note Info window:', result.error);
+          }
+        });
       } else {
         console.log('[Menu] No note selected for Note Info');
       }
@@ -559,6 +581,25 @@ function App(): React.ReactElement {
     );
   }
 
+  // Render note info window (standalone window for note information)
+  if (noteInfoMode && noteInfoTargetNoteId) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <NoteInfoWindow noteId={noteInfoTargetNoteId} />
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
   // Render minimal layout (just editor, no sidebars)
   if (minimalMode) {
     return (
@@ -663,13 +704,6 @@ function App(): React.ReactElement {
             onThemeChange={setThemeMode}
           />
         )}
-        <NoteInfoDialog
-          open={noteInfoOpen}
-          noteId={selectedNoteId}
-          onClose={() => {
-            setNoteInfoOpen(false);
-          }}
-        />
         <AboutDialog
           open={aboutOpen}
           onClose={() => {

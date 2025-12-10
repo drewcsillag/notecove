@@ -200,6 +200,10 @@ function createWindow(options?: {
   noteId?: string;
   minimal?: boolean;
   syncStatus?: boolean;
+  noteInfo?: boolean;
+  targetNoteId?: string;
+  noteTitle?: string;
+  parentWindow?: BrowserWindow;
   sdId?: string;
   bounds?: { x: number; y: number; width: number; height: number };
   isMaximized?: boolean;
@@ -212,8 +216,13 @@ function createWindow(options?: {
   }
 
   // Determine window dimensions
-  const defaultWidth = options?.syncStatus ? 950 : options?.minimal ? 800 : 1200;
-  const defaultHeight = options?.syncStatus ? 600 : 800;
+  const defaultWidth =
+    options?.syncStatus || options?.noteInfo ? 900 : options?.minimal ? 800 : 1200;
+  const defaultHeight = options?.syncStatus || options?.noteInfo ? 600 : 800;
+
+  // Determine window title
+  const windowTitle =
+    options?.noteInfo && options.noteTitle ? `Note Info - ${options.noteTitle}` : getWindowTitle();
 
   // Create the browser window with saved bounds or defaults
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -221,7 +230,7 @@ function createWindow(options?: {
     height: options?.bounds?.height ?? defaultHeight,
     show: false,
     autoHideMenuBar: false,
-    title: getWindowTitle(),
+    title: windowTitle,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -229,6 +238,11 @@ function createWindow(options?: {
       nodeIntegration: false,
     },
   };
+
+  // Set parent window for noteInfo windows (child window behavior)
+  if (options?.noteInfo && options.parentWindow) {
+    windowOptions.parent = options.parentWindow;
+  }
 
   // Conditionally add x/y position (only if bounds provided)
   if (options?.bounds?.x !== undefined) {
@@ -241,11 +255,13 @@ function createWindow(options?: {
   const newWindow = new BrowserWindow(windowOptions);
 
   // Determine window type for state tracking
-  const windowType: 'main' | 'minimal' | 'syncStatus' = options?.syncStatus
+  const windowType: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' = options?.syncStatus
     ? 'syncStatus'
-    : options?.minimal
-      ? 'minimal'
-      : 'main';
+    : options?.noteInfo
+      ? 'noteInfo'
+      : options?.minimal
+        ? 'minimal'
+        : 'main';
 
   // Register window with state manager (if available)
   let windowId: string | undefined;
@@ -313,6 +329,12 @@ function createWindow(options?: {
   }
   if (options?.syncStatus) {
     params.set('syncStatus', 'true');
+  }
+  if (options?.noteInfo) {
+    params.set('noteInfo', 'true');
+  }
+  if (options?.targetNoteId) {
+    params.set('targetNoteId', options.targetNoteId);
   }
 
   const queryString = params.toString();

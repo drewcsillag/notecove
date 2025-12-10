@@ -5,12 +5,13 @@
 ## Summary
 
 When inserting an inter-note link via autocomplete (`[[`), the preceding whitespace/newline was incorrectly consumed, causing:
+
 - Links to merge into the previous line (e.g., H1 title)
 - Spaces before `[[` to disappear (`foo [[link]]` → `foo[[link]]`)
 
-**Root Cause:** `findDoubleBracketMatch()` in `InterNoteLink.ts` used `$position.before()` which returns position *before* the parent node (including the node's opening), but added `match.index` which is a *text content* offset. This caused the range to be off by 1, including preceding whitespace/newlines.
+**Root Cause:** `findDoubleBracketMatch()` in `InterNoteLink.ts` used `$position.before()` which returns position _before_ the parent node (including the node's opening), but added `match.index` which is a _text content_ offset. This caused the range to be off by 1, including preceding whitespace/newlines.
 
-**Fix:** Changed `$position.before()` to `$position.start()` which returns the position at the *start of the parent's content*.
+**Fix:** Changed `$position.before()` to `$position.start()` which returns the position at the _start of the parent's content_.
 
 ## Tasks
 
@@ -31,22 +32,24 @@ When inserting an inter-note link via autocomplete (`[[`), the preceding whitesp
 
 ## Files Modified
 
-| File | Change |
-|------|--------|
-| `InterNoteLink.ts:70` | `$position.before()` → `$position.start()` |
-| `InterNoteLink.ts:63` | Export `findDoubleBracketMatch` for testing |
-| `InterNoteLink.test.ts` | New test file with 10 tests |
+| File                    | Change                                      |
+| ----------------------- | ------------------------------------------- |
+| `InterNoteLink.ts:70`   | `$position.before()` → `$position.start()`  |
+| `InterNoteLink.ts:63`   | Export `findDoubleBracketMatch` for testing |
+| `InterNoteLink.test.ts` | New test file with 10 tests                 |
 
 ## Technical Details
 
 ### Before (buggy):
+
 ```typescript
-const textFrom = $position.before();  // Position BEFORE parent node
+const textFrom = $position.before(); // Position BEFORE parent node
 ```
 
 ### After (fixed):
+
 ```typescript
-const textFrom = $position.start();  // Position at START of parent's content
+const textFrom = $position.start(); // Position at START of parent's content
 ```
 
 ## Related Files

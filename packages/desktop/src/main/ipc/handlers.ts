@@ -77,7 +77,14 @@ export class IPCHandlers {
     private noteMoveManager: NoteMoveManager,
     private diagnosticsManager: DiagnosticsManager,
     private backupManager: BackupManager,
-    private createWindowFn?: (options?: { noteId?: string; minimal?: boolean }) => void,
+    private createWindowFn?: (options?: {
+      noteId?: string;
+      minimal?: boolean;
+      noteInfo?: boolean;
+      targetNoteId?: string;
+      noteTitle?: string;
+      parentWindow?: BrowserWindow;
+    }) => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>,
     private getDeletionLogger?: GetDeletionLoggerFn,
     private getSyncStatus?: GetSyncStatusFn,
@@ -303,9 +310,10 @@ export class IPCHandlers {
     // Tools operations
     ipcMain.handle('tools:reindexNotes', this.handleReindexNotes.bind(this));
 
-    // Testing operations (only register if createWindowFn provided)
+    // Window operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
       ipcMain.handle('testing:createWindow', this.handleCreateWindow.bind(this));
+      ipcMain.handle('window:openNoteInfo', this.handleOpenNoteInfoWindow.bind(this));
     }
 
     // Test-only operations (only available in NODE_ENV=test)
@@ -2087,6 +2095,40 @@ export class IPCHandlers {
   }
 
   /**
+   * Window: Open Note Info window for a specific note
+   * Creates a new window showing detailed information about the note.
+   * Requires a focused window (to set as parent) and validates the note exists.
+   */
+  private async handleOpenNoteInfoWindow(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    // Validate note exists
+    const note = await this.database.getNote(noteId);
+    if (!note) {
+      return { success: false, error: 'Note not found' };
+    }
+
+    // Get focused window to use as parent
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (!focusedWindow) {
+      return { success: false, error: 'No focused window' };
+    }
+
+    // Create the Note Info window
+    if (this.createWindowFn) {
+      this.createWindowFn({
+        noteInfo: true,
+        targetNoteId: noteId,
+        noteTitle: note.title,
+        parentWindow: focusedWindow,
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
    * Test-only: Set note timestamp (for testing auto-cleanup)
    * Only available when NODE_ENV=test
    *
@@ -2623,6 +2665,7 @@ export class IPCHandlers {
     folderId: string | null;
     folderName: string | null;
     folderPath: string | null;
+    fullFolderPath: string; // SD name + folder hierarchy (e.g., "My SD / Folder / Subfolder")
 
     // Timestamps
     created: number;
@@ -2639,11 +2682,10 @@ export class IPCHandlers {
     // CRDT info
     vectorClock: Record<string, { sequence: number; offset: number; file: string }>;
     documentHash: string; // SHA-256 hash of document state (first 16 chars)
-    crdtUpdateCount: number; // Number of updates in the document
+    crdtUpdateCount: number; // Sum of all vector clock sequences (total updates across all instances)
     noteDirPath: string; // Path to note directory
-    totalFileSize: number; // Total size of all CRDT files (updates + packs + snapshots)
+    totalFileSize: number; // Total size of all CRDT files (updates + snapshots)
     snapshotCount: number; // Number of snapshot files
-    packCount: number; // Number of pack files
 
     // Advanced info
     deleted: boolean;
@@ -2687,24 +2729,40 @@ export class IPCHandlers {
     const tagRecords = await this.database.getTagsForNote(noteId);
     const tags = tagRecords.map((t) => t.name);
 
-    // Check if note is already loaded - don't load it just for statistics
-    // This avoids expensive CRDT loading for notes that aren't currently open
+    // Check if note is already loaded in memory
     const doc = this.crdtManager.getDocument(noteId);
 
-    // Extract content for statistics (only if note is already loaded)
-    let contentText = '';
-    let paragraphCount = 0;
-    let characterCount = 0;
-    let wordCount = 0;
-
-    if (doc) {
-      const content = doc.getXmlFragment('content');
-
+    // Helper to extract text from Y.Doc content fragment
+    const extractTextFromContent = (content: Y.XmlFragment): string => {
+      let text = '';
       content.forEach((item) => {
         if (item instanceof Y.XmlText) {
-          contentText += String(item.toString()) + '\n';
+          text += String(item.toString()) + '\n';
+        } else if (item instanceof Y.XmlElement) {
+          const extractText = (el: Y.XmlElement | Y.XmlText): string => {
+            if (el instanceof Y.XmlText) {
+              return String(el.toString());
+            }
+            let innerText = '';
+            el.forEach((child: unknown) => {
+              const childElement = child as Y.XmlElement | Y.XmlText;
+              innerText += extractText(childElement);
+            });
+            return innerText;
+          };
+          text += extractText(item) + '\n';
+        }
+      });
+      return text;
+    };
+
+    // Helper to count paragraphs from Y.Doc content fragment
+    const countParagraphs = (content: Y.XmlFragment): number => {
+      let count = 0;
+      content.forEach((item) => {
+        if (item instanceof Y.XmlText) {
           if (String(item.toString()).trim()) {
-            paragraphCount++;
+            count++;
           }
         } else if (item instanceof Y.XmlElement) {
           const extractText = (el: Y.XmlElement | Y.XmlText): string => {
@@ -2718,34 +2776,114 @@ export class IPCHandlers {
             });
             return text;
           };
-          const elemText = extractText(item);
-          contentText += elemText + '\n';
-          if (elemText.trim()) {
-            paragraphCount++;
+          if (extractText(item).trim()) {
+            count++;
           }
         }
       });
+      return count;
+    };
 
-      // Calculate word count and character count
+    // Extract content stats and vector clock
+    let contentText = '';
+    let paragraphCount = 0;
+    let characterCount = 0;
+    let wordCount = 0;
+    let vectorClock: Record<string, { sequence: number; offset: number; file: string }> = {};
+    let documentHash = '';
+
+    if (doc) {
+      // Note is loaded in memory - use it directly
+      const content = doc.getXmlFragment('content');
+      contentText = extractTextFromContent(content);
+      paragraphCount = countParagraphs(content);
       characterCount = contentText.length;
       wordCount = contentText
         .trim()
         .split(/\s+/)
         .filter((word) => word.length > 0).length;
+
+      // Get vector clock from memory
+      vectorClock = this.storageManager.getNoteVectorClock(note.sdId, noteId);
+
+      // Create document hash
+      documentHash = crypto
+        .createHash('sha256')
+        .update(Y.encodeStateAsUpdate(doc))
+        .digest('hex')
+        .substring(0, 16);
+    } else {
+      // Note not in memory - try to get from DB sync state cache
+      const syncState = await this.database.getNoteSyncState(noteId, note.sdId);
+
+      if (syncState) {
+        // Parse vector clock from DB
+        try {
+          vectorClock = JSON.parse(syncState.vectorClock) as Record<
+            string,
+            { sequence: number; offset: number; file: string }
+          >;
+        } catch {
+          vectorClock = {};
+        }
+
+        // If document state is available, calculate content stats
+        if (syncState.documentState.length > 0) {
+          try {
+            const tempDoc = new Y.Doc();
+            Y.applyUpdate(tempDoc, syncState.documentState);
+            const content = tempDoc.getXmlFragment('content');
+            contentText = extractTextFromContent(content);
+            paragraphCount = countParagraphs(content);
+            characterCount = contentText.length;
+            wordCount = contentText
+              .trim()
+              .split(/\s+/)
+              .filter((word) => word.length > 0).length;
+
+            // Create document hash
+            documentHash = crypto
+              .createHash('sha256')
+              .update(syncState.documentState)
+              .digest('hex')
+              .substring(0, 16);
+          } catch (err) {
+            console.error('[NoteInfo] Failed to parse document state from sync cache:', err);
+          }
+        }
+      } else {
+        // No sync state cache - load directly from disk
+        console.log(`[NoteInfo] No DB cache for note ${noteId}, loading from disk`);
+        try {
+          const loadResult = await this.storageManager.loadNote(note.sdId, noteId);
+          vectorClock = loadResult.vectorClock;
+
+          // Calculate content stats from the loaded document
+          const content = loadResult.doc.getXmlFragment('content');
+          contentText = extractTextFromContent(content);
+          paragraphCount = countParagraphs(content);
+          characterCount = contentText.length;
+          wordCount = contentText
+            .trim()
+            .split(/\s+/)
+            .filter((word) => word.length > 0).length;
+
+          // Create document hash
+          documentHash = crypto
+            .createHash('sha256')
+            .update(Y.encodeStateAsUpdate(loadResult.doc))
+            .digest('hex')
+            .substring(0, 16);
+
+          // Clean up the temporary doc
+          loadResult.doc.destroy();
+        } catch (err) {
+          console.error(`[NoteInfo] Failed to load note ${noteId} from disk:`, err);
+          // Fall back to empty vector clock from memory
+          vectorClock = this.storageManager.getNoteVectorClock(note.sdId, noteId);
+        }
+      }
     }
-
-    // Get vector clock (NoteCove's tracking of updates from other instances)
-    // Return the full VectorClock format for debugging (includes sequence, offset, file)
-    const vectorClock = this.storageManager.getNoteVectorClock(note.sdId, noteId);
-
-    // Get document state and create hash (only if note is loaded)
-    const documentHash = doc
-      ? crypto
-          .createHash('sha256')
-          .update(Y.encodeStateAsUpdate(doc))
-          .digest('hex')
-          .substring(0, 16)
-      : '';
 
     // Get note directory path and calculate total size of all CRDT files
     const noteDir = path.join(sd.path, 'notes', noteId);
@@ -2772,10 +2910,13 @@ export class IPCHandlers {
       // Directory may not exist
     }
 
-    // Get counts (new format has no packs)
-    const crdtUpdateCount = logs.length;
+    // Get counts
+    // crdtUpdateCount is the sum of all vector clock sequences (total updates from all instances)
+    const crdtUpdateCount = Object.values(vectorClock).reduce(
+      (sum, entry) => sum + entry.sequence,
+      0
+    );
     const snapshotCount = snapshots.length;
-    const packCount = 0; // No packs in new format
 
     // Sum up file sizes
     const logSizes = await Promise.all(
@@ -2806,6 +2947,9 @@ export class IPCHandlers {
       logSizes.reduce((sum, size) => sum + size, 0) +
       snapshotSizes.reduce((sum, size) => sum + size, 0);
 
+    // Build full folder path: SD name + folder hierarchy
+    const fullFolderPath = folderPath ? `${sd.name} / ${folderPath}` : sd.name;
+
     return {
       id: noteId,
       title: note.title,
@@ -2815,6 +2959,7 @@ export class IPCHandlers {
       folderId: note.folderId,
       folderName,
       folderPath,
+      fullFolderPath,
       created: note.created,
       modified: note.modified,
       tags,
@@ -2827,7 +2972,6 @@ export class IPCHandlers {
       noteDirPath,
       totalFileSize,
       snapshotCount,
-      packCount,
       deleted: note.deleted,
       pinned: note.pinned,
       contentPreview: note.contentPreview,

@@ -244,6 +244,10 @@ export const browserApiStub: typeof window.electronAPI = {
     reportEditorState: notImplemented('windowState.reportEditorState'),
     getSavedState: notImplemented('windowState.getSavedState'),
   },
+
+  window: {
+    openNoteInfo: notImplemented('window.openNoteInfo'),
+  },
 };
 
 /**

@@ -753,6 +753,14 @@ export const webClient: typeof window.electronAPI = {
       return null;
     },
   },
+
+  window: {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    openNoteInfo: async () => {
+      // Not supported in web client - no separate windows
+      return { success: false, error: 'Not supported in web client' };
+    },
+  },
 };
 
 /**

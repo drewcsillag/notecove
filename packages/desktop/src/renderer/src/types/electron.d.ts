@@ -82,6 +82,7 @@ declare global {
           folderId: string | null;
           folderName: string | null;
           folderPath: string | null;
+          fullFolderPath: string;
           created: number;
           modified: number;
           tags: string[];
@@ -94,7 +95,6 @@ declare global {
           noteDirPath: string;
           totalFileSize: number;
           snapshotCount: number;
-          packCount: number;
           deleted: boolean;
           pinned: boolean;
           contentPreview: string;
@@ -624,6 +624,15 @@ declare global {
           sdId?: string;
           editorState?: { scrollTop: number; cursorPosition: number };
         } | null>;
+      };
+
+      // Window operations
+      window: {
+        /**
+         * Open a Note Info window for the specified note.
+         * Creates a new window that displays detailed information about the note.
+         */
+        openNoteInfo: (noteId: string) => Promise<{ success: boolean; error?: string }>;
       };
     };
   }

@@ -973,6 +973,22 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       });
   }, [contextMenu, handleContextMenuClose, onNoteSelect, selectedFolderId, fetchNotes]);
 
+  // Handle "Note Info" from context menu - opens Note Info window
+  const handleNoteInfoFromMenu = useCallback(() => {
+    if (!contextMenu) return;
+
+    const { noteId } = contextMenu;
+    handleContextMenuClose();
+
+    // Call IPC to open Note Info window
+    void window.electronAPI.window.openNoteInfo(noteId).then((result) => {
+      if (!result.success) {
+        console.error('[NotesListPanel] Failed to open Note Info window:', result.error);
+        setError(result.error ?? 'Failed to open Note Info');
+      }
+    });
+  }, [contextMenu, handleContextMenuClose]);
+
   // Handle "Move to..." from context menu
   const handleMoveToFromMenu = useCallback(async () => {
     if (!contextMenu) return;
@@ -1422,6 +1438,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
               )}
               {selectedNoteIds.size === 0 && (
                 <MenuItem onClick={handleDuplicateFromMenu}>Duplicate</MenuItem>
+              )}
+              {/* Note Info is only available in Electron (requires window API) */}
+              {selectedNoteIds.size === 0 && isElectron() && (
+                <MenuItem onClick={handleNoteInfoFromMenu}>Note Info</MenuItem>
               )}
               <MenuItem onClick={() => void handleMoveToFromMenu()}>
                 {selectedNoteIds.size > 0

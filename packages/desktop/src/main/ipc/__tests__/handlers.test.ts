@@ -26,14 +26,15 @@ jest.mock('crypto', () => ({
   }),
 }));
 
-// Mock crypto.randomUUID for Node <19 (for compatibility)
-// let uuidCounter = 0;
 // Reset counter before each test
-beforeEach(() => {
+beforeEach(async () => {
   uuidCounter = 0;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const crypto = require('crypto');
-  (crypto.randomUUID as jest.Mock).mockClear();
+  // Access the mock through dynamic import to get the mocked version
+  const cryptoModule = await import('crypto');
+  const cryptoMock = cryptoModule as unknown as { randomUUID: jest.Mock };
+  if (typeof cryptoMock.randomUUID.mockClear === 'function') {
+    cryptoMock.randomUUID.mockClear();
+  }
 });
 
 import { IPCHandlers } from '../handlers';
@@ -42,6 +43,9 @@ import type { Database } from '@notecove/shared';
 import type { FolderData } from '@notecove/shared';
 import type { ConfigManager } from '../../config/manager';
 import type { NoteMoveManager } from '../../note-move-manager';
+import * as fs from 'fs/promises';
+import * as Y from 'yjs';
+import { BrowserWindow } from 'electron';
 
 // Mock types
 interface MockFolderTreeDoc {
@@ -84,6 +88,8 @@ interface MockDatabase {
   getAllTags: jest.Mock;
   getBacklinks: jest.Mock;
   getStorageDir: jest.Mock;
+  getFolder: jest.Mock;
+  getTagsForNote: jest.Mock;
   getState: jest.Mock;
   setState: jest.Mock;
   createStorageDir: jest.Mock;
@@ -93,6 +99,7 @@ interface MockDatabase {
   searchNotes: jest.Mock;
   deleteNote: jest.Mock;
   deleteStorageDir: jest.Mock;
+  getNoteSyncState: jest.Mock;
   adapter: {
     exec: jest.Mock;
   };
@@ -106,6 +113,7 @@ interface MockConfigManager {
 interface MockAppendLogManager {
   getNoteVectorClock: jest.Mock;
   writeNoteSnapshot: jest.Mock;
+  loadNote: jest.Mock;
 }
 
 interface MockNoteMoveManager {
@@ -196,6 +204,8 @@ describe('IPCHandlers - Folder CRUD', () => {
       getAllTags: jest.fn().mockResolvedValue([]),
       getBacklinks: jest.fn().mockResolvedValue([]),
       getStorageDir: jest.fn(),
+      getFolder: jest.fn(),
+      getTagsForNote: jest.fn().mockResolvedValue([]),
       getState: jest.fn(),
       setState: jest.fn().mockResolvedValue(undefined),
       createStorageDir: jest.fn(),
@@ -205,6 +215,7 @@ describe('IPCHandlers - Folder CRUD', () => {
       searchNotes: jest.fn().mockResolvedValue([]),
       deleteNote: jest.fn().mockResolvedValue(undefined),
       deleteStorageDir: jest.fn().mockResolvedValue(undefined),
+      getNoteSyncState: jest.fn().mockResolvedValue(null),
       adapter: {
         exec: jest.fn().mockResolvedValue(undefined),
       },
@@ -220,6 +231,7 @@ describe('IPCHandlers - Folder CRUD', () => {
     mockAppendLogManager = {
       getNoteVectorClock: jest.fn(),
       writeNoteSnapshot: jest.fn(),
+      loadNote: jest.fn(),
     };
 
     // Create mock note move manager
@@ -965,6 +977,8 @@ describe('IPCHandlers - SD Management', () => {
       getAllTags: jest.fn().mockResolvedValue([]),
       getBacklinks: jest.fn().mockResolvedValue([]),
       getStorageDir: jest.fn(),
+      getFolder: jest.fn(),
+      getTagsForNote: jest.fn().mockResolvedValue([]),
       getState: jest.fn(),
       setState: jest.fn().mockResolvedValue(undefined),
       createStorageDir: jest.fn(),
@@ -974,6 +988,7 @@ describe('IPCHandlers - SD Management', () => {
       searchNotes: jest.fn().mockResolvedValue([]),
       deleteNote: jest.fn().mockResolvedValue(undefined),
       deleteStorageDir: jest.fn().mockResolvedValue(undefined),
+      getNoteSyncState: jest.fn().mockResolvedValue(null),
       adapter: {
         exec: jest.fn().mockResolvedValue(undefined),
       },
@@ -989,6 +1004,7 @@ describe('IPCHandlers - SD Management', () => {
     mockAppendLogManager = {
       getNoteVectorClock: jest.fn(),
       writeNoteSnapshot: jest.fn(),
+      loadNote: jest.fn(),
     };
 
     // Create mock note move manager
@@ -3731,6 +3747,369 @@ describe('IPCHandlers - SD Management', () => {
 
         expect(result).toBeNull();
       });
+
+      it('should calculate crdtUpdateCount as sum of vector clock sequences', async () => {
+        // Set up mocks for a complete note info request
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Preview',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue({
+          id: 'test-sd',
+          name: 'Test SD',
+          path: '/test/path',
+        });
+        mockDatabase.getTagsForNote.mockResolvedValue([]);
+
+        // Mock getDocument to return undefined (note not loaded in memory)
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+
+        // Mock vector clock with multiple instances
+        // Instance A has sequence 100, Instance B has sequence 50
+        // Total should be 150
+        mockAppendLogManager.getNoteVectorClock.mockReturnValue({
+          'instance-A': { sequence: 100, offset: 0, file: 'a.crdtlog' },
+          'instance-B': { sequence: 50, offset: 0, file: 'b.crdtlog' },
+        });
+
+        // Mock file system to return empty arrays (no files to count)
+        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).not.toBeNull();
+        expect(result.crdtUpdateCount).toBe(150); // Sum of sequences: 100 + 50
+      });
+
+      it('should not include packCount field in response', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Preview',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue({
+          id: 'test-sd',
+          name: 'Test SD',
+          path: '/test/path',
+        });
+        mockDatabase.getTagsForNote.mockResolvedValue([]);
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+        mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
+
+        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).not.toBeNull();
+        expect(result).not.toHaveProperty('packCount');
+      });
+
+      it('should include fullFolderPath with SD name prefix', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+          folderId: 'folder-1',
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Preview',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue({
+          id: 'test-sd',
+          name: 'My Storage',
+          path: '/test/path',
+        });
+        // Folder hierarchy: My Storage / Parent Folder / Child Folder
+        mockDatabase.getFolder.mockImplementation(async (folderId: string) => {
+          if (folderId === 'folder-1') {
+            return {
+              id: 'folder-1',
+              name: 'Child Folder',
+              parentId: 'folder-parent',
+              sdId: 'test-sd',
+            };
+          }
+          if (folderId === 'folder-parent') {
+            return { id: 'folder-parent', name: 'Parent Folder', parentId: null, sdId: 'test-sd' };
+          }
+          return null;
+        });
+        mockDatabase.getTagsForNote.mockResolvedValue([]);
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+        mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
+
+        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).not.toBeNull();
+        // fullFolderPath should start with SD name
+        expect(result.fullFolderPath).toBe('My Storage / Parent Folder / Child Folder');
+      });
+
+      it('should set fullFolderPath to just SD name when note is at root', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+          folderId: null, // Root level
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Preview',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue({
+          id: 'test-sd',
+          name: 'My Storage',
+          path: '/test/path',
+        });
+        mockDatabase.getTagsForNote.mockResolvedValue([]);
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+        mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
+
+        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).not.toBeNull();
+        expect(result.fullFolderPath).toBe('My Storage');
+      });
+
+      it('should get vector clock from DB sync state when note not loaded in memory', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Preview',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue({
+          id: 'test-sd',
+          name: 'Test SD',
+          path: '/test/path',
+        });
+        mockDatabase.getTagsForNote.mockResolvedValue([]);
+
+        // Note NOT loaded in memory
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+
+        // Memory vector clock is empty (note not loaded)
+        mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
+
+        // But DB sync state has the vector clock cached
+        mockDatabase.getNoteSyncState.mockResolvedValue({
+          noteId: 'note-1',
+          sdId: 'test-sd',
+          vectorClock: JSON.stringify({
+            'instance-A': { sequence: 100, offset: 0, file: 'a.crdtlog' },
+            'instance-B': { sequence: 75, offset: 0, file: 'b.crdtlog' },
+          }),
+          documentState: new Uint8Array([]),
+          updatedAt: Date.now(),
+        });
+
+        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).not.toBeNull();
+        // Should get vector clock from DB sync state
+        expect(result.vectorClock).toEqual({
+          'instance-A': { sequence: 100, offset: 0, file: 'a.crdtlog' },
+          'instance-B': { sequence: 75, offset: 0, file: 'b.crdtlog' },
+        });
+        // crdtUpdateCount should be sum of sequences: 100 + 75
+        expect(result.crdtUpdateCount).toBe(175);
+      });
+
+      it('should get word count from DB sync state when note not loaded in memory', async () => {
+        // Create a simple Yjs document with text content for the mock
+        const testDoc = new Y.Doc();
+        const content = testDoc.getXmlFragment('content');
+        const textNode = new Y.XmlText();
+        textNode.insert(0, 'Hello world this is a test');
+        content.insert(0, [textNode]);
+        const docState = Y.encodeStateAsUpdate(testDoc);
+
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Preview',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue({
+          id: 'test-sd',
+          name: 'Test SD',
+          path: '/test/path',
+        });
+        mockDatabase.getTagsForNote.mockResolvedValue([]);
+
+        // Note NOT loaded in memory
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+        mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
+
+        // DB sync state has cached document state
+        mockDatabase.getNoteSyncState.mockResolvedValue({
+          noteId: 'note-1',
+          sdId: 'test-sd',
+          vectorClock: JSON.stringify({}),
+          documentState: docState,
+          updatedAt: Date.now(),
+        });
+
+        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).not.toBeNull();
+        // Should have non-zero word count from DB sync state
+        expect(result.wordCount).toBeGreaterThan(0);
+        expect(result.characterCount).toBeGreaterThan(0);
+      });
+
+      it('should load vector clock from disk when no DB cache exists', async () => {
+        // Create a simple Yjs document with text content for the mock
+        const testDoc = new Y.Doc();
+        const content = testDoc.getXmlFragment('content');
+        const textNode = new Y.XmlText();
+        textNode.insert(0, 'Hello world from disk');
+        content.insert(0, [textNode]);
+
+        const diskVectorClock = {
+          'disk-instance-1': { sequence: 42, offset: 100, file: 'disk1.crdtlog' },
+          'disk-instance-2': { sequence: 33, offset: 200, file: 'disk2.crdtlog' },
+        };
+
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Preview',
+        });
+        mockDatabase.getStorageDir.mockResolvedValue({
+          id: 'test-sd',
+          name: 'Test SD',
+          path: '/test/path',
+        });
+        mockDatabase.getTagsForNote.mockResolvedValue([]);
+
+        // Note NOT loaded in memory
+        mockCRDTManager.getDocument.mockReturnValue(undefined);
+        mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
+
+        // NO DB sync state cache
+        mockDatabase.getNoteSyncState.mockResolvedValue(null);
+
+        // Mock loadNote to return data from disk
+        mockAppendLogManager.loadNote.mockResolvedValue({
+          doc: testDoc,
+          vectorClock: diskVectorClock,
+        });
+
+        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+
+        const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
+
+        expect(result).not.toBeNull();
+        // Should have called loadNote to get data from disk
+        expect(mockAppendLogManager.loadNote).toHaveBeenCalledWith('test-sd', 'note-1');
+        // Should get vector clock from disk
+        expect(result.vectorClock).toEqual(diskVectorClock);
+        // crdtUpdateCount should be sum of sequences: 42 + 33
+        expect(result.crdtUpdateCount).toBe(75);
+        // Should have non-zero word count from disk
+        expect(result.wordCount).toBeGreaterThan(0);
+        expect(result.characterCount).toBeGreaterThan(0);
+      });
+    });
+
+    describe('window:openNoteInfo', () => {
+      it('should return error when note does not exist', async () => {
+        mockDatabase.getNote.mockResolvedValue(null);
+
+        const result = await (handlers as any).handleOpenNoteInfoWindow(mockEvent, 'non-existent');
+
+        expect(result).toEqual({
+          success: false,
+          error: 'Note not found',
+        });
+      });
+
+      it('should return error when no focused window', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+        });
+
+        // Mock BrowserWindow.getFocusedWindow to return null
+
+        BrowserWindow.getFocusedWindow = jest.fn().mockReturnValue(null);
+
+        const result = await (handlers as any).handleOpenNoteInfoWindow(mockEvent, 'note-1');
+
+        expect(result).toEqual({
+          success: false,
+          error: 'No focused window',
+        });
+      });
+
+      it('should call createWindowFn with correct parameters when note exists', async () => {
+        mockDatabase.getNote.mockResolvedValue({
+          id: 'note-1',
+          sdId: 'test-sd',
+          title: 'Test Note',
+        });
+
+        // Mock BrowserWindow.getFocusedWindow to return a window
+        const mockFocusedWindow = { id: 1 };
+
+        BrowserWindow.getFocusedWindow = jest.fn().mockReturnValue(mockFocusedWindow);
+
+        // Set up createWindowFn mock
+        const mockCreateWindowFn = jest.fn();
+        (handlers as any).createWindowFn = mockCreateWindowFn;
+
+        const result = await (handlers as any).handleOpenNoteInfoWindow(mockEvent, 'note-1');
+
+        expect(result).toEqual({ success: true });
+        expect(mockCreateWindowFn).toHaveBeenCalledWith({
+          noteInfo: true,
+          targetNoteId: 'note-1',
+          noteTitle: 'Test Note',
+          parentWindow: mockFocusedWindow,
+        });
+      });
     });
   });
 
@@ -3916,8 +4295,6 @@ describe('IPCHandlers - SD Management', () => {
 
   describe('broadcastToAll', () => {
     it('should broadcast to electron windows', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { BrowserWindow } = require('electron');
       const mockWindow = {
         webContents: {
           send: jest.fn(),
@@ -3931,8 +4308,6 @@ describe('IPCHandlers - SD Management', () => {
     });
 
     it('should broadcast to multiple windows', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { BrowserWindow } = require('electron');
       const mockWindow1 = { webContents: { send: jest.fn() } };
       const mockWindow2 = { webContents: { send: jest.fn() } };
       (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow1, mockWindow2]);
@@ -3944,8 +4319,6 @@ describe('IPCHandlers - SD Management', () => {
     });
 
     it('should not call web callback when not set', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { BrowserWindow } = require('electron');
       (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([]);
       handlers.setWebBroadcastCallback(undefined);
 

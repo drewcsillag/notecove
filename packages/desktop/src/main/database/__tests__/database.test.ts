@@ -645,7 +645,6 @@ describe('SqliteDatabase', () => {
 
     it('should get storage directory by UUID', async () => {
       const sd = await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const found = await db.getStorageDirByUuid(sd.uuid!);
       expect(found?.id).toBe('sd-1');
     });

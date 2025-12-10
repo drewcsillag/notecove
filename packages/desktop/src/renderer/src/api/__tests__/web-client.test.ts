@@ -712,7 +712,14 @@ describe('Web Client', () => {
           ok: true,
           text: () =>
             Promise.resolve(
-              JSON.stringify({ id: 'note-1', title: 'Test', created: 12345, modified: 67890 })
+              JSON.stringify({
+                noteId: 'note-1',
+                title: 'Test',
+                folderId: 'folder-1',
+                createdAt: 12345,
+                modifiedAt: 67890,
+                deleted: false,
+              })
             ),
         });
 
