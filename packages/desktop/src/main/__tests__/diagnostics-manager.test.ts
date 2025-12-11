@@ -418,4 +418,166 @@ describe('DiagnosticsManager', () => {
       });
     });
   });
+
+  describe('Image Diagnostics', () => {
+    describe('detectOrphanedImages', () => {
+      it('should detect images in media folder not in database', async () => {
+        const sdPath = join(testDir, 'sd1');
+        const mediaDir = join(sdPath, 'media');
+        const orphanedImagePath = join(mediaDir, 'orphaned-image-id.png');
+
+        await mkdir(mediaDir, { recursive: true });
+        await writeFile(orphanedImagePath, 'fake image data');
+
+        // Mock SD list
+        mockAdapter.all.mockResolvedValueOnce([
+          {
+            id: 1,
+            name: 'SD 1',
+            path: sdPath,
+          },
+        ]);
+
+        // Mock image query - no images in database
+        mockAdapter.get.mockResolvedValueOnce(null);
+
+        const orphaned = await diagnosticsManager.detectOrphanedImages();
+
+        expect(orphaned).toHaveLength(1);
+        expect(orphaned[0]?.imageId).toBe('orphaned-image-id');
+        expect(orphaned[0]?.sdId).toBe(1);
+        expect(orphaned[0]?.filePath).toBe(orphanedImagePath);
+        expect(orphaned[0]?.sizeBytes).toBeGreaterThan(0);
+      });
+
+      it('should not flag images that exist in database', async () => {
+        const sdPath = join(testDir, 'sd1');
+        const mediaDir = join(sdPath, 'media');
+        const validImagePath = join(mediaDir, 'valid-image-id.png');
+
+        await mkdir(mediaDir, { recursive: true });
+        await writeFile(validImagePath, 'fake image data');
+
+        mockAdapter.all.mockResolvedValueOnce([
+          {
+            id: 1,
+            name: 'SD 1',
+            path: sdPath,
+          },
+        ]);
+
+        // Image exists in database
+        mockAdapter.get.mockResolvedValueOnce({ id: 'valid-image-id' });
+
+        const orphaned = await diagnosticsManager.detectOrphanedImages();
+
+        expect(orphaned).toHaveLength(0);
+      });
+    });
+
+    describe('detectMissingImages', () => {
+      it('should detect database entries without image files', async () => {
+        const sdPath = join(testDir, 'sd1');
+        // Don't create the media directory - image is missing
+
+        mockAdapter.all.mockResolvedValueOnce([
+          {
+            id: 'missing-image-id',
+            sd_id: 1,
+            filename: 'missing-image-id.png',
+            sd_name: 'SD 1',
+            sd_path: sdPath,
+            mime_type: 'image/png',
+            size: 12345,
+            created: Date.now(),
+          },
+        ]);
+
+        const missing = await diagnosticsManager.detectMissingImages();
+
+        expect(missing).toHaveLength(1);
+        expect(missing[0]?.imageId).toBe('missing-image-id');
+        expect(missing[0]?.sdId).toBe(1);
+        expect(missing[0]?.expectedPath).toContain('media');
+        expect(missing[0]?.expectedPath).toContain('missing-image-id.png');
+      });
+
+      it('should return empty array when all images have files', async () => {
+        const sdPath = join(testDir, 'sd1');
+        const mediaDir = join(sdPath, 'media');
+        const imagePath = join(mediaDir, 'valid-image-id.png');
+
+        await mkdir(mediaDir, { recursive: true });
+        await writeFile(imagePath, 'fake image data');
+
+        mockAdapter.all.mockResolvedValueOnce([
+          {
+            id: 'valid-image-id',
+            sd_id: 1,
+            filename: 'valid-image-id.png',
+            sd_name: 'SD 1',
+            sd_path: sdPath,
+            mime_type: 'image/png',
+            size: 12345,
+            created: Date.now(),
+          },
+        ]);
+
+        const missing = await diagnosticsManager.detectMissingImages();
+
+        expect(missing).toHaveLength(0);
+      });
+    });
+
+    describe('getImageStorageStats', () => {
+      it('should calculate total image storage per SD', async () => {
+        const sdPath = join(testDir, 'sd1');
+        const mediaDir = join(sdPath, 'media');
+
+        await mkdir(mediaDir, { recursive: true });
+        // Create some test image files
+        await writeFile(join(mediaDir, 'image1.png'), 'a'.repeat(1000));
+        await writeFile(join(mediaDir, 'image2.jpg'), 'b'.repeat(2000));
+        await writeFile(join(mediaDir, 'image3.gif'), 'c'.repeat(500));
+
+        mockAdapter.all.mockResolvedValueOnce([
+          {
+            id: 1,
+            name: 'SD 1',
+            path: sdPath,
+          },
+        ]);
+
+        const stats = await diagnosticsManager.getImageStorageStats();
+
+        expect(stats).toHaveLength(1);
+        expect(stats[0]?.sdId).toBe(1);
+        expect(stats[0]?.sdName).toBe('SD 1');
+        expect(stats[0]?.imageCount).toBe(3);
+        expect(stats[0]?.totalSizeBytes).toBe(3500);
+      });
+
+      it('should return zero for SD with no media folder', async () => {
+        const sdPath = join(testDir, 'sd1');
+        // Don't create media folder
+
+        await mkdir(sdPath, { recursive: true });
+
+        mockAdapter.all.mockResolvedValueOnce([
+          {
+            id: 1,
+            name: 'SD 1',
+            path: sdPath,
+          },
+        ]);
+
+        const stats = await diagnosticsManager.getImageStorageStats();
+
+        expect(stats).toHaveLength(1);
+        expect(stats[0]?.sdId).toBe(1);
+        expect(stats[0]?.imageCount).toBe(0);
+        expect(stats[0]?.totalSizeBytes).toBe(0);
+      });
+    });
+  });
 });

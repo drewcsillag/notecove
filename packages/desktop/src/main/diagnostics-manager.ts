@@ -61,6 +61,45 @@ export interface OrphanedActivityLog {
   sizeBytes: number;
 }
 
+/**
+ * Image file in media folder not tracked in database
+ */
+export interface OrphanedImage {
+  imageId: string;
+  sdId: number;
+  sdName: string;
+  sdPath: string;
+  filePath: string;
+  filename: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+/**
+ * Image entry in database without corresponding file
+ */
+export interface MissingImage {
+  imageId: string;
+  sdId: number;
+  sdName: string;
+  sdPath: string;
+  expectedPath: string;
+  filename: string;
+  mimeType: string;
+  recordedSize: number;
+}
+
+/**
+ * Image storage statistics per SD
+ */
+export interface ImageStorageStats {
+  sdId: number;
+  sdName: string;
+  sdPath: string;
+  imageCount: number;
+  totalSizeBytes: number;
+}
+
 export class DiagnosticsManager {
   private db: Database;
 
@@ -503,5 +542,148 @@ export class DiagnosticsManager {
     }
 
     console.log(`[DiagnosticsManager] Deleted duplicate note: ${noteId} from SD ${sdId}`);
+  }
+
+  // ==================== IMAGE DIAGNOSTICS ====================
+
+  /**
+   * Detect orphaned images (files in media folder not tracked in database)
+   */
+  async detectOrphanedImages(): Promise<OrphanedImage[]> {
+    const sds = await this.db
+      .getAdapter()
+      .all<{ id: number; name: string; path: string }>('SELECT id, name, path FROM storage_dirs');
+
+    const orphaned: OrphanedImage[] = [];
+
+    for (const sd of sds) {
+      const mediaDir = path.join(sd.path, 'media');
+      if (!fs.existsSync(mediaDir)) continue;
+
+      const files = fs.readdirSync(mediaDir);
+
+      for (const filename of files) {
+        // Skip hidden files
+        if (filename.startsWith('.')) continue;
+
+        const filePath = path.join(mediaDir, filename);
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile()) continue;
+
+        // Extract imageId from filename (remove extension)
+        const imageId = path.basename(filename, path.extname(filename));
+
+        // Check if image exists in database
+        const exists = await this.db.getAdapter().get<{
+          id: string;
+        }>('SELECT id FROM images WHERE id = ? AND sd_id = ?', [imageId, sd.id]);
+
+        if (!exists) {
+          orphaned.push({
+            imageId,
+            sdId: sd.id,
+            sdName: sd.name,
+            sdPath: sd.path,
+            filePath,
+            filename,
+            sizeBytes: stat.size,
+            modifiedAt: stat.mtime.toISOString(),
+          });
+        }
+      }
+    }
+
+    return orphaned;
+  }
+
+  /**
+   * Detect missing images (database entries without corresponding files)
+   */
+  async detectMissingImages(): Promise<MissingImage[]> {
+    const images = await this.db.getAdapter().all<{
+      id: string;
+      sd_id: number;
+      filename: string;
+      sd_name: string;
+      sd_path: string;
+      mime_type: string;
+      size: number;
+    }>(
+      `
+      SELECT i.id, i.sd_id, i.filename, i.mime_type, i.size,
+             s.name as sd_name, s.path as sd_path
+      FROM images i
+      JOIN storage_dirs s ON i.sd_id = s.id
+    `
+    );
+
+    const missing: MissingImage[] = [];
+
+    for (const image of images) {
+      const imagePath = path.join(image.sd_path, 'media', image.filename);
+
+      if (!fs.existsSync(imagePath)) {
+        missing.push({
+          imageId: image.id,
+          sdId: image.sd_id,
+          sdName: image.sd_name,
+          sdPath: image.sd_path,
+          expectedPath: imagePath,
+          filename: image.filename,
+          mimeType: image.mime_type,
+          recordedSize: image.size,
+        });
+      }
+    }
+
+    return missing;
+  }
+
+  /**
+   * Get image storage statistics per SD
+   */
+  async getImageStorageStats(): Promise<ImageStorageStats[]> {
+    const sds = await this.db
+      .getAdapter()
+      .all<{ id: number; name: string; path: string }>('SELECT id, name, path FROM storage_dirs');
+
+    const stats: ImageStorageStats[] = [];
+
+    for (const sd of sds) {
+      const mediaDir = path.join(sd.path, 'media');
+
+      let imageCount = 0;
+      let totalSizeBytes = 0;
+
+      if (fs.existsSync(mediaDir)) {
+        const files = fs.readdirSync(mediaDir);
+
+        for (const filename of files) {
+          // Skip hidden files
+          if (filename.startsWith('.')) continue;
+
+          const filePath = path.join(mediaDir, filename);
+          try {
+            const stat = fs.statSync(filePath);
+            if (stat.isFile()) {
+              imageCount++;
+              totalSizeBytes += stat.size;
+            }
+          } catch (error) {
+            console.error(`[DiagnosticsManager] Failed to stat image file ${filePath}:`, error);
+          }
+        }
+      }
+
+      stats.push({
+        sdId: sd.id,
+        sdName: sd.name,
+        sdPath: sd.path,
+        imageCount,
+        totalSizeBytes,
+      });
+    }
+
+    return stats;
   }
 }

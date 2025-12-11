@@ -908,6 +908,33 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
             const tr = editor.state.tr.delete(currentPos, currentPos + nodeAtPos.nodeSize);
             editor.view.dispatch(tr);
           },
+          onReload: () => {
+            if (!attrs.imageId || !attrs.sdId) return;
+
+            // Clear caches for this image
+            const cacheKey = `${attrs.sdId}:${attrs.imageId}`;
+            thumbnailCache.delete(cacheKey);
+            imageDataCache.delete(cacheKey);
+
+            // Reset load state
+            hasLoadedImage = false;
+
+            // Reset visual state
+            img.src = '';
+            img.style.display = 'none';
+            img.classList.remove('notecove-image--fade-in');
+            loadingPlaceholder.style.display = 'none';
+            errorPlaceholder.style.display = 'none';
+            lazyPlaceholder.style.display = '';
+
+            // Re-trigger lazy loading
+            if (intersectionObserver) {
+              intersectionObserver.observe(wrapper);
+            } else {
+              // Immediate load if no observer
+              void loadImage(attrs.imageId, attrs.sdId);
+            }
+          },
         });
       };
 

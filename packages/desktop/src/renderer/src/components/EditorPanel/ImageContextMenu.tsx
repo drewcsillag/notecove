@@ -21,6 +21,7 @@ import SaveAltIcon from '@mui/icons-material/SaveAlt';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SettingsIcon from '@mui/icons-material/Settings';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import FormatAlignLeftIcon from '@mui/icons-material/FormatAlignLeft';
@@ -42,6 +43,8 @@ export interface ContextMenuOpenEvent {
   onUpdateAttrs: (attrs: Partial<ImageNodeAttrs>) => void;
   /** Callback to delete the image */
   onDelete: () => void;
+  /** Callback to reload the image (clear cache and refetch) */
+  onReload: () => void;
 }
 
 /** Custom event name for opening context menu */
@@ -154,6 +157,13 @@ export function ImageContextMenu(): React.JSX.Element | null {
     handleClose();
   }, [currentData, handleClose]);
 
+  // Reload image (clear cache and refetch)
+  const handleReload = useCallback(() => {
+    if (!currentData) return;
+    currentData.onReload();
+    handleClose();
+  }, [currentData, handleClose]);
+
   // Toggle display mode
   const handleSetDisplay = useCallback(
     (display: 'block' | 'inline') => {
@@ -225,6 +235,13 @@ export function ImageContextMenu(): React.JSX.Element | null {
             <SettingsIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Edit Properties...</ListItemText>
+        </MenuItem>
+
+        <MenuItem onClick={handleReload}>
+          <ListItemIcon>
+            <RefreshIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Reload Image</ListItemText>
         </MenuItem>
 
         <Divider />
