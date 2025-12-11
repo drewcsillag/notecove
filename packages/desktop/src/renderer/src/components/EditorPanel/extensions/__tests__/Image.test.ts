@@ -724,5 +724,79 @@ describe('NotecoveImage Extension', () => {
       const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
       expect(errorPlaceholder?.getAttribute('title')).toContain('syncing');
     });
+
+    it('should reload image when onAvailable event matches', async () => {
+      // First load fails - image not found
+      mockThumbnailGetDataUrl.mockResolvedValue(null);
+      mockGetDataUrl.mockResolvedValue(null);
+
+      // Track onAvailable callback for testing
+      let onAvailableCallback:
+        | ((event: { sdId: string; imageId: string; filename: string }) => void)
+        | null = null;
+
+      // Mock onAvailable to capture the callback
+      (window as unknown as { electronAPI: unknown }).electronAPI = {
+        image: {
+          getDataUrl: mockGetDataUrl,
+          getMetadata: mockGetMetadata,
+          onAvailable: (
+            listener: (event: { sdId: string; imageId: string; filename: string }) => void
+          ) => {
+            onAvailableCallback = listener;
+            return () => {
+              onAvailableCallback = null;
+            };
+          },
+        },
+        thumbnail: {
+          getDataUrl: mockThumbnailGetDataUrl,
+        },
+      };
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'sync-test-image',
+              sdId: 'sd-sync',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Trigger visibility
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Error placeholder should be visible
+      const wrapper = container.querySelector('.notecove-image');
+      const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
+      expect(errorPlaceholder).toBeTruthy();
+
+      // Now simulate the image becoming available
+      mockThumbnailGetDataUrl.mockResolvedValue('data:image/jpeg;base64,synced-thumb');
+
+      // Trigger onAvailable event
+      expect(onAvailableCallback).not.toBeNull();
+      onAvailableCallback!({
+        sdId: 'sd-sync',
+        imageId: 'sync-test-image',
+        filename: 'sync-test-image.png',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // Thumbnail should have been requested again
+      expect(mockThumbnailGetDataUrl).toHaveBeenLastCalledWith('sd-sync', 'sync-test-image');
+
+      // Image should now be visible
+      const img = wrapper?.querySelector('.notecove-image-element') as HTMLImageElement | null;
+      expect(img?.src).toContain('synced-thumb');
+    });
   });
 });

@@ -866,6 +866,10 @@ export const webClient: typeof window.electronAPI = {
       // Open external is not supported in web client
       throw new Error('Open external is not supported in browser mode');
     },
+    // No-op in web client - images don't arrive via sync
+    onAvailable: () => () => {
+      /* No-op in web client */
+    },
   },
 
   // Thumbnail operations via REST API

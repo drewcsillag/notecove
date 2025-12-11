@@ -667,6 +667,10 @@ declare global {
         saveAs: (sdId: string, imageId: string) => Promise<string | null>;
         /** Open image in external application */
         openExternal: (sdId: string, imageId: string) => Promise<void>;
+        /** Subscribe to image availability events (when synced images arrive) */
+        onAvailable: (
+          listener: (event: { sdId: string; imageId: string; filename: string }) => void
+        ) => () => void;
       };
 
       thumbnail: {

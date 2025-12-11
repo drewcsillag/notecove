@@ -89,6 +89,9 @@ const sdDeletionSyncs = new Map<string, DeletionSync>();
 const sdDeletionWatchers = new Map<string, NodeFileWatcher>();
 const sdDeletionPollIntervals = new Map<string, NodeJS.Timeout>();
 
+// Media file watcher: detect when images arrive via sync
+const sdMediaWatchers = new Map<string, NodeFileWatcher>();
+
 /**
  * Reindex tags for a set of notes after external sync
  */
@@ -1492,6 +1495,42 @@ async function setupSDWatchers(
   });
 
   sdActivityWatchers.set(sdId, activityWatcher);
+
+  // Set up media watcher for image sync detection
+  const mediaDir = `${sdPath}/media`;
+  const mediaWatcher = new NodeFileWatcher();
+
+  // Only watch if media directory exists
+  if (existsSync(mediaDir)) {
+    await mediaWatcher.watch(mediaDir, (event) => {
+      // Extract imageId from filename (e.g., "abc123.png" → "abc123")
+      const filename = event.filename;
+      const lastDotIndex = filename.lastIndexOf('.');
+      if (lastDotIndex === -1) return; // No extension, not an image
+
+      const imageId = filename.substring(0, lastDotIndex);
+      const extension = filename.substring(lastDotIndex + 1).toLowerCase();
+
+      // Only handle image files
+      const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'heic', 'heif'];
+      if (!imageExtensions.includes(extension)) return;
+
+      console.log(`[MediaWatcher ${sdId}] Image file available:`, { imageId, filename });
+
+      // Broadcast to all renderer windows
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('image:available', {
+          sdId,
+          imageId,
+          filename,
+        });
+      }
+    });
+    sdMediaWatchers.set(sdId, mediaWatcher);
+    console.log(`[Init] Media watcher set up for SD: ${sdId}`);
+  } else {
+    console.log(`[Init] Media directory doesn't exist yet for SD: ${sdId}, skipping watcher`);
+  }
 
   console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
 
@@ -3479,6 +3518,13 @@ app.on('will-quit', (event) => {
       sdDeletionPollIntervals.clear();
       sdDeletionSyncs.clear();
       sdDeletionLoggers.clear();
+
+      // 5d. Clear media watchers
+      console.log('[App] Cleaning up media watchers...');
+      for (const watcher of sdMediaWatchers.values()) {
+        await watcher.unwatch();
+      }
+      sdMediaWatchers.clear();
 
       // 6. Clear compaction interval
       if (compactionInterval) {

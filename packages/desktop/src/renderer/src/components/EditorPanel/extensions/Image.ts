@@ -950,6 +950,43 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
       // Listen for selection changes
       editor.on('selectionUpdate', handleSelection);
 
+      // Subscribe to image availability events (for when synced images arrive)
+      // Note: Defensive check even though types say it's always present - could be browser mode
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      let cleanupImageAvailable: (() => void) | null = null;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (window.electronAPI?.image.onAvailable) {
+        cleanupImageAvailable = window.electronAPI.image.onAvailable((event) => {
+          // Get fresh node attrs (they may have changed)
+          if (typeof getPos !== 'function') return;
+          const pos = getPos();
+          if (typeof pos !== 'number') return;
+          const currentNode = editor.state.doc.nodeAt(pos);
+          if (!currentNode) return;
+          const attrs = currentNode.attrs as ImageNodeAttrs;
+
+          // Check if this event matches our image
+          if (event.imageId === attrs.imageId && event.sdId === attrs.sdId) {
+            debugLog('Image became available via sync:', event);
+
+            // Only reload if currently showing error placeholder
+            if (errorPlaceholder.style.display !== 'none') {
+              // Reset state so image can be reloaded
+              hasLoadedImage = false;
+              errorPlaceholder.style.display = 'none';
+
+              // Clear any cached data for this image so we fetch fresh
+              const cacheKey = `${attrs.sdId}:${attrs.imageId}`;
+              thumbnailCache.delete(cacheKey);
+              imageDataCache.delete(cacheKey);
+
+              // Re-trigger load
+              void loadImage(attrs.imageId, attrs.sdId);
+            }
+          }
+        });
+      }
+
       return {
         dom: wrapper,
         // No contentDOM since this is an atom node
@@ -991,6 +1028,10 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           wrapper.removeEventListener('contextmenu', handleContextMenu);
           // Clean up double-click listener
           img.removeEventListener('dblclick', handleDoubleClick);
+          // Clean up image availability listener
+          if (cleanupImageAvailable) {
+            cleanupImageAvailable();
+          }
         },
       };
     };

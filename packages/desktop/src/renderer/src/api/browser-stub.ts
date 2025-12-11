@@ -259,6 +259,9 @@ export const browserApiStub: typeof window.electronAPI = {
     copyToClipboard: notImplemented('image.copyToClipboard'),
     saveAs: notImplemented('image.saveAs'),
     openExternal: notImplemented('image.openExternal'),
+    onAvailable: () => () => {
+      /* No-op in browser mode */
+    },
   },
 
   thumbnail: {

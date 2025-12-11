@@ -1617,6 +1617,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     openExternal: (sdId: string, imageId: string): Promise<void> =>
       ipcRenderer.invoke('image:openExternal', sdId, imageId) as Promise<void>,
+
+    /**
+     * Subscribe to image availability events (when synced images arrive)
+     * @param listener Callback when image becomes available
+     * @returns Cleanup function to remove listener
+     */
+    onAvailable: (
+      listener: (event: { sdId: string; imageId: string; filename: string }) => void
+    ): (() => void) => {
+      const wrapper = (
+        _: Electron.IpcRendererEvent,
+        data: { sdId: string; imageId: string; filename: string }
+      ) => {
+        listener(data);
+      };
+      ipcRenderer.on('image:available', wrapper);
+      return () => {
+        ipcRenderer.removeListener('image:available', wrapper);
+      };
+    },
   },
 
   // Thumbnail operations
