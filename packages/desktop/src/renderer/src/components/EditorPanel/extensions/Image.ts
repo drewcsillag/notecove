@@ -356,12 +356,15 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
 
       const errorPlaceholder = document.createElement('div');
       errorPlaceholder.className = 'notecove-image-error';
+      errorPlaceholder.title =
+        'This image may still be syncing from another device, or was deleted.';
       errorPlaceholder.innerHTML = `
         <svg class="notecove-image-broken" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/>
           <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2"/>
         </svg>
         <span>Image not found</span>
+        <span class="notecove-image-error-id"></span>
       `;
       errorPlaceholder.style.display = 'none';
 
@@ -523,6 +526,8 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
               // Image not found
               debugLog('Image not found:', { imageId, sdId });
               loadingPlaceholder.style.display = 'none';
+              const errorIdSpan = errorPlaceholder.querySelector('.notecove-image-error-id');
+              if (errorIdSpan) errorIdSpan.textContent = imageId;
               errorPlaceholder.style.display = '';
               img.style.display = 'none';
               hasLoadedImage = true; // Don't retry
@@ -531,6 +536,8 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         } catch (error) {
           console.error('[NotecoveImage] Failed to load image:', error);
           loadingPlaceholder.style.display = 'none';
+          const errorIdSpan = errorPlaceholder.querySelector('.notecove-image-error-id');
+          if (errorIdSpan) errorIdSpan.textContent = imageId;
           errorPlaceholder.style.display = '';
           img.style.display = 'none';
           hasLoadedImage = true; // Don't retry on error

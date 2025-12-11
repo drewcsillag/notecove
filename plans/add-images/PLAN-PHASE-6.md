@@ -1,7 +1,7 @@
 # Phase 6: Sync & Edge Cases
 
-**Status:** 🟥 To Do
-**Progress:** `0%`
+**Status:** 🟡 In Progress
+**Progress:** `25%` (6.1 complete)
 
 **Depends on:** Phase 1 (Foundation), Phase 5 (Thumbnails)
 
@@ -15,7 +15,7 @@ Handle sync edge cases: missing images, file arrival detection, and cross-SD cop
 
 ### 6.1 Broken Image Placeholder
 
-**Status:** 🟥 To Do
+**Status:** ✅ Complete
 
 Show appropriate placeholder when image file is missing.
 
@@ -46,16 +46,29 @@ Show appropriate placeholder when image file is missing.
 #### Implementation
 
 - Detect missing file during `getDataUrl` IPC call
-- Return error state instead of throwing
-- `ImageNodeView` renders broken placeholder
+- Return null for missing files (already implemented)
+- `ImageNodeView` renders broken placeholder with imageId
+- Title tooltip explains possible sync scenario
 
 #### Steps
 
-- [ ] 🟥 Write test: missing image shows broken placeholder
-- [ ] 🟥 Design broken placeholder component
-- [ ] 🟥 Update IPC to return null/error for missing files
-- [ ] 🟥 Update `ImageNodeView` to handle missing state
-- [ ] 🟥 Add CSS for broken placeholder styling
+- [x] ✅ Write test: missing image shows broken placeholder (4 tests)
+- [x] ✅ Design broken placeholder component (enhanced existing)
+- [x] ✅ IPC returns null for missing files (already worked)
+- [x] ✅ Update `ImageNodeView` to display imageId in error placeholder
+- [x] ✅ Add title tooltip: "This image may still be syncing..."
+- [x] ✅ Add CSS for error-id styling (monospace, smaller font)
+
+#### Files Modified
+
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/Image.ts`
+  - Added title tooltip to errorPlaceholder
+  - Added `.notecove-image-error-id` span for imageId display
+  - Update imageId in span when showing error
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/__tests__/Image.test.ts`
+  - Added 4 tests for broken image placeholder
+- `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx`
+  - Added CSS for `.notecove-image-error-id`
 
 ---
 

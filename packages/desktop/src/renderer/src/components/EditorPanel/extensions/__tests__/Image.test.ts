@@ -581,4 +581,148 @@ describe('NotecoveImage Extension', () => {
       expect(mockThumbnailGetDataUrl).not.toHaveBeenCalled();
     });
   });
+
+  describe('Broken Image Placeholder', () => {
+    let container: HTMLDivElement;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      editor.destroy();
+      editor = new Editor({
+        element: container,
+        extensions: [
+          StarterKit.configure({
+            history: false,
+          }),
+          NotecoveImage,
+        ],
+      });
+    });
+
+    afterEach(() => {
+      document.body.removeChild(container);
+    });
+
+    it('should show error placeholder when image not found', async () => {
+      // Both thumbnail and full image APIs return null (image not found)
+      mockThumbnailGetDataUrl.mockResolvedValue(null);
+      mockGetDataUrl.mockResolvedValue(null);
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'missing-image-id',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Trigger visibility
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Error placeholder should be visible
+      const wrapper = container.querySelector('.notecove-image');
+      const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
+      expect(errorPlaceholder).toBeTruthy();
+
+      // Check that it's visible (not display: none)
+      const style = window.getComputedStyle(errorPlaceholder!);
+      expect(style.display).not.toBe('none');
+    });
+
+    it('should display imageId in error placeholder for debugging', async () => {
+      mockThumbnailGetDataUrl.mockResolvedValue(null);
+      mockGetDataUrl.mockResolvedValue(null);
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'debug-image-id-12345',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Trigger visibility
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Error placeholder should contain the imageId
+      const wrapper = container.querySelector('.notecove-image');
+      const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
+      expect(errorPlaceholder?.textContent).toContain('debug-image-id-12345');
+    });
+
+    it('should show error placeholder when image API throws error', async () => {
+      mockThumbnailGetDataUrl.mockRejectedValue(new Error('Network error'));
+      mockGetDataUrl.mockRejectedValue(new Error('Network error'));
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'error-image',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Trigger visibility
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Error placeholder should be visible
+      const wrapper = container.querySelector('.notecove-image');
+      const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
+      expect(errorPlaceholder).toBeTruthy();
+    });
+
+    it('should have title tooltip explaining possible sync state', async () => {
+      mockThumbnailGetDataUrl.mockResolvedValue(null);
+      mockGetDataUrl.mockResolvedValue(null);
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'tooltip-test-image',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Trigger visibility
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Error placeholder should have title attribute explaining the situation
+      const wrapper = container.querySelector('.notecove-image');
+      const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
+      expect(errorPlaceholder?.getAttribute('title')).toContain('syncing');
+    });
+  });
 });

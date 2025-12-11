@@ -1736,6 +1736,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             height: '32px',
             color: theme.palette.error.main,
           },
+          '& .notecove-image-error-id': {
+            fontSize: '0.75rem',
+            fontFamily: 'monospace',
+            color: theme.palette.text.disabled,
+            marginTop: '4px',
+          },
           '& .notecove-image-caption': {
             marginTop: '8px',
             fontSize: '0.875rem',
