@@ -1,6 +1,6 @@
 # Image Support Implementation Plan
 
-**Overall Progress:** `64%` (Phases 1-5, 9 complete)
+**Overall Progress:** `73%` (Phases 1-6, 9 complete)
 
 ## Architecture Summary
 
@@ -22,7 +22,7 @@
 3. ✅ [Phase 3: Display & Interaction](./PLAN-PHASE-3.md) - Resizing, lightbox, context menu
 4. ✅ [Phase 4: Metadata & Accessibility](./PLAN-PHASE-4.md) - Alt text, captions, alignment, link wrapping
 5. ✅ [Phase 5: Thumbnails & Performance](./PLAN-PHASE-5.md) - Thumbnail generation, lazy loading, cache management
-6. 🟥 [Phase 6: Sync & Edge Cases](./PLAN-PHASE-6.md) - Broken placeholders, cross-SD copy
+6. ✅ [Phase 6: Sync & Edge Cases](./PLAN-PHASE-6.md) - Broken placeholders, cross-SD copy
 7. 🟥 [Phase 7: Cleanup](./PLAN-PHASE-7.md) - Mark-and-sweep orphan cleanup
 8. 🟥 [Phase 8: Export](./PLAN-PHASE-8.md) - Export with adjacent folder
 9. ✅ [Phase 9: Toolbar UI](./PLAN-PHASE-9.md) - Image button in toolbar
@@ -69,12 +69,12 @@
 - [x] ✅ **5.2 Lazy loading for images** (IntersectionObserver, thumbnail display, 5 tests)
 - [x] ✅ **5.3 Thumbnail cache management** (ThumbnailCacheManager class, age/size/orphan cleanup, 13 tests)
 
-### Phase 6: Sync & Edge Cases
+### Phase 6: Sync & Edge Cases ✅
 
-- [ ] 🟥 **6.1 Broken image placeholder**
-- [ ] 🟥 **6.2 Auto-update when image file arrives**
-- [ ] 🟥 **6.3 Cross-SD copy handling**
-- [ ] 🟥 **6.4 Image diagnostics (orphan count, missing count, storage stats)**
+- [x] ✅ **6.1 Broken image placeholder** (imageId display, tooltip, 4 tests)
+- [x] ✅ **6.2 Auto-update when image file arrives** (Chokidar media watcher, onAvailable IPC, 1 test)
+- [x] ✅ **6.3 Cross-SD copy handling** (cross-SD paste detection, image file copy)
+- [x] ✅ **6.4 Image diagnostics** (orphan/missing detection, storage stats, reload context menu, 6 tests)
 
 ### Phase 7: Cleanup
 
