@@ -6,3 +6,12 @@
  */
 
 export { ThumbnailGenerator, ThumbnailSpec, type ThumbnailResult } from './thumbnail-generator';
+export {
+  ThumbnailCacheManager,
+  type ThumbnailCacheConfig,
+  type CleanupResult,
+  type CacheStats,
+  type SdCacheStats,
+  type FullCleanupResult,
+  type ImageExistsCheck,
+} from './thumbnail-cache-manager';

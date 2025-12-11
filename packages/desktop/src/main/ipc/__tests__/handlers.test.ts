@@ -13,6 +13,14 @@ jest.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
+  app: {
+    getPath: jest.fn((name: string) => {
+      if (name === 'userData') {
+        return '/mock/user/data';
+      }
+      return `/mock/${name}`;
+    }),
+  },
 }));
 
 // Mock Node.js crypto module

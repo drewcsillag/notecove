@@ -1,6 +1,6 @@
 # Image Support Implementation Plan
 
-**Overall Progress:** `56%` (Phases 1-4, 9 complete)
+**Overall Progress:** `64%` (Phases 1-5, 9 complete)
 
 ## Architecture Summary
 
@@ -21,7 +21,7 @@
 2. ✅ [Phase 2: Insertion Methods](./PLAN-PHASE-2.md) - Paste, drag-drop, file picker, markdown syntax
 3. ✅ [Phase 3: Display & Interaction](./PLAN-PHASE-3.md) - Resizing, lightbox, context menu
 4. ✅ [Phase 4: Metadata & Accessibility](./PLAN-PHASE-4.md) - Alt text, captions, alignment, link wrapping
-5. 🟥 [Phase 5: Thumbnails & Performance](./PLAN-PHASE-5.md) - Thumbnail generation, lazy loading
+5. ✅ [Phase 5: Thumbnails & Performance](./PLAN-PHASE-5.md) - Thumbnail generation, lazy loading, cache management
 6. 🟥 [Phase 6: Sync & Edge Cases](./PLAN-PHASE-6.md) - Broken placeholders, cross-SD copy
 7. 🟥 [Phase 7: Cleanup](./PLAN-PHASE-7.md) - Mark-and-sweep orphan cleanup
 8. 🟥 [Phase 8: Export](./PLAN-PHASE-8.md) - Export with adjacent folder
@@ -63,11 +63,11 @@
 - [x] ✅ **4.3 Alignment options (left/center/right)**
 - [x] ✅ **4.4 Link wrapping (click image → URL)**
 
-### Phase 5: Thumbnails & Performance
+### Phase 5: Thumbnails & Performance ✅
 
 - [x] ✅ **5.1 Thumbnail generation** (ThumbnailGenerator class, 5 IPC handlers, 17 tests)
 - [x] ✅ **5.2 Lazy loading for images** (IntersectionObserver, thumbnail display, 5 tests)
-- [ ] 🟥 **5.3 Thumbnail cache management**
+- [x] ✅ **5.3 Thumbnail cache management** (ThumbnailCacheManager class, age/size/orphan cleanup, 13 tests)
 
 ### Phase 6: Sync & Edge Cases
 

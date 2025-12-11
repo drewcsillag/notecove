@@ -14,6 +14,14 @@ jest.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
+  app: {
+    getPath: jest.fn((name: string) => {
+      if (name === 'userData') {
+        return '/mock/user/data';
+      }
+      return `/mock/${name}`;
+    }),
+  },
   dialog: {
     showSaveDialog: jest.fn(),
     showOpenDialog: jest.fn(),
