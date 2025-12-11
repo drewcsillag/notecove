@@ -8,16 +8,16 @@ A dedicated window to browse all images in sync directories, see which notes con
 
 ## Design Decisions
 
-| Question | Answer |
-|----------|--------|
-| Access Point | Menu item (View → Media Browser) + keyboard shortcut |
-| Layout | New window (separate from main app window) |
-| Display Modes | Grid + List toggle |
-| Image-to-Note Info | Note name + preview snippet, clickable to navigate |
-| Actions | Navigate, Lightbox, Copy, Export, Bulk ops, Insert into note |
-| Filtering | Advanced (search + filter by date/size/format, used vs orphaned) |
-| Name | Media Browser |
-| Scope | Switchable between SDs |
+| Question           | Answer                                                           |
+| ------------------ | ---------------------------------------------------------------- |
+| Access Point       | Menu item (View → Media Browser) + keyboard shortcut             |
+| Layout             | New window (separate from main app window)                       |
+| Display Modes      | Grid + List toggle                                               |
+| Image-to-Note Info | Note name + preview snippet, clickable to navigate               |
+| Actions            | Navigate, Lightbox, Copy, Export, Bulk ops, Insert into note     |
+| Filtering          | Advanced (search + filter by date/size/format, used vs orphaned) |
+| Name               | Media Browser                                                    |
+| Scope              | Switchable between SDs                                           |
 
 ---
 

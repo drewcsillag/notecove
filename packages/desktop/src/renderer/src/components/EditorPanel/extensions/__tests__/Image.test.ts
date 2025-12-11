@@ -11,16 +11,79 @@ import { NotecoveImage, type ImageNodeAttrs } from '../Image';
 
 // Mock window.electronAPI
 const mockGetDataUrl = jest.fn();
+const mockThumbnailGetDataUrl = jest.fn();
+const mockGetMetadata = jest.fn();
 beforeAll(() => {
   (window as unknown as { electronAPI: unknown }).electronAPI = {
     image: {
       getDataUrl: mockGetDataUrl,
+      getMetadata: mockGetMetadata,
+    },
+    thumbnail: {
+      getDataUrl: mockThumbnailGetDataUrl,
     },
   };
 });
 
+// Mock IntersectionObserver
+class MockIntersectionObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: readonly number[] = [];
+  private callback: IntersectionObserverCallback;
+  private static instances: MockIntersectionObserver[] = [];
+
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback;
+    MockIntersectionObserver.instances.push(this);
+  }
+
+  observe(_target: Element): void {
+    // Store reference but don't trigger callback immediately
+  }
+
+  unobserve(_target: Element): void {
+    // Mock implementation
+  }
+  disconnect(): void {
+    // Mock implementation
+  }
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+
+  // Test helper to simulate intersection
+  static triggerIntersection(isIntersecting: boolean): void {
+    MockIntersectionObserver.instances.forEach((instance) => {
+      instance.callback(
+        [
+          {
+            isIntersecting,
+            intersectionRatio: isIntersecting ? 1 : 0,
+            boundingClientRect: {} as DOMRectReadOnly,
+            intersectionRect: {} as DOMRectReadOnly,
+            rootBounds: null,
+            target: document.createElement('div'),
+            time: Date.now(),
+          },
+        ],
+        instance
+      );
+    });
+  }
+
+  static reset(): void {
+    MockIntersectionObserver.instances = [];
+  }
+}
+
+beforeAll(() => {
+  global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
+  MockIntersectionObserver.reset();
 });
 
 describe('NotecoveImage Extension', () => {
@@ -343,6 +406,179 @@ describe('NotecoveImage Extension', () => {
         '![image](https://example.com/my%20image.png) '
       );
       expect(matchEncoded).toBeTruthy();
+    });
+  });
+
+  describe('Lazy Loading', () => {
+    let container: HTMLDivElement;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      editor.destroy();
+      editor = new Editor({
+        element: container,
+        extensions: [
+          StarterKit.configure({
+            history: false,
+          }),
+          NotecoveImage,
+        ],
+      });
+    });
+
+    afterEach(() => {
+      document.body.removeChild(container);
+    });
+
+    it('should not load image data until visible (lazy loading)', async () => {
+      mockThumbnailGetDataUrl.mockResolvedValue('data:image/jpeg;base64,thumbnail');
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'lazy-test-id',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      // Wait a tick for initial render
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Image API should NOT have been called yet (not visible)
+      expect(mockThumbnailGetDataUrl).not.toHaveBeenCalled();
+      expect(mockGetDataUrl).not.toHaveBeenCalled();
+
+      // Simulate the image becoming visible
+      MockIntersectionObserver.triggerIntersection(true);
+
+      // Wait for async load
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Now thumbnail API should have been called
+      expect(mockThumbnailGetDataUrl).toHaveBeenCalledWith('sd-1', 'lazy-test-id');
+    });
+
+    it('should show placeholder before image is loaded', async () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'placeholder-test',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Find the image wrapper in the DOM
+      const wrapper = container.querySelector('.notecove-image');
+      expect(wrapper).toBeTruthy();
+
+      // Placeholder should be visible before intersection
+      const placeholder = wrapper?.querySelector('.notecove-image-lazy-placeholder');
+      expect(placeholder).toBeTruthy();
+    });
+
+    it('should use thumbnail for display, not full image', async () => {
+      mockThumbnailGetDataUrl.mockResolvedValue('data:image/jpeg;base64,thumbnail');
+      mockGetDataUrl.mockResolvedValue('data:image/png;base64,fullimage');
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'thumb-test',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Trigger visibility
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Thumbnail API should be called, not the full image API
+      expect(mockThumbnailGetDataUrl).toHaveBeenCalledWith('sd-1', 'thumb-test');
+      // Full image API should NOT be called for normal display
+      expect(mockGetDataUrl).not.toHaveBeenCalled();
+    });
+
+    it('should add fade-in class when image loads', async () => {
+      mockThumbnailGetDataUrl.mockResolvedValue('data:image/jpeg;base64,thumbnail');
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'fade-test',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Trigger visibility
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Find the image element
+      const wrapper = container.querySelector('.notecove-image');
+      const img = wrapper?.querySelector('.notecove-image-element');
+
+      // Should have fade-in class
+      expect(img?.classList.contains('notecove-image--fade-in')).toBe(true);
+    });
+
+    it('should stop observing after image loads', async () => {
+      mockThumbnailGetDataUrl.mockResolvedValue('data:image/jpeg;base64,thumbnail');
+
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'unobserve-test',
+              sdId: 'sd-1',
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // First intersection - loads the image
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Clear mocks
+      mockThumbnailGetDataUrl.mockClear();
+
+      // Second intersection should NOT trigger another load
+      MockIntersectionObserver.triggerIntersection(true);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Should not have been called again
+      expect(mockThumbnailGetDataUrl).not.toHaveBeenCalled();
     });
   });
 });

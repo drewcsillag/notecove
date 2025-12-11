@@ -1,7 +1,7 @@
 # Phase 5: Thumbnails & Performance
 
 **Status:** 🟡 In Progress
-**Progress:** `33%` (5.1 complete)
+**Progress:** `66%` (5.1, 5.2 complete)
 
 **Depends on:** Phase 1 (Foundation)
 
@@ -104,38 +104,54 @@ interface ThumbnailResult {
 
 ### 5.2 Lazy Loading for Images
 
-**Status:** 🟥 To Do
+**Status:** ✅ Complete
 
 Only load images when they're visible in the viewport.
 
 #### Behavior
 
-1. Image node renders placeholder initially
-2. When scrolled into view, fetch thumbnail
-3. Display thumbnail
-4. Full image only loaded for lightbox/export
+1. Image node renders lazy placeholder initially
+2. When scrolled into view (via IntersectionObserver), fetch thumbnail
+3. Display thumbnail with fade-in animation
+4. Full image only loaded for lightbox/export (fallback if no thumbnail)
 
-#### Implementation Options
+#### Implementation
 
-1. **Intersection Observer API** - Browser native, efficient
-2. **Scroll event + bounds checking** - More control, less efficient
-
-Use Intersection Observer for better performance.
+- Uses IntersectionObserver API (browser native, efficient)
+- 100px rootMargin for pre-loading slightly before visible
+- Thumbnail API used for display (smaller, faster)
+- Falls back to full image if thumbnail unavailable
 
 #### Placeholder
 
-- Show gray box with image icon
-- Same dimensions as image (from node attrs or default)
-- Smooth fade-in when image loads
+- Gray box with image icon (`.notecove-image-lazy-placeholder`)
+- Loading spinner shown during fetch (`.notecove-image-loading`)
+- Smooth fade-in via `.notecove-image--fade-in` class
 
 #### Steps
 
-- [ ] 🟥 Write test: images not loaded until scrolled into view
-- [ ] 🟥 Write test: placeholder shown before load
-- [ ] 🟥 Add Intersection Observer to `ImageNodeView`
-- [ ] 🟥 Implement loading state and placeholder
-- [ ] 🟥 Add fade-in animation on load
-- [ ] 🟥 Handle load errors gracefully
+- [x] ✅ Write test: images not loaded until scrolled into view
+- [x] ✅ Write test: placeholder shown before load
+- [x] ✅ Write test: thumbnail API used, not full image API
+- [x] ✅ Write test: fade-in class added on load
+- [x] ✅ Write test: stops observing after load
+- [x] ✅ Add Intersection Observer to `ImageNodeView`
+- [x] ✅ Implement lazy placeholder element
+- [x] ✅ Implement loading state transitions
+- [x] ✅ Add fade-in animation class
+- [x] ✅ Handle load errors gracefully (shows error placeholder)
+
+#### Files Modified
+
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/Image.ts`
+  - Added `thumbnailCache` Map for caching thumbnails
+  - Added `lazyPlaceholder` DOM element
+  - Refactored `updateVisualState` to set up IntersectionObserver
+  - Added `loadImage` function for async thumbnail loading
+  - IntersectionObserver cleanup in `destroy()`
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/__tests__/Image.test.ts`
+  - Added MockIntersectionObserver for testing
+  - 5 new lazy loading tests
 
 ---
 

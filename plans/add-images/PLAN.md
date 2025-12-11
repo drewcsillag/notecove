@@ -66,7 +66,7 @@
 ### Phase 5: Thumbnails & Performance
 
 - [x] ✅ **5.1 Thumbnail generation** (ThumbnailGenerator class, 5 IPC handlers, 17 tests)
-- [ ] 🟥 **5.2 Lazy loading for images**
+- [x] ✅ **5.2 Lazy loading for images** (IntersectionObserver, thumbnail display, 5 tests)
 - [ ] 🟥 **5.3 Thumbnail cache management**
 
 ### Phase 6: Sync & Edge Cases

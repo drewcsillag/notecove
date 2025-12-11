@@ -61,7 +61,7 @@ export class ThumbnailGenerator {
    */
   async thumbnailExists(sdId: string, imageId: string): Promise<boolean> {
     // Check for any format
-    const formats: Array<'jpeg' | 'png' | 'gif'> = ['jpeg', 'png', 'gif'];
+    const formats: ('jpeg' | 'png' | 'gif')[] = ['jpeg', 'png', 'gif'];
     for (const format of formats) {
       const thumbPath = this.getThumbnailPath(sdId, imageId, format);
       try {
@@ -78,7 +78,7 @@ export class ThumbnailGenerator {
    * Get the actual thumbnail path (checking all formats)
    */
   private async getExistingThumbnailPath(sdId: string, imageId: string): Promise<string | null> {
-    const formats: Array<'jpeg' | 'png' | 'gif'> = ['jpeg', 'png', 'gif'];
+    const formats: ('jpeg' | 'png' | 'gif')[] = ['jpeg', 'png', 'gif'];
     for (const format of formats) {
       const thumbPath = this.getThumbnailPath(sdId, imageId, format);
       try {
@@ -117,8 +117,8 @@ export class ThumbnailGenerator {
 
     // Get original metadata
     const metadata = await sharpInstance.metadata();
-    const originalWidth = metadata.width ?? 0;
-    const originalHeight = metadata.height ?? 0;
+    const originalWidth = metadata.width || 0;
+    const originalHeight = metadata.height || 0;
 
     // Calculate target dimensions (preserve aspect ratio, max 800px on longest edge)
     const { width: targetWidth, height: targetHeight } = this.calculateDimensions(
@@ -159,8 +159,8 @@ export class ThumbnailGenerator {
     return {
       path: outputPath,
       format: outputFormat,
-      width: outputMetadata.width ?? targetWidth,
-      height: outputMetadata.height ?? targetHeight,
+      width: outputMetadata.width || targetWidth,
+      height: outputMetadata.height || targetHeight,
       size: stats.size,
     };
   }

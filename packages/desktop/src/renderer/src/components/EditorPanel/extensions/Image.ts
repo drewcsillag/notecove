@@ -101,11 +101,15 @@ declare module '@tiptap/core' {
 // Cache for loaded image data URLs to avoid re-fetching
 const imageDataCache = new Map<string, string>();
 
+// Cache for thumbnail data URLs (separate from full images)
+const thumbnailCache = new Map<string, string>();
+
 /**
  * Clear the image data cache (useful when images are updated)
  */
 export function clearImageCache(): void {
   imageDataCache.clear();
+  thumbnailCache.clear();
 }
 
 /**
@@ -113,6 +117,12 @@ export function clearImageCache(): void {
  */
 export function removeFromImageCache(imageId: string): void {
   imageDataCache.delete(imageId);
+  // Also remove from thumbnail cache (need to check all keys)
+  for (const key of thumbnailCache.keys()) {
+    if (key.endsWith(`:${imageId}`)) {
+      thumbnailCache.delete(key);
+    }
+  }
 }
 
 /**
@@ -342,6 +352,7 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         </svg>
         <span>Loading image...</span>
       `;
+      loadingPlaceholder.style.display = 'none';
 
       const errorPlaceholder = document.createElement('div');
       errorPlaceholder.className = 'notecove-image-error';
@@ -353,6 +364,18 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         <span>Image not found</span>
       `;
       errorPlaceholder.style.display = 'none';
+
+      // Lazy loading placeholder (shown before image enters viewport)
+      const lazyPlaceholder = document.createElement('div');
+      lazyPlaceholder.className = 'notecove-image-lazy-placeholder';
+      lazyPlaceholder.innerHTML = `
+        <svg class="notecove-image-placeholder-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+          <path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        </svg>
+      `;
+      lazyPlaceholder.style.display = '';
 
       const caption = document.createElement('figcaption');
       caption.className = 'notecove-image-caption';
@@ -386,6 +409,7 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
       resizeTooltip.className = 'notecove-image-resize-tooltip';
       resizeTooltip.style.display = 'none';
 
+      imageContainer.appendChild(lazyPlaceholder);
       imageContainer.appendChild(loadingPlaceholder);
       imageContainer.appendChild(errorPlaceholder);
       imageContainer.appendChild(img);
@@ -393,6 +417,10 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
       imageContainer.appendChild(resizeTooltip);
       wrapper.appendChild(imageContainer);
       wrapper.appendChild(caption);
+
+      // Track whether image has been loaded (for lazy loading)
+      let hasLoadedImage = false;
+      let intersectionObserver: IntersectionObserver | null = null;
 
       // Apply HTML attributes
       Object.entries(HTMLAttributes).forEach(([key, value]) => {
@@ -411,9 +439,114 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
       } | null = null;
 
       /**
+       * Actually load the image (called when visible via IntersectionObserver)
+       */
+      const loadImage = async (imageId: string, sdId: string): Promise<void> => {
+        if (hasLoadedImage) return;
+
+        const cacheKey = `${sdId}:${imageId}`;
+
+        // Check thumbnail cache first
+        const cachedThumbnail = thumbnailCache.get(cacheKey);
+        if (cachedThumbnail) {
+          debugLog('Thumbnail loaded from cache:', { imageId, sdId });
+          lazyPlaceholder.style.display = 'none';
+          loadingPlaceholder.style.display = 'none';
+          errorPlaceholder.style.display = 'none';
+          img.src = cachedThumbnail;
+          img.style.display = '';
+          img.classList.add('notecove-image--fade-in');
+          hasLoadedImage = true;
+          return;
+        }
+
+        // Show loading state (hide lazy placeholder)
+        lazyPlaceholder.style.display = 'none';
+        loadingPlaceholder.style.display = '';
+        errorPlaceholder.style.display = 'none';
+        img.style.display = 'none';
+
+        debugLog('Loading thumbnail:', { imageId, sdId });
+
+        try {
+          // Try to get thumbnail first (preferred for display)
+          // Fetch thumbnail and metadata in parallel
+          const [thumbnailDataUrl, metadata] = await Promise.all([
+            window.electronAPI.thumbnail.getDataUrl(sdId, imageId),
+            DEBUG ? window.electronAPI.image.getMetadata(imageId) : Promise.resolve(null),
+          ]);
+
+          if (thumbnailDataUrl) {
+            // Cache the thumbnail
+            thumbnailCache.set(cacheKey, thumbnailDataUrl);
+
+            // Store metadata for dev tooltip
+            if (metadata) {
+              imageMetadata = {
+                id: metadata.id,
+                width: metadata.width,
+                height: metadata.height,
+                size: metadata.size,
+                mimeType: metadata.mimeType,
+              };
+              debugLog('Thumbnail loaded successfully:', {
+                imageId,
+                dimensions:
+                  metadata.width && metadata.height
+                    ? `${metadata.width}x${metadata.height}`
+                    : 'unknown',
+                size: formatFileSize(metadata.size),
+                mimeType: metadata.mimeType,
+              });
+            }
+
+            // Display the thumbnail
+            loadingPlaceholder.style.display = 'none';
+            img.src = thumbnailDataUrl;
+            img.style.display = '';
+            img.classList.add('notecove-image--fade-in');
+            hasLoadedImage = true;
+          } else {
+            // Thumbnail not available, try full image as fallback
+            debugLog('Thumbnail not found, falling back to full image:', { imageId, sdId });
+            const fullDataUrl = await window.electronAPI.image.getDataUrl(sdId, imageId);
+
+            if (fullDataUrl) {
+              // Cache to full image cache (not thumbnail cache)
+              imageDataCache.set(cacheKey, fullDataUrl);
+              loadingPlaceholder.style.display = 'none';
+              img.src = fullDataUrl;
+              img.style.display = '';
+              img.classList.add('notecove-image--fade-in');
+              hasLoadedImage = true;
+            } else {
+              // Image not found
+              debugLog('Image not found:', { imageId, sdId });
+              loadingPlaceholder.style.display = 'none';
+              errorPlaceholder.style.display = '';
+              img.style.display = 'none';
+              hasLoadedImage = true; // Don't retry
+            }
+          }
+        } catch (error) {
+          console.error('[NotecoveImage] Failed to load image:', error);
+          loadingPlaceholder.style.display = 'none';
+          errorPlaceholder.style.display = '';
+          img.style.display = 'none';
+          hasLoadedImage = true; // Don't retry on error
+        }
+
+        // Stop observing once loaded
+        if (intersectionObserver) {
+          intersectionObserver.disconnect();
+          intersectionObserver = null;
+        }
+      };
+
+      /**
        * Update the visual state based on node attributes
        */
-      const updateVisualState = async (nodeAttrs: ImageNodeAttrs): Promise<void> => {
+      const updateVisualState = (nodeAttrs: ImageNodeAttrs): void => {
         const {
           imageId,
           sdId,
@@ -462,79 +595,40 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           delete wrapper.dataset['linkHref'];
         }
 
-        // Load image if we have imageId and sdId
+        // Set up lazy loading if we have imageId and sdId
         if (imageId && sdId) {
-          const cacheKey = `${sdId}:${imageId}`;
-
-          // Check cache first
-          const cachedData = imageDataCache.get(cacheKey);
-          if (cachedData) {
-            debugLog('Image loaded from cache:', { imageId, sdId });
-            loadingPlaceholder.style.display = 'none';
-            errorPlaceholder.style.display = 'none';
-            img.src = cachedData;
-            img.style.display = '';
+          // If already loaded, just update visual state (don't reload)
+          if (hasLoadedImage) {
             return;
           }
 
-          // Show loading state
-          loadingPlaceholder.style.display = '';
+          // Set up IntersectionObserver for lazy loading
+          if (!intersectionObserver) {
+            intersectionObserver = new IntersectionObserver(
+              (entries) => {
+                entries.forEach((entry) => {
+                  if (entry.isIntersecting && imageId && sdId) {
+                    void loadImage(imageId, sdId);
+                  }
+                });
+              },
+              {
+                rootMargin: '100px', // Start loading 100px before visible
+                threshold: 0,
+              }
+            );
+            intersectionObserver.observe(wrapper);
+          }
+
+          // Show lazy placeholder (not loading spinner)
+          lazyPlaceholder.style.display = '';
+          loadingPlaceholder.style.display = 'none';
           errorPlaceholder.style.display = 'none';
           img.style.display = 'none';
-
-          debugLog('Loading image:', { imageId, sdId });
-
-          try {
-            // Fetch image data and metadata in parallel
-            const [dataUrl, metadata] = await Promise.all([
-              window.electronAPI.image.getDataUrl(sdId, imageId),
-              DEBUG ? window.electronAPI.image.getMetadata(imageId) : Promise.resolve(null),
-            ]);
-
-            if (dataUrl) {
-              // Cache the result
-              imageDataCache.set(cacheKey, dataUrl);
-
-              // Store metadata for dev tooltip
-              if (metadata) {
-                imageMetadata = {
-                  id: metadata.id,
-                  width: metadata.width,
-                  height: metadata.height,
-                  size: metadata.size,
-                  mimeType: metadata.mimeType,
-                };
-                debugLog('Image loaded successfully:', {
-                  imageId,
-                  dimensions:
-                    metadata.width && metadata.height
-                      ? `${metadata.width}x${metadata.height}`
-                      : 'unknown',
-                  size: formatFileSize(metadata.size),
-                  mimeType: metadata.mimeType,
-                });
-              }
-
-              // Display the image
-              loadingPlaceholder.style.display = 'none';
-              img.src = dataUrl;
-              img.style.display = '';
-            } else {
-              // Image not found
-              debugLog('Image not found:', { imageId, sdId });
-              loadingPlaceholder.style.display = 'none';
-              errorPlaceholder.style.display = '';
-              img.style.display = 'none';
-            }
-          } catch (error) {
-            console.error('[NotecoveImage] Failed to load image:', error);
-            loadingPlaceholder.style.display = 'none';
-            errorPlaceholder.style.display = '';
-            img.style.display = 'none';
-          }
         } else {
           // No imageId/sdId - show error state
           debugLog('Image missing imageId or sdId:', { imageId, sdId });
+          lazyPlaceholder.style.display = 'none';
           loadingPlaceholder.style.display = 'none';
           errorPlaceholder.style.display = '';
           img.style.display = 'none';
@@ -832,8 +926,8 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
 
       img.addEventListener('dblclick', handleDoubleClick);
 
-      // Initial load
-      void updateVisualState(node.attrs as ImageNodeAttrs);
+      // Initial setup (lazy loading will load when visible)
+      updateVisualState(node.attrs as ImageNodeAttrs);
 
       // Handle selection styling
       const handleSelection = (): void => {
@@ -855,7 +949,7 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
 
         update: (updatedNode: ProseMirrorNode) => {
           if (updatedNode.type !== this.type) return false;
-          void updateVisualState(updatedNode.attrs as ImageNodeAttrs);
+          updateVisualState(updatedNode.attrs as ImageNodeAttrs);
           return true;
         },
 
@@ -872,6 +966,11 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           if (DEBUG) {
             imageContainer.removeEventListener('mouseenter', showDevTooltip);
             imageContainer.removeEventListener('mouseleave', hideDevTooltip);
+          }
+          // Clean up IntersectionObserver
+          if (intersectionObserver) {
+            intersectionObserver.disconnect();
+            intersectionObserver = null;
           }
           // Clean up resize listeners
           Object.values(resizeHandles).forEach((handle) => {
