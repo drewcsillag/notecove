@@ -667,6 +667,17 @@ declare global {
         saveAs: (sdId: string, imageId: string) => Promise<string | null>;
         /** Open image in external application */
         openExternal: (sdId: string, imageId: string) => Promise<void>;
+        /** Copy an image from one sync directory to another */
+        copyToSD: (
+          sourceSdId: string,
+          targetSdId: string,
+          imageId: string
+        ) => Promise<{
+          success: boolean;
+          imageId: string;
+          alreadyExists?: boolean;
+          error?: string;
+        }>;
         /** Subscribe to image availability events (when synced images arrive) */
         onAvailable: (
           listener: (event: { sdId: string; imageId: string; filename: string }) => void

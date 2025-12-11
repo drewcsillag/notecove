@@ -1,7 +1,7 @@
 # Phase 6: Sync & Edge Cases
 
 **Status:** 🟡 In Progress
-**Progress:** `25%` (6.1 complete)
+**Progress:** `50%` (6.1, 6.2 complete)
 
 **Depends on:** Phase 1 (Foundation), Phase 5 (Thumbnails)
 
@@ -74,7 +74,7 @@ Show appropriate placeholder when image file is missing.
 
 ### 6.2 Auto-Update When Image File Arrives
 
-**Status:** 🟥 To Do
+**Status:** ✅ Complete
 
 Automatically display image when file appears (after sync).
 
@@ -98,19 +98,32 @@ Automatically display image when file appears (after sync).
 
 ```typescript
 // Main → Renderer
-window.electronAPI.image.onAvailable((imageId: string, sdId: string) => {
-  // Image file is now available
-});
+window.electronAPI.image.onAvailable(
+  (event: { sdId: string; imageId: string; filename: string }) => {
+    // Image file is now available
+  }
+);
 ```
 
 #### Steps
 
-- [ ] 🟥 Write test: broken placeholder updates when file arrives
-- [ ] 🟥 Extend file watcher to watch `media/` directories
-- [ ] 🟥 Add `image:available` IPC event
-- [ ] 🟥 Add event listener in `TipTapEditor.tsx`
-- [ ] 🟥 Update `ImageNodeView` to re-render on availability
-- [ ] 🟥 Handle rapid arrivals (debounce updates)
+- [x] ✅ Write test: onAvailable event handling test
+- [x] ✅ Extend file watcher to watch `media/` directories (Chokidar in main/index.ts)
+- [x] ✅ Add `image:available` IPC event (main → renderer)
+- [x] ✅ Add preload API: `window.electronAPI.image.onAvailable()`
+- [x] ✅ Subscribe in `ImageNodeView` to availability events
+- [x] ✅ Re-render when matching imageId arrives (if showing error placeholder)
+- [x] ✅ Proper cleanup on node destroy
+
+#### Files Modified
+
+- `packages/desktop/src/main/index.ts` - Media watcher setup for each SD
+- `packages/desktop/src/preload/index.ts` - onAvailable IPC listener with cleanup
+- `packages/desktop/src/renderer/src/types/electron.d.ts` - TypeScript type
+- `packages/desktop/src/renderer/src/api/browser-stub.ts` - No-op stub
+- `packages/desktop/src/renderer/src/api/web-client.ts` - No-op stub
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/Image.ts` - Event subscription
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/__tests__/Image.test.ts` - Tests
 
 ---
 

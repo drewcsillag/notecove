@@ -116,6 +116,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const shouldFocusAfterLoadRef = useRef(false);
   // Track if we've already scheduled/attempted focus (to prevent cancellation)
   const focusAttemptedRef = useRef(false);
+  // Cache the active SD for synchronous access in transformPasted
+  const activeSdIdRef = useRef<string | null>(null);
   // Link popover state (for viewing/editing existing links)
   const [linkPopoverData, setLinkPopoverData] = useState<{
     href: string;
@@ -401,6 +403,112 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         // Join top-level blocks with double newlines to preserve paragraph spacing
         return results.join('\n\n');
       },
+      // Transform pasted content to handle cross-SD image copying
+      // When content with images is pasted from another SD, copy the image files
+      // and update the sdId attribute to point to the current SD.
+      transformPasted: (slice) => {
+        const targetSdId = activeSdIdRef.current;
+
+        // If we don't have a cached target SD, just return the slice unchanged
+        // The image will try to load from its original SD (may still work)
+        if (!targetSdId) {
+          return slice;
+        }
+
+        // Helper to recursively transform image nodes to update sdId
+        // Also triggers background copy operations for cross-SD images
+        const transformNode = (
+          node: typeof slice.content.firstChild
+        ): typeof slice.content.firstChild => {
+          if (!node) return node;
+
+          if (node.type.name === 'notecoveImage') {
+            const sourceSdId = node.attrs['sdId'] as string | undefined;
+            const imageId = node.attrs['imageId'] as string | undefined;
+
+            if (sourceSdId && imageId && sourceSdId !== targetSdId) {
+              // Trigger async copy in background
+              console.log(
+                `[TipTapEditor] Cross-SD paste: copying image ${imageId} from ${sourceSdId} to ${targetSdId}`
+              );
+              window.electronAPI.image
+                .copyToSD(sourceSdId, targetSdId, imageId)
+                .then((result) => {
+                  if (result.success) {
+                    console.log(
+                      `[TipTapEditor] Image ${imageId} copied successfully`,
+                      result.alreadyExists ? '(already existed)' : ''
+                    );
+                  } else {
+                    console.error(`[TipTapEditor] Failed to copy image ${imageId}:`, result.error);
+                  }
+                })
+                .catch((err) => {
+                  console.error(`[TipTapEditor] Error copying image ${imageId}:`, err);
+                });
+
+              // Create new node with updated sdId
+              return node.type.create(
+                { ...node.attrs, sdId: targetSdId },
+                node.content,
+                node.marks
+              );
+            }
+          }
+
+          // For other nodes, recursively transform children
+          if (node.content.size > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const newContent: any[] = [];
+            let hasChanges = false;
+            node.content.forEach((child) => {
+              const newChild = transformNode(child);
+              if (newChild !== child) {
+                hasChanges = true;
+              }
+              newContent.push(newChild);
+            });
+
+            // Only create new node if children changed
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
+            if (hasChanges) {
+              // Use ProseMirror's Fragment.from to create a new fragment
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+              const Fragment = (node.content as any).constructor;
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+              const newFragment = Fragment.fromArray(newContent) as typeof node.content;
+              return node.copy(newFragment);
+            }
+          }
+          return node;
+        };
+
+        // Transform the slice
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const newContent: any[] = [];
+        let hasChanges = false;
+        slice.content.forEach((node) => {
+          const newNode = transformNode(node);
+          if (newNode !== node) {
+            hasChanges = true;
+          }
+          newContent.push(newNode);
+        });
+
+        // Return transformed slice if there were changes
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
+        if (hasChanges) {
+          // Use ProseMirror's Fragment.from to create a new fragment
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+          const Fragment = (slice.content as any).constructor;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          const newFragment = Fragment.fromArray(newContent) as typeof slice.content;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
+          return new (slice.constructor as any)(newFragment, slice.openStart, slice.openEnd);
+        }
+
+        return slice;
+      },
     },
     // Track content changes for title extraction
     onUpdate: ({ editor }) => {
@@ -503,6 +611,23 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // properly tested because Playwright's keyboard simulation bypasses DOM events
   // when Electron's menu accelerators handle the shortcut.
   // TODO: Re-enable paste detection when a testable solution is found.
+
+  // Cache the active SD when the note changes
+  // This enables synchronous access in transformPasted for cross-SD image copying
+  useEffect(() => {
+    if (noteId) {
+      window.electronAPI.sd
+        .getActive()
+        .then((sdId) => {
+          activeSdIdRef.current = sdId;
+        })
+        .catch(() => {
+          activeSdIdRef.current = null;
+        });
+    } else {
+      activeSdIdRef.current = null;
+    }
+  }, [noteId]);
 
   // Keep noteIdRef in sync with noteId prop and handle note deselection
   useEffect(() => {

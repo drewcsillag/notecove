@@ -866,6 +866,11 @@ export const webClient: typeof window.electronAPI = {
       // Open external is not supported in web client
       throw new Error('Open external is not supported in browser mode');
     },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    copyToSD: async (_sourceSdId: string, _targetSdId: string, _imageId: string) => {
+      // Cross-SD copy is not supported in web client
+      throw new Error('Cross-SD copy is not supported in browser mode');
+    },
     // No-op in web client - images don't arrive via sync
     onAvailable: () => () => {
       /* No-op in web client */

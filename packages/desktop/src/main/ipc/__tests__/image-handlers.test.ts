@@ -41,6 +41,7 @@ jest.mock('fs/promises', () => ({
   access: jest.fn(),
   stat: jest.fn(),
   appendFile: jest.fn(),
+  readdir: jest.fn(),
 }));
 
 // Mock ImageStorage's saveImage to avoid crypto.randomUUID issues in tests
@@ -885,6 +886,118 @@ describe('IPCHandlers - Image Operations', () => {
       const handler = registeredHandlers.get('image:downloadAndSave');
 
       await expect(handler!({} as unknown, 'sd-1', url)).rejects.toThrow('Unsupported image type');
+    });
+  });
+
+  describe('image:copyToSD', () => {
+    beforeEach(() => {
+      // Setup: Both SDs exist by default, with different paths
+      mockDatabase.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === 'sd-1') {
+          return Promise.resolve({ id: 'sd-1', name: 'Source SD', path: '/test/sd-1' });
+        } else if (sdId === 'sd-2') {
+          return Promise.resolve({ id: 'sd-2', name: 'Target SD', path: '/test/sd-2' });
+        }
+        return Promise.resolve(null);
+      });
+    });
+
+    it('should copy image from source SD to target SD', async () => {
+      const fsPromises = await import('fs/promises');
+
+      // Mock getImage to return the image in source SD (sd-1), not in target (sd-2)
+      mockDatabase.getImage.mockResolvedValue({
+        id: 'test-image-id',
+        sdId: 'sd-1', // Image is in SOURCE SD, not target
+        filename: 'test-image-id.png',
+        mimeType: 'image/png',
+        size: 100,
+        created: Date.now(),
+      });
+
+      // Mock fs.readdir to return the image file
+      (fsPromises.readdir as jest.Mock).mockResolvedValue(['test-image-id.png']);
+      // Mock source image file data
+      const mockImageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG header
+      (fsPromises.readFile as jest.Mock).mockResolvedValue(Buffer.from(mockImageData));
+      // Mock fs.writeFile
+      (fsPromises.writeFile as jest.Mock).mockResolvedValue(undefined);
+      // Mock fs.mkdir (for initializeMediaDir)
+      (fsPromises.mkdir as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:copyToSD');
+      expect(handler).toBeDefined();
+
+      // Copy from sd-1 to sd-2
+      const result = await handler!(
+        {} as unknown,
+        'sd-1', // source SD
+        'sd-2', // target SD
+        'test-image-id' // imageId
+      );
+
+      expect(result).toEqual({
+        success: true,
+        imageId: 'test-image-id',
+      });
+    });
+
+    it('should throw when source SD not found', async () => {
+      const handler = registeredHandlers.get('image:copyToSD');
+
+      await expect(
+        handler!({} as unknown, 'nonexistent-sd', 'sd-2', 'test-image-id')
+      ).rejects.toThrow('Source storage directory not found');
+    });
+
+    it('should throw when target SD not found', async () => {
+      const handler = registeredHandlers.get('image:copyToSD');
+
+      await expect(
+        handler!({} as unknown, 'sd-1', 'nonexistent-sd', 'test-image-id')
+      ).rejects.toThrow('Target storage directory not found');
+    });
+
+    it('should return success false when source image not found', async () => {
+      const fsPromises = await import('fs/promises');
+
+      // Mock getImage to return null (image doesn't exist in database)
+      mockDatabase.getImage.mockResolvedValue(null);
+
+      // Mock readdir to return empty (no matching files on disk)
+      (fsPromises.readdir as jest.Mock).mockResolvedValue([]);
+
+      const handler = registeredHandlers.get('image:copyToSD');
+
+      const result = await handler!({} as unknown, 'sd-1', 'sd-2', 'missing-image-id');
+
+      expect(result).toEqual({
+        success: false,
+        imageId: 'missing-image-id',
+        error: 'Source image not found',
+      });
+    });
+
+    it('should not copy if image already exists in target SD', async () => {
+      const handler = registeredHandlers.get('image:copyToSD');
+
+      // Setup: Mark image as existing in target
+      mockDatabase.getImage.mockResolvedValueOnce({
+        id: 'test-image-id',
+        sdId: 'sd-2',
+        filename: 'test-image-id.png',
+        mimeType: 'image/png',
+        size: 100,
+        created: Date.now(),
+      });
+
+      const result = await handler!({} as unknown, 'sd-1', 'sd-2', 'test-image-id');
+
+      expect(result).toEqual({
+        success: true,
+        imageId: 'test-image-id',
+        alreadyExists: true,
+      });
     });
   });
 });

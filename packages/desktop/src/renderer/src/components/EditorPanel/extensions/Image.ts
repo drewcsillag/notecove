@@ -952,7 +952,6 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
 
       // Subscribe to image availability events (for when synced images arrive)
       // Note: Defensive check even though types say it's always present - could be browser mode
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       let cleanupImageAvailable: (() => void) | null = null;
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (window.electronAPI?.image.onAvailable) {

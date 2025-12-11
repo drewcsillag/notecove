@@ -1619,6 +1619,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('image:openExternal', sdId, imageId) as Promise<void>,
 
     /**
+     * Copy an image from one sync directory to another
+     * Used when pasting content containing images across different SDs
+     * @param sourceSdId Source storage directory ID
+     * @param targetSdId Target storage directory ID
+     * @param imageId Image ID to copy
+     * @returns Copy result with success status
+     */
+    copyToSD: (
+      sourceSdId: string,
+      targetSdId: string,
+      imageId: string
+    ): Promise<{ success: boolean; imageId: string; alreadyExists?: boolean; error?: string }> =>
+      ipcRenderer.invoke('image:copyToSD', sourceSdId, targetSdId, imageId) as Promise<{
+        success: boolean;
+        imageId: string;
+        alreadyExists?: boolean;
+        error?: string;
+      }>,
+
+    /**
      * Subscribe to image availability events (when synced images arrive)
      * @param listener Callback when image becomes available
      * @returns Cleanup function to remove listener
