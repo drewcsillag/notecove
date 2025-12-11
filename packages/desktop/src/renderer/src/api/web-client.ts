@@ -867,6 +867,58 @@ export const webClient: typeof window.electronAPI = {
       throw new Error('Open external is not supported in browser mode');
     },
   },
+
+  // Thumbnail operations via REST API
+  thumbnail: {
+    get: async (sdId: string, imageId: string) => {
+      try {
+        return await apiRequest<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        }>('GET', `/api/thumbnails/${sdId}/${imageId}`);
+      } catch {
+        return null;
+      }
+    },
+    getDataUrl: async (sdId: string, imageId: string) => {
+      try {
+        const response = await apiRequest<{ dataUrl: string }>(
+          'GET',
+          `/api/thumbnails/${sdId}/${imageId}/data`
+        );
+        return response.dataUrl;
+      } catch {
+        return null;
+      }
+    },
+    exists: async (sdId: string, imageId: string) => {
+      try {
+        await apiRequest('HEAD', `/api/thumbnails/${sdId}/${imageId}`);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    delete: async (sdId: string, imageId: string) => {
+      await apiRequest('DELETE', `/api/thumbnails/${sdId}/${imageId}`);
+    },
+    generate: async (sdId: string, imageId: string) => {
+      try {
+        return await apiRequest<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        }>('POST', `/api/thumbnails/${sdId}/${imageId}/generate`);
+      } catch {
+        return null;
+      }
+    },
+  },
 };
 
 /**

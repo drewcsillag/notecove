@@ -260,6 +260,14 @@ export const browserApiStub: typeof window.electronAPI = {
     saveAs: notImplemented('image.saveAs'),
     openExternal: notImplemented('image.openExternal'),
   },
+
+  thumbnail: {
+    get: notImplemented('thumbnail.get'),
+    getDataUrl: notImplemented('thumbnail.getDataUrl'),
+    exists: notImplemented('thumbnail.exists'),
+    delete: notImplemented('thumbnail.delete'),
+    generate: notImplemented('thumbnail.generate'),
+  },
 };
 
 /**

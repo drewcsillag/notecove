@@ -1618,6 +1618,82 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (sdId: string, imageId: string): Promise<void> =>
       ipcRenderer.invoke('image:openExternal', sdId, imageId) as Promise<void>,
   },
+
+  // Thumbnail operations
+  thumbnail: {
+    /**
+     * Get or generate a thumbnail for an image
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     * @returns Thumbnail result or null if not found
+     */
+    get: (
+      sdId: string,
+      imageId: string
+    ): Promise<{
+      path: string;
+      format: 'jpeg' | 'png' | 'gif';
+      width: number;
+      height: number;
+      size: number;
+    } | null> =>
+      ipcRenderer.invoke('thumbnail:get', sdId, imageId) as Promise<{
+        path: string;
+        format: 'jpeg' | 'png' | 'gif';
+        width: number;
+        height: number;
+        size: number;
+      } | null>,
+
+    /**
+     * Get thumbnail as data URL (for rendering in browser)
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     * @returns Data URL string or null if not found
+     */
+    getDataUrl: (sdId: string, imageId: string): Promise<string | null> =>
+      ipcRenderer.invoke('thumbnail:getDataUrl', sdId, imageId) as Promise<string | null>,
+
+    /**
+     * Check if a thumbnail exists
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     */
+    exists: (sdId: string, imageId: string): Promise<boolean> =>
+      ipcRenderer.invoke('thumbnail:exists', sdId, imageId) as Promise<boolean>,
+
+    /**
+     * Delete a thumbnail
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     */
+    delete: (sdId: string, imageId: string): Promise<void> =>
+      ipcRenderer.invoke('thumbnail:delete', sdId, imageId) as Promise<void>,
+
+    /**
+     * Force regenerate a thumbnail
+     * @param sdId Storage directory ID
+     * @param imageId Image ID
+     * @returns Thumbnail result or null if not found
+     */
+    generate: (
+      sdId: string,
+      imageId: string
+    ): Promise<{
+      path: string;
+      format: 'jpeg' | 'png' | 'gif';
+      width: number;
+      height: number;
+      size: number;
+    } | null> =>
+      ipcRenderer.invoke('thumbnail:generate', sdId, imageId) as Promise<{
+        path: string;
+        format: 'jpeg' | 'png' | 'gif';
+        width: number;
+        height: number;
+        size: number;
+      } | null>,
+  },
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection

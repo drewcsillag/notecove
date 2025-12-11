@@ -15,6 +15,7 @@ import {
   shell,
   clipboard,
   nativeImage,
+  app,
 } from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
@@ -40,6 +41,7 @@ import {
   SyncDirectoryStructure,
 } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
+import { ThumbnailGenerator, type ThumbnailResult } from '../thumbnail';
 
 /**
  * Callback type for getting deletion logger by SD
@@ -91,6 +93,7 @@ export type WebBroadcastCallback = (channel: string, ...args: unknown[]) => void
 
 export class IPCHandlers {
   private webBroadcastCallback: WebBroadcastCallback | undefined;
+  private thumbnailGenerator: ThumbnailGenerator;
 
   constructor(
     private crdtManager: CRDTManager,
@@ -108,6 +111,10 @@ export class IPCHandlers {
     private skipStaleEntry?: SkipStaleEntryFn,
     private retryStaleEntry?: RetryStaleEntryFn
   ) {
+    // Initialize thumbnail generator with cache directory in userData
+    const thumbnailCacheDir = path.join(app.getPath('userData'), 'thumbnails');
+    this.thumbnailGenerator = new ThumbnailGenerator(thumbnailCacheDir);
+
     this.registerHandlers();
   }
 
@@ -340,6 +347,13 @@ export class IPCHandlers {
     ipcMain.handle('image:copyToClipboard', this.handleImageCopyToClipboard.bind(this));
     ipcMain.handle('image:saveAs', this.handleImageSaveAs.bind(this));
     ipcMain.handle('image:openExternal', this.handleImageOpenExternal.bind(this));
+
+    // Thumbnail operations
+    ipcMain.handle('thumbnail:get', this.handleThumbnailGet.bind(this));
+    ipcMain.handle('thumbnail:getDataUrl', this.handleThumbnailGetDataUrl.bind(this));
+    ipcMain.handle('thumbnail:exists', this.handleThumbnailExists.bind(this));
+    ipcMain.handle('thumbnail:delete', this.handleThumbnailDelete.bind(this));
+    ipcMain.handle('thumbnail:generate', this.handleThumbnailGenerate.bind(this));
 
     // Testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
@@ -3405,6 +3419,125 @@ export class IPCHandlers {
     // Open in default application
     await shell.openPath(imagePath);
     console.log(`[IPC] Image opened in external app: ${imageId}`);
+  }
+
+  // ============================================================================
+  // Thumbnail Handlers
+  // ============================================================================
+
+  /**
+   * Get or generate a thumbnail for an image
+   * Returns the thumbnail path if it exists, or generates it first
+   */
+  private async handleThumbnailGet(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<ThumbnailResult | null> {
+    // Check if thumbnail already exists
+    if (await this.thumbnailGenerator.thumbnailExists(sdId, imageId)) {
+      const thumbPath = this.thumbnailGenerator.getThumbnailPath(sdId, imageId);
+      try {
+        const stats = await fs.stat(thumbPath);
+        // We don't have width/height cached, but we know the file exists
+        return {
+          path: thumbPath,
+          format: 'jpeg',
+          width: 0, // Unknown without reading
+          height: 0,
+          size: stats.size,
+        };
+      } catch {
+        // File might have been deleted, regenerate
+      }
+    }
+
+    // Generate thumbnail
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      return null;
+    }
+
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return null;
+    }
+
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    try {
+      const imageData = await fs.readFile(imagePath);
+      const result = await this.thumbnailGenerator.generateThumbnailForSd(
+        imageData,
+        image.mimeType,
+        sdId,
+        imageId
+      );
+      console.log(`[IPC] Generated thumbnail for ${imageId}: ${result.path}`);
+      return result;
+    } catch (error) {
+      console.error(`[IPC] Failed to generate thumbnail for ${imageId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get thumbnail as data URL (for rendering in browser)
+   */
+  private async handleThumbnailGetDataUrl(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // First ensure thumbnail exists
+    const exists = await this.thumbnailGenerator.thumbnailExists(sdId, imageId);
+    if (!exists) {
+      // Try to generate it first
+      const result = await this.handleThumbnailGet(_event, sdId, imageId);
+      if (!result) {
+        return null;
+      }
+    }
+
+    return this.thumbnailGenerator.getThumbnailDataUrl(sdId, imageId);
+  }
+
+  /**
+   * Check if a thumbnail exists
+   */
+  private async handleThumbnailExists(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<boolean> {
+    return this.thumbnailGenerator.thumbnailExists(sdId, imageId);
+  }
+
+  /**
+   * Delete a thumbnail
+   */
+  private async handleThumbnailDelete(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    await this.thumbnailGenerator.deleteThumbnail(sdId, imageId);
+    console.log(`[IPC] Deleted thumbnail for ${imageId}`);
+  }
+
+  /**
+   * Force regenerate a thumbnail
+   */
+  private async handleThumbnailGenerate(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<ThumbnailResult | null> {
+    // Delete existing thumbnail first
+    await this.thumbnailGenerator.deleteThumbnail(sdId, imageId);
+
+    // Generate new thumbnail
+    return this.handleThumbnailGet(_event, sdId, imageId);
   }
 
   // ============================================================================

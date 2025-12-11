@@ -27,6 +27,7 @@
 8. 🟥 [Phase 8: Export](./PLAN-PHASE-8.md) - Export with adjacent folder
 9. ✅ [Phase 9: Toolbar UI](./PLAN-PHASE-9.md) - Image button in toolbar
 10. 🟥 [Phase 10: Text Wrapping](./PLAN-PHASE-10.md) - Text flow around images
+11. 🟥 [Phase 11: Media Browser](./PLAN-PHASE-11.md) - Browse images, see which notes use them, bulk actions
 
 ---
 
@@ -64,7 +65,7 @@
 
 ### Phase 5: Thumbnails & Performance
 
-- [ ] 🟥 **5.1 Thumbnail generation**
+- [x] ✅ **5.1 Thumbnail generation** (ThumbnailGenerator class, 5 IPC handlers, 17 tests)
 - [ ] 🟥 **5.2 Lazy loading for images**
 - [ ] 🟥 **5.3 Thumbnail cache management**
 
@@ -93,6 +94,15 @@
 - [ ] 🟥 **10.1 CSS float-based text wrapping**
 - [ ] 🟥 **10.2 Wrap mode UI (wrap vs no-wrap option)**
 - [ ] 🟥 **10.3 Clear handling for consecutive images**
+
+### Phase 11: Media Browser
+
+- [ ] 🟥 **11.1 Media Browser window**
+- [ ] 🟥 **11.2 Media Browser UI (Grid/List views)**
+- [ ] 🟥 **11.3 Search & filtering**
+- [ ] 🟥 **11.4 Image-to-note mapping**
+- [ ] 🟥 **11.5 Image actions (single & bulk)**
+- [ ] 🟥 **11.6 IPC & data layer**
 
 ---
 

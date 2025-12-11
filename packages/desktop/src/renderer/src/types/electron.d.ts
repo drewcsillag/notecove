@@ -668,6 +668,37 @@ declare global {
         /** Open image in external application */
         openExternal: (sdId: string, imageId: string) => Promise<void>;
       };
+
+      thumbnail: {
+        /** Get or generate a thumbnail for an image */
+        get: (
+          sdId: string,
+          imageId: string
+        ) => Promise<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        } | null>;
+        /** Get thumbnail as data URL (for rendering in browser) */
+        getDataUrl: (sdId: string, imageId: string) => Promise<string | null>;
+        /** Check if a thumbnail exists */
+        exists: (sdId: string, imageId: string) => Promise<boolean>;
+        /** Delete a thumbnail */
+        delete: (sdId: string, imageId: string) => Promise<void>;
+        /** Force regenerate a thumbnail */
+        generate: (
+          sdId: string,
+          imageId: string
+        ) => Promise<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        } | null>;
+      };
     };
   }
 }
