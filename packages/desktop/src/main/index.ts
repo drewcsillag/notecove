@@ -3256,6 +3256,10 @@ void app.whenReady().then(async () => {
         );
       }
 
+      // Run image orphan cleanup (mark-and-sweep with 14-day grace period)
+      console.log('[Init] Running image orphan cleanup...');
+      await ipcHandlers?.runImageCleanup(14);
+
       // Recover incomplete cross-SD note moves
       console.log('[Init] Checking for incomplete note moves...');
       await noteMoveManager?.recoverIncompleteMoves();

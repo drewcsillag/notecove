@@ -43,6 +43,7 @@ import {
 } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { ThumbnailGenerator, type ThumbnailResult } from '../thumbnail';
+import { ImageCleanupManager, type CleanupStats } from '../image-cleanup-manager';
 
 /**
  * Callback type for getting deletion logger by SD
@@ -95,6 +96,7 @@ export type WebBroadcastCallback = (channel: string, ...args: unknown[]) => void
 export class IPCHandlers {
   private webBroadcastCallback: WebBroadcastCallback | undefined;
   private thumbnailGenerator: ThumbnailGenerator;
+  private imageCleanupManager: ImageCleanupManager;
 
   constructor(
     private crdtManager: CRDTManager,
@@ -115,6 +117,9 @@ export class IPCHandlers {
     // Initialize thumbnail generator with cache directory in userData
     const thumbnailCacheDir = path.join(app.getPath('userData'), 'thumbnails');
     this.thumbnailGenerator = new ThumbnailGenerator(thumbnailCacheDir);
+
+    // Initialize image cleanup manager with database and thumbnail directory
+    this.imageCleanupManager = new ImageCleanupManager(database, thumbnailCacheDir);
 
     this.registerHandlers();
   }
@@ -193,6 +198,54 @@ export class IPCHandlers {
     } catch (err) {
       logMsg(`[auto-cleanup] Auto-cleanup failed: ${String(err)}`);
       // Don't throw - auto-cleanup failure should not prevent app startup
+    }
+  }
+
+  /**
+   * Run image cleanup: Delete orphaned images that are no longer referenced by any note
+   * Uses mark-and-sweep algorithm with 14-day grace period
+   * @param gracePeriodDays Number of days before an orphan can be deleted (default: 14)
+   * @param dryRun If true, just report what would be deleted without actually deleting
+   * @returns Cleanup statistics for all sync directories
+   */
+  async runImageCleanup(gracePeriodDays = 14, dryRun = false): Promise<CleanupStats[]> {
+    console.log(
+      `[image-cleanup] Starting image cleanup (grace period: ${gracePeriodDays} days, dryRun: ${dryRun})...`
+    );
+
+    try {
+      const allStats = await this.imageCleanupManager.cleanupAllSyncDirectories({
+        gracePeriodDays,
+        dryRun,
+      });
+
+      // Log summary
+      let totalDeleted = 0;
+      let totalOrphaned = 0;
+      let totalBytesReclaimed = 0;
+
+      for (const stats of allStats) {
+        totalDeleted += stats.deletedImages;
+        totalOrphaned += stats.orphanedImages;
+        totalBytesReclaimed += stats.bytesReclaimed;
+
+        console.log(
+          `[image-cleanup] SD "${stats.sdName}": ${stats.totalImages} images, ` +
+            `${stats.referencedImages} referenced, ${stats.orphanedImages} orphaned, ` +
+            `${stats.deletedImages} deleted, ${stats.skippedImages} skipped (within grace period)`
+        );
+      }
+
+      console.log(
+        `[image-cleanup] Summary: ${totalDeleted} images deleted, ` +
+          `${totalOrphaned} total orphans found, ${(totalBytesReclaimed / 1024 / 1024).toFixed(2)} MB reclaimed`
+      );
+
+      return allStats;
+    } catch (err) {
+      console.error(`[image-cleanup] Image cleanup failed: ${String(err)}`);
+      // Don't throw - cleanup failure should not prevent app startup
+      return [];
     }
   }
 
