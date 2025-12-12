@@ -135,9 +135,6 @@ describe('NotecoveImage Extension', () => {
       expect(attrs?.['caption']).toBeDefined();
       expect(attrs?.['caption']?.default).toBe('');
 
-      expect(attrs?.['alignment']).toBeDefined();
-      expect(attrs?.['alignment']?.default).toBe('center');
-
       expect(attrs?.['width']).toBeDefined();
       expect(attrs?.['width']?.default).toBeNull();
 
@@ -153,11 +150,8 @@ describe('NotecoveImage Extension', () => {
         sdId: 'sd-1',
         alt: 'Test image',
         caption: 'A test caption',
-        alignment: 'center',
         width: '50%',
         linkHref: null,
-        display: 'block',
-        wrap: false,
       };
 
       editor.commands.setContent({
@@ -177,7 +171,6 @@ describe('NotecoveImage Extension', () => {
       expect(node?.attrs['sdId']).toBe('sd-1');
       expect(node?.attrs['alt']).toBe('Test image');
       expect(node?.attrs['caption']).toBe('A test caption');
-      expect(node?.attrs['alignment']).toBe('center');
       expect(node?.attrs['width']).toBe('50%');
     });
 
@@ -198,7 +191,6 @@ describe('NotecoveImage Extension', () => {
       const node = editor.state.doc.firstChild;
       expect(node?.attrs['alt']).toBe('');
       expect(node?.attrs['caption']).toBe('');
-      expect(node?.attrs['alignment']).toBe('center');
       expect(node?.attrs['width']).toBeNull();
       expect(node?.attrs['linkHref']).toBeNull();
     });
@@ -237,7 +229,6 @@ describe('NotecoveImage Extension', () => {
               sdId: 'sd-1',
               alt: 'Alt text',
               caption: 'Caption text',
-              alignment: 'left',
               width: '300px',
             },
           },
@@ -249,13 +240,12 @@ describe('NotecoveImage Extension', () => {
       expect(html).toContain('data-sd-id="sd-1"');
       expect(html).toContain('alt="Alt text"');
       expect(html).toContain('data-caption="Caption text"');
-      expect(html).toContain('data-alignment="left"');
       expect(html).toContain('data-width="300px"');
     });
 
     it('should parse HTML back to node', () => {
       const html = `
-        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed" data-alignment="right">
+        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed">
           <img alt="Parsed alt" />
           <figcaption>Parsed caption</figcaption>
         </figure>
@@ -267,342 +257,17 @@ describe('NotecoveImage Extension', () => {
       expect(node?.type.name).toBe('notecoveImage');
       expect(node?.attrs['imageId']).toBe('parsed-id');
       expect(node?.attrs['sdId']).toBe('sd-parsed');
-      expect(node?.attrs['alignment']).toBe('right');
       expect(node?.attrs['alt']).toBe('Parsed alt');
     });
   });
 
-  describe('Display Modes', () => {
-    it('should default to block display mode', () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'test-image',
-              sdId: 'sd-1',
-            },
-          },
-        ],
-      });
-
-      const node = editor.state.doc.firstChild;
-      expect(node?.attrs['display']).toBe('block');
-    });
-
-    it('should accept inline display mode', () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'test-image',
-              sdId: 'sd-1',
-              display: 'inline',
-            },
-          },
-        ],
-      });
-
-      const node = editor.state.doc.firstChild;
-      expect(node?.attrs['display']).toBe('inline');
-    });
-
-    it('should serialize display attribute to HTML', () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'test-image',
-              sdId: 'sd-1',
-              display: 'inline',
-            },
-          },
-        ],
-      });
-
-      const html = editor.getHTML();
-      expect(html).toContain('data-display="inline"');
-    });
-
-    it('should parse display attribute from HTML', () => {
-      const html = `
-        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed" data-display="inline">
-          <img alt="Test" />
-        </figure>
-      `;
-
-      editor.commands.setContent(html);
-
-      const node = editor.state.doc.firstChild;
-      expect(node?.type.name).toBe('notecoveImage');
-      expect(node?.attrs['display']).toBe('inline');
-    });
-
-    it('should default to block display when parsing HTML without display attribute', () => {
-      const html = `
-        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed">
-          <img alt="Test" />
-        </figure>
-      `;
-
-      editor.commands.setContent(html);
-
-      const node = editor.state.doc.firstChild;
-      expect(node?.attrs['display']).toBe('block');
-    });
-  });
-
-  describe('Text Wrapping (wrap attribute)', () => {
-    it('should have wrap attribute with default false', () => {
-      const imageType = editor.schema.nodes['notecoveImage'];
-      const attrs = imageType?.spec.attrs as Record<string, { default: unknown }> | undefined;
-
-      expect(attrs?.['wrap']).toBeDefined();
-      expect(attrs?.['wrap']?.default).toBe(false);
-    });
-
-    it('should accept wrap: true attribute', () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'wrap-test-id',
-              sdId: 'sd-1',
-              alignment: 'left',
-              wrap: true,
-            },
-          },
-        ],
-      });
-
-      const node = editor.state.doc.firstChild;
-      expect(node?.attrs['wrap']).toBe(true);
-    });
-
-    it('should serialize wrap attribute to HTML', () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'wrap-test-id',
-              sdId: 'sd-1',
-              wrap: true,
-            },
-          },
-        ],
-      });
-
-      const html = editor.getHTML();
-      expect(html).toContain('data-wrap="true"');
-    });
-
-    it('should not serialize wrap attribute when false (default)', () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'no-wrap-test-id',
-              sdId: 'sd-1',
-              wrap: false,
-            },
-          },
-        ],
-      });
-
-      const html = editor.getHTML();
-      expect(html).not.toContain('data-wrap');
-    });
-
-    it('should parse wrap attribute from HTML', () => {
-      const html = `
-        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed" data-wrap="true">
-          <img alt="Test" />
-        </figure>
-      `;
-
-      editor.commands.setContent(html);
-
-      const node = editor.state.doc.firstChild;
-      expect(node?.attrs['wrap']).toBe(true);
-    });
-
-    it('should default to wrap: false when parsing HTML without wrap attribute', () => {
-      const html = `
-        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed">
-          <img alt="Test" />
-        </figure>
-      `;
-
-      editor.commands.setContent(html);
-
-      const node = editor.state.doc.firstChild;
-      expect(node?.attrs['wrap']).toBe(false);
-    });
-  });
-
-  describe('Text Wrapping Visual Rendering', () => {
-    let container: HTMLDivElement;
-
-    beforeEach(() => {
-      container = document.createElement('div');
-      document.body.appendChild(container);
-      editor.destroy();
-      editor = new Editor({
-        element: container,
-        extensions: [
-          StarterKit.configure({
-            history: false,
-          }),
-          NotecoveImage,
-        ],
-      });
-    });
-
-    afterEach(() => {
-      document.body.removeChild(container);
-    });
-
-    it('should apply wrap class when wrap is true and alignment is left', async () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'wrap-left-test',
-              sdId: 'sd-1',
-              alignment: 'left',
-              wrap: true,
-            },
-          },
-        ],
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      const wrapper = container.querySelector('.notecove-image');
-      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(true);
-      expect(wrapper?.classList.contains('notecove-image--align-left')).toBe(true);
-    });
-
-    it('should apply wrap class when wrap is true and alignment is right', async () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'wrap-right-test',
-              sdId: 'sd-1',
-              alignment: 'right',
-              wrap: true,
-            },
-          },
-        ],
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      const wrapper = container.querySelector('.notecove-image');
-      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(true);
-      expect(wrapper?.classList.contains('notecove-image--align-right')).toBe(true);
-    });
-
-    it('should NOT apply wrap class when wrap is true but alignment is center', async () => {
-      // Wrap doesn't make sense with center alignment - text can't flow around centered content
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'wrap-center-test',
-              sdId: 'sd-1',
-              alignment: 'center',
-              wrap: true,
-            },
-          },
-        ],
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      const wrapper = container.querySelector('.notecove-image');
-      // Wrap class should NOT be applied for center alignment
-      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(false);
-    });
-
-    it('should NOT apply wrap class when wrap is false', async () => {
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'no-wrap-test',
-              sdId: 'sd-1',
-              alignment: 'left',
-              wrap: false,
-            },
-          },
-        ],
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      const wrapper = container.querySelector('.notecove-image');
-      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(false);
-    });
-
-    it('should NOT apply wrap class when display is inline (even if wrap is true)', async () => {
-      // Inline images don't support wrapping - they're already inline with text
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'inline-wrap-test',
-              sdId: 'sd-1',
-              alignment: 'left',
-              display: 'inline',
-              wrap: true,
-            },
-          },
-        ],
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      const wrapper = container.querySelector('.notecove-image');
-      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(false);
-    });
-  });
-
   describe('Markdown Input Rule', () => {
-    // The markdown input rule requires the editor to call downloadAndSave
-    // These tests verify the regex pattern matching behavior
-
     it('should have input rules defined', () => {
-      // Input rules are added to the extension
       const extensionOptions = NotecoveImage.options;
       expect(extensionOptions).toBeDefined();
     });
 
     it('should match markdown image syntax pattern', () => {
-      // Test the regex pattern that will be used
-      // Pattern: ![alt](url) followed by space
       const MARKDOWN_IMAGE_REGEX = /!\[([^[\]]*)\]\((https?:\/\/[^\s<>)]+|file:\/\/[^\s<>)]+)\) $/;
 
       // Valid patterns
@@ -957,80 +622,6 @@ describe('NotecoveImage Extension', () => {
       const wrapper = container.querySelector('.notecove-image');
       const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
       expect(errorPlaceholder?.getAttribute('title')).toContain('syncing');
-    });
-
-    it('should reload image when onAvailable event matches', async () => {
-      // First load fails - image not found
-      mockThumbnailGetDataUrl.mockResolvedValue(null);
-      mockGetDataUrl.mockResolvedValue(null);
-
-      // Track onAvailable callback for testing
-      let onAvailableCallback:
-        | ((event: { sdId: string; imageId: string; filename: string }) => void)
-        | null = null;
-
-      // Mock onAvailable to capture the callback
-      (window as unknown as { electronAPI: unknown }).electronAPI = {
-        image: {
-          getDataUrl: mockGetDataUrl,
-          getMetadata: mockGetMetadata,
-          onAvailable: (
-            listener: (event: { sdId: string; imageId: string; filename: string }) => void
-          ) => {
-            onAvailableCallback = listener;
-            return () => {
-              onAvailableCallback = null;
-            };
-          },
-        },
-        thumbnail: {
-          getDataUrl: mockThumbnailGetDataUrl,
-        },
-      };
-
-      editor.commands.setContent({
-        type: 'doc',
-        content: [
-          {
-            type: 'notecoveImage',
-            attrs: {
-              imageId: 'sync-test-image',
-              sdId: 'sd-sync',
-            },
-          },
-        ],
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      // Trigger visibility
-      MockIntersectionObserver.triggerIntersection(true);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      // Error placeholder should be visible
-      const wrapper = container.querySelector('.notecove-image');
-      const errorPlaceholder = wrapper?.querySelector('.notecove-image-error');
-      expect(errorPlaceholder).toBeTruthy();
-
-      // Now simulate the image becoming available
-      mockThumbnailGetDataUrl.mockResolvedValue('data:image/jpeg;base64,synced-thumb');
-
-      // Trigger onAvailable event
-      expect(onAvailableCallback).not.toBeNull();
-      onAvailableCallback!({
-        sdId: 'sd-sync',
-        imageId: 'sync-test-image',
-        filename: 'sync-test-image.png',
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 20));
-
-      // Thumbnail should have been requested again
-      expect(mockThumbnailGetDataUrl).toHaveBeenLastCalledWith('sd-sync', 'sync-test-image');
-
-      // Image should now be visible
-      const img = wrapper?.querySelector('.notecove-image-element') as HTMLImageElement | null;
-      expect(img?.src).toContain('synced-thumb');
     });
   });
 });

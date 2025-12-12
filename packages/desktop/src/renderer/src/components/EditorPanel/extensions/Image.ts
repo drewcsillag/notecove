@@ -54,6 +54,10 @@ function formatFileSize(bytes: number): string {
 
 /**
  * Image node attributes
+ *
+ * Note: Inline display, alignment, and text wrapping were removed due to
+ * fundamental limitations in how block-based editors (TipTap/ProseMirror)
+ * handle floated content. All images are now block-level and centered.
  */
 export interface ImageNodeAttrs {
   /** Reference to image in media folder (UUID) */
@@ -64,16 +68,10 @@ export interface ImageNodeAttrs {
   alt: string;
   /** Caption text displayed below image */
   caption: string;
-  /** Alignment: left, center, or right */
-  alignment: 'left' | 'center' | 'right';
   /** Display width (percentage or px, e.g., '50%' or '300px') */
   width: string | null;
   /** Optional link URL when image is clicked */
   linkHref: string | null;
-  /** Display mode: block (standalone) or inline (within text flow) */
-  display: 'block' | 'inline';
-  /** Enable text wrapping around the image (only for left/right aligned block images) */
-  wrap: boolean;
 }
 
 /**
@@ -186,17 +184,6 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           return { 'data-caption': attributes.caption };
         },
       },
-      alignment: {
-        default: 'center' as const,
-        parseHTML: (element) => {
-          const alignment = element.getAttribute('data-alignment');
-          if (alignment === 'left' || alignment === 'right') return alignment;
-          return 'center';
-        },
-        renderHTML: (attributes: ImageNodeAttrs) => {
-          return { 'data-alignment': attributes.alignment };
-        },
-      },
       width: {
         default: null,
         parseHTML: (element) => element.getAttribute('data-width'),
@@ -211,25 +198,6 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         renderHTML: (attributes: ImageNodeAttrs) => {
           if (!attributes.linkHref) return {};
           return { 'data-link-href': attributes.linkHref };
-        },
-      },
-      display: {
-        default: 'block' as const,
-        parseHTML: (element) => {
-          const display = element.getAttribute('data-display');
-          if (display === 'inline') return 'inline';
-          return 'block';
-        },
-        renderHTML: (attributes: ImageNodeAttrs) => {
-          return { 'data-display': attributes.display };
-        },
-      },
-      wrap: {
-        default: false,
-        parseHTML: (element) => element.getAttribute('data-wrap') === 'true',
-        renderHTML: (attributes: ImageNodeAttrs) => {
-          if (!attributes.wrap) return {};
-          return { 'data-wrap': 'true' };
         },
       },
     };
@@ -564,33 +532,10 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
        * Update the visual state based on node attributes
        */
       const updateVisualState = (nodeAttrs: ImageNodeAttrs): void => {
-        const {
-          imageId,
-          sdId,
-          alt,
-          caption: captionText,
-          alignment,
-          width,
-          display,
-          linkHref,
-          wrap,
-        } = nodeAttrs;
+        const { imageId, sdId, alt, caption: captionText, width, linkHref } = nodeAttrs;
 
-        // Update display mode
-        wrapper.dataset['display'] = display;
-        wrapper.classList.toggle('notecove-image--inline', display === 'inline');
-        wrapper.classList.toggle('notecove-image--block', display === 'block');
-
-        // Update alignment classes
-        wrapper.dataset['alignment'] = alignment;
-        wrapper.classList.toggle('notecove-image--align-left', alignment === 'left');
-        wrapper.classList.toggle('notecove-image--align-center', alignment === 'center');
-        wrapper.classList.toggle('notecove-image--align-right', alignment === 'right');
-
-        // Update wrap mode (only applies to block images with left/right alignment)
-        // Wrap doesn't make sense for center alignment (can't flow text around centered content)
-        const shouldWrap = wrap && display === 'block' && alignment !== 'center';
-        wrapper.classList.toggle('notecove-image--wrap', shouldWrap);
+        // All images are block display (centered)
+        wrapper.classList.add('notecove-image--block');
 
         // Update width
         if (width) {
@@ -604,8 +549,8 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         // Update alt text
         img.alt = alt || '';
 
-        // Update caption (hidden in inline mode)
-        if (captionText && display === 'block') {
+        // Update caption
+        if (captionText) {
           caption.textContent = captionText;
           caption.style.display = '';
         } else {

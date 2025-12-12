@@ -7,11 +7,9 @@
  * - Open Original - Open full file in default app
  * - Edit Properties... - Open properties dialog
  * - Delete Image - Remove from note
- * - Set as Block / Set as Inline - Toggle display mode
- * - Alignment submenu - Left, Center, Right
+ * - Reload Image - Clear cache and refetch
  *
  * @see plans/add-images/PLAN-PHASE-3.md
- * @see plans/add-images/PLAN-PHASE-4.md
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -22,14 +20,6 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SettingsIcon from '@mui/icons-material/Settings';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import ViewModuleIcon from '@mui/icons-material/ViewModule';
-import ViewStreamIcon from '@mui/icons-material/ViewStream';
-import FormatAlignLeftIcon from '@mui/icons-material/FormatAlignLeft';
-import FormatAlignCenterIcon from '@mui/icons-material/FormatAlignCenter';
-import FormatAlignRightIcon from '@mui/icons-material/FormatAlignRight';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import WrapTextIcon from '@mui/icons-material/WrapText';
-import CheckIcon from '@mui/icons-material/Check';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog';
 import type { ImageNodeAttrs } from './extensions/Image';
 
@@ -66,7 +56,6 @@ export function openImageContextMenu(data: ContextMenuOpenEvent): void {
 export function ImageContextMenu(): React.JSX.Element | null {
   const [anchorPosition, setAnchorPosition] = useState<{ top: number; left: number } | null>(null);
   const [currentData, setCurrentData] = useState<ContextMenuOpenEvent | null>(null);
-  const [alignmentMenuAnchor, setAlignmentMenuAnchor] = useState<HTMLElement | null>(null);
   const [propertiesDialogOpen, setPropertiesDialogOpen] = useState(false);
   const [propertiesDialogData, setPropertiesDialogData] = useState<ContextMenuOpenEvent | null>(
     null
@@ -90,7 +79,6 @@ export function ImageContextMenu(): React.JSX.Element | null {
   const handleClose = useCallback(() => {
     setAnchorPosition(null);
     setCurrentData(null);
-    setAlignmentMenuAnchor(null);
   }, []);
 
   // Copy image to clipboard
@@ -166,45 +154,6 @@ export function ImageContextMenu(): React.JSX.Element | null {
     handleClose();
   }, [currentData, handleClose]);
 
-  // Toggle display mode
-  const handleSetDisplay = useCallback(
-    (display: 'block' | 'inline') => {
-      if (!currentData) return;
-      currentData.onUpdateAttrs({ display });
-      handleClose();
-    },
-    [currentData, handleClose]
-  );
-
-  // Set alignment
-  const handleSetAlignment = useCallback(
-    (alignment: 'left' | 'center' | 'right') => {
-      if (!currentData) return;
-      currentData.onUpdateAttrs({ alignment });
-      setAlignmentMenuAnchor(null);
-      handleClose();
-    },
-    [currentData, handleClose]
-  );
-
-  // Toggle text wrapping
-  const handleToggleWrap = useCallback(() => {
-    if (!currentData) return;
-    currentData.onUpdateAttrs({ wrap: !currentData.attrs.wrap });
-    handleClose();
-  }, [currentData, handleClose]);
-
-  // Open alignment submenu
-  const handleAlignmentClick = (event: React.MouseEvent<HTMLLIElement>): void => {
-    setAlignmentMenuAnchor(event.currentTarget);
-  };
-
-  // Close alignment submenu
-  const handleAlignmentMenuClose = (): void => {
-    setAlignmentMenuAnchor(null);
-  };
-
-  const isAlignmentMenuOpen = Boolean(alignmentMenuAnchor);
   const isMenuOpen = Boolean(anchorPosition);
 
   return (
@@ -260,110 +209,6 @@ export function ImageContextMenu(): React.JSX.Element | null {
             <DeleteIcon fontSize="small" color="error" />
           </ListItemIcon>
           <ListItemText primaryTypographyProps={{ color: 'error' }}>Delete Image</ListItemText>
-        </MenuItem>
-
-        <Divider />
-
-        {currentData?.attrs.display === 'inline' ? (
-          <MenuItem
-            onClick={() => {
-              handleSetDisplay('block');
-            }}
-          >
-            <ListItemIcon>
-              <ViewModuleIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Set as Block</ListItemText>
-          </MenuItem>
-        ) : (
-          <MenuItem
-            onClick={() => {
-              handleSetDisplay('inline');
-            }}
-          >
-            <ListItemIcon>
-              <ViewStreamIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Set as Inline</ListItemText>
-          </MenuItem>
-        )}
-
-        <MenuItem onClick={handleAlignmentClick} disabled={currentData?.attrs.display === 'inline'}>
-          <ListItemIcon>
-            <FormatAlignCenterIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Alignment</ListItemText>
-          <ChevronRightIcon fontSize="small" sx={{ ml: 2 }} />
-        </MenuItem>
-
-        <MenuItem
-          onClick={handleToggleWrap}
-          disabled={
-            currentData?.attrs.display === 'inline' || currentData?.attrs.alignment === 'center'
-          }
-        >
-          <ListItemIcon>
-            {currentData?.attrs.wrap ? (
-              <CheckIcon fontSize="small" />
-            ) : (
-              <WrapTextIcon fontSize="small" />
-            )}
-          </ListItemIcon>
-          <ListItemText>Wrap Text</ListItemText>
-        </MenuItem>
-      </Menu>
-
-      {/* Alignment submenu */}
-      <Menu
-        anchorEl={alignmentMenuAnchor}
-        open={isAlignmentMenuOpen}
-        onClose={handleAlignmentMenuClose}
-        anchorOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        MenuListProps={{
-          'aria-label': 'Alignment options',
-        }}
-      >
-        <MenuItem
-          onClick={() => {
-            handleSetAlignment('left');
-          }}
-          selected={currentData?.attrs.alignment === 'left'}
-        >
-          <ListItemIcon>
-            <FormatAlignLeftIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Left</ListItemText>
-        </MenuItem>
-
-        <MenuItem
-          onClick={() => {
-            handleSetAlignment('center');
-          }}
-          selected={currentData?.attrs.alignment === 'center'}
-        >
-          <ListItemIcon>
-            <FormatAlignCenterIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Center</ListItemText>
-        </MenuItem>
-
-        <MenuItem
-          onClick={() => {
-            handleSetAlignment('right');
-          }}
-          selected={currentData?.attrs.alignment === 'right'}
-        >
-          <ListItemIcon>
-            <FormatAlignRightIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Right</ListItemText>
         </MenuItem>
       </Menu>
 

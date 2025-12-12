@@ -3,8 +3,7 @@
  *
  * Allows editing:
  * - Alt text (for accessibility)
- * - Caption (displayed below block images)
- * - Alignment (left, center, right)
+ * - Caption (displayed below images)
  * - Link URL (makes image clickable)
  *
  * @see plans/add-images/PLAN-PHASE-4.md
@@ -18,13 +17,7 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   Box,
-  Checkbox,
 } from '@mui/material';
 import type { ImageNodeAttrs } from './extensions/Image';
 
@@ -65,32 +58,18 @@ export function ImagePropertiesDialog({
   // Form state
   const [alt, setAlt] = useState(attrs.alt);
   const [caption, setCaption] = useState(attrs.caption);
-  const [alignment, setAlignment] = useState<'left' | 'center' | 'right'>(attrs.alignment);
   const [linkHref, setLinkHref] = useState(attrs.linkHref ?? '');
   const [linkError, setLinkError] = useState<string | null>(null);
-  const [wrap, setWrap] = useState(attrs.wrap);
 
   // Reset form when dialog opens with new attrs
   useEffect(() => {
     if (open) {
       setAlt(attrs.alt);
       setCaption(attrs.caption);
-      setAlignment(attrs.alignment);
       setLinkHref(attrs.linkHref ?? '');
       setLinkError(null);
-      setWrap(attrs.wrap);
     }
   }, [open, attrs]);
-
-  // Wrap is only available for block images with left/right alignment
-  const isWrapDisabled = attrs.display === 'inline' || alignment === 'center';
-
-  // Auto-disable wrap when alignment changes to center
-  useEffect(() => {
-    if (alignment === 'center') {
-      setWrap(false);
-    }
-  }, [alignment]);
 
   // Validate link URL on blur
   const handleLinkBlur = useCallback(() => {
@@ -112,12 +91,10 @@ export function ImagePropertiesDialog({
     onSave({
       alt,
       caption,
-      alignment,
       linkHref: linkHref.trim() || null,
-      wrap,
     });
     onClose();
-  }, [alt, caption, alignment, linkHref, wrap, onSave, onClose]);
+  }, [alt, caption, linkHref, onSave, onClose]);
 
   // Handle cancel
   const handleCancel = useCallback(() => {
@@ -161,57 +138,11 @@ export function ImagePropertiesDialog({
               setCaption(e.target.value);
             }}
             fullWidth
-            helperText="Displayed below the image (block images only)"
+            helperText="Displayed below the image"
             inputProps={{
               'aria-label': 'Caption',
             }}
           />
-
-          {/* Alignment - only applicable to block images */}
-          <FormControl component="fieldset" disabled={attrs.display === 'inline'}>
-            <FormLabel component="legend">Alignment</FormLabel>
-            <RadioGroup
-              row
-              value={alignment}
-              onChange={(e) => {
-                setAlignment(e.target.value as 'left' | 'center' | 'right');
-              }}
-            >
-              <FormControlLabel value="left" control={<Radio />} label="Left" />
-              <FormControlLabel value="center" control={<Radio />} label="Center" />
-              <FormControlLabel value="right" control={<Radio />} label="Right" />
-            </RadioGroup>
-            {attrs.display === 'inline' && (
-              <Box sx={{ mt: 0.5, color: 'text.secondary', fontSize: '0.75rem' }}>
-                Alignment only applies to block images
-              </Box>
-            )}
-          </FormControl>
-
-          {/* Text Wrapping - only for block images with left/right alignment */}
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={wrap}
-                onChange={(e) => {
-                  setWrap(e.target.checked);
-                }}
-                disabled={isWrapDisabled}
-                inputProps={{
-                  'aria-label': 'Wrap text around image',
-                }}
-              />
-            }
-            label="Wrap text around image"
-            disabled={isWrapDisabled}
-          />
-          {isWrapDisabled && (
-            <Box sx={{ ml: 4, mt: -1, color: 'text.secondary', fontSize: '0.75rem' }}>
-              {attrs.display === 'inline'
-                ? 'Text wrapping only applies to block images'
-                : 'Text wrapping requires left or right alignment'}
-            </Box>
-          )}
 
           {/* Link URL */}
           <TextField

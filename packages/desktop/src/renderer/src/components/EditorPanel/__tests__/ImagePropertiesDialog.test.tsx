@@ -15,11 +15,8 @@ describe('ImagePropertiesDialog', () => {
     sdId: 'test-sd-456',
     alt: '',
     caption: '',
-    alignment: 'center',
     width: null,
     linkHref: null,
-    display: 'block',
-    wrap: false,
   };
 
   const defaultProps = {
@@ -53,11 +50,6 @@ describe('ImagePropertiesDialog', () => {
 
       // Caption field
       expect(screen.getByLabelText(/caption/i)).toBeInTheDocument();
-
-      // Alignment options
-      expect(screen.getByLabelText(/left/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/center/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/right/i)).toBeInTheDocument();
 
       // Link URL field
       expect(screen.getByLabelText(/link url/i)).toBeInTheDocument();
@@ -121,34 +113,6 @@ describe('ImagePropertiesDialog', () => {
 
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ caption: 'My caption' }));
     });
-
-    it('shows hint that caption only shows for block images', () => {
-      render(<ImagePropertiesDialog {...defaultProps} />);
-      expect(screen.getByText(/block images only/i)).toBeInTheDocument();
-    });
-  });
-
-  describe('alignment', () => {
-    it('displays current alignment as selected', () => {
-      const attrs = { ...defaultAttrs, alignment: 'right' as const };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} />);
-
-      const rightOption = screen.getByLabelText(/right/i);
-      expect(rightOption).toBeChecked();
-    });
-
-    it('updates alignment on selection', () => {
-      const onSave = jest.fn();
-      render(<ImagePropertiesDialog {...defaultProps} onSave={onSave} />);
-
-      const leftOption = screen.getByLabelText(/left/i);
-      fireEvent.click(leftOption);
-
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      fireEvent.click(saveButton);
-
-      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ alignment: 'left' }));
-    });
   });
 
   describe('link URL', () => {
@@ -202,85 +166,6 @@ describe('ImagePropertiesDialog', () => {
       fireEvent.click(saveButton);
 
       expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ linkHref: null }));
-    });
-  });
-
-  describe('text wrapping', () => {
-    it('renders wrap checkbox for block images', () => {
-      render(<ImagePropertiesDialog {...defaultProps} />);
-
-      expect(screen.getByLabelText(/wrap text around image/i)).toBeInTheDocument();
-    });
-
-    it('displays current wrap state', () => {
-      // Need left alignment for wrap to be enabled
-      const attrs = { ...defaultAttrs, alignment: 'left' as const, wrap: true };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} />);
-
-      const wrapCheckbox = screen.getByLabelText(/wrap text around image/i);
-      expect(wrapCheckbox).toBeChecked();
-    });
-
-    it('saves wrap value on submit', () => {
-      const onSave = jest.fn();
-      // Need left alignment for wrap to be enabled
-      const attrs = { ...defaultAttrs, alignment: 'left' as const };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} onSave={onSave} />);
-
-      const wrapCheckbox = screen.getByLabelText(/wrap text around image/i);
-      fireEvent.click(wrapCheckbox);
-
-      const saveButton = screen.getByRole('button', { name: /save/i });
-      fireEvent.click(saveButton);
-
-      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ wrap: true }));
-    });
-
-    it('disables wrap checkbox for inline images', () => {
-      const attrs = { ...defaultAttrs, display: 'inline' as const };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} />);
-
-      const wrapCheckbox = screen.getByLabelText(/wrap text around image/i);
-      expect(wrapCheckbox).toBeDisabled();
-    });
-
-    it('disables wrap checkbox for center-aligned images', () => {
-      const attrs = { ...defaultAttrs, alignment: 'center' as const };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} />);
-
-      const wrapCheckbox = screen.getByLabelText(/wrap text around image/i);
-      expect(wrapCheckbox).toBeDisabled();
-    });
-
-    it('enables wrap checkbox for left-aligned block images', () => {
-      const attrs = { ...defaultAttrs, alignment: 'left' as const, display: 'block' as const };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} />);
-
-      const wrapCheckbox = screen.getByLabelText(/wrap text around image/i);
-      expect(wrapCheckbox).not.toBeDisabled();
-    });
-
-    it('enables wrap checkbox for right-aligned block images', () => {
-      const attrs = { ...defaultAttrs, alignment: 'right' as const, display: 'block' as const };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} />);
-
-      const wrapCheckbox = screen.getByLabelText(/wrap text around image/i);
-      expect(wrapCheckbox).not.toBeDisabled();
-    });
-
-    it('disables wrap when alignment changes to center', () => {
-      const onSave = jest.fn();
-      const attrs = { ...defaultAttrs, alignment: 'left' as const, wrap: true };
-      render(<ImagePropertiesDialog {...defaultProps} attrs={attrs} onSave={onSave} />);
-
-      // Change alignment to center
-      const centerOption = screen.getByLabelText(/center/i);
-      fireEvent.click(centerOption);
-
-      // Wrap should be disabled and unchecked
-      const wrapCheckbox = screen.getByLabelText(/wrap text around image/i);
-      expect(wrapCheckbox).toBeDisabled();
-      expect(wrapCheckbox).not.toBeChecked();
     });
   });
 

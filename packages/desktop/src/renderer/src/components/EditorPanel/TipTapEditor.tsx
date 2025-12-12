@@ -1759,50 +1759,19 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               color: theme.palette.info.main,
             },
           },
-          // NotecoveImage styling
+          // NotecoveImage styling - all images are block-level and centered
           '& figure.notecove-image': {
             margin: '16px 0',
             padding: 0,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            // Alignment variations
-            '&[data-alignment="left"]': {
-              alignItems: 'flex-start',
-            },
-            '&[data-alignment="right"]': {
-              alignItems: 'flex-end',
-            },
-            '&[data-alignment="center"]': {
-              alignItems: 'center',
-            },
+            width: '100%',
             // Selected state
             '&.ProseMirror-selectednode': {
               outline: `2px solid ${theme.palette.primary.main}`,
               outlineOffset: '4px',
               borderRadius: '4px',
-            },
-            // Block display mode (default)
-            '&.notecove-image--block': {
-              display: 'flex',
-              flexDirection: 'column',
-              width: '100%',
-            },
-            // Inline display mode
-            '&.notecove-image--inline': {
-              display: 'inline-flex',
-              flexDirection: 'row',
-              margin: '0 4px',
-              verticalAlign: 'middle',
-              '& .notecove-image-container': {
-                minHeight: 'auto',
-                minWidth: 'auto',
-              },
-              '& .notecove-image-element': {
-                maxHeight: '200px',
-                width: 'auto',
-                maxWidth: '300px',
-              },
             },
           },
           '& .notecove-image-container': {
@@ -1997,22 +1966,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               outline: `2px solid ${theme.palette.info.main}`,
               outlineOffset: '-2px',
             },
-          },
-          // Text wrapping - float-based text flow around images
-          '& figure.notecove-image--wrap': {
-            margin: '0 0 1rem 0', // Remove top margin for wrapped images
-            '&.notecove-image--align-left': {
-              float: 'left',
-              marginRight: '1rem',
-            },
-            '&.notecove-image--align-right': {
-              float: 'right',
-              marginLeft: '1rem',
-            },
-          },
-          // Clear floats after consecutive wrapped images to prevent stacking
-          '& figure.notecove-image--wrap + figure.notecove-image--wrap': {
-            clear: 'both', // Prevent horizontal stacking of wrapped images
           },
           // Search result highlighting
           '& .search-result': {
