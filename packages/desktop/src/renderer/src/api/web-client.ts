@@ -270,7 +270,24 @@ export const webClient: typeof window.electronAPI = {
     },
     moveToSD: browserNotAvailable('note.moveToSD'),
     getMetadata: async (noteId: string) => {
-      return apiRequest('GET', `/api/notes/${noteId}`);
+      const response = await apiRequest<{
+        id: string;
+        title: string;
+        folderId: string | null;
+        created: number;
+        modified: number;
+        deleted: boolean;
+      }>('GET', `/api/notes/${noteId}`);
+
+      // Map API response to IPC format
+      return {
+        noteId: response.id,
+        title: response.title,
+        folderId: response.folderId ?? '',
+        createdAt: response.created,
+        modifiedAt: response.modified,
+        deleted: response.deleted,
+      };
     },
     updateTitle: async (noteId: string, title: string, contentText?: string) => {
       await apiRequest('POST', `/api/notes/${noteId}/title`, { title, contentText });
@@ -690,6 +707,7 @@ export const webClient: typeof window.electronAPI = {
     createDirectory: browserNotAvailable('export.createDirectory'),
     getNotesForExport: browserNotAvailable('export.getNotesForExport'),
     showCompletionMessage: browserNotAvailable('export.showCompletionMessage'),
+    copyImageFile: browserNotAvailable('export.copyImageFile'),
   },
 
   testing: {
@@ -759,6 +777,164 @@ export const webClient: typeof window.electronAPI = {
     openNoteInfo: async () => {
       // Not supported in web client - no separate windows
       return { success: false, error: 'Not supported in web client' };
+    },
+  },
+
+  // Image operations via REST API
+  image: {
+    save: async (sdId: string, data: Uint8Array, mimeType: string) => {
+      return apiRequest<{ imageId: string; filename: string }>('POST', `/api/images/${sdId}`, {
+        data: Array.from(data),
+        mimeType,
+      });
+    },
+    getDataUrl: async (sdId: string, imageId: string) => {
+      try {
+        const response = await apiRequest<{ dataUrl: string }>(
+          'GET',
+          `/api/images/${sdId}/${imageId}/data`
+        );
+        return response.dataUrl;
+      } catch {
+        return null;
+      }
+    },
+    getPath: async (_sdId: string, _imageId: string) => {
+      // File paths are not meaningful in browser context
+      return Promise.resolve(null);
+    },
+    delete: async (sdId: string, imageId: string) => {
+      await apiRequest('DELETE', `/api/images/${sdId}/${imageId}`);
+    },
+    exists: async (sdId: string, imageId: string) => {
+      try {
+        await apiRequest('HEAD', `/api/images/${sdId}/${imageId}`);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    getMetadata: async (imageId: string) => {
+      try {
+        return await apiRequest<{
+          id: string;
+          sdId: string;
+          filename: string;
+          mimeType: string;
+          width: number | null;
+          height: number | null;
+          size: number;
+          created: number;
+        }>('GET', `/api/images/metadata/${imageId}`);
+      } catch {
+        return null;
+      }
+    },
+    list: async (sdId: string) => {
+      return apiRequest<
+        {
+          id: string;
+          sdId: string;
+          filename: string;
+          mimeType: string;
+          width: number | null;
+          height: number | null;
+          size: number;
+          created: number;
+        }[]
+      >('GET', `/api/images/${sdId}`);
+    },
+    getStorageStats: async (sdId: string) => {
+      return apiRequest<{ totalSize: number; imageCount: number }>(
+        'GET',
+        `/api/images/${sdId}/stats`
+      );
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    pickAndSave: async (_sdId: string) => {
+      // File picker is not supported in web client
+      throw new Error('File picker is not supported in browser mode');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    downloadAndSave: async (_sdId: string, _url: string) => {
+      // URL download is not supported in web client
+      throw new Error('URL image download is not supported in browser mode');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    copyToClipboard: async (_sdId: string, _imageId: string) => {
+      // Clipboard copy is not supported in web client
+      throw new Error('Clipboard copy is not supported in browser mode');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    saveAs: async (_sdId: string, _imageId: string) => {
+      // Save as is not supported in web client
+      throw new Error('Save as is not supported in browser mode');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    openExternal: async (_sdId: string, _imageId: string) => {
+      // Open external is not supported in web client
+      throw new Error('Open external is not supported in browser mode');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    copyToSD: async (_sourceSdId: string, _targetSdId: string, _imageId: string) => {
+      // Cross-SD copy is not supported in web client
+      throw new Error('Cross-SD copy is not supported in browser mode');
+    },
+    // No-op in web client - images don't arrive via sync
+    onAvailable: () => () => {
+      /* No-op in web client */
+    },
+  },
+
+  // Thumbnail operations via REST API
+  thumbnail: {
+    get: async (sdId: string, imageId: string) => {
+      try {
+        return await apiRequest<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        }>('GET', `/api/thumbnails/${sdId}/${imageId}`);
+      } catch {
+        return null;
+      }
+    },
+    getDataUrl: async (sdId: string, imageId: string) => {
+      try {
+        const response = await apiRequest<{ dataUrl: string }>(
+          'GET',
+          `/api/thumbnails/${sdId}/${imageId}/data`
+        );
+        return response.dataUrl;
+      } catch {
+        return null;
+      }
+    },
+    exists: async (sdId: string, imageId: string) => {
+      try {
+        await apiRequest('HEAD', `/api/thumbnails/${sdId}/${imageId}`);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    delete: async (sdId: string, imageId: string) => {
+      await apiRequest('DELETE', `/api/thumbnails/${sdId}/${imageId}`);
+    },
+    generate: async (sdId: string, imageId: string) => {
+      try {
+        return await apiRequest<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        }>('POST', `/api/thumbnails/${sdId}/${imageId}/generate`);
+      } catch {
+        return null;
+      }
     },
   },
 };

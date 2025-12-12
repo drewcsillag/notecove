@@ -82,6 +82,10 @@ function convertNode(
     case 'triStateCheckbox':
       return convertCheckbox(node);
 
+    // NoteCove image node
+    case 'notecoveImage':
+      return convertNotecoveImage(node);
+
     default:
       // For unknown nodes, try to extract text content
       if (node.content) {
@@ -360,6 +364,152 @@ function convertTaskItem(
   }
 
   return parts.join('');
+}
+
+/**
+ * Convert NoteCove image node to markdown/HTML
+ *
+ * Export strategy:
+ * - Simple images (no caption, default alignment): Markdown ![alt](path)
+ * - Images with captions: HTML <figure> with <figcaption>
+ * - Images with alignment: HTML <img> with inline style
+ * - Images with links: Wrapped in <a> tag
+ *
+ * The path uses a placeholder format that gets replaced during actual export:
+ * {ATTACHMENTS}/{imageId}.{ext}
+ */
+function convertNotecoveImage(node: JSONContent): string {
+  const attrs = node.attrs ?? {};
+  const imageId = (attrs['imageId'] as string | undefined) ?? 'unknown';
+  const alt = (attrs['alt'] as string | undefined) ?? '';
+  const caption = (attrs['caption'] as string | undefined) ?? '';
+  const alignment = (attrs['alignment'] as 'left' | 'center' | 'right' | undefined) ?? 'center';
+  const width = attrs['width'] as string | null;
+  const linkHref = attrs['linkHref'] as string | null;
+
+  // Placeholder path - will be replaced by export service with actual relative path
+  // Format: {ATTACHMENTS}/imageId (extension will be determined during file copy)
+  const imagePath = `{ATTACHMENTS}/${imageId}`;
+
+  // Determine if we need HTML (caption, non-left alignment, width, or link)
+  const needsHtml = caption !== '' || alignment !== 'left' || width !== null || linkHref !== null;
+
+  if (!needsHtml) {
+    // Simple markdown format for left-aligned images without extras
+    return `![${alt}](${imagePath})`;
+  }
+
+  // Build HTML output
+  const styleAttrs: string[] = ['display: block'];
+
+  // Alignment styles
+  if (alignment === 'center') {
+    styleAttrs.push('margin-left: auto', 'margin-right: auto');
+  } else if (alignment === 'right') {
+    styleAttrs.push('margin-left: auto');
+  }
+  // 'left' alignment = natural flow, no special styles
+
+  const style = styleAttrs.join('; ');
+
+  // Build <img> tag
+  let imgTag = `<img src="${imagePath}" alt="${escapeHtml(alt)}"`;
+  if (width) {
+    imgTag += ` width="${width}"`;
+  }
+  imgTag += ` style="${style}" />`;
+
+  // Wrap in link if needed
+  if (linkHref) {
+    imgTag = `<a href="${escapeHtml(linkHref)}">${imgTag}</a>`;
+  }
+
+  // Wrap in figure if caption exists
+  if (caption) {
+    return `<figure style="${style}">\n  ${imgTag}\n  <figcaption>${escapeHtml(caption)}</figcaption>\n</figure>`;
+  }
+
+  return imgTag;
+}
+
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ============================================================================
+// Image extraction utilities
+// ============================================================================
+
+/**
+ * Image reference extracted from content
+ */
+export interface ImageReference {
+  imageId: string;
+  sdId: string | null;
+  alt: string;
+}
+
+/**
+ * Extract all image references from ProseMirror/TipTap content
+ * Used by export service to know which images to copy
+ */
+export function extractImageReferences(content: JSONContent): ImageReference[] {
+  const images: ImageReference[] = [];
+  extractImagesRecursive(content, images);
+  return images;
+}
+
+/**
+ * Recursively extract images from content
+ */
+function extractImagesRecursive(node: JSONContent, images: ImageReference[]): void {
+  if (node.type === 'notecoveImage' && node.attrs) {
+    const imageId = node.attrs['imageId'] as string | null;
+    if (imageId) {
+      images.push({
+        imageId,
+        sdId: (node.attrs['sdId'] as string | undefined) ?? null,
+        alt: (node.attrs['alt'] as string | undefined) ?? '',
+      });
+    }
+  }
+
+  // Recurse into children
+  if (node.content) {
+    for (const child of node.content) {
+      extractImagesRecursive(child, images);
+    }
+  }
+}
+
+/**
+ * Replace image placeholders in markdown with actual relative paths
+ *
+ * @param markdown Markdown string with {ATTACHMENTS}/imageId placeholders
+ * @param attachmentsFolder Name of the attachments folder (e.g., "Note Title_attachments")
+ * @param imageExtensions Map of imageId -> file extension (e.g., "abc123" -> ".png")
+ * @returns Markdown with placeholders replaced
+ */
+export function replaceImagePlaceholders(
+  markdown: string,
+  attachmentsFolder: string,
+  imageExtensions: Map<string, string>
+): string {
+  // Replace {ATTACHMENTS}/imageId with actual path
+  return markdown.replace(/\{ATTACHMENTS\}\/([a-zA-Z0-9_-]+)/g, (_match, imageId: string) => {
+    const extension = imageExtensions.get(imageId) ?? '';
+    // URL-encode the folder name for markdown/HTML compatibility
+    const encodedFolder = encodeURIComponent(attachmentsFolder).replace(/%20/g, '%20');
+    return `${encodedFolder}/${imageId}${extension}`;
+  });
 }
 
 // ============================================================================

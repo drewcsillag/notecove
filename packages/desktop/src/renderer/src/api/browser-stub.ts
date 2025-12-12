@@ -206,6 +206,7 @@ export const browserApiStub: typeof window.electronAPI = {
     createDirectory: notImplemented('export.createDirectory'),
     getNotesForExport: notImplemented('export.getNotesForExport'),
     showCompletionMessage: notImplemented('export.showCompletionMessage'),
+    copyImageFile: notImplemented('export.copyImageFile'),
   },
 
   testing: {
@@ -247,6 +248,34 @@ export const browserApiStub: typeof window.electronAPI = {
 
   window: {
     openNoteInfo: notImplemented('window.openNoteInfo'),
+  },
+
+  image: {
+    save: notImplemented('image.save'),
+    getDataUrl: notImplemented('image.getDataUrl'),
+    getPath: notImplemented('image.getPath'),
+    delete: notImplemented('image.delete'),
+    exists: notImplemented('image.exists'),
+    getMetadata: notImplemented('image.getMetadata'),
+    list: notImplemented('image.list'),
+    getStorageStats: notImplemented('image.getStorageStats'),
+    pickAndSave: notImplemented('image.pickAndSave'),
+    downloadAndSave: notImplemented('image.downloadAndSave'),
+    copyToClipboard: notImplemented('image.copyToClipboard'),
+    saveAs: notImplemented('image.saveAs'),
+    openExternal: notImplemented('image.openExternal'),
+    copyToSD: notImplemented('image.copyToSD'),
+    onAvailable: () => () => {
+      /* No-op in browser mode */
+    },
+  },
+
+  thumbnail: {
+    get: notImplemented('thumbnail.get'),
+    getDataUrl: notImplemented('thumbnail.getDataUrl'),
+    exists: notImplemented('thumbnail.exists'),
+    delete: notImplemented('thumbnail.delete'),
+    generate: notImplemented('thumbnail.generate'),
   },
 };
 

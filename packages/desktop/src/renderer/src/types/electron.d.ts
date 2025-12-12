@@ -564,6 +564,7 @@ declare global {
             id: string;
             title: string;
             folderId: string | null;
+            sdId: string;
             content: unknown;
             isEmpty: boolean;
           }[]
@@ -574,6 +575,11 @@ declare global {
           destinationPath: string,
           errors: string[]
         ) => Promise<void>;
+        copyImageFile: (
+          sdId: string,
+          imageId: string,
+          destPath: string
+        ) => Promise<{ success: boolean; error?: string; extension?: string }>;
       };
 
       testing: {
@@ -633,6 +639,95 @@ declare global {
          * Creates a new window that displays detailed information about the note.
          */
         openNoteInfo: (noteId: string) => Promise<{ success: boolean; error?: string }>;
+      };
+
+      image: {
+        save: (
+          sdId: string,
+          data: Uint8Array,
+          mimeType: string
+        ) => Promise<{ imageId: string; filename: string }>;
+        getDataUrl: (sdId: string, imageId: string) => Promise<string | null>;
+        getPath: (sdId: string, imageId: string) => Promise<string | null>;
+        delete: (sdId: string, imageId: string) => Promise<void>;
+        exists: (sdId: string, imageId: string) => Promise<boolean>;
+        getMetadata: (imageId: string) => Promise<{
+          id: string;
+          sdId: string;
+          filename: string;
+          mimeType: string;
+          width: number | null;
+          height: number | null;
+          size: number;
+          created: number;
+        } | null>;
+        list: (sdId: string) => Promise<
+          {
+            id: string;
+            sdId: string;
+            filename: string;
+            mimeType: string;
+            width: number | null;
+            height: number | null;
+            size: number;
+            created: number;
+          }[]
+        >;
+        getStorageStats: (sdId: string) => Promise<{ totalSize: number; imageCount: number }>;
+        pickAndSave: (sdId: string) => Promise<string[]>;
+        downloadAndSave: (sdId: string, url: string) => Promise<string>;
+        /** Copy image to clipboard */
+        copyToClipboard: (sdId: string, imageId: string) => Promise<void>;
+        /** Save image as... (with file dialog) */
+        saveAs: (sdId: string, imageId: string) => Promise<string | null>;
+        /** Open image in external application */
+        openExternal: (sdId: string, imageId: string) => Promise<void>;
+        /** Copy an image from one sync directory to another */
+        copyToSD: (
+          sourceSdId: string,
+          targetSdId: string,
+          imageId: string
+        ) => Promise<{
+          success: boolean;
+          imageId: string;
+          alreadyExists?: boolean;
+          error?: string;
+        }>;
+        /** Subscribe to image availability events (when synced images arrive) */
+        onAvailable: (
+          listener: (event: { sdId: string; imageId: string; filename: string }) => void
+        ) => () => void;
+      };
+
+      thumbnail: {
+        /** Get or generate a thumbnail for an image */
+        get: (
+          sdId: string,
+          imageId: string
+        ) => Promise<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        } | null>;
+        /** Get thumbnail as data URL (for rendering in browser) */
+        getDataUrl: (sdId: string, imageId: string) => Promise<string | null>;
+        /** Check if a thumbnail exists */
+        exists: (sdId: string, imageId: string) => Promise<boolean>;
+        /** Delete a thumbnail */
+        delete: (sdId: string, imageId: string) => Promise<void>;
+        /** Force regenerate a thumbnail */
+        generate: (
+          sdId: string,
+          imageId: string
+        ) => Promise<{
+          path: string;
+          format: 'jpeg' | 'png' | 'gif';
+          width: number;
+          height: number;
+          size: number;
+        } | null>;
       };
     };
   }

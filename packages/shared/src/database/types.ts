@@ -18,6 +18,7 @@ import type {
   ActivityLogState,
   SequenceState,
   CachedProfilePresence,
+  ImageCache,
 } from './schema';
 import type { UUID } from '../types';
 
@@ -490,6 +491,47 @@ export interface SequenceStateOperations {
 }
 
 /**
+ * Image cache operations
+ * @see plans/add-images/PLAN-PHASE-1.md
+ */
+export interface ImageCacheOperations {
+  /**
+   * Insert or update an image in the cache
+   */
+  upsertImage(image: ImageCache): Promise<void>;
+
+  /**
+   * Get an image from the cache by ID
+   */
+  getImage(imageId: UUID): Promise<ImageCache | null>;
+
+  /**
+   * Get all images in a sync directory
+   */
+  getImagesBySd(sdId: string): Promise<ImageCache[]>;
+
+  /**
+   * Delete an image from the cache
+   */
+  deleteImage(imageId: UUID): Promise<void>;
+
+  /**
+   * Check if an image exists in the cache
+   */
+  imageExists(imageId: UUID): Promise<boolean>;
+
+  /**
+   * Get total size of all images in a sync directory
+   */
+  getImageStorageSize(sdId: string): Promise<number>;
+
+  /**
+   * Get count of images in a sync directory
+   */
+  getImageCount(sdId: string): Promise<number>;
+}
+
+/**
  * Profile presence cache operations
  * @see plans/stale-sync-ux/PROFILE-PRESENCE.md
  */
@@ -557,7 +599,8 @@ export interface Database
     SchemaVersionOperations,
     NoteSyncStateOperations,
     FolderSyncStateOperations,
-    ProfilePresenceCacheOperations {
+    ProfilePresenceCacheOperations,
+    ImageCacheOperations {
   /**
    * Get the underlying adapter
    */

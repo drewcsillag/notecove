@@ -124,6 +124,7 @@ describe('SyncDirectoryStructure', () => {
       expect(paths.folders).toBe('/test/sd/folders');
       expect(paths.activity).toBe('/test/sd/activity');
       expect(paths.profiles).toBe('/test/sd/profiles');
+      expect(paths.media).toBe('/test/sd/media');
     });
   });
 
@@ -159,6 +160,7 @@ describe('SyncDirectoryStructure', () => {
       expect(fs.getDir('/test/sd/folders/meta')).toBe(true);
       expect(fs.getDir('/test/sd/activity')).toBe(true);
       expect(fs.getDir('/test/sd/profiles')).toBe(true);
+      expect(fs.getDir('/test/sd/media')).toBe(true);
     });
   });
 
@@ -258,6 +260,13 @@ describe('SyncDirectoryStructure', () => {
     it('should return correct profiles directory path', () => {
       const profilesPath = sdStructure.getProfilesPath();
       expect(profilesPath).toBe('/test/sd/profiles');
+    });
+  });
+
+  describe('getMediaPath', () => {
+    it('should return correct media directory path', () => {
+      const mediaPath = sdStructure.getMediaPath();
+      expect(mediaPath).toBe('/test/sd/media');
     });
   });
 

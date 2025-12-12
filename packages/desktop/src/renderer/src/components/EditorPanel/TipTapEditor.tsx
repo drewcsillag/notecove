@@ -22,12 +22,54 @@ import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
+import { NotecoveImage } from './extensions/Image';
+import { ImageLightbox } from './ImageLightbox';
+import { ImageContextMenu } from './ImageContextMenu';
 import { SearchPanel } from './SearchPanel';
 import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { useWindowState } from '../../hooks/useWindowState';
+
+/**
+ * Map of file extensions to MIME types for image files.
+ * Used when file.type is empty (common when dropping files from Finder on macOS).
+ */
+const EXTENSION_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  heic: 'image/heic',
+  heif: 'image/heif',
+};
+
+/**
+ * Get MIME type from filename extension.
+ * Returns null if extension is not a supported image type.
+ */
+function getMimeTypeFromFilename(filename: string): string | null {
+  const lastDotIndex = filename.lastIndexOf('.');
+  if (lastDotIndex === -1) return null;
+  const extension = filename.slice(lastDotIndex + 1).toLowerCase();
+  return EXTENSION_TO_MIME[extension] ?? null;
+}
+
+/**
+ * Check if a file is an image, using both file.type and filename extension.
+ * Returns the MIME type if it's an image, or null otherwise.
+ */
+function getImageMimeType(file: File): string | null {
+  // First try the file's MIME type
+  if (file.type.startsWith('image/')) {
+    return file.type;
+  }
+  // Fall back to inferring from extension (common when dropping from Finder)
+  return getMimeTypeFromFilename(file.name);
+}
 
 export interface TipTapEditorProps {
   noteId: string | null;
@@ -74,6 +116,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const shouldFocusAfterLoadRef = useRef(false);
   // Track if we've already scheduled/attempted focus (to prevent cancellation)
   const focusAttemptedRef = useRef(false);
+  // Cache the active SD for synchronous access in transformPasted
+  const activeSdIdRef = useRef<string | null>(null);
   // Link popover state (for viewing/editing existing links)
   const [linkPopoverData, setLinkPopoverData] = useState<{
     href: string;
@@ -201,6 +245,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       SearchAndReplace,
       // Add WebLink extension for http/https links
       WebLink,
+      // Add NotecoveImage extension for image display
+      NotecoveImage,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
@@ -216,6 +262,76 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
       },
+      // Handle image paste from clipboard
+      handlePaste: (view, event, _slice) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+
+        // Look for image data in clipboard
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            // IMPORTANT: Capture MIME type synchronously before any async operations.
+            // The clipboard DataTransferItem becomes invalid after the event handler returns,
+            // so item.type would be empty if read inside an async callback.
+            const mimeType = item.type;
+            console.log('[TipTapEditor] Image paste detected, type:', mimeType);
+
+            // Get the image as a blob
+            const blob = item.getAsFile();
+            if (!blob) {
+              console.log('[TipTapEditor] Could not get blob from clipboard item');
+              continue;
+            }
+
+            // Read as ArrayBuffer and save via IPC
+            blob
+              .arrayBuffer()
+              .then(async (buffer) => {
+                // Get the active SD to save the image in
+                const sdId = await window.electronAPI.sd.getActive();
+                if (!sdId) {
+                  console.error('[TipTapEditor] No active SD, cannot save image');
+                  return;
+                }
+
+                const data = new Uint8Array(buffer);
+
+                console.log('[TipTapEditor] Saving image, size:', data.length, 'type:', mimeType);
+
+                // Save the image via IPC (returns {imageId, filename})
+                const result = await window.electronAPI.image.save(sdId, data, mimeType);
+                console.log('[TipTapEditor] Image saved with ID:', result.imageId);
+
+                // Insert the image node at current cursor position
+                const { state } = view;
+                const imageNode = state.schema.nodes['notecoveImage'];
+                if (imageNode) {
+                  const node = imageNode.create({
+                    imageId: result.imageId,
+                    sdId,
+                  });
+                  const tr = state.tr.replaceSelectionWith(node);
+                  view.dispatch(tr);
+                  console.log('[TipTapEditor] Image node inserted');
+                }
+              })
+              .catch((err) => {
+                console.error('[TipTapEditor] Failed to save pasted image:', err);
+              });
+
+            // Prevent default paste handling for this image
+            event.preventDefault();
+            return true;
+          }
+        }
+
+        // Let other handlers process non-image paste
+        return false;
+      },
+      // Note: Image drop is handled by a DOM-level event listener in a useEffect
+      // below. ProseMirror's handleDrop prop doesn't get triggered by synthetic
+      // events (from tests), so we use the DOM listener which works for both.
+
       // Custom clipboard text serializer to fix newline handling when copying
       // Default TipTap behavior adds too many newlines within lists.
       // We want:
@@ -286,6 +402,112 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
         // Join top-level blocks with double newlines to preserve paragraph spacing
         return results.join('\n\n');
+      },
+      // Transform pasted content to handle cross-SD image copying
+      // When content with images is pasted from another SD, copy the image files
+      // and update the sdId attribute to point to the current SD.
+      transformPasted: (slice) => {
+        const targetSdId = activeSdIdRef.current;
+
+        // If we don't have a cached target SD, just return the slice unchanged
+        // The image will try to load from its original SD (may still work)
+        if (!targetSdId) {
+          return slice;
+        }
+
+        // Helper to recursively transform image nodes to update sdId
+        // Also triggers background copy operations for cross-SD images
+        const transformNode = (
+          node: typeof slice.content.firstChild
+        ): typeof slice.content.firstChild => {
+          if (!node) return node;
+
+          if (node.type.name === 'notecoveImage') {
+            const sourceSdId = node.attrs['sdId'] as string | undefined;
+            const imageId = node.attrs['imageId'] as string | undefined;
+
+            if (sourceSdId && imageId && sourceSdId !== targetSdId) {
+              // Trigger async copy in background
+              console.log(
+                `[TipTapEditor] Cross-SD paste: copying image ${imageId} from ${sourceSdId} to ${targetSdId}`
+              );
+              window.electronAPI.image
+                .copyToSD(sourceSdId, targetSdId, imageId)
+                .then((result) => {
+                  if (result.success) {
+                    console.log(
+                      `[TipTapEditor] Image ${imageId} copied successfully`,
+                      result.alreadyExists ? '(already existed)' : ''
+                    );
+                  } else {
+                    console.error(`[TipTapEditor] Failed to copy image ${imageId}:`, result.error);
+                  }
+                })
+                .catch((err) => {
+                  console.error(`[TipTapEditor] Error copying image ${imageId}:`, err);
+                });
+
+              // Create new node with updated sdId
+              return node.type.create(
+                { ...node.attrs, sdId: targetSdId },
+                node.content,
+                node.marks
+              );
+            }
+          }
+
+          // For other nodes, recursively transform children
+          if (node.content.size > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const newContent: any[] = [];
+            let hasChanges = false;
+            node.content.forEach((child) => {
+              const newChild = transformNode(child);
+              if (newChild !== child) {
+                hasChanges = true;
+              }
+              newContent.push(newChild);
+            });
+
+            // Only create new node if children changed
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
+            if (hasChanges) {
+              // Use ProseMirror's Fragment.from to create a new fragment
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+              const Fragment = (node.content as any).constructor;
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+              const newFragment = Fragment.fromArray(newContent) as typeof node.content;
+              return node.copy(newFragment);
+            }
+          }
+          return node;
+        };
+
+        // Transform the slice
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const newContent: any[] = [];
+        let hasChanges = false;
+        slice.content.forEach((node) => {
+          const newNode = transformNode(node);
+          if (newNode !== node) {
+            hasChanges = true;
+          }
+          newContent.push(newNode);
+        });
+
+        // Return transformed slice if there were changes
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
+        if (hasChanges) {
+          // Use ProseMirror's Fragment.from to create a new fragment
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+          const Fragment = (slice.content as any).constructor;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          const newFragment = Fragment.fromArray(newContent) as typeof slice.content;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
+          return new (slice.constructor as any)(newFragment, slice.openStart, slice.openEnd);
+        }
+
+        return slice;
       },
     },
     // Track content changes for title extraction
@@ -389,6 +611,23 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // properly tested because Playwright's keyboard simulation bypasses DOM events
   // when Electron's menu accelerators handle the shortcut.
   // TODO: Re-enable paste detection when a testable solution is found.
+
+  // Cache the active SD when the note changes
+  // This enables synchronous access in transformPasted for cross-SD image copying
+  useEffect(() => {
+    if (noteId) {
+      window.electronAPI.sd
+        .getActive()
+        .then((sdId) => {
+          activeSdIdRef.current = sdId;
+        })
+        .catch(() => {
+          activeSdIdRef.current = null;
+        });
+    } else {
+      activeSdIdRef.current = null;
+    }
+  }, [noteId]);
 
   // Keep noteIdRef in sync with noteId prop and handle note deselection
   useEffect(() => {
@@ -788,6 +1027,248 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     savedStateRef.current = null;
   }, [noteId]);
 
+  // DOM-level drop handler for image files
+  // We handle drops at the document level because:
+  // 1. ProseMirror's handleDrop prop doesn't get triggered by synthetic events
+  // 2. Native file drops from Finder often land on container elements, not the editor itself
+  // We check if the drop is within the editor container and handle it accordingly.
+  // If dropped in the container but below the editor content, append to the end.
+  useEffect(() => {
+    if (!editor) return;
+
+    // Reference to the editor DOM and container
+    const editorDom = editor.view.dom;
+    const dropZone = editorContainerRef.current; // The scrollable container with the editor
+
+    const handleDocumentDrop = async (event: DragEvent) => {
+      const dataTransfer = event.dataTransfer;
+      if (!dataTransfer) return;
+
+      // Check if the drop target is within the drop zone (editor container)
+      const target = event.target as HTMLElement;
+      const isInDropZone = dropZone?.contains(target);
+      const isDirectlyOnEditor = editorDom.contains(target);
+
+      console.log(
+        '[TipTapEditor] Document drop - target:',
+        target,
+        'isInDropZone:',
+        isInDropZone,
+        'isDirectlyOnEditor:',
+        isDirectlyOnEditor
+      );
+
+      if (!isInDropZone) {
+        console.log('[TipTapEditor] Drop not in drop zone, ignoring');
+        return;
+      }
+
+      // Determine where to insert: at cursor if on editor, at end if on container
+      const insertAtEnd = !isDirectlyOnEditor;
+      console.log('[TipTapEditor] Insert at end:', insertAtEnd);
+
+      // Check both files and items (items works better in some contexts like tests)
+      const files = dataTransfer.files;
+      const items = dataTransfer.items;
+
+      // Debug logging
+      console.log('[TipTapEditor] Drop event - files:', files.length, 'items:', items.length);
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (f) {
+          console.log(`[TipTapEditor] File ${i}: name="${f.name}" type="${f.type}" size=${f.size}`);
+        }
+      }
+
+      // Collect files to process (with their MIME types)
+      // We use getImageMimeType which checks both file.type and filename extension,
+      // since files dropped from Finder on macOS often have empty file.type
+      const imageFiles: { file: File; mimeType: string }[] = [];
+
+      // First try files (preferred for native drops)
+      if (files.length > 0) {
+        for (const file of files) {
+          const mimeType = getImageMimeType(file);
+          if (mimeType) {
+            imageFiles.push({ file, mimeType });
+          }
+        }
+      }
+
+      // If no files found, try items (works better in synthetic events)
+      if (imageFiles.length === 0 && items.length > 0) {
+        for (const item of items) {
+          if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) {
+              const mimeType = getImageMimeType(file);
+              if (mimeType) {
+                imageFiles.push({ file, mimeType });
+              }
+            }
+          }
+        }
+      }
+
+      if (imageFiles.length === 0) return;
+
+      // Prevent default drop handling
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Process each image file
+      for (const { file, mimeType } of imageFiles) {
+        console.log(
+          '[TipTapEditor] DOM drop handler: Image detected, type:',
+          mimeType,
+          'name:',
+          file.name
+        );
+
+        try {
+          // Read as ArrayBuffer and save via IPC
+          const buffer = await file.arrayBuffer();
+
+          // Get the active SD to save the image in
+          const sdId = await window.electronAPI.sd.getActive();
+          if (!sdId) {
+            console.error('[TipTapEditor] No active SD, cannot save dropped image');
+            return;
+          }
+
+          const data = new Uint8Array(buffer);
+
+          console.log('[TipTapEditor] Saving dropped image, size:', data.length, 'type:', mimeType);
+
+          // Save the image via IPC (returns {imageId, filename})
+          const result = await window.electronAPI.image.save(sdId, data, mimeType);
+          console.log('[TipTapEditor] Dropped image saved with ID:', result.imageId);
+
+          // Insert the image node
+          const { state, dispatch } = editor.view;
+          const imageNode = state.schema.nodes['notecoveImage'];
+          if (imageNode) {
+            const node = imageNode.create({
+              imageId: result.imageId,
+              sdId,
+            });
+
+            let tr;
+            if (insertAtEnd) {
+              // Insert at the end of the document
+              const endPos = state.doc.content.size;
+              tr = state.tr.insert(endPos, node);
+              console.log('[TipTapEditor] Inserting image at end, position:', endPos);
+            } else {
+              // Insert at current cursor position
+              tr = state.tr.replaceSelectionWith(node);
+              console.log('[TipTapEditor] Inserting image at cursor');
+            }
+            dispatch(tr);
+            console.log('[TipTapEditor] Dropped image node inserted');
+          }
+        } catch (err) {
+          console.error('[TipTapEditor] Failed to save dropped image:', err);
+        }
+      }
+    };
+
+    // Wrap the async handler
+    const wrappedDropHandler = (event: Event) => {
+      void handleDocumentDrop(event as DragEvent);
+    };
+
+    // IMPORTANT: dragover must call preventDefault() for drop to fire
+    // We handle this at document level and check if over the drop zone
+    const handleDragOver = (event: DragEvent) => {
+      // Check if the drag contains files that might be images
+      const hasFiles = event.dataTransfer?.types.includes('Files');
+      if (!hasFiles) return;
+
+      // Check if over the drop zone (editor container)
+      const target = event.target as HTMLElement;
+      const isInDropZone = dropZone?.contains(target);
+
+      if (isInDropZone) {
+        event.preventDefault();
+        // Set dropEffect to show the user they can drop here
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = 'copy';
+        }
+      }
+    };
+
+    // Listen at document level to catch drops that land on container elements
+    document.addEventListener('drop', wrappedDropHandler);
+    document.addEventListener('dragover', handleDragOver);
+
+    return () => {
+      document.removeEventListener('drop', wrappedDropHandler);
+      document.removeEventListener('dragover', handleDragOver);
+    };
+  }, [editor]);
+
+  // Keyboard shortcut for inserting images via file picker (Cmd+Shift+I / Ctrl+Shift+I)
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      // Check for Cmd+Shift+I (Mac) or Ctrl+Shift+I (Windows/Linux)
+      // eslint-disable-next-line @typescript-eslint/prefer-includes, @typescript-eslint/no-deprecated
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? event.metaKey : event.ctrlKey;
+
+      if (modifier && event.shiftKey && event.key.toLowerCase() === 'i') {
+        event.preventDefault();
+        event.stopPropagation();
+
+        try {
+          // Get the active SD
+          const sdId = await window.electronAPI.sd.getActive();
+          if (!sdId) {
+            console.error('[TipTapEditor] No active SD, cannot pick images');
+            return;
+          }
+
+          // Open file picker and save selected images
+          const imageIds = await window.electronAPI.image.pickAndSave(sdId);
+
+          if (imageIds.length === 0) {
+            // User canceled or no valid images selected
+            return;
+          }
+
+          // Insert image nodes for each saved image
+          const { state, dispatch } = editor.view;
+          const imageNode = state.schema.nodes['notecoveImage'];
+          if (!imageNode) return;
+
+          let { tr } = state;
+          for (const imageId of imageIds) {
+            const node = imageNode.create({ imageId, sdId });
+            tr = tr.replaceSelectionWith(node);
+          }
+          dispatch(tr);
+
+          console.log('[TipTapEditor] Inserted', imageIds.length, 'images from file picker');
+        } catch (err) {
+          console.error('[TipTapEditor] Failed to pick and insert images:', err);
+        }
+      }
+    };
+
+    // Add listener to the editor DOM element
+    const editorDom = editor.view.dom;
+    const wrappedHandler = (event: Event) => {
+      void handleKeyDown(event as KeyboardEvent);
+    };
+    editorDom.addEventListener('keydown', wrappedHandler);
+
+    return () => {
+      editorDom.removeEventListener('keydown', wrappedHandler);
+    };
+  }, [editor]);
+
   // Manage link popover using tippy.js
   useEffect(() => {
     // Clean up existing popover
@@ -1075,6 +1556,47 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle image button click from toolbar
+   * Opens file picker and inserts selected images
+   */
+  const handleImageButtonClick = async () => {
+    if (!editor) return;
+
+    try {
+      // Get the active SD
+      const sdId = await window.electronAPI.sd.getActive();
+      if (!sdId) {
+        console.error('[TipTapEditor] No active SD, cannot pick images');
+        return;
+      }
+
+      // Open file picker and save selected images
+      const imageIds = await window.electronAPI.image.pickAndSave(sdId);
+
+      if (imageIds.length === 0) {
+        // User canceled or no valid images selected
+        return;
+      }
+
+      // Insert image nodes for each saved image
+      const { state, dispatch } = editor.view;
+      const imageNode = state.schema.nodes['notecoveImage'];
+      if (!imageNode) return;
+
+      let { tr } = state;
+      for (const imageId of imageIds) {
+        const node = imageNode.create({ imageId, sdId });
+        tr = tr.replaceSelectionWith(node);
+      }
+      dispatch(tr);
+
+      console.log('[TipTapEditor] Inserted', imageIds.length, 'images from toolbar button');
+    } catch (err) {
+      console.error('[TipTapEditor] Failed to pick and insert images:', err);
+    }
+  };
+
+  /**
    * Handle Cmd+K keyboard shortcut
    * Similar to handleLinkButtonClick but triggered from keyboard
    */
@@ -1237,6 +1759,214 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               color: theme.palette.info.main,
             },
           },
+          // NotecoveImage styling - all images are block-level and centered
+          '& figure.notecove-image': {
+            margin: '16px 0',
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%',
+            // Selected state
+            '&.ProseMirror-selectednode': {
+              outline: `2px solid ${theme.palette.primary.main}`,
+              outlineOffset: '4px',
+              borderRadius: '4px',
+            },
+          },
+          '& .notecove-image-container': {
+            position: 'relative',
+            display: 'inline-flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '100px',
+            minWidth: '100px',
+            backgroundColor: theme.palette.action.hover,
+            borderRadius: '4px',
+            overflow: 'hidden',
+          },
+          '& .notecove-image-element': {
+            maxWidth: '100%',
+            height: 'auto',
+            display: 'block',
+            borderRadius: '4px',
+          },
+          '& .notecove-image-loading': {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '24px',
+            color: theme.palette.text.secondary,
+            fontSize: '0.875rem',
+          },
+          '& .notecove-image-spinner': {
+            width: '24px',
+            height: '24px',
+            animation: 'notecove-spin 1s linear infinite',
+          },
+          '& .notecove-spinner-circle': {
+            stroke: theme.palette.primary.main,
+            strokeLinecap: 'round',
+            strokeDasharray: '50 50',
+          },
+          '@keyframes notecove-spin': {
+            from: { transform: 'rotate(0deg)' },
+            to: { transform: 'rotate(360deg)' },
+          },
+          '& .notecove-image-error': {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '24px',
+            color: theme.palette.error.main,
+            fontSize: '0.875rem',
+          },
+          '& .notecove-image-broken': {
+            width: '32px',
+            height: '32px',
+            color: theme.palette.error.main,
+          },
+          '& .notecove-image-error-id': {
+            fontSize: '0.75rem',
+            fontFamily: 'monospace',
+            color: theme.palette.text.disabled,
+            marginTop: '4px',
+          },
+          '& .notecove-image-caption': {
+            marginTop: '8px',
+            fontSize: '0.875rem',
+            color: theme.palette.text.secondary,
+            fontStyle: 'italic',
+            textAlign: 'center',
+            maxWidth: '100%',
+          },
+          // Dev-mode tooltip (only visible in development)
+          '& .notecove-image-dev-tooltip': {
+            position: 'absolute',
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: '8px',
+            padding: '8px 12px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            color: '#fff',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            borderRadius: '4px',
+            whiteSpace: 'nowrap',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          },
+          '& .notecove-dev-tooltip-row': {
+            padding: '2px 0',
+            '& strong': {
+              color: '#8be9fd',
+              marginRight: '8px',
+            },
+          },
+          // Resize handles container - only visible when image is selected
+          '& .notecove-image-resize-handles': {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            pointerEvents: 'none',
+            opacity: 0,
+            transition: 'opacity 0.15s ease',
+          },
+          // Show resize handles when image is selected
+          '& figure.notecove-image.ProseMirror-selectednode .notecove-image-resize-handles': {
+            opacity: 1,
+          },
+          // Individual resize handle
+          '& .notecove-image-resize-handle': {
+            position: 'absolute',
+            width: '12px',
+            height: '12px',
+            backgroundColor: theme.palette.primary.main,
+            border: `2px solid ${theme.palette.background.paper}`,
+            borderRadius: '2px',
+            pointerEvents: 'auto',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            transition: 'transform 0.1s ease',
+            '&:hover': {
+              transform: 'scale(1.2)',
+            },
+          },
+          // Corner positions
+          '& .notecove-image-resize-handle--nw': {
+            top: '-6px',
+            left: '-6px',
+            cursor: 'nw-resize',
+          },
+          '& .notecove-image-resize-handle--ne': {
+            top: '-6px',
+            right: '-6px',
+            cursor: 'ne-resize',
+          },
+          '& .notecove-image-resize-handle--sw': {
+            bottom: '-6px',
+            left: '-6px',
+            cursor: 'sw-resize',
+          },
+          '& .notecove-image-resize-handle--se': {
+            bottom: '-6px',
+            right: '-6px',
+            cursor: 'se-resize',
+          },
+          // Resize dimension tooltip
+          '& .notecove-image-resize-tooltip': {
+            position: 'absolute',
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: '8px',
+            padding: '4px 8px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            color: '#fff',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            borderRadius: '4px',
+            whiteSpace: 'nowrap',
+            zIndex: 1001,
+            pointerEvents: 'none',
+          },
+          // Resizing state - show cursor and prevent selection
+          '& figure.notecove-image--resizing': {
+            userSelect: 'none',
+            cursor: 'nw-resize',
+            '& *': {
+              cursor: 'inherit',
+            },
+          },
+          // Linked image indicator - subtle border and link icon
+          '& figure.notecove-image--linked': {
+            '& .notecove-image-container': {
+              position: 'relative',
+              '&::after': {
+                content: '"\\1F517"', // Link emoji
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                fontSize: '16px',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                borderRadius: '4px',
+                padding: '2px 6px',
+                opacity: 0.8,
+                pointerEvents: 'none',
+              },
+            },
+            '& .notecove-image-element': {
+              outline: `2px solid ${theme.palette.info.main}`,
+              outlineOffset: '-2px',
+            },
+          },
           // Search result highlighting
           '& .search-result': {
             backgroundColor:
@@ -1338,7 +2068,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         },
       }}
     >
-      <EditorToolbar editor={editor} onLinkButtonClick={handleLinkButtonClick} />
+      <EditorToolbar
+        editor={editor}
+        onLinkButtonClick={handleLinkButtonClick}
+        onImageButtonClick={() => void handleImageButtonClick()}
+      />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>
         <Chip
@@ -1399,6 +2133,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           onSearchTermChange={onSearchTermChange}
         />
       )}
+      {/* Image lightbox - renders via portal */}
+      <ImageLightbox />
+      {/* Image context menu */}
+      <ImageContextMenu />
     </Box>
   );
 };

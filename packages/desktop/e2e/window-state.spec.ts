@@ -150,6 +150,9 @@ test.describe('Window State Restoration', () => {
     // Close the app
     await closeApp();
 
+    // Wait for app to fully shut down and cleanup to complete
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // Relaunch with --fresh flag
     await launchApp(['--fresh']);
 

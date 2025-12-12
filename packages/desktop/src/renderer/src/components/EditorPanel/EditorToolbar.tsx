@@ -20,6 +20,7 @@ import {
   Redo,
   CheckBoxOutlineBlank,
   Link,
+  AddPhotoAlternate,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
 
@@ -30,9 +31,18 @@ export interface EditorToolbarProps {
    * Called with the button element for popover positioning
    */
   onLinkButtonClick?: (buttonElement: HTMLElement) => void;
+  /**
+   * Callback when the image button is clicked
+   * Called with the button element for popover positioning
+   */
+  onImageButtonClick?: (buttonElement: HTMLElement) => void;
 }
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, onLinkButtonClick }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({
+  editor,
+  onLinkButtonClick,
+  onImageButtonClick,
+}) => {
   if (!editor) {
     return null;
   }
@@ -43,6 +53,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, onLinkButt
   const handleLinkClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (onLinkButtonClick) {
       onLinkButtonClick(event.currentTarget);
+    }
+  };
+
+  /**
+   * Handle image button click
+   */
+  const handleImageClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (onImageButtonClick) {
+      onImageButtonClick(event.currentTarget);
     }
   };
 
@@ -191,6 +210,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, onLinkButt
       <Tooltip title="Horizontal Rule">
         <IconButton size="small" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
           <HorizontalRule fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Insert image (⌘⇧I)">
+        <IconButton
+          size="small"
+          onClick={handleImageClick}
+          aria-label="Insert image"
+          data-testid="image-button"
+        >
+          <AddPhotoAlternate fontSize="small" />
         </IconButton>
       </Tooltip>
 

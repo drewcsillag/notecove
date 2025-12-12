@@ -9,7 +9,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { BetterSqliteAdapter } from '../adapter';
 import { SqliteDatabase } from '../database';
-import type { NoteCache, FolderCache, User, UUID } from '@notecove/shared';
+import type { NoteCache, FolderCache, User, UUID, ImageCache } from '@notecove/shared';
 
 describe('SqliteDatabase', () => {
   let db: SqliteDatabase;
@@ -37,7 +37,7 @@ describe('SqliteDatabase', () => {
     it('should initialize database schema', async () => {
       // Database is initialized in beforeEach
       const version = await db.getCurrentVersion();
-      expect(version).toBe(7); // Version 7 adds instance_id to profile_presence_cache
+      expect(version).toBe(8); // Version 8 adds images table
     });
 
     it('should create all required tables', async () => {
@@ -645,6 +645,7 @@ describe('SqliteDatabase', () => {
 
     it('should get storage directory by UUID', async () => {
       const sd = await db.createStorageDir('sd-1', 'Storage 1', sdTestDir);
+      expect(sd.uuid).toBeDefined();
       const found = await db.getStorageDirByUuid(sd.uuid!);
       expect(found?.id).toBe('sd-1');
     });
@@ -1218,13 +1219,13 @@ describe('SqliteDatabase', () => {
   describe('Schema Version', () => {
     it('should get current version', async () => {
       const version = await db.getCurrentVersion();
-      expect(version).toBe(7);
+      expect(version).toBe(8);
     });
 
     it('should get version history', async () => {
       const history = await db.getVersionHistory();
       expect(history.length).toBeGreaterThan(0);
-      expect(history.some((v) => v.version === 7)).toBe(true);
+      expect(history.some((v) => v.version === 8)).toBe(true);
     });
   });
 
@@ -1495,6 +1496,259 @@ describe('SqliteDatabase', () => {
 
       const presences = await db.getProfilePresenceCacheBySd('sd-1');
       expect(presences).toEqual([]);
+    });
+  });
+
+  describe('Image Cache Operations', () => {
+    const testSdId = 'test-sd-for-images';
+
+    beforeEach(async () => {
+      // Create a storage directory for foreign key constraints
+      await db.createStorageDir(testSdId, 'Test SD', '/tmp/test-sd');
+    });
+
+    it('should insert and retrieve an image', async () => {
+      const image: ImageCache = {
+        id: 'img-001' as UUID,
+        sdId: testSdId,
+        filename: 'img-001.png',
+        mimeType: 'image/png',
+        width: 1920,
+        height: 1080,
+        size: 1024000,
+        created: Date.now(),
+      };
+
+      await db.upsertImage(image);
+      const retrieved = await db.getImage('img-001' as UUID);
+
+      expect(retrieved).not.toBeNull();
+      expect(retrieved?.id).toBe('img-001');
+      expect(retrieved?.filename).toBe('img-001.png');
+      expect(retrieved?.mimeType).toBe('image/png');
+      expect(retrieved?.width).toBe(1920);
+      expect(retrieved?.height).toBe(1080);
+      expect(retrieved?.size).toBe(1024000);
+    });
+
+    it('should handle null dimensions', async () => {
+      const image: ImageCache = {
+        id: 'img-002' as UUID,
+        sdId: testSdId,
+        filename: 'img-002.jpg',
+        mimeType: 'image/jpeg',
+        width: null,
+        height: null,
+        size: 512000,
+        created: Date.now(),
+      };
+
+      await db.upsertImage(image);
+      const retrieved = await db.getImage('img-002' as UUID);
+
+      expect(retrieved?.width).toBeNull();
+      expect(retrieved?.height).toBeNull();
+    });
+
+    it('should update existing image on upsert', async () => {
+      const image: ImageCache = {
+        id: 'img-003' as UUID,
+        sdId: testSdId,
+        filename: 'img-003.png',
+        mimeType: 'image/png',
+        width: 800,
+        height: 600,
+        size: 100000,
+        created: Date.now(),
+      };
+
+      await db.upsertImage(image);
+
+      // Update with new dimensions
+      const updated: ImageCache = {
+        ...image,
+        width: 1600,
+        height: 1200,
+        size: 200000,
+      };
+
+      await db.upsertImage(updated);
+      const retrieved = await db.getImage('img-003' as UUID);
+
+      expect(retrieved?.width).toBe(1600);
+      expect(retrieved?.height).toBe(1200);
+      expect(retrieved?.size).toBe(200000);
+    });
+
+    it('should get all images by SD', async () => {
+      const images: ImageCache[] = [
+        {
+          id: 'img-a' as UUID,
+          sdId: testSdId,
+          filename: 'img-a.png',
+          mimeType: 'image/png',
+          width: 100,
+          height: 100,
+          size: 10000,
+          created: Date.now() - 2000,
+        },
+        {
+          id: 'img-b' as UUID,
+          sdId: testSdId,
+          filename: 'img-b.jpg',
+          mimeType: 'image/jpeg',
+          width: 200,
+          height: 200,
+          size: 20000,
+          created: Date.now() - 1000,
+        },
+        {
+          id: 'img-c' as UUID,
+          sdId: testSdId,
+          filename: 'img-c.gif',
+          mimeType: 'image/gif',
+          width: 300,
+          height: 300,
+          size: 30000,
+          created: Date.now(),
+        },
+      ];
+
+      for (const img of images) {
+        await db.upsertImage(img);
+      }
+
+      const retrieved = await db.getImagesBySd(testSdId);
+      expect(retrieved).toHaveLength(3);
+      // Should be ordered by created DESC (newest first)
+      expect(retrieved[0]?.id).toBe('img-c');
+      expect(retrieved[1]?.id).toBe('img-b');
+      expect(retrieved[2]?.id).toBe('img-a');
+    });
+
+    it('should delete an image', async () => {
+      const image: ImageCache = {
+        id: 'img-delete' as UUID,
+        sdId: testSdId,
+        filename: 'img-delete.png',
+        mimeType: 'image/png',
+        width: 100,
+        height: 100,
+        size: 10000,
+        created: Date.now(),
+      };
+
+      await db.upsertImage(image);
+      expect(await db.getImage('img-delete' as UUID)).not.toBeNull();
+
+      await db.deleteImage('img-delete' as UUID);
+      expect(await db.getImage('img-delete' as UUID)).toBeNull();
+    });
+
+    it('should check if image exists', async () => {
+      const image: ImageCache = {
+        id: 'img-exists' as UUID,
+        sdId: testSdId,
+        filename: 'img-exists.png',
+        mimeType: 'image/png',
+        width: 100,
+        height: 100,
+        size: 10000,
+        created: Date.now(),
+      };
+
+      expect(await db.imageExists('img-exists' as UUID)).toBe(false);
+
+      await db.upsertImage(image);
+      expect(await db.imageExists('img-exists' as UUID)).toBe(true);
+
+      await db.deleteImage('img-exists' as UUID);
+      expect(await db.imageExists('img-exists' as UUID)).toBe(false);
+    });
+
+    it('should get image storage size', async () => {
+      const images: ImageCache[] = [
+        {
+          id: 'img-size-1' as UUID,
+          sdId: testSdId,
+          filename: 'img-size-1.png',
+          mimeType: 'image/png',
+          width: 100,
+          height: 100,
+          size: 1000,
+          created: Date.now(),
+        },
+        {
+          id: 'img-size-2' as UUID,
+          sdId: testSdId,
+          filename: 'img-size-2.png',
+          mimeType: 'image/png',
+          width: 100,
+          height: 100,
+          size: 2000,
+          created: Date.now(),
+        },
+        {
+          id: 'img-size-3' as UUID,
+          sdId: testSdId,
+          filename: 'img-size-3.png',
+          mimeType: 'image/png',
+          width: 100,
+          height: 100,
+          size: 3000,
+          created: Date.now(),
+        },
+      ];
+
+      for (const img of images) {
+        await db.upsertImage(img);
+      }
+
+      const totalSize = await db.getImageStorageSize(testSdId);
+      expect(totalSize).toBe(6000); // 1000 + 2000 + 3000
+    });
+
+    it('should get image count', async () => {
+      expect(await db.getImageCount(testSdId)).toBe(0);
+
+      const images: ImageCache[] = [
+        {
+          id: 'img-count-1' as UUID,
+          sdId: testSdId,
+          filename: 'img-count-1.png',
+          mimeType: 'image/png',
+          width: 100,
+          height: 100,
+          size: 1000,
+          created: Date.now(),
+        },
+        {
+          id: 'img-count-2' as UUID,
+          sdId: testSdId,
+          filename: 'img-count-2.png',
+          mimeType: 'image/png',
+          width: 100,
+          height: 100,
+          size: 2000,
+          created: Date.now(),
+        },
+      ];
+
+      for (const img of images) {
+        await db.upsertImage(img);
+      }
+
+      expect(await db.getImageCount(testSdId)).toBe(2);
+    });
+
+    it('should return 0 for storage size of SD with no images', async () => {
+      const size = await db.getImageStorageSize('empty-sd');
+      expect(size).toBe(0);
+    });
+
+    it('should return null for non-existent image', async () => {
+      const image = await db.getImage('non-existent' as UUID);
+      expect(image).toBeNull();
     });
   });
 });

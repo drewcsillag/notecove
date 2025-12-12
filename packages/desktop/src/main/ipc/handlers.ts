@@ -6,7 +6,17 @@
 
 /* eslint-disable @typescript-eslint/require-await */
 
-import { ipcMain, type IpcMainInvokeEvent, BrowserWindow, dialog } from 'electron';
+import {
+  ipcMain,
+  type IpcMainInvokeEvent,
+  BrowserWindow,
+  dialog,
+  net,
+  shell,
+  clipboard,
+  nativeImage,
+  app,
+} from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
@@ -14,9 +24,26 @@ import * as path from 'path';
 import * as os from 'os';
 import type { CRDTManager } from '../crdt';
 import type { NoteMetadata, SyncStatus, StaleSyncEntry } from './types';
-import type { Database, NoteCache, AppendLogManager, UUID, DeletionLogger } from '@notecove/shared';
+import type {
+  Database,
+  NoteCache,
+  AppendLogManager,
+  UUID,
+  DeletionLogger,
+  ImageCache,
+} from '@notecove/shared';
+import {
+  extractTags,
+  extractLinks,
+  ImageStorage,
+  getMimeTypeFromExtension,
+  getExtensionFromMimeType,
+  isSupportedMimeType,
+  SyncDirectoryStructure,
+} from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
-import { extractTags, extractLinks } from '@notecove/shared';
+import { ThumbnailGenerator, type ThumbnailResult } from '../thumbnail';
+import { ImageCleanupManager, type CleanupStats } from '../image-cleanup-manager';
 
 /**
  * Callback type for getting deletion logger by SD
@@ -68,6 +95,8 @@ export type WebBroadcastCallback = (channel: string, ...args: unknown[]) => void
 
 export class IPCHandlers {
   private webBroadcastCallback: WebBroadcastCallback | undefined;
+  private thumbnailGenerator: ThumbnailGenerator;
+  private imageCleanupManager: ImageCleanupManager;
 
   constructor(
     private crdtManager: CRDTManager,
@@ -92,6 +121,13 @@ export class IPCHandlers {
     private skipStaleEntry?: SkipStaleEntryFn,
     private retryStaleEntry?: RetryStaleEntryFn
   ) {
+    // Initialize thumbnail generator with cache directory in userData
+    const thumbnailCacheDir = path.join(app.getPath('userData'), 'thumbnails');
+    this.thumbnailGenerator = new ThumbnailGenerator(thumbnailCacheDir);
+
+    // Initialize image cleanup manager with database and thumbnail directory
+    this.imageCleanupManager = new ImageCleanupManager(database, thumbnailCacheDir);
+
     this.registerHandlers();
   }
 
@@ -169,6 +205,54 @@ export class IPCHandlers {
     } catch (err) {
       logMsg(`[auto-cleanup] Auto-cleanup failed: ${String(err)}`);
       // Don't throw - auto-cleanup failure should not prevent app startup
+    }
+  }
+
+  /**
+   * Run image cleanup: Delete orphaned images that are no longer referenced by any note
+   * Uses mark-and-sweep algorithm with 14-day grace period
+   * @param gracePeriodDays Number of days before an orphan can be deleted (default: 14)
+   * @param dryRun If true, just report what would be deleted without actually deleting
+   * @returns Cleanup statistics for all sync directories
+   */
+  async runImageCleanup(gracePeriodDays = 14, dryRun = false): Promise<CleanupStats[]> {
+    console.log(
+      `[image-cleanup] Starting image cleanup (grace period: ${gracePeriodDays} days, dryRun: ${dryRun})...`
+    );
+
+    try {
+      const allStats = await this.imageCleanupManager.cleanupAllSyncDirectories({
+        gracePeriodDays,
+        dryRun,
+      });
+
+      // Log summary
+      let totalDeleted = 0;
+      let totalOrphaned = 0;
+      let totalBytesReclaimed = 0;
+
+      for (const stats of allStats) {
+        totalDeleted += stats.deletedImages;
+        totalOrphaned += stats.orphanedImages;
+        totalBytesReclaimed += stats.bytesReclaimed;
+
+        console.log(
+          `[image-cleanup] SD "${stats.sdName}": ${stats.totalImages} images, ` +
+            `${stats.referencedImages} referenced, ${stats.orphanedImages} orphaned, ` +
+            `${stats.deletedImages} deleted, ${stats.skippedImages} skipped (within grace period)`
+        );
+      }
+
+      console.log(
+        `[image-cleanup] Summary: ${totalDeleted} images deleted, ` +
+          `${totalOrphaned} total orphans found, ${(totalBytesReclaimed / 1024 / 1024).toFixed(2)} MB reclaimed`
+      );
+
+      return allStats;
+    } catch (err) {
+      console.error(`[image-cleanup] Image cleanup failed: ${String(err)}`);
+      // Don't throw - cleanup failure should not prevent app startup
+      return [];
     }
   }
 
@@ -306,11 +390,35 @@ export class IPCHandlers {
     ipcMain.handle('export:createDirectory', this.handleCreateExportDirectory.bind(this));
     ipcMain.handle('export:getNotesForExport', this.handleGetNotesForExport.bind(this));
     ipcMain.handle('export:showCompletionMessage', this.handleShowExportCompletion.bind(this));
+    ipcMain.handle('export:copyImageFile', this.handleCopyImageForExport.bind(this));
 
     // Tools operations
     ipcMain.handle('tools:reindexNotes', this.handleReindexNotes.bind(this));
 
-    // Window operations (only register if createWindowFn provided)
+    // Image operations
+    ipcMain.handle('image:save', this.handleImageSave.bind(this));
+    ipcMain.handle('image:getDataUrl', this.handleImageGetDataUrl.bind(this));
+    ipcMain.handle('image:getPath', this.handleImageGetPath.bind(this));
+    ipcMain.handle('image:delete', this.handleImageDelete.bind(this));
+    ipcMain.handle('image:exists', this.handleImageExists.bind(this));
+    ipcMain.handle('image:getMetadata', this.handleImageGetMetadata.bind(this));
+    ipcMain.handle('image:list', this.handleImageList.bind(this));
+    ipcMain.handle('image:getStorageStats', this.handleImageGetStorageStats.bind(this));
+    ipcMain.handle('image:pickAndSave', this.handleImagePickAndSave.bind(this));
+    ipcMain.handle('image:downloadAndSave', this.handleImageDownloadAndSave.bind(this));
+    ipcMain.handle('image:copyToClipboard', this.handleImageCopyToClipboard.bind(this));
+    ipcMain.handle('image:saveAs', this.handleImageSaveAs.bind(this));
+    ipcMain.handle('image:openExternal', this.handleImageOpenExternal.bind(this));
+    ipcMain.handle('image:copyToSD', this.handleImageCopyToSD.bind(this));
+
+    // Thumbnail operations
+    ipcMain.handle('thumbnail:get', this.handleThumbnailGet.bind(this));
+    ipcMain.handle('thumbnail:getDataUrl', this.handleThumbnailGetDataUrl.bind(this));
+    ipcMain.handle('thumbnail:exists', this.handleThumbnailExists.bind(this));
+    ipcMain.handle('thumbnail:delete', this.handleThumbnailDelete.bind(this));
+    ipcMain.handle('thumbnail:generate', this.handleThumbnailGenerate.bind(this));
+
+    // Window and testing operations (only register if createWindowFn provided)
     if (this.createWindowFn) {
       ipcMain.handle('testing:createWindow', this.handleCreateWindow.bind(this));
       ipcMain.handle('window:openNoteInfo', this.handleOpenNoteInfoWindow.bind(this));
@@ -3040,6 +3148,709 @@ export class IPCHandlers {
   }
 
   // ============================================================================
+  // Image Handlers
+  // ============================================================================
+
+  /**
+   * Save an image to the media folder and database
+   */
+  private async handleImageSave(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    data: Uint8Array,
+    mimeType: string
+  ): Promise<{ imageId: string; filename: string }> {
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Validate MIME type
+    if (!isSupportedMimeType(mimeType)) {
+      throw new Error(`Unsupported image MIME type: ${mimeType}`);
+    }
+
+    // Create ImageStorage instance
+    const fsAdapter = new NodeFileSystemAdapter();
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: sdId,
+      path: sd.path,
+      label: sd.name,
+    });
+    const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+
+    // Save the image
+    const result = await imageStorage.saveImage(data, mimeType);
+
+    // Add to database cache
+    await this.database.upsertImage({
+      id: result.imageId,
+      sdId,
+      filename: result.filename,
+      mimeType,
+      width: null, // Will be populated when we add dimension detection
+      height: null,
+      size: data.length,
+      created: Date.now(),
+    });
+
+    // Log for debugging
+    console.log('[Image] Saved:', {
+      imageId: result.imageId,
+      sdId,
+      mimeType,
+      size: `${(data.length / 1024).toFixed(1)} KB`,
+    });
+
+    return result;
+  }
+
+  /**
+   * Get an image as a base64 data URL
+   */
+  private async handleImageGetDataUrl(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      return null;
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return null;
+    }
+
+    // Get the file path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    try {
+      // Read file and convert to base64
+      const data = await fs.readFile(imagePath);
+      const base64 = data.toString('base64');
+      return `data:${image.mimeType};base64,${base64}`;
+    } catch {
+      // File not found on disk
+      return null;
+    }
+  }
+
+  /**
+   * Get the file path for an image
+   */
+  private async handleImageGetPath(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      return null;
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return null;
+    }
+
+    return path.join(sd.path, 'media', image.filename);
+  }
+
+  /**
+   * Delete an image from disk and database
+   */
+  private async handleImageDelete(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      // Image not in database, nothing to delete
+      return;
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return;
+    }
+
+    // Delete file from disk
+    const imagePath = path.join(sd.path, 'media', image.filename);
+    await fs.rm(imagePath, { force: true });
+
+    // Delete from database
+    await this.database.deleteImage(imageId);
+
+    // Log for debugging
+    console.log('[Image] Deleted:', { imageId, sdId, filename: image.filename });
+  }
+
+  /**
+   * Check if an image exists in the database
+   */
+  private async handleImageExists(
+    _event: IpcMainInvokeEvent,
+    _sdId: string,
+    imageId: string
+  ): Promise<boolean> {
+    return await this.database.imageExists(imageId);
+  }
+
+  /**
+   * Get image metadata from database
+   */
+  private async handleImageGetMetadata(
+    _event: IpcMainInvokeEvent,
+    imageId: string
+  ): Promise<ImageCache | null> {
+    return await this.database.getImage(imageId);
+  }
+
+  /**
+   * List all images in an SD
+   */
+  private async handleImageList(_event: IpcMainInvokeEvent, sdId: string): Promise<ImageCache[]> {
+    return await this.database.getImagesBySd(sdId);
+  }
+
+  /**
+   * Get storage stats for images in an SD
+   */
+  private async handleImageGetStorageStats(
+    _event: IpcMainInvokeEvent,
+    sdId: string
+  ): Promise<{ totalSize: number; imageCount: number }> {
+    const totalSize = await this.database.getImageStorageSize(sdId);
+    const imageCount = await this.database.getImageCount(sdId);
+    return { totalSize, imageCount };
+  }
+
+  /**
+   * Open native file picker and save selected images to storage directory.
+   * Returns array of imageIds for successfully saved images.
+   */
+  private async handleImagePickAndSave(
+    _event: IpcMainInvokeEvent,
+    sdId: string
+  ): Promise<string[]> {
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Show file picker dialog
+    const result = await dialog.showOpenDialog({
+      title: 'Select Images',
+      buttonLabel: 'Insert',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        {
+          name: 'Images',
+          extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'heic', 'heif'],
+        },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return [];
+    }
+
+    // Create ImageStorage instance
+    const fsAdapter = new NodeFileSystemAdapter();
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: sdId,
+      path: sd.path,
+      label: sd.name,
+    });
+    const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+
+    const imageIds: string[] = [];
+
+    // Process each selected file
+    for (const filePath of result.filePaths) {
+      try {
+        // Read file data
+
+        const data = await fs.readFile(filePath);
+
+        // Determine MIME type from extension
+        const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+        const mimeType = getMimeTypeFromExtension(ext);
+
+        if (!mimeType || !isSupportedMimeType(mimeType)) {
+          console.warn(`[IPCHandlers] Skipping unsupported file type: ${filePath}`);
+          continue;
+        }
+
+        // Save the image
+
+        const saveResult = await imageStorage.saveImage(new Uint8Array(data), mimeType);
+
+        // Add to database cache
+        await this.database.upsertImage({
+          id: saveResult.imageId,
+          sdId,
+          filename: saveResult.filename,
+          mimeType,
+          width: null,
+          height: null,
+
+          size: data.length,
+          created: Date.now(),
+        });
+
+        imageIds.push(saveResult.imageId);
+      } catch (err) {
+        console.error(`[IPCHandlers] Failed to save image from ${filePath}:`, err);
+      }
+    }
+
+    return imageIds;
+  }
+
+  /**
+   * Download an image from a URL and save it to the media folder
+   *
+   * Supports:
+   * - Remote URLs (http://, https://) - downloaded via Electron's net.fetch
+   * - Local file URLs (file://) - read from local filesystem
+   */
+  private async handleImageDownloadAndSave(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    url: string
+  ): Promise<string> {
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    let imageData: Uint8Array;
+    let mimeType: string | null = null;
+
+    // Handle file:// URLs by reading from local filesystem
+    if (url.startsWith('file://')) {
+      const filePath = url.slice(7); // Remove 'file://' prefix
+
+      const data = await fs.readFile(filePath);
+
+      imageData = new Uint8Array(data);
+
+      // Infer MIME type from extension
+      const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+      mimeType = getMimeTypeFromExtension(ext);
+    } else {
+      // Remote URL - use Electron's net.fetch to avoid CORS issues
+      const response = await net.fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+
+      // Get MIME type from Content-Type header or infer from URL
+      mimeType = response.headers.get('content-type');
+
+      // If no Content-Type, try to infer from URL extension
+      if (!mimeType) {
+        const urlPath = new URL(url).pathname;
+        const ext = urlPath.split('.').pop()?.toLowerCase() ?? '';
+        mimeType = getMimeTypeFromExtension(ext);
+      }
+
+      const buffer = await response.arrayBuffer();
+      imageData = new Uint8Array(buffer);
+    }
+
+    // Validate MIME type
+    if (!mimeType || !isSupportedMimeType(mimeType)) {
+      throw new Error(`Unsupported image type: ${mimeType ?? 'unknown'}`);
+    }
+
+    // Create ImageStorage instance
+    const fsAdapter = new NodeFileSystemAdapter();
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: sdId,
+      path: sd.path,
+      label: sd.name,
+    });
+    const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+
+    // Save the image
+    const saveResult = await imageStorage.saveImage(imageData, mimeType);
+
+    // Add to database cache
+    await this.database.upsertImage({
+      id: saveResult.imageId,
+      sdId,
+      filename: saveResult.filename,
+      mimeType,
+      width: null,
+      height: null,
+      size: imageData.length,
+      created: Date.now(),
+    });
+
+    return saveResult.imageId;
+  }
+
+  /**
+   * Copy image to clipboard
+   */
+  private async handleImageCopyToClipboard(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      throw new Error(`Image not found: ${imageId}`);
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Get image path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    // Read image and copy to clipboard
+    const img = nativeImage.createFromPath(imagePath);
+    if (img.isEmpty()) {
+      throw new Error(`Failed to load image: ${imagePath}`);
+    }
+
+    clipboard.writeImage(img);
+    console.log(`[IPC] Image copied to clipboard: ${imageId}`);
+  }
+
+  /**
+   * Save image as... (with file dialog)
+   */
+  private async handleImageSaveAs(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      throw new Error(`Image not found: ${imageId}`);
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Get image path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    // Get file extension
+    const ext = path.extname(image.filename).slice(1);
+    const extFilter = ext ? { name: ext.toUpperCase(), extensions: [ext] } : undefined;
+
+    // Show save dialog
+    const dialogOptions: Electron.SaveDialogOptions = {
+      title: 'Save Image As',
+      defaultPath: image.filename,
+    };
+    if (extFilter) {
+      dialogOptions.filters = [extFilter, { name: 'All Files', extensions: ['*'] }];
+    }
+    const result = await dialog.showSaveDialog(dialogOptions);
+
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+
+    // Copy file to destination
+    await fs.copyFile(imagePath, result.filePath);
+    console.log(`[IPC] Image saved to: ${result.filePath}`);
+
+    return result.filePath;
+  }
+
+  /**
+   * Open image in external application
+   */
+  private async handleImageOpenExternal(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    // Get image metadata from database
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      throw new Error(`Image not found: ${imageId}`);
+    }
+
+    // Get SD from database
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      throw new Error(`Storage directory not found: ${sdId}`);
+    }
+
+    // Get image path
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    // Check if file exists
+    try {
+      await fs.access(imagePath);
+    } catch {
+      throw new Error(`Image file not found: ${imagePath}`);
+    }
+
+    // Open in default application
+    await shell.openPath(imagePath);
+    console.log(`[IPC] Image opened in external app: ${imageId}`);
+  }
+
+  /**
+   * Copy an image from one sync directory to another.
+   * Used when pasting content containing images across different SDs.
+   * Keeps the same imageId (UUIDs are globally unique).
+   */
+  private async handleImageCopyToSD(
+    _event: IpcMainInvokeEvent,
+    sourceSdId: string,
+    targetSdId: string,
+    imageId: string
+  ): Promise<{ success: boolean; imageId: string; alreadyExists?: boolean; error?: string }> {
+    // Validate source SD exists
+    const sourceSd = await this.database.getStorageDir(sourceSdId);
+    if (!sourceSd) {
+      throw new Error(`Source storage directory not found: ${sourceSdId}`);
+    }
+
+    // Validate target SD exists
+    const targetSd = await this.database.getStorageDir(targetSdId);
+    if (!targetSd) {
+      throw new Error(`Target storage directory not found: ${targetSdId}`);
+    }
+
+    // Check if image already exists in target SD (in database cache)
+    const existingImage = await this.database.getImage(imageId);
+    if (existingImage?.sdId === targetSdId) {
+      console.log(`[IPC] Image ${imageId} already exists in target SD ${targetSdId}`);
+      return { success: true, imageId, alreadyExists: true };
+    }
+
+    // Get source image metadata (from any SD that has it)
+    const sourceImage = existingImage ?? (await this.database.getImage(imageId));
+    if (!sourceImage) {
+      // Try to read directly from filesystem as fallback
+      console.log(`[IPC] Image ${imageId} not in database, checking filesystem in source SD`);
+    }
+
+    // Construct source path - look for any file with this imageId
+    const sourceMediaPath = path.join(sourceSd.path, 'media');
+    let sourceFilePath: string | null = null;
+    let mimeType = sourceImage?.mimeType;
+
+    try {
+      // List files in source media directory to find matching imageId
+      const files = await fs.readdir(sourceMediaPath);
+      for (const file of files) {
+        if (file.startsWith(imageId)) {
+          sourceFilePath = path.join(sourceMediaPath, file);
+          // Infer mime type from extension if not known
+          if (!mimeType) {
+            const ext = file.split('.').pop()?.toLowerCase();
+            mimeType = getMimeTypeFromExtension(ext ?? '') ?? 'image/png';
+          }
+          break;
+        }
+      }
+    } catch {
+      // Media directory doesn't exist or can't be read
+    }
+
+    if (!sourceFilePath) {
+      console.log(`[IPC] Source image file not found: ${imageId} in SD ${sourceSdId}`);
+      return { success: false, imageId, error: 'Source image not found' };
+    }
+
+    // Read source image data
+    let imageData: Buffer;
+    try {
+      imageData = await fs.readFile(sourceFilePath);
+    } catch {
+      console.log(`[IPC] Failed to read source image: ${sourceFilePath}`);
+      return { success: false, imageId, error: 'Failed to read source image' };
+    }
+
+    // Create target SD structure and save image
+    const fsAdapter = new NodeFileSystemAdapter();
+    const targetSdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: targetSdId,
+      path: targetSd.path,
+      label: targetSd.name,
+    });
+    const targetImageStorage = new ImageStorage(fsAdapter, targetSdStructure);
+
+    // Save with the same imageId
+    const filename = `${imageId}.${getExtensionFromMimeType(mimeType ?? 'image/png')}`;
+    const targetPath = path.join(targetSd.path, 'media', filename);
+
+    // Ensure media directory exists
+    await targetImageStorage.initializeMediaDir();
+
+    // Write the file
+    await fs.writeFile(targetPath, imageData);
+
+    // Add to database cache for target SD
+    await this.database.upsertImage({
+      id: imageId,
+      sdId: targetSdId,
+      filename,
+      mimeType: mimeType ?? 'image/png',
+      width: sourceImage?.width ?? null,
+      height: sourceImage?.height ?? null,
+      size: imageData.length,
+      created: Date.now(),
+    });
+
+    console.log(`[IPC] Image copied from SD ${sourceSdId} to ${targetSdId}: ${imageId}`);
+
+    return { success: true, imageId };
+  }
+
+  // ============================================================================
+  // Thumbnail Handlers
+  // ============================================================================
+
+  /**
+   * Get or generate a thumbnail for an image
+   * Returns the thumbnail path if it exists, or generates it first
+   */
+  private async handleThumbnailGet(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<ThumbnailResult | null> {
+    // Check if thumbnail already exists
+    if (await this.thumbnailGenerator.thumbnailExists(sdId, imageId)) {
+      const thumbPath = this.thumbnailGenerator.getThumbnailPath(sdId, imageId);
+      try {
+        const stats = await fs.stat(thumbPath);
+        // We don't have width/height cached, but we know the file exists
+        return {
+          path: thumbPath,
+          format: 'jpeg',
+          width: 0, // Unknown without reading
+          height: 0,
+          size: stats.size,
+        };
+      } catch {
+        // File might have been deleted, regenerate
+      }
+    }
+
+    // Generate thumbnail
+    const image = await this.database.getImage(imageId);
+    if (!image) {
+      return null;
+    }
+
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      return null;
+    }
+
+    const imagePath = path.join(sd.path, 'media', image.filename);
+
+    try {
+      const imageData = await fs.readFile(imagePath);
+      const result = await this.thumbnailGenerator.generateThumbnailForSd(
+        imageData,
+        image.mimeType,
+        sdId,
+        imageId
+      );
+      console.log(`[IPC] Generated thumbnail for ${imageId}: ${result.path}`);
+      return result;
+    } catch (error) {
+      console.error(`[IPC] Failed to generate thumbnail for ${imageId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get thumbnail as data URL (for rendering in browser)
+   */
+  private async handleThumbnailGetDataUrl(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<string | null> {
+    // First ensure thumbnail exists
+    const exists = await this.thumbnailGenerator.thumbnailExists(sdId, imageId);
+    if (!exists) {
+      // Try to generate it first
+      const result = await this.handleThumbnailGet(_event, sdId, imageId);
+      if (!result) {
+        return null;
+      }
+    }
+
+    return this.thumbnailGenerator.getThumbnailDataUrl(sdId, imageId);
+  }
+
+  /**
+   * Check if a thumbnail exists
+   */
+  private async handleThumbnailExists(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<boolean> {
+    return this.thumbnailGenerator.thumbnailExists(sdId, imageId);
+  }
+
+  /**
+   * Delete a thumbnail
+   */
+  private async handleThumbnailDelete(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<void> {
+    await this.thumbnailGenerator.deleteThumbnail(sdId, imageId);
+    console.log(`[IPC] Deleted thumbnail for ${imageId}`);
+  }
+
+  /**
+   * Force regenerate a thumbnail
+   */
+  private async handleThumbnailGenerate(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string
+  ): Promise<ThumbnailResult | null> {
+    // Delete existing thumbnail first
+    await this.thumbnailGenerator.deleteThumbnail(sdId, imageId);
+
+    // Generate new thumbnail
+    return this.handleThumbnailGet(_event, sdId, imageId);
+  }
+
+  // ============================================================================
   // History Handlers
   // ============================================================================
 
@@ -3289,6 +4100,7 @@ export class IPCHandlers {
       id: string;
       title: string;
       folderId: string | null;
+      sdId: string;
       content: unknown;
       isEmpty: boolean;
     }[]
@@ -3297,6 +4109,7 @@ export class IPCHandlers {
       id: string;
       title: string;
       folderId: string | null;
+      sdId: string;
       content: unknown;
       isEmpty: boolean;
     }[] = [];
@@ -3326,6 +4139,7 @@ export class IPCHandlers {
           id: noteId,
           title: note.title || 'Untitled',
           folderId: note.folderId,
+          sdId: note.sdId,
           content: jsonContent,
           isEmpty,
         });
@@ -3336,6 +4150,64 @@ export class IPCHandlers {
     }
 
     return results;
+  }
+
+  /**
+   * Copy an image file for export to a destination path
+   * @param sdId Source sync directory ID
+   * @param imageId Image ID to copy
+   * @param destPath Destination file path (including filename)
+   * @returns Object with success status, optional error message, and file extension
+   */
+  private async handleCopyImageForExport(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string,
+    destPath: string
+  ): Promise<{ success: boolean; error?: string; extension?: string }> {
+    try {
+      // Get image metadata from database
+      const image = await this.database.getImage(imageId);
+      if (!image) {
+        return { success: false, error: `Image ${imageId} not found in database` };
+      }
+
+      // Get SD from database
+      const sd = await this.database.getStorageDir(sdId);
+      if (!sd) {
+        return { success: false, error: `Sync directory ${sdId} not found` };
+      }
+
+      // Build source path
+      const sourcePath = path.join(sd.path, 'media', image.filename);
+
+      // Check if source exists
+      try {
+        await fs.access(sourcePath);
+      } catch {
+        return { success: false, error: `Image file not found at ${sourcePath}` };
+      }
+
+      // Get the file extension from the original filename
+      const extension = path.extname(image.filename);
+
+      // Build full destination path with extension
+      const fullDestPath = destPath + extension;
+
+      // Ensure destination directory exists
+      const destDir = path.dirname(fullDestPath);
+      await fs.mkdir(destDir, { recursive: true });
+
+      // Copy the file
+      await fs.copyFile(sourcePath, fullDestPath);
+
+      console.log(`[Export] Copied image ${imageId} to ${fullDestPath}`);
+      return { success: true, extension };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Export] Failed to copy image ${imageId}:`, message);
+      return { success: false, error: message };
+    }
   }
 
   /**

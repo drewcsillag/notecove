@@ -22,6 +22,7 @@ import type {
   NoteSyncState,
   FolderSyncState,
   CachedProfilePresence,
+  ImageCache,
 } from '@notecove/shared';
 import { SCHEMA_SQL, SCHEMA_VERSION, SdUuidManager } from '@notecove/shared';
 import type { UUID, FileSystemAdapter, FileStats } from '@notecove/shared';
@@ -168,6 +169,9 @@ export class SqliteDatabase implements Database {
 
     // Profile presence cache for Stale Sync UI
     await this.adapter.exec(SCHEMA_SQL.profilePresenceCache);
+
+    // Images table for image metadata (v8)
+    await this.adapter.exec(SCHEMA_SQL.images);
   }
 
   /**
@@ -196,6 +200,11 @@ export class SqliteDatabase implements Database {
     // Migration v6 -> v7: Add instance_id column to profile_presence_cache
     if (fromVersion < 7) {
       await this.migrateToVersion7();
+    }
+
+    // Migration v7 -> v8: Add images table
+    if (fromVersion < 8) {
+      await this.migrateToVersion8();
     }
 
     // Add future migrations here following the pattern:
@@ -231,6 +240,22 @@ export class SqliteDatabase implements Database {
     // Record the migration
     await this.recordVersion(7, 'Added instance_id column and index to profile_presence_cache');
     console.log('[Database] Migration to v7 complete');
+  }
+
+  /**
+   * Migration to version 8:
+   * - Add images table for image metadata caching
+   */
+  private async migrateToVersion8(): Promise<void> {
+    console.log('[Database] Migrating to v8: Adding images table');
+
+    // Create the images table (CREATE TABLE IF NOT EXISTS is safe)
+    await this.adapter.exec(SCHEMA_SQL.images);
+    console.log('[Database] Created/verified images table');
+
+    // Record the migration
+    await this.recordVersion(8, 'Added images table for image metadata');
+    console.log('[Database] Migration to v8 complete');
   }
 
   // ============================================================================
@@ -1443,5 +1468,112 @@ export class SqliteDatabase implements Database {
 
   async deleteProfilePresenceCacheBySd(sdId: string): Promise<void> {
     await this.adapter.exec('DELETE FROM profile_presence_cache WHERE sd_id = ?', [sdId]);
+  }
+
+  // ============================================================================
+  // Image Cache Operations
+  // ============================================================================
+
+  async upsertImage(image: ImageCache): Promise<void> {
+    await this.adapter.exec(
+      `INSERT INTO images (id, sd_id, filename, mime_type, width, height, size, created)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         sd_id = excluded.sd_id,
+         filename = excluded.filename,
+         mime_type = excluded.mime_type,
+         width = excluded.width,
+         height = excluded.height,
+         size = excluded.size,
+         created = excluded.created`,
+      [
+        image.id,
+        image.sdId,
+        image.filename,
+        image.mimeType,
+        image.width,
+        image.height,
+        image.size,
+        image.created,
+      ]
+    );
+  }
+
+  async getImage(imageId: UUID): Promise<ImageCache | null> {
+    const row = await this.adapter.get<{
+      id: string;
+      sd_id: string;
+      filename: string;
+      mime_type: string;
+      width: number | null;
+      height: number | null;
+      size: number;
+      created: number;
+    }>('SELECT * FROM images WHERE id = ?', [imageId]);
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      sdId: row.sd_id,
+      filename: row.filename,
+      mimeType: row.mime_type,
+      width: row.width,
+      height: row.height,
+      size: row.size,
+      created: row.created,
+    };
+  }
+
+  async getImagesBySd(sdId: string): Promise<ImageCache[]> {
+    const rows = await this.adapter.all<{
+      id: string;
+      sd_id: string;
+      filename: string;
+      mime_type: string;
+      width: number | null;
+      height: number | null;
+      size: number;
+      created: number;
+    }>('SELECT * FROM images WHERE sd_id = ? ORDER BY created DESC', [sdId]);
+
+    return rows.map((row) => ({
+      id: row.id,
+      sdId: row.sd_id,
+      filename: row.filename,
+      mimeType: row.mime_type,
+      width: row.width,
+      height: row.height,
+      size: row.size,
+      created: row.created,
+    }));
+  }
+
+  async deleteImage(imageId: UUID): Promise<void> {
+    await this.adapter.exec('DELETE FROM images WHERE id = ?', [imageId]);
+  }
+
+  async imageExists(imageId: UUID): Promise<boolean> {
+    const row = await this.adapter.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM images WHERE id = ?',
+      [imageId]
+    );
+    return (row?.count ?? 0) > 0;
+  }
+
+  async getImageStorageSize(sdId: string): Promise<number> {
+    const row = await this.adapter.get<{ total: number | null }>(
+      'SELECT SUM(size) as total FROM images WHERE sd_id = ?',
+      [sdId]
+    );
+    return row?.total ?? 0;
+  }
+
+  async getImageCount(sdId: string): Promise<number> {
+    const row = await this.adapter.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM images WHERE sd_id = ?',
+      [sdId]
+    );
+    return row?.count ?? 0;
   }
 }
