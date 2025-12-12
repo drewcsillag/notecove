@@ -1998,6 +1998,22 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               outlineOffset: '-2px',
             },
           },
+          // Text wrapping - float-based text flow around images
+          '& figure.notecove-image--wrap': {
+            margin: '0 0 1rem 0', // Remove top margin for wrapped images
+            '&.notecove-image--align-left': {
+              float: 'left',
+              marginRight: '1rem',
+            },
+            '&.notecove-image--align-right': {
+              float: 'right',
+              marginLeft: '1rem',
+            },
+          },
+          // Clear floats after consecutive wrapped images to prevent stacking
+          '& figure.notecove-image--wrap + figure.notecove-image--wrap': {
+            clear: 'both', // Prevent horizontal stacking of wrapped images
+          },
           // Search result highlighting
           '& .search-result': {
             backgroundColor:

@@ -24,6 +24,7 @@ import {
   FormControlLabel,
   Radio,
   Box,
+  Checkbox,
 } from '@mui/material';
 import type { ImageNodeAttrs } from './extensions/Image';
 
@@ -67,6 +68,7 @@ export function ImagePropertiesDialog({
   const [alignment, setAlignment] = useState<'left' | 'center' | 'right'>(attrs.alignment);
   const [linkHref, setLinkHref] = useState(attrs.linkHref ?? '');
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [wrap, setWrap] = useState(attrs.wrap);
 
   // Reset form when dialog opens with new attrs
   useEffect(() => {
@@ -76,8 +78,19 @@ export function ImagePropertiesDialog({
       setAlignment(attrs.alignment);
       setLinkHref(attrs.linkHref ?? '');
       setLinkError(null);
+      setWrap(attrs.wrap);
     }
   }, [open, attrs]);
+
+  // Wrap is only available for block images with left/right alignment
+  const isWrapDisabled = attrs.display === 'inline' || alignment === 'center';
+
+  // Auto-disable wrap when alignment changes to center
+  useEffect(() => {
+    if (alignment === 'center') {
+      setWrap(false);
+    }
+  }, [alignment]);
 
   // Validate link URL on blur
   const handleLinkBlur = useCallback(() => {
@@ -101,9 +114,10 @@ export function ImagePropertiesDialog({
       caption,
       alignment,
       linkHref: linkHref.trim() || null,
+      wrap,
     });
     onClose();
-  }, [alt, caption, alignment, linkHref, onSave, onClose]);
+  }, [alt, caption, alignment, linkHref, wrap, onSave, onClose]);
 
   // Handle cancel
   const handleCancel = useCallback(() => {
@@ -173,6 +187,31 @@ export function ImagePropertiesDialog({
               </Box>
             )}
           </FormControl>
+
+          {/* Text Wrapping - only for block images with left/right alignment */}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={wrap}
+                onChange={(e) => {
+                  setWrap(e.target.checked);
+                }}
+                disabled={isWrapDisabled}
+                inputProps={{
+                  'aria-label': 'Wrap text around image',
+                }}
+              />
+            }
+            label="Wrap text around image"
+            disabled={isWrapDisabled}
+          />
+          {isWrapDisabled && (
+            <Box sx={{ ml: 4, mt: -1, color: 'text.secondary', fontSize: '0.75rem' }}>
+              {attrs.display === 'inline'
+                ? 'Text wrapping only applies to block images'
+                : 'Text wrapping requires left or right alignment'}
+            </Box>
+          )}
 
           {/* Link URL */}
           <TextField

@@ -28,6 +28,8 @@ import FormatAlignLeftIcon from '@mui/icons-material/FormatAlignLeft';
 import FormatAlignCenterIcon from '@mui/icons-material/FormatAlignCenter';
 import FormatAlignRightIcon from '@mui/icons-material/FormatAlignRight';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import WrapTextIcon from '@mui/icons-material/WrapText';
+import CheckIcon from '@mui/icons-material/Check';
 import { ImagePropertiesDialog } from './ImagePropertiesDialog';
 import type { ImageNodeAttrs } from './extensions/Image';
 
@@ -185,6 +187,13 @@ export function ImageContextMenu(): React.JSX.Element | null {
     [currentData, handleClose]
   );
 
+  // Toggle text wrapping
+  const handleToggleWrap = useCallback(() => {
+    if (!currentData) return;
+    currentData.onUpdateAttrs({ wrap: !currentData.attrs.wrap });
+    handleClose();
+  }, [currentData, handleClose]);
+
   // Open alignment submenu
   const handleAlignmentClick = (event: React.MouseEvent<HTMLLIElement>): void => {
     setAlignmentMenuAnchor(event.currentTarget);
@@ -285,6 +294,22 @@ export function ImageContextMenu(): React.JSX.Element | null {
           </ListItemIcon>
           <ListItemText>Alignment</ListItemText>
           <ChevronRightIcon fontSize="small" sx={{ ml: 2 }} />
+        </MenuItem>
+
+        <MenuItem
+          onClick={handleToggleWrap}
+          disabled={
+            currentData?.attrs.display === 'inline' || currentData?.attrs.alignment === 'center'
+          }
+        >
+          <ListItemIcon>
+            {currentData?.attrs.wrap ? (
+              <CheckIcon fontSize="small" />
+            ) : (
+              <WrapTextIcon fontSize="small" />
+            )}
+          </ListItemIcon>
+          <ListItemText>Wrap Text</ListItemText>
         </MenuItem>
       </Menu>
 

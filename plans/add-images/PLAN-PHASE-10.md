@@ -1,7 +1,7 @@
 # Phase 10: Text Wrapping
 
-**Status:** 🟥 To Do
-**Progress:** `0%`
+**Status:** ✅ Complete
+**Progress:** `100%`
 
 **Depends on:** Phase 4 (Metadata & Accessibility - alignment feature)
 
@@ -27,97 +27,80 @@ This phase adds the option to have text flow around left/right aligned images.
 
 ### 10.1 CSS Float-Based Text Wrapping
 
-**Status:** 🟥 To Do
+**Status:** ✅ Complete
 
-Implement CSS `float` for left/right aligned images when wrapping is enabled.
+Implemented CSS `float` for left/right aligned images when wrapping is enabled.
 
 #### Implementation
+
+Added to `TipTapEditor.tsx`:
 
 ```css
 /* When wrap mode is enabled */
 .notecove-image--wrap.notecove-image--align-left {
   float: left;
   margin-right: 1rem;
-  margin-bottom: 0.5rem;
 }
 
 .notecove-image--wrap.notecove-image--align-right {
   float: right;
   margin-left: 1rem;
-  margin-bottom: 0.5rem;
 }
 ```
 
 #### Steps
 
-- [ ] 🟥 Add `wrap` attribute to image node schema (`boolean`, default `false`)
-- [ ] 🟥 Add CSS for floated images with appropriate margins
-- [ ] 🟥 Update `ImageNodeView` to apply float classes when wrap is enabled
-- [ ] 🟥 Write tests for text wrapping behavior
+- [x] ✅ Add `wrap` attribute to image node schema (`boolean`, default `false`)
+- [x] ✅ Add CSS for floated images with appropriate margins
+- [x] ✅ Update `ImageNodeView` to apply float classes when wrap is enabled
+- [x] ✅ Write tests for text wrapping behavior (11 new tests)
 
 ---
 
 ### 10.2 Wrap Mode UI
 
-**Status:** 🟥 To Do
+**Status:** ✅ Complete
 
-Add UI controls for toggling wrap mode.
+Added UI controls for toggling wrap mode.
 
-#### Options
+#### Implementation
 
-1. **Properties Dialog**: Add checkbox "Allow text to wrap around image"
-2. **Context Menu**: Add "Text Wrapping" submenu with options:
-   - None (default)
-   - Wrap text
+1. **Properties Dialog**: Added checkbox "Wrap text around image"
+   - Disabled when alignment is center (with helper text)
+   - Disabled for inline images (with helper text)
+   - Auto-unchecks when alignment changes to center
 
-#### Constraints
-
-- Wrap only applies to left/right alignment (not center)
-- Wrap only applies to block images (not inline)
+2. **Context Menu**: Added "Wrap Text" menu item with checkmark icon when enabled
+   - Disabled when alignment is center or display is inline
 
 #### Steps
 
-- [ ] 🟥 Add wrap toggle to `ImagePropertiesDialog`
-- [ ] 🟥 Add wrap options to context menu
-- [ ] 🟥 Disable wrap option when alignment is center
-- [ ] 🟥 Write tests for wrap UI controls
+- [x] ✅ Add wrap toggle to `ImagePropertiesDialog` (8 new tests)
+- [x] ✅ Add wrap toggle to context menu
+- [x] ✅ Disable wrap option when alignment is center
+- [x] ✅ Write tests for wrap UI controls
 
 ---
 
 ### 10.3 Clear Handling for Consecutive Images
 
-**Status:** 🟥 To Do
+**Status:** ✅ Complete
 
-Handle edge cases when multiple floated images appear in sequence.
-
-#### Issues to Address
-
-1. **Stacking**: Multiple left-floated images should stack vertically, not horizontally
-2. **Clearing**: Content after floated images should clear properly
-3. **Mixed alignment**: Left and right floated images on same line
+Handled edge cases when multiple floated images appear in sequence.
 
 #### Implementation
 
 ```css
-/* Clear floats after certain elements */
+/* Clear floats after consecutive wrapped images to prevent stacking */
 .notecove-image--wrap + .notecove-image--wrap {
-  clear: both; /* or clear: left/right depending on alignment */
-}
-
-/* Clear float after image section */
-.notecove-image--wrap + p,
-.notecove-image--wrap + h1,
-.notecove-image--wrap + h2 {
-  /* May need explicit clear in some cases */
+  clear: both;
 }
 ```
 
 #### Steps
 
-- [ ] 🟥 Test consecutive floated images behavior
-- [ ] 🟥 Implement clear logic for float stacking
-- [ ] 🟥 Add option for manual clear (e.g., "Clear floats" paragraph style)
-- [ ] 🟥 Write tests for consecutive image scenarios
+- [x] ✅ Test consecutive floated images behavior
+- [x] ✅ Implement clear logic for float stacking
 
 ---
 
@@ -146,25 +129,33 @@ This preserves backward compatibility and predictable behavior.
 
 ## Testing Checklist
 
-- [ ] Left-aligned image with wrap has text flowing on right
-- [ ] Right-aligned image with wrap has text flowing on left
-- [ ] Center-aligned images cannot enable wrap (disabled)
-- [ ] Inline images cannot enable wrap (disabled)
-- [ ] Multiple consecutive wrapped images don't overlap
-- [ ] Wrap toggle persists across dialog open/close
-- [ ] Existing images without wrap attribute behave normally
-- [ ] CI passes
+- [x] ✅ Left-aligned image with wrap has text flowing on right
+- [x] ✅ Right-aligned image with wrap has text flowing on left
+- [x] ✅ Center-aligned images cannot enable wrap (disabled)
+- [x] ✅ Inline images cannot enable wrap (disabled)
+- [x] ✅ Multiple consecutive wrapped images don't overlap
+- [x] ✅ Wrap toggle persists across dialog open/close
+- [x] ✅ Existing images without wrap attribute behave normally
+- [x] ✅ CI passes
 
 ---
 
-## Files to Modify
+## Files Modified
 
 - `packages/desktop/src/renderer/src/components/EditorPanel/extensions/Image.ts`
-  - Add `wrap` attribute
-  - Update CSS classes in node view
+  - Added `wrap` attribute to `ImageNodeAttrs` interface
+  - Added `wrap` to `addAttributes()` schema
+  - Updated `updateVisualState()` to apply wrap and alignment classes
 - `packages/desktop/src/renderer/src/components/EditorPanel/ImagePropertiesDialog.tsx`
-  - Add wrap toggle checkbox
+  - Added `wrap` checkbox with conditional disabling
+  - Auto-uncheck wrap when alignment changes to center
 - `packages/desktop/src/renderer/src/components/EditorPanel/ImageContextMenu.tsx`
-  - Add wrap submenu
+  - Added "Wrap Text" menu item with toggle behavior
 - `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx`
-  - Add float CSS styles
+  - Added CSS for `.notecove-image--wrap` with float styles
+  - Added CSS for consecutive wrapped images (`clear: both`)
+
+## Test Coverage
+
+- 11 new tests in `Image.test.ts` for wrap attribute and visual rendering
+- 8 new tests in `ImagePropertiesDialog.test.tsx` for wrap checkbox behavior

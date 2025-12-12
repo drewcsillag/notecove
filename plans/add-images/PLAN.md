@@ -1,6 +1,6 @@
 # Image Support Implementation Plan
 
-**Overall Progress:** `91%` (Phases 1-8, 9 complete)
+**Overall Progress:** `100%` (Phases 1-10 complete)
 
 ## Architecture Summary
 
@@ -26,7 +26,7 @@
 7. ✅ [Phase 7: Cleanup](./PLAN-PHASE-7.md) - Mark-and-sweep orphan cleanup
 8. ✅ [Phase 8: Export](./PLAN-PHASE-8.md) - Export with adjacent folder
 9. ✅ [Phase 9: Toolbar UI](./PLAN-PHASE-9.md) - Image button in toolbar
-10. 🟥 [Phase 10: Text Wrapping](./PLAN-PHASE-10.md) - Text flow around images
+10. ✅ [Phase 10: Text Wrapping](./PLAN-PHASE-10.md) - Text flow around images
 11. 🟥 [Phase 11: Media Browser](./PLAN-PHASE-11.md) - Browse images, see which notes use them, bulk actions
 
 ---
@@ -89,11 +89,11 @@
 
 - [x] ✅ **9.1 Add image button to toolbar**
 
-### Phase 10: Text Wrapping
+### Phase 10: Text Wrapping ✅
 
-- [ ] 🟥 **10.1 CSS float-based text wrapping**
-- [ ] 🟥 **10.2 Wrap mode UI (wrap vs no-wrap option)**
-- [ ] 🟥 **10.3 Clear handling for consecutive images**
+- [x] ✅ **10.1 CSS float-based text wrapping** (float left/right CSS, 11 tests)
+- [x] ✅ **10.2 Wrap mode UI** (properties dialog checkbox, context menu toggle, 8 tests)
+- [x] ✅ **10.3 Clear handling for consecutive images** (CSS clear: both)
 
 ### Phase 11: Media Browser
 

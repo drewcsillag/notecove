@@ -157,6 +157,7 @@ describe('NotecoveImage Extension', () => {
         width: '50%',
         linkHref: null,
         display: 'block',
+        wrap: false,
       };
 
       editor.commands.setContent({
@@ -353,6 +354,239 @@ describe('NotecoveImage Extension', () => {
 
       const node = editor.state.doc.firstChild;
       expect(node?.attrs['display']).toBe('block');
+    });
+  });
+
+  describe('Text Wrapping (wrap attribute)', () => {
+    it('should have wrap attribute with default false', () => {
+      const imageType = editor.schema.nodes['notecoveImage'];
+      const attrs = imageType?.spec.attrs as Record<string, { default: unknown }> | undefined;
+
+      expect(attrs?.['wrap']).toBeDefined();
+      expect(attrs?.['wrap']?.default).toBe(false);
+    });
+
+    it('should accept wrap: true attribute', () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'wrap-test-id',
+              sdId: 'sd-1',
+              alignment: 'left',
+              wrap: true,
+            },
+          },
+        ],
+      });
+
+      const node = editor.state.doc.firstChild;
+      expect(node?.attrs['wrap']).toBe(true);
+    });
+
+    it('should serialize wrap attribute to HTML', () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'wrap-test-id',
+              sdId: 'sd-1',
+              wrap: true,
+            },
+          },
+        ],
+      });
+
+      const html = editor.getHTML();
+      expect(html).toContain('data-wrap="true"');
+    });
+
+    it('should not serialize wrap attribute when false (default)', () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'no-wrap-test-id',
+              sdId: 'sd-1',
+              wrap: false,
+            },
+          },
+        ],
+      });
+
+      const html = editor.getHTML();
+      expect(html).not.toContain('data-wrap');
+    });
+
+    it('should parse wrap attribute from HTML', () => {
+      const html = `
+        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed" data-wrap="true">
+          <img alt="Test" />
+        </figure>
+      `;
+
+      editor.commands.setContent(html);
+
+      const node = editor.state.doc.firstChild;
+      expect(node?.attrs['wrap']).toBe(true);
+    });
+
+    it('should default to wrap: false when parsing HTML without wrap attribute', () => {
+      const html = `
+        <figure class="notecove-image" data-image-id="parsed-id" data-sd-id="sd-parsed">
+          <img alt="Test" />
+        </figure>
+      `;
+
+      editor.commands.setContent(html);
+
+      const node = editor.state.doc.firstChild;
+      expect(node?.attrs['wrap']).toBe(false);
+    });
+  });
+
+  describe('Text Wrapping Visual Rendering', () => {
+    let container: HTMLDivElement;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      editor.destroy();
+      editor = new Editor({
+        element: container,
+        extensions: [
+          StarterKit.configure({
+            history: false,
+          }),
+          NotecoveImage,
+        ],
+      });
+    });
+
+    afterEach(() => {
+      document.body.removeChild(container);
+    });
+
+    it('should apply wrap class when wrap is true and alignment is left', async () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'wrap-left-test',
+              sdId: 'sd-1',
+              alignment: 'left',
+              wrap: true,
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const wrapper = container.querySelector('.notecove-image');
+      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(true);
+      expect(wrapper?.classList.contains('notecove-image--align-left')).toBe(true);
+    });
+
+    it('should apply wrap class when wrap is true and alignment is right', async () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'wrap-right-test',
+              sdId: 'sd-1',
+              alignment: 'right',
+              wrap: true,
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const wrapper = container.querySelector('.notecove-image');
+      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(true);
+      expect(wrapper?.classList.contains('notecove-image--align-right')).toBe(true);
+    });
+
+    it('should NOT apply wrap class when wrap is true but alignment is center', async () => {
+      // Wrap doesn't make sense with center alignment - text can't flow around centered content
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'wrap-center-test',
+              sdId: 'sd-1',
+              alignment: 'center',
+              wrap: true,
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const wrapper = container.querySelector('.notecove-image');
+      // Wrap class should NOT be applied for center alignment
+      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(false);
+    });
+
+    it('should NOT apply wrap class when wrap is false', async () => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'no-wrap-test',
+              sdId: 'sd-1',
+              alignment: 'left',
+              wrap: false,
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const wrapper = container.querySelector('.notecove-image');
+      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(false);
+    });
+
+    it('should NOT apply wrap class when display is inline (even if wrap is true)', async () => {
+      // Inline images don't support wrapping - they're already inline with text
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'inline-wrap-test',
+              sdId: 'sd-1',
+              alignment: 'left',
+              display: 'inline',
+              wrap: true,
+            },
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const wrapper = container.querySelector('.notecove-image');
+      expect(wrapper?.classList.contains('notecove-image--wrap')).toBe(false);
     });
   });
 

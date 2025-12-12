@@ -72,6 +72,8 @@ export interface ImageNodeAttrs {
   linkHref: string | null;
   /** Display mode: block (standalone) or inline (within text flow) */
   display: 'block' | 'inline';
+  /** Enable text wrapping around the image (only for left/right aligned block images) */
+  wrap: boolean;
 }
 
 /**
@@ -220,6 +222,14 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         },
         renderHTML: (attributes: ImageNodeAttrs) => {
           return { 'data-display': attributes.display };
+        },
+      },
+      wrap: {
+        default: false,
+        parseHTML: (element) => element.getAttribute('data-wrap') === 'true',
+        renderHTML: (attributes: ImageNodeAttrs) => {
+          if (!attributes.wrap) return {};
+          return { 'data-wrap': 'true' };
         },
       },
     };
@@ -563,6 +573,7 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
           width,
           display,
           linkHref,
+          wrap,
         } = nodeAttrs;
 
         // Update display mode
@@ -570,8 +581,16 @@ export const NotecoveImage = Node.create<NotecoveImageOptions>({
         wrapper.classList.toggle('notecove-image--inline', display === 'inline');
         wrapper.classList.toggle('notecove-image--block', display === 'block');
 
-        // Update alignment
+        // Update alignment classes
         wrapper.dataset['alignment'] = alignment;
+        wrapper.classList.toggle('notecove-image--align-left', alignment === 'left');
+        wrapper.classList.toggle('notecove-image--align-center', alignment === 'center');
+        wrapper.classList.toggle('notecove-image--align-right', alignment === 'right');
+
+        // Update wrap mode (only applies to block images with left/right alignment)
+        // Wrap doesn't make sense for center alignment (can't flow text around centered content)
+        const shouldWrap = wrap && display === 'block' && alignment !== 'center';
+        wrapper.classList.toggle('notecove-image--wrap', shouldWrap);
 
         // Update width
         if (width) {
