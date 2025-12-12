@@ -707,6 +707,7 @@ export const webClient: typeof window.electronAPI = {
     createDirectory: browserNotAvailable('export.createDirectory'),
     getNotesForExport: browserNotAvailable('export.getNotesForExport'),
     showCompletionMessage: browserNotAvailable('export.showCompletionMessage'),
+    copyImageFile: browserNotAvailable('export.copyImageFile'),
   },
 
   testing: {

@@ -383,6 +383,7 @@ export class IPCHandlers {
     ipcMain.handle('export:createDirectory', this.handleCreateExportDirectory.bind(this));
     ipcMain.handle('export:getNotesForExport', this.handleGetNotesForExport.bind(this));
     ipcMain.handle('export:showCompletionMessage', this.handleShowExportCompletion.bind(this));
+    ipcMain.handle('export:copyImageFile', this.handleCopyImageForExport.bind(this));
 
     // Tools operations
     ipcMain.handle('tools:reindexNotes', this.handleReindexNotes.bind(this));
@@ -3955,6 +3956,7 @@ export class IPCHandlers {
       id: string;
       title: string;
       folderId: string | null;
+      sdId: string;
       content: unknown;
       isEmpty: boolean;
     }[]
@@ -3963,6 +3965,7 @@ export class IPCHandlers {
       id: string;
       title: string;
       folderId: string | null;
+      sdId: string;
       content: unknown;
       isEmpty: boolean;
     }[] = [];
@@ -3992,6 +3995,7 @@ export class IPCHandlers {
           id: noteId,
           title: note.title || 'Untitled',
           folderId: note.folderId,
+          sdId: note.sdId,
           content: jsonContent,
           isEmpty,
         });
@@ -4002,6 +4006,64 @@ export class IPCHandlers {
     }
 
     return results;
+  }
+
+  /**
+   * Copy an image file for export to a destination path
+   * @param sdId Source sync directory ID
+   * @param imageId Image ID to copy
+   * @param destPath Destination file path (including filename)
+   * @returns Object with success status, optional error message, and file extension
+   */
+  private async handleCopyImageForExport(
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    imageId: string,
+    destPath: string
+  ): Promise<{ success: boolean; error?: string; extension?: string }> {
+    try {
+      // Get image metadata from database
+      const image = await this.database.getImage(imageId);
+      if (!image) {
+        return { success: false, error: `Image ${imageId} not found in database` };
+      }
+
+      // Get SD from database
+      const sd = await this.database.getStorageDir(sdId);
+      if (!sd) {
+        return { success: false, error: `Sync directory ${sdId} not found` };
+      }
+
+      // Build source path
+      const sourcePath = path.join(sd.path, 'media', image.filename);
+
+      // Check if source exists
+      try {
+        await fs.access(sourcePath);
+      } catch {
+        return { success: false, error: `Image file not found at ${sourcePath}` };
+      }
+
+      // Get the file extension from the original filename
+      const extension = path.extname(image.filename);
+
+      // Build full destination path with extension
+      const fullDestPath = destPath + extension;
+
+      // Ensure destination directory exists
+      const destDir = path.dirname(fullDestPath);
+      await fs.mkdir(destDir, { recursive: true });
+
+      // Copy the file
+      await fs.copyFile(sourcePath, fullDestPath);
+
+      console.log(`[Export] Copied image ${imageId} to ${fullDestPath}`);
+      return { success: true, extension };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Export] Failed to copy image ${imageId}:`, message);
+      return { success: false, error: message };
+    }
   }
 
   /**

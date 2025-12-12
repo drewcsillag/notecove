@@ -564,6 +564,7 @@ declare global {
             id: string;
             title: string;
             folderId: string | null;
+            sdId: string;
             content: unknown;
             isEmpty: boolean;
           }[]
@@ -574,6 +575,11 @@ declare global {
           destinationPath: string,
           errors: string[]
         ) => Promise<void>;
+        copyImageFile: (
+          sdId: string,
+          imageId: string,
+          destPath: string
+        ) => Promise<{ success: boolean; error?: string; extension?: string }>;
       };
 
       testing: {

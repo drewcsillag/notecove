@@ -7,6 +7,8 @@ import {
   sanitizeFilename,
   truncateFilename,
   resolveFilenameCollision,
+  extractImageReferences,
+  replaceImagePlaceholders,
   type NoteTitleLookup,
 } from '../markdown-export';
 
@@ -773,5 +775,402 @@ describe('resolveFilenameCollision', () => {
     const usedNames = new Set(['myfile']); // lowercase in set - would match MyFile too
     const result = resolveFilenameCollision('MyFile', usedNames);
     expect(result).toBe('MyFile (2)');
+  });
+});
+
+describe('image export', () => {
+  const noopLookup: NoteTitleLookup = () => undefined;
+
+  describe('notecoveImage nodes', () => {
+    it('should export simple left-aligned image as markdown', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'abc123',
+              sdId: 'sd-1',
+              alt: 'Screenshot of dashboard',
+              caption: '',
+              alignment: 'left',
+              width: null,
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      // Simple left-aligned images use pure markdown syntax
+      expect(result).toBe('![Screenshot of dashboard]({ATTACHMENTS}/abc123)');
+    });
+
+    it('should export image with width as HTML (markdown has no width support)', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'abc123',
+              sdId: 'sd-1',
+              alt: 'Screenshot of dashboard',
+              caption: '',
+              alignment: 'center',
+              width: '50%',
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      // Images with width use HTML because markdown doesn't support width
+      expect(result).toContain('alt="Screenshot of dashboard"');
+      expect(result).toContain('abc123');
+      expect(result).toContain('width="50%"');
+    });
+
+    it('should export image with caption using HTML figure/figcaption', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-456',
+              sdId: 'sd-1',
+              alt: 'My photo',
+              caption: 'A beautiful sunset',
+              alignment: 'center',
+              width: null,
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toContain('<figure');
+      expect(result).toContain('<figcaption>A beautiful sunset</figcaption>');
+      expect(result).toContain('alt="My photo"');
+    });
+
+    it('should export centered image with center alignment style', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-center',
+              sdId: 'sd-1',
+              alt: 'Centered image',
+              caption: '',
+              alignment: 'center',
+              width: null,
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toContain('margin-left: auto');
+      expect(result).toContain('margin-right: auto');
+    });
+
+    it('should export left-aligned image with float:left style', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-left',
+              sdId: 'sd-1',
+              alt: 'Left image',
+              caption: '',
+              alignment: 'left',
+              width: null,
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      // Left aligned images should have no special style (natural flow)
+      expect(result).not.toContain('margin-left: auto');
+    });
+
+    it('should export right-aligned image with float:right style', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-right',
+              sdId: 'sd-1',
+              alt: 'Right image',
+              caption: '',
+              alignment: 'right',
+              width: null,
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toContain('margin-left: auto');
+    });
+
+    it('should export image with link wrapper', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-link',
+              sdId: 'sd-1',
+              alt: 'Linked image',
+              caption: '',
+              alignment: 'center',
+              width: null,
+              linkHref: 'https://example.com',
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toContain('<a href="https://example.com"');
+      expect(result).toContain('</a>');
+    });
+
+    it('should include width attribute when specified', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-width',
+              sdId: 'sd-1',
+              alt: 'Sized image',
+              caption: '',
+              alignment: 'center',
+              width: '300px',
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toContain('width="300px"');
+    });
+
+    it('should handle image without sdId (missing image)', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'missing-img',
+              sdId: null,
+              alt: 'Missing image',
+              caption: '',
+              alignment: 'center',
+              width: null,
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      // Should still export a placeholder reference
+      expect(result).toContain('missing-img');
+    });
+
+    it('should extract all image references for export', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Some text' }],
+          },
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-1',
+              sdId: 'sd-1',
+              alt: 'First image',
+              caption: '',
+              alignment: 'center',
+              width: null,
+              linkHref: null,
+            },
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'More text' }],
+          },
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-2',
+              sdId: 'sd-1',
+              alt: 'Second image',
+              caption: '',
+              alignment: 'left',
+              width: null,
+              linkHref: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toContain('img-1');
+      expect(result).toContain('img-2');
+      expect(result).toContain('First image');
+      expect(result).toContain('Second image');
+    });
+  });
+
+  describe('extractImageReferences', () => {
+    it('should extract single image reference', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-123',
+              sdId: 'sd-1',
+              alt: 'My image',
+            },
+          },
+        ],
+      };
+      const refs = extractImageReferences(content);
+      expect(refs).toHaveLength(1);
+      expect(refs[0]).toEqual({
+        imageId: 'img-123',
+        sdId: 'sd-1',
+        alt: 'My image',
+      });
+    });
+
+    it('should extract multiple image references', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: { imageId: 'img-1', sdId: 'sd-1', alt: 'First' },
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Some text' }],
+          },
+          {
+            type: 'notecoveImage',
+            attrs: { imageId: 'img-2', sdId: 'sd-1', alt: 'Second' },
+          },
+        ],
+      };
+      const refs = extractImageReferences(content);
+      expect(refs).toHaveLength(2);
+      expect(refs[0]?.imageId).toBe('img-1');
+      expect(refs[1]?.imageId).toBe('img-2');
+    });
+
+    it('should return empty array for content without images', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'No images here' }],
+          },
+        ],
+      };
+      const refs = extractImageReferences(content);
+      expect(refs).toHaveLength(0);
+    });
+
+    it('should skip images without imageId', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: { imageId: null, sdId: 'sd-1', alt: 'Broken' },
+          },
+        ],
+      };
+      const refs = extractImageReferences(content);
+      expect(refs).toHaveLength(0);
+    });
+
+    it('should handle nested content', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'blockquote',
+            content: [
+              {
+                type: 'notecoveImage',
+                attrs: { imageId: 'nested-img', sdId: 'sd-1', alt: 'Nested' },
+              },
+            ],
+          },
+        ],
+      };
+      const refs = extractImageReferences(content);
+      expect(refs).toHaveLength(1);
+      expect(refs[0]?.imageId).toBe('nested-img');
+    });
+  });
+
+  describe('replaceImagePlaceholders', () => {
+    it('should replace single placeholder', () => {
+      const markdown = '![Alt]({ATTACHMENTS}/img-123)';
+      const extensions = new Map([['img-123', '.png']]);
+      const result = replaceImagePlaceholders(markdown, 'Note_attachments', extensions);
+      expect(result).toBe('![Alt](Note_attachments/img-123.png)');
+    });
+
+    it('should replace multiple placeholders', () => {
+      const markdown = '![One]({ATTACHMENTS}/img-1)\n\n![Two]({ATTACHMENTS}/img-2)';
+      const extensions = new Map([
+        ['img-1', '.png'],
+        ['img-2', '.jpg'],
+      ]);
+      const result = replaceImagePlaceholders(markdown, 'My Note_attachments', extensions);
+      expect(result).toContain('My%20Note_attachments/img-1.png');
+      expect(result).toContain('My%20Note_attachments/img-2.jpg');
+    });
+
+    it('should URL-encode folder names with spaces', () => {
+      const markdown = '![Alt]({ATTACHMENTS}/img-1)';
+      const extensions = new Map([['img-1', '.png']]);
+      const result = replaceImagePlaceholders(markdown, 'My Note Title_attachments', extensions);
+      expect(result).toBe('![Alt](My%20Note%20Title_attachments/img-1.png)');
+    });
+
+    it('should handle missing extension gracefully', () => {
+      const markdown = '![Alt]({ATTACHMENTS}/unknown-img)';
+      const extensions = new Map<string, string>();
+      const result = replaceImagePlaceholders(markdown, 'Note_attachments', extensions);
+      expect(result).toBe('![Alt](Note_attachments/unknown-img)');
+    });
+
+    it('should handle HTML img tags', () => {
+      const markdown = '<img src="{ATTACHMENTS}/img-1" alt="Test" />';
+      const extensions = new Map([['img-1', '.png']]);
+      const result = replaceImagePlaceholders(markdown, 'Attachments', extensions);
+      expect(result).toBe('<img src="Attachments/img-1.png" alt="Test" />');
+    });
   });
 });

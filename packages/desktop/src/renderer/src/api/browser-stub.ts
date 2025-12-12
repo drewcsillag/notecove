@@ -206,6 +206,7 @@ export const browserApiStub: typeof window.electronAPI = {
     createDirectory: notImplemented('export.createDirectory'),
     getNotesForExport: notImplemented('export.getNotesForExport'),
     showCompletionMessage: notImplemented('export.showCompletionMessage'),
+    copyImageFile: notImplemented('export.copyImageFile'),
   },
 
   testing: {

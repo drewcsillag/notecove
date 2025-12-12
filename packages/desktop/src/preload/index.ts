@@ -1180,6 +1180,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         id: string;
         title: string;
         folderId: string | null;
+        sdId: string;
         content: unknown;
         isEmpty: boolean;
       }[]
@@ -1189,6 +1190,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
           id: string;
           title: string;
           folderId: string | null;
+          sdId: string;
           content: unknown;
           isEmpty: boolean;
         }[]
@@ -1206,6 +1208,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         destinationPath,
         errors
       ) as Promise<void>,
+    copyImageFile: (
+      sdId: string,
+      imageId: string,
+      destPath: string
+    ): Promise<{ success: boolean; error?: string; extension?: string }> =>
+      ipcRenderer.invoke('export:copyImageFile', sdId, imageId, destPath) as Promise<{
+        success: boolean;
+        error?: string;
+        extension?: string;
+      }>,
   },
 
   // Testing operations (only available if main process registered handler)

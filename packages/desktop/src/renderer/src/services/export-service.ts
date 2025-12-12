@@ -9,6 +9,8 @@ import type { JSONContent } from '@tiptap/core';
 import {
   prosemirrorToMarkdown,
   generateNoteFilename,
+  extractImageReferences,
+  replaceImagePlaceholders,
   type NoteTitleLookup,
   type ExportProgress,
   type ExportResult,
@@ -25,6 +27,7 @@ export interface NoteForExport {
   id: string;
   title: string;
   folderId: string | null;
+  sdId?: string;
   content: JSONContent;
   isEmpty: boolean;
 }
@@ -79,14 +82,48 @@ export async function exportNotes(
     }
 
     try {
-      // Convert to markdown
-      const markdown = prosemirrorToMarkdown(note.content, noteTitleLookup);
+      // Convert to markdown (with image placeholders)
+      let markdown = prosemirrorToMarkdown(note.content, noteTitleLookup);
 
-      // Generate filename
+      // Extract image references
+      const imageRefs = extractImageReferences(note.content);
+
+      // Generate filename (without extension for now)
       const filename = generateNoteFilename(note.title, existingFilenames);
-      const filePath = `${destinationPath}/${filename}`;
+      const baseFilename = filename.replace(/\.md$/, '');
 
-      // Write file
+      // If note has images, copy them to attachments folder
+      const imageExtensions = new Map<string, string>();
+      if (imageRefs.length > 0 && note.sdId) {
+        const attachmentsFolderName = `${baseFilename}_attachments`;
+        const attachmentsPath = `${destinationPath}/${attachmentsFolderName}`;
+
+        // Copy each image
+        for (const ref of imageRefs) {
+          const destImagePath = `${attachmentsPath}/${ref.imageId}`;
+          const result = await window.electronAPI.export.copyImageFile(
+            note.sdId,
+            ref.imageId,
+            destImagePath
+          );
+
+          if (result.success && result.extension) {
+            imageExtensions.set(ref.imageId, result.extension);
+          } else if (!result.success) {
+            // Log warning but continue - missing images shouldn't break export
+            console.warn(`[Export] Failed to copy image ${ref.imageId}: ${result.error}`);
+            errors.push(
+              `Warning: Image "${ref.alt || ref.imageId}" not found for note "${note.title}"`
+            );
+          }
+        }
+
+        // Replace placeholders with actual paths
+        markdown = replaceImagePlaceholders(markdown, attachmentsFolderName, imageExtensions);
+      }
+
+      // Write markdown file
+      const filePath = `${destinationPath}/${filename}`;
       const result = await window.electronAPI.export.writeFile(filePath, markdown);
       if (result.success) {
         exportedCount++;
@@ -209,14 +246,48 @@ export async function exportAllNotes(
       }
       const existingFilenames = filenamesByDir.get(targetDir) ?? new Set<string>();
 
-      // Convert to markdown
-      const markdown = prosemirrorToMarkdown(note.content, noteTitleLookup);
+      // Convert to markdown (with image placeholders)
+      let markdown = prosemirrorToMarkdown(note.content, noteTitleLookup);
+
+      // Extract image references
+      const imageRefs = extractImageReferences(note.content);
 
       // Generate filename
       const filename = generateNoteFilename(note.title, existingFilenames);
-      const filePath = `${targetDir}/${filename}`;
+      const baseFilename = filename.replace(/\.md$/, '');
 
-      // Write file
+      // If note has images, copy them to attachments folder
+      const imageExtensions = new Map<string, string>();
+      if (imageRefs.length > 0 && note.sdId) {
+        const attachmentsFolderName = `${baseFilename}_attachments`;
+        const attachmentsPath = `${targetDir}/${attachmentsFolderName}`;
+
+        // Copy each image
+        for (const ref of imageRefs) {
+          const destImagePath = `${attachmentsPath}/${ref.imageId}`;
+          const result = await window.electronAPI.export.copyImageFile(
+            note.sdId,
+            ref.imageId,
+            destImagePath
+          );
+
+          if (result.success && result.extension) {
+            imageExtensions.set(ref.imageId, result.extension);
+          } else if (!result.success) {
+            // Log warning but continue - missing images shouldn't break export
+            console.warn(`[Export] Failed to copy image ${ref.imageId}: ${result.error}`);
+            errors.push(
+              `Warning: Image "${ref.alt || ref.imageId}" not found for note "${note.title}"`
+            );
+          }
+        }
+
+        // Replace placeholders with actual paths
+        markdown = replaceImagePlaceholders(markdown, attachmentsFolderName, imageExtensions);
+      }
+
+      // Write markdown file
+      const filePath = `${targetDir}/${filename}`;
       const result = await window.electronAPI.export.writeFile(filePath, markdown);
       if (result.success) {
         exportedCount++;
