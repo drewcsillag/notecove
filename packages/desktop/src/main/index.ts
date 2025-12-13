@@ -204,10 +204,14 @@ function createWindow(options?: {
   minimal?: boolean;
   syncStatus?: boolean;
   noteInfo?: boolean;
+  storageInspector?: boolean;
+  sdPicker?: boolean;
   targetNoteId?: string;
   noteTitle?: string;
   parentWindow?: BrowserWindow;
   sdId?: string;
+  sdPath?: string;
+  sdName?: string;
   bounds?: { x: number; y: number; width: number; height: number };
   isMaximized?: boolean;
   isFullScreen?: boolean;
@@ -219,13 +223,31 @@ function createWindow(options?: {
   }
 
   // Determine window dimensions
-  const defaultWidth =
-    options?.syncStatus || options?.noteInfo ? 900 : options?.minimal ? 800 : 1200;
-  const defaultHeight = options?.syncStatus || options?.noteInfo ? 600 : 800;
+  const defaultWidth = options?.storageInspector
+    ? 1200
+    : options?.sdPicker
+      ? 500
+      : options?.syncStatus || options?.noteInfo
+        ? 900
+        : options?.minimal
+          ? 800
+          : 1200;
+  const defaultHeight = options?.storageInspector
+    ? 800
+    : options?.sdPicker
+      ? 400
+      : options?.syncStatus || options?.noteInfo
+        ? 600
+        : 800;
 
   // Determine window title
-  const windowTitle =
-    options?.noteInfo && options.noteTitle ? `Note Info - ${options.noteTitle}` : getWindowTitle();
+  const windowTitle = options?.storageInspector
+    ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}`
+    : options?.sdPicker
+      ? 'Select Storage Directory'
+      : options?.noteInfo && options.noteTitle
+        ? `Note Info - ${options.noteTitle}`
+        : getWindowTitle();
 
   // Create the browser window with saved bounds or defaults
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -258,13 +280,23 @@ function createWindow(options?: {
   const newWindow = new BrowserWindow(windowOptions);
 
   // Determine window type for state tracking
-  const windowType: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' = options?.syncStatus
+  const windowType:
+    | 'main'
+    | 'minimal'
+    | 'syncStatus'
+    | 'noteInfo'
+    | 'storageInspector'
+    | 'sdPicker' = options?.syncStatus
     ? 'syncStatus'
     : options?.noteInfo
       ? 'noteInfo'
-      : options?.minimal
-        ? 'minimal'
-        : 'main';
+      : options?.storageInspector
+        ? 'storageInspector'
+        : options?.sdPicker
+          ? 'sdPicker'
+          : options?.minimal
+            ? 'minimal'
+            : 'main';
 
   // Register window with state manager (if available)
   let windowId: string | undefined;
@@ -336,8 +368,23 @@ function createWindow(options?: {
   if (options?.noteInfo) {
     params.set('noteInfo', 'true');
   }
+  if (options?.storageInspector) {
+    params.set('storageInspector', 'true');
+  }
+  if (options?.sdPicker) {
+    params.set('sdPicker', 'true');
+  }
   if (options?.targetNoteId) {
     params.set('targetNoteId', options.targetNoteId);
+  }
+  if (options?.sdId) {
+    params.set('sdId', options.sdId);
+  }
+  if (options?.sdPath) {
+    params.set('sdPath', options.sdPath);
+  }
+  if (options?.sdName) {
+    params.set('sdName', options.sdName);
   }
 
   const queryString = params.toString();
@@ -1931,6 +1978,35 @@ function createMenu(): void {
             if (mainWindow) {
               mainWindow.webContents.send('menu:syncStatus');
             }
+          },
+        },
+        {
+          label: 'Storage Inspector',
+          click: () => {
+            void (async () => {
+              if (!database) return;
+
+              // Get all SDs
+              const sds = await database.getAllStorageDirs();
+              if (sds.length === 0) return;
+
+              // If only one SD, open inspector directly
+              if (sds.length === 1 && sds[0]) {
+                const sd = sds[0];
+                createWindow({
+                  storageInspector: true,
+                  sdId: sd.id,
+                  sdPath: sd.path,
+                  sdName: sd.name,
+                });
+                return;
+              }
+
+              // Multiple SDs - open picker window
+              createWindow({
+                sdPicker: true,
+              });
+            })();
           },
         },
         { type: 'separator' },
