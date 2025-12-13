@@ -34,6 +34,12 @@ jest.mock('crypto', () => ({
   }),
 }));
 
+// Mock fs/promises module for Note Info tests
+jest.mock('fs/promises', () => ({
+  ...jest.requireActual('fs/promises'),
+  readdir: jest.fn().mockResolvedValue([]),
+}));
+
 // Reset counter before each test
 beforeEach(async () => {
   uuidCounter = 0;
@@ -51,7 +57,6 @@ import type { Database } from '@notecove/shared';
 import type { FolderData } from '@notecove/shared';
 import type { ConfigManager } from '../../config/manager';
 import type { NoteMoveManager } from '../../note-move-manager';
-import * as fs from 'fs/promises';
 import * as Y from 'yjs';
 import { BrowserWindow } from 'electron';
 
@@ -3787,8 +3792,7 @@ describe('IPCHandlers - SD Management', () => {
           'instance-B': { sequence: 50, offset: 0, file: 'b.crdtlog' },
         });
 
-        // Mock file system to return empty arrays (no files to count)
-        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+        // fs.readdir is mocked at module level to return empty array
 
         const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
 
@@ -3817,7 +3821,7 @@ describe('IPCHandlers - SD Management', () => {
         mockCRDTManager.getDocument.mockReturnValue(undefined);
         mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
 
-        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+        // fs.readdir is mocked at module level to return empty array
 
         const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
 
@@ -3861,7 +3865,7 @@ describe('IPCHandlers - SD Management', () => {
         mockCRDTManager.getDocument.mockReturnValue(undefined);
         mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
 
-        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+        // fs.readdir is mocked at module level to return empty array
 
         const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
 
@@ -3891,7 +3895,7 @@ describe('IPCHandlers - SD Management', () => {
         mockCRDTManager.getDocument.mockReturnValue(undefined);
         mockAppendLogManager.getNoteVectorClock.mockReturnValue({});
 
-        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+        // fs.readdir is mocked at module level to return empty array
 
         const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
 
@@ -3936,7 +3940,7 @@ describe('IPCHandlers - SD Management', () => {
           updatedAt: Date.now(),
         });
 
-        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+        // fs.readdir is mocked at module level to return empty array
 
         const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
 
@@ -3990,7 +3994,7 @@ describe('IPCHandlers - SD Management', () => {
           updatedAt: Date.now(),
         });
 
-        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+        // fs.readdir is mocked at module level to return empty array
 
         const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
 
@@ -4044,7 +4048,7 @@ describe('IPCHandlers - SD Management', () => {
           vectorClock: diskVectorClock,
         });
 
-        jest.spyOn(fs, 'readdir').mockResolvedValue([]);
+        // fs.readdir is mocked at module level to return empty array
 
         const result = await (handlers as any).handleGetNoteInfo(mockEvent, 'note-1');
 
@@ -4064,8 +4068,12 @@ describe('IPCHandlers - SD Management', () => {
     describe('window:openNoteInfo', () => {
       it('should return error when note does not exist', async () => {
         mockDatabase.getNote.mockResolvedValue(null);
+        const mockEventWithSender = { sender: {} } as any;
 
-        const result = await (handlers as any).handleOpenNoteInfoWindow(mockEvent, 'non-existent');
+        const result = await (handlers as any).handleOpenNoteInfoWindow(
+          mockEventWithSender,
+          'non-existent'
+        );
 
         expect(result).toEqual({
           success: false,
@@ -4073,22 +4081,25 @@ describe('IPCHandlers - SD Management', () => {
         });
       });
 
-      it('should return error when no focused window', async () => {
+      it('should return error when parent window cannot be determined', async () => {
         mockDatabase.getNote.mockResolvedValue({
           id: 'note-1',
           sdId: 'test-sd',
           title: 'Test Note',
         });
 
-        // Mock BrowserWindow.getFocusedWindow to return null
+        // Mock BrowserWindow.fromWebContents to return null (no window found)
+        const mockEventWithSender = { sender: {} } as any;
+        BrowserWindow.fromWebContents = jest.fn().mockReturnValue(null);
 
-        BrowserWindow.getFocusedWindow = jest.fn().mockReturnValue(null);
-
-        const result = await (handlers as any).handleOpenNoteInfoWindow(mockEvent, 'note-1');
+        const result = await (handlers as any).handleOpenNoteInfoWindow(
+          mockEventWithSender,
+          'note-1'
+        );
 
         expect(result).toEqual({
           success: false,
-          error: 'No focused window',
+          error: 'Could not determine parent window',
         });
       });
 
@@ -4099,23 +4110,26 @@ describe('IPCHandlers - SD Management', () => {
           title: 'Test Note',
         });
 
-        // Mock BrowserWindow.getFocusedWindow to return a window
-        const mockFocusedWindow = { id: 1 };
-
-        BrowserWindow.getFocusedWindow = jest.fn().mockReturnValue(mockFocusedWindow);
+        // Mock BrowserWindow.fromWebContents to return a window
+        const mockParentWindow = { id: 1 };
+        const mockEventWithSender = { sender: {} } as any;
+        BrowserWindow.fromWebContents = jest.fn().mockReturnValue(mockParentWindow);
 
         // Set up createWindowFn mock
         const mockCreateWindowFn = jest.fn();
         (handlers as any).createWindowFn = mockCreateWindowFn;
 
-        const result = await (handlers as any).handleOpenNoteInfoWindow(mockEvent, 'note-1');
+        const result = await (handlers as any).handleOpenNoteInfoWindow(
+          mockEventWithSender,
+          'note-1'
+        );
 
         expect(result).toEqual({ success: true });
         expect(mockCreateWindowFn).toHaveBeenCalledWith({
           noteInfo: true,
           targetNoteId: 'note-1',
           noteTitle: 'Test Note',
-          parentWindow: mockFocusedWindow,
+          parentWindow: mockParentWindow,
         });
       });
     });

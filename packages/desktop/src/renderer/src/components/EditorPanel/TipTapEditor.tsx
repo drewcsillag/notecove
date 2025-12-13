@@ -1208,17 +1208,18 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, [editor]);
 
-  // Keyboard shortcut for inserting images via file picker (Cmd+Shift+I / Ctrl+Shift+I)
+  // Keyboard shortcut for inserting images via file picker (Cmd+Shift+M / Ctrl+Shift+M)
+  // Note: "M" for Media - avoids conflict with Cmd+Shift+I which is Note Info
   useEffect(() => {
     if (!editor) return;
 
     const handleKeyDown = async (event: KeyboardEvent) => {
-      // Check for Cmd+Shift+I (Mac) or Ctrl+Shift+I (Windows/Linux)
+      // Check for Cmd+Shift+M (Mac) or Ctrl+Shift+M (Windows/Linux)
       // eslint-disable-next-line @typescript-eslint/prefer-includes, @typescript-eslint/no-deprecated
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifier = isMac ? event.metaKey : event.ctrlKey;
 
-      if (modifier && event.shiftKey && event.key.toLowerCase() === 'i') {
+      if (modifier && event.shiftKey && event.key.toLowerCase() === 'm') {
         event.preventDefault();
         event.stopPropagation();
 

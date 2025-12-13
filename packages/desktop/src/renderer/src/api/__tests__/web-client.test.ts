@@ -713,11 +713,11 @@ describe('Web Client', () => {
           text: () =>
             Promise.resolve(
               JSON.stringify({
-                noteId: 'note-1',
+                id: 'note-1',
                 title: 'Test',
                 folderId: 'folder-1',
-                createdAt: 12345,
-                modifiedAt: 67890,
+                created: 12345,
+                modified: 67890,
                 deleted: false,
               })
             ),
@@ -727,6 +727,8 @@ describe('Web Client', () => {
 
         expect(metadata.noteId).toBe('note-1');
         expect(metadata.title).toBe('Test');
+        expect(metadata.createdAt).toBe(12345);
+        expect(metadata.modifiedAt).toBe(67890);
       });
 
       it('should list notes for root (no folder specified)', async () => {

@@ -2205,10 +2205,10 @@ export class IPCHandlers {
   /**
    * Window: Open Note Info window for a specific note
    * Creates a new window showing detailed information about the note.
-   * Requires a focused window (to set as parent) and validates the note exists.
+   * Uses the sender's window as parent. Validates the note exists.
    */
   private async handleOpenNoteInfoWindow(
-    _event: IpcMainInvokeEvent,
+    event: IpcMainInvokeEvent,
     noteId: string
   ): Promise<{ success: boolean; error?: string }> {
     // Validate note exists
@@ -2217,10 +2217,10 @@ export class IPCHandlers {
       return { success: false, error: 'Note not found' };
     }
 
-    // Get focused window to use as parent
-    const focusedWindow = BrowserWindow.getFocusedWindow();
-    if (!focusedWindow) {
-      return { success: false, error: 'No focused window' };
+    // Get the window that sent this IPC message (works even if window is not focused/shown)
+    const parentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!parentWindow) {
+      return { success: false, error: 'Could not determine parent window' };
     }
 
     // Create the Note Info window
@@ -2229,7 +2229,7 @@ export class IPCHandlers {
         noteInfo: true,
         targetNoteId: noteId,
         noteTitle: note.title,
-        parentWindow: focusedWindow,
+        parentWindow: parentWindow,
       });
     }
 

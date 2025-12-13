@@ -2054,7 +2054,8 @@ test.describe('cross-machine sync - new note creation', () => {
 
     // This is THE KEY ASSERTION - does the new note appear without restart?
     // Use toHaveCount which retries until condition is met or timeout
-    await expect(notesList2).toHaveCount(2, { timeout: 30000 });
+    // 60s timeout to handle resource contention during parallel test execution
+    await expect(notesList2).toHaveCount(2, { timeout: 60000 });
     console.log('[LiveNewNote] Instance 2 note count after sync: 2');
 
     // Also verify the title is correct

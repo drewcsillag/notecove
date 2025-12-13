@@ -56,6 +56,7 @@ Modified existing export functionality to handle images.
 #### Implementation Summary
 
 **Files Modified:**
+
 1. `markdown-export.ts` - Added `convertNotecoveImage()`, `extractImageReferences()`, `replaceImagePlaceholders()`
 2. `export-service.ts` - Updated to copy images and create attachments folders
 3. `handlers.ts` - Added `handleCopyImageForExport()` IPC handler
@@ -107,7 +108,11 @@ Modified existing export functionality to handle images.
 
 ```html
 <figure style="display: block; margin-left: auto; margin-right: auto">
-  <img src="path/to/image.png" alt="Alt text" style="display: block; margin-left: auto; margin-right: auto" />
+  <img
+    src="path/to/image.png"
+    alt="Alt text"
+    style="display: block; margin-left: auto; margin-right: auto"
+  />
   <figcaption>Caption text</figcaption>
 </figure>
 ```
@@ -139,12 +144,14 @@ Modified existing export functionality to handle images.
 ### Bulk Export
 
 ✅ Each note gets its own `_attachments` folder:
+
 - Self-contained exports
 - No sharing between notes
 
 ### Missing Images
 
 ✅ Handled gracefully:
+
 - Warning logged to console
 - Warning added to errors list (shown in completion dialog)
 - Export continues without failing

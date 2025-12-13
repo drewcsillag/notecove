@@ -10,12 +10,31 @@ import { resolve } from 'path';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { execSync } from 'child_process';
+
+// Run tests in this file serially to avoid Electron process conflicts
+test.describe.configure({ mode: 'serial' });
 
 let electronApp: ElectronApplication;
 let page: Page;
 let testUserDataDir: string;
 
+// Helper to kill any orphaned Electron processes from this test file
+function killOrphanedElectronProcesses(): void {
+  try {
+    // Kill any Electron processes that might be stuck from previous test runs
+    // This is aggressive but necessary to prevent cascade failures
+    if (process.platform === 'darwin') {
+      execSync('pkill -f "notecove-e2e-note-menu" 2>/dev/null || true', { stdio: 'ignore' });
+    }
+  } catch {
+    // Ignore errors - process might not exist
+  }
+}
+
 test.beforeEach(async () => {
+  // Kill any orphaned processes before starting
+  killOrphanedElectronProcesses();
   const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
 
   // Create a unique temporary directory for this test's userData
@@ -44,12 +63,23 @@ test.beforeEach(async () => {
 }, 60000);
 
 test.afterEach(async () => {
-  await electronApp.close();
+  // Robust cleanup - handle cases where app may have crashed
+  try {
+    if (electronApp) {
+      await electronApp.close().catch((err) => {
+        console.error('[E2E Note Menu] Failed to close Electron app:', err);
+      });
+    }
+  } catch (err) {
+    console.error('[E2E Note Menu] Error during app cleanup:', err);
+  }
 
   // Clean up the temporary user data directory
   try {
-    rmSync(testUserDataDir, { recursive: true, force: true });
-    console.log('[E2E Note Menu] Cleaned up test userData directory');
+    if (testUserDataDir) {
+      rmSync(testUserDataDir, { recursive: true, force: true });
+      console.log('[E2E Note Menu] Cleaned up test userData directory');
+    }
   } catch (err) {
     console.error('[E2E Note Menu] Failed to clean up test userData directory:', err);
   }
