@@ -23,8 +23,15 @@ import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
 import { NotecoveImage } from './extensions/Image';
+import {
+  NotecoveTable,
+  NotecoveTableRow,
+  NotecoveTableHeader,
+  NotecoveTableCell,
+} from './extensions/Table';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
+import { TableSizePickerDialog } from './TableSizePickerDialog';
 import { SearchPanel } from './SearchPanel';
 import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
@@ -142,6 +149,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   } | null>(null);
   const textAndUrlPopoverRef = useRef<TippyInstance | null>(null);
 
+  // Table size picker state
+  const [tableSizePickerAnchor, setTableSizePickerAnchor] = useState<HTMLElement | null>(null);
+
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
 
@@ -247,6 +257,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       WebLink,
       // Add NotecoveImage extension for image display
       NotecoveImage,
+      // Add Table extensions for table support
+      NotecoveTable,
+      NotecoveTableRow,
+      NotecoveTableHeader,
+      NotecoveTableCell,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
@@ -262,10 +277,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
       },
-      // Handle image paste from clipboard
+      // Handle paste from clipboard (markdown tables and images)
       handlePaste: (view, event, _slice) => {
-        const items = event.clipboardData?.items;
-        if (!items) return false;
+        const clipboardData = event.clipboardData;
+        if (!clipboardData) return false;
+
+        // TODO: Add markdown table paste handling in Phase 7 (Copy/Paste)
+        // For now, markdown tables can be created via the toolbar button
+
+        const items = clipboardData.items;
 
         // Look for image data in clipboard
         for (const item of items) {
@@ -1598,6 +1618,25 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle table button click from toolbar
+   * Opens the table size picker dialog
+   */
+  const handleTableButtonClick = (buttonElement: HTMLElement) => {
+    setTableSizePickerAnchor(buttonElement);
+  };
+
+  /**
+   * Handle table size selection from picker
+   * Inserts a table with the selected dimensions
+   */
+  const handleTableSizeSelect = (rows: number, cols: number) => {
+    if (!editor) return;
+
+    console.log('[TipTapEditor] Inserting table with dimensions:', rows, 'x', cols);
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+  };
+
+  /**
    * Handle Cmd+K keyboard shortcut
    * Similar to handleLinkButtonClick but triggered from keyboard
    */
@@ -1968,6 +2007,72 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               outlineOffset: '-2px',
             },
           },
+          // Table styling
+          '& table': {
+            borderCollapse: 'collapse',
+            width: '100%',
+            margin: '16px 0',
+            tableLayout: 'fixed',
+            overflow: 'hidden',
+            borderRadius: '4px',
+            border: `1px solid ${theme.palette.divider}`,
+          },
+          '& table td, & table th': {
+            border: `1px solid ${theme.palette.divider}`,
+            padding: '8px 12px',
+            textAlign: 'left',
+            verticalAlign: 'top',
+            position: 'relative',
+            minWidth: '50px',
+            boxSizing: 'border-box',
+            '& > p': {
+              margin: 0,
+            },
+          },
+          '& table th': {
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+            fontWeight: 600,
+          },
+          '& table tr:hover': {
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          },
+          // Selected cell styling
+          '& table .selectedCell': {
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.2)' : 'rgba(25, 118, 210, 0.1)',
+          },
+          '& table .selectedCell::after': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            border: `2px solid ${theme.palette.primary.main}`,
+            pointerEvents: 'none',
+          },
+          // Column resize handle styling
+          '& .column-resize-handle': {
+            position: 'absolute',
+            right: '-2px',
+            top: 0,
+            bottom: 0,
+            width: '4px',
+            backgroundColor: theme.palette.primary.main,
+            cursor: 'col-resize',
+            zIndex: 20,
+          },
+          // Table selected state
+          '& table.ProseMirror-selectednode': {
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: '2px',
+          },
+          // Resize cursor when dragging
+          '&.resize-cursor': {
+            cursor: 'col-resize',
+          },
           // Search result highlighting
           '& .search-result': {
             backgroundColor:
@@ -2073,6 +2178,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         editor={editor}
         onLinkButtonClick={handleLinkButtonClick}
         onImageButtonClick={() => void handleImageButtonClick()}
+        onTableButtonClick={handleTableButtonClick}
       />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>
@@ -2138,6 +2244,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       <ImageLightbox />
       {/* Image context menu */}
       <ImageContextMenu />
+      {/* Table size picker dialog */}
+      <TableSizePickerDialog
+        open={Boolean(tableSizePickerAnchor)}
+        anchorEl={tableSizePickerAnchor}
+        onClose={() => {
+          setTableSizePickerAnchor(null);
+        }}
+        onSelect={handleTableSizeSelect}
+      />
     </Box>
   );
 };
