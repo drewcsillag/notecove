@@ -78,6 +78,11 @@ export const NotecoveTable = Table.configure({
       // Custom shortcuts for table manipulation
       'Mod-Enter': () => {
         if (this.editor.isActive('table')) {
+          const dims = getTableDimensionsFromEditor(this.editor);
+          if (dims && dims.rows >= TABLE_CONSTRAINTS.MAX_ROWS) {
+            debugLog(`Cannot add row: already at max (${TABLE_CONSTRAINTS.MAX_ROWS})`);
+            return false;
+          }
           debugLog('Adding row below (Mod+Enter)');
           return this.editor.commands.addRowAfter();
         }
@@ -85,6 +90,11 @@ export const NotecoveTable = Table.configure({
       },
       'Mod-Shift-Enter': () => {
         if (this.editor.isActive('table')) {
+          const dims = getTableDimensionsFromEditor(this.editor);
+          if (dims && dims.cols >= TABLE_CONSTRAINTS.MAX_COLS) {
+            debugLog(`Cannot add column: already at max (${TABLE_CONSTRAINTS.MAX_COLS})`);
+            return false;
+          }
           debugLog('Adding column after (Mod+Shift+Enter)');
           return this.editor.commands.addColumnAfter();
         }
@@ -92,6 +102,11 @@ export const NotecoveTable = Table.configure({
       },
       'Mod-Backspace': () => {
         if (this.editor.isActive('table')) {
+          const dims = getTableDimensionsFromEditor(this.editor);
+          if (dims && dims.rows <= TABLE_CONSTRAINTS.MIN_ROWS) {
+            debugLog(`Cannot delete row: already at min (${TABLE_CONSTRAINTS.MIN_ROWS})`);
+            return false;
+          }
           debugLog('Deleting row (Mod+Backspace)');
           return this.editor.commands.deleteRow();
         }
@@ -99,6 +114,11 @@ export const NotecoveTable = Table.configure({
       },
       'Mod-Shift-Backspace': () => {
         if (this.editor.isActive('table')) {
+          const dims = getTableDimensionsFromEditor(this.editor);
+          if (dims && dims.cols <= TABLE_CONSTRAINTS.MIN_COLS) {
+            debugLog(`Cannot delete column: already at min (${TABLE_CONSTRAINTS.MIN_COLS})`);
+            return false;
+          }
           debugLog('Deleting column (Mod+Shift+Backspace)');
           return this.editor.commands.deleteColumn();
         }
@@ -162,4 +182,70 @@ export function getTableDimensions(
   const cols = rows > 0 ? tableNode.content.child(0).content.childCount : 0;
 
   return { rows, cols };
+}
+
+/**
+ * Get table dimensions from editor state
+ * Finds the table node containing the current selection and returns its dimensions.
+ */
+export function getTableDimensionsFromEditor(editor: {
+  state: {
+    selection: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      $from: any;
+    };
+  };
+}): { rows: number; cols: number } | null {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const { $from } = editor.state.selection;
+
+  // Walk up the node tree to find the table
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+  const depth = $from.depth;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+  for (let d = depth; d > 0; d--) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    const node = $from.node(d);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/prefer-optional-chain
+    if (node && node.type.name === 'table') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      return getTableDimensions(node);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Check if we can add a row (haven't reached max rows)
+ */
+export function canAddRow(editor: Parameters<typeof getTableDimensionsFromEditor>[0]): boolean {
+  const dims = getTableDimensionsFromEditor(editor);
+  return !dims || dims.rows < TABLE_CONSTRAINTS.MAX_ROWS;
+}
+
+/**
+ * Check if we can add a column (haven't reached max columns)
+ */
+export function canAddColumn(editor: Parameters<typeof getTableDimensionsFromEditor>[0]): boolean {
+  const dims = getTableDimensionsFromEditor(editor);
+  return !dims || dims.cols < TABLE_CONSTRAINTS.MAX_COLS;
+}
+
+/**
+ * Check if we can delete a row (haven't reached min rows)
+ */
+export function canDeleteRow(editor: Parameters<typeof getTableDimensionsFromEditor>[0]): boolean {
+  const dims = getTableDimensionsFromEditor(editor);
+  return !dims || dims.rows > TABLE_CONSTRAINTS.MIN_ROWS;
+}
+
+/**
+ * Check if we can delete a column (haven't reached min columns)
+ */
+export function canDeleteColumn(
+  editor: Parameters<typeof getTableDimensionsFromEditor>[0]
+): boolean {
+  const dims = getTableDimensionsFromEditor(editor);
+  return !dims || dims.cols > TABLE_CONSTRAINTS.MIN_COLS;
 }

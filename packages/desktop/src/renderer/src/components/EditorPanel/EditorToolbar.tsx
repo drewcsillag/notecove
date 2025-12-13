@@ -21,8 +21,15 @@ import {
   CheckBoxOutlineBlank,
   Link,
   AddPhotoAlternate,
+  TableChart,
+  // Table manipulation icons
+  AddCircleOutline,
+  RemoveCircleOutline,
+  BorderTop,
+  DeleteSweep,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
+import { canAddRow, canAddColumn, canDeleteRow, canDeleteColumn } from './extensions/Table';
 
 export interface EditorToolbarProps {
   editor: Editor | null;
@@ -36,12 +43,18 @@ export interface EditorToolbarProps {
    * Called with the button element for popover positioning
    */
   onImageButtonClick?: (buttonElement: HTMLElement) => void;
+  /**
+   * Callback when the table button is clicked
+   * Called with the button element for popover positioning
+   */
+  onTableButtonClick?: (buttonElement: HTMLElement) => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editor,
   onLinkButtonClick,
   onImageButtonClick,
+  onTableButtonClick,
 }) => {
   if (!editor) {
     return null;
@@ -62,6 +75,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const handleImageClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (onImageButtonClick) {
       onImageButtonClick(event.currentTarget);
+    }
+  };
+
+  /**
+   * Handle table button click
+   */
+  const handleTableClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (onTableButtonClick) {
+      onTableButtonClick(event.currentTarget);
     }
   };
 
@@ -223,6 +245,120 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <AddPhotoAlternate fontSize="small" />
         </IconButton>
       </Tooltip>
+
+      <Tooltip title="Insert table">
+        <IconButton
+          size="small"
+          onClick={handleTableClick}
+          color={editor.isActive('table') ? 'primary' : 'default'}
+          aria-label="Insert table"
+          data-testid="table-button"
+        >
+          <TableChart fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      {/* Table Manipulation - only shown when cursor is in a table */}
+      {editor.isActive('table') && (
+        <>
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+          <Tooltip title="Add row below (⌘↵)">
+            <IconButton
+              size="small"
+              onClick={() => canAddRow(editor) && editor.chain().focus().addRowAfter().run()}
+              disabled={!canAddRow(editor)}
+              aria-label="Add row below"
+              data-testid="table-add-row-after"
+            >
+              <AddCircleOutline fontSize="small" sx={{ transform: 'rotate(0deg)' }} />
+              <Box
+                component="span"
+                sx={{ fontSize: '0.6rem', fontWeight: 'bold', ml: -0.5, mt: 0.5 }}
+              >
+                R
+              </Box>
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Add column right (⌘⇧↵)">
+            <IconButton
+              size="small"
+              onClick={() => canAddColumn(editor) && editor.chain().focus().addColumnAfter().run()}
+              disabled={!canAddColumn(editor)}
+              aria-label="Add column right"
+              data-testid="table-add-col-after"
+            >
+              <AddCircleOutline fontSize="small" />
+              <Box
+                component="span"
+                sx={{ fontSize: '0.6rem', fontWeight: 'bold', ml: -0.5, mt: 0.5 }}
+              >
+                C
+              </Box>
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Delete row (⌘⌫)">
+            <IconButton
+              size="small"
+              onClick={() => canDeleteRow(editor) && editor.chain().focus().deleteRow().run()}
+              disabled={!canDeleteRow(editor)}
+              aria-label="Delete row"
+              data-testid="table-delete-row"
+            >
+              <RemoveCircleOutline fontSize="small" color="error" />
+              <Box
+                component="span"
+                sx={{ fontSize: '0.6rem', fontWeight: 'bold', ml: -0.5, mt: 0.5 }}
+              >
+                R
+              </Box>
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Delete column (⌘⇧⌫)">
+            <IconButton
+              size="small"
+              onClick={() => canDeleteColumn(editor) && editor.chain().focus().deleteColumn().run()}
+              disabled={!canDeleteColumn(editor)}
+              aria-label="Delete column"
+              data-testid="table-delete-col"
+            >
+              <RemoveCircleOutline fontSize="small" color="error" />
+              <Box
+                component="span"
+                sx={{ fontSize: '0.6rem', fontWeight: 'bold', ml: -0.5, mt: 0.5 }}
+              >
+                C
+              </Box>
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Toggle header row">
+            <IconButton
+              size="small"
+              onClick={() => editor.chain().focus().toggleHeaderRow().run()}
+              aria-label="Toggle header row"
+              data-testid="table-toggle-header"
+            >
+              <BorderTop fontSize="small" />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Delete table">
+            <IconButton
+              size="small"
+              onClick={() => editor.chain().focus().deleteTable().run()}
+              aria-label="Delete table"
+              data-testid="table-delete"
+              color="error"
+            >
+              <DeleteSweep fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 

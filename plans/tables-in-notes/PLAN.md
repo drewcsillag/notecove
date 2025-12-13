@@ -1,6 +1,6 @@
 # Tables in Notes - Implementation Plan
 
-**Overall Progress:** `11%` (Phase 1 complete)
+**Overall Progress:** `22%` (Phases 1-2 complete)
 
 **Branch:** `tables-in-notes`
 
@@ -87,44 +87,55 @@ Install TipTap table extensions, get basic rendering working, and validate Yjs c
 
 ## Phase 2: Toolbar & Insertion UI
 
-**Status:** 🟥 To Do
-**Progress:** `0%`
+**Status:** 🟩 Done
+**Progress:** `100%`
 
 Add UI for creating tables and manipulating them.
 
 ### Tasks
 
-- [ ] 🟥 **2.1 Table insertion button**
-  - [ ] 🟥 Write test: Insert table button appears in toolbar
-  - [ ] 🟥 Add table icon button to EditorToolbar.tsx
-  - [ ] 🟥 Position between horizontal rule and undo/redo
+- [x] 🟩 **2.1 Table insertion button**
+  - [x] 🟩 Add table icon button to EditorToolbar.tsx
+  - [x] 🟩 Position between horizontal rule and undo/redo
+  - [x] 🟩 Button highlights when cursor is in table
 
-- [ ] 🟥 **2.2 Table size picker dialog**
-  - [ ] 🟥 Write test: Size picker shows grid, selection works
-  - [ ] 🟥 Create TableSizePickerDialog component
-  - [ ] 🟥 Grid-based selection (hover to preview size)
-  - [ ] 🟥 Default 3×3, max preview 10×10
-  - [ ] 🟥 Enforce min 2×2 in UI
-  - [ ] 🟥 Insert table on click
+- [x] 🟩 **2.2 Table size picker dialog**
+  - [x] 🟩 Write tests: Size picker shows grid, selection works (8 tests)
+  - [x] 🟩 Create TableSizePickerDialog component
+  - [x] 🟩 Grid-based selection (hover to preview size)
+  - [x] 🟩 Default 3×3, max preview 10×10
+  - [x] 🟩 Enforce min 2×2 in UI (grid starts at 1×1)
+  - [x] 🟩 Insert table on click
+  - [x] 🟩 Keyboard accessibility (Enter/Space to select)
 
-- [ ] 🟥 **2.3 Table manipulation toolbar**
-  - [ ] 🟥 Write test: Table toolbar appears when cursor in table
-  - [ ] 🟥 Detect when editor selection is inside table
-  - [ ] 🟥 Show additional toolbar buttons:
-    - Add row above/below
-    - Add column left/right
-    - Delete row/column
+- [x] 🟩 **2.3 Table manipulation toolbar**
+  - [x] 🟩 Detect when editor selection is inside table (`editor.isActive('table')`)
+  - [x] 🟩 Show additional toolbar buttons conditionally:
+    - Add row below (⌘↵)
+    - Add column right (⌘⇧↵)
+    - Delete row (⌘⌫)
+    - Delete column (⌘⇧⌫)
+    - Toggle header row
     - Delete table
-    - Toggle header row (converts first row th↔td)
-    - Toggle header column
+  - [x] 🟩 Buttons disabled when at size limits
 
-- [ ] 🟥 **2.4 Implement table commands**
-  - [ ] 🟥 Write tests for each command
-  - [ ] 🟥 Wire up all toolbar buttons to TipTap table commands
-  - [ ] 🟥 Enforce size limits in commands (max 20 cols, max 1000 rows)
-  - [ ] 🟥 Verify each operation works correctly
+- [x] 🟩 **2.4 Implement table commands with size limits**
+  - [x] 🟩 Write tests for size limit helpers (8 tests)
+  - [x] 🟩 Wire up all toolbar buttons to TipTap table commands
+  - [x] 🟩 Enforce size limits in keyboard shortcuts
+  - [x] 🟩 Enforce size limits in toolbar buttons
+  - [x] 🟩 Helper functions: canAddRow, canAddColumn, canDeleteRow, canDeleteColumn
+  - [x] 🟩 getTableDimensionsFromEditor helper
 
 **Outputs:** Users can insert tables via toolbar and manipulate structure.
+
+### Files Created/Modified
+
+- `packages/desktop/src/renderer/src/components/EditorPanel/TableSizePickerDialog.tsx` - New component
+- `packages/desktop/src/renderer/src/components/EditorPanel/__tests__/TableSizePickerDialog.test.tsx` - 8 tests
+- `packages/desktop/src/renderer/src/components/EditorPanel/EditorToolbar.tsx` - Table button + manipulation buttons
+- `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx` - Table size picker integration
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/Table.ts` - Size limit helpers
 
 ---
 

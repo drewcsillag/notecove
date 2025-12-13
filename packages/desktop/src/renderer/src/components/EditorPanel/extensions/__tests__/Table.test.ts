@@ -9,7 +9,17 @@ import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import * as Y from 'yjs';
 import { yUndoPluginKey } from 'y-prosemirror';
-import { NotecoveTable, NotecoveTableRow, NotecoveTableHeader, NotecoveTableCell } from '../Table';
+import {
+  NotecoveTable,
+  NotecoveTableRow,
+  NotecoveTableHeader,
+  NotecoveTableCell,
+  canAddRow,
+  canAddColumn,
+  canDeleteRow,
+  canDeleteColumn,
+  getTableDimensionsFromEditor,
+} from '../Table';
 
 describe('NoteCove Table Extension', () => {
   let editor: Editor;
@@ -330,5 +340,71 @@ describe('Table Nesting Rules', () => {
     // A simple check: between the first </table> and last <table there should be no other <table
     // This is a simplistic test - the actual behavior depends on TipTap's implementation
     expect(tableOpenCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Table Size Limit Helpers', () => {
+  let editor: Editor;
+
+  beforeEach(() => {
+    editor = new Editor({
+      extensions: [
+        StarterKit,
+        NotecoveTable,
+        NotecoveTableRow,
+        NotecoveTableHeader,
+        NotecoveTableCell,
+      ],
+      content: '',
+    });
+  });
+
+  afterEach(() => {
+    editor.destroy();
+  });
+
+  it('canAddRow should return true when below max rows', () => {
+    editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: false });
+    expect(canAddRow(editor)).toBe(true);
+  });
+
+  it('canAddColumn should return true when below max columns', () => {
+    editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: false });
+    expect(canAddColumn(editor)).toBe(true);
+  });
+
+  it('canDeleteRow should return true when above min rows', () => {
+    editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: false });
+    expect(canDeleteRow(editor)).toBe(true);
+  });
+
+  it('canDeleteColumn should return true when above min columns', () => {
+    editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: false });
+    expect(canDeleteColumn(editor)).toBe(true);
+  });
+
+  it('canDeleteRow should return false at min rows (2)', () => {
+    editor.commands.insertTable({ rows: 2, cols: 3, withHeaderRow: false });
+    expect(canDeleteRow(editor)).toBe(false);
+  });
+
+  it('canDeleteColumn should return false at min columns (2)', () => {
+    editor.commands.insertTable({ rows: 3, cols: 2, withHeaderRow: false });
+    expect(canDeleteColumn(editor)).toBe(false);
+  });
+
+  it('getTableDimensionsFromEditor should return correct dimensions', () => {
+    editor.commands.insertTable({ rows: 4, cols: 5, withHeaderRow: false });
+
+    const dims = getTableDimensionsFromEditor(editor);
+    expect(dims).toEqual({ rows: 4, cols: 5 });
+  });
+
+  it('getTableDimensionsFromEditor should return null when not in table', () => {
+    // No table inserted, just a paragraph
+    editor.commands.setContent('<p>Hello</p>');
+
+    const dims = getTableDimensionsFromEditor(editor);
+    expect(dims).toBe(null);
   });
 });

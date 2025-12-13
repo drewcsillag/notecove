@@ -31,6 +31,7 @@ import {
 } from './extensions/Table';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
+import { TableSizePickerDialog } from './TableSizePickerDialog';
 import { SearchPanel } from './SearchPanel';
 import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
@@ -147,6 +148,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     insertPosition: number;
   } | null>(null);
   const textAndUrlPopoverRef = useRef<TippyInstance | null>(null);
+
+  // Table size picker state
+  const [tableSizePickerAnchor, setTableSizePickerAnchor] = useState<HTMLElement | null>(null);
 
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
@@ -1609,6 +1613,25 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle table button click from toolbar
+   * Opens the table size picker dialog
+   */
+  const handleTableButtonClick = (buttonElement: HTMLElement) => {
+    setTableSizePickerAnchor(buttonElement);
+  };
+
+  /**
+   * Handle table size selection from picker
+   * Inserts a table with the selected dimensions
+   */
+  const handleTableSizeSelect = (rows: number, cols: number) => {
+    if (!editor) return;
+
+    console.log('[TipTapEditor] Inserting table with dimensions:', rows, 'x', cols);
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+  };
+
+  /**
    * Handle Cmd+K keyboard shortcut
    * Similar to handleLinkButtonClick but triggered from keyboard
    */
@@ -2150,6 +2173,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         editor={editor}
         onLinkButtonClick={handleLinkButtonClick}
         onImageButtonClick={() => void handleImageButtonClick()}
+        onTableButtonClick={handleTableButtonClick}
       />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>
@@ -2215,6 +2239,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       <ImageLightbox />
       {/* Image context menu */}
       <ImageContextMenu />
+      {/* Table size picker dialog */}
+      <TableSizePickerDialog
+        open={Boolean(tableSizePickerAnchor)}
+        anchorEl={tableSizePickerAnchor}
+        onClose={() => {
+          setTableSizePickerAnchor(null);
+        }}
+        onSelect={handleTableSizeSelect}
+      />
     </Box>
   );
 };
