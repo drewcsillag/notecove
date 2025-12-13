@@ -22,6 +22,14 @@ import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
+import type { Editor } from '@tiptap/core';
+import type { Transaction } from '@tiptap/pm/state';
+import type { Node as ProseMirrorNode, ResolvedPos } from '@tiptap/pm/model';
+
+// Type declaration for our custom command (used in tests)
+export interface TableCommands {
+  setColumnAlignment: (alignment: 'left' | 'center' | 'right') => boolean;
+}
 
 // Debug logging enabled in development mode
 const DEBUG: boolean =
@@ -70,10 +78,94 @@ export const NotecoveTable = Table.configure({
     debugLog('Table extension initialized');
   },
 
+  addCommands() {
+    return {
+      ...this.parent?.(),
+      /**
+       * Set text alignment for all cells in the current column
+       */
+      setColumnAlignment:
+        (alignment: 'left' | 'center' | 'right') =>
+        ({
+          editor,
+          tr,
+          dispatch,
+        }: {
+          editor: Editor;
+          tr: Transaction;
+          dispatch?: (tr: Transaction) => void;
+        }) => {
+          if (!editor.isActive('table')) {
+            return false;
+          }
+
+          const { $from } = editor.state.selection;
+          const tableDepth = findTableDepth($from);
+          if (tableDepth === null) {
+            return false;
+          }
+
+          // Find the column index of the current cell
+          const columnIndex = findColumnIndex($from, tableDepth);
+          if (columnIndex === null) {
+            return false;
+          }
+
+          // Get the table node
+          const tableNode = $from.node(tableDepth);
+          const tableStart = $from.start(tableDepth);
+
+          if (!dispatch) {
+            return true;
+          }
+
+          // Iterate through all rows and set alignment on cells at the column index
+          let pos = tableStart;
+          for (let rowIdx = 0; rowIdx < tableNode.content.childCount; rowIdx++) {
+            const row = tableNode.content.child(rowIdx);
+            let cellPos = pos + 1; // Skip the row opening tag
+
+            for (let colIdx = 0; colIdx < row.content.childCount; colIdx++) {
+              const cell = row.content.child(colIdx);
+
+              if (colIdx === columnIndex) {
+                // Set the alignment on this cell
+                tr.setNodeMarkup(cellPos, undefined, {
+                  ...cell.attrs,
+                  textAlign: alignment,
+                });
+              }
+
+              cellPos += cell.nodeSize;
+            }
+
+            pos += row.nodeSize;
+          }
+
+          debugLog(`Set column ${columnIndex} alignment to ${alignment}`);
+          return true;
+        },
+    };
+  },
+
   addKeyboardShortcuts() {
     return {
-      // Tab navigates to next cell (built-in behavior)
-      // Shift-Tab navigates to previous cell (built-in behavior)
+      // Include parent shortcuts (Tab/Shift+Tab cell navigation)
+      ...this.parent?.(),
+
+      // Explicit Tab handling for cell navigation
+      Tab: () => {
+        if (this.editor.isActive('table')) {
+          return this.editor.commands.goToNextCell();
+        }
+        return false;
+      },
+      'Shift-Tab': () => {
+        if (this.editor.isActive('table')) {
+          return this.editor.commands.goToPreviousCell();
+        }
+        return false;
+      },
 
       // Custom shortcuts for table manipulation
       'Mod-Enter': () => {
@@ -129,23 +221,105 @@ export const NotecoveTable = Table.configure({
 });
 
 /**
+ * Find the depth of the table in the document structure
+ */
+function findTableDepth($from: ResolvedPos): number | null {
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d);
+    if (node.type.name === 'table') {
+      return d;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find the column index of the cell containing the selection
+ */
+function findColumnIndex($from: ResolvedPos, tableDepth: number): number | null {
+  // Find the cell depth (should be tableDepth + 2: table > row > cell)
+  const cellDepth = tableDepth + 2;
+  if ($from.depth < cellDepth) {
+    return null;
+  }
+
+  // Get the row containing the cell
+  const row = $from.node(tableDepth + 1);
+  const cell = $from.node(cellDepth);
+
+  // Find the column index by iterating through the row's cells
+  for (let i = 0; i < row.content.childCount; i++) {
+    if (row.content.child(i) === cell) {
+      return i;
+    }
+  }
+
+  return null;
+}
+
+/**
  * NoteCove Table Row Extension
  */
 export const NotecoveTableRow = TableRow.configure({});
 
 /**
+ * Valid text alignment values for table cells
+ */
+export type TableCellAlignment = 'left' | 'center' | 'right';
+
+/**
  * NoteCove Table Header Extension
  *
  * Used for header cells (<th>) in the first row or first column.
+ * Extended to support text alignment.
  */
-export const NotecoveTableHeader = TableHeader.configure({});
+export const NotecoveTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      textAlign: {
+        default: 'left',
+        parseHTML: (element) => element.style.textAlign || 'left',
+        renderHTML: (attributes) => {
+          const align = attributes['textAlign'] as string;
+          if (align === 'left') {
+            return {};
+          }
+          return {
+            style: `text-align: ${align}`,
+          };
+        },
+      },
+    };
+  },
+});
 
 /**
  * NoteCove Table Cell Extension
  *
  * Regular table cells (<td>).
+ * Extended to support text alignment.
  */
-export const NotecoveTableCell = TableCell.configure({});
+export const NotecoveTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      textAlign: {
+        default: 'left',
+        parseHTML: (element) => element.style.textAlign || 'left',
+        renderHTML: (attributes) => {
+          const align = attributes['textAlign'] as string;
+          if (align === 'left') {
+            return {};
+          }
+          return {
+            style: `text-align: ${align}`,
+          };
+        },
+      },
+    };
+  },
+});
 
 /**
  * Check if a table size is valid
@@ -406,4 +580,102 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// =============================================================================
+// Table to Markdown Export
+// =============================================================================
+
+/**
+ * Convert a table in the editor to Markdown pipe-syntax.
+ * Finds the first table in the document and converts it.
+ */
+export function tableToMarkdown(editor: {
+  state: {
+    doc: ProseMirrorNode;
+  };
+}): string {
+  let tableNode: ProseMirrorNode | undefined;
+
+  // Find the first table node
+
+  editor.state.doc.descendants((node: ProseMirrorNode) => {
+    if (node.type.name === 'table' && !tableNode) {
+      tableNode = node;
+      return false; // Stop iteration
+    }
+    return undefined;
+  });
+
+  if (!tableNode) {
+    return '';
+  }
+
+  const rows: string[][] = [];
+  const alignments: ('left' | 'center' | 'right')[] = [];
+  let hasHeaderRow = false;
+
+  const tableContent = tableNode.content;
+
+  for (let rowIdx = 0; rowIdx < tableContent.childCount; rowIdx++) {
+    const row = tableContent.child(rowIdx);
+    const cells: string[] = [];
+    const rowContent = row.content;
+
+    for (let cellIdx = 0; cellIdx < rowContent.childCount; cellIdx++) {
+      const cell = rowContent.child(cellIdx);
+
+      // Check if first row is a header row
+      if (rowIdx === 0 && cell.type.name === 'tableHeader') {
+        hasHeaderRow = true;
+      }
+
+      // Get text content from the cell
+      const textContent = cell.textContent;
+      // Escape pipe characters in content
+      const escapedContent = textContent.replace(/\|/g, '\\|');
+      cells.push(escapedContent);
+
+      // Get alignment from first row (applies to whole column)
+      if (rowIdx === 0) {
+        const textAlign = (cell.attrs['textAlign'] as string | undefined) ?? 'left';
+
+        alignments.push(textAlign as 'left' | 'center' | 'right');
+      }
+    }
+
+    rows.push(cells);
+  }
+
+  if (rows.length === 0) {
+    return '';
+  }
+
+  // Build markdown output
+  const lines: string[] = [];
+
+  // First row (header or first data row)
+  const firstRow = rows[0];
+  if (firstRow) {
+    lines.push('| ' + firstRow.join(' | ') + ' |');
+  }
+
+  // Separator row with alignment markers
+  const separatorCells = alignments.map((align) => {
+    if (align === 'center') return ':---:';
+    if (align === 'right') return '---:';
+    return '---';
+  });
+  lines.push('| ' + separatorCells.join(' | ') + ' |');
+
+  // Data rows (skip first if it was header)
+  const dataStart = hasHeaderRow ? 1 : 1; // Always start from index 1 since we've already output row 0
+  for (let i = dataStart; i < rows.length; i++) {
+    const row = rows[i];
+    if (row) {
+      lines.push('| ' + row.join(' | ') + ' |');
+    }
+  }
+
+  return lines.join('\n');
 }

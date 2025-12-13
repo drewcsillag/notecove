@@ -27,9 +27,19 @@ import {
   RemoveCircleOutline,
   BorderTop,
   DeleteSweep,
+  // Cell alignment icons
+  FormatAlignLeft,
+  FormatAlignCenter,
+  FormatAlignRight,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
 import { canAddRow, canAddColumn, canDeleteRow, canDeleteColumn } from './extensions/Table';
+
+// Extended chain commands interface for our custom table commands
+interface ExtendedChainCommands {
+  setColumnAlignment: (alignment: 'left' | 'center' | 'right') => ExtendedChainCommands;
+  run: () => boolean;
+}
 
 export interface EditorToolbarProps {
   editor: Editor | null;
@@ -345,6 +355,55 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               <BorderTop fontSize="small" />
             </IconButton>
           </Tooltip>
+
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+          <Tooltip title="Align column left">
+            <IconButton
+              size="small"
+              onClick={() =>
+                (editor.chain().focus() as unknown as ExtendedChainCommands)
+                  .setColumnAlignment('left')
+                  .run()
+              }
+              aria-label="Align column left"
+              data-testid="table-column-align-left"
+            >
+              <FormatAlignLeft fontSize="small" />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Align column center">
+            <IconButton
+              size="small"
+              onClick={() =>
+                (editor.chain().focus() as unknown as ExtendedChainCommands)
+                  .setColumnAlignment('center')
+                  .run()
+              }
+              aria-label="Align column center"
+              data-testid="table-column-align-center"
+            >
+              <FormatAlignCenter fontSize="small" />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Align column right">
+            <IconButton
+              size="small"
+              onClick={() =>
+                (editor.chain().focus() as unknown as ExtendedChainCommands)
+                  .setColumnAlignment('right')
+                  .run()
+              }
+              aria-label="Align column right"
+              data-testid="table-column-align-right"
+            >
+              <FormatAlignRight fontSize="small" />
+            </IconButton>
+          </Tooltip>
+
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
           <Tooltip title="Delete table">
             <IconButton

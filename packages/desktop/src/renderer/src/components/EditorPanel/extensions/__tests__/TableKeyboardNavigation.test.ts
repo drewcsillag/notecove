@@ -6,12 +6,7 @@
 
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import {
-  NotecoveTable,
-  NotecoveTableRow,
-  NotecoveTableHeader,
-  NotecoveTableCell,
-} from '../Table';
+import { NotecoveTable, NotecoveTableRow, NotecoveTableHeader, NotecoveTableCell } from '../Table';
 
 describe('Table Keyboard Navigation', () => {
   let editor: Editor;
