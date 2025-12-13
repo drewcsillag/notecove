@@ -205,6 +205,7 @@ function createWindow(options?: {
   syncStatus?: boolean;
   noteInfo?: boolean;
   storageInspector?: boolean;
+  sdPicker?: boolean;
   targetNoteId?: string;
   noteTitle?: string;
   parentWindow?: BrowserWindow;
@@ -224,23 +225,29 @@ function createWindow(options?: {
   // Determine window dimensions
   const defaultWidth = options?.storageInspector
     ? 1200
-    : options?.syncStatus || options?.noteInfo
-      ? 900
-      : options?.minimal
-        ? 800
-        : 1200;
+    : options?.sdPicker
+      ? 500
+      : options?.syncStatus || options?.noteInfo
+        ? 900
+        : options?.minimal
+          ? 800
+          : 1200;
   const defaultHeight = options?.storageInspector
     ? 800
-    : options?.syncStatus || options?.noteInfo
-      ? 600
-      : 800;
+    : options?.sdPicker
+      ? 400
+      : options?.syncStatus || options?.noteInfo
+        ? 600
+        : 800;
 
   // Determine window title
   const windowTitle = options?.storageInspector
     ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}`
-    : options?.noteInfo && options.noteTitle
-      ? `Note Info - ${options.noteTitle}`
-      : getWindowTitle();
+    : options?.sdPicker
+      ? 'Select Storage Directory'
+      : options?.noteInfo && options.noteTitle
+        ? `Note Info - ${options.noteTitle}`
+        : getWindowTitle();
 
   // Create the browser window with saved bounds or defaults
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -273,13 +280,20 @@ function createWindow(options?: {
   const newWindow = new BrowserWindow(windowOptions);
 
   // Determine window type for state tracking
-  const windowType: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector' =
-    options?.syncStatus
-      ? 'syncStatus'
-      : options?.noteInfo
-        ? 'noteInfo'
-        : options?.storageInspector
-          ? 'storageInspector'
+  const windowType:
+    | 'main'
+    | 'minimal'
+    | 'syncStatus'
+    | 'noteInfo'
+    | 'storageInspector'
+    | 'sdPicker' = options?.syncStatus
+    ? 'syncStatus'
+    : options?.noteInfo
+      ? 'noteInfo'
+      : options?.storageInspector
+        ? 'storageInspector'
+        : options?.sdPicker
+          ? 'sdPicker'
           : options?.minimal
             ? 'minimal'
             : 'main';
@@ -356,6 +370,9 @@ function createWindow(options?: {
   }
   if (options?.storageInspector) {
     params.set('storageInspector', 'true');
+  }
+  if (options?.sdPicker) {
+    params.set('sdPicker', 'true');
   }
   if (options?.targetNoteId) {
     params.set('targetNoteId', options.targetNoteId);
@@ -1966,9 +1983,30 @@ function createMenu(): void {
         {
           label: 'Storage Inspector',
           click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('menu:storageInspector');
-            }
+            void (async () => {
+              if (!database) return;
+
+              // Get all SDs
+              const sds = await database.getAllStorageDirs();
+              if (sds.length === 0) return;
+
+              // If only one SD, open inspector directly
+              if (sds.length === 1 && sds[0]) {
+                const sd = sds[0];
+                createWindow({
+                  storageInspector: true,
+                  sdId: sd.id,
+                  sdPath: sd.path,
+                  sdName: sd.name,
+                });
+                return;
+              }
+
+              // Multiple SDs - open picker window
+              createWindow({
+                sdPicker: true,
+              });
+            })();
           },
         },
         { type: 'separator' },

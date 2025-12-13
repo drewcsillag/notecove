@@ -26,6 +26,69 @@ import { HexViewer, type ParsedField } from './HexViewer';
 import { RecordList, type RecordInfo } from './RecordList';
 import { TextPreview } from './TextPreview';
 import { ImagePreview } from './ImagePreview';
+import { YjsUpdatePreview } from './YjsUpdatePreview';
+
+/**
+ * Helper to ensure data is a proper Uint8Array after IPC serialization.
+ * Electron IPC can serialize Uint8Array to a plain object with numeric keys.
+ * Cross-realm Uint8Arrays (from preload) fail instanceof checks.
+ */
+function ensureUint8Array(data: unknown): Uint8Array {
+  if (data instanceof Uint8Array) {
+    return data;
+  }
+  // IPC serialization may convert Uint8Array to an object with numeric keys
+  if (data && typeof data === 'object') {
+    // If it's an ArrayBuffer, wrap it
+    if (data instanceof ArrayBuffer) {
+      return new Uint8Array(data);
+    }
+    // If it's a Buffer (Node.js)
+    if (Buffer.isBuffer(data)) {
+      return new Uint8Array(data);
+    }
+    // Check if it's a cross-realm Uint8Array (from preload context)
+    // These have the right constructor name but fail instanceof
+    const obj = data as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (obj.constructor?.name === 'Uint8Array' && typeof obj['length'] === 'number') {
+      // It's a Uint8Array from another realm - copy byte by byte
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const length = obj['length'] as number;
+      const arr = new Uint8Array(length);
+      for (let i = 0; i < length; i++) {
+        arr[i] = (obj[i] as number | undefined) ?? 0;
+      }
+      return arr;
+    }
+    // If it's an object with numeric keys (serialized Uint8Array)
+    // Need to sort keys numerically since Object.values doesn't guarantee order
+    const numericObj = obj as Record<string, number>;
+    const keys = Object.keys(numericObj)
+      .filter((k) => /^\d+$/.test(k))
+      .sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+    if (keys.length > 0) {
+      const arr = new Uint8Array(keys.length);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (key !== undefined) {
+          arr[i] = numericObj[key] ?? 0;
+        }
+      }
+      return arr;
+    }
+    // If object has 'data' property (some serialization formats)
+    if ('data' in numericObj && Array.isArray(numericObj['data'])) {
+      return new Uint8Array(numericObj['data'] as number[]);
+    }
+  }
+  // If it's an array of numbers
+  if (Array.isArray(data)) {
+    return new Uint8Array(data as number[]);
+  }
+  console.warn('[StorageInspector] Could not convert to Uint8Array:', typeof data, data);
+  return new Uint8Array();
+}
 
 export interface StorageInspectorWindowProps {
   sdId: string;
@@ -106,19 +169,33 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
           console.error('[StorageInspector] Failed to load file:', result.error);
           setFileData(null);
         } else {
+          // Ensure data is a proper Uint8Array after IPC serialization
+          console.log(
+            '[StorageInspector] Raw data type:',
+            typeof result.data,
+            result.data.constructor.name
+          );
+          const fileBytes = ensureUint8Array(result.data);
+          console.log(
+            '[StorageInspector] Converted bytes length:',
+            fileBytes.length,
+            'first bytes:',
+            fileBytes.slice(0, 10)
+          );
+
           setFileData({
             path: result.path,
             type: result.type,
             size: result.size,
             modified: result.modified,
-            data: result.data,
+            data: fileBytes,
           });
 
           // Parse binary files for color coding
           if (result.type === 'crdtlog' || result.type === 'snapshot') {
             try {
               const parseResult = await window.electronAPI.inspector.parseFile(
-                result.data,
+                fileBytes,
                 result.type
               );
 
@@ -139,6 +216,7 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
                     dataSize: record.dataSize,
                     startOffset: record.startOffset,
                     endOffset: record.endOffset,
+                    dataStartOffset: record.dataStartOffset,
                   });
                 }
                 setParsedRecords(records);
@@ -444,6 +522,22 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
                   />
                 </Box>
               )}
+
+              {/* Yjs update preview when a CRDT record is selected */}
+              {selectedRecordIndex !== null &&
+                parsedRecords[selectedRecordIndex] &&
+                fileData.type === 'crdtlog' && (
+                  <Box sx={{ mb: 2 }}>
+                    <YjsUpdatePreview
+                      data={fileData.data.slice(
+                        parsedRecords[selectedRecordIndex].dataStartOffset,
+                        parsedRecords[selectedRecordIndex].dataStartOffset +
+                          parsedRecords[selectedRecordIndex].dataSize
+                      )}
+                      maxHeight={300}
+                    />
+                  </Box>
+                )}
 
               {/* Hex viewer */}
               <Paper

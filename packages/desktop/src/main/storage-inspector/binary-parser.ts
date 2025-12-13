@@ -52,6 +52,8 @@ export interface ParsedLogRecord {
   dataSize: number;
   startOffset: number;
   endOffset: number;
+  /** Start offset of the Yjs update data (after length, timestamp, sequence) */
+  dataStartOffset: number;
   fields: ParsedFieldWithOffsets[];
 }
 
@@ -243,6 +245,7 @@ export function parseCrdtLogWithOffsets(buffer: Uint8Array): ParsedCrdtLogResult
         dataSize: dataLength,
         startOffset: recordStartOffset,
         endOffset: offset,
+        dataStartOffset: dataStartOffset,
         fields: recordFields,
       });
 

@@ -5,7 +5,7 @@
  * Shows dimensions, format, and file size.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Paper, CircularProgress } from '@mui/material';
 import ImageIcon from '@mui/icons-material/Image';
 import BrokenImageIcon from '@mui/icons-material/BrokenImage';
@@ -99,23 +99,43 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({ data, fileName, maxH
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [mimeType, setMimeType] = useState<string>('application/octet-stream');
 
-  // Create blob URL for the image
-  const { blobUrl, mimeType } = useMemo(() => {
+  // Keep a reference to the blob to prevent garbage collection
+  const blobRef = useRef<Blob | null>(null);
+
+  // Create blob URL for the image - use useEffect to handle cleanup properly
+  useEffect(() => {
+    console.log(
+      '[ImagePreview] Data received:',
+      data.length,
+      'bytes, first 10:',
+      Array.from(data.slice(0, 10))
+    );
     const mime = detectMimeType(data);
+    console.log('[ImagePreview] Detected MIME type:', mime);
+    setMimeType(mime);
+
     // Copy to a regular ArrayBuffer to ensure compatibility with Blob
     const buffer = new ArrayBuffer(data.length);
     new Uint8Array(buffer).set(data);
     const blob = new Blob([buffer], { type: mime });
-    return { blobUrl: URL.createObjectURL(blob), mimeType: mime };
-  }, [data]);
+    blobRef.current = blob; // Keep reference to prevent GC
 
-  // Clean up blob URL on unmount
-  useEffect(() => {
+    const url = URL.createObjectURL(blob);
+    console.log('[ImagePreview] Created blob URL:', url);
+    setBlobUrl(url);
+    setLoading(true);
+    setError(null);
+
+    // Cleanup function
     return () => {
-      URL.revokeObjectURL(blobUrl);
+      console.log('[ImagePreview] Revoking blob URL:', url);
+      URL.revokeObjectURL(url);
+      blobRef.current = null;
     };
-  }, [blobUrl]);
+  }, [data]);
 
   // Handle image load
   const handleLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -126,7 +146,8 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({ data, fileName, maxH
   };
 
   // Handle image error
-  const handleError = () => {
+  const handleError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    console.error('[ImagePreview] Image load error:', event);
     setLoading(false);
     setError('Failed to load image');
     setDimensions(null);
@@ -159,20 +180,20 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({ data, fileName, maxH
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <ImageIcon fontSize="small" sx={{ color: 'grey.500' }} />
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" sx={{ color: 'grey.400' }}>
             Image Preview
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" sx={{ color: 'grey.400' }}>
             {getFormatName(mimeType)}
           </Typography>
           {dimensions && (
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: 'grey.400' }}>
               {dimensions.width} × {dimensions.height}
             </Typography>
           )}
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" sx={{ color: 'grey.500' }}>
             {formatBytes(data.length)}
           </Typography>
         </Box>
@@ -189,10 +210,10 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({ data, fileName, maxH
           minHeight: 200,
         }}
       >
-        {loading && !error && (
+        {(loading || !blobUrl) && !error && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress size={20} />
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: 'grey.400' }}>
               Loading image...
             </Typography>
           </Box>
@@ -207,19 +228,21 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({ data, fileName, maxH
           </Box>
         )}
 
-        <img
-          src={blobUrl}
-          alt={fileName}
-          onLoad={handleLoad}
-          onError={handleError}
-          style={{
-            maxWidth: '100%',
-            maxHeight: maxHeight - 100,
-            objectFit: 'contain',
-            display: loading || error ? 'none' : 'block',
-            borderRadius: '4px',
-          }}
-        />
+        {blobUrl && (
+          <img
+            src={blobUrl}
+            alt={fileName}
+            onLoad={handleLoad}
+            onError={handleError}
+            style={{
+              maxWidth: '100%',
+              maxHeight: maxHeight - 100,
+              objectFit: 'contain',
+              display: loading || error ? 'none' : 'block',
+              borderRadius: '4px',
+            }}
+          />
+        )}
       </Box>
     </Paper>
   );

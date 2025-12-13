@@ -25,7 +25,7 @@ const BOUNDS_DEBOUNCE_MS = 500;
 interface TrackedWindow {
   windowId: string;
   window: BrowserWindow;
-  type: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector';
+  type: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector' | 'sdPicker';
   noteId?: string | undefined;
   sdId?: string | undefined;
   editorState?: EditorState | undefined;
@@ -65,7 +65,7 @@ export class WindowStateManager {
    */
   registerWindow(
     window: BrowserWindow,
-    type: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector',
+    type: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector' | 'sdPicker',
     noteId?: string,
     sdId?: string
   ): string {

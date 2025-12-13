@@ -12,7 +12,7 @@
  * - Bidirectional highlighting between hex and structure
  */
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Box, Typography, IconButton, Tooltip, Paper } from '@mui/material';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
@@ -225,6 +225,7 @@ export const HexViewer: React.FC<HexViewerProps> = ({
   onHighlightChange,
 }) => {
   const [currentPage, setCurrentPage] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-navigate to page containing highlighted bytes when highlight changes
   useEffect(() => {
@@ -232,6 +233,32 @@ export const HexViewer: React.FC<HexViewerProps> = ({
       const targetPage = Math.floor(highlightRange.start / BYTES_PER_PAGE);
       if (targetPage !== currentPage) {
         setCurrentPage(targetPage);
+      }
+    }
+  }, [highlightRange, currentPage]);
+
+  // Scroll to highlighted row within the current page
+  useEffect(() => {
+    if (highlightRange && scrollContainerRef.current) {
+      const pageStartOffset = currentPage * BYTES_PER_PAGE;
+      const highlightStartOffset = highlightRange.start;
+
+      // Only scroll if highlight is on current page
+      if (
+        highlightStartOffset >= pageStartOffset &&
+        highlightStartOffset < pageStartOffset + BYTES_PER_PAGE
+      ) {
+        // Calculate which row contains the start of the highlight
+        const rowIndex = Math.floor((highlightStartOffset - pageStartOffset) / BYTES_PER_ROW);
+        // Each row is approximately 20px tall (based on the font size and padding)
+        const rowHeight = 20;
+        const targetScrollTop = rowIndex * rowHeight;
+
+        // Scroll the container to show the highlighted row
+        scrollContainerRef.current.scrollTo({
+          top: Math.max(0, targetScrollTop - 100), // Offset by 100px to show context above
+          behavior: 'smooth',
+        });
       }
     }
   }, [highlightRange, currentPage]);
@@ -327,7 +354,7 @@ export const HexViewer: React.FC<HexViewerProps> = ({
       </Box>
 
       {/* Hex content */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      <Box ref={scrollContainerRef} sx={{ flexGrow: 1, overflow: 'auto' }}>
         {rows.map((row) => (
           <HexRow
             key={row.offset}

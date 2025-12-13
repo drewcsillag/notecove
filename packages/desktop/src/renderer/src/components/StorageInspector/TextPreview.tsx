@@ -98,10 +98,10 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ data, fileType, maxHei
           zIndex: 1,
         }}
       >
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: 'grey.400' }}>
           {getTitle()}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: 'grey.500' }}>
           {data.length.toLocaleString()} bytes
         </Typography>
       </Box>

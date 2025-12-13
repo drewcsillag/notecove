@@ -18,6 +18,8 @@ export interface RecordInfo {
   dataSize: number;
   startOffset: number;
   endOffset: number;
+  /** Start offset of the Yjs update data (after length, timestamp, sequence) */
+  dataStartOffset: number;
 }
 
 export interface RecordListProps {
@@ -95,10 +97,10 @@ export const RecordList: React.FC<RecordListProps> = ({
           zIndex: 1,
         }}
       >
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: 'grey.400' }}>
           Records ({records.length})
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: 'grey.500' }}>
           Click to highlight in hex view
         </Typography>
       </Box>

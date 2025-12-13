@@ -747,6 +747,7 @@ declare global {
               dataSize: number;
               startOffset: number;
               endOffset: number;
+              dataStartOffset: number;
               fields: {
                 name: string;
                 value: string | number;

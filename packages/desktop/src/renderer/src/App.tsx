@@ -19,7 +19,7 @@ import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgr
 import { NoteInfoWindow } from './components/NoteInfoWindow';
 import {
   StorageInspectorWindow,
-  SDPickerDialog,
+  SDPickerWindow,
   InspectorErrorBoundary,
 } from './components/StorageInspector';
 import { AboutDialog } from './components/AboutDialog/AboutDialog';
@@ -78,8 +78,8 @@ function App(): React.ReactElement {
   const [storageInspectorSdId, setStorageInspectorSdId] = useState<string | null>(null);
   const [storageInspectorSdPath, setStorageInspectorSdPath] = useState<string | null>(null);
   const [storageInspectorSdName, setStorageInspectorSdName] = useState<string | null>(null);
-  // SD Picker dialog for Storage Inspector
-  const [sdPickerOpen, setSdPickerOpen] = useState(false);
+  // SD Picker window mode (dedicated window for selecting SD to inspect)
+  const [sdPickerMode, setSdPickerMode] = useState(false);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
 
@@ -101,6 +101,8 @@ function App(): React.ReactElement {
       let sdPathParam = searchParams.get('sdPath');
       let sdNameParam = searchParams.get('sdName');
 
+      let sdPickerParam = searchParams.get('sdPicker');
+
       // If not in search, try hash (for file:// protocol)
       if (
         !noteIdParam &&
@@ -108,6 +110,7 @@ function App(): React.ReactElement {
         !syncStatusParam &&
         !noteInfoParam &&
         !storageInspectorParam &&
+        !sdPickerParam &&
         window.location.hash
       ) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -120,6 +123,7 @@ function App(): React.ReactElement {
         sdIdParam = hashParams.get('sdId');
         sdPathParam = hashParams.get('sdPath');
         sdNameParam = hashParams.get('sdName');
+        sdPickerParam = hashParams.get('sdPicker');
       }
 
       if (noteIdParam) {
@@ -149,6 +153,11 @@ function App(): React.ReactElement {
         setStorageInspectorSdId(sdIdParam);
         setStorageInspectorSdPath(sdPathParam);
         setStorageInspectorSdName(sdNameParam);
+      }
+
+      if (sdPickerParam === 'true') {
+        console.log('[App] Enabling SD picker mode from URL parameter');
+        setSdPickerMode(true);
       }
     } catch (error) {
       console.error('[App] Error parsing URL parameters:', error);
@@ -525,10 +534,7 @@ function App(): React.ReactElement {
       void window.electronAPI.sync.openWindow();
     });
 
-    // Storage Inspector - open SD selection dialog then inspector window
-    const cleanupStorageInspector = window.electronAPI.menu.onStorageInspector(() => {
-      setSdPickerOpen(true);
-    });
+    // Storage Inspector - now handled directly by main process (no renderer callback needed)
 
     return () => {
       cleanupNewNote();
@@ -547,7 +553,6 @@ function App(): React.ReactElement {
       cleanupReloadFromCRDTLogs();
       cleanupReindexNotes();
       cleanupSyncStatus();
-      cleanupStorageInspector();
     };
   }, [selectedNoteId]);
 
@@ -660,6 +665,25 @@ function App(): React.ReactElement {
               sdName={storageInspectorSdName}
             />
           </InspectorErrorBoundary>
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
+  // Render SD picker window (standalone window for selecting SD to inspect)
+  if (sdPickerMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <SDPickerWindow />
         </Box>
       </ThemeProvider>
     );
@@ -794,16 +818,6 @@ function App(): React.ReactElement {
           {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
         />
         <StaleSyncToast />
-        <SDPickerDialog
-          open={sdPickerOpen}
-          onClose={() => {
-            setSdPickerOpen(false);
-          }}
-          onSelect={(sd) => {
-            setSdPickerOpen(false);
-            void window.electronAPI.window.openStorageInspector(sd.id, sd.path, sd.name);
-          }}
-        />
       </DndProvider>
     </ThemeProvider>
   );
