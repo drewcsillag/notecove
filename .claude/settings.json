@@ -57,8 +57,10 @@
   },
   "permissions": {
     "allow": [
+      "Bash(nc_canary=1 cat:*)",
       "Bash(nc_canary=1 cd:*)",
       "Bash(nc_canary=1 date:*)",
+      "Bash(nc_canary=1 echo:*)",
       "Bash(nc_canary=1 find:*)",
       "Bash(nc_canary=1 git add:*)",
       "Bash(nc_canary=1 git checkout:*)",
@@ -104,8 +106,9 @@
       "Bash(nc_canary=1 rm:*)",
       "Bash(nc_canary=1 sleep:*)",
       "Bash(nc_canary=1 tail:*)",
+      "Bash(nc_canary=1 tee:*)",
       "Bash(nc_canary=1 timeout 600 pnpm ci-local:*)",
-      "Bash(nc_canary=1 npx jest:*)"
+      "Bash(nc_canary=1 wc:*)"
     ]
   }
 }
