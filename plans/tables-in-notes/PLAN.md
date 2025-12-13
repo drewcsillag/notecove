@@ -1,6 +1,6 @@
 # Tables in Notes - Implementation Plan
 
-**Overall Progress:** `22%` (Phases 1-2 complete)
+**Overall Progress:** `33%` (Phases 1-3 complete)
 
 **Branch:** `tables-in-notes`
 
@@ -139,27 +139,36 @@ Add UI for creating tables and manipulating them.
 
 ---
 
-## Phase 3: Markdown Input Rule
+## Phase 3: Markdown Parsing Utilities
 
-**Status:** 🟥 To Do
-**Progress:** `0%`
+**Status:** 🟩 Done
+**Progress:** `100%`
 
-Support creating tables via Markdown syntax.
+Parsing utilities for markdown table syntax (paste handling deferred to Phase 7).
 
 ### Tasks
 
-- [ ] 🟥 **3.1 Markdown table input rule**
-  - [ ] 🟥 Write test: `| col1 | col2 |` + Enter converts to table
-  - [ ] 🟥 Create input rule for pipe-separated header row
-  - [ ] 🟥 Detect `|---|---|` separator line
-  - [ ] 🟥 Convert markdown table syntax to table node
+- [x] 🟩 **3.1 Markdown table parsing utilities**
+  - [x] 🟩 Write tests for parsing utilities (13 tests)
+  - [x] 🟩 `parseMarkdownTableRow` - parse pipe-separated row
+  - [x] 🟩 `isMarkdownTableSeparator` - detect `|---|---|` pattern
+  - [x] 🟩 `parseMarkdownAlignment` - detect `:---`, `:---:`, `---:` patterns
+  - [x] 🟩 `parseMarkdownTable` - parse complete markdown table structure
 
-- [ ] 🟥 **3.2 Handle multi-row markdown tables**
-  - [ ] 🟥 Write test: Pasting multi-row markdown creates full table
-  - [ ] 🟥 Parse multiple rows of pipe-separated content
-  - [ ] 🟥 Respect column alignment markers (`:---`, `:---:`, `---:`)
+- [x] 🟩 **3.2 HTML conversion**
+  - [x] 🟩 `markdownTableToHtml` - convert parsed table to HTML
+  - [x] 🟩 Escape HTML special characters
+  - [x] 🟩 Test HTML insertion into TipTap editor
 
-**Outputs:** Users can type or paste Markdown tables.
+**Note:** Interactive input rule (typing `| col1 | col2 |` + Enter) deferred - complex multi-line pattern matching.
+Paste handling moved to Phase 7 (Copy/Paste) for proper integration.
+
+**Outputs:** Parsing utilities ready for Phase 7 paste handling.
+
+### Files Modified
+
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/Table.ts` - Added parsing functions
+- `packages/desktop/src/renderer/src/components/EditorPanel/extensions/__tests__/TableMarkdownInput.test.ts` - 13 tests
 
 ---
 

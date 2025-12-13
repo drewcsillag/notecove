@@ -202,7 +202,7 @@ export function getTableDimensionsFromEditor(editor: {
   // Walk up the node tree to find the table
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
   const depth = $from.depth;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   for (let d = depth; d > 0; d--) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
     const node = $from.node(d);
@@ -248,4 +248,162 @@ export function canDeleteColumn(
 ): boolean {
   const dims = getTableDimensionsFromEditor(editor);
   return !dims || dims.cols > TABLE_CONSTRAINTS.MIN_COLS;
+}
+
+// =============================================================================
+// Markdown Table Parsing Utilities
+// =============================================================================
+
+/**
+ * Parse a markdown table row into cell contents.
+ * Returns null if the text is not a valid table row.
+ *
+ * @example
+ * parseMarkdownTableRow('| col1 | col2 |') // ['col1', 'col2']
+ * parseMarkdownTableRow('not a table') // null
+ */
+export function parseMarkdownTableRow(text: string): string[] | null {
+  const trimmed = text.trim();
+
+  // Must start and end with pipe (or just have pipes)
+  if (!trimmed.includes('|')) {
+    return null;
+  }
+
+  // Split by pipe and filter
+  const parts = trimmed.split('|');
+
+  // Remove empty first/last elements from leading/trailing pipes
+  const cells = parts
+    .map((p) => p.trim())
+    .filter((p, i, arr) => {
+      // Keep middle elements, skip empty first/last
+      if (i === 0 && p === '') return false;
+      if (i === arr.length - 1 && p === '') return false;
+      return true;
+    });
+
+  // Must have at least one cell
+  if (cells.length === 0) {
+    return null;
+  }
+
+  return cells;
+}
+
+/**
+ * Check if a row is a markdown table separator (|---|---|)
+ */
+export function isMarkdownTableSeparator(text: string): boolean {
+  const cells = parseMarkdownTableRow(text);
+  if (!cells) return false;
+
+  // Each cell must be a separator pattern: optional :, at least one -, optional :
+  const separatorPattern = /^:?-+:?$/;
+  return cells.every((cell) => separatorPattern.test(cell));
+}
+
+/**
+ * Parse alignment from a separator cell
+ * :--- = left, :---: = center, ---: = right, --- = left (default)
+ */
+export function parseMarkdownAlignment(separator: string): 'left' | 'center' | 'right' {
+  const trimmed = separator.trim();
+  const startsWithColon = trimmed.startsWith(':');
+  const endsWithColon = trimmed.endsWith(':');
+
+  if (startsWithColon && endsWithColon) {
+    return 'center';
+  } else if (endsWithColon) {
+    return 'right';
+  }
+  return 'left';
+}
+
+/**
+ * Parse a complete markdown table into structured data.
+ * Returns null if the lines don't form a valid table.
+ */
+export function parseMarkdownTable(lines: string[]): {
+  headers: string[];
+  alignments: ('left' | 'center' | 'right')[];
+  rows: string[][];
+} | null {
+  const headerLine = lines[0];
+  const separatorLine = lines[1];
+
+  if (!headerLine || !separatorLine) {
+    return null;
+  }
+
+  // First line should be header
+  const headers = parseMarkdownTableRow(headerLine);
+  if (!headers) return null;
+
+  // Second line should be separator
+  if (!isMarkdownTableSeparator(separatorLine)) {
+    return null;
+  }
+
+  // Parse alignments from separator
+  const separatorCells = parseMarkdownTableRow(separatorLine) ?? [];
+  const alignments = separatorCells.map(parseMarkdownAlignment);
+
+  // Ensure alignments match header count
+  while (alignments.length < headers.length) {
+    alignments.push('left');
+  }
+
+  // Parse data rows
+  const rows: string[][] = [];
+  for (let i = 2; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const row = parseMarkdownTableRow(line);
+    if (row) {
+      // Pad row to match header count
+      while (row.length < headers.length) {
+        row.push('');
+      }
+      rows.push(row);
+    }
+  }
+
+  return { headers, alignments, rows };
+}
+
+/**
+ * Convert a parsed markdown table to HTML string.
+ * This HTML can be inserted into TipTap editor.
+ */
+export function markdownTableToHtml(
+  table: NonNullable<ReturnType<typeof parseMarkdownTable>>
+): string {
+  const { headers, rows } = table;
+
+  // Build header row
+  const headerCells = headers.map((h) => `<th><p>${escapeHtml(h)}</p></th>`).join('');
+  const headerRow = `<tr>${headerCells}</tr>`;
+
+  // Build data rows
+  const dataRows = rows
+    .map((row) => {
+      const cells = row.map((cell) => `<td><p>${escapeHtml(cell)}</p></td>`).join('');
+      return `<tr>${cells}</tr>`;
+    })
+    .join('');
+
+  return `<table>${headerRow}${dataRows}</table>`;
+}
+
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

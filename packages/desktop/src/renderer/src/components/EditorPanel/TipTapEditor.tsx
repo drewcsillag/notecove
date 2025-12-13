@@ -277,10 +277,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
       },
-      // Handle image paste from clipboard
+      // Handle paste from clipboard (markdown tables and images)
       handlePaste: (view, event, _slice) => {
-        const items = event.clipboardData?.items;
-        if (!items) return false;
+        const clipboardData = event.clipboardData;
+        if (!clipboardData) return false;
+
+        // TODO: Add markdown table paste handling in Phase 7 (Copy/Paste)
+        // For now, markdown tables can be created via the toolbar button
+
+        const items = clipboardData.items;
 
         // Look for image data in clipboard
         for (const item of items) {
