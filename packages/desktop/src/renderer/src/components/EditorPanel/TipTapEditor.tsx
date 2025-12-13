@@ -23,6 +23,12 @@ import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
 import { NotecoveImage } from './extensions/Image';
+import {
+  NotecoveTable,
+  NotecoveTableRow,
+  NotecoveTableHeader,
+  NotecoveTableCell,
+} from './extensions/Table';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
 import { SearchPanel } from './SearchPanel';
@@ -247,6 +253,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       WebLink,
       // Add NotecoveImage extension for image display
       NotecoveImage,
+      // Add Table extensions for table support
+      NotecoveTable,
+      NotecoveTableRow,
+      NotecoveTableHeader,
+      NotecoveTableCell,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
@@ -1967,6 +1978,72 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               outline: `2px solid ${theme.palette.info.main}`,
               outlineOffset: '-2px',
             },
+          },
+          // Table styling
+          '& table': {
+            borderCollapse: 'collapse',
+            width: '100%',
+            margin: '16px 0',
+            tableLayout: 'fixed',
+            overflow: 'hidden',
+            borderRadius: '4px',
+            border: `1px solid ${theme.palette.divider}`,
+          },
+          '& table td, & table th': {
+            border: `1px solid ${theme.palette.divider}`,
+            padding: '8px 12px',
+            textAlign: 'left',
+            verticalAlign: 'top',
+            position: 'relative',
+            minWidth: '50px',
+            boxSizing: 'border-box',
+            '& > p': {
+              margin: 0,
+            },
+          },
+          '& table th': {
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+            fontWeight: 600,
+          },
+          '& table tr:hover': {
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          },
+          // Selected cell styling
+          '& table .selectedCell': {
+            backgroundColor:
+              theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.2)' : 'rgba(25, 118, 210, 0.1)',
+          },
+          '& table .selectedCell::after': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            border: `2px solid ${theme.palette.primary.main}`,
+            pointerEvents: 'none',
+          },
+          // Column resize handle styling
+          '& .column-resize-handle': {
+            position: 'absolute',
+            right: '-2px',
+            top: 0,
+            bottom: 0,
+            width: '4px',
+            backgroundColor: theme.palette.primary.main,
+            cursor: 'col-resize',
+            zIndex: 20,
+          },
+          // Table selected state
+          '& table.ProseMirror-selectednode': {
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: '2px',
+          },
+          // Resize cursor when dragging
+          '&.resize-cursor': {
+            cursor: 'col-resize',
           },
           // Search result highlighting
           '& .search-result': {
