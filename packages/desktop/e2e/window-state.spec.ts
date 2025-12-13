@@ -208,4 +208,46 @@ test.describe('Window State Restoration', () => {
     console.log('[E2E] Restored maximized state:', isMaximizedAfter);
     expect(isMaximizedAfter).toBe(true);
   });
+
+  test('should quit app on first app.quit() call (macOS quit bug fix)', async () => {
+    // This test verifies the fix for the macOS quit bug where:
+    // - First Cmd+Q (app.quit()) closes the window but doesn't quit the app
+    // - Second Cmd+Q actually quits
+    // The fix ensures the app quits on the first app.quit() call.
+
+    await launchApp();
+
+    // Track if the process exits
+    const electronProcess = electronApp.process();
+    let processExited = false;
+
+    electronProcess.on('exit', () => {
+      processExited = true;
+      console.log('[E2E] Electron process exited');
+    });
+
+    console.log('[E2E] Calling app.quit()...');
+
+    // Call app.quit() - this should cause the app to fully exit
+    await electronApp.evaluate(async ({ app }) => {
+      app.quit();
+    });
+
+    // Wait up to 10 seconds for the process to exit
+    // With the bug, the process won't exit (test fails)
+    // With the fix, the process exits promptly (test passes)
+    const maxWaitMs = 10000;
+    const checkIntervalMs = 100;
+    let waitedMs = 0;
+
+    while (!processExited && waitedMs < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, checkIntervalMs));
+      waitedMs += checkIntervalMs;
+    }
+
+    console.log(`[E2E] Process exited: ${processExited} (waited ${waitedMs}ms)`);
+
+    // The test passes if the process exited, fails if it timed out
+    expect(processExited).toBe(true);
+  });
 });

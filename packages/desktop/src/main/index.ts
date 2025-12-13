@@ -3312,7 +3312,9 @@ void app.whenReady().then(async () => {
 
 void app.on('window-all-closed', () => {
   // On macOS, keep app running unless explicitly quit
-  if (process.platform !== 'darwin') {
+  // The isExplicitQuit flag ensures quit continues after before-quit
+  // saves window state and calls app.quit() again
+  if (process.platform !== 'darwin' || isExplicitQuit) {
     app.quit();
   }
 });
@@ -3370,11 +3372,17 @@ powerMonitor.on('resume', () => {
 // Note: We use before-quit for window state (before windows close)
 // and will-quit for async cleanup (after windows close)
 let isQuitting = false;
+// Track explicit quit requests to ensure quit continues on macOS
+// (macOS normally keeps app running when windows close)
+let isExplicitQuit = false;
 
 // Save window state BEFORE windows close
 // The before-quit event fires before any windows are destroyed
 let windowStateSaved = false;
 app.on('before-quit', (event) => {
+  // Mark that an explicit quit was requested (for window-all-closed on macOS)
+  isExplicitQuit = true;
+
   if (isQuitting || windowStateSaved) return; // Already saved or in shutdown
 
   // Save window state - this must complete before windows close
