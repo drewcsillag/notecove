@@ -204,10 +204,13 @@ function createWindow(options?: {
   minimal?: boolean;
   syncStatus?: boolean;
   noteInfo?: boolean;
+  storageInspector?: boolean;
   targetNoteId?: string;
   noteTitle?: string;
   parentWindow?: BrowserWindow;
   sdId?: string;
+  sdPath?: string;
+  sdName?: string;
   bounds?: { x: number; y: number; width: number; height: number };
   isMaximized?: boolean;
   isFullScreen?: boolean;
@@ -219,13 +222,25 @@ function createWindow(options?: {
   }
 
   // Determine window dimensions
-  const defaultWidth =
-    options?.syncStatus || options?.noteInfo ? 900 : options?.minimal ? 800 : 1200;
-  const defaultHeight = options?.syncStatus || options?.noteInfo ? 600 : 800;
+  const defaultWidth = options?.storageInspector
+    ? 1200
+    : options?.syncStatus || options?.noteInfo
+      ? 900
+      : options?.minimal
+        ? 800
+        : 1200;
+  const defaultHeight = options?.storageInspector
+    ? 800
+    : options?.syncStatus || options?.noteInfo
+      ? 600
+      : 800;
 
   // Determine window title
-  const windowTitle =
-    options?.noteInfo && options.noteTitle ? `Note Info - ${options.noteTitle}` : getWindowTitle();
+  const windowTitle = options?.storageInspector
+    ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}`
+    : options?.noteInfo && options.noteTitle
+      ? `Note Info - ${options.noteTitle}`
+      : getWindowTitle();
 
   // Create the browser window with saved bounds or defaults
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -258,13 +273,16 @@ function createWindow(options?: {
   const newWindow = new BrowserWindow(windowOptions);
 
   // Determine window type for state tracking
-  const windowType: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' = options?.syncStatus
-    ? 'syncStatus'
-    : options?.noteInfo
-      ? 'noteInfo'
-      : options?.minimal
-        ? 'minimal'
-        : 'main';
+  const windowType: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector' =
+    options?.syncStatus
+      ? 'syncStatus'
+      : options?.noteInfo
+        ? 'noteInfo'
+        : options?.storageInspector
+          ? 'storageInspector'
+          : options?.minimal
+            ? 'minimal'
+            : 'main';
 
   // Register window with state manager (if available)
   let windowId: string | undefined;
@@ -336,8 +354,20 @@ function createWindow(options?: {
   if (options?.noteInfo) {
     params.set('noteInfo', 'true');
   }
+  if (options?.storageInspector) {
+    params.set('storageInspector', 'true');
+  }
   if (options?.targetNoteId) {
     params.set('targetNoteId', options.targetNoteId);
+  }
+  if (options?.sdId) {
+    params.set('sdId', options.sdId);
+  }
+  if (options?.sdPath) {
+    params.set('sdPath', options.sdPath);
+  }
+  if (options?.sdName) {
+    params.set('sdName', options.sdName);
   }
 
   const queryString = params.toString();
@@ -1930,6 +1960,14 @@ function createMenu(): void {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.send('menu:syncStatus');
+            }
+          },
+        },
+        {
+          label: 'Storage Inspector',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:storageInspector');
             }
           },
         },

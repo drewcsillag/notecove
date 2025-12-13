@@ -191,6 +191,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onReloadFromCRDTLogs: stubEventSubscription,
     onReindexNotes: stubEventSubscription,
     onSyncStatus: stubEventSubscription,
+    onStorageInspector: stubEventSubscription,
   },
 
   tools: {
@@ -248,6 +249,7 @@ export const browserApiStub: typeof window.electronAPI = {
 
   window: {
     openNoteInfo: notImplemented('window.openNoteInfo'),
+    openStorageInspector: notImplemented('window.openStorageInspector'),
   },
 
   image: {
@@ -276,6 +278,12 @@ export const browserApiStub: typeof window.electronAPI = {
     exists: notImplemented('thumbnail.exists'),
     delete: notImplemented('thumbnail.delete'),
     generate: notImplemented('thumbnail.generate'),
+  },
+
+  inspector: {
+    listSDContents: notImplemented('inspector.listSDContents'),
+    readFileInfo: notImplemented('inspector.readFileInfo'),
+    parseFile: notImplemented('inspector.parseFile'),
   },
 };
 

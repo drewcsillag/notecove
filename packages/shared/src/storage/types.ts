@@ -102,6 +102,7 @@ export interface FileStats {
   size: number; // File size in bytes
   mtimeMs: number; // Modified time in milliseconds
   ctimeMs: number; // Created time in milliseconds
+  isDirectory?: boolean; // True if path is a directory
 }
 
 /**

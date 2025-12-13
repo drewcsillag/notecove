@@ -692,6 +692,7 @@ export const webClient: typeof window.electronAPI = {
     onReloadFromCRDTLogs: noopSubscription,
     onReindexNotes: noopSubscription,
     onSyncStatus: noopSubscription,
+    onStorageInspector: noopSubscription,
   },
 
   tools: {
@@ -775,6 +776,11 @@ export const webClient: typeof window.electronAPI = {
   window: {
     // eslint-disable-next-line @typescript-eslint/require-await
     openNoteInfo: async () => {
+      // Not supported in web client - no separate windows
+      return { success: false, error: 'Not supported in web client' };
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    openStorageInspector: async () => {
       // Not supported in web client - no separate windows
       return { success: false, error: 'Not supported in web client' };
     },
@@ -935,6 +941,32 @@ export const webClient: typeof window.electronAPI = {
       } catch {
         return null;
       }
+    },
+  },
+
+  // Inspector is not available in web mode (desktop-only feature)
+  inspector: {
+    listSDContents: () => {
+      console.warn('Storage inspector is not available in browser mode');
+      return Promise.resolve({ root: '', children: [], error: 'Not available in browser mode' });
+    },
+    readFileInfo: () => {
+      console.warn('Storage inspector is not available in browser mode');
+      return Promise.resolve({
+        path: '',
+        type: 'unknown' as const,
+        size: 0,
+        modified: new Date(),
+        data: new Uint8Array(),
+        error: 'Not available in browser mode',
+      });
+    },
+    parseFile: () => {
+      console.warn('Storage inspector is not available in browser mode');
+      return Promise.resolve({
+        type: 'unknown' as const,
+        error: 'Not available in browser mode',
+      });
     },
   },
 };

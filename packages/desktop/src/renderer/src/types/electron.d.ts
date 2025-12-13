@@ -541,6 +541,7 @@ declare global {
         onReloadFromCRDTLogs: (callback: () => void) => () => void;
         onReindexNotes: (callback: () => void) => () => void;
         onSyncStatus: (callback: () => void) => () => void;
+        onStorageInspector: (callback: () => void) => () => void;
       };
 
       tools: {
@@ -639,6 +640,183 @@ declare global {
          * Creates a new window that displays detailed information about the note.
          */
         openNoteInfo: (noteId: string) => Promise<{ success: boolean; error?: string }>;
+        /**
+         * Open a Storage Inspector window for the specified storage directory.
+         * Creates a new window that displays storage directory contents and allows inspection.
+         */
+        openStorageInspector: (
+          sdId: string,
+          sdPath: string,
+          sdName: string
+        ) => Promise<{ success: boolean; error?: string }>;
+      };
+
+      // Storage inspector operations
+      inspector: {
+        /**
+         * List contents of a storage directory for inspection
+         */
+        listSDContents: (sdPath: string) => Promise<{
+          root: string;
+          children: {
+            name: string;
+            path: string;
+            type:
+              | 'crdtlog'
+              | 'snapshot'
+              | 'activity'
+              | 'profile'
+              | 'image'
+              | 'identity'
+              | 'directory'
+              | 'unknown';
+            size?: number;
+            modified?: Date;
+            children?: unknown[];
+          }[];
+          error?: string;
+        }>;
+        /**
+         * Read file info from a storage directory
+         */
+        readFileInfo: (
+          sdPath: string,
+          relativePath: string
+        ) => Promise<{
+          path: string;
+          type:
+            | 'crdtlog'
+            | 'snapshot'
+            | 'activity'
+            | 'profile'
+            | 'image'
+            | 'identity'
+            | 'directory'
+            | 'unknown';
+          size: number;
+          modified: Date;
+          data: Uint8Array;
+          error?: string;
+        }>;
+        /**
+         * Parse a file's binary data and return structured result with byte offsets
+         */
+        parseFile: (
+          data: Uint8Array,
+          type:
+            | 'crdtlog'
+            | 'snapshot'
+            | 'activity'
+            | 'profile'
+            | 'image'
+            | 'identity'
+            | 'directory'
+            | 'unknown'
+        ) => Promise<{
+          type:
+            | 'crdtlog'
+            | 'snapshot'
+            | 'activity'
+            | 'profile'
+            | 'image'
+            | 'identity'
+            | 'directory'
+            | 'unknown';
+          crdtLog?: {
+            fields: {
+              name: string;
+              value: string | number;
+              startOffset: number;
+              endOffset: number;
+              type:
+                | 'magic'
+                | 'version'
+                | 'timestamp'
+                | 'sequence'
+                | 'length'
+                | 'data'
+                | 'error'
+                | 'vectorClock'
+                | 'status';
+              error?: string;
+            }[];
+            records: {
+              index: number;
+              timestamp: number;
+              sequence: number;
+              dataSize: number;
+              startOffset: number;
+              endOffset: number;
+              fields: {
+                name: string;
+                value: string | number;
+                startOffset: number;
+                endOffset: number;
+                type:
+                  | 'magic'
+                  | 'version'
+                  | 'timestamp'
+                  | 'sequence'
+                  | 'length'
+                  | 'data'
+                  | 'error'
+                  | 'vectorClock'
+                  | 'status';
+                error?: string;
+              }[];
+            }[];
+            error?: string;
+          };
+          snapshot?: {
+            fields: {
+              name: string;
+              value: string | number;
+              startOffset: number;
+              endOffset: number;
+              type:
+                | 'magic'
+                | 'version'
+                | 'timestamp'
+                | 'sequence'
+                | 'length'
+                | 'data'
+                | 'error'
+                | 'vectorClock'
+                | 'status';
+              error?: string;
+            }[];
+            vectorClockEntries: {
+              instanceId: string;
+              sequence: number;
+              offset: number;
+              filename: string;
+              startOffset: number;
+              endOffset: number;
+              fields: {
+                name: string;
+                value: string | number;
+                startOffset: number;
+                endOffset: number;
+                type:
+                  | 'magic'
+                  | 'version'
+                  | 'timestamp'
+                  | 'sequence'
+                  | 'length'
+                  | 'data'
+                  | 'error'
+                  | 'vectorClock'
+                  | 'status';
+                error?: string;
+              }[];
+            }[];
+            documentStateOffset: number;
+            documentStateSize: number;
+            complete: boolean;
+            error?: string;
+          };
+          error?: string;
+        }>;
       };
 
       image: {

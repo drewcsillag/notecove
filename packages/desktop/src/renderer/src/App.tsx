@@ -17,6 +17,7 @@ import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgress
 import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownProgressDialog';
 import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgressDialog';
 import { NoteInfoWindow } from './components/NoteInfoWindow';
+import { StorageInspectorWindow, SDPickerDialog } from './components/StorageInspector';
 import { AboutDialog } from './components/AboutDialog/AboutDialog';
 import { StaleSyncToast } from './components/StaleSyncToast';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
@@ -68,6 +69,13 @@ function App(): React.ReactElement {
   // Note Info window mode (dedicated window for note information)
   const [noteInfoMode, setNoteInfoMode] = useState(false);
   const [noteInfoTargetNoteId, setNoteInfoTargetNoteId] = useState<string | null>(null);
+  // Storage Inspector window mode (dedicated window for browsing SD contents)
+  const [storageInspectorMode, setStorageInspectorMode] = useState(false);
+  const [storageInspectorSdId, setStorageInspectorSdId] = useState<string | null>(null);
+  const [storageInspectorSdPath, setStorageInspectorSdPath] = useState<string | null>(null);
+  const [storageInspectorSdName, setStorageInspectorSdName] = useState<string | null>(null);
+  // SD Picker dialog for Storage Inspector
+  const [sdPickerOpen, setSdPickerOpen] = useState(false);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
 
@@ -84,6 +92,10 @@ function App(): React.ReactElement {
       let syncStatusParam = searchParams.get('syncStatus');
       let noteInfoParam = searchParams.get('noteInfo');
       let targetNoteIdParam = searchParams.get('targetNoteId');
+      let storageInspectorParam = searchParams.get('storageInspector');
+      let sdIdParam = searchParams.get('sdId');
+      let sdPathParam = searchParams.get('sdPath');
+      let sdNameParam = searchParams.get('sdName');
 
       // If not in search, try hash (for file:// protocol)
       if (
@@ -91,6 +103,7 @@ function App(): React.ReactElement {
         !minimalParam &&
         !syncStatusParam &&
         !noteInfoParam &&
+        !storageInspectorParam &&
         window.location.hash
       ) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -99,6 +112,10 @@ function App(): React.ReactElement {
         syncStatusParam = hashParams.get('syncStatus');
         noteInfoParam = hashParams.get('noteInfo');
         targetNoteIdParam = hashParams.get('targetNoteId');
+        storageInspectorParam = hashParams.get('storageInspector');
+        sdIdParam = hashParams.get('sdId');
+        sdPathParam = hashParams.get('sdPath');
+        sdNameParam = hashParams.get('sdName');
       }
 
       if (noteIdParam) {
@@ -120,6 +137,14 @@ function App(): React.ReactElement {
         console.log('[App] Enabling note info mode from URL parameter, noteId:', targetNoteIdParam);
         setNoteInfoMode(true);
         setNoteInfoTargetNoteId(targetNoteIdParam);
+      }
+
+      if (storageInspectorParam === 'true' && sdIdParam && sdPathParam && sdNameParam) {
+        console.log('[App] Enabling storage inspector mode from URL parameter, sdId:', sdIdParam);
+        setStorageInspectorMode(true);
+        setStorageInspectorSdId(sdIdParam);
+        setStorageInspectorSdPath(sdPathParam);
+        setStorageInspectorSdName(sdNameParam);
       }
     } catch (error) {
       console.error('[App] Error parsing URL parameters:', error);
@@ -496,6 +521,11 @@ function App(): React.ReactElement {
       void window.electronAPI.sync.openWindow();
     });
 
+    // Storage Inspector - open SD selection dialog then inspector window
+    const cleanupStorageInspector = window.electronAPI.menu.onStorageInspector(() => {
+      setSdPickerOpen(true);
+    });
+
     return () => {
       cleanupNewNote();
       cleanupNewFolder();
@@ -513,6 +543,7 @@ function App(): React.ReactElement {
       cleanupReloadFromCRDTLogs();
       cleanupReindexNotes();
       cleanupSyncStatus();
+      cleanupStorageInspector();
     };
   }, [selectedNoteId]);
 
@@ -595,6 +626,34 @@ function App(): React.ReactElement {
           }}
         >
           <NoteInfoWindow noteId={noteInfoTargetNoteId} />
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
+  // Render storage inspector window (standalone window for SD inspection)
+  if (
+    storageInspectorMode &&
+    storageInspectorSdId &&
+    storageInspectorSdPath &&
+    storageInspectorSdName
+  ) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <StorageInspectorWindow
+            sdId={storageInspectorSdId}
+            sdPath={storageInspectorSdPath}
+            sdName={storageInspectorSdName}
+          />
         </Box>
       </ThemeProvider>
     );
@@ -729,6 +788,16 @@ function App(): React.ReactElement {
           {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
         />
         <StaleSyncToast />
+        <SDPickerDialog
+          open={sdPickerOpen}
+          onClose={() => {
+            setSdPickerOpen(false);
+          }}
+          onSelect={(sd) => {
+            setSdPickerOpen(false);
+            void window.electronAPI.window.openStorageInspector(sd.id, sd.path, sd.name);
+          }}
+        />
       </DndProvider>
     </ThemeProvider>
   );

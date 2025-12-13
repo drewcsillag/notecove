@@ -126,6 +126,7 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
       size: stats.size,
       mtimeMs: stats.mtimeMs,
       ctimeMs: stats.ctimeMs,
+      isDirectory: stats.isDirectory(),
     };
   }
 

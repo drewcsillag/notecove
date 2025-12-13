@@ -87,6 +87,13 @@ import type { NoteMoveManager } from '../note-move-manager';
 import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
 import type { DiagnosticsManager } from '../diagnostics-manager';
 import type { BackupManager } from '../backup-manager';
+import {
+  StorageInspectorService,
+  type SDContentsResult,
+  type FileInfoResult,
+  type ParsedFileResult,
+  type InspectorFileType,
+} from '../storage-inspector';
 
 /**
  * Callback type for broadcasting to web clients via WebSocket
@@ -97,6 +104,7 @@ export class IPCHandlers {
   private webBroadcastCallback: WebBroadcastCallback | undefined;
   private thumbnailGenerator: ThumbnailGenerator;
   private imageCleanupManager: ImageCleanupManager;
+  private storageInspectorService: StorageInspectorService;
 
   constructor(
     private crdtManager: CRDTManager,
@@ -110,9 +118,13 @@ export class IPCHandlers {
       noteId?: string;
       minimal?: boolean;
       noteInfo?: boolean;
+      storageInspector?: boolean;
       targetNoteId?: string;
       noteTitle?: string;
       parentWindow?: BrowserWindow;
+      sdId?: string;
+      sdPath?: string;
+      sdName?: string;
     }) => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>,
     private getDeletionLogger?: GetDeletionLoggerFn,
@@ -127,6 +139,9 @@ export class IPCHandlers {
 
     // Initialize image cleanup manager with database and thumbnail directory
     this.imageCleanupManager = new ImageCleanupManager(database, thumbnailCacheDir);
+
+    // Initialize storage inspector service
+    this.storageInspectorService = new StorageInspectorService(new NodeFileSystemAdapter());
 
     this.registerHandlers();
   }
@@ -422,7 +437,16 @@ export class IPCHandlers {
     if (this.createWindowFn) {
       ipcMain.handle('testing:createWindow', this.handleCreateWindow.bind(this));
       ipcMain.handle('window:openNoteInfo', this.handleOpenNoteInfoWindow.bind(this));
+      ipcMain.handle(
+        'window:openStorageInspector',
+        this.handleOpenStorageInspectorWindow.bind(this)
+      );
     }
+
+    // Storage inspector operations
+    ipcMain.handle('inspector:listSDContents', this.handleListSDContents.bind(this));
+    ipcMain.handle('inspector:readFileInfo', this.handleReadFileInfo.bind(this));
+    ipcMain.handle('inspector:parseFile', this.handleParseFile.bind(this));
 
     // Test-only operations (only available in NODE_ENV=test)
     if (process.env['NODE_ENV'] === 'test') {
@@ -2230,6 +2254,35 @@ export class IPCHandlers {
         targetNoteId: noteId,
         noteTitle: note.title,
         parentWindow: parentWindow,
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Window: Open Storage Inspector window for a specific storage directory.
+   * Creates a new window that allows browsing and inspecting SD contents.
+   */
+  private async handleOpenStorageInspectorWindow(
+    event: IpcMainInvokeEvent,
+    sdId: string,
+    sdPath: string,
+    sdName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    // Get the window that sent this IPC message
+    const parentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!parentWindow) {
+      return { success: false, error: 'Could not determine parent window' };
+    }
+
+    // Create the Storage Inspector window
+    if (this.createWindowFn) {
+      this.createWindowFn({
+        storageInspector: true,
+        sdId,
+        sdPath,
+        sdName,
       });
     }
 
@@ -4262,6 +4315,38 @@ export class IPCHandlers {
       this.broadcastToAll('tools:reindex-error', { error: message });
       return { success: false, error: message };
     }
+  }
+
+  /**
+   * List contents of a Storage Directory for the inspector
+   */
+  private async handleListSDContents(
+    _event: IpcMainInvokeEvent,
+    sdPath: string
+  ): Promise<SDContentsResult> {
+    return this.storageInspectorService.listSDContents(sdPath);
+  }
+
+  /**
+   * Read file info from a Storage Directory for the inspector
+   */
+  private async handleReadFileInfo(
+    _event: IpcMainInvokeEvent,
+    sdPath: string,
+    relativePath: string
+  ): Promise<FileInfoResult> {
+    return this.storageInspectorService.readFileInfo(sdPath, relativePath);
+  }
+
+  /**
+   * Parse a file's binary data and return structured result with byte offsets
+   */
+  private handleParseFile(
+    _event: IpcMainInvokeEvent,
+    data: Uint8Array,
+    type: InspectorFileType
+  ): ParsedFileResult {
+    return this.storageInspectorService.parseFile(data, type);
   }
 }
 

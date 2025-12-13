@@ -1122,6 +1122,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('menu:syncStatus', listener);
       };
     },
+    onStorageInspector: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:storageInspector', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:storageInspector', listener);
+      };
+    },
   },
 
   // Tools operations
@@ -1475,6 +1484,195 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openNoteInfo: (noteId: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('window:openNoteInfo', noteId) as Promise<{
         success: boolean;
+        error?: string;
+      }>,
+    /**
+     * Open a Storage Inspector window for the specified storage directory.
+     * Creates a new window that displays storage directory contents and allows inspection.
+     */
+    openStorageInspector: (
+      sdId: string,
+      sdPath: string,
+      sdName: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('window:openStorageInspector', sdId, sdPath, sdName) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+  },
+
+  // Storage inspector operations
+  inspector: {
+    /**
+     * List contents of a storage directory for inspection
+     * @param sdPath Path to the storage directory
+     */
+    listSDContents: (sdPath: string) =>
+      ipcRenderer.invoke('inspector:listSDContents', sdPath) as Promise<{
+        root: string;
+        children: {
+          name: string;
+          path: string;
+          type:
+            | 'crdtlog'
+            | 'snapshot'
+            | 'activity'
+            | 'profile'
+            | 'image'
+            | 'identity'
+            | 'directory'
+            | 'unknown';
+          size?: number;
+          modified?: Date;
+          children?: unknown[];
+        }[];
+        error?: string;
+      }>,
+
+    /**
+     * Read file info from a storage directory
+     * @param sdPath Path to the storage directory
+     * @param relativePath Path relative to the SD root
+     */
+    readFileInfo: (sdPath: string, relativePath: string) =>
+      ipcRenderer.invoke('inspector:readFileInfo', sdPath, relativePath) as Promise<{
+        path: string;
+        type:
+          | 'crdtlog'
+          | 'snapshot'
+          | 'activity'
+          | 'profile'
+          | 'image'
+          | 'identity'
+          | 'directory'
+          | 'unknown';
+        size: number;
+        modified: Date;
+        data: Uint8Array;
+        error?: string;
+      }>,
+
+    /**
+     * Parse a file's binary data and return structured result with byte offsets
+     * for hex viewer color coding
+     * @param data Raw file data
+     * @param type File type
+     */
+    parseFile: (
+      data: Uint8Array,
+      type:
+        | 'crdtlog'
+        | 'snapshot'
+        | 'activity'
+        | 'profile'
+        | 'image'
+        | 'identity'
+        | 'directory'
+        | 'unknown'
+    ) =>
+      ipcRenderer.invoke('inspector:parseFile', data, type) as Promise<{
+        type:
+          | 'crdtlog'
+          | 'snapshot'
+          | 'activity'
+          | 'profile'
+          | 'image'
+          | 'identity'
+          | 'directory'
+          | 'unknown';
+        crdtLog?: {
+          fields: {
+            name: string;
+            value: string | number;
+            startOffset: number;
+            endOffset: number;
+            type:
+              | 'magic'
+              | 'version'
+              | 'timestamp'
+              | 'sequence'
+              | 'length'
+              | 'data'
+              | 'error'
+              | 'vectorClock'
+              | 'status';
+            error?: string;
+          }[];
+          records: {
+            index: number;
+            timestamp: number;
+            sequence: number;
+            dataSize: number;
+            startOffset: number;
+            endOffset: number;
+            fields: {
+              name: string;
+              value: string | number;
+              startOffset: number;
+              endOffset: number;
+              type:
+                | 'magic'
+                | 'version'
+                | 'timestamp'
+                | 'sequence'
+                | 'length'
+                | 'data'
+                | 'error'
+                | 'vectorClock'
+                | 'status';
+              error?: string;
+            }[];
+          }[];
+          error?: string;
+        };
+        snapshot?: {
+          fields: {
+            name: string;
+            value: string | number;
+            startOffset: number;
+            endOffset: number;
+            type:
+              | 'magic'
+              | 'version'
+              | 'timestamp'
+              | 'sequence'
+              | 'length'
+              | 'data'
+              | 'error'
+              | 'vectorClock'
+              | 'status';
+            error?: string;
+          }[];
+          vectorClockEntries: {
+            instanceId: string;
+            sequence: number;
+            offset: number;
+            filename: string;
+            startOffset: number;
+            endOffset: number;
+            fields: {
+              name: string;
+              value: string | number;
+              startOffset: number;
+              endOffset: number;
+              type:
+                | 'magic'
+                | 'version'
+                | 'timestamp'
+                | 'sequence'
+                | 'length'
+                | 'data'
+                | 'error'
+                | 'vectorClock'
+                | 'status';
+              error?: string;
+            }[];
+          }[];
+          documentStateOffset: number;
+          documentStateSize: number;
+          complete: boolean;
+          error?: string;
+        };
         error?: string;
       }>,
   },
