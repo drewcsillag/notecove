@@ -144,6 +144,9 @@ const mockElectronAPI = {
     onSyncStatus: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    onStorageInspector: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   export: {
     selectDirectory: jest.fn(() => Promise.resolve(null)),

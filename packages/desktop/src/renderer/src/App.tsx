@@ -17,7 +17,11 @@ import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgress
 import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownProgressDialog';
 import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgressDialog';
 import { NoteInfoWindow } from './components/NoteInfoWindow';
-import { StorageInspectorWindow, SDPickerDialog } from './components/StorageInspector';
+import {
+  StorageInspectorWindow,
+  SDPickerDialog,
+  InspectorErrorBoundary,
+} from './components/StorageInspector';
 import { AboutDialog } from './components/AboutDialog/AboutDialog';
 import { StaleSyncToast } from './components/StaleSyncToast';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
@@ -649,11 +653,13 @@ function App(): React.ReactElement {
             overflow: 'hidden',
           }}
         >
-          <StorageInspectorWindow
-            sdId={storageInspectorSdId}
-            sdPath={storageInspectorSdPath}
-            sdName={storageInspectorSdName}
-          />
+          <InspectorErrorBoundary>
+            <StorageInspectorWindow
+              sdId={storageInspectorSdId}
+              sdPath={storageInspectorSdPath}
+              sdName={storageInspectorSdName}
+            />
+          </InspectorErrorBoundary>
         </Box>
       </ThemeProvider>
     );

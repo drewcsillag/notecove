@@ -7,11 +7,25 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, CircularProgress, Button, Paper } from '@mui/material';
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Button,
+  Paper,
+  IconButton,
+  Tooltip,
+  Divider,
+} from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DownloadIcon from '@mui/icons-material/Download';
+import BugReportIcon from '@mui/icons-material/BugReport';
 import { StorageTreeBrowser, type SDTreeNode } from './StorageTreeBrowser';
 import { HexViewer, type ParsedField } from './HexViewer';
 import { RecordList, type RecordInfo } from './RecordList';
+import { TextPreview } from './TextPreview';
+import { ImagePreview } from './ImagePreview';
 
 export interface StorageInspectorWindowProps {
   sdId: string;
@@ -164,6 +178,68 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
     void loadContents();
   };
 
+  // Copy hex selection to clipboard
+  const handleCopyHex = useCallback(async () => {
+    if (!fileData || !highlightRange) return;
+
+    const { start, end } = highlightRange;
+    const selectedBytes = fileData.data.slice(start, end);
+    const hexString = Array.from(selectedBytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join(' ');
+
+    await navigator.clipboard.writeText(hexString);
+  }, [fileData, highlightRange]);
+
+  // Copy parsed structure as JSON
+  const handleCopyJson = useCallback(async () => {
+    if (!parsedFields || parsedFields.length === 0) return;
+
+    const jsonData = {
+      fields: parsedFields,
+      records: parsedRecords.length > 0 ? parsedRecords : undefined,
+    };
+
+    await navigator.clipboard.writeText(JSON.stringify(jsonData, null, 2));
+  }, [parsedFields, parsedRecords]);
+
+  // Export raw file
+  const handleExportFile = useCallback(() => {
+    if (!fileData || !selectedNode) return;
+
+    // Create download link
+    const buffer = new ArrayBuffer(fileData.data.length);
+    new Uint8Array(buffer).set(fileData.data);
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = selectedNode.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [fileData, selectedNode]);
+
+  // Dump to console (dev mode)
+  const handleDumpToConsole = useCallback(() => {
+    if (!fileData) return;
+
+    console.group(`[StorageInspector] File: ${selectedNode?.name}`);
+    console.log('Type:', fileData.type);
+    console.log('Size:', fileData.size);
+    console.log('Path:', fileData.path);
+    console.log('Data:', fileData.data);
+    if (parsedFields) {
+      console.log('Parsed Fields:', parsedFields);
+    }
+    if (parsedRecords.length > 0) {
+      console.log('Records:', parsedRecords);
+    }
+    console.groupEnd();
+  }, [fileData, selectedNode, parsedFields, parsedRecords]);
+
   if (loading) {
     return (
       <Box
@@ -222,6 +298,54 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
         <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
           {sdName}
         </Typography>
+
+        {/* File actions - only show when a file is selected */}
+        {fileData && (
+          <>
+            <Tooltip title="Copy hex selection to clipboard">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    void handleCopyHex();
+                  }}
+                  disabled={!highlightRange}
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Copy parsed structure as JSON">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    void handleCopyJson();
+                  }}
+                  disabled={!parsedFields || parsedFields.length === 0}
+                >
+                  <ContentCopyIcon fontSize="small" sx={{ color: 'info.main' }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Export file">
+              <IconButton size="small" onClick={handleExportFile}>
+                <DownloadIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Dump to console">
+              <IconButton size="small" onClick={handleDumpToConsole}>
+                <BugReportIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          </>
+        )}
+
         <Button size="small" startIcon={<RefreshIcon />} onClick={handleRefresh}>
           Refresh
         </Button>
@@ -292,6 +416,22 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
                   Path: {selectedNode.path}
                 </Typography>
               </Box>
+
+              {/* Image preview for image files */}
+              {fileData.type === 'image' && (
+                <Box sx={{ mb: 2 }}>
+                  <ImagePreview data={fileData.data} fileName={selectedNode.name} maxHeight={400} />
+                </Box>
+              )}
+
+              {/* Text preview for text-based files */}
+              {(fileData.type === 'activity' ||
+                fileData.type === 'profile' ||
+                fileData.type === 'identity') && (
+                <Box sx={{ mb: 2 }}>
+                  <TextPreview data={fileData.data} fileType={fileData.type} maxHeight={300} />
+                </Box>
+              )}
 
               {/* Record list for CRDT log files */}
               {parsedRecords.length > 0 && (

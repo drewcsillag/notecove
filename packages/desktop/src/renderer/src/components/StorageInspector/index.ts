@@ -2,3 +2,8 @@ export { StorageInspectorWindow } from './StorageInspectorWindow';
 export type { StorageInspectorWindowProps } from './StorageInspectorWindow';
 export { SDPickerDialog } from './SDPickerDialog';
 export type { SDPickerDialogProps } from './SDPickerDialog';
+export { TextPreview } from './TextPreview';
+export type { TextPreviewProps } from './TextPreview';
+export { ImagePreview } from './ImagePreview';
+export type { ImagePreviewProps } from './ImagePreview';
+export { InspectorErrorBoundary } from './ErrorBoundary';
