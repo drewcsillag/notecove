@@ -9,6 +9,13 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 
+/**
+ * Wait for the first window with explicit timeout (more reliable than firstWindow())
+ */
+async function getFirstWindow(app: ElectronApplication, timeoutMs = 60000): Promise<Page> {
+  return app.waitForEvent('window', { timeout: timeoutMs });
+}
+
 // Helper function to create a test note
 async function createTestNote(window: Page, content: string) {
   const createButton = window.locator('button[title="Create note"]');
@@ -52,35 +59,46 @@ test.describe('Note count badges in folder tree', () => {
     testStorageDir = path.join(os.tmpdir(), `notecove-test-storage-${Date.now()}`);
     await fs.mkdir(testStorageDir, { recursive: true });
 
+    const mainPath = path.resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
+
     // Launch Electron app with test database
     electronApp = await electron.launch({
-      args: ['.'],
+      args: [mainPath],
       env: {
         ...process.env,
         NODE_ENV: 'test',
         TEST_DB_PATH: testDbPath,
         TEST_STORAGE_DIR: testStorageDir,
       },
+      timeout: 60000,
     });
 
-    // Wait for the first window
-    window = await electronApp.firstWindow();
+    // Wait for the first window with explicit timeout
+    window = await getFirstWindow(electronApp);
     await window.waitForLoadState('domcontentloaded');
 
     // Wait for app to be ready
     await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
     await window.waitForTimeout(1000);
-  });
+  }, 60000);
 
   test.afterEach(async () => {
-    // Close app
-    await electronApp.close();
+    // Robust cleanup - handle cases where app may have crashed
+    try {
+      if (electronApp) {
+        await electronApp.close().catch((err) => {
+          console.error('[E2E Note Badges] Failed to close Electron app:', err);
+        });
+      }
+    } catch (err) {
+      console.error('[E2E Note Badges] Error during app cleanup:', err);
+    }
 
     // Clean up test files
     try {
-      await fs.unlink(testDbPath);
-      await fs.rm(testStorageDir, { recursive: true, force: true });
-    } catch (err) {
+      await fs.unlink(testDbPath).catch(() => {});
+      await fs.rm(testStorageDir, { recursive: true, force: true }).catch(() => {});
+    } catch {
       // Ignore cleanup errors
     }
   });

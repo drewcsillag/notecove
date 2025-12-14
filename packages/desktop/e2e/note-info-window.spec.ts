@@ -12,6 +12,13 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+/**
+ * Wait for the first window with explicit timeout (more reliable than firstWindow())
+ */
+async function getFirstWindow(app: ElectronApplication, timeoutMs = 60000): Promise<Page> {
+  return app.waitForEvent('window', { timeout: timeoutMs });
+}
+
 let electronApp: ElectronApplication;
 let page: Page;
 let testUserDataDir: string;
@@ -32,7 +39,7 @@ test.beforeEach(async () => {
     timeout: 60000,
   });
 
-  page = await electronApp.firstWindow();
+  page = await getFirstWindow(electronApp);
 
   // Capture renderer console logs
   page.on('console', (msg) => {
@@ -45,12 +52,23 @@ test.beforeEach(async () => {
 }, 60000);
 
 test.afterEach(async () => {
-  await electronApp.close();
+  // Robust cleanup - handle cases where app may have crashed
+  try {
+    if (electronApp) {
+      await electronApp.close().catch((err) => {
+        console.error('[E2E Note Info] Failed to close Electron app:', err);
+      });
+    }
+  } catch (err) {
+    console.error('[E2E Note Info] Error during app cleanup:', err);
+  }
 
   // Clean up the temporary user data directory
   try {
-    rmSync(testUserDataDir, { recursive: true, force: true });
-    console.log('[E2E Note Info] Cleaned up test userData directory');
+    if (testUserDataDir) {
+      rmSync(testUserDataDir, { recursive: true, force: true });
+      console.log('[E2E Note Info] Cleaned up test userData directory');
+    }
   } catch (err) {
     console.error('[E2E Note Info] Failed to clean up test userData directory:', err);
   }
