@@ -108,8 +108,19 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       // Sort threads by their anchor position in the document
       threadsWithDetails.sort((a, b) => {
         // Decode anchorStart from Uint8Array (first 4 bytes are Uint32 position)
-        const posA = new Uint32Array(a.anchorStart.buffer)[0] ?? 0;
-        const posB = new Uint32Array(b.anchorStart.buffer)[0] ?? 0;
+        // Handle invalid anchorStart defensively
+        let posA = 0;
+        let posB = 0;
+        try {
+          posA = new Uint32Array(a.anchorStart.buffer)[0] ?? 0;
+        } catch {
+          // Fall back to 0 if decoding fails
+        }
+        try {
+          posB = new Uint32Array(b.anchorStart.buffer)[0] ?? 0;
+        } catch {
+          // Fall back to 0 if decoding fails
+        }
         return posA - posB;
       });
 

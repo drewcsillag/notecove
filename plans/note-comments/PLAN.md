@@ -1,6 +1,6 @@
 # Note Comments Feature - Implementation Plan
 
-**Overall Progress:** `66%`
+**Overall Progress:** `75%`
 
 ## Summary
 
@@ -78,7 +78,7 @@ See: [PLAN-phase3-resolution.md](./PLAN-phase3-resolution.md)
 
 ---
 
-## Phase 4: Emoji Reactions (Backend Complete)
+## Phase 4: Emoji Reactions ✅
 
 **Goal:** Allow emoji reactions on comments and replies.
 
@@ -88,9 +88,9 @@ See: [PLAN-phase4-reactions.md](./PLAN-phase4-reactions.md)
 - [x] 🟢 **4.2 Extend NoteDoc for reactions**
 - [x] 🟢 **4.3 Add comment_reactions SQLite table**
 - [x] 🟢 **4.4 Add reaction IPC handlers**
-- [ ] 🟥 **4.5 Create ReactionPicker component**
-- [ ] 🟥 **4.6 Create ReactionDisplay component**
-- [ ] 🟥 **4.7 Write tests**
+- [x] 🟢 **4.5 Create ReactionPicker component**
+- [x] 🟢 **4.6 Create ReactionDisplay component**
+- [x] 🟢 **4.7 Write tests**
 
 ---
 
@@ -116,7 +116,7 @@ See: [PLAN-phase6-toolbar.md](./PLAN-phase6-toolbar.md)
 
 - [x] 🟢 **6.1 Add toolbar button (selection-dependent)**
 - [x] 🟢 **6.2 Add keyboard shortcut (Cmd+Alt+M)** (changed from Cmd+Shift+M)
-- [ ] 🟥 **6.3 Add context menu item**
+- [x] 🟢 **6.3 Add context menu item**
 - [x] 🟢 **6.4 Add comment count badge**
 - [ ] 🟥 **6.5 Write E2E tests**
 

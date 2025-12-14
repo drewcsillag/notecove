@@ -1,6 +1,6 @@
 # Phase 6: Toolbar & Keyboard Integration
 
-**Progress:** `0%`
+**Progress:** `80%`
 
 ## Goal
 
@@ -10,7 +10,7 @@ Provide multiple entry points for adding comments: toolbar button, keyboard shor
 
 ## 6.1 Add Toolbar Button (Selection-Dependent)
 
-**Status:** 🟥 To Do
+**Status:** 🟢 Complete
 
 **File:** `packages/desktop/src/renderer/src/components/EditorPanel/EditorToolbar.tsx`
 
@@ -65,9 +65,9 @@ useEffect(() => {
 
 ---
 
-## 6.2 Add Keyboard Shortcut (Cmd+Shift+M)
+## 6.2 Add Keyboard Shortcut (Cmd+Alt+M)
 
-**Status:** 🟥 To Do
+**Status:** 🟢 Complete
 
 **Option A: TipTap extension keyboard shortcut**
 
@@ -106,7 +106,7 @@ Prefer Option A for better TipTap integration.
 
 ## 6.3 Add Context Menu Item
 
-**Status:** 🟥 To Do
+**Status:** 🟢 Complete
 
 **File:** `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx`
 
@@ -159,7 +159,7 @@ const handleContextMenu = (e: React.MouseEvent) => {
 
 ## 6.4 Add Comment Count Badge
 
-**Status:** 🟥 To Do
+**Status:** 🟢 Complete
 
 Track unresolved comment count:
 

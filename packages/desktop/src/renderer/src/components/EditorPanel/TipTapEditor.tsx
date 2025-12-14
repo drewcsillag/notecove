@@ -16,7 +16,17 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import Collaboration from '@tiptap/extension-collaboration';
 import Underline from '@tiptap/extension-underline';
 import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
-import { Box, useTheme, Chip, Fade, CircularProgress } from '@mui/material';
+import {
+  Box,
+  useTheme,
+  Chip,
+  Fade,
+  CircularProgress,
+  Menu,
+  MenuItem,
+  Divider,
+  Typography,
+} from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
 import { yUndoPluginKey } from 'y-prosemirror';
@@ -171,6 +181,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   // Table size picker state
   const [tableSizePickerAnchor, setTableSizePickerAnchor] = useState<HTMLElement | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
@@ -1830,6 +1843,22 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle context menu open
+   * Shows custom context menu with Cut, Copy, Paste, and Add Comment options
+   */
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  /**
+   * Handle context menu close
+   */
+  const handleContextMenuClose = () => {
+    setContextMenu(null);
+  };
+
+  /**
    * Handle Cmd+K keyboard shortcut
    * Similar to handleLinkButtonClick but triggered from keyboard
    */
@@ -2448,6 +2477,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             editor.commands.focus('end');
           }
         }}
+        onContextMenu={handleContextMenu}
       >
         <EditorContent editor={editor} />
       </Box>
@@ -2472,6 +2502,58 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }}
         onSelect={handleTableSizeSelect}
       />
+      {/* Editor context menu */}
+      {contextMenu !== null && (
+        <Menu
+          open
+          onClose={handleContextMenuClose}
+          anchorReference="anchorPosition"
+          anchorPosition={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <MenuItem
+            onClick={() => {
+              // eslint-disable-next-line @typescript-eslint/no-deprecated
+              document.execCommand('cut');
+              handleContextMenuClose();
+            }}
+          >
+            Cut
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              // eslint-disable-next-line @typescript-eslint/no-deprecated
+              document.execCommand('copy');
+              handleContextMenuClose();
+            }}
+          >
+            Copy
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              // eslint-disable-next-line @typescript-eslint/no-deprecated
+              document.execCommand('paste');
+              handleContextMenuClose();
+            }}
+          >
+            Paste
+          </MenuItem>
+          <Divider />
+          <MenuItem
+            onClick={() => {
+              handleContextMenuClose();
+              void handleAddCommentOnSelection();
+            }}
+            disabled={!hasTextSelection}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <span>Add Comment</span>
+              <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>
+                ⌘⌥M
+              </Typography>
+            </Box>
+          </MenuItem>
+        </Menu>
+      )}
     </Box>
   );
 };
