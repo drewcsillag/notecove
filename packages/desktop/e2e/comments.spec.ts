@@ -124,12 +124,20 @@ test.describe('Comments - Basic CRUD', () => {
     await page.waitForTimeout(500);
 
     // Look for comment input or panel
-    const commentInput = page.locator('textarea[placeholder*="comment" i], input[placeholder*="comment" i]');
+    const commentInput = page.locator(
+      'textarea[placeholder*="comment" i], input[placeholder*="comment" i]'
+    );
     const commentPanel = page.locator('[class*="comment" i]');
 
     // At least one should be visible
-    const inputVisible = await commentInput.first().isVisible().catch(() => false);
-    const panelVisible = await commentPanel.first().isVisible().catch(() => false);
+    const inputVisible = await commentInput
+      .first()
+      .isVisible()
+      .catch(() => false);
+    const panelVisible = await commentPanel
+      .first()
+      .isVisible()
+      .catch(() => false);
 
     expect(inputVisible || panelVisible).toBe(true);
   });
@@ -149,7 +157,9 @@ test.describe('Comments - Basic CRUD', () => {
       await commentTextarea.fill('This is my comment');
 
       // Submit the comment
-      const submitButton = page.locator('button:has-text("Add"), button:has-text("Submit"), button:has-text("Comment")').first();
+      const submitButton = page
+        .locator('button:has-text("Add"), button:has-text("Submit"), button:has-text("Comment")')
+        .first();
       if (await submitButton.isVisible()) {
         await submitButton.click();
         await page.waitForTimeout(500);
@@ -234,7 +244,10 @@ test.describe('Comments - Highlight Integration', () => {
 
     // Check for highlight class in editor
     const highlight = page.locator('.comment-highlight, [data-comment-mark]');
-    const highlightVisible = await highlight.first().isVisible().catch(() => false);
+    const highlightVisible = await highlight
+      .first()
+      .isVisible()
+      .catch(() => false);
 
     // May not be visible if comment wasn't successfully added
     // This is expected behavior to test
@@ -285,7 +298,10 @@ test.describe('Comments - Reply Flow', () => {
 
     // Look for Reply button
     const replyButton = page.locator('button:has-text("Reply"), [aria-label*="reply" i]');
-    const replyVisible = await replyButton.first().isVisible().catch(() => false);
+    const replyVisible = await replyButton
+      .first()
+      .isVisible()
+      .catch(() => false);
     // Reply button should be visible if comment was added
   });
 });
@@ -309,7 +325,9 @@ test.describe('Comments - Reactions', () => {
     }
 
     // Look for reaction/emoji button
-    const reactionButton = page.locator('[aria-label*="reaction" i], [aria-label*="emoji" i], button:has-text("😀")');
+    const reactionButton = page.locator(
+      '[aria-label*="reaction" i], [aria-label*="emoji" i], button:has-text("😀")'
+    );
     // Reaction UI should be present on comments
   });
 });
@@ -329,7 +347,9 @@ test.describe('Comments - @Mentions', () => {
       await page.waitForTimeout(500);
 
       // Look for autocomplete dropdown
-      const autocomplete = page.locator('[class*="autocomplete" i], [class*="popper" i], [class*="mention" i]');
+      const autocomplete = page.locator(
+        '[class*="autocomplete" i], [class*="popper" i], [class*="mention" i]'
+      );
       // Autocomplete should appear when @ is typed
     }
   });

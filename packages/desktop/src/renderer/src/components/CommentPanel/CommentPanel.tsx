@@ -138,17 +138,31 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
 
       // Sort threads by their anchor position in the document
       threadsWithDetails.sort((a, b) => {
-        // Decode anchorStart from Uint8Array (first 4 bytes are Uint32 position)
+        // Decode anchorStart from Uint8Array using DataView for proper byte alignment
         // Handle invalid anchorStart defensively
         let posA = 0;
         let posB = 0;
         try {
-          posA = new Uint32Array(a.anchorStart.buffer)[0] ?? 0;
+          if (a.anchorStart.byteLength >= 4) {
+            const view = new DataView(
+              a.anchorStart.buffer,
+              a.anchorStart.byteOffset,
+              a.anchorStart.byteLength
+            );
+            posA = view.getUint32(0, true); // true = little-endian
+          }
         } catch {
           // Fall back to 0 if decoding fails
         }
         try {
-          posB = new Uint32Array(b.anchorStart.buffer)[0] ?? 0;
+          if (b.anchorStart.byteLength >= 4) {
+            const view = new DataView(
+              b.anchorStart.buffer,
+              b.anchorStart.byteOffset,
+              b.anchorStart.byteLength
+            );
+            posB = view.getUint32(0, true); // true = little-endian
+          }
         } catch {
           // Fall back to 0 if decoding fails
         }
@@ -246,6 +260,16 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       unsubscribeReactionRemoved();
     };
   }, [noteId, loadThreads]);
+
+  // Clean up stale refs for threads that no longer exist (prevent memory leak)
+  useEffect(() => {
+    const currentThreadIds = new Set(threads.map((t) => t.id));
+    for (const threadId of threadRefs.current.keys()) {
+      if (!currentThreadIds.has(threadId)) {
+        threadRefs.current.delete(threadId);
+      }
+    }
+  }, [threads]);
 
   // Auto-enter edit mode for newly created threads (empty content)
   useEffect(() => {
@@ -488,9 +512,10 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
 
     // Check for @ trigger
     const textBefore = value.slice(0, cursor);
-    const match = textBefore.match(/@(\w*)$/);
+    const mentionRegex = /@(\w*)$/;
+    const match = mentionRegex.exec(textBefore);
 
-    if (match && match.index !== undefined) {
+    if (match?.index !== undefined) {
       setReplyMention({
         active: true,
         query: match[1] ?? '',
@@ -529,9 +554,10 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
 
     // Check for @ trigger
     const textBefore = value.slice(0, cursor);
-    const match = textBefore.match(/@(\w*)$/);
+    const mentionRegex = /@(\w*)$/;
+    const match = mentionRegex.exec(textBefore);
 
-    if (match && match.index !== undefined) {
+    if (match?.index !== undefined) {
       setEditMention({
         active: true,
         query: match[1] ?? '',
@@ -792,7 +818,9 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                         <MentionAutocomplete
                           query={editMention.query}
                           onSelect={handleEditMentionSelect}
-                          onClose={() => setEditMention(null)}
+                          onClose={() => {
+                            setEditMention(null);
+                          }}
                           anchorEl={editInputRef.current}
                         />
                       )}
@@ -939,7 +967,9 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                         <MentionAutocomplete
                           query={replyMention.query}
                           onSelect={handleReplyMentionSelect}
-                          onClose={() => setReplyMention(null)}
+                          onClose={() => {
+                            setReplyMention(null);
+                          }}
                           anchorEl={replyInputRef.current}
                         />
                       )}

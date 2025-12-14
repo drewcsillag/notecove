@@ -65,9 +65,7 @@ export const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
   useEffect(() => {
     const q = query.toLowerCase();
     const matches = users
-      .filter(
-        (u) => u.handle.toLowerCase().includes(q) || u.name.toLowerCase().includes(q)
-      )
+      .filter((u) => u.handle.toLowerCase().includes(q) || u.name.toLowerCase().includes(q))
       .slice(0, 5); // Limit to 5 results
     setFiltered(matches);
     setSelectedIndex(0);
@@ -101,7 +99,9 @@ export const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
 
     // Use capture phase to handle before textarea
     document.addEventListener('keydown', handler, true);
-    return () => document.removeEventListener('keydown', handler, true);
+    return () => {
+      document.removeEventListener('keydown', handler, true);
+    };
   }, [filtered, selectedIndex, onSelect, onClose, anchorEl]);
 
   // Don't render if no anchor or no matches
@@ -128,7 +128,9 @@ export const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
             <ListItemButton
               key={user.profileId}
               selected={i === selectedIndex}
-              onClick={() => onSelect(user)}
+              onClick={() => {
+                onSelect(user);
+              }}
               sx={{
                 py: 0.5,
                 '&.Mui-selected': {

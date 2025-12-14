@@ -20,10 +20,7 @@ interface CommentContentProps {
 /**
  * CommentContent - Renders comment text with styled @-mentions
  */
-export const CommentContent: React.FC<CommentContentProps> = ({
-  content,
-  variant = 'body2',
-}) => {
+export const CommentContent: React.FC<CommentContentProps> = ({ content, variant = 'body2' }) => {
   // Parse content and extract mentions
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
