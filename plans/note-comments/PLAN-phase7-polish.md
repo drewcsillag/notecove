@@ -97,7 +97,7 @@ if (commentIds.length > 1) {
 
 ## 7.3 Add Keyboard Navigation in Panel
 
-**Status:** 🟥 To Do
+**Status:** 🟢 Complete
 
 | Key    | Action                           |
 | ------ | -------------------------------- |

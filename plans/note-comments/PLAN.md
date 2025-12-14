@@ -130,7 +130,7 @@ See: [PLAN-phase7-polish.md](./PLAN-phase7-polish.md)
 
 - [ ] 🟥 **7.1 Handle orphaned comments**
 - [ ] 🟥 **7.2 Handle overlapping ranges**
-- [ ] 🟥 **7.3 Add keyboard navigation in panel**
+- [x] 🟢 **7.3 Add keyboard navigation in panel**
 - [ ] 🟥 **7.4 Add to Storage Inspector**
 - [ ] 🟥 **7.5 Performance testing (100+ comments)**
 - [ ] 🟥 **7.6 Final E2E test suite**
