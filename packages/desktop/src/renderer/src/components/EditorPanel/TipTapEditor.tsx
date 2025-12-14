@@ -82,6 +82,9 @@ function getImageMimeType(file: File): string | null {
   return getMimeTypeFromFilename(file.name);
 }
 
+// TODO: Replace with actual user ID from authentication system
+const CURRENT_USER_ID = 'current-user';
+
 export interface TipTapEditorProps {
   noteId: string | null;
   readOnly?: boolean;
@@ -1370,7 +1373,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         noteId,
         anchorStart,
         anchorEnd,
-        authorId: 'current-user', // TODO: Get actual user ID
+        authorId: CURRENT_USER_ID,
         authorName: 'You', // TODO: Get actual user name
         authorHandle: '@you', // TODO: Get actual handle
         content: '', // Empty content - user will fill in via panel

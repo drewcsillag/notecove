@@ -1,6 +1,6 @@
 # Note Comments Feature - Implementation Plan
 
-**Overall Progress:** `62%`
+**Overall Progress:** `66%`
 
 ## Summary
 
@@ -62,7 +62,7 @@ See: [PLAN-phase2-replies.md](./PLAN-phase2-replies.md)
 
 ---
 
-## Phase 3: Resolution & Edit/Delete (Partial)
+## Phase 3: Resolution & Edit/Delete ✅
 
 **Goal:** Allow resolving threads and editing/deleting own comments.
 
@@ -73,8 +73,8 @@ See: [PLAN-phase3-resolution.md](./PLAN-phase3-resolution.md)
 - [x] 🟢 **3.3 Add "Show resolved" toggle to panel**
 - [x] 🟢 **3.4 Implement edit mode for comments**
 - [x] 🟢 **3.5 Implement delete with confirmation**
-- [ ] 🟥 **3.6 Add ownership validation**
-- [ ] 🟥 **3.7 Write tests**
+- [x] 🟢 **3.6 Add ownership validation**
+- [x] 🟢 **3.7 Write tests**
 
 ---
 

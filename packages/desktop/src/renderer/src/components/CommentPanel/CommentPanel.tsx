@@ -36,6 +36,9 @@ import {
 } from '@mui/icons-material';
 import type { CommentThread, CommentReply } from '@notecove/shared/comments';
 
+// TODO: Replace with actual user ID from authentication system
+const CURRENT_USER_ID = 'current-user';
+
 export interface CommentPanelProps {
   noteId: string | null;
   onClose: () => void;
@@ -141,7 +144,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
         resolved,
       };
       if (resolved) {
-        updates.resolvedBy = 'current-user'; // TODO: Get actual user ID
+        updates.resolvedBy = CURRENT_USER_ID;
         updates.resolvedAt = Date.now();
       }
       if (noteId) {
@@ -179,7 +182,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
     try {
       await window.electronAPI.comment.addReply(noteId, threadId, {
         threadId,
-        authorId: 'current-user', // TODO: Get actual user ID
+        authorId: CURRENT_USER_ID,
         authorName: 'You', // TODO: Get actual user name
         authorHandle: '@you', // TODO: Get actual handle
         content: replyText.trim(),
@@ -450,17 +453,19 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                     <Typography variant="body2" sx={{ flex: 1 }}>
                       {thread.content || <em style={{ opacity: 0.6 }}>No comment text</em>}
                     </Typography>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStartEdit(thread.id, thread.content);
-                      }}
-                      title="Edit comment"
-                      sx={{ ml: 'auto', opacity: 0.6, '&:hover': { opacity: 1 } }}
-                    >
-                      <EditIcon sx={{ fontSize: 14 }} />
-                    </IconButton>
+                    {thread.authorId === CURRENT_USER_ID && (
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartEdit(thread.id, thread.content);
+                        }}
+                        title="Edit comment"
+                        sx={{ ml: 'auto', opacity: 0.6, '&:hover': { opacity: 1 } }}
+                      >
+                        <EditIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    )}
                   </Box>
                 )}
               </Box>
@@ -573,28 +578,30 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
               </Box>
 
               {/* Delete button (only for own comments) */}
-              <Box
-                sx={{
-                  px: 1.5,
-                  pb: 1,
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <Button
-                  size="small"
-                  color="error"
-                  onClick={() => {
-                    handleDeleteClick(thread.id);
+              {thread.authorId === CURRENT_USER_ID && (
+                <Box
+                  sx={{
+                    px: 1.5,
+                    pb: 1,
+                    display: 'flex',
+                    justifyContent: 'flex-end',
                   }}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
                 >
-                  Delete
-                </Button>
-              </Box>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() => {
+                      handleDeleteClick(thread.id);
+                    }}
+                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                  >
+                    Delete
+                  </Button>
+                </Box>
+              )}
             </Paper>
           ))
         )}

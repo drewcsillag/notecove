@@ -159,4 +159,274 @@ describe('CommentPanel', () => {
       expect(mockOnThreadSelect).toHaveBeenCalledWith('thread-1');
     }
   });
+
+  describe('Edit functionality', () => {
+    it('should show edit button only for own comments', async () => {
+      const mockThreads = [
+        {
+          id: 'thread-1',
+          noteId: 'test-note',
+          authorId: 'current-user', // Current user's comment
+          authorName: 'You',
+          content: 'My comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+        {
+          id: 'thread-2',
+          noteId: 'test-note',
+          authorId: 'other-user', // Someone else's comment
+          authorName: 'Other User',
+          content: 'Their comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+      ];
+      mockGetThreads.mockResolvedValue(mockThreads);
+
+      render(<CommentPanel noteId="test-note" onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('My comment')).toBeInTheDocument();
+        expect(screen.getByText('Their comment')).toBeInTheDocument();
+      });
+
+      // Should show edit button for own comment
+      const editButtons = screen.getAllByTitle('Edit comment');
+      expect(editButtons).toHaveLength(1);
+    });
+
+    it('should enter edit mode when edit button is clicked', async () => {
+      const mockThreads = [
+        {
+          id: 'thread-1',
+          noteId: 'test-note',
+          authorId: 'current-user',
+          authorName: 'You',
+          content: 'Original comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+      ];
+      mockGetThreads.mockResolvedValue(mockThreads);
+
+      render(<CommentPanel noteId="test-note" onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Original comment')).toBeInTheDocument();
+      });
+
+      // Click edit button
+      const editButton = screen.getByTitle('Edit comment');
+      fireEvent.click(editButton);
+
+      // Should show edit form with textarea
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Original comment')).toBeInTheDocument();
+        expect(screen.getByText('Save')).toBeInTheDocument();
+        expect(screen.getByText('Cancel')).toBeInTheDocument();
+      });
+    });
+
+    it('should save edited comment when Save is clicked', async () => {
+      const mockThreads = [
+        {
+          id: 'thread-1',
+          noteId: 'test-note',
+          authorId: 'current-user',
+          authorName: 'You',
+          content: 'Original comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+      ];
+      mockGetThreads.mockResolvedValue(mockThreads);
+      mockUpdateThread.mockResolvedValue(undefined);
+
+      render(<CommentPanel noteId="test-note" onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Original comment')).toBeInTheDocument();
+      });
+
+      // Click edit button
+      fireEvent.click(screen.getByTitle('Edit comment'));
+
+      // Edit the comment
+      const textarea = screen.getByDisplayValue('Original comment');
+      fireEvent.change(textarea, { target: { value: 'Updated comment' } });
+
+      // Click save
+      fireEvent.click(screen.getByText('Save'));
+
+      await waitFor(() => {
+        expect(mockUpdateThread).toHaveBeenCalledWith('test-note', 'thread-1', {
+          content: 'Updated comment',
+        });
+      });
+    });
+  });
+
+  describe('Delete functionality', () => {
+    it('should show delete button only for own comments', async () => {
+      const mockThreads = [
+        {
+          id: 'thread-1',
+          noteId: 'test-note',
+          authorId: 'current-user',
+          authorName: 'You',
+          content: 'My comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+        {
+          id: 'thread-2',
+          noteId: 'test-note',
+          authorId: 'other-user',
+          authorName: 'Other User',
+          content: 'Their comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+      ];
+      mockGetThreads.mockResolvedValue(mockThreads);
+
+      render(<CommentPanel noteId="test-note" onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('My comment')).toBeInTheDocument();
+        expect(screen.getByText('Their comment')).toBeInTheDocument();
+      });
+
+      // Should show only one delete button (for own comment)
+      const deleteButtons = screen.getAllByText('Delete');
+      expect(deleteButtons).toHaveLength(1);
+    });
+
+    it('should show confirmation dialog when delete is clicked', async () => {
+      const mockThreads = [
+        {
+          id: 'thread-1',
+          noteId: 'test-note',
+          authorId: 'current-user',
+          authorName: 'You',
+          content: 'My comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+      ];
+      mockGetThreads.mockResolvedValue(mockThreads);
+
+      render(<CommentPanel noteId="test-note" onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('My comment')).toBeInTheDocument();
+      });
+
+      // Click delete button
+      fireEvent.click(screen.getByText('Delete'));
+
+      // Should show confirmation dialog
+      await waitFor(() => {
+        expect(screen.getByText('Delete Comment')).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            'Are you sure you want to delete this comment? This action cannot be undone.'
+          )
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('should delete comment when confirmed', async () => {
+      const mockThreads = [
+        {
+          id: 'thread-1',
+          noteId: 'test-note',
+          authorId: 'current-user',
+          authorName: 'You',
+          content: 'My comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+      ];
+      mockGetThreads.mockResolvedValue(mockThreads);
+      mockDeleteThread.mockResolvedValue(undefined);
+
+      render(<CommentPanel noteId="test-note" onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('My comment')).toBeInTheDocument();
+      });
+
+      // Click delete button
+      fireEvent.click(screen.getByText('Delete'));
+
+      // Wait for dialog and confirm
+      await waitFor(() => {
+        expect(screen.getByText('Delete Comment')).toBeInTheDocument();
+      });
+
+      // Find and click the Confirm button (not the Delete button on the thread)
+      // There are now two Delete buttons - one in thread, one in dialog
+      // Get the one in the dialog (it's inside DialogActions)
+      const dialogButtons = screen.getAllByText('Delete');
+      const confirmDeleteButton = dialogButtons.find((btn) =>
+        btn.closest('[class*="MuiDialogActions"]')
+      );
+      if (confirmDeleteButton) {
+        fireEvent.click(confirmDeleteButton);
+      }
+
+      await waitFor(() => {
+        expect(mockDeleteThread).toHaveBeenCalledWith('test-note', 'thread-1');
+      });
+    });
+
+    it('should cancel delete when Cancel is clicked', async () => {
+      const mockThreads = [
+        {
+          id: 'thread-1',
+          noteId: 'test-note',
+          authorId: 'current-user',
+          authorName: 'You',
+          content: 'My comment',
+          created: Date.now(),
+          modified: Date.now(),
+          resolved: false,
+        },
+      ];
+      mockGetThreads.mockResolvedValue(mockThreads);
+
+      render(<CommentPanel noteId="test-note" onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('My comment')).toBeInTheDocument();
+      });
+
+      // Click delete button
+      fireEvent.click(screen.getByText('Delete'));
+
+      // Wait for dialog
+      await waitFor(() => {
+        expect(screen.getByText('Delete Comment')).toBeInTheDocument();
+      });
+
+      // Click Cancel
+      fireEvent.click(screen.getByText('Cancel'));
+
+      // Dialog should close, deleteThread should not be called
+      await waitFor(() => {
+        expect(screen.queryByText('Delete Comment')).not.toBeInTheDocument();
+      });
+      expect(mockDeleteThread).not.toHaveBeenCalled();
+    });
+  });
 });
