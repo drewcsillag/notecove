@@ -178,6 +178,41 @@ const mockElectronAPI = {
     }),
     reindexNotes: jest.fn(() => Promise.resolve()),
   },
+  comment: {
+    createThread: jest.fn().mockResolvedValue('thread-1'),
+    getThreads: jest.fn().mockResolvedValue([]),
+    updateThread: jest.fn().mockResolvedValue(undefined),
+    deleteThread: jest.fn().mockResolvedValue(undefined),
+    addReply: jest.fn().mockResolvedValue('reply-1'),
+    updateReply: jest.fn().mockResolvedValue(undefined),
+    deleteReply: jest.fn().mockResolvedValue(undefined),
+    addReaction: jest.fn().mockResolvedValue(undefined),
+    removeReaction: jest.fn().mockResolvedValue(undefined),
+    onThreadAdded: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onThreadUpdated: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onThreadDeleted: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReplyAdded: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReplyUpdated: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReplyDeleted: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReactionAdded: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+    onReactionRemoved: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+  },
 };
 
 Object.defineProperty(window, 'electronAPI', {

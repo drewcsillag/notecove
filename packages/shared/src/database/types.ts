@@ -19,6 +19,9 @@ import type {
   SequenceState,
   CachedProfilePresence,
   ImageCache,
+  CommentThreadCache,
+  CommentReplyCache,
+  CommentReactionCache,
 } from './schema';
 import type { UUID } from '../types';
 
@@ -572,6 +575,90 @@ export interface ProfilePresenceCacheOperations {
 }
 
 /**
+ * Comment cache operations
+ * @see plans/note-comments/PLAN.md
+ */
+export interface CommentCacheOperations {
+  /**
+   * Insert or update a comment thread in the cache
+   */
+  upsertCommentThread(thread: CommentThreadCache): Promise<void>;
+
+  /**
+   * Get a comment thread by ID
+   */
+  getCommentThread(threadId: UUID): Promise<CommentThreadCache | null>;
+
+  /**
+   * Get all comment threads for a note
+   */
+  getCommentThreadsForNote(noteId: UUID): Promise<CommentThreadCache[]>;
+
+  /**
+   * Delete a comment thread from the cache
+   */
+  deleteCommentThread(threadId: UUID): Promise<void>;
+
+  /**
+   * Delete all comment threads for a note
+   */
+  deleteCommentThreadsForNote(noteId: UUID): Promise<void>;
+
+  /**
+   * Insert or update a comment reply in the cache
+   */
+  upsertCommentReply(reply: CommentReplyCache): Promise<void>;
+
+  /**
+   * Get a comment reply by ID
+   */
+  getCommentReply(replyId: UUID): Promise<CommentReplyCache | null>;
+
+  /**
+   * Get all replies for a thread
+   */
+  getRepliesForThread(threadId: UUID): Promise<CommentReplyCache[]>;
+
+  /**
+   * Delete a comment reply from the cache
+   */
+  deleteCommentReply(replyId: UUID): Promise<void>;
+
+  /**
+   * Delete all replies for a thread
+   */
+  deleteRepliesForThread(threadId: UUID): Promise<void>;
+
+  /**
+   * Insert or update a comment reaction in the cache
+   */
+  upsertCommentReaction(reaction: CommentReactionCache): Promise<void>;
+
+  /**
+   * Get a comment reaction by ID
+   */
+  getCommentReaction(reactionId: UUID): Promise<CommentReactionCache | null>;
+
+  /**
+   * Get all reactions for a target (thread or reply)
+   */
+  getReactionsForTarget(
+    targetType: 'thread' | 'reply',
+    targetId: UUID
+  ): Promise<CommentReactionCache[]>;
+
+  /**
+   * Delete a comment reaction from the cache
+   */
+  deleteCommentReaction(reactionId: UUID): Promise<void>;
+
+  /**
+   * Delete all reactions for a target
+   */
+  deleteReactionsForTarget(targetType: 'thread' | 'reply', targetId: UUID): Promise<void>;
+}
+
+/**
  * Migration result
  */
 export enum MigrationResult {
@@ -600,7 +687,8 @@ export interface Database
     NoteSyncStateOperations,
     FolderSyncStateOperations,
     ProfilePresenceCacheOperations,
-    ImageCacheOperations {
+    ImageCacheOperations,
+    CommentCacheOperations {
   /**
    * Get the underlying adapter
    */

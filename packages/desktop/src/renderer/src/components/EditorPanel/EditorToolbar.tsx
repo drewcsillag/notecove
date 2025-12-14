@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, IconButton, Divider, Tooltip } from '@mui/material';
+import { Box, IconButton, Divider, Tooltip, Badge } from '@mui/material';
 import {
   FormatBold,
   FormatItalic,
@@ -31,6 +31,8 @@ import {
   FormatAlignLeft,
   FormatAlignCenter,
   FormatAlignRight,
+  // Comment icon
+  AddComment,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
 import { canAddRow, canAddColumn, canDeleteRow, canDeleteColumn } from './extensions/Table';
@@ -58,6 +60,19 @@ export interface EditorToolbarProps {
    * Called with the button element for popover positioning
    */
   onTableButtonClick?: (buttonElement: HTMLElement) => void;
+  /**
+   * Callback when the comment button is clicked
+   * Called with the current selection info
+   */
+  onCommentButtonClick?: () => void;
+  /**
+   * Whether any text is currently selected (for enabling comment button)
+   */
+  hasTextSelection?: boolean;
+  /**
+   * Number of open (unresolved) comments for the current note
+   */
+  commentCount?: number;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -65,6 +80,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onLinkButtonClick,
   onImageButtonClick,
   onTableButtonClick,
+  onCommentButtonClick,
+  hasTextSelection = false,
+  commentCount = 0,
 }) => {
   if (!editor) {
     return null;
@@ -266,6 +284,34 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         >
           <TableChart fontSize="small" />
         </IconButton>
+      </Tooltip>
+
+      <Tooltip title={hasTextSelection ? 'Add comment (⌘⌥M)' : 'Select text to add comment'}>
+        <span>
+          <IconButton
+            size="small"
+            onClick={onCommentButtonClick}
+            disabled={!hasTextSelection}
+            aria-label="Add comment"
+            data-testid="comment-button"
+          >
+            <Badge
+              badgeContent={commentCount}
+              color="primary"
+              max={99}
+              sx={{
+                '& .MuiBadge-badge': {
+                  fontSize: '0.6rem',
+                  minWidth: '14px',
+                  height: '14px',
+                  padding: '0 3px',
+                },
+              }}
+            >
+              <AddComment fontSize="small" />
+            </Badge>
+          </IconButton>
+        </span>
       </Tooltip>
 
       {/* Table Manipulation - only shown when cursor is in a table */}

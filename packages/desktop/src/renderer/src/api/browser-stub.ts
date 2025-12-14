@@ -294,6 +294,32 @@ export const browserApiStub: typeof window.electronAPI = {
     readFileInfo: notImplemented('inspector.readFileInfo'),
     parseFile: notImplemented('inspector.parseFile'),
   },
+
+  comment: {
+    getThreads: notImplemented('comment.getThreads'),
+    addThread: notImplemented('comment.addThread'),
+    updateThread: notImplemented('comment.updateThread'),
+    deleteThread: notImplemented('comment.deleteThread'),
+    addReply: notImplemented('comment.addReply'),
+    getReplies: notImplemented('comment.getReplies'),
+    updateReply: notImplemented('comment.updateReply'),
+    deleteReply: notImplemented('comment.deleteReply'),
+    getReactions: notImplemented('comment.getReactions'),
+    addReaction: notImplemented('comment.addReaction'),
+    removeReaction: notImplemented('comment.removeReaction'),
+    onThreadAdded: stubEventSubscription,
+    onThreadUpdated: stubEventSubscription,
+    onThreadDeleted: stubEventSubscription,
+    onReplyAdded: stubEventSubscription,
+    onReplyUpdated: stubEventSubscription,
+    onReplyDeleted: stubEventSubscription,
+    onReactionAdded: stubEventSubscription,
+    onReactionRemoved: stubEventSubscription,
+  },
+
+  mention: {
+    getUsers: notImplemented('mention.getUsers'),
+  },
 };
 
 /**

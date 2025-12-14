@@ -37,7 +37,7 @@ describe('SqliteDatabase', () => {
     it('should initialize database schema', async () => {
       // Database is initialized in beforeEach
       const version = await db.getCurrentVersion();
-      expect(version).toBe(8); // Version 8 adds images table
+      expect(version).toBe(9); // Version 9 adds comments table
     });
 
     it('should create all required tables', async () => {
@@ -1424,7 +1424,7 @@ describe('SqliteDatabase', () => {
   describe('Schema Version', () => {
     it('should get current version', async () => {
       const version = await db.getCurrentVersion();
-      expect(version).toBe(8);
+      expect(version).toBe(9);
     });
 
     it('should get version history', async () => {

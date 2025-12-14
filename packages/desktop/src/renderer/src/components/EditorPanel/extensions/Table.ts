@@ -1,3 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 /**
  * NoteCove Table Extension
  *
@@ -34,7 +40,7 @@ export interface TableCommands {
 // Debug logging enabled in development mode
 const DEBUG: boolean =
   typeof window !== 'undefined' &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__NOTECOVE_DEV_MODE__ === true;
 
 /**
@@ -279,8 +285,8 @@ export const NotecoveTableHeader = TableHeader.extend({
       ...this.parent?.(),
       textAlign: {
         default: 'left',
-        parseHTML: (element) => element.style.textAlign || 'left',
-        renderHTML: (attributes) => {
+        parseHTML: (element: HTMLElement) => element.style.textAlign || 'left',
+        renderHTML: (attributes: Record<string, unknown>) => {
           const align = attributes['textAlign'] as string;
           if (align === 'left') {
             return {};
@@ -306,8 +312,8 @@ export const NotecoveTableCell = TableCell.extend({
       ...this.parent?.(),
       textAlign: {
         default: 'left',
-        parseHTML: (element) => element.style.textAlign || 'left',
-        renderHTML: (attributes) => {
+        parseHTML: (element: HTMLElement) => element.style.textAlign || 'left',
+        renderHTML: (attributes: Record<string, unknown>) => {
           const align = attributes['textAlign'] as string;
           if (align === 'left') {
             return {};
@@ -370,19 +376,17 @@ export function getTableDimensionsFromEditor(editor: {
     };
   };
 }): { rows: number; cols: number } | null {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { $from } = editor.state.selection;
 
   // Walk up the node tree to find the table
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+
   const depth = $from.depth;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
   for (let d = depth; d > 0; d--) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const node = $from.node(d);
     // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unsafe-member-access
     if (node && node.type.name === 'table') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       return getTableDimensions(node);
     }
   }

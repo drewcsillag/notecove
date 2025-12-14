@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /**
  * TipTap Editor Component
  *
@@ -7,7 +10,7 @@
 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import BulletList from '@tiptap/extension-bullet-list';
@@ -15,7 +18,23 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import Collaboration from '@tiptap/extension-collaboration';
 import Underline from '@tiptap/extension-underline';
 import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
-import { Box, useTheme, Chip, Fade, CircularProgress } from '@mui/material';
+import {
+  Box,
+  useTheme,
+  Chip,
+  Fade,
+  CircularProgress,
+  Menu,
+  MenuItem,
+  Divider,
+  Typography,
+  Popper,
+  Paper,
+  List,
+  ListItemButton,
+  ListItemText,
+  ClickAwayListener,
+} from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
 import { yUndoPluginKey } from 'y-prosemirror';
@@ -24,6 +43,7 @@ import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
+import { CommentMark } from './extensions/CommentMark';
 import { NotecoveImage } from './extensions/Image';
 import {
   NotecoveTable,
@@ -80,6 +100,9 @@ function getImageMimeType(file: File): string | null {
   return getMimeTypeFromFilename(file.name);
 }
 
+// TODO: Replace with actual user ID from authentication system
+const CURRENT_USER_ID = 'current-user';
+
 export interface TipTapEditorProps {
   noteId: string | null;
   readOnly?: boolean;
@@ -93,6 +116,12 @@ export interface TipTapEditorProps {
   searchTerm?: string;
   /** Callback to update the lifted search term state */
   onSearchTermChange?: (term: string) => void;
+  /** Currently selected comment thread ID (for highlighting) */
+  selectedThreadId?: string | null;
+  /** Callback when a comment mark is clicked */
+  onCommentClick?: (threadId: string) => void;
+  /** Callback to add a comment on the current selection */
+  onAddComment?: (selection: { from: number; to: number; text: string; threadId: string }) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -106,11 +135,18 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   onNavigateToNote,
   searchTerm = '',
   onSearchTermChange,
+  selectedThreadId: _selectedThreadId, // TODO: Use for highlighting active thread
+  onCommentClick,
+  onAddComment,
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
   // Show sync indicator when external updates arrive
   const [showSyncIndicator, setShowSyncIndicator] = useState(false);
+  // Track whether text is selected (for enabling comment button)
+  const [hasTextSelection, setHasTextSelection] = useState(false);
+  // Track open (unresolved) comment count for badge
+  const [openCommentCount, setOpenCommentCount] = useState(0);
   const syncIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Loading state - start with loading=true to prevent title extraction before note loads
   // Use both state (for rendering) and ref (for callbacks that need synchronous access)
@@ -153,6 +189,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   // Table size picker state
   const [tableSizePickerAnchor, setTableSizePickerAnchor] = useState<HTMLElement | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // Overlapping comments popover state
+  const [overlapPopover, setOverlapPopover] = useState<{
+    anchorEl: HTMLElement;
+    threadIds: string[];
+  } | null>(null);
 
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
@@ -257,6 +302,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       SearchAndReplace,
       // Add WebLink extension for http/https links
       WebLink,
+      // Add CommentMark extension for highlighting commented text
+      CommentMark.configure({
+        onCommentClick: (threadId) => {
+          onCommentClick?.(threadId);
+        },
+      }),
       // Add NotecoveImage extension for image display
       NotecoveImage,
       // Add Table extensions for table support
@@ -497,6 +548,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               // Use ProseMirror's Fragment.from to create a new fragment
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const Fragment = (node.content as any).constructor;
+
               const newFragment = Fragment.fromArray(newContent) as typeof node.content;
               return node.copy(newFragment);
             }
@@ -522,6 +574,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           // Use ProseMirror's Fragment.from to create a new fragment
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const Fragment = (slice.content as any).constructor;
+
           const newFragment = Fragment.fromArray(newContent) as typeof slice.content;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
           return new (slice.constructor as any)(newFragment, slice.openStart, slice.openEnd);
@@ -588,6 +641,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }, 300);
       }
     },
+    // Track selection changes for enabling comment button
+    onSelectionUpdate: ({ editor }) => {
+      const { empty } = editor.state.selection;
+      setHasTextSelection(!empty);
+    },
   });
 
   // Fix: Ensure UndoManager is properly configured after React StrictMode double-mount
@@ -611,7 +669,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         const umAny = um as any;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const yDocAny = yDoc as any;
+
         const observers = yDocAny._observers?.get('afterTransaction');
+
         const hasUmHandler = observers?.has(umAny.afterTransactionHandler) ?? false;
 
         if (!hasUmHandler && umAny.afterTransactionHandler) {
@@ -1287,6 +1347,194 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, [editor]);
 
+  // Click handler for comment highlights
+  // When a comment mark is clicked, check for overlapping comments and show popover if multiple
+  useEffect(() => {
+    if (!editor || !onCommentClick) return;
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const commentHighlight = target.closest('.comment-highlight');
+      if (commentHighlight) {
+        // Collect all thread IDs from this element and its ancestors
+        const threadIds: string[] = [];
+        let current: Element | null = commentHighlight;
+
+        while (current) {
+          if (current.classList.contains('comment-highlight')) {
+            const threadId = current.getAttribute('data-thread-id');
+            if (threadId && !threadIds.includes(threadId)) {
+              threadIds.push(threadId);
+            }
+          }
+          current = current.parentElement?.closest('.comment-highlight') ?? null;
+        }
+
+        if (threadIds.length === 0) {
+          return;
+        }
+
+        if (threadIds.length === 1 && threadIds[0]) {
+          // Single comment - select it directly
+          console.log('[TipTapEditor] Comment highlight clicked, threadId:', threadIds[0]);
+          onCommentClick(threadIds[0]);
+        } else if (threadIds.length > 1) {
+          // Multiple overlapping comments - show popover
+          console.log('[TipTapEditor] Overlapping comments clicked:', threadIds);
+          setOverlapPopover({
+            anchorEl: commentHighlight as HTMLElement,
+            threadIds,
+          });
+        }
+      }
+    };
+
+    const editorDom = editor.view.dom;
+    editorDom.addEventListener('click', handleClick);
+
+    return () => {
+      editorDom.removeEventListener('click', handleClick);
+    };
+  }, [editor, onCommentClick]);
+
+  // Create a comment on the current selection
+  // This function is used by both the keyboard shortcut and toolbar button
+  const handleAddCommentOnSelection = useCallback(async () => {
+    if (!editor || !noteId) return;
+
+    // Get current selection
+    const { from, to, empty } = editor.state.selection;
+
+    if (empty) {
+      console.log('[TipTapEditor] Cannot add comment: no selection');
+      return;
+    }
+
+    // Get selected text
+    const text = editor.state.doc.textBetween(from, to, ' ');
+    console.log('[TipTapEditor] Adding comment for selection:', { from, to, text });
+
+    try {
+      // Encode positions as simple Uint8Array for now
+      // TODO: Use proper Yjs RelativePosition encoding for robust anchor tracking
+      const anchorStart = new Uint8Array(new Uint32Array([from]).buffer);
+      const anchorEnd = new Uint8Array(new Uint32Array([to]).buffer);
+
+      // Create the comment thread via IPC
+      const result = await window.electronAPI.comment.addThread(noteId, {
+        noteId,
+        anchorStart,
+        anchorEnd,
+        authorId: CURRENT_USER_ID,
+        authorName: 'You', // TODO: Get actual user name
+        authorHandle: '@you', // TODO: Get actual handle
+        content: '', // Empty content - user will fill in via panel
+        originalText: text,
+        created: Date.now(),
+        modified: Date.now(),
+        resolved: false,
+      });
+
+      if (!result.success || !result.threadId) {
+        console.error('[TipTapEditor] Failed to create comment thread:', result.error);
+        return;
+      }
+
+      console.log('[TipTapEditor] Comment thread created:', result.threadId);
+
+      // Apply the comment mark to the selection
+      editor.chain().focus().setTextSelection({ from, to }).setCommentMark(result.threadId).run();
+
+      console.log('[TipTapEditor] Comment mark applied');
+
+      // Notify parent about the new comment (to open panel, select thread, etc.)
+      onAddComment?.({ from, to, text, threadId: result.threadId });
+    } catch (err) {
+      console.error('[TipTapEditor] Failed to create comment thread:', err);
+    }
+  }, [editor, noteId, onAddComment]);
+
+  // Keyboard shortcut for adding comments (Cmd+Alt+M / Ctrl+Alt+M like Google Docs)
+  useEffect(() => {
+    if (!editor || !noteId) return;
+
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      // Check for Cmd+Alt+M (Mac) or Ctrl+Alt+M (Windows/Linux)
+      // eslint-disable-next-line @typescript-eslint/prefer-includes, @typescript-eslint/no-deprecated
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? event.metaKey : event.ctrlKey;
+
+      // Use event.code instead of event.key because Alt/Option modifies the character on Mac
+      if (modifier && event.altKey && event.code === 'KeyM') {
+        event.preventDefault();
+        event.stopPropagation();
+        await handleAddCommentOnSelection();
+      }
+    };
+
+    const editorDom = editor.view.dom;
+    const wrappedHandler = (event: Event) => {
+      void handleKeyDown(event as KeyboardEvent);
+    };
+    editorDom.addEventListener('keydown', wrappedHandler);
+
+    return () => {
+      editorDom.removeEventListener('keydown', wrappedHandler);
+    };
+  }, [editor, noteId, handleAddCommentOnSelection]);
+
+  // Handler for the comment toolbar button
+  const handleCommentButtonClick = () => {
+    void handleAddCommentOnSelection();
+  };
+
+  // Load and track open comment count for toolbar badge
+  useEffect(() => {
+    if (!noteId) {
+      setOpenCommentCount(0);
+      return;
+    }
+
+    // Load initial count
+    const loadCommentCount = async () => {
+      try {
+        const threads = await window.electronAPI.comment.getThreads(noteId);
+        const openCount = threads.filter((t) => !t.resolved).length;
+        setOpenCommentCount(openCount);
+      } catch (error) {
+        console.error('Failed to load comment count:', error);
+      }
+    };
+    void loadCommentCount();
+
+    // Subscribe to thread changes
+    const unsubAdded = window.electronAPI.comment.onThreadAdded((addedNoteId) => {
+      if (addedNoteId === noteId) {
+        void loadCommentCount();
+      }
+    });
+    const unsubUpdated = window.electronAPI.comment.onThreadUpdated((updatedNoteId) => {
+      if (updatedNoteId === noteId) {
+        void loadCommentCount();
+      }
+    });
+    const unsubDeleted = window.electronAPI.comment.onThreadDeleted((deletedNoteId, threadId) => {
+      if (deletedNoteId === noteId) {
+        void loadCommentCount();
+        // Remove the comment mark from the editor
+        if (editor) {
+          editor.commands.removeCommentMarkById(threadId);
+        }
+      }
+    });
+
+    return () => {
+      unsubAdded();
+      unsubUpdated();
+      unsubDeleted();
+    };
+  }, [noteId, editor]);
+
   // Manage link popover using tippy.js
   useEffect(() => {
     // Clean up existing popover
@@ -1634,6 +1882,22 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle context menu open
+   * Shows custom context menu with Cut, Copy, Paste, and Add Comment options
+   */
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  /**
+   * Handle context menu close
+   */
+  const handleContextMenuClose = () => {
+    setContextMenu(null);
+  };
+
+  /**
    * Handle Cmd+K keyboard shortcut
    * Similar to handleLinkButtonClick but triggered from keyboard
    */
@@ -1756,6 +2020,43 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             textDecoration: 'none',
             '&:hover': {
               textDecoration: 'underline',
+            },
+          },
+          // Comment highlight styling
+          '& .comment-highlight': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(255, 213, 79, 0.25)'
+                : 'rgba(255, 213, 79, 0.4)',
+            borderBottom: `2px solid ${theme.palette.warning.main}`,
+            cursor: 'pointer',
+            transition: 'background-color 0.2s ease',
+            '&:hover': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255, 213, 79, 0.35)'
+                  : 'rgba(255, 213, 79, 0.5)',
+            },
+            // Active/selected comment
+            '&.comment-active': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255, 213, 79, 0.45)'
+                  : 'rgba(255, 213, 79, 0.6)',
+            },
+            // Overlapping comments - nested highlights get progressively darker
+            '& .comment-highlight': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255, 193, 7, 0.35)'
+                  : 'rgba(255, 193, 7, 0.5)',
+              // Third level overlap (rare but possible)
+              '& .comment-highlight': {
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(255, 160, 0, 0.45)'
+                    : 'rgba(255, 160, 0, 0.6)',
+              },
             },
           },
           // Inter-note link styling (complementary to tags - use secondary color)
@@ -2176,6 +2477,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         onLinkButtonClick={handleLinkButtonClick}
         onImageButtonClick={() => void handleImageButtonClick()}
         onTableButtonClick={handleTableButtonClick}
+        onCommentButtonClick={handleCommentButtonClick}
+        hasTextSelection={hasTextSelection}
+        commentCount={openCommentCount}
       />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>
@@ -2226,6 +2530,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             editor.commands.focus('end');
           }
         }}
+        onContextMenu={handleContextMenu}
       >
         <EditorContent editor={editor} />
       </Box>
@@ -2250,6 +2555,102 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }}
         onSelect={handleTableSizeSelect}
       />
+      {/* Overlapping comments selection popover */}
+      {overlapPopover && (
+        <Popper
+          open
+          anchorEl={overlapPopover.anchorEl}
+          placement="bottom-start"
+          style={{ zIndex: 1400 }}
+        >
+          <ClickAwayListener
+            onClickAway={() => {
+              setOverlapPopover(null);
+            }}
+          >
+            <Paper elevation={8} sx={{ minWidth: 180 }}>
+              <Typography
+                variant="caption"
+                sx={{ px: 1.5, py: 0.75, display: 'block', color: 'text.secondary' }}
+              >
+                Select a comment:
+              </Typography>
+              <Divider />
+              <List dense sx={{ py: 0.5 }}>
+                {overlapPopover.threadIds.map((threadId, index) => (
+                  <ListItemButton
+                    key={threadId}
+                    onClick={() => {
+                      onCommentClick?.(threadId);
+                      setOverlapPopover(null);
+                    }}
+                    sx={{ py: 0.5 }}
+                  >
+                    <ListItemText
+                      primary={`Comment ${index + 1}`}
+                      secondary={`Thread: ${threadId.slice(0, 8)}...`}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Paper>
+          </ClickAwayListener>
+        </Popper>
+      )}
+      {/* Editor context menu */}
+      {contextMenu !== null && (
+        <Menu
+          open
+          onClose={handleContextMenuClose}
+          anchorReference="anchorPosition"
+          anchorPosition={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <MenuItem
+            onClick={() => {
+              // eslint-disable-next-line @typescript-eslint/no-deprecated
+              document.execCommand('cut');
+              handleContextMenuClose();
+            }}
+          >
+            Cut
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              // eslint-disable-next-line @typescript-eslint/no-deprecated
+              document.execCommand('copy');
+              handleContextMenuClose();
+            }}
+          >
+            Copy
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              // eslint-disable-next-line @typescript-eslint/no-deprecated
+              document.execCommand('paste');
+              handleContextMenuClose();
+            }}
+          >
+            Paste
+          </MenuItem>
+          <Divider />
+          <MenuItem
+            onClick={() => {
+              handleContextMenuClose();
+              void handleAddCommentOnSelection();
+            }}
+            disabled={!hasTextSelection}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <span>Add Comment</span>
+              <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>
+                ⌘⌥M
+              </Typography>
+            </Box>
+          </MenuItem>
+        </Menu>
+      )}
     </Box>
   );
 };

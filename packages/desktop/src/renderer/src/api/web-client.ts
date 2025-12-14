@@ -978,6 +978,32 @@ export const webClient: typeof window.electronAPI = {
       });
     },
   },
+
+  comment: {
+    getThreads: browserNotAvailable('comment.getThreads'),
+    addThread: browserNotAvailable('comment.addThread'),
+    updateThread: browserNotAvailable('comment.updateThread'),
+    deleteThread: browserNotAvailable('comment.deleteThread'),
+    addReply: browserNotAvailable('comment.addReply'),
+    getReplies: browserNotAvailable('comment.getReplies'),
+    updateReply: browserNotAvailable('comment.updateReply'),
+    deleteReply: browserNotAvailable('comment.deleteReply'),
+    getReactions: browserNotAvailable('comment.getReactions'),
+    addReaction: browserNotAvailable('comment.addReaction'),
+    removeReaction: browserNotAvailable('comment.removeReaction'),
+    onThreadAdded: noopSubscription,
+    onThreadUpdated: noopSubscription,
+    onThreadDeleted: noopSubscription,
+    onReplyAdded: noopSubscription,
+    onReplyUpdated: noopSubscription,
+    onReplyDeleted: noopSubscription,
+    onReactionAdded: noopSubscription,
+    onReactionRemoved: noopSubscription,
+  },
+
+  mention: {
+    getUsers: browserNotAvailable('mention.getUsers'),
+  },
 };
 
 /**

@@ -38,6 +38,7 @@ function App(): React.ReactElement {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
+  const [commentPanelOpen, setCommentPanelOpen] = useState(false);
   const [activeSdId, setActiveSdId] = useState<string | undefined>(undefined);
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
@@ -726,6 +727,13 @@ function App(): React.ReactElement {
               onSearchPanelClose={() => {
                 setSearchPanelOpen(false);
               }}
+              showCommentPanel={commentPanelOpen}
+              onCommentPanelClose={() => {
+                setCommentPanelOpen(false);
+              }}
+              onCommentAdded={() => {
+                setCommentPanelOpen(true);
+              }}
               onNavigateToNote={setSelectedNoteId}
             />
           </Box>
@@ -784,6 +792,13 @@ function App(): React.ReactElement {
                 showSearchPanel={searchPanelOpen}
                 onSearchPanelClose={() => {
                   setSearchPanelOpen(false);
+                }}
+                showCommentPanel={commentPanelOpen}
+                onCommentPanelClose={() => {
+                  setCommentPanelOpen(false);
+                }}
+                onCommentAdded={() => {
+                  setCommentPanelOpen(true);
                 }}
                 onNavigateToNote={setSelectedNoteId}
               />

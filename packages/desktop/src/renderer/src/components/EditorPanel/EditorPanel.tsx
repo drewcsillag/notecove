@@ -2,12 +2,23 @@
  * Editor Panel Component
  *
  * Displays the TipTap note editor with formatting toolbar.
+ * Includes a resizable comment panel on the right.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Box, Drawer } from '@mui/material';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { Box, Drawer, useTheme } from '@mui/material';
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  ImperativePanelHandle,
+} from 'react-resizable-panels';
 import { TipTapEditor } from './TipTapEditor';
 import { HistoryPanel } from '../HistoryPanel/HistoryPanel';
+import { CommentPanel } from '../CommentPanel';
+
+const COMMENT_PANEL_STORAGE_KEY = 'notecove-comment-panel-size';
+const DEFAULT_COMMENT_PANEL_SIZE = 40; // 40% of editor width
 
 interface EditorPanelProps {
   selectedNoteId: string | null;
@@ -18,6 +29,10 @@ interface EditorPanelProps {
   showSearchPanel?: boolean;
   onSearchPanelClose?: () => void;
   onNavigateToNote?: (noteId: string) => void;
+  showCommentPanel?: boolean;
+  onCommentPanelClose?: () => void;
+  /** Called when user adds a comment - parent can use to open panel */
+  onCommentAdded?: () => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({
@@ -29,15 +44,55 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   showSearchPanel = false,
   onSearchPanelClose,
   onNavigateToNote,
+  showCommentPanel = false,
+  onCommentPanelClose,
+  onCommentAdded,
 }) => {
+  const theme = useTheme();
   const [isNoteDeleted, setIsNoteDeleted] = useState(false);
   // Lifted search term state - retained across panel open/close, cleared on note switch
   const [searchTerm, setSearchTerm] = useState('');
+  // Selected comment thread ID (for highlighting in editor and panel)
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  // Comment panel ref for programmatic expand/collapse
+  const commentPanelRef = useRef<ImperativePanelHandle>(null);
+  // Track saved panel size
+  const [savedPanelSize, setSavedPanelSize] = useState<number>(() => {
+    const saved = localStorage.getItem(COMMENT_PANEL_STORAGE_KEY);
+    return saved ? parseFloat(saved) : DEFAULT_COMMENT_PANEL_SIZE;
+  });
 
-  // Clear search term when note changes
+  // Clear search term and selected thread when note changes
   useEffect(() => {
     setSearchTerm('');
+    setSelectedThreadId(null);
   }, [selectedNoteId]);
+
+  // Auto-close panel when no thread is selected (after a small delay to allow for switching)
+  useEffect(() => {
+    if (!selectedThreadId && showCommentPanel) {
+      const timer = setTimeout(() => {
+        onCommentPanelClose?.();
+      }, 300);
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+    return undefined;
+  }, [selectedThreadId, showCommentPanel, onCommentPanelClose]);
+
+  // Expand/collapse comment panel based on showCommentPanel prop
+  useEffect(() => {
+    const panel = commentPanelRef.current;
+    if (!panel) return;
+
+    if (showCommentPanel) {
+      panel.expand();
+      panel.resize(savedPanelSize);
+    } else {
+      panel.collapse();
+    }
+  }, [showCommentPanel, savedPanelSize]);
 
   // Check if the selected note is deleted
   useEffect(() => {
@@ -70,26 +125,103 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     []
   );
 
+  // Save panel size when it changes
+  const handlePanelResize = (sizes: number[]) => {
+    const commentSize = sizes[1];
+    if (commentSize && commentSize > 0) {
+      setSavedPanelSize(commentSize);
+      localStorage.setItem(COMMENT_PANEL_STORAGE_KEY, commentSize.toString());
+    }
+  };
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {/* Use key to force recreation of editor when switching notes */}
-      <TipTapEditor
-        key={selectedNoteId}
-        noteId={selectedNoteId}
-        readOnly={isNoteDeleted}
-        isNewlyCreated={isNewlyCreated}
-        {...(onNavigateToNote && { onNavigateToNote })}
-        {...(onNoteLoaded && { onNoteLoaded })}
-        onTitleChange={(noteId: string, title: string, contentText: string) => {
-          void handleTitleChange(noteId, title, contentText);
-        }}
-        showSearchPanel={showSearchPanel}
-        {...(onSearchPanelClose && { onSearchPanelClose })}
-        searchTerm={searchTerm}
-        onSearchTermChange={setSearchTerm}
-      />
+      <PanelGroup direction="horizontal" onLayout={handlePanelResize}>
+        {/* Editor Panel */}
+        <Panel id="editor-panel" order={1} minSize={40}>
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Use key to force recreation of editor when switching notes */}
+            <TipTapEditor
+              key={selectedNoteId}
+              noteId={selectedNoteId}
+              readOnly={isNoteDeleted}
+              isNewlyCreated={isNewlyCreated}
+              {...(onNavigateToNote && { onNavigateToNote })}
+              {...(onNoteLoaded && { onNoteLoaded })}
+              onTitleChange={(noteId: string, title: string, contentText: string) => {
+                void handleTitleChange(noteId, title, contentText);
+              }}
+              showSearchPanel={showSearchPanel}
+              {...(onSearchPanelClose && { onSearchPanelClose })}
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              selectedThreadId={selectedThreadId}
+              onCommentClick={(threadId) => {
+                setSelectedThreadId(threadId);
+                onCommentAdded?.(); // Open the panel when clicking on a comment
+              }}
+              onAddComment={({ threadId }) => {
+                // Select the new thread and notify parent (to open panel if needed)
+                setSelectedThreadId(threadId);
+                onCommentAdded?.();
+              }}
+            />
+          </Box>
+        </Panel>
 
-      {/* History Panel Drawer */}
+        {/* Resize Handle - only visible when panel is open */}
+        <PanelResizeHandle>
+          <Box
+            sx={{
+              width: '4px',
+              height: '100%',
+              backgroundColor: showCommentPanel ? theme.palette.divider : 'transparent',
+              cursor: showCommentPanel ? 'col-resize' : 'default',
+              '&:hover': {
+                backgroundColor: showCommentPanel ? theme.palette.primary.main : 'transparent',
+              },
+              '&:active': {
+                backgroundColor: showCommentPanel ? theme.palette.primary.dark : 'transparent',
+              },
+            }}
+          />
+        </PanelResizeHandle>
+
+        {/* Comment Panel */}
+        <Panel
+          id="comment-panel"
+          order={2}
+          ref={commentPanelRef}
+          defaultSize={0}
+          minSize={0}
+          maxSize={50}
+          collapsible={true}
+          collapsedSize={0}
+        >
+          <Box
+            sx={{
+              height: '100%',
+              overflow: 'hidden',
+              borderLeft: showCommentPanel ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.background.paper,
+            }}
+          >
+            <CommentPanel
+              noteId={selectedNoteId}
+              onClose={() => {
+                setSelectedThreadId(null);
+                onCommentPanelClose?.();
+              }}
+              selectedThreadId={selectedThreadId}
+              onThreadSelect={(threadId) => {
+                setSelectedThreadId(threadId);
+              }}
+            />
+          </Box>
+        </Panel>
+      </PanelGroup>
+
+      {/* History Panel Drawer - kept as drawer since it's modal */}
       <Drawer
         anchor="right"
         open={showHistoryPanel}

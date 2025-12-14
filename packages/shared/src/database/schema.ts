@@ -307,6 +307,57 @@ export interface CachedProfilePresence {
 }
 
 /**
+ * Comment thread cache entry
+ * Cached data extracted from CRDT for fast access
+ * @see plans/note-comments/PLAN.md
+ */
+export interface CommentThreadCache {
+  id: UUID;
+  noteId: UUID;
+  anchorStart: Uint8Array;
+  anchorEnd: Uint8Array;
+  originalText: string;
+  authorId: string;
+  authorName: string;
+  authorHandle: string;
+  content: string;
+  created: number;
+  modified: number;
+  resolved: boolean;
+  resolvedBy: string | null;
+  resolvedAt: number | null;
+}
+
+/**
+ * Comment reply cache entry
+ * @see plans/note-comments/PLAN.md
+ */
+export interface CommentReplyCache {
+  id: UUID;
+  threadId: UUID;
+  authorId: string;
+  authorName: string;
+  authorHandle: string;
+  content: string;
+  created: number;
+  modified: number;
+}
+
+/**
+ * Comment reaction cache entry
+ * @see plans/note-comments/PLAN.md
+ */
+export interface CommentReactionCache {
+  id: UUID;
+  targetType: 'thread' | 'reply';
+  targetId: UUID;
+  emoji: string;
+  authorId: string;
+  authorName: string;
+  created: number;
+}
+
+/**
  * Database schema version
  *
  * Version history:
@@ -318,13 +369,15 @@ export interface CachedProfilePresence {
  * - v6: Added note_sync_state, folder_sync_state, activity_log_state, sequence_state tables for new append-only log format
  * - v7: Added instance_id column and index to profile_presence_cache for proper activity log lookups
  * - v8: Added images table for image metadata caching
+ * - v9: Added comment_threads, comment_replies, comment_reactions tables for note comments
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
  * - User data tables (tags, note_tags, note_links, checkboxes, app_state): Migrate with version-specific logic
  * - Sync state tables: Safe to recreate (will rebuild from files)
+ * - Comment tables: Cache only, safe to recreate (rebuilt from CRDT)
  */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /**
  * SQL schema definitions
@@ -650,5 +703,73 @@ export const SCHEMA_SQL = {
     );
 
     CREATE INDEX IF NOT EXISTS idx_images_sd_id ON images(sd_id);
+  `,
+
+  /**
+   * Comment threads table
+   * Stores comment threads anchored to text selections in notes
+   * @see plans/note-comments/PLAN.md
+   */
+  commentThreads: `
+    CREATE TABLE IF NOT EXISTS comment_threads (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      anchor_start BLOB NOT NULL,
+      anchor_end BLOB NOT NULL,
+      original_text TEXT NOT NULL,
+      author_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      author_handle TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created INTEGER NOT NULL,
+      modified INTEGER NOT NULL,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      resolved_by TEXT,
+      resolved_at INTEGER,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_comment_threads_note_id ON comment_threads(note_id);
+    CREATE INDEX IF NOT EXISTS idx_comment_threads_resolved ON comment_threads(resolved);
+  `,
+
+  /**
+   * Comment replies table
+   * Stores replies to comment threads (single-level threading)
+   * @see plans/note-comments/PLAN.md
+   */
+  commentReplies: `
+    CREATE TABLE IF NOT EXISTS comment_replies (
+      id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL,
+      author_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      author_handle TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created INTEGER NOT NULL,
+      modified INTEGER NOT NULL,
+      FOREIGN KEY (thread_id) REFERENCES comment_threads(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_comment_replies_thread_id ON comment_replies(thread_id);
+  `,
+
+  /**
+   * Comment reactions table
+   * Stores emoji reactions on threads or replies
+   * @see plans/note-comments/PLAN.md
+   */
+  commentReactions: `
+    CREATE TABLE IF NOT EXISTS comment_reactions (
+      id TEXT PRIMARY KEY,
+      target_type TEXT NOT NULL CHECK(target_type IN ('thread', 'reply')),
+      target_id TEXT NOT NULL,
+      emoji TEXT NOT NULL,
+      author_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      created INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_comment_reactions_target ON comment_reactions(target_type, target_id);
   `,
 };

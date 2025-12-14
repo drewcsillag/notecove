@@ -133,6 +133,25 @@ const mockElectronAPI = {
     onReindexError: jest.fn(() => () => {}),
     reindexNotes: jest.fn(() => Promise.resolve()),
   },
+  comment: {
+    createThread: jest.fn().mockResolvedValue('thread-1'),
+    getThreads: jest.fn().mockResolvedValue([]),
+    updateThread: jest.fn().mockResolvedValue(undefined),
+    deleteThread: jest.fn().mockResolvedValue(undefined),
+    addReply: jest.fn().mockResolvedValue('reply-1'),
+    updateReply: jest.fn().mockResolvedValue(undefined),
+    deleteReply: jest.fn().mockResolvedValue(undefined),
+    addReaction: jest.fn().mockResolvedValue(undefined),
+    removeReaction: jest.fn().mockResolvedValue(undefined),
+    onThreadAdded: jest.fn(() => () => {}),
+    onThreadUpdated: jest.fn(() => () => {}),
+    onThreadDeleted: jest.fn(() => () => {}),
+    onReplyAdded: jest.fn(() => () => {}),
+    onReplyUpdated: jest.fn(() => () => {}),
+    onReplyDeleted: jest.fn(() => () => {}),
+    onReactionAdded: jest.fn(() => () => {}),
+    onReactionRemoved: jest.fn(() => () => {}),
+  },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */
 

@@ -968,6 +968,178 @@ declare global {
           size: number;
         } | null>;
       };
+
+      comment: {
+        /** Get all comment threads for a note */
+        getThreads: (noteId: string) => Promise<
+          {
+            id: string;
+            noteId: string;
+            anchorStart: Uint8Array;
+            anchorEnd: Uint8Array;
+            originalText: string;
+            authorId: string;
+            authorName: string;
+            authorHandle: string;
+            content: string;
+            created: number;
+            modified: number;
+            resolved: boolean;
+            resolvedBy?: string;
+            resolvedAt?: number;
+          }[]
+        >;
+        /** Add a new comment thread to a note */
+        addThread: (
+          noteId: string,
+          thread: {
+            noteId: string;
+            anchorStart: Uint8Array;
+            anchorEnd: Uint8Array;
+            originalText: string;
+            authorId: string;
+            authorName: string;
+            authorHandle: string;
+            content: string;
+            created: number;
+            modified: number;
+            resolved: boolean;
+            resolvedBy?: string;
+            resolvedAt?: number;
+          }
+        ) => Promise<{ success: boolean; threadId?: string; error?: string }>;
+        /** Update an existing comment thread */
+        updateThread: (
+          noteId: string,
+          threadId: string,
+          updates: {
+            content?: string;
+            resolved?: boolean;
+            resolvedBy?: string;
+            resolvedAt?: number;
+          }
+        ) => Promise<{ success: boolean; error?: string }>;
+        /** Delete a comment thread */
+        deleteThread: (
+          noteId: string,
+          threadId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        /** Add a reply to a thread */
+        addReply: (
+          noteId: string,
+          threadId: string,
+          reply: {
+            threadId: string;
+            authorId: string;
+            authorName: string;
+            authorHandle: string;
+            content: string;
+            created: number;
+            modified: number;
+          }
+        ) => Promise<{ success: boolean; replyId?: string; error?: string }>;
+        /** Get all replies for a thread */
+        getReplies: (
+          noteId: string,
+          threadId: string
+        ) => Promise<
+          {
+            id: string;
+            threadId: string;
+            authorId: string;
+            authorName: string;
+            authorHandle: string;
+            content: string;
+            created: number;
+            modified: number;
+          }[]
+        >;
+        /** Update a reply */
+        updateReply: (
+          noteId: string,
+          threadId: string,
+          replyId: string,
+          updates: { content?: string }
+        ) => Promise<{ success: boolean; error?: string }>;
+        /** Delete a reply */
+        deleteReply: (
+          noteId: string,
+          threadId: string,
+          replyId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        /** Get all reactions for a thread */
+        getReactions: (
+          noteId: string,
+          threadId: string
+        ) => Promise<
+          {
+            id: string;
+            targetType: 'thread' | 'reply';
+            targetId: string;
+            emoji: string;
+            authorId: string;
+            authorName: string;
+            created: number;
+          }[]
+        >;
+        /** Add a reaction to a thread or reply */
+        addReaction: (
+          noteId: string,
+          threadId: string,
+          reaction: {
+            targetType: 'thread' | 'reply';
+            targetId: string;
+            emoji: string;
+            authorId: string;
+            authorName: string;
+            created: number;
+          }
+        ) => Promise<{ success: boolean; reactionId?: string; error?: string }>;
+        /** Remove a reaction */
+        removeReaction: (
+          noteId: string,
+          threadId: string,
+          reactionId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        /** Event listener for when a thread is added */
+        onThreadAdded: (callback: (noteId: string, threadId: string) => void) => () => void;
+        /** Event listener for when a thread is updated */
+        onThreadUpdated: (callback: (noteId: string, threadId: string) => void) => () => void;
+        /** Event listener for when a thread is deleted */
+        onThreadDeleted: (callback: (noteId: string, threadId: string) => void) => () => void;
+        /** Event listener for when a reply is added */
+        onReplyAdded: (
+          callback: (noteId: string, threadId: string, replyId: string) => void
+        ) => () => void;
+        /** Event listener for when a reply is updated */
+        onReplyUpdated: (
+          callback: (noteId: string, threadId: string, replyId: string) => void
+        ) => () => void;
+        /** Event listener for when a reply is deleted */
+        onReplyDeleted: (
+          callback: (noteId: string, threadId: string, replyId: string) => void
+        ) => () => void;
+        /** Event listener for when a reaction is added */
+        onReactionAdded: (
+          callback: (noteId: string, threadId: string, reactionId: string) => void
+        ) => () => void;
+        /** Event listener for when a reaction is removed */
+        onReactionRemoved: (
+          callback: (noteId: string, threadId: string, reactionId: string) => void
+        ) => () => void;
+      };
+
+      /** Mention operations for @-mentions in comments */
+      mention: {
+        /** Get users available for @-mentions autocomplete */
+        getUsers: () => Promise<
+          {
+            profileId: string;
+            handle: string;
+            name: string;
+          }[]
+        >;
+      };
     };
   }
 }
