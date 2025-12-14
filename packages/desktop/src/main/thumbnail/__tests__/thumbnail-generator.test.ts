@@ -58,7 +58,7 @@ describe('ThumbnailGenerator', () => {
 
       // Verify dimensions
       const thumbnailBuffer = await readFile(result.path);
-      const metadata = await sharp(thumbnailBuffer).metadata();
+      const metadata = await sharp(thumbnailBuffer as Buffer).metadata();
 
       expect(metadata.width).toBeLessThanOrEqual(ThumbnailSpec.MAX_SIZE);
       expect(metadata.height).toBeLessThanOrEqual(ThumbnailSpec.MAX_SIZE);
@@ -84,7 +84,7 @@ describe('ThumbnailGenerator', () => {
 
       // Verify dimensions are not upscaled
       const thumbnailBuffer = await readFile(result.path);
-      const metadata = await sharp(thumbnailBuffer).metadata();
+      const metadata = await sharp(thumbnailBuffer as Buffer).metadata();
 
       expect(metadata.width).toBe(200);
       expect(metadata.height).toBe(200);
@@ -106,7 +106,7 @@ describe('ThumbnailGenerator', () => {
       const result = await generator.generateThumbnail(wideImage, 'image/png', 'wide-image');
 
       const thumbnailBuffer = await readFile(result.path);
-      const metadata = await sharp(thumbnailBuffer).metadata();
+      const metadata = await sharp(thumbnailBuffer as Buffer).metadata();
 
       // Longest edge (width) should be 800, height should be 400
       expect(metadata.width).toBe(800);
@@ -174,7 +174,7 @@ describe('ThumbnailGenerator', () => {
 
       // Verify it has alpha channel
       const thumbnailBuffer = await readFile(result.path);
-      const metadata = await sharp(thumbnailBuffer).metadata();
+      const metadata = await sharp(thumbnailBuffer as Buffer).metadata();
       expect(metadata.channels).toBe(4);
       expect(metadata.hasAlpha).toBe(true);
     });

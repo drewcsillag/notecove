@@ -21,6 +21,27 @@ export function transformHashtags(text: string): string {
   return text.replace(/#(\w+)/g, '__hashtag__$1');
 }
 
+/**
+ * Transforms slash commands in text to a tokenizer-friendly format.
+ * Converts /command to __slash__command so FTS5 can distinguish slash commands from plain words.
+ */
+export function transformSlashCommands(text: string): string {
+  // Match slash commands: / at word boundary followed by word characters
+  // Use word boundary to avoid matching paths like file/path
+  return text.replace(/(?:^|(?<=\s))\/(\w+)/g, '__slash__$1');
+}
+
+/**
+ * Combined transformation for FTS indexing.
+ * Applies all special character transformations for searchability.
+ */
+export function transformForFts(text: string): string {
+  let result = text;
+  result = transformHashtags(result);
+  result = transformSlashCommands(result);
+  return result;
+}
+
 export class BetterSqliteAdapter implements DatabaseAdapter {
   private db: BetterSqlite3Type.Database | null = null;
 
@@ -34,8 +55,9 @@ export class BetterSqliteAdapter implements DatabaseAdapter {
     // Enable foreign keys
     this.db.pragma('foreign_keys = ON');
 
-    // Register custom function for hashtag transformation in FTS indexing
-    this.db.function('transform_hashtags', transformHashtags);
+    // Register custom function for FTS transformation (handles hashtags, slash commands, etc.)
+    // Named 'transform_hashtags' for backward compatibility with existing triggers
+    this.db.function('transform_hashtags', transformForFts);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await

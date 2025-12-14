@@ -278,10 +278,11 @@ export class ThumbnailGenerator {
           // Check if alpha channel is actually used (not all 255)
           const stats = await sharp(imageData).stats();
           // If alpha channel has variance, keep PNG
+          const channels = stats.channels;
           if (
-            stats.channels.length >= 4 &&
-            stats.channels[3] &&
-            (stats.channels[3].min < 255 || stats.channels[3].stdev > 0)
+            channels.length >= 4 &&
+            channels[3] &&
+            (channels[3].min < 255 || channels[3].stdev > 0)
           ) {
             return 'png';
           }

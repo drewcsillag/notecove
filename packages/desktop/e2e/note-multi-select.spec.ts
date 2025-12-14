@@ -340,12 +340,14 @@ test.describe('Multi-Select Functionality', () => {
     const folderInput = window.locator('div[role="dialog"] input[type="text"]');
     await folderInput.fill('Test Folder');
     await folderInput.press('Enter');
-    await window.waitForTimeout(500);
+    // Increased wait to ensure folder creation completes
+    await window.waitForTimeout(1000);
 
     // Navigate to "All Notes" to ensure notes are created there, not in the new folder
+    // Increased wait time to ensure folder deselection completes
     const allNotesFolder = window.locator('[aria-label="All Notes"]').first();
     await allNotesFolder.click();
-    await window.waitForTimeout(300);
+    await window.waitForTimeout(1000);
 
     // Create three test notes
     const createButton = window.locator('button[title="Create note"]');
