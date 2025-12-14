@@ -396,9 +396,7 @@ export class ImportService {
     liftImagesToBlockLevel(prosemirrorJson);
 
     // Convert inter-note links to import markers, then resolve them
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- convertLinksToImportMarkers mutates the JSON
     convertLinksToImportMarkers(prosemirrorJson);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- resolveImportLinkMarkers mutates the JSON
     resolveImportLinkMarkers(prosemirrorJson, pathToNoteId);
 
     const now = Date.now();

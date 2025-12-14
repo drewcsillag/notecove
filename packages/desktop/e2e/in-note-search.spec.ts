@@ -339,10 +339,8 @@ test.describe('In-Note Search - Cleanup on Close', () => {
     const highlights = editor.locator('.search-result');
     await expect(highlights.first()).toBeVisible({ timeout: 5000 });
 
-    // Close with close button
-    const closeButton = page.locator(
-      'button[aria-label*="close" i], button:has([data-testid="CloseIcon"])'
-    );
+    // Close with close button (specifically the search close button, not comment panel)
+    const closeButton = page.locator('button[aria-label="Close search (Esc)"]');
     await closeButton.click();
     await page.waitForTimeout(500);
 

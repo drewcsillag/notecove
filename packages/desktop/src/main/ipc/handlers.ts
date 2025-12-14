@@ -111,6 +111,9 @@ import {
   type ParsedFileResult,
   type InspectorFileType,
 } from '../storage-inspector';
+import { ImportService } from '../import/import-service';
+import { scanPath } from '../import/file-scanner';
+import type { ImportProgress, ImportOptions, ScanResult } from '../import/types';
 
 /**
  * Callback type for broadcasting to web clients via WebSocket
@@ -122,6 +125,7 @@ export class IPCHandlers {
   private thumbnailGenerator: ThumbnailGenerator;
   private imageCleanupManager: ImageCleanupManager;
   private storageInspectorService: StorageInspectorService;
+  private currentImport: ImportService | undefined;
 
   constructor(
     private crdtManager: CRDTManager,
