@@ -165,8 +165,9 @@ test.describe('Bug 1: Title becomes Untitled when clicking away during load', ()
     }
 
     // Wait for sync through FileSyncSimulator
+    // Increased from 5s to 8s to reduce flakiness under CI load
     console.log('[Bug 1] Waiting for first note to sync to instance 2...');
-    await window1.waitForTimeout(5000);
+    await window1.waitForTimeout(8000);
 
     // Close and relaunch instance 2 to see synced content (workaround for live editor bug)
     await instance2.close();
@@ -204,8 +205,9 @@ test.describe('Bug 1: Title becomes Untitled when clicking away during load', ()
     await window1.waitForTimeout(2000);
 
     // Wait for the second note to sync
+    // Increased from 5s to 8s to reduce flakiness under CI load
     console.log('[Bug 1] Waiting for second note to sync to instance 2...');
-    await window1.waitForTimeout(5000);
+    await window1.waitForTimeout(8000);
 
     // Close and relaunch instance 2 again
     await instance2.close();

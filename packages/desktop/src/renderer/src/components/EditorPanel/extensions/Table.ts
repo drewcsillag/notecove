@@ -378,9 +378,9 @@ export function getTableDimensionsFromEditor(editor: {
   const depth = $from.depth;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   for (let d = depth; d > 0; d--) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const node = $from.node(d);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/prefer-optional-chain
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unsafe-member-access
     if (node && node.type.name === 'table') {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       return getTableDimensions(node);

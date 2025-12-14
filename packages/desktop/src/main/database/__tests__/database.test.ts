@@ -537,6 +537,211 @@ describe('SqliteDatabase', () => {
       expect(results.some((r) => r.noteId === 'note-reindex-1')).toBe(true);
       expect(results.some((r) => r.noteId === 'note-reindex-2')).toBe(false);
     });
+
+    describe('special character handling', () => {
+      it('should search for slash commands and only match notes with the slash', async () => {
+        // Insert note with /feature (slash command)
+        await db.upsertNote({
+          id: 'note-slash' as any,
+          title: 'Slash Command',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Use the /feature command',
+          contentText: 'Use the /feature command to enable features',
+        });
+
+        // Insert note with just "feature" (no slash)
+        await db.upsertNote({
+          id: 'note-no-slash' as any,
+          title: 'Feature Discussion',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'This feature is great',
+          contentText: 'This feature is great for productivity',
+        });
+
+        // Searching for /feature should only find the note with /feature
+        const results = await db.searchNotes('/feature');
+        expect(results.some((r) => r.noteId === 'note-slash')).toBe(true);
+        expect(results.some((r) => r.noteId === 'note-no-slash')).toBe(false);
+      });
+
+      it('should search for version numbers with periods', async () => {
+        await db.upsertNote({
+          id: 'note-version' as any,
+          title: 'Release Notes',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Version v1.0.2 released',
+          contentText: 'Version v1.0.2 released with bug fixes',
+        });
+
+        const results = await db.searchNotes('v1.0.2');
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.noteId === 'note-version')).toBe(true);
+      });
+
+      it('should search for hyphenated terms', async () => {
+        await db.upsertNote({
+          id: 'note-hyphen' as any,
+          title: 'Code Style',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Use kebab-case naming',
+          contentText: 'Use kebab-case naming for CSS classes',
+        });
+
+        const results = await db.searchNotes('kebab-case');
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.noteId === 'note-hyphen')).toBe(true);
+      });
+
+      it('should search for C++ without error', async () => {
+        await db.upsertNote({
+          id: 'note-cpp' as any,
+          title: 'Programming Languages',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Learn C++ basics',
+          contentText: 'Learn C++ basics for game development',
+        });
+
+        const results = await db.searchNotes('C++');
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.noteId === 'note-cpp')).toBe(true);
+      });
+
+      it('should search for email addresses', async () => {
+        await db.upsertNote({
+          id: 'note-email' as any,
+          title: 'Contact Info',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Contact user@example.com',
+          contentText: 'Contact user@example.com for support',
+        });
+
+        const results = await db.searchNotes('user@example.com');
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.noteId === 'note-email')).toBe(true);
+      });
+
+      it('should support prefix matching for special char terms', async () => {
+        await db.upsertNote({
+          id: 'note-v1' as any,
+          title: 'Version v1.0.2',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'v1.0.2 release',
+          contentText: 'v1.0.2 release notes',
+        });
+
+        await db.upsertNote({
+          id: 'note-v1-beta' as any,
+          title: 'Version v1.0.2-beta',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'v1.0.2-beta release',
+          contentText: 'v1.0.2-beta pre-release notes',
+        });
+
+        // Search for v1.0.2 should find both (prefix matching)
+        const results = await db.searchNotes('v1.0.2');
+        expect(results.some((r) => r.noteId === 'note-v1')).toBe(true);
+        expect(results.some((r) => r.noteId === 'note-v1-beta')).toBe(true);
+      });
+
+      it('should support exact match with user-provided quotes', async () => {
+        await db.upsertNote({
+          id: 'note-exact' as any,
+          title: 'Exact Match Test',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'The exact phrase here',
+          contentText: 'The exact phrase here is important',
+        });
+
+        // User-provided quotes should work for exact phrase matching
+        const results = await db.searchNotes('"exact phrase"');
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.noteId === 'note-exact')).toBe(true);
+      });
+
+      it('should handle mixed queries with special and normal terms', async () => {
+        await db.upsertNote({
+          id: 'note-mixed' as any,
+          title: 'Mixed Content',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'The /feature command works',
+          contentText: 'The /feature command works in the terminal',
+        });
+
+        const results = await db.searchNotes('the /feature command');
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.noteId === 'note-mixed')).toBe(true);
+      });
+
+      it('should preserve user wildcard when term contains asterisk', async () => {
+        await db.upsertNote({
+          id: 'note-wildcard' as any,
+          title: 'Wildcard Test',
+          sdId: 'sd-1',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Testing wildcards',
+          contentText: 'Testing wildcards in search queries',
+        });
+
+        // User typing wild* should get prefix matching
+        const results = await db.searchNotes('wild*');
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.some((r) => r.noteId === 'note-wildcard')).toBe(true);
+      });
+    });
   });
 
   describe('Transactions', () => {

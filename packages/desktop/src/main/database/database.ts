@@ -454,17 +454,22 @@ export class SqliteDatabase implements Database {
   }
 
   async searchNotes(query: string, limit = 50): Promise<SearchResult[]> {
-    // First, transform hashtags in the query to match the indexed format
-    // e.g., "#work" becomes "__hashtag__work"
-    const hashtagTransformedQuery = query.replace(/#(\w+)/g, '__hashtag__$1');
+    // Transform special patterns in the query to match the indexed format
+    // e.g., "#work" becomes "__hashtag__work", "/feature" becomes "__slash__feature"
+    let transformedQuery = query;
+    // Transform hashtags: #tag -> __hashtag__tag
+    transformedQuery = transformedQuery.replace(/#(\w+)/g, '__hashtag__$1');
+    // Transform slash commands: /command -> __slash__command (at word boundaries)
+    transformedQuery = transformedQuery.replace(/(?:^|(?<=\s))\/(\w+)/g, '__slash__$1');
 
     // FTS5 special characters that need to be quoted (excluding # which is now transformed)
-    // These characters have special meaning in FTS5 query syntax
-    const fts5SpecialChars = /[@:^$(){}[\]\\|!&~<>]/;
+    // These characters have special meaning in FTS5 query syntax or cause parse errors
+    // Includes: / . - ' , ; % ? = ` + and the original set @ : ^ $ ( ) { } [ ] \ | ! & ~ < >
+    const fts5SpecialChars = /[/@:.^$(){}[\]\\|!&~<>'\-,;%?=`+]/;
 
     // Transform query to support prefix matching
     // For each word >=3 chars, add wildcard for prefix search
-    const fts5Query = hashtagTransformedQuery
+    const fts5Query = transformedQuery
       .trim()
       .split(/\s+/)
       .filter((word) => word.length > 0)
@@ -473,10 +478,18 @@ export class SqliteDatabase implements Database {
         if (word.startsWith('"') && word.endsWith('"')) {
           return word;
         }
-        // If it contains special characters, quote it for exact match
+        // If word contains *, user wants wildcard behavior - leave unchanged
+        if (word.includes('*')) {
+          return word;
+        }
+        // If it contains special characters, quote it and add prefix wildcard for >= 3 chars
         if (fts5SpecialChars.test(word)) {
           // Escape any internal quotes and wrap in quotes
           const escaped = word.replace(/"/g, '""');
+          // Add prefix wildcard for longer terms
+          if (word.length >= 3) {
+            return `"${escaped}"*`;
+          }
           return `"${escaped}"`;
         }
         // For words >= 3 chars, add prefix wildcard

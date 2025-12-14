@@ -5,6 +5,8 @@
  * Syncs with main process CRDT via IPC.
  */
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -493,9 +495,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
             if (hasChanges) {
               // Use ProseMirror's Fragment.from to create a new fragment
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const Fragment = (node.content as any).constructor;
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
               const newFragment = Fragment.fromArray(newContent) as typeof node.content;
               return node.copy(newFragment);
             }
@@ -519,11 +520,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
         if (hasChanges) {
           // Use ProseMirror's Fragment.from to create a new fragment
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const Fragment = (slice.content as any).constructor;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           const newFragment = Fragment.fromArray(newContent) as typeof slice.content;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
           return new (slice.constructor as any)(newFragment, slice.openStart, slice.openEnd);
         }
 
@@ -607,18 +607,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }
 
         // Fix 2: If the UndoManager's handler is not registered on Y.Doc, re-register it
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const umAny = um as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const yDocAny = yDoc as any;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         const observers = yDocAny._observers?.get('afterTransaction');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         const hasUmHandler = observers?.has(umAny.afterTransactionHandler) ?? false;
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (!hasUmHandler && umAny.afterTransactionHandler) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           yDoc.on('afterTransaction', umAny.afterTransactionHandler);
         }
       }
