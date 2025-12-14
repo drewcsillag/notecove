@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Drawer } from '@mui/material';
 import { TipTapEditor } from './TipTapEditor';
 import { HistoryPanel } from '../HistoryPanel/HistoryPanel';
+import { CommentPanel } from '../CommentPanel';
 
 interface EditorPanelProps {
   selectedNoteId: string | null;
@@ -18,6 +19,10 @@ interface EditorPanelProps {
   showSearchPanel?: boolean;
   onSearchPanelClose?: () => void;
   onNavigateToNote?: (noteId: string) => void;
+  showCommentPanel?: boolean;
+  onCommentPanelClose?: () => void;
+  /** Called when user adds a comment - parent can use to open panel */
+  onCommentAdded?: () => void;
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({
@@ -29,14 +34,20 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   showSearchPanel = false,
   onSearchPanelClose,
   onNavigateToNote,
+  showCommentPanel = false,
+  onCommentPanelClose,
+  onCommentAdded,
 }) => {
   const [isNoteDeleted, setIsNoteDeleted] = useState(false);
   // Lifted search term state - retained across panel open/close, cleared on note switch
   const [searchTerm, setSearchTerm] = useState('');
+  // Selected comment thread ID (for highlighting in editor and panel)
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
-  // Clear search term when note changes
+  // Clear search term and selected thread when note changes
   useEffect(() => {
     setSearchTerm('');
+    setSelectedThreadId(null);
   }, [selectedNoteId]);
 
   // Check if the selected note is deleted
@@ -87,6 +98,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         {...(onSearchPanelClose && { onSearchPanelClose })}
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
+        selectedThreadId={selectedThreadId}
+        onCommentClick={(threadId) => {
+          setSelectedThreadId(threadId);
+        }}
+        onAddComment={() => {
+          // When a comment is added, notify parent (to open panel if needed)
+          onCommentAdded?.();
+        }}
       />
 
       {/* History Panel Drawer */}
@@ -111,6 +130,36 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 // Empty fallback
               })
             }
+          />
+        )}
+      </Drawer>
+
+      {/* Comment Panel Drawer */}
+      <Drawer
+        anchor="right"
+        open={showCommentPanel}
+        onClose={onCommentPanelClose}
+        variant="temporary"
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 350,
+            maxWidth: '80vw',
+          },
+        }}
+      >
+        {showCommentPanel && (
+          <CommentPanel
+            noteId={selectedNoteId}
+            onClose={
+              onCommentPanelClose ??
+              (() => {
+                // Empty fallback
+              })
+            }
+            selectedThreadId={selectedThreadId}
+            onThreadSelect={(threadId) => {
+              setSelectedThreadId(threadId);
+            }}
           />
         )}
       </Drawer>

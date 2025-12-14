@@ -31,6 +31,11 @@
       "types": "./dist/esm/history/index.d.ts",
       "require": "./dist/cjs/history/index.js",
       "import": "./dist/esm/history/index.js"
+    },
+    "./comments": {
+      "types": "./dist/esm/comments/index.d.ts",
+      "require": "./dist/cjs/comments/index.js",
+      "import": "./dist/esm/comments/index.js"
     }
   },
   "scripts": {

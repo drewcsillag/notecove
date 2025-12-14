@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /**
  * TipTap Editor Component
  *
@@ -22,6 +25,7 @@ import { Hashtag } from './extensions/Hashtag';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
+import { CommentMark } from './extensions/CommentMark';
 import { NotecoveImage } from './extensions/Image';
 import {
   NotecoveTable,
@@ -91,6 +95,12 @@ export interface TipTapEditorProps {
   searchTerm?: string;
   /** Callback to update the lifted search term state */
   onSearchTermChange?: (term: string) => void;
+  /** Currently selected comment thread ID (for highlighting) */
+  selectedThreadId?: string | null;
+  /** Callback when a comment mark is clicked */
+  onCommentClick?: (threadId: string) => void;
+  /** Callback to add a comment on the current selection */
+  onAddComment?: (selection: { from: number; to: number; text: string }) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -104,6 +114,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   onNavigateToNote,
   searchTerm = '',
   onSearchTermChange,
+  selectedThreadId: _selectedThreadId, // TODO: Use for highlighting active thread
+  onCommentClick,
+  onAddComment,
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
@@ -255,6 +268,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       SearchAndReplace,
       // Add WebLink extension for http/https links
       WebLink,
+      // Add CommentMark extension for highlighting commented text
+      CommentMark.configure({
+        onCommentClick: (threadId) => {
+          onCommentClick?.(threadId);
+        },
+      }),
       // Add NotecoveImage extension for image display
       NotecoveImage,
       // Add Table extensions for table support
@@ -493,9 +512,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
             if (hasChanges) {
               // Use ProseMirror's Fragment.from to create a new fragment
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const Fragment = (node.content as any).constructor;
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
               const newFragment = Fragment.fromArray(newContent) as typeof node.content;
               return node.copy(newFragment);
             }
@@ -519,11 +538,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated in forEach
         if (hasChanges) {
           // Use ProseMirror's Fragment.from to create a new fragment
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const Fragment = (slice.content as any).constructor;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
           const newFragment = Fragment.fromArray(newContent) as typeof slice.content;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
           return new (slice.constructor as any)(newFragment, slice.openStart, slice.openEnd);
         }
 
@@ -607,18 +626,17 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }
 
         // Fix 2: If the UndoManager's handler is not registered on Y.Doc, re-register it
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const umAny = um as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const yDocAny = yDoc as any;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+
         const observers = yDocAny._observers?.get('afterTransaction');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+
         const hasUmHandler = observers?.has(umAny.afterTransactionHandler) ?? false;
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (!hasUmHandler && umAny.afterTransactionHandler) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           yDoc.on('afterTransaction', umAny.afterTransactionHandler);
         }
       }
@@ -1290,6 +1308,114 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, [editor]);
 
+  // Click handler for comment highlights
+  // When a comment mark is clicked, notify parent to select that thread in the panel
+  useEffect(() => {
+    if (!editor || !onCommentClick) return;
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const commentHighlight = target.closest('.comment-highlight');
+      if (commentHighlight) {
+        const threadId = commentHighlight.getAttribute('data-thread-id');
+        if (threadId) {
+          console.log('[TipTapEditor] Comment highlight clicked, threadId:', threadId);
+          onCommentClick(threadId);
+        }
+      }
+    };
+
+    const editorDom = editor.view.dom;
+    editorDom.addEventListener('click', handleClick);
+
+    return () => {
+      editorDom.removeEventListener('click', handleClick);
+    };
+  }, [editor, onCommentClick]);
+
+  // Keyboard shortcut for adding comments (Cmd+Alt+M / Ctrl+Alt+M like Google Docs)
+  useEffect(() => {
+    if (!editor || !noteId) return;
+
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      // Check for Cmd+Alt+M (Mac) or Ctrl+Alt+M (Windows/Linux)
+      // eslint-disable-next-line @typescript-eslint/prefer-includes, @typescript-eslint/no-deprecated
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? event.metaKey : event.ctrlKey;
+
+      if (modifier && event.altKey && event.key.toLowerCase() === 'm') {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Get current selection
+        const { from, to, empty } = editor.state.selection;
+
+        if (empty) {
+          console.log('[TipTapEditor] Cannot add comment: no selection');
+          return;
+        }
+
+        // Get selected text
+        const text = editor.state.doc.textBetween(from, to, ' ');
+        console.log('[TipTapEditor] Adding comment for selection:', { from, to, text });
+
+        try {
+          // Encode positions as simple Uint8Array for now
+          // TODO: Use proper Yjs RelativePosition encoding for robust anchor tracking
+          const anchorStart = new Uint8Array(new Uint32Array([from]).buffer);
+          const anchorEnd = new Uint8Array(new Uint32Array([to]).buffer);
+
+          // Create the comment thread via IPC
+          const result = await window.electronAPI.comment.addThread(noteId, {
+            noteId,
+            anchorStart,
+            anchorEnd,
+            authorId: 'current-user', // TODO: Get actual user ID
+            authorName: 'You', // TODO: Get actual user name
+            authorHandle: '@you', // TODO: Get actual handle
+            content: '', // Empty content - user will fill in via panel
+            originalText: text,
+            created: Date.now(),
+            modified: Date.now(),
+            resolved: false,
+          });
+
+          if (!result.success || !result.threadId) {
+            console.error('[TipTapEditor] Failed to create comment thread:', result.error);
+            return;
+          }
+
+          console.log('[TipTapEditor] Comment thread created:', result.threadId);
+
+          // Apply the comment mark to the selection
+          editor
+            .chain()
+            .focus()
+            .setTextSelection({ from, to })
+            .setCommentMark(result.threadId)
+            .run();
+
+          console.log('[TipTapEditor] Comment mark applied');
+
+          // Notify parent about the new comment (to open panel, select thread, etc.)
+          onAddComment?.({ from, to, text });
+        } catch (err) {
+          console.error('[TipTapEditor] Failed to create comment thread:', err);
+        }
+      }
+    };
+
+    const editorDom = editor.view.dom;
+    const wrappedHandler = (event: Event) => {
+      void handleKeyDown(event as KeyboardEvent);
+    };
+    editorDom.addEventListener('keydown', wrappedHandler);
+
+    return () => {
+      editorDom.removeEventListener('keydown', wrappedHandler);
+    };
+  }, [editor, noteId, onAddComment]);
+
   // Manage link popover using tippy.js
   useEffect(() => {
     // Clean up existing popover
@@ -1759,6 +1885,29 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             textDecoration: 'none',
             '&:hover': {
               textDecoration: 'underline',
+            },
+          },
+          // Comment highlight styling
+          '& .comment-highlight': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(255, 213, 79, 0.25)'
+                : 'rgba(255, 213, 79, 0.4)',
+            borderBottom: `2px solid ${theme.palette.warning.main}`,
+            cursor: 'pointer',
+            transition: 'background-color 0.2s ease',
+            '&:hover': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255, 213, 79, 0.35)'
+                  : 'rgba(255, 213, 79, 0.5)',
+            },
+            // Active/selected comment
+            '&.comment-active': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255, 213, 79, 0.45)'
+                  : 'rgba(255, 213, 79, 0.6)',
             },
           },
           // Inter-note link styling (complementary to tags - use secondary color)

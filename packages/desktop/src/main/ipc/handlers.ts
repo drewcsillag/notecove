@@ -32,6 +32,7 @@ import type {
   DeletionLogger,
   ImageCache,
 } from '@notecove/shared';
+import type { CommentThread, CommentReply, CommentReaction } from '@notecove/shared/comments';
 import {
   extractTags,
   extractLinks,
@@ -447,6 +448,17 @@ export class IPCHandlers {
     ipcMain.handle('inspector:listSDContents', this.handleListSDContents.bind(this));
     ipcMain.handle('inspector:readFileInfo', this.handleReadFileInfo.bind(this));
     ipcMain.handle('inspector:parseFile', this.handleParseFile.bind(this));
+
+    // Comment operations
+    ipcMain.handle('comment:getThreads', this.handleGetCommentThreads.bind(this));
+    ipcMain.handle('comment:addThread', this.handleAddCommentThread.bind(this));
+    ipcMain.handle('comment:updateThread', this.handleUpdateCommentThread.bind(this));
+    ipcMain.handle('comment:deleteThread', this.handleDeleteCommentThread.bind(this));
+    ipcMain.handle('comment:addReply', this.handleAddCommentReply.bind(this));
+    ipcMain.handle('comment:updateReply', this.handleUpdateCommentReply.bind(this));
+    ipcMain.handle('comment:deleteReply', this.handleDeleteCommentReply.bind(this));
+    ipcMain.handle('comment:addReaction', this.handleAddCommentReaction.bind(this));
+    ipcMain.handle('comment:removeReaction', this.handleRemoveCommentReaction.bind(this));
 
     // Test-only operations (only available in NODE_ENV=test)
     if (process.env['NODE_ENV'] === 'test') {
@@ -4347,6 +4359,373 @@ export class IPCHandlers {
     type: InspectorFileType
   ): ParsedFileResult {
     return this.storageInspectorService.parseFile(data, type);
+  }
+
+  // ============================================================================
+  // Comment Handlers
+  // ============================================================================
+
+  /**
+   * Get all comment threads for a note
+   */
+  private async handleGetCommentThreads(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<CommentThread[]> {
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (!noteDoc) {
+      // Note not loaded yet, try to load it
+      const note = await this.database.getNote(noteId);
+      if (!note) {
+        return [];
+      }
+      await this.crdtManager.loadNote(noteId, note.sdId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!loadedNoteDoc) {
+        return [];
+      }
+      return loadedNoteDoc.getCommentThreads();
+    }
+    return noteDoc.getCommentThreads();
+  }
+
+  /**
+   * Add a new comment thread to a note
+   */
+  private async handleAddCommentThread(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    thread: Omit<CommentThread, 'id'>
+  ): Promise<{ success: boolean; threadId?: string; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      const threadId = noteDoc.addCommentThread(thread);
+
+      // Update database cache
+      const threadData = noteDoc.getCommentThread(threadId);
+      if (threadData) {
+        await this.database.upsertCommentThread({
+          id: threadData.id,
+          noteId: threadData.noteId,
+          anchorStart: threadData.anchorStart,
+          anchorEnd: threadData.anchorEnd,
+          originalText: threadData.originalText,
+          authorId: threadData.authorId,
+          authorName: threadData.authorName,
+          authorHandle: threadData.authorHandle,
+          content: threadData.content,
+          created: threadData.created,
+          modified: threadData.modified,
+          resolved: threadData.resolved,
+          resolvedBy: threadData.resolvedBy ?? null,
+          resolvedAt: threadData.resolvedAt ?? null,
+        });
+      }
+
+      // Broadcast the update
+      this.broadcastToAll('comment:threadAdded', noteId, threadId);
+
+      return { success: true, threadId };
+    } catch (error) {
+      console.error('[IPC] Failed to add comment thread:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Update an existing comment thread
+   */
+  private async handleUpdateCommentThread(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string,
+    updates: Partial<Pick<CommentThread, 'content' | 'resolved' | 'resolvedBy' | 'resolvedAt'>>
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      noteDoc.updateCommentThread(threadId, updates);
+
+      // Update database cache
+      const threadData = noteDoc.getCommentThread(threadId);
+      if (threadData) {
+        await this.database.upsertCommentThread({
+          id: threadData.id,
+          noteId: threadData.noteId,
+          anchorStart: threadData.anchorStart,
+          anchorEnd: threadData.anchorEnd,
+          originalText: threadData.originalText,
+          authorId: threadData.authorId,
+          authorName: threadData.authorName,
+          authorHandle: threadData.authorHandle,
+          content: threadData.content,
+          created: threadData.created,
+          modified: threadData.modified,
+          resolved: threadData.resolved,
+          resolvedBy: threadData.resolvedBy ?? null,
+          resolvedAt: threadData.resolvedAt ?? null,
+        });
+      }
+
+      // Broadcast the update
+      this.broadcastToAll('comment:threadUpdated', noteId, threadId);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to update comment thread:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Delete a comment thread
+   */
+  private async handleDeleteCommentThread(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      noteDoc.deleteCommentThread(threadId);
+
+      // Update database cache
+      await this.database.deleteCommentThread(threadId);
+      await this.database.deleteRepliesForThread(threadId);
+      await this.database.deleteReactionsForTarget('thread', threadId);
+
+      // Broadcast the update
+      this.broadcastToAll('comment:threadDeleted', noteId, threadId);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to delete comment thread:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Add a reply to a comment thread
+   */
+  private async handleAddCommentReply(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string,
+    reply: Omit<CommentReply, 'id'>
+  ): Promise<{ success: boolean; replyId?: string; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      const replyId = noteDoc.addReply(threadId, reply);
+
+      // Update database cache
+      const replies = noteDoc.getReplies(threadId);
+      const replyData = replies.find((r) => r.id === replyId);
+      if (replyData) {
+        await this.database.upsertCommentReply({
+          id: replyData.id,
+          threadId: replyData.threadId,
+          authorId: replyData.authorId,
+          authorName: replyData.authorName,
+          authorHandle: replyData.authorHandle,
+          content: replyData.content,
+          created: replyData.created,
+          modified: replyData.modified,
+        });
+      }
+
+      // Broadcast the update
+      this.broadcastToAll('comment:replyAdded', noteId, threadId, replyId);
+
+      return { success: true, replyId };
+    } catch (error) {
+      console.error('[IPC] Failed to add comment reply:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Update a comment reply
+   */
+  private async handleUpdateCommentReply(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string,
+    replyId: string,
+    updates: Partial<Pick<CommentReply, 'content'>>
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      noteDoc.updateReply(threadId, replyId, updates);
+
+      // Update database cache
+      const replies = noteDoc.getReplies(threadId);
+      const replyData = replies.find((r) => r.id === replyId);
+      if (replyData) {
+        await this.database.upsertCommentReply({
+          id: replyData.id,
+          threadId: replyData.threadId,
+          authorId: replyData.authorId,
+          authorName: replyData.authorName,
+          authorHandle: replyData.authorHandle,
+          content: replyData.content,
+          created: replyData.created,
+          modified: replyData.modified,
+        });
+      }
+
+      // Broadcast the update
+      this.broadcastToAll('comment:replyUpdated', noteId, threadId, replyId);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to update comment reply:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Delete a comment reply
+   */
+  private async handleDeleteCommentReply(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string,
+    replyId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      noteDoc.deleteReply(threadId, replyId);
+
+      // Update database cache
+      await this.database.deleteCommentReply(replyId);
+
+      // Broadcast the update
+      this.broadcastToAll('comment:replyDeleted', noteId, threadId, replyId);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to delete comment reply:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Add a reaction to a thread or reply
+   */
+  private async handleAddCommentReaction(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string,
+    reaction: Omit<CommentReaction, 'id'>
+  ): Promise<{ success: boolean; reactionId?: string; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      const reactionId = noteDoc.addReaction(threadId, reaction);
+
+      // Update database cache
+      const reactions = noteDoc.getReactions(threadId);
+      const reactionData = reactions.find((r) => r.id === reactionId);
+      if (reactionData) {
+        await this.database.upsertCommentReaction({
+          id: reactionData.id,
+          targetType: reactionData.targetType,
+          targetId: reactionData.targetId,
+          emoji: reactionData.emoji,
+          authorId: reactionData.authorId,
+          authorName: reactionData.authorName,
+          created: reactionData.created,
+        });
+      }
+
+      // Broadcast the update
+      this.broadcastToAll('comment:reactionAdded', noteId, threadId, reactionId);
+
+      return { success: true, reactionId };
+    } catch (error) {
+      console.error('[IPC] Failed to add comment reaction:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Remove a reaction
+   */
+  private async handleRemoveCommentReaction(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string,
+    reactionId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const noteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!noteDoc) {
+        return { success: false, error: 'Note not loaded' };
+      }
+
+      noteDoc.removeReaction(threadId, reactionId);
+
+      // Update database cache
+      await this.database.deleteCommentReaction(reactionId);
+
+      // Broadcast the update
+      this.broadcastToAll('comment:reactionRemoved', noteId, threadId, reactionId);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to remove comment reaction:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 }
 
