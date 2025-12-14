@@ -114,10 +114,10 @@ See: [PLAN-phase5-mentions.md](./PLAN-phase5-mentions.md)
 
 See: [PLAN-phase6-toolbar.md](./PLAN-phase6-toolbar.md)
 
-- [ ] 🟥 **6.1 Add toolbar button (selection-dependent)**
+- [x] 🟢 **6.1 Add toolbar button (selection-dependent)**
 - [x] 🟢 **6.2 Add keyboard shortcut (Cmd+Alt+M)** (changed from Cmd+Shift+M)
 - [ ] 🟥 **6.3 Add context menu item**
-- [ ] 🟥 **6.4 Add comment count badge**
+- [x] 🟢 **6.4 Add comment count badge**
 - [ ] 🟥 **6.5 Write E2E tests**
 
 ---

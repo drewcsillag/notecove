@@ -67,7 +67,7 @@ describe('CommentPanel', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('No comments yet. Select text and use Cmd+Shift+M to add a comment.')
+        screen.getByText('No comments yet. Select text and click the comment button or press ⌘⌥M.')
       ).toBeInTheDocument();
     });
   });

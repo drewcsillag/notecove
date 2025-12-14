@@ -124,6 +124,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const [showSyncIndicator, setShowSyncIndicator] = useState(false);
   // Track whether text is selected (for enabling comment button)
   const [hasTextSelection, setHasTextSelection] = useState(false);
+  // Track open (unresolved) comment count for badge
+  const [openCommentCount, setOpenCommentCount] = useState(0);
   const syncIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Loading state - start with loading=true to prevent title extraction before note loads
   // Use both state (for rendering) and ref (for callbacks that need synchronous access)
@@ -1430,6 +1432,49 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     void handleAddCommentOnSelection();
   };
 
+  // Load and track open comment count for toolbar badge
+  useEffect(() => {
+    if (!noteId) {
+      setOpenCommentCount(0);
+      return;
+    }
+
+    // Load initial count
+    const loadCommentCount = async () => {
+      try {
+        const threads = await window.electronAPI.comment.getThreads(noteId);
+        const openCount = threads.filter((t) => !t.resolved).length;
+        setOpenCommentCount(openCount);
+      } catch (error) {
+        console.error('Failed to load comment count:', error);
+      }
+    };
+    void loadCommentCount();
+
+    // Subscribe to thread changes
+    const unsubAdded = window.electronAPI.comment.onThreadAdded((addedNoteId) => {
+      if (addedNoteId === noteId) {
+        void loadCommentCount();
+      }
+    });
+    const unsubUpdated = window.electronAPI.comment.onThreadUpdated((updatedNoteId) => {
+      if (updatedNoteId === noteId) {
+        void loadCommentCount();
+      }
+    });
+    const unsubDeleted = window.electronAPI.comment.onThreadDeleted((deletedNoteId) => {
+      if (deletedNoteId === noteId) {
+        void loadCommentCount();
+      }
+    });
+
+    return () => {
+      unsubAdded();
+      unsubUpdated();
+      unsubDeleted();
+    };
+  }, [noteId]);
+
   // Manage link popover using tippy.js
   useEffect(() => {
     // Clean up existing popover
@@ -2344,6 +2389,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         onTableButtonClick={handleTableButtonClick}
         onCommentButtonClick={handleCommentButtonClick}
         hasTextSelection={hasTextSelection}
+        commentCount={openCommentCount}
       />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>

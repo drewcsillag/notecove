@@ -330,7 +330,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
         {visibleThreads.length === 0 ? (
           <Box sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
-              No comments yet. Select text and use Cmd+Shift+M to add a comment.
+              No comments yet. Select text and click the comment button or press ⌘⌥M.
             </Typography>
           </Box>
         ) : (

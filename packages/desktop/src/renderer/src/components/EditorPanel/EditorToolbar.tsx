@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, IconButton, Divider, Tooltip } from '@mui/material';
+import { Box, IconButton, Divider, Tooltip, Badge } from '@mui/material';
 import {
   FormatBold,
   FormatItalic,
@@ -69,6 +69,10 @@ export interface EditorToolbarProps {
    * Whether any text is currently selected (for enabling comment button)
    */
   hasTextSelection?: boolean;
+  /**
+   * Number of open (unresolved) comments for the current note
+   */
+  commentCount?: number;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -78,6 +82,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onTableButtonClick,
   onCommentButtonClick,
   hasTextSelection = false,
+  commentCount = 0,
 }) => {
   if (!editor) {
     return null;
@@ -290,7 +295,21 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             aria-label="Add comment"
             data-testid="comment-button"
           >
-            <AddComment fontSize="small" />
+            <Badge
+              badgeContent={commentCount}
+              color="primary"
+              max={99}
+              sx={{
+                '& .MuiBadge-badge': {
+                  fontSize: '0.6rem',
+                  minWidth: '14px',
+                  height: '14px',
+                  padding: '0 3px',
+                },
+              }}
+            >
+              <AddComment fontSize="small" />
+            </Badge>
           </IconButton>
         </span>
       </Tooltip>
