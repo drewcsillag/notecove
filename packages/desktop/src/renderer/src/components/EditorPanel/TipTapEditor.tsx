@@ -26,6 +26,12 @@ import {
   MenuItem,
   Divider,
   Typography,
+  Popper,
+  Paper,
+  List,
+  ListItemButton,
+  ListItemText,
+  ClickAwayListener,
 } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
@@ -184,6 +190,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // Overlapping comments popover state
+  const [overlapPopover, setOverlapPopover] = useState<{
+    anchorEl: HTMLElement;
+    threadIds: string[];
+  } | null>(null);
 
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
@@ -1334,7 +1346,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   }, [editor]);
 
   // Click handler for comment highlights
-  // When a comment mark is clicked, notify parent to select that thread in the panel
+  // When a comment mark is clicked, check for overlapping comments and show popover if multiple
   useEffect(() => {
     if (!editor || !onCommentClick) return;
 
@@ -1342,10 +1354,35 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       const target = event.target as HTMLElement;
       const commentHighlight = target.closest('.comment-highlight');
       if (commentHighlight) {
-        const threadId = commentHighlight.getAttribute('data-thread-id');
-        if (threadId) {
-          console.log('[TipTapEditor] Comment highlight clicked, threadId:', threadId);
-          onCommentClick(threadId);
+        // Collect all thread IDs from this element and its ancestors
+        const threadIds: string[] = [];
+        let current: Element | null = commentHighlight;
+
+        while (current) {
+          if (current.classList.contains('comment-highlight')) {
+            const threadId = current.getAttribute('data-thread-id');
+            if (threadId && !threadIds.includes(threadId)) {
+              threadIds.push(threadId);
+            }
+          }
+          current = current.parentElement?.closest('.comment-highlight') ?? null;
+        }
+
+        if (threadIds.length === 0) {
+          return;
+        }
+
+        if (threadIds.length === 1 && threadIds[0]) {
+          // Single comment - select it directly
+          console.log('[TipTapEditor] Comment highlight clicked, threadId:', threadIds[0]);
+          onCommentClick(threadIds[0]);
+        } else if (threadIds.length > 1) {
+          // Multiple overlapping comments - show popover
+          console.log('[TipTapEditor] Overlapping comments clicked:', threadIds);
+          setOverlapPopover({
+            anchorEl: commentHighlight as HTMLElement,
+            threadIds,
+          });
         }
       }
     };
@@ -2005,6 +2042,20 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                   ? 'rgba(255, 213, 79, 0.45)'
                   : 'rgba(255, 213, 79, 0.6)',
             },
+            // Overlapping comments - nested highlights get progressively darker
+            '& .comment-highlight': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255, 193, 7, 0.35)'
+                  : 'rgba(255, 193, 7, 0.5)',
+              // Third level overlap (rare but possible)
+              '& .comment-highlight': {
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(255, 160, 0, 0.45)'
+                    : 'rgba(255, 160, 0, 0.6)',
+              },
+            },
           },
           // Inter-note link styling (complementary to tags - use secondary color)
           '& .inter-note-link': {
@@ -2502,6 +2553,50 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }}
         onSelect={handleTableSizeSelect}
       />
+      {/* Overlapping comments selection popover */}
+      {overlapPopover && (
+        <Popper
+          open
+          anchorEl={overlapPopover.anchorEl}
+          placement="bottom-start"
+          style={{ zIndex: 1400 }}
+        >
+          <ClickAwayListener
+            onClickAway={() => {
+              setOverlapPopover(null);
+            }}
+          >
+            <Paper elevation={8} sx={{ minWidth: 180 }}>
+              <Typography
+                variant="caption"
+                sx={{ px: 1.5, py: 0.75, display: 'block', color: 'text.secondary' }}
+              >
+                Select a comment:
+              </Typography>
+              <Divider />
+              <List dense sx={{ py: 0.5 }}>
+                {overlapPopover.threadIds.map((threadId, index) => (
+                  <ListItemButton
+                    key={threadId}
+                    onClick={() => {
+                      onCommentClick?.(threadId);
+                      setOverlapPopover(null);
+                    }}
+                    sx={{ py: 0.5 }}
+                  >
+                    <ListItemText
+                      primary={`Comment ${index + 1}`}
+                      secondary={`Thread: ${threadId.slice(0, 8)}...`}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Paper>
+          </ClickAwayListener>
+        </Popper>
+      )}
       {/* Editor context menu */}
       {contextMenu !== null && (
         <Menu

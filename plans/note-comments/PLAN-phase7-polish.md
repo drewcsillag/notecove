@@ -1,6 +1,6 @@
 # Phase 7: Polish & Edge Cases
 
-**Progress:** `83%`
+**Progress:** `100%`
 
 ## Goal
 
@@ -27,18 +27,24 @@ When anchored text is deleted, the comment becomes orphaned.
 
 ## 7.2 Handle Overlapping Ranges
 
-**Status:** 🟥 To Do (Deferred)
+**Status:** 🟢 Complete
 
 When multiple comments cover the same text:
 
-**Planned Visual treatment:**
-- Darker highlight for overlapped regions
-- Add `comment-overlap` class when position has multiple comments
+**Visual treatment:**
+- Nested comment highlights get progressively darker (CSS)
+- Two levels of overlap styling (normal → amber → orange)
 
-**Planned Click handling:**
-- If click hits multiple comments, show selection popover
+**Click handling:**
+- Single click on overlapping comments shows a selection popover
+- User can choose which comment thread to view
+- Popover shows "Comment 1", "Comment 2", etc. with thread ID preview
 
-This feature is deferred as it requires more complex implementation in the TipTap extension.
+**Files Modified:**
+- `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx`
+  - Added nested `.comment-highlight` CSS rules for darker overlaps
+  - Updated click handler to detect multiple thread IDs from parent elements
+  - Added `overlapPopover` state and Popper component for selection UI
 
 ---
 
@@ -123,7 +129,7 @@ Comprehensive E2E test suite with 14 tests covering:
 ## Definition of Done (Phase 7)
 
 - [x] Orphaned comments handled gracefully
-- [ ] Overlapping comments show selection UI (deferred)
+- [x] Overlapping comments show selection UI
 - [x] Keyboard navigation works
 - [x] Storage Inspector shows comments
 - [x] Performance acceptable with 20+ comments (3 tests)

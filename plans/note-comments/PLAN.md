@@ -1,6 +1,6 @@
 # Note Comments Feature - Implementation Plan
 
-**Overall Progress:** `98%`
+**Overall Progress:** `100%`
 
 ## Summary
 
@@ -122,14 +122,14 @@ See: [PLAN-phase6-toolbar.md](./PLAN-phase6-toolbar.md)
 
 ---
 
-## Phase 7: Polish & Edge Cases (Partial)
+## Phase 7: Polish & Edge Cases ✅
 
 **Goal:** Handle edge cases and finalize the feature.
 
 See: [PLAN-phase7-polish.md](./PLAN-phase7-polish.md)
 
 - [x] 🟢 **7.1 Handle orphaned comments**
-- [ ] 🟥 **7.2 Handle overlapping ranges** (deferred)
+- [x] 🟢 **7.2 Handle overlapping ranges**
 - [x] 🟢 **7.3 Add keyboard navigation in panel**
 - [x] 🟢 **7.4 Add to Storage Inspector**
 - [x] 🟢 **7.5 Performance testing (20+ comments)**
