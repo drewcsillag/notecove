@@ -122,6 +122,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const [yDoc] = useState(() => new Y.Doc());
   // Show sync indicator when external updates arrive
   const [showSyncIndicator, setShowSyncIndicator] = useState(false);
+  // Track whether text is selected (for enabling comment button)
+  const [hasTextSelection, setHasTextSelection] = useState(false);
   const syncIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Loading state - start with loading=true to prevent title extraction before note loads
   // Use both state (for rendering) and ref (for callbacks that need synchronous access)
@@ -606,6 +608,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           onTitleChange?.(capturedNoteId, titleText || 'Untitled', text.trim());
         }, 300);
       }
+    },
+    // Track selection changes for enabling comment button
+    onSelectionUpdate: ({ editor }) => {
+      const { empty } = editor.state.selection;
+      setHasTextSelection(!empty);
     },
   });
 
@@ -1333,6 +1340,63 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, [editor, onCommentClick]);
 
+  // Create a comment on the current selection
+  // This function is used by both the keyboard shortcut and toolbar button
+  const handleAddCommentOnSelection = async () => {
+    if (!editor || !noteId) return;
+
+    // Get current selection
+    const { from, to, empty } = editor.state.selection;
+
+    if (empty) {
+      console.log('[TipTapEditor] Cannot add comment: no selection');
+      return;
+    }
+
+    // Get selected text
+    const text = editor.state.doc.textBetween(from, to, ' ');
+    console.log('[TipTapEditor] Adding comment for selection:', { from, to, text });
+
+    try {
+      // Encode positions as simple Uint8Array for now
+      // TODO: Use proper Yjs RelativePosition encoding for robust anchor tracking
+      const anchorStart = new Uint8Array(new Uint32Array([from]).buffer);
+      const anchorEnd = new Uint8Array(new Uint32Array([to]).buffer);
+
+      // Create the comment thread via IPC
+      const result = await window.electronAPI.comment.addThread(noteId, {
+        noteId,
+        anchorStart,
+        anchorEnd,
+        authorId: 'current-user', // TODO: Get actual user ID
+        authorName: 'You', // TODO: Get actual user name
+        authorHandle: '@you', // TODO: Get actual handle
+        content: '', // Empty content - user will fill in via panel
+        originalText: text,
+        created: Date.now(),
+        modified: Date.now(),
+        resolved: false,
+      });
+
+      if (!result.success || !result.threadId) {
+        console.error('[TipTapEditor] Failed to create comment thread:', result.error);
+        return;
+      }
+
+      console.log('[TipTapEditor] Comment thread created:', result.threadId);
+
+      // Apply the comment mark to the selection
+      editor.chain().focus().setTextSelection({ from, to }).setCommentMark(result.threadId).run();
+
+      console.log('[TipTapEditor] Comment mark applied');
+
+      // Notify parent about the new comment (to open panel, select thread, etc.)
+      onAddComment?.({ from, to, text });
+    } catch (err) {
+      console.error('[TipTapEditor] Failed to create comment thread:', err);
+    }
+  };
+
   // Keyboard shortcut for adding comments (Cmd+Alt+M / Ctrl+Alt+M like Google Docs)
   useEffect(() => {
     if (!editor || !noteId) return;
@@ -1346,62 +1410,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       if (modifier && event.altKey && event.key.toLowerCase() === 'm') {
         event.preventDefault();
         event.stopPropagation();
-
-        // Get current selection
-        const { from, to, empty } = editor.state.selection;
-
-        if (empty) {
-          console.log('[TipTapEditor] Cannot add comment: no selection');
-          return;
-        }
-
-        // Get selected text
-        const text = editor.state.doc.textBetween(from, to, ' ');
-        console.log('[TipTapEditor] Adding comment for selection:', { from, to, text });
-
-        try {
-          // Encode positions as simple Uint8Array for now
-          // TODO: Use proper Yjs RelativePosition encoding for robust anchor tracking
-          const anchorStart = new Uint8Array(new Uint32Array([from]).buffer);
-          const anchorEnd = new Uint8Array(new Uint32Array([to]).buffer);
-
-          // Create the comment thread via IPC
-          const result = await window.electronAPI.comment.addThread(noteId, {
-            noteId,
-            anchorStart,
-            anchorEnd,
-            authorId: 'current-user', // TODO: Get actual user ID
-            authorName: 'You', // TODO: Get actual user name
-            authorHandle: '@you', // TODO: Get actual handle
-            content: '', // Empty content - user will fill in via panel
-            originalText: text,
-            created: Date.now(),
-            modified: Date.now(),
-            resolved: false,
-          });
-
-          if (!result.success || !result.threadId) {
-            console.error('[TipTapEditor] Failed to create comment thread:', result.error);
-            return;
-          }
-
-          console.log('[TipTapEditor] Comment thread created:', result.threadId);
-
-          // Apply the comment mark to the selection
-          editor
-            .chain()
-            .focus()
-            .setTextSelection({ from, to })
-            .setCommentMark(result.threadId)
-            .run();
-
-          console.log('[TipTapEditor] Comment mark applied');
-
-          // Notify parent about the new comment (to open panel, select thread, etc.)
-          onAddComment?.({ from, to, text });
-        } catch (err) {
-          console.error('[TipTapEditor] Failed to create comment thread:', err);
-        }
+        await handleAddCommentOnSelection();
       }
     };
 
@@ -1415,6 +1424,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       editorDom.removeEventListener('keydown', wrappedHandler);
     };
   }, [editor, noteId, onAddComment]);
+
+  // Handler for the comment toolbar button
+  const handleCommentButtonClick = () => {
+    void handleAddCommentOnSelection();
+  };
 
   // Manage link popover using tippy.js
   useEffect(() => {
@@ -2328,6 +2342,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         onLinkButtonClick={handleLinkButtonClick}
         onImageButtonClick={() => void handleImageButtonClick()}
         onTableButtonClick={handleTableButtonClick}
+        onCommentButtonClick={handleCommentButtonClick}
+        hasTextSelection={hasTextSelection}
       />
       {/* Sync indicator - shows briefly when external updates arrive */}
       <Fade in={showSyncIndicator}>

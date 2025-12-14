@@ -31,6 +31,8 @@ import {
   FormatAlignLeft,
   FormatAlignCenter,
   FormatAlignRight,
+  // Comment icon
+  AddComment,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
 import { canAddRow, canAddColumn, canDeleteRow, canDeleteColumn } from './extensions/Table';
@@ -58,6 +60,15 @@ export interface EditorToolbarProps {
    * Called with the button element for popover positioning
    */
   onTableButtonClick?: (buttonElement: HTMLElement) => void;
+  /**
+   * Callback when the comment button is clicked
+   * Called with the current selection info
+   */
+  onCommentButtonClick?: () => void;
+  /**
+   * Whether any text is currently selected (for enabling comment button)
+   */
+  hasTextSelection?: boolean;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -65,6 +76,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onLinkButtonClick,
   onImageButtonClick,
   onTableButtonClick,
+  onCommentButtonClick,
+  hasTextSelection = false,
 }) => {
   if (!editor) {
     return null;
@@ -266,6 +279,20 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         >
           <TableChart fontSize="small" />
         </IconButton>
+      </Tooltip>
+
+      <Tooltip title={hasTextSelection ? 'Add comment (⌘⌥M)' : 'Select text to add comment'}>
+        <span>
+          <IconButton
+            size="small"
+            onClick={onCommentButtonClick}
+            disabled={!hasTextSelection}
+            aria-label="Add comment"
+            data-testid="comment-button"
+          >
+            <AddComment fontSize="small" />
+          </IconButton>
+        </span>
       </Tooltip>
 
       {/* Table Manipulation - only shown when cursor is in a table */}

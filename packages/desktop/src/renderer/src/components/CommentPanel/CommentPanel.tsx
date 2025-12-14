@@ -19,6 +19,11 @@ import {
   Divider,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   Comment as CommentIcon,
@@ -27,6 +32,7 @@ import {
   Reply as ReplyIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import type { CommentThread, CommentReply } from '@notecove/shared/comments';
 
@@ -55,6 +61,11 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  // Edit mode state
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  // Delete confirmation state
+  const [deleteConfirmThreadId, setDeleteConfirmThreadId] = useState<string | null>(null);
 
   // Load threads from the note
   const loadThreads = useCallback(async () => {
@@ -142,11 +153,20 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
     }
   };
 
-  const handleDelete = async (threadId: string) => {
+  const handleDeleteClick = (threadId: string) => {
+    setDeleteConfirmThreadId(threadId);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmThreadId(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmThreadId || !noteId) return;
+
     try {
-      if (noteId) {
-        await window.electronAPI.comment.deleteThread(noteId, threadId);
-      }
+      await window.electronAPI.comment.deleteThread(noteId, deleteConfirmThreadId);
+      setDeleteConfirmThreadId(null);
       void loadThreads();
     } catch (err) {
       console.error('Failed to delete thread:', err);
@@ -171,6 +191,34 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       void loadThreads();
     } catch (err) {
       console.error('Failed to add reply:', err);
+    }
+  };
+
+  const handleStartEdit = (threadId: string, currentContent: string) => {
+    setEditingThreadId(threadId);
+    setEditText(currentContent);
+    // Cancel any reply in progress
+    setReplyingTo(null);
+    setReplyText('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingThreadId(null);
+    setEditText('');
+  };
+
+  const handleSaveEdit = async (threadId: string) => {
+    if (!editText.trim() || !noteId) return;
+
+    try {
+      await window.electronAPI.comment.updateThread(noteId, threadId, {
+        content: editText.trim(),
+      });
+      setEditingThreadId(null);
+      setEditText('');
+      void loadThreads();
+    } catch (err) {
+      console.error('Failed to update thread:', err);
     }
   };
 
@@ -367,7 +415,54 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
 
               {/* Comment content */}
               <Box sx={{ px: 1.5, py: 1 }}>
-                <Typography variant="body2">{thread.content}</Typography>
+                {editingThreadId === thread.id ? (
+                  <Box>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      multiline
+                      rows={2}
+                      value={editText}
+                      onChange={(e) => {
+                        setEditText(e.target.value);
+                      }}
+                      autoFocus
+                      sx={{ mb: 1 }}
+                    />
+                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                      <Button size="small" onClick={handleCancelEdit}>
+                        Cancel
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => {
+                          void handleSaveEdit(thread.id);
+                        }}
+                        disabled={!editText.trim()}
+                      >
+                        Save
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Typography variant="body2" sx={{ flex: 1 }}>
+                      {thread.content || <em style={{ opacity: 0.6 }}>No comment text</em>}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStartEdit(thread.id, thread.content);
+                      }}
+                      title="Edit comment"
+                      sx={{ ml: 'auto', opacity: 0.6, '&:hover': { opacity: 1 } }}
+                    >
+                      <EditIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
 
               {/* Replies section */}
@@ -493,7 +588,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                   size="small"
                   color="error"
                   onClick={() => {
-                    void handleDelete(thread.id);
+                    handleDeleteClick(thread.id);
                   }}
                   sx={{ textTransform: 'none', fontSize: '0.75rem' }}
                 >
@@ -504,6 +599,33 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
           ))
         )}
       </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmThreadId !== null}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-confirm-title"
+        aria-describedby="delete-confirm-description"
+      >
+        <DialogTitle id="delete-confirm-title">Delete Comment</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-confirm-description">
+            Are you sure you want to delete this comment? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button
+            onClick={() => {
+              void handleDeleteConfirm();
+            }}
+            color="error"
+            autoFocus
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
