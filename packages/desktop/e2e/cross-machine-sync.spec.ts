@@ -2691,21 +2691,33 @@ test.describe('cross-machine sync - new note creation', () => {
     await window2.waitForTimeout(2000);
     console.log('[DeletionSync] Instance 2 ready');
 
-    // Create a new note in Instance 1
+    // Verify Instance 2 starts with 1 note (welcome note)
+    const notesList2Items = window2.locator('[data-testid="notes-list"] li');
+    const initialNoteCount2 = await notesList2Items.count();
+    console.log(`[DeletionSync] Instance 2 initial note count: ${initialNoteCount2}`);
+    expect(initialNoteCount2).toBe(1); // Just the welcome note
+
+    // Create a new note in Instance 1 using button click (like passing test)
     console.log('[DeletionSync] Creating new note in Instance 1...');
-    await window1.keyboard.press('Meta+n');
+    const createButton = window1.getByTitle('Create note');
+    await createButton.click();
     await window1.waitForTimeout(1000);
 
+    // Type content to give it a unique title
+    const noteTitle = `Delete Me ${Date.now()}`;
     const editor1 = window1.locator('.ProseMirror');
     await editor1.click();
-    const noteTitle = `Delete Me ${Date.now()}`;
     await window1.keyboard.type(noteTitle);
     await window1.waitForTimeout(2000);
 
-    // Wait for sync to Instance 2 - use toHaveCount like the passing "live new note" test
+    // Verify note was created in Instance 1
+    const notesList1Items = window1.locator('[data-testid="notes-list"] li');
+    const noteCount1 = await notesList1Items.count();
+    console.log(`[DeletionSync] Instance 1 note count after create: ${noteCount1}`);
+    expect(noteCount1).toBe(2);
+
+    // Wait for sync to Instance 2 - use toHaveCount like the passing test
     console.log('[DeletionSync] Waiting for new note to sync...');
-    const notesList2Items = window2.locator('[data-testid="notes-list"] li');
-    // Wait for 2 notes (welcome + new note) - this is how the passing test works
     await expect(notesList2Items).toHaveCount(2, { timeout: 60000 });
     console.log('[DeletionSync] Instance 2 has 2 notes');
 
