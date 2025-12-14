@@ -1,6 +1,6 @@
 # Import Markdown Tree Feature - Implementation Plan
 
-**Overall Progress:** `~80%` (Phase 1-4 complete, Phase 5 in progress)
+**Overall Progress:** `~90%` (Phase 1-4 complete, Phase 5.1-5.2 complete, 5.3-5.4 pending)
 
 **Branch:** `import-markdown-tree`
 
@@ -201,17 +201,19 @@ All extended parser features were implemented as part of Phase 1 (the parser sup
 
 ### Phase 5: Testing & Polish
 
-- [ ] 🟥 **5.1: Unit test coverage**
-  - [ ] 🟥 Ensure all parser functions have tests
-  - [ ] 🟥 Ensure import service has tests
-  - [ ] 🟥 Edge case coverage
+- [x] ✅ **5.1: Unit test coverage**
+  - [x] ✅ Ensure all parser functions have tests (22 test cases in markdown-to-prosemirror.test.ts)
+  - [x] ✅ Ensure import service has tests (20 test cases in file-scanner.test.ts)
+  - [x] ✅ Edge case coverage
 
-- [ ] 🟥 **5.2: E2E tests**
-  - [ ] 🟥 Import single markdown file
-  - [ ] 🟥 Import folder with hierarchy
-  - [ ] 🟥 Import with images
-  - [ ] 🟥 Import with inter-note links
-  - [ ] 🟥 Cancel mid-import
+- [x] ✅ **5.2: E2E tests**
+  - [x] ✅ Import single markdown file
+  - [x] ✅ Import folder with hierarchy (3 files, folder structure preserved)
+  - [x] ✅ Preserve folder structure when importing (nested folders)
+  - [x] ✅ Cancel import operation
+  - [x] ✅ Handle dialog cancellation gracefully
+  - [ ] 🟥 Import with images (deferred - images import as placeholders)
+  - [ ] 🟥 Import with inter-note links (deferred - links not yet resolved)
 
 - [ ] 🟥 **5.3: Edge cases**
   - [ ] 🟥 Empty folder handling
@@ -257,6 +259,8 @@ packages/
 │               └── ImportDialog/        # ✅ Phase 4 complete
 │                   ├── ImportDialog.tsx # ✅ Multi-step dialog component
 │                   └── index.ts         # ✅ Module export
+│   └── e2e/
+│       └── markdown-import.spec.ts      # ✅ 5 E2E test cases
 ```
 
 ---
