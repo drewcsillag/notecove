@@ -328,7 +328,8 @@ describe('IPCHandlers - Image Operations', () => {
       mockAppendLogManager as never,
       mockNoteMoveManager as never,
       mockDiagnosticsManager as never,
-      mockBackupManager as never
+      mockBackupManager as never,
+      'test-profile-id' // profileId for mentions
     );
   });
 

@@ -11,6 +11,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import DataObjectIcon from '@mui/icons-material/DataObject';
+import CommentIcon from '@mui/icons-material/Comment';
 import * as Y from 'yjs';
 
 export interface YjsUpdatePreviewProps {
@@ -113,6 +114,49 @@ function describeParent(parent: string | { client: number; clock: number } | nul
   return `item(${parent.client}:${parent.clock})`;
 }
 
+/**
+ * Check if a struct involves comments
+ */
+function isCommentRelated(struct: DecodedStruct): boolean {
+  const parent = struct.parent;
+  if (typeof parent === 'string') {
+    // Direct children of 'comments' map or thread submaps
+    return parent === 'comments' || parent.startsWith('comment_');
+  }
+  // Check parentSub for comment-related keys
+  if (struct.parentSub) {
+    const sub = struct.parentSub.toLowerCase();
+    return (
+      sub === 'comments' ||
+      sub === 'replies' ||
+      sub === 'reactions' ||
+      sub.includes('anchor') ||
+      sub.includes('author') ||
+      sub.includes('content') ||
+      sub.includes('resolved')
+    );
+  }
+  return false;
+}
+
+/**
+ * Get comment operation description
+ */
+function describeCommentOperation(struct: DecodedStruct): string | null {
+  if (!isCommentRelated(struct)) return null;
+
+  const parentSub = struct.parentSub;
+  if (parentSub === 'replies') return 'Reply added';
+  if (parentSub === 'reactions') return 'Reaction added';
+  if (parentSub === 'content') return 'Content updated';
+  if (parentSub === 'resolved') return 'Resolution status changed';
+
+  const parent = struct.parent;
+  if (parent === 'comments') return 'New comment thread';
+
+  return 'Comment data';
+}
+
 export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHeight = 300 }) => {
   const decoded = useMemo(() => {
     try {
@@ -147,6 +191,7 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
   const { structs, ds } = decoded.data;
   const hasDeleteSet =
     ds.clients instanceof Map ? ds.clients.size > 0 : Object.keys(ds.clients).length > 0;
+  const commentCount = structs.filter((s) => isCommentRelated(s)).length;
 
   return (
     <Paper
@@ -198,6 +243,16 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
               variant="outlined"
             />
           )}
+          {commentCount > 0 && (
+            <Chip
+              size="small"
+              icon={<CommentIcon />}
+              label={`${commentCount} comment op${commentCount !== 1 ? 's' : ''}`}
+              sx={{ height: 20, fontSize: '0.7rem' }}
+              color="warning"
+              variant="outlined"
+            />
+          )}
         </Box>
       </Box>
 
@@ -213,6 +268,8 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
             {structs.map((struct, index) => {
               const content = describeContent(struct.content);
               const parent = describeParent(struct.parent);
+              const commentOp = describeCommentOperation(struct);
+              const isComment = commentOp !== null;
 
               return (
                 <Box
@@ -221,22 +278,24 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
                     mb: 1.5,
                     p: 1,
                     borderRadius: 1,
-                    bgcolor: 'grey.800',
+                    bgcolor: isComment ? 'rgba(255, 167, 38, 0.1)' : 'grey.800',
+                    border: isComment ? '1px solid' : 'none',
+                    borderColor: isComment ? 'warning.dark' : 'transparent',
                     '&:last-child': { mb: 0 },
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    {content.icon === 'text' && (
+                    {isComment ? (
+                      <CommentIcon fontSize="small" sx={{ color: 'warning.main' }} />
+                    ) : content.icon === 'text' ? (
                       <TextFieldsIcon fontSize="small" sx={{ color: 'success.main' }} />
-                    )}
-                    {content.icon === 'object' && (
+                    ) : content.icon === 'object' ? (
                       <DataObjectIcon fontSize="small" sx={{ color: 'info.main' }} />
-                    )}
-                    {content.icon === 'other' && (
+                    ) : (
                       <AddIcon fontSize="small" sx={{ color: 'grey.500' }} />
                     )}
-                    <Typography variant="caption" sx={{ color: 'grey.400' }}>
-                      {content.type}
+                    <Typography variant="caption" sx={{ color: isComment ? 'warning.main' : 'grey.400' }}>
+                      {isComment ? commentOp : content.type}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'grey.500', ml: 'auto' }}>
                       in {parent}

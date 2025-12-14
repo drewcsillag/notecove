@@ -2358,6 +2358,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
     },
   },
+
+  // Mention operations
+  mention: {
+    /**
+     * Get users available for @-mentions autocomplete
+     * @returns Array of mention users (current user + users from profile presence)
+     */
+    getUsers: (): Promise<
+      {
+        profileId: string;
+        handle: string;
+        name: string;
+      }[]
+    > =>
+      ipcRenderer.invoke('mention:getUsers') as Promise<
+        {
+          profileId: string;
+          handle: string;
+          name: string;
+        }[]
+      >,
+  },
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection

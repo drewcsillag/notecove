@@ -1068,6 +1068,18 @@ declare global {
           callback: (noteId: string, threadId: string, reactionId: string) => void
         ) => () => void;
       };
+
+      /** Mention operations for @-mentions in comments */
+      mention: {
+        /** Get users available for @-mentions autocomplete */
+        getUsers: () => Promise<
+          {
+            profileId: string;
+            handle: string;
+            name: string;
+          }[]
+        >;
+      };
     };
   }
 }

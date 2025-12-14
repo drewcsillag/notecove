@@ -2873,6 +2873,7 @@ void app.whenReady().then(async () => {
       noteMoveManager,
       diagnosticsManager,
       backupManager,
+      selectedProfileId ?? instanceId, // profileId for @-mentions
       createWindow,
       handleNewStorageDir,
       (sdId: string) => sdDeletionLoggers.get(sdId),

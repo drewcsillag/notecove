@@ -292,7 +292,8 @@ describe('IPCHandlers - Folder CRUD', () => {
       mockAppendLogManager as unknown as import('@notecove/shared').AppendLogManager,
       mockNoteMoveManager as unknown as NoteMoveManager,
       mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager,
-      mockBackupManager as unknown as import('../../backup-manager').BackupManager
+      mockBackupManager as unknown as import('../../backup-manager').BackupManager,
+      'test-profile-id' // profileId for mentions
     );
   });
 
@@ -1065,7 +1066,8 @@ describe('IPCHandlers - SD Management', () => {
       mockAppendLogManager as unknown as import('@notecove/shared').AppendLogManager,
       mockNoteMoveManager as unknown as NoteMoveManager,
       mockDiagnosticsManager as unknown as import('../../diagnostics-manager').DiagnosticsManager,
-      mockBackupManager as unknown as import('../../backup-manager').BackupManager
+      mockBackupManager as unknown as import('../../backup-manager').BackupManager,
+      'test-profile-id' // profileId for mentions
     );
   });
 

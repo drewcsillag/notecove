@@ -1,6 +1,6 @@
 # Note Comments Feature - Implementation Plan
 
-**Overall Progress:** `75%`
+**Overall Progress:** `90%`
 
 ## Summary
 
@@ -94,17 +94,17 @@ See: [PLAN-phase4-reactions.md](./PLAN-phase4-reactions.md)
 
 ---
 
-## Phase 5: @-Mentions
+## Phase 5: @-Mentions ✅
 
 **Goal:** Enable @-mentioning users with autocomplete.
 
 See: [PLAN-phase5-mentions.md](./PLAN-phase5-mentions.md)
 
-- [ ] 🟥 **5.1 Create mention user IPC handler**
-- [ ] 🟥 **5.2 Build MentionAutocomplete component**
-- [ ] 🟥 **5.3 Integrate with CommentInput**
-- [ ] 🟥 **5.4 Style mentions in rendered comments**
-- [ ] 🟥 **5.5 Write tests**
+- [x] 🟢 **5.1 Create mention user IPC handler**
+- [x] 🟢 **5.2 Build MentionAutocomplete component**
+- [x] 🟢 **5.3 Integrate with CommentInput**
+- [x] 🟢 **5.4 Style mentions in rendered comments**
+- [x] 🟢 **5.5 Write tests**
 
 ---
 
@@ -122,16 +122,16 @@ See: [PLAN-phase6-toolbar.md](./PLAN-phase6-toolbar.md)
 
 ---
 
-## Phase 7: Polish & Edge Cases
+## Phase 7: Polish & Edge Cases (Partial)
 
 **Goal:** Handle edge cases and finalize the feature.
 
 See: [PLAN-phase7-polish.md](./PLAN-phase7-polish.md)
 
-- [ ] 🟥 **7.1 Handle orphaned comments**
-- [ ] 🟥 **7.2 Handle overlapping ranges**
+- [x] 🟢 **7.1 Handle orphaned comments**
+- [ ] 🟥 **7.2 Handle overlapping ranges** (deferred)
 - [x] 🟢 **7.3 Add keyboard navigation in panel**
-- [ ] 🟥 **7.4 Add to Storage Inspector**
+- [x] 🟢 **7.4 Add to Storage Inspector**
 - [ ] 🟥 **7.5 Performance testing (100+ comments)**
 - [ ] 🟥 **7.6 Final E2E test suite**
 

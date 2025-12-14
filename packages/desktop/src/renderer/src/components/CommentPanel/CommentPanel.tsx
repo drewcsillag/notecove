@@ -24,6 +24,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Alert,
 } from '@mui/material';
 import {
   Comment as CommentIcon,
@@ -37,6 +38,8 @@ import {
 import type { CommentThread, CommentReply, CommentReaction } from '@notecove/shared/comments';
 import { ReactionPicker } from './ReactionPicker';
 import { ReactionDisplay } from './ReactionDisplay';
+import { MentionAutocomplete, type MentionUser } from './MentionAutocomplete';
+import { CommentContent } from './CommentContent';
 
 // TODO: Replace with actual user ID from authentication system
 const CURRENT_USER_ID = 'current-user';
@@ -52,6 +55,17 @@ export interface CommentPanelProps {
 interface ThreadWithDetails extends CommentThread {
   replies: CommentReply[];
   reactions: CommentReaction[];
+  isOrphaned: boolean;
+}
+
+/**
+ * Check if anchor data appears valid (non-empty, has expected structure)
+ */
+function isValidAnchor(anchor: Uint8Array | undefined): boolean {
+  if (!anchor || anchor.length === 0) return false;
+  // Yjs RelativePosition is typically at least 4 bytes
+  if (anchor.length < 4) return false;
+  return true;
 }
 
 export const CommentPanel: React.FC<CommentPanelProps> = ({
@@ -75,6 +89,20 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
   // Refs for scrolling to threads
   const threadRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Mention state for reply input
+  const [replyMention, setReplyMention] = useState<{
+    active: boolean;
+    query: string;
+    startIndex: number;
+  } | null>(null);
+  const replyInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Mention state for edit input
+  const [editMention, setEditMention] = useState<{
+    active: boolean;
+    query: string;
+    startIndex: number;
+  } | null>(null);
+  const editInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Load threads from the note
   const loadThreads = useCallback(async () => {
@@ -97,10 +125,13 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
             window.electronAPI.comment.getReplies(noteId, thread.id),
             window.electronAPI.comment.getReactions(noteId, thread.id),
           ]);
+          // Check if thread is orphaned (anchor text was deleted)
+          const isOrphaned = !isValidAnchor(thread.anchorStart);
           return {
             ...thread,
             replies,
             reactions,
+            isOrphaned,
           };
         })
       );
@@ -449,6 +480,88 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
     }
   };
 
+  // Handle @ mention detection in reply text
+  const handleReplyTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursor = e.target.selectionStart;
+    setReplyText(value);
+
+    // Check for @ trigger
+    const textBefore = value.slice(0, cursor);
+    const match = textBefore.match(/@(\w*)$/);
+
+    if (match && match.index !== undefined) {
+      setReplyMention({
+        active: true,
+        query: match[1] ?? '',
+        startIndex: match.index,
+      });
+    } else {
+      setReplyMention(null);
+    }
+  };
+
+  // Handle mention selection in reply
+  const handleReplyMentionSelect = (user: MentionUser) => {
+    if (!replyMention || !replyInputRef.current) return;
+
+    const before = replyText.slice(0, replyMention.startIndex);
+    const afterCursor = replyInputRef.current.selectionStart;
+    const after = replyText.slice(afterCursor);
+    const newText = `${before}${user.handle} ${after}`;
+
+    setReplyText(newText);
+    setReplyMention(null);
+
+    // Move cursor after inserted mention
+    const newPos = replyMention.startIndex + user.handle.length + 1;
+    requestAnimationFrame(() => {
+      replyInputRef.current?.setSelectionRange(newPos, newPos);
+      replyInputRef.current?.focus();
+    });
+  };
+
+  // Handle @ mention detection in edit text
+  const handleEditTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursor = e.target.selectionStart;
+    setEditText(value);
+
+    // Check for @ trigger
+    const textBefore = value.slice(0, cursor);
+    const match = textBefore.match(/@(\w*)$/);
+
+    if (match && match.index !== undefined) {
+      setEditMention({
+        active: true,
+        query: match[1] ?? '',
+        startIndex: match.index,
+      });
+    } else {
+      setEditMention(null);
+    }
+  };
+
+  // Handle mention selection in edit
+  const handleEditMentionSelect = (user: MentionUser) => {
+    if (!editMention || !editInputRef.current) return;
+
+    const before = editText.slice(0, editMention.startIndex);
+    const afterCursor = editInputRef.current.selectionStart;
+    const after = editText.slice(afterCursor);
+    const newText = `${before}${user.handle} ${after}`;
+
+    setEditText(newText);
+    setEditMention(null);
+
+    // Move cursor after inserted mention
+    const newPos = editMention.startIndex + user.handle.length + 1;
+    requestAnimationFrame(() => {
+      editInputRef.current?.setSelectionRange(newPos, newPos);
+      editInputRef.current?.focus();
+    });
+  };
+
   const toggleExpanded = (threadId: string) => {
     setExpandedThreads((prev) => {
       const next = new Set(prev);
@@ -623,6 +736,13 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                   </Box>
                 </Box>
 
+                {/* Orphaned comment warning */}
+                {thread.isOrphaned && (
+                  <Alert severity="warning" sx={{ mx: 1.5, mt: 1, py: 0.5 }}>
+                    The text this comment was attached to has been deleted.
+                  </Alert>
+                )}
+
                 {/* Original text quote */}
                 {thread.originalText && (
                   <Box
@@ -630,10 +750,11 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                       mx: 1.5,
                       mt: 1,
                       p: 1,
-                      backgroundColor: 'action.hover',
+                      backgroundColor: thread.isOrphaned ? 'error.light' : 'action.hover',
                       borderRadius: 0.5,
                       borderLeft: 3,
-                      borderColor: 'warning.main',
+                      borderColor: thread.isOrphaned ? 'error.main' : 'warning.main',
+                      opacity: thread.isOrphaned ? 0.7 : 1,
                     }}
                   >
                     <Typography
@@ -644,6 +765,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
+                        textDecoration: thread.isOrphaned ? 'line-through' : 'none',
                       }}
                     >
                       &ldquo;{thread.originalText}&rdquo;
@@ -654,19 +776,26 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                 {/* Comment content */}
                 <Box sx={{ px: 1.5, py: 1 }}>
                   {editingThreadId === thread.id ? (
-                    <Box>
+                    <Box sx={{ position: 'relative' }}>
                       <TextField
                         size="small"
                         fullWidth
                         multiline
                         rows={2}
                         value={editText}
-                        onChange={(e) => {
-                          setEditText(e.target.value);
-                        }}
+                        onChange={handleEditTextChange}
+                        inputRef={editInputRef}
                         autoFocus
                         sx={{ mb: 1 }}
                       />
+                      {editMention?.active && (
+                        <MentionAutocomplete
+                          query={editMention.query}
+                          onSelect={handleEditMentionSelect}
+                          onClose={() => setEditMention(null)}
+                          anchorEl={editInputRef.current}
+                        />
+                      )}
                       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                         <Button size="small" onClick={handleCancelEdit}>
                           Cancel
@@ -685,9 +814,15 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                     </Box>
                   ) : (
                     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                      <Typography variant="body2" sx={{ flex: 1 }}>
-                        {thread.content || <em style={{ opacity: 0.6 }}>No comment text</em>}
-                      </Typography>
+                      <Box sx={{ flex: 1 }}>
+                        {thread.content ? (
+                          <CommentContent content={thread.content} />
+                        ) : (
+                          <Typography variant="body2">
+                            <em style={{ opacity: 0.6 }}>No comment text</em>
+                          </Typography>
+                        )}
+                      </Box>
                       {thread.authorId === CURRENT_USER_ID && (
                         <IconButton
                           size="small"
@@ -769,9 +904,9 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                             <Typography variant="caption" color="text.secondary">
                               {formatDate(reply.created)}
                             </Typography>
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>
-                              {reply.content}
-                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>
+                              <CommentContent content={reply.content} />
+                            </Box>
                           </Box>
                         ))}
                       </Box>
@@ -787,26 +922,34 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                   }}
                 >
                   {replyingTo === thread.id ? (
-                    <Box sx={{ mt: 1 }}>
+                    <Box sx={{ mt: 1, position: 'relative' }}>
                       <TextField
                         size="small"
                         fullWidth
                         multiline
                         rows={2}
-                        placeholder="Write a reply..."
+                        placeholder="Write a reply... (type @ to mention)"
                         value={replyText}
-                        onChange={(e) => {
-                          setReplyText(e.target.value);
-                        }}
+                        onChange={handleReplyTextChange}
+                        inputRef={replyInputRef}
                         autoFocus
                         sx={{ mb: 1 }}
                       />
+                      {replyMention?.active && (
+                        <MentionAutocomplete
+                          query={replyMention.query}
+                          onSelect={handleReplyMentionSelect}
+                          onClose={() => setReplyMention(null)}
+                          anchorEl={replyInputRef.current}
+                        />
+                      )}
                       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                         <Button
                           size="small"
                           onClick={() => {
                             setReplyingTo(null);
                             setReplyText('');
+                            setReplyMention(null);
                           }}
                         >
                           Cancel

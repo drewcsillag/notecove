@@ -991,6 +991,10 @@ export const webClient: typeof window.electronAPI = {
     onReactionAdded: noopSubscription,
     onReactionRemoved: noopSubscription,
   },
+
+  mention: {
+    getUsers: browserNotAvailable('mention.getUsers'),
+  },
 };
 
 /**

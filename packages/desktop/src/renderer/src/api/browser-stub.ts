@@ -307,6 +307,10 @@ export const browserApiStub: typeof window.electronAPI = {
     onReactionAdded: stubEventSubscription,
     onReactionRemoved: stubEventSubscription,
   },
+
+  mention: {
+    getUsers: notImplemented('mention.getUsers'),
+  },
 };
 
 /**

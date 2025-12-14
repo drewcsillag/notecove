@@ -41,6 +41,7 @@ import {
   getExtensionFromMimeType,
   isSupportedMimeType,
   SyncDirectoryStructure,
+  AppStateKey,
 } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { ThumbnailGenerator, type ThumbnailResult } from '../thumbnail';
@@ -84,6 +85,15 @@ export type RetryStaleEntryFn = (
  * Called when Username or UserHandle changes so profile presence can be updated
  */
 export type OnUserSettingsChangedFn = (key: string, value: string) => Promise<void>;
+
+/**
+ * User info for @-mentions autocomplete
+ */
+export interface MentionUser {
+  profileId: string;
+  handle: string; // @drew
+  name: string; // Drew Colthorp
+}
 import {
   type ActivitySession,
   type ReconstructionPoint,
@@ -121,6 +131,7 @@ export class IPCHandlers {
     private noteMoveManager: NoteMoveManager,
     private diagnosticsManager: DiagnosticsManager,
     private backupManager: BackupManager,
+    private profileId: string,
     private createWindowFn?: (options?: {
       noteId?: string;
       minimal?: boolean;
@@ -468,6 +479,9 @@ export class IPCHandlers {
     ipcMain.handle('comment:getReactions', this.handleGetCommentReactions.bind(this));
     ipcMain.handle('comment:addReaction', this.handleAddCommentReaction.bind(this));
     ipcMain.handle('comment:removeReaction', this.handleRemoveCommentReaction.bind(this));
+
+    // Mention operations
+    ipcMain.handle('mention:getUsers', this.handleGetMentionUsers.bind(this));
 
     // Test-only operations (only available in NODE_ENV=test)
     if (process.env['NODE_ENV'] === 'test') {
@@ -4790,6 +4804,54 @@ export class IPCHandlers {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  /**
+   * Get users available for @-mentions
+   * Returns current user and users from profile presence cache across all SDs
+   */
+  private async handleGetMentionUsers(): Promise<MentionUser[]> {
+    const users: MentionUser[] = [];
+    const seenProfileIds = new Set<string>();
+
+    // Current user
+    const currentProfileId = this.profileId;
+    const currentName = (await this.database.getState(AppStateKey.Username)) ?? '';
+    const currentHandle = (await this.database.getState(AppStateKey.UserHandle)) ?? '';
+
+    if (currentHandle) {
+      users.push({
+        profileId: currentProfileId,
+        handle: currentHandle,
+        name: currentName,
+      });
+      seenProfileIds.add(currentProfileId);
+    }
+
+    // Users from profile presence cache in all SDs
+    try {
+      const sds = await this.database.getAllStorageDirs();
+      for (const sd of sds) {
+        const presences = await this.database.getProfilePresenceCacheBySd(sd.id);
+        for (const presence of presences) {
+          // Skip current user and duplicates
+          if (seenProfileIds.has(presence.profileId)) continue;
+          if (!presence.user) continue;
+
+          users.push({
+            profileId: presence.profileId,
+            handle: presence.user,
+            name: presence.username ?? presence.user, // Fall back to handle if no name
+          });
+          seenProfileIds.add(presence.profileId);
+        }
+      }
+    } catch (error) {
+      console.error('[IPC] Failed to get profile presences for mentions:', error);
+      // Return what we have (at least current user)
+    }
+
+    return users;
   }
 }
 
