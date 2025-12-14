@@ -364,6 +364,21 @@ function convertListItemContent(tokens: Token[]): ProseMirrorNode[] {
 }
 
 /**
+ * Extract text alignment from a cell token's style attribute
+ * markdown-it sets style="text-align:left|center|right" on th/td tokens
+ */
+function extractCellAlignment(token: Token): 'left' | 'center' | 'right' | null {
+  const style = token.attrGet('style');
+  if (!style) return null;
+
+  const match = style.match(/text-align:\s*(left|center|right)/);
+  if (match) {
+    return match[1] as 'left' | 'center' | 'right';
+  }
+  return null;
+}
+
+/**
  * Convert a table
  */
 function convertTable(tokens: Token[], index: number): { node: ProseMirrorNode; skip: number } {
@@ -388,6 +403,10 @@ function convertTable(tokens: Token[], index: number): { node: ProseMirrorNode; 
       rows.push({ type: 'tableRow', content: currentRow });
     } else if (token.type === 'th_open' || token.type === 'td_open') {
       const cellType = isHeader ? 'tableHeader' : 'tableCell';
+
+      // Extract alignment from cell style attribute
+      const textAlign = extractCellAlignment(token);
+
       // Find inline content
       const content: ProseMirrorNode[] = [];
       for (let j = i + 1; j < tokens.length; j++) {
@@ -400,10 +419,19 @@ function convertTable(tokens: Token[], index: number): { node: ProseMirrorNode; 
           content.push(...convertInlineTokens(t.children));
         }
       }
-      currentRow.push({
+
+      // Build cell node with optional alignment attribute
+      const cellNode: ProseMirrorNode = {
         type: cellType,
         content: [{ type: 'paragraph', content: content.length > 0 ? content : undefined }],
-      });
+      };
+
+      // Only add textAlign attribute if not the default (left)
+      if (textAlign && textAlign !== 'left') {
+        cellNode.attrs = { textAlign };
+      }
+
+      currentRow.push(cellNode);
     }
   }
 
@@ -687,10 +715,10 @@ export function extractLinkReferences(doc: ProseMirrorNode): LinkReference[] {
 }
 
 /**
- * Convert inter-note markdown links to [[import:path]] format
+ * Convert inter-note markdown links to [[import:path|text]] markers
  * This modifies the document in place
  *
- * Links to .md files are converted from linked text to [[import:path.md]] plain text
+ * Links to .md files are converted from linked text to [[import:path.md|Display Text]] plain text
  * This allows the import service to resolve them to actual note IDs later
  */
 export function convertLinksToImportMarkers(doc: ProseMirrorNode): void {

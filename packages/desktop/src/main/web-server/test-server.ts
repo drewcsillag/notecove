@@ -86,7 +86,7 @@ const mockStorageDirectories = [
 
 // Pre-generate Y.js states for mock notes
 const mockNoteStates: Record<string, Uint8Array> = {
-  'note-1': createMockYjsState('This is a sample note with some content. Welcome to NoteCove!'),
+  'note-1': createMockYjsState('This is a sample note with some content. Welcome to NoteCove'),
   'note-2': createMockYjsState('Learn how to use the app. Getting started guide.'),
 };
 

@@ -623,6 +623,8 @@ declare global {
           notesCreated?: number;
           foldersCreated?: number;
           skipped?: number;
+          noteIds?: string[];
+          folderIds?: string[];
           error?: string;
         }>;
         cancel: () => Promise<{ success: boolean }>;

@@ -260,6 +260,58 @@ describe('markdownToProsemirror', () => {
       // Table should have rows
       expect(result.content![0].content!.length).toBeGreaterThan(0);
     });
+
+    it('should preserve table alignment', () => {
+      const markdown = '| Left | Center | Right |\n|:-----|:------:|------:|\n| a | b | c |';
+      const result = markdownToProsemirror(markdown);
+
+      const table = result.content![0];
+      expect(table.type).toBe('table');
+
+      // Header row
+      const headerRow = table.content![0];
+      expect(headerRow.type).toBe('tableRow');
+
+      // Left-aligned cell (default, no attrs)
+      const leftCell = headerRow.content![0];
+      expect(leftCell.type).toBe('tableHeader');
+      expect(leftCell.attrs).toBeUndefined(); // left is default, no attr needed
+
+      // Center-aligned cell
+      const centerCell = headerRow.content![1];
+      expect(centerCell.type).toBe('tableHeader');
+      expect(centerCell.attrs).toEqual({ textAlign: 'center' });
+
+      // Right-aligned cell
+      const rightCell = headerRow.content![2];
+      expect(rightCell.type).toBe('tableHeader');
+      expect(rightCell.attrs).toEqual({ textAlign: 'right' });
+
+      // Data row should also have alignment
+      const dataRow = table.content![1];
+      const dataLeftCell = dataRow.content![0];
+      expect(dataLeftCell.attrs).toBeUndefined(); // left is default
+
+      const dataCenterCell = dataRow.content![1];
+      expect(dataCenterCell.attrs).toEqual({ textAlign: 'center' });
+
+      const dataRightCell = dataRow.content![2];
+      expect(dataRightCell.attrs).toEqual({ textAlign: 'right' });
+    });
+
+    it('should handle mixed alignment in tables', () => {
+      const markdown = '| Default | Right |\n|---------|------:|\n| 1 | 2 |';
+      const result = markdownToProsemirror(markdown);
+
+      const table = result.content![0];
+      const headerRow = table.content![0];
+
+      // Default alignment (no colon = left)
+      expect(headerRow.content![0].attrs).toBeUndefined();
+
+      // Right alignment
+      expect(headerRow.content![1].attrs).toEqual({ textAlign: 'right' });
+    });
   });
 });
 

@@ -75,7 +75,7 @@ test('should not move welcome note to Recently Deleted when switching folders', 
   // because we intentionally don't clear the editor when changing folders
   // This allows users to browse folders while keeping their current note open
   const editorPanel = page.locator('#right-panel');
-  await expect(editorPanel).toContainText('Welcome to NoteCove! Open multiple windows');
+  await expect(editorPanel).toContainText('Welcome to NoteCove');
 
   // Step 3: Click "Work" folder
   console.log('[E2E] Step 3: Click Work folder');
@@ -85,7 +85,7 @@ test('should not move welcome note to Recently Deleted when switching folders', 
 
   // Work folder should also be empty (but editor still shows welcome note)
   await expect(middlePanel).toContainText('No notes in this folder');
-  await expect(editorPanel).toContainText('Welcome to NoteCove! Open multiple windows');
+  await expect(editorPanel).toContainText('Welcome to NoteCove');
 
   // Step 4: Click "All Notes" - welcome note should still be there
   console.log('[E2E] Step 4: Click All Notes - should find welcome note');
@@ -106,7 +106,7 @@ test('should not move welcome note to Recently Deleted when switching folders', 
   // BUG CHECK: Welcome note should NOT be in "Recently Deleted" notes list
   await expect(middlePanel).toContainText('No notes in this folder');
   // But editor still shows welcome note (from previous selection)
-  await expect(editorPanel).toContainText('Welcome to NoteCove! Open multiple windows');
+  await expect(editorPanel).toContainText('Welcome to NoteCove');
 
   console.log(
     '[E2E] Test passed - welcome note stays in All Notes and does not appear in Recently Deleted'

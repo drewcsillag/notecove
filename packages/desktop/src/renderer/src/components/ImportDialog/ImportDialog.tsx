@@ -32,7 +32,13 @@ import DescriptionIcon from '@mui/icons-material/Description';
 interface ImportDialogProps {
   open: boolean;
   onClose: () => void;
-  onImportComplete?: (result: { notesCreated: number; foldersCreated: number }) => void;
+  onImportComplete?: (result: {
+    notesCreated: number;
+    foldersCreated: number;
+    noteIds: string[];
+    folderIds: string[];
+    sdId: string;
+  }) => void;
 }
 
 interface ScanResult {
@@ -293,6 +299,9 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
         onImportComplete({
           notesCreated: importResult.notesCreated ?? 0,
           foldersCreated: importResult.foldersCreated ?? 0,
+          noteIds: importResult.noteIds ?? [],
+          folderIds: importResult.folderIds ?? [],
+          sdId: selectedSdId,
         });
       }
     } catch (err) {

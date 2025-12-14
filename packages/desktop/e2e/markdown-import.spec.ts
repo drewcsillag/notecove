@@ -318,4 +318,184 @@ Content of third note.
     // Should still be on select step (dialog was canceled)
     await expect(page.locator('text=Select a markdown file or folder')).toBeVisible();
   });
+
+  test('should import markdown file with images', async () => {
+    // Create a test image (1x1 red PNG)
+    const pngData = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    const imagesDir = join(importDir, 'images');
+    mkdirSync(imagesDir);
+    const imagePath = join(imagesDir, 'test-image.png');
+    writeFileSync(imagePath, pngData);
+
+    // Create markdown file referencing the image
+    const testFilePath = join(importDir, 'note-with-image.md');
+    writeFileSync(
+      testFilePath,
+      `# Note With Image
+
+Here is an image:
+
+![Test Image](images/test-image.png)
+
+End of note.
+`
+    );
+
+    // Mock the import file dialog
+    await electronApp.evaluate(
+      ({ dialog }, { filePath }) => {
+        dialog.showOpenDialog = async () => {
+          return { canceled: false, filePaths: [filePath] };
+        };
+      },
+      { filePath: testFilePath }
+    );
+
+    // Open import dialog via IPC
+    await openImportDialog(electronApp, page);
+    await page.waitForSelector('text=Import Markdown', { timeout: 5000 });
+
+    // Select file
+    const selectFileButton = page.locator('button:has-text("Select File")');
+    await selectFileButton.click();
+    await page.waitForTimeout(1000);
+
+    // Import
+    await expect(page.locator('text=1 markdown file found')).toBeVisible({ timeout: 5000 });
+    const importButton = page.locator('button:has-text("Import 1 file")');
+    await importButton.click();
+
+    // Wait for import to complete
+    await page.waitForSelector('text=Import Complete', { timeout: 10000 });
+    await expect(page.locator('text=Successfully imported 1 note')).toBeVisible();
+
+    // Close dialog
+    const doneButton = page.locator('button:has-text("Done")');
+    await doneButton.click();
+
+    // Open the imported note
+    await page.waitForTimeout(1000);
+    const notesList = page.locator('[data-testid="notes-list"]');
+    await notesList.locator('h6:has-text("Note With Image")').click();
+    await page.waitForTimeout(500);
+
+    // Verify image was imported and is visible in the editor
+    const editor = page.locator('.ProseMirror');
+    await expect(editor).toBeVisible();
+
+    // Check that the note content includes text around the image
+    await expect(editor.locator('text=Here is an image')).toBeVisible({ timeout: 5000 });
+    await expect(editor.locator('text=End of note')).toBeVisible();
+
+    // Verify the image element is present in the editor
+    // The notecoveImage extension renders images inside a figure element
+    const imageElement = editor.locator('figure.notecove-image img');
+    await expect(imageElement).toBeVisible({ timeout: 5000 });
+
+    // Verify the image has the correct alt text
+    const altText = await imageElement.getAttribute('alt');
+    expect(altText).toBe('Test Image');
+
+    // Verify the figure has an imageId data attribute (proving it was imported to storage)
+    const figureElement = editor.locator('figure.notecove-image');
+    const imageId = await figureElement.getAttribute('data-image-id');
+    expect(imageId).toBeTruthy();
+    expect(imageId).toMatch(/^[0-9a-f-]+$/); // UUID format
+  });
+
+  test('should resolve inter-note links when importing', async () => {
+    // Create two markdown files that link to each other
+    writeFileSync(
+      join(importDir, 'note-a.md'),
+      `# Note A
+
+This note links to [Note B](note-b.md).
+
+Some content here.
+`
+    );
+    writeFileSync(
+      join(importDir, 'note-b.md'),
+      `# Note B
+
+This note links back to [Note A](note-a.md).
+
+More content here.
+`
+    );
+
+    // Mock the import folder dialog
+    await electronApp.evaluate(
+      ({ dialog }, { folderPath }) => {
+        dialog.showOpenDialog = async () => {
+          return { canceled: false, filePaths: [folderPath] };
+        };
+      },
+      { folderPath: importDir }
+    );
+
+    // Open import dialog via IPC
+    await openImportDialog(electronApp, page);
+    await page.waitForSelector('text=Import Markdown', { timeout: 5000 });
+
+    // Select folder
+    const selectFolderButton = page.locator('button:has-text("Select Folder")');
+    await selectFolderButton.click();
+    await page.waitForTimeout(1000);
+
+    // Import
+    await expect(page.locator('text=2 markdown files found')).toBeVisible({ timeout: 5000 });
+    const importButton = page.locator('button:has-text("Import 2 files")');
+    await importButton.click();
+
+    // Wait for import to complete
+    await page.waitForSelector('text=Import Complete', { timeout: 10000 });
+    await expect(page.locator('text=Successfully imported 2 notes')).toBeVisible();
+
+    // Close dialog
+    const doneButton = page.locator('button:has-text("Done")');
+    await doneButton.click();
+
+    // Open Note A
+    await page.waitForTimeout(1000);
+    const notesList = page.locator('[data-testid="notes-list"]');
+    await notesList.locator('h6:has-text("Note A")').click();
+    await page.waitForTimeout(500);
+
+    // Verify the link to Note B exists and is a proper inter-note link
+    const editor = page.locator('.ProseMirror');
+    await expect(editor).toBeVisible();
+    await expect(editor.locator('text=This note links to')).toBeVisible({ timeout: 5000 });
+
+    // Inter-note links render as spans with class 'inter-note-link'
+    // The span has a data-note-id attribute with the linked note's UUID
+    // Note: Title is loaded asynchronously and may show "Loading..." initially
+    const linkSpan = editor.locator('span.inter-note-link');
+    await expect(linkSpan).toBeVisible({ timeout: 5000 });
+
+    // Get the note ID from the link span
+    const noteIdB = await linkSpan.getAttribute('data-note-id');
+    expect(noteIdB).toBeTruthy();
+    expect(noteIdB).toMatch(/^[0-9a-f-]+$/); // UUID format
+
+    // Click the link to navigate to Note B
+    await linkSpan.click();
+    await page.waitForTimeout(1500);
+
+    // Verify Note B content is now shown
+    await expect(editor.locator('text=This note links back to')).toBeVisible({ timeout: 5000 });
+
+    // Verify the link back to Note A exists
+    const linkBackSpan = editor.locator('span.inter-note-link');
+    await expect(linkBackSpan).toBeVisible({ timeout: 5000 });
+    const noteIdA = await linkBackSpan.getAttribute('data-note-id');
+    expect(noteIdA).toBeTruthy();
+    expect(noteIdA).toMatch(/^[0-9a-f-]+$/);
+
+    // Verify the two note IDs are different (A links to B, B links to A)
+    expect(noteIdA).not.toBe(noteIdB);
+  });
 });

@@ -4346,6 +4346,8 @@ export class IPCHandlers {
     notesCreated?: number;
     foldersCreated?: number;
     skipped?: number;
+    noteIds?: string[];
+    folderIds?: string[];
     error?: string;
   }> {
     try {
@@ -4390,12 +4392,16 @@ export class IPCHandlers {
         notesCreated?: number;
         foldersCreated?: number;
         skipped?: number;
+        noteIds?: string[];
+        folderIds?: string[];
         error?: string;
       } = {
         success: result.success,
         notesCreated: result.notesCreated,
         foldersCreated: result.foldersCreated,
         skipped: result.skipped,
+        noteIds: result.noteIds,
+        folderIds: result.folderIds,
       };
       if (result.error) {
         response.error = result.error;

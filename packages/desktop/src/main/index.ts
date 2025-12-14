@@ -577,14 +577,16 @@ async function populateWelcomeContent(fragment: Y.XmlFragment): Promise<void> {
   } catch (error) {
     // Fallback to hardcoded content if welcome.md can't be read
     console.warn('[ensureDefaultNote] Failed to load welcome.md, using fallback:', error);
+    const heading = new Y.XmlElement('heading');
+    heading.setAttribute('level', '1');
+    const headingText = new Y.XmlText();
+    headingText.insert(0, 'Welcome to NoteCove');
+    heading.insert(0, [headingText]);
     const paragraph = new Y.XmlElement('paragraph');
     const text = new Y.XmlText();
-    text.insert(
-      0,
-      'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
-    );
+    text.insert(0, 'Your notes, beautifully organized and always in sync.');
     paragraph.insert(0, [text]);
-    fragment.insert(0, [paragraph]);
+    fragment.insert(0, [heading, paragraph]);
   }
 }
 
@@ -828,9 +830,8 @@ async function ensureDefaultNote(
     modified: Date.now(),
     deleted: false,
     pinned: false,
-    contentPreview: 'Welcome to NoteCove!',
-    contentText:
-      'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.',
+    contentPreview: 'Your notes, beautifully organized and always in sync.',
+    contentText: 'Welcome to NoteCove Your notes, beautifully organized and always in sync.',
   });
 
   // Set as selected note

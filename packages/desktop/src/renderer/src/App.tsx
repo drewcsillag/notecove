@@ -724,6 +724,24 @@ function App(): React.ReactElement {
           onClose={() => {
             setImportDialogOpen(false);
           }}
+          onImportComplete={(result) => {
+            console.log('[App] Import complete:', result);
+            // Navigate to the imported content
+            if (result.folderIds.length > 0) {
+              // Navigate to the first created folder (usually the container)
+              const folderId = result.folderIds[0];
+              if (folderId) {
+                void window.electronAPI.appState.set('selectedFolderId', folderId);
+              }
+            }
+            if (result.noteIds.length > 0) {
+              // Select the first imported note
+              const noteId = result.noteIds[0];
+              if (noteId) {
+                setSelectedNoteId(noteId);
+              }
+            }
+          }}
         />
         <SDInitProgressDialog
           open={sdInitProgress.open}

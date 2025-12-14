@@ -1297,6 +1297,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       notesCreated?: number;
       foldersCreated?: number;
       skipped?: number;
+      noteIds?: string[];
+      folderIds?: string[];
       error?: string;
     }> =>
       ipcRenderer.invoke('import:execute', sourcePath, options) as Promise<{
@@ -1304,6 +1306,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         notesCreated?: number;
         foldersCreated?: number;
         skipped?: number;
+        noteIds?: string[];
+        folderIds?: string[];
         error?: string;
       }>,
     cancel: (): Promise<{ success: boolean }> =>
