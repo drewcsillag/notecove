@@ -1,6 +1,6 @@
 # Note Comments Feature - Implementation Plan
 
-**Overall Progress:** `90%`
+**Overall Progress:** `95%`
 
 ## Summary
 
@@ -108,7 +108,7 @@ See: [PLAN-phase5-mentions.md](./PLAN-phase5-mentions.md)
 
 ---
 
-## Phase 6: Toolbar & Keyboard Integration (Partial)
+## Phase 6: Toolbar & Keyboard Integration ✅
 
 **Goal:** Provide multiple entry points for adding comments.
 
@@ -118,7 +118,7 @@ See: [PLAN-phase6-toolbar.md](./PLAN-phase6-toolbar.md)
 - [x] 🟢 **6.2 Add keyboard shortcut (Cmd+Alt+M)** (changed from Cmd+Shift+M)
 - [x] 🟢 **6.3 Add context menu item**
 - [x] 🟢 **6.4 Add comment count badge**
-- [ ] 🟥 **6.5 Write E2E tests**
+- [x] 🟢 **6.5 Write E2E tests**
 
 ---
 
@@ -133,7 +133,7 @@ See: [PLAN-phase7-polish.md](./PLAN-phase7-polish.md)
 - [x] 🟢 **7.3 Add keyboard navigation in panel**
 - [x] 🟢 **7.4 Add to Storage Inspector**
 - [ ] 🟥 **7.5 Performance testing (100+ comments)**
-- [ ] 🟥 **7.6 Final E2E test suite**
+- [x] 🟢 **7.6 Final E2E test suite**
 
 ---
 

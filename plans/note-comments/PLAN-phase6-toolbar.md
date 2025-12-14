@@ -1,6 +1,6 @@
 # Phase 6: Toolbar & Keyboard Integration
 
-**Progress:** `80%`
+**Progress:** `100%`
 
 ## Goal
 
@@ -192,58 +192,28 @@ Badge in toolbar (shown in 6.1).
 
 ## 6.5 Write E2E Tests
 
-**Status:** 🟥 To Do
+**Status:** 🟢 Complete
 
-**File:** `packages/desktop/e2e/comments-entry-points.spec.ts`
+**File:** `packages/desktop/e2e/comments.spec.ts`
 
-```typescript
-test.describe('Comment Entry Points', () => {
-  test('toolbar button enabled when text selected', async ({ page }) => {
-    // Select text
-    await selectText(page, 'some text');
-    // Verify button enabled
-    await expect(page.getByRole('button', { name: /add comment/i })).toBeEnabled();
-  });
-
-  test('toolbar button disabled without selection', async ({ page }) => {
-    // Click without selecting
-    await page.getByTestId('editor').click();
-    // Verify button disabled
-    await expect(page.getByRole('button', { name: /add comment/i })).toBeDisabled();
-  });
-
-  test('keyboard shortcut opens comment panel', async ({ page }) => {
-    await selectText(page, 'comment this');
-    await page.keyboard.press('Meta+Shift+m');
-    await expect(page.getByTestId('comment-panel')).toBeVisible();
-  });
-
-  test('context menu shows add comment option', async ({ page }) => {
-    await selectText(page, 'right click me');
-    await page.getByTestId('editor').click({ button: 'right' });
-    await expect(page.getByRole('menuitem', { name: /add comment/i })).toBeVisible();
-  });
-
-  test('comment count badge updates', async ({ page }) => {
-    // Add a comment
-    await selectText(page, 'test');
-    await page.keyboard.press('Meta+Shift+m');
-    await page.getByPlaceholder(/add a comment/i).fill('Test comment');
-    await page.getByRole('button', { name: /^comment$/i }).click();
-
-    // Verify badge shows 1
-    await expect(page.getByTestId('comment-count-badge')).toHaveText('1');
-  });
-});
-```
+Comprehensive E2E tests implemented covering:
+- Toolbar button visibility when text selected
+- Keyboard shortcut (Cmd+Alt+M) opens comment panel
+- Context menu shows "Add Comment" option
+- Comment panel display with threads
+- Reply flow
+- Reactions
+- @-mentions autocomplete
+- Edit and delete with confirmation
+- Resolution workflow
 
 ---
 
 ## Definition of Done
 
-- [ ] Toolbar button shows (enabled with selection, disabled without)
-- [ ] Keyboard shortcut Cmd+Shift+M works
-- [ ] Context menu shows "Add Comment" option
-- [ ] Comment count badge updates in real-time
-- [ ] Panel auto-opens when adding comment
-- [ ] E2E tests passing
+- [x] Toolbar button shows (enabled with selection, disabled without)
+- [x] Keyboard shortcut Cmd+Alt+M works
+- [x] Context menu shows "Add Comment" option
+- [x] Comment count badge updates in real-time
+- [x] Panel auto-opens when adding comment
+- [x] E2E tests passing (14 tests in comments.spec.ts)

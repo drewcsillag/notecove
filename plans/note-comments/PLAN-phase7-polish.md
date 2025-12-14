@@ -1,6 +1,6 @@
 # Phase 7: Polish & Edge Cases
 
-**Progress:** `50%`
+**Progress:** `66%`
 
 ## Goal
 
@@ -103,11 +103,21 @@ Updated YjsUpdatePreview to show comment-related operations:
 
 ## 7.6 Final E2E Test Suite
 
-**Status:** 🟥 To Do
+**Status:** 🟢 Complete
 
-**File:** `packages/desktop/e2e/comments-full.spec.ts`
+**File:** `packages/desktop/e2e/comments.spec.ts`
 
-Comprehensive scenarios to be implemented.
+Comprehensive E2E test suite with 14 tests covering:
+- Basic CRUD: toolbar button, keyboard shortcut, panel display
+- Context menu integration
+- Keyboard navigation (Escape to close)
+- Highlight integration
+- Panel display and comment count badge
+- Reply flow
+- Reactions
+- @-mentions autocomplete
+- Edit and delete with confirmation
+- Resolution workflow
 
 ---
 
@@ -119,7 +129,7 @@ Comprehensive scenarios to be implemented.
 - [x] Storage Inspector shows comments
 - [ ] Performance acceptable with 100+ comments
 - [ ] Virtualization implemented if needed
-- [ ] Final E2E suite passing
+- [x] Final E2E suite passing (14 tests)
 
 ---
 
@@ -128,7 +138,7 @@ Comprehensive scenarios to be implemented.
 - [x] All 7 phases complete (core functionality)
 - [x] All unit tests passing
 - [x] All integration tests passing
-- [ ] All E2E tests passing
+- [x] All E2E tests passing (14 tests)
 - [ ] CI passes (`pnpm ci-local`)
 - [ ] Manual QA complete
 - [ ] Code review complete
