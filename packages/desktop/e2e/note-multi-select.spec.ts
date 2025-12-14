@@ -345,7 +345,9 @@ test.describe('Multi-Select Functionality', () => {
     // Navigate to "All Notes" to ensure notes are created there, not in the new folder
     const allNotesFolder = window.locator('[aria-label="All Notes"]').first();
     await allNotesFolder.click();
-    await window.waitForTimeout(300);
+    await window.waitForTimeout(1000);
+    // Verify we're on All Notes by checking the notes panel header
+    await expect(window.locator('h6:has-text("Notes")')).toBeVisible({ timeout: 5000 });
 
     // Create three test notes
     const createButton = window.locator('button[title="Create note"]');

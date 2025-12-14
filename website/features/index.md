@@ -98,6 +98,18 @@ Monitor sync activity and debug issues:
 - Diagnose sync problems
 - Export logs for support
 
+### 📥 Import Markdown
+
+Bring your notes from other apps:
+
+- **Import files or folders**: Single files or entire note hierarchies
+- **Preserve structure**: Keep your folder organization
+- **Image support**: Local images are automatically copied
+- **Inter-note links**: Links to `.md` files are converted automatically
+- **Migration ready**: Import from Obsidian, Bear, Notion, and more
+
+[Learn more about importing →](/features/import-export)
+
 ## Coming Soon
 
 ### Tags
@@ -109,15 +121,6 @@ Flexible tagging system:
 - Tag filtering and search
 - Tag-based organization
 
-### Inter-Note Links
-
-Connect your knowledge:
-
-- `[[Note Title]]` syntax for linking
-- Backlinks panel
-- Graph view of connections
-- Orphaned note detection
-
 ### Templates
 
 Reusable note templates:
@@ -127,14 +130,13 @@ Reusable note templates:
 - Variable substitution
 - Template library
 
-### Export & Import
+### Export
 
-Take your data anywhere:
+Export your notes to:
 
-- Export to Markdown, HTML, PDF
-- Import from other note apps
-- Bulk export/import
-- Preserve formatting
+- Markdown files
+- HTML
+- PDF
 
 ### Mobile Apps
 

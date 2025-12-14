@@ -50,3 +50,4 @@ export * from './database';
 export * from './logging';
 export * from './utils';
 export * from './profiles';
+export * from './markdown';

@@ -25,6 +25,7 @@ import {
 import { AboutDialog } from './components/AboutDialog/AboutDialog';
 import { StaleSyncToast } from './components/StaleSyncToast';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
+import { ImportDialog } from './components/ImportDialog';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
@@ -82,6 +83,8 @@ function App(): React.ReactElement {
   const [sdPickerMode, setSdPickerMode] = useState(false);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
+  // Import dialog open state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
@@ -497,6 +500,11 @@ function App(): React.ReactElement {
       setExportTrigger('all');
     });
 
+    // Import Markdown
+    const cleanupImportMarkdown = window.electronAPI.menu.onImportMarkdown(() => {
+      setImportDialogOpen(true);
+    });
+
     // Reload from CRDT Logs (Advanced)
     const cleanupReloadFromCRDTLogs = window.electronAPI.menu.onReloadFromCRDTLogs(() => {
       if (selectedNoteId) {
@@ -550,6 +558,7 @@ function App(): React.ReactElement {
       cleanupViewHistory();
       cleanupExportSelected();
       cleanupExportAll();
+      cleanupImportMarkdown();
       cleanupReloadFromCRDTLogs();
       cleanupReindexNotes();
       cleanupSyncStatus();
@@ -797,6 +806,30 @@ function App(): React.ReactElement {
           open={aboutOpen}
           onClose={() => {
             setAboutOpen(false);
+          }}
+        />
+        <ImportDialog
+          open={importDialogOpen}
+          onClose={() => {
+            setImportDialogOpen(false);
+          }}
+          onImportComplete={(result) => {
+            console.log('[App] Import complete:', result);
+            // Navigate to the imported content
+            if (result.folderIds.length > 0) {
+              // Navigate to the first created folder (usually the container)
+              const folderId = result.folderIds[0];
+              if (folderId) {
+                void window.electronAPI.appState.set('selectedFolderId', folderId);
+              }
+            }
+            if (result.noteIds.length > 0) {
+              // Select the first imported note
+              const noteId = result.noteIds[0];
+              if (noteId) {
+                setSelectedNoteId(noteId);
+              }
+            }
           }}
         />
         <SDInitProgressDialog

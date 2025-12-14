@@ -188,6 +188,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onAbout: stubEventSubscription,
     onExportSelectedNotes: stubEventSubscription,
     onExportAllNotes: stubEventSubscription,
+    onImportMarkdown: stubEventSubscription,
     onReloadFromCRDTLogs: stubEventSubscription,
     onReindexNotes: stubEventSubscription,
     onSyncStatus: stubEventSubscription,
@@ -208,6 +209,14 @@ export const browserApiStub: typeof window.electronAPI = {
     getNotesForExport: notImplemented('export.getNotesForExport'),
     showCompletionMessage: notImplemented('export.showCompletionMessage'),
     copyImageFile: notImplemented('export.copyImageFile'),
+  },
+
+  import: {
+    selectSource: notImplemented('import.selectSource'),
+    scanSource: notImplemented('import.scanSource'),
+    execute: notImplemented('import.execute'),
+    cancel: notImplemented('import.cancel'),
+    onProgress: stubEventSubscription,
   },
 
   testing: {

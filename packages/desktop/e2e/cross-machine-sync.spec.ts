@@ -2569,11 +2569,11 @@ test.describe('cross-machine sync - new note creation', () => {
     await window1.keyboard.type('Initial Title For Test');
     await window1.waitForTimeout(2000);
 
-    // Wait for sync to Instance 2 - use waitFor instead of fixed timeout
+    // Wait for sync to Instance 2 - use retrying assertion with 60s timeout (matches other live sync tests)
     console.log('[TitleSyncUnopened] Waiting for new note to sync to Instance 2...');
     const notesList2 = window2.locator('[data-testid="notes-list"]');
     const initialNote2 = notesList2.locator('li:has-text("Initial Title For Test")');
-    await initialNote2.waitFor({ state: 'visible', timeout: 30000 });
+    await expect(initialNote2).toBeVisible({ timeout: 60000 });
     console.log('[TitleSyncUnopened] Instance 2 has initial note: true');
 
     // KEY: Switch Instance 2 back to welcome note so the new note is NOT open
@@ -2702,16 +2702,18 @@ test.describe('cross-machine sync - new note creation', () => {
     await window1.keyboard.type(noteTitle);
     await window1.waitForTimeout(2000);
 
-    // Wait for sync to Instance 2
+    // Wait for sync to Instance 2 - use toHaveCount like the passing "live new note" test
     console.log('[DeletionSync] Waiting for new note to sync...');
-    await window1.waitForTimeout(10000);
+    const notesList2Items = window2.locator('[data-testid="notes-list"] li');
+    // Wait for 2 notes (welcome + new note) - this is how the passing test works
+    await expect(notesList2Items).toHaveCount(2, { timeout: 60000 });
+    console.log('[DeletionSync] Instance 2 has 2 notes');
 
-    // Verify Instance 2 sees the note
+    // Now verify the specific note is there
     const notesList2 = window2.locator('[data-testid="notes-list"]');
     const noteToDelete2 = notesList2.locator(`li:has-text("${noteTitle}")`);
-    const hasNote = await noteToDelete2.isVisible();
-    console.log(`[DeletionSync] Instance 2 has note before delete: ${hasNote}`);
-    expect(hasNote).toBe(true);
+    await expect(noteToDelete2).toBeVisible({ timeout: 5000 });
+    console.log('[DeletionSync] Instance 2 has note before delete: true');
 
     // Delete the note in Instance 1 via context menu
     console.log('[DeletionSync] Deleting note in Instance 1...');

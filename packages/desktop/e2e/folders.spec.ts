@@ -445,8 +445,8 @@ test.describe('Folder Drag & Drop UI', () => {
   });
 
   test('should display folders with proper hierarchy', async () => {
-    // Wait for folder panel
-    await page.waitForSelector('text=Folders', { timeout: 10000 });
+    // Wait for folder panel header (use role selector to avoid matching welcome note content)
+    await page.waitForSelector('#left-panel h6:has-text("Folders")', { timeout: 10000 });
 
     // Wait for tree to load
     await page.waitForTimeout(1000);
@@ -459,8 +459,8 @@ test.describe('Folder Drag & Drop UI', () => {
     await expect(page.locator('text=All Notes').first()).toBeVisible();
     await expect(page.locator('text=Recently Deleted').first()).toBeVisible();
 
-    // Verify folder panel is functional
-    const folderPanelHeader = page.locator('text=Folders');
+    // Verify folder panel header is visible
+    const folderPanelHeader = page.locator('#left-panel h6:has-text("Folders")');
     await expect(folderPanelHeader).toBeVisible();
   });
 });

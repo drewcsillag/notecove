@@ -61,10 +61,10 @@ test.describe('Cross-Instance Bugs', () => {
     const content1Initial = await window1.locator('.ProseMirror').textContent();
     console.log('[Test] Instance 1 initial content:', content1Initial);
 
-    expect(content1Initial).toContain('Welcome to NoteCove!');
+    expect(content1Initial).toContain('Welcome to NoteCove');
 
     // Count welcome messages in instance 1 (should be 1)
-    const welcomeCount1 = (content1Initial?.match(/Welcome to NoteCove!/g) || []).length;
+    const welcomeCount1 = (content1Initial?.match(/Welcome to NoteCove/g) || []).length;
     expect(welcomeCount1).toBe(1);
 
     // Launch second instance with SAME storage directory but DIFFERENT userData
@@ -96,12 +96,12 @@ test.describe('Cross-Instance Bugs', () => {
     console.log('[Test] Instance 2 content:', content2);
 
     // Instance 2 should also have exactly 1 welcome message
-    const welcomeCount2 = (content2?.match(/Welcome to NoteCove!/g) || []).length;
+    const welcomeCount2 = (content2?.match(/Welcome to NoteCove/g) || []).length;
     expect(welcomeCount2).toBe(1);
 
     // Check that instance 1 still has no duplication
     const content1After = await window1.locator('.ProseMirror').textContent();
-    const welcomeCount1After = (content1After?.match(/Welcome to NoteCove!/g) || []).length;
+    const welcomeCount1After = (content1After?.match(/Welcome to NoteCove/g) || []).length;
     expect(welcomeCount1After).toBe(1);
 
     console.log('[Test] ✅ Welcome note duplication test completed');

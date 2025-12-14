@@ -106,10 +106,10 @@ test.describe('Collaboration Demo', () => {
 
     // Get initial content from window 1
     const window1InitialContent = await window1.locator('.ProseMirror').textContent();
-    expect(window1InitialContent).toContain('Welcome to NoteCove!');
+    expect(window1InitialContent).toContain('Welcome to NoteCove');
 
     // Count how many times "Welcome" appears (should be 1)
-    const welcomeCount1 = (window1InitialContent?.match(/Welcome to NoteCove!/g) || []).length;
+    const welcomeCount1 = (window1InitialContent?.match(/Welcome to NoteCove/g) || []).length;
     expect(welcomeCount1).toBe(1);
 
     // Check that window 2 exists and is ready
@@ -121,13 +121,13 @@ test.describe('Collaboration Demo', () => {
 
     // Check that window 1 still has no duplication
     const window1ContentAfter = await window1.locator('.ProseMirror').textContent();
-    const welcomeCount1After = (window1ContentAfter?.match(/Welcome to NoteCove!/g) || []).length;
+    const welcomeCount1After = (window1ContentAfter?.match(/Welcome to NoteCove/g) || []).length;
     expect(welcomeCount1After).toBe(1);
 
     // Check that window 2 has the welcome message once
     const window2Content = await window2.locator('.ProseMirror').textContent();
-    expect(window2Content).toContain('Welcome to NoteCove!');
-    const welcomeCount2 = (window2Content?.match(/Welcome to NoteCove!/g) || []).length;
+    expect(window2Content).toContain('Welcome to NoteCove');
+    const welcomeCount2 = (window2Content?.match(/Welcome to NoteCove/g) || []).length;
     expect(welcomeCount2).toBe(1);
   });
 

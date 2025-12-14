@@ -689,6 +689,7 @@ export const webClient: typeof window.electronAPI = {
     onAbout: noopSubscription,
     onExportSelectedNotes: noopSubscription,
     onExportAllNotes: noopSubscription,
+    onImportMarkdown: noopSubscription,
     onReloadFromCRDTLogs: noopSubscription,
     onReindexNotes: noopSubscription,
     onSyncStatus: noopSubscription,
@@ -709,6 +710,14 @@ export const webClient: typeof window.electronAPI = {
     getNotesForExport: browserNotAvailable('export.getNotesForExport'),
     showCompletionMessage: browserNotAvailable('export.showCompletionMessage'),
     copyImageFile: browserNotAvailable('export.copyImageFile'),
+  },
+
+  import: {
+    selectSource: browserNotAvailable('import.selectSource'),
+    scanSource: browserNotAvailable('import.scanSource'),
+    execute: browserNotAvailable('import.execute'),
+    cancel: browserNotAvailable('import.cancel'),
+    onProgress: noopSubscription,
   },
 
   testing: {

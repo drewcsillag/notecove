@@ -1095,6 +1095,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('menu:export-all-notes', listener);
       };
     },
+    onImportMarkdown: (callback: () => void): (() => void) => {
+      const listener = (): void => {
+        callback();
+      };
+      ipcRenderer.on('menu:import-markdown', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:import-markdown', listener);
+      };
+    },
     onReloadFromCRDTLogs: (callback: () => void): (() => void) => {
       const listener = (): void => {
         callback();
@@ -1227,6 +1236,123 @@ contextBridge.exposeInMainWorld('electronAPI', {
         error?: string;
         extension?: string;
       }>,
+  },
+
+  // Import operations
+  import: {
+    selectSource: (type: 'file' | 'folder'): Promise<string | null> =>
+      ipcRenderer.invoke('import:selectSource', type) as Promise<string | null>,
+    scanSource: (
+      sourcePath: string
+    ): Promise<{
+      success: boolean;
+      result?: {
+        rootPath: string;
+        isDirectory: boolean;
+        totalFiles: number;
+        totalSize: number;
+        files: {
+          absolutePath: string;
+          relativePath: string;
+          name: string;
+          parentPath: string;
+          size: number;
+          modifiedAt: number;
+        }[];
+        tree: {
+          name: string;
+          path: string;
+          isFolder: boolean;
+          children?: unknown[];
+        };
+      };
+      error?: string;
+    }> =>
+      ipcRenderer.invoke('import:scanSource', sourcePath) as Promise<{
+        success: boolean;
+        result?: {
+          rootPath: string;
+          isDirectory: boolean;
+          totalFiles: number;
+          totalSize: number;
+          files: {
+            absolutePath: string;
+            relativePath: string;
+            name: string;
+            parentPath: string;
+            size: number;
+            modifiedAt: number;
+          }[];
+          tree: {
+            name: string;
+            path: string;
+            isFolder: boolean;
+            children?: unknown[];
+          };
+        };
+        error?: string;
+      }>,
+    execute: (
+      sourcePath: string,
+      options: {
+        sdId: string;
+        targetFolderId: string | null;
+        folderMode: 'preserve' | 'container' | 'flatten';
+        containerName?: string;
+        duplicateHandling: 'rename' | 'skip';
+      }
+    ): Promise<{
+      success: boolean;
+      notesCreated?: number;
+      foldersCreated?: number;
+      skipped?: number;
+      noteIds?: string[];
+      folderIds?: string[];
+      error?: string;
+    }> =>
+      ipcRenderer.invoke('import:execute', sourcePath, options) as Promise<{
+        success: boolean;
+        notesCreated?: number;
+        foldersCreated?: number;
+        skipped?: number;
+        noteIds?: string[];
+        folderIds?: string[];
+        error?: string;
+      }>,
+    cancel: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('import:cancel') as Promise<{ success: boolean }>,
+    onProgress: (
+      callback: (progress: {
+        phase: 'scanning' | 'folders' | 'notes' | 'complete' | 'cancelled' | 'error';
+        processedFiles: number;
+        totalFiles: number;
+        currentFile?: string;
+        foldersCreated: number;
+        notesCreated: number;
+        notesSkipped: number;
+        errors: { type: string; item: string; message: string }[];
+      }) => void
+    ): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        progress: {
+          phase: 'scanning' | 'folders' | 'notes' | 'complete' | 'cancelled' | 'error';
+          processedFiles: number;
+          totalFiles: number;
+          currentFile?: string;
+          foldersCreated: number;
+          notesCreated: number;
+          notesSkipped: number;
+          errors: { type: string; item: string; message: string }[];
+        }
+      ) => {
+        callback(progress);
+      };
+      ipcRenderer.on('import:progress', handler);
+      return () => {
+        ipcRenderer.removeListener('import:progress', handler);
+      };
+    },
   },
 
   // Testing operations (only available if main process registered handler)

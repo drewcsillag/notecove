@@ -114,6 +114,7 @@ const mockElectronAPI = {
     onReindexNotes: jest.fn(() => () => {}),
     onSyncStatus: jest.fn(() => () => {}),
     onStorageInspector: jest.fn(() => () => {}),
+    onImportMarkdown: jest.fn(() => () => {}),
   },
   export: {
     selectDirectory: jest.fn(() => Promise.resolve(null)),

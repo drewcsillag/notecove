@@ -94,6 +94,13 @@ import {
   type ParsedFileResult,
   type InspectorFileType,
 } from '../storage-inspector';
+import {
+  ImportService,
+  scanPath,
+  type ScanResult,
+  type ImportOptions,
+  type ImportProgress,
+} from '../import';
 
 /**
  * Callback type for broadcasting to web clients via WebSocket
@@ -105,6 +112,7 @@ export class IPCHandlers {
   private thumbnailGenerator: ThumbnailGenerator;
   private imageCleanupManager: ImageCleanupManager;
   private storageInspectorService: StorageInspectorService;
+  private currentImport: ImportService | undefined;
 
   constructor(
     private crdtManager: CRDTManager,
@@ -406,6 +414,12 @@ export class IPCHandlers {
     ipcMain.handle('export:getNotesForExport', this.handleGetNotesForExport.bind(this));
     ipcMain.handle('export:showCompletionMessage', this.handleShowExportCompletion.bind(this));
     ipcMain.handle('export:copyImageFile', this.handleCopyImageForExport.bind(this));
+
+    // Import operations
+    ipcMain.handle('import:selectSource', this.handleSelectImportSource.bind(this));
+    ipcMain.handle('import:scanSource', this.handleScanImportSource.bind(this));
+    ipcMain.handle('import:execute', this.handleExecuteImport.bind(this));
+    ipcMain.handle('import:cancel', this.handleCancelImport.bind(this));
 
     // Tools operations
     ipcMain.handle('tools:reindexNotes', this.handleReindexNotes.bind(this));
@@ -4347,6 +4361,155 @@ export class IPCHandlers {
     type: InspectorFileType
   ): ParsedFileResult {
     return this.storageInspectorService.parseFile(data, type);
+  }
+  // ===========================================================================
+  // Import Operations
+  // ===========================================================================
+
+  /**
+   * Show file picker dialog to select import source (file or folder)
+   */
+  private async handleSelectImportSource(
+    event: IpcMainInvokeEvent,
+    type: 'file' | 'folder'
+  ): Promise<string | null> {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const targetWindow = window ?? BrowserWindow.getFocusedWindow();
+    if (!targetWindow) {
+      throw new Error('No window available for dialog');
+    }
+    const result =
+      type === 'folder'
+        ? await dialog.showOpenDialog(targetWindow, {
+            properties: ['openDirectory'],
+            title: 'Select Folder to Import',
+            buttonLabel: 'Select',
+          })
+        : await dialog.showOpenDialog(targetWindow, {
+            properties: ['openFile'],
+            filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+            title: 'Select Markdown File to Import',
+            buttonLabel: 'Select',
+          });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0] ?? null;
+  }
+
+  /**
+   * Scan a source path and return scan results
+   */
+  private async handleScanImportSource(
+    _event: IpcMainInvokeEvent,
+    sourcePath: string
+  ): Promise<{ success: boolean; result?: ScanResult; error?: string }> {
+    try {
+      console.log(`[Import] Scanning source: ${sourcePath}`);
+      const result = await scanPath(sourcePath);
+      console.log(`[Import] Scan complete: ${result.totalFiles} markdown files found`);
+      return { success: true, result };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Import] Scan failed: ${message}`);
+      return { success: false, error: message };
+    }
+  }
+
+  /**
+   * Execute the import operation
+   */
+  private async handleExecuteImport(
+    _event: IpcMainInvokeEvent,
+    sourcePath: string,
+    options: ImportOptions
+  ): Promise<{
+    success: boolean;
+    notesCreated?: number;
+    foldersCreated?: number;
+    skipped?: number;
+    noteIds?: string[];
+    folderIds?: string[];
+    error?: string;
+  }> {
+    try {
+      // Cancel any existing import
+      if (this.currentImport) {
+        this.currentImport.cancel();
+      }
+
+      console.log(`[Import] Starting import from: ${sourcePath}`);
+      console.log(`[Import] Options:`, JSON.stringify(options));
+
+      // Create new import service
+      this.currentImport = new ImportService(
+        this.crdtManager,
+        this.database,
+        (channel: string, ...args: unknown[]) => {
+          this.broadcastToAll(channel, ...args);
+        }
+      );
+
+      // Execute import with progress callback
+      const result = await this.currentImport.importFromPath(
+        sourcePath,
+        options,
+        (progress: ImportProgress) => {
+          this.broadcastToAll('import:progress', progress);
+        }
+      );
+
+      this.currentImport = undefined;
+
+      if (result.success) {
+        console.log(
+          `[Import] Import completed: ${result.notesCreated} notes, ${result.foldersCreated} folders`
+        );
+      } else {
+        console.log(`[Import] Import failed or cancelled: ${result.error}`);
+      }
+
+      const response: {
+        success: boolean;
+        notesCreated?: number;
+        foldersCreated?: number;
+        skipped?: number;
+        noteIds?: string[];
+        folderIds?: string[];
+        error?: string;
+      } = {
+        success: result.success,
+        notesCreated: result.notesCreated,
+        foldersCreated: result.foldersCreated,
+        skipped: result.skipped,
+        noteIds: result.noteIds,
+        folderIds: result.folderIds,
+      };
+      if (result.error) {
+        response.error = result.error;
+      }
+      return response;
+    } catch (error) {
+      this.currentImport = undefined;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Import] Import error: ${message}`);
+      return { success: false, error: message };
+    }
+  }
+
+  /**
+   * Cancel the current import operation
+   */
+  private async handleCancelImport(): Promise<{ success: boolean }> {
+    if (this.currentImport) {
+      console.log('[Import] Cancelling import...');
+      this.currentImport.cancel();
+      this.currentImport = undefined;
+      return { success: true };
+    }
+    return { success: false };
   }
 }
 

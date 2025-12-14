@@ -30,6 +30,8 @@ import {
   SDMarker,
   type SDType,
   ProfileLock,
+  markdownToProsemirror,
+  prosemirrorJsonToYXmlFragment,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import type { SyncStatus, StaleSyncEntry } from './ipc/types';
@@ -594,6 +596,48 @@ async function getOtherInstanceCRDTLogs(logsPath: string, instanceId: string): P
 }
 
 /**
+ * Get the path to a bundled resource file
+ * In development, resources are in the project's resources directory
+ * In production, they're in the app's resources folder
+ */
+function getResourcePath(filename: string): string {
+  if (is.dev) {
+    // In development, resources are in packages/desktop/resources
+    return join(__dirname, '..', '..', 'resources', filename);
+  } else {
+    // In production, resources are in the app's resources folder
+    return join(process.resourcesPath, 'resources', filename);
+  }
+}
+
+/**
+ * Read and parse the welcome.md file, populating the Y.XmlFragment with content
+ * @param fragment The Y.XmlFragment to populate
+ */
+async function populateWelcomeContent(fragment: Y.XmlFragment): Promise<void> {
+  try {
+    const welcomePath = getResourcePath('welcome.md');
+    const markdown = await fs.readFile(welcomePath, 'utf-8');
+    const prosemirrorJson = markdownToProsemirror(markdown);
+    prosemirrorJsonToYXmlFragment(prosemirrorJson, fragment);
+    console.log('[ensureDefaultNote] Loaded welcome content from welcome.md');
+  } catch (error) {
+    // Fallback to hardcoded content if welcome.md can't be read
+    console.warn('[ensureDefaultNote] Failed to load welcome.md, using fallback:', error);
+    const heading = new Y.XmlElement('heading');
+    heading.setAttribute('level', '1');
+    const headingText = new Y.XmlText();
+    headingText.insert(0, 'Welcome to NoteCove');
+    heading.insert(0, [headingText]);
+    const paragraph = new Y.XmlElement('paragraph');
+    const text = new Y.XmlText();
+    text.insert(0, 'Your notes, beautifully organized and always in sync.');
+    paragraph.insert(0, [text]);
+    fragment.insert(0, [heading, paragraph]);
+  }
+}
+
+/**
  * Ensure a default note exists for the user
  * @param db Database instance
  * @param crdtMgr CRDT manager instance
@@ -677,14 +721,7 @@ async function ensureDefaultNote(
       if (content.length === 0) {
         // No content, add the welcome message
         console.log('[ensureDefaultNote] Default note is empty, adding content');
-        const paragraph = new Y.XmlElement('paragraph');
-        const text = new Y.XmlText();
-        text.insert(
-          0,
-          'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
-        );
-        paragraph.insert(0, [text]);
-        content.insert(0, [paragraph]);
+        await populateWelcomeContent(content);
       }
 
       // Sync CRDT metadata to database (handles folder moves from other instances)
@@ -815,28 +852,13 @@ async function ensureDefaultNote(
               '[ensureDefaultNote] Timeout waiting for content from other instances, creating welcome content'
             );
             // Create welcome content since nothing arrived
-            const paragraph = new Y.XmlElement('paragraph');
-            const text = new Y.XmlText();
-            text.insert(
-              0,
-              'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
-            );
-            paragraph.insert(0, [text]);
-            finalContent.insert(0, [paragraph]);
+            await populateWelcomeContent(finalContent);
           }
         }
       } else {
         // No other instances, create welcome content immediately
         console.log('[ensureDefaultNote] CRDT is empty, adding welcome content');
-        // ProseMirror structure: paragraph containing text
-        const paragraph = new Y.XmlElement('paragraph');
-        const text = new Y.XmlText();
-        text.insert(
-          0,
-          'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.'
-        );
-        paragraph.insert(0, [text]);
-        content.insert(0, [paragraph]);
+        await populateWelcomeContent(content);
       }
     } else {
       console.log(
@@ -855,9 +877,8 @@ async function ensureDefaultNote(
     modified: Date.now(),
     deleted: false,
     pinned: false,
-    contentPreview: 'Welcome to NoteCove!',
-    contentText:
-      'Welcome to NoteCove! Open multiple windows to see real-time collaboration in action.',
+    contentPreview: 'Your notes, beautifully organized and always in sync.',
+    contentText: 'Welcome to NoteCove Your notes, beautifully organized and always in sync.',
   });
 
   // Set as selected note
@@ -1810,6 +1831,19 @@ function createMenu(): void {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.send('menu:export-all-notes');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Import Markdown...',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:import-markdown');
+            } else if (mainWindow) {
+              mainWindow.webContents.send('menu:import-markdown');
             }
           },
         },

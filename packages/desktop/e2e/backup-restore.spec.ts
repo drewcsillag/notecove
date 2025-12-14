@@ -443,12 +443,12 @@ test.describe('Backup and Restore', () => {
     // Open Recovery > Backups tab
     await openBackupsTab();
 
-    // Get the current backup count
-    const table = window.locator('table');
-    const tableExists = await table.isVisible();
+    // Get the current backup count - target backup table via its header (has "Storage Directory" column)
+    const backupTable = window.locator('table:has(th:has-text("Storage Directory"))');
+    const tableExists = await backupTable.isVisible();
     let backupCountBefore = 0;
     if (tableExists) {
-      backupCountBefore = await window.locator('table tbody tr').count();
+      backupCountBefore = await backupTable.locator('tbody tr').count();
     }
     console.log('Backup count before refresh:', backupCountBefore);
 
@@ -464,7 +464,7 @@ test.describe('Backup and Restore', () => {
     if (backupCountBefore > 0) {
       // Should still show backups - allow for minor variance due to timing
       // (e.g., table might still be loading or a backup might have been cleaned up)
-      const backupCountAfter = await window.locator('table tbody tr').count();
+      const backupCountAfter = await backupTable.locator('tbody tr').count();
       console.log('Backup count after refresh:', backupCountAfter);
       // Allow count to be within +/- 5 of the original (accounts for race conditions)
       expect(backupCountAfter).toBeGreaterThan(0);
