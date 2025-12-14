@@ -1,6 +1,6 @@
 # Note Comments Feature - Implementation Plan
 
-**Overall Progress:** `60%`
+**Overall Progress:** `62%`
 
 ## Summary
 
@@ -71,8 +71,8 @@ See: [PLAN-phase3-resolution.md](./PLAN-phase3-resolution.md)
 - [x] 🟢 **3.1 Add resolved fields to CommentThread**
 - [x] 🟢 **3.2 Implement resolve/reopen IPC**
 - [x] 🟢 **3.3 Add "Show resolved" toggle to panel**
-- [ ] 🟥 **3.4 Implement edit mode for comments**
-- [ ] 🟡 **3.5 Implement delete with confirmation** (delete works, no confirmation yet)
+- [x] 🟢 **3.4 Implement edit mode for comments**
+- [x] 🟢 **3.5 Implement delete with confirmation**
 - [ ] 🟥 **3.6 Add ownership validation**
 - [ ] 🟥 **3.7 Write tests**
 
