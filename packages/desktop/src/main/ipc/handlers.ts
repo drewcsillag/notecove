@@ -457,6 +457,7 @@ export class IPCHandlers {
     ipcMain.handle('comment:addReply', this.handleAddCommentReply.bind(this));
     ipcMain.handle('comment:updateReply', this.handleUpdateCommentReply.bind(this));
     ipcMain.handle('comment:deleteReply', this.handleDeleteCommentReply.bind(this));
+    ipcMain.handle('comment:getReplies', this.handleGetCommentReplies.bind(this));
     ipcMain.handle('comment:addReaction', this.handleAddCommentReaction.bind(this));
     ipcMain.handle('comment:removeReaction', this.handleRemoveCommentReaction.bind(this));
 
@@ -4648,6 +4649,31 @@ export class IPCHandlers {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  /**
+   * Get all replies for a comment thread
+   */
+  private async handleGetCommentReplies(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string
+  ): Promise<CommentReply[]> {
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (!noteDoc) {
+      // Note not loaded yet, try to load it
+      const note = await this.database.getNote(noteId);
+      if (!note) {
+        return [];
+      }
+      await this.crdtManager.loadNote(noteId, note.sdId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!loadedNoteDoc) {
+        return [];
+      }
+      return loadedNoteDoc.getReplies(threadId);
+    }
+    return noteDoc.getReplies(threadId);
   }
 
   /**

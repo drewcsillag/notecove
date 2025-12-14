@@ -292,6 +292,7 @@ export const browserApiStub: typeof window.electronAPI = {
     updateThread: notImplemented('comment.updateThread'),
     deleteThread: notImplemented('comment.deleteThread'),
     addReply: notImplemented('comment.addReply'),
+    getReplies: notImplemented('comment.getReplies'),
     updateReply: notImplemented('comment.updateReply'),
     deleteReply: notImplemented('comment.deleteReply'),
     addReaction: notImplemented('comment.addReaction'),

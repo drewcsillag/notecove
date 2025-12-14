@@ -2097,6 +2097,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }>,
 
     /**
+     * Get all replies for a thread
+     * @param noteId Note ID
+     * @param threadId Thread ID
+     * @returns Array of replies
+     */
+    getReplies: (
+      noteId: string,
+      threadId: string
+    ): Promise<
+      {
+        id: string;
+        threadId: string;
+        authorId: string;
+        authorName: string;
+        authorHandle: string;
+        content: string;
+        created: number;
+        modified: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('comment:getReplies', noteId, threadId) as Promise<
+        {
+          id: string;
+          threadId: string;
+          authorId: string;
+          authorName: string;
+          authorHandle: string;
+          content: string;
+          created: number;
+          modified: number;
+        }[]
+      >,
+
+    /**
      * Update a reply
      * @param noteId Note ID
      * @param threadId Thread ID

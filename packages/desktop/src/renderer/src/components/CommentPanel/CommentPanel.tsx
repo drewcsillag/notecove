@@ -7,7 +7,7 @@
  * Phase 1 - Minimal Vertical Slice
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -69,6 +69,9 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
   const [editText, setEditText] = useState('');
   // Delete confirmation state
   const [deleteConfirmThreadId, setDeleteConfirmThreadId] = useState<string | null>(null);
+  // Refs for scrolling to threads
+  const threadRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Load threads from the note
   const loadThreads = useCallback(async () => {
@@ -84,12 +87,24 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
 
       const fetchedThreads = await window.electronAPI.comment.getThreads(noteId);
 
-      // For now, we'll load replies separately (in a real implementation,
-      // the IPC could return threads with replies pre-loaded)
-      const threadsWithReplies: ThreadWithReplies[] = fetchedThreads.map((thread) => ({
-        ...thread,
-        replies: [], // TODO: Load replies from CRDT
-      }));
+      // Load replies for each thread
+      const threadsWithReplies: ThreadWithReplies[] = await Promise.all(
+        fetchedThreads.map(async (thread) => {
+          const replies = await window.electronAPI.comment.getReplies(noteId, thread.id);
+          return {
+            ...thread,
+            replies,
+          };
+        })
+      );
+
+      // Sort threads by their anchor position in the document
+      threadsWithReplies.sort((a, b) => {
+        // Decode anchorStart from Uint8Array (first 4 bytes are Uint32 position)
+        const posA = new Uint32Array(a.anchorStart.buffer)[0] ?? 0;
+        const posB = new Uint32Array(b.anchorStart.buffer)[0] ?? 0;
+        return posA - posB;
+      });
 
       setThreads(threadsWithReplies);
     } catch (err) {
@@ -105,7 +120,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
     void loadThreads();
   }, [loadThreads]);
 
-  // Listen for comment updates
+  // Listen for comment and reply updates
   useEffect(() => {
     const unsubscribeThreadAdded = window.electronAPI.comment.onThreadAdded(
       (eventNoteId, _threadId) => {
@@ -131,12 +146,74 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       }
     );
 
+    const unsubscribeReplyAdded = window.electronAPI.comment.onReplyAdded(
+      (eventNoteId, _threadId, _replyId) => {
+        if (eventNoteId === noteId) {
+          void loadThreads();
+        }
+      }
+    );
+
+    const unsubscribeReplyUpdated = window.electronAPI.comment.onReplyUpdated(
+      (eventNoteId, _threadId, _replyId) => {
+        if (eventNoteId === noteId) {
+          void loadThreads();
+        }
+      }
+    );
+
+    const unsubscribeReplyDeleted = window.electronAPI.comment.onReplyDeleted(
+      (eventNoteId, _threadId, _replyId) => {
+        if (eventNoteId === noteId) {
+          void loadThreads();
+        }
+      }
+    );
+
     return () => {
       unsubscribeThreadAdded();
       unsubscribeThreadUpdated();
       unsubscribeThreadDeleted();
+      unsubscribeReplyAdded();
+      unsubscribeReplyUpdated();
+      unsubscribeReplyDeleted();
     };
   }, [noteId, loadThreads]);
+
+  // Auto-enter edit mode for newly created threads (empty content)
+  useEffect(() => {
+    if (!selectedThreadId || editingThreadId) return;
+
+    // Find the selected thread
+    const selectedThread = threads.find((t) => t.id === selectedThreadId);
+    if (!selectedThread) return;
+
+    // If it has empty content and belongs to current user, auto-enter edit mode
+    if (!selectedThread.content && selectedThread.authorId === CURRENT_USER_ID) {
+      setEditingThreadId(selectedThreadId);
+      setEditText('');
+    }
+  }, [selectedThreadId, threads, editingThreadId]);
+
+  // Auto-scroll to selected thread when it changes
+  useEffect(() => {
+    if (!selectedThreadId) return;
+
+    // Small delay to ensure the DOM has updated
+    const timer = setTimeout(() => {
+      const threadElement = threadRefs.current.get(selectedThreadId);
+      if (threadElement && scrollContainerRef.current) {
+        threadElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [selectedThreadId]);
 
   const handleResolve = async (threadId: string, resolved: boolean) => {
     try {
@@ -217,9 +294,10 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       await window.electronAPI.comment.updateThread(noteId, threadId, {
         content: editText.trim(),
       });
+      // Reload threads first, then exit edit mode so the new content is visible
+      await loadThreads();
       setEditingThreadId(null);
       setEditText('');
-      void loadThreads();
     } catch (err) {
       console.error('Failed to update thread:', err);
     }
@@ -329,7 +407,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       )}
 
       {/* Thread list */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 1 }}>
+      <Box ref={scrollContainerRef} sx={{ flex: 1, overflow: 'auto', p: 1 }}>
         {visibleThreads.length === 0 ? (
           <Box sx={{ p: 2, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
@@ -337,273 +415,285 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
             </Typography>
           </Box>
         ) : (
-          visibleThreads.map((thread) => (
-            <Paper
-              key={thread.id}
-              elevation={0}
-              sx={{
-                mb: 1,
-                border: 1,
-                borderColor: selectedThreadId === thread.id ? 'primary.main' : 'divider',
-                borderRadius: 1,
-                overflow: 'hidden',
-                opacity: thread.resolved ? 0.7 : 1,
-                cursor: 'pointer',
-                '&:hover': {
-                  borderColor: 'primary.light',
-                },
-              }}
-              onClick={() => onThreadSelect?.(thread.id)}
-            >
-              {/* Thread header */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  p: 1.5,
-                  pb: 0,
+          visibleThreads.map((thread) => {
+            const isSelected = selectedThreadId === thread.id;
+            return (
+              <Paper
+                key={thread.id}
+                ref={(el) => {
+                  if (el) {
+                    threadRefs.current.set(thread.id, el);
+                  } else {
+                    threadRefs.current.delete(thread.id);
+                  }
                 }}
+                elevation={isSelected ? 2 : 0}
+                sx={{
+                  mb: 1,
+                  border: isSelected ? 3 : 1,
+                  borderColor: isSelected ? 'primary.main' : 'divider',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  opacity: thread.resolved ? 0.7 : 1,
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? 'action.selected' : 'background.paper',
+                  transition: 'border-color 0.2s, border-width 0.2s, box-shadow 0.2s',
+                  '&:hover': {
+                    borderColor: isSelected ? 'primary.main' : 'primary.light',
+                  },
+                }}
+                onClick={() => onThreadSelect?.(thread.id)}
               >
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" fontWeight={600}>
-                    {thread.authorName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {formatDate(thread.created)}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleResolve(thread.id, !thread.resolved);
-                    }}
-                    title={thread.resolved ? 'Reopen' : 'Resolve'}
-                    color={thread.resolved ? 'success' : 'default'}
-                  >
-                    <CheckIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Box>
-              </Box>
-
-              {/* Original text quote */}
-              {thread.originalText && (
+                {/* Thread header */}
                 <Box
                   sx={{
-                    mx: 1.5,
-                    mt: 1,
-                    p: 1,
-                    backgroundColor: 'action.hover',
-                    borderRadius: 0.5,
-                    borderLeft: 3,
-                    borderColor: 'warning.main',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    p: 1.5,
+                    pb: 0,
                   }}
                 >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontStyle: 'italic',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    &ldquo;{thread.originalText}&rdquo;
-                  </Typography>
-                </Box>
-              )}
-
-              {/* Comment content */}
-              <Box sx={{ px: 1.5, py: 1 }}>
-                {editingThreadId === thread.id ? (
-                  <Box>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      multiline
-                      rows={2}
-                      value={editText}
-                      onChange={(e) => {
-                        setEditText(e.target.value);
-                      }}
-                      autoFocus
-                      sx={{ mb: 1 }}
-                    />
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                      <Button size="small" onClick={handleCancelEdit}>
-                        Cancel
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => {
-                          void handleSaveEdit(thread.id);
-                        }}
-                        disabled={!editText.trim()}
-                      >
-                        Save
-                      </Button>
-                    </Box>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                    <Typography variant="body2" sx={{ flex: 1 }}>
-                      {thread.content || <em style={{ opacity: 0.6 }}>No comment text</em>}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight={600}>
+                      {thread.authorName}
                     </Typography>
-                    {thread.authorId === CURRENT_USER_ID && (
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartEdit(thread.id, thread.content);
-                        }}
-                        title="Edit comment"
-                        sx={{ ml: 'auto', opacity: 0.6, '&:hover': { opacity: 1 } }}
-                      >
-                        <EditIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    )}
+                    <Typography variant="caption" color="text.secondary">
+                      {formatDate(thread.created)}
+                    </Typography>
                   </Box>
-                )}
-              </Box>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleResolve(thread.id, !thread.resolved);
+                      }}
+                      title={thread.resolved ? 'Reopen' : 'Resolve'}
+                      color={thread.resolved ? 'success' : 'default'}
+                    >
+                      <CheckIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                </Box>
 
-              {/* Replies section */}
-              {thread.replies.length > 0 && (
-                <>
-                  <Divider />
+                {/* Original text quote */}
+                {thread.originalText && (
                   <Box
-                    sx={{ px: 1.5, py: 0.5, cursor: 'pointer' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleExpanded(thread.id);
+                    sx={{
+                      mx: 1.5,
+                      mt: 1,
+                      p: 1,
+                      backgroundColor: 'action.hover',
+                      borderRadius: 0.5,
+                      borderLeft: 3,
+                      borderColor: 'warning.main',
                     }}
                   >
                     <Typography
                       variant="caption"
-                      color="primary"
-                      sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                      sx={{
+                        fontStyle: 'italic',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
                     >
-                      {expandedThreads.has(thread.id) ? (
-                        <ExpandLessIcon sx={{ fontSize: 14 }} />
-                      ) : (
-                        <ExpandMoreIcon sx={{ fontSize: 14 }} />
-                      )}
-                      {thread.replies.length} {thread.replies.length === 1 ? 'reply' : 'replies'}
+                      &ldquo;{thread.originalText}&rdquo;
                     </Typography>
                   </Box>
-                  <Collapse in={expandedThreads.has(thread.id)}>
-                    <Box sx={{ pl: 2, pr: 1.5, pb: 1 }}>
-                      {thread.replies.map((reply) => (
-                        <Box
-                          key={reply.id}
-                          sx={{
-                            py: 1,
-                            borderTop: 1,
-                            borderColor: 'divider',
-                          }}
-                        >
-                          <Typography variant="body2" fontWeight={600}>
-                            {reply.authorName}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {formatDate(reply.created)}
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            {reply.content}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Collapse>
-                </>
-              )}
-
-              {/* Reply input */}
-              <Box
-                sx={{ px: 1.5, pb: 1 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                {replyingTo === thread.id ? (
-                  <Box sx={{ mt: 1 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      multiline
-                      rows={2}
-                      placeholder="Write a reply..."
-                      value={replyText}
-                      onChange={(e) => {
-                        setReplyText(e.target.value);
-                      }}
-                      autoFocus
-                      sx={{ mb: 1 }}
-                    />
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          setReplyingTo(null);
-                          setReplyText('');
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => void handleReply(thread.id)}
-                        disabled={!replyText.trim()}
-                      >
-                        Reply
-                      </Button>
-                    </Box>
-                  </Box>
-                ) : (
-                  <Button
-                    size="small"
-                    startIcon={<ReplyIcon sx={{ fontSize: 14 }} />}
-                    onClick={() => {
-                      setReplyingTo(thread.id);
-                    }}
-                    sx={{ textTransform: 'none' }}
-                  >
-                    Reply
-                  </Button>
                 )}
-              </Box>
 
-              {/* Delete button (only for own comments) */}
-              {thread.authorId === CURRENT_USER_ID && (
+                {/* Comment content */}
+                <Box sx={{ px: 1.5, py: 1 }}>
+                  {editingThreadId === thread.id ? (
+                    <Box>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        rows={2}
+                        value={editText}
+                        onChange={(e) => {
+                          setEditText(e.target.value);
+                        }}
+                        autoFocus
+                        sx={{ mb: 1 }}
+                      />
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                        <Button size="small" onClick={handleCancelEdit}>
+                          Cancel
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => {
+                            void handleSaveEdit(thread.id);
+                          }}
+                          disabled={!editText.trim()}
+                        >
+                          Save
+                        </Button>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                      <Typography variant="body2" sx={{ flex: 1 }}>
+                        {thread.content || <em style={{ opacity: 0.6 }}>No comment text</em>}
+                      </Typography>
+                      {thread.authorId === CURRENT_USER_ID && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEdit(thread.id, thread.content);
+                          }}
+                          title="Edit comment"
+                          sx={{ ml: 'auto', opacity: 0.6, '&:hover': { opacity: 1 } }}
+                        >
+                          <EditIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Replies section */}
+                {thread.replies.length > 0 && (
+                  <>
+                    <Divider />
+                    <Box
+                      sx={{ px: 1.5, py: 0.5, cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpanded(thread.id);
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        color="primary"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                      >
+                        {expandedThreads.has(thread.id) ? (
+                          <ExpandLessIcon sx={{ fontSize: 14 }} />
+                        ) : (
+                          <ExpandMoreIcon sx={{ fontSize: 14 }} />
+                        )}
+                        {thread.replies.length} {thread.replies.length === 1 ? 'reply' : 'replies'}
+                      </Typography>
+                    </Box>
+                    <Collapse in={expandedThreads.has(thread.id)}>
+                      <Box sx={{ pl: 2, pr: 1.5, pb: 1 }}>
+                        {thread.replies.map((reply) => (
+                          <Box
+                            key={reply.id}
+                            sx={{
+                              py: 1,
+                              borderTop: 1,
+                              borderColor: 'divider',
+                            }}
+                          >
+                            <Typography variant="body2" fontWeight={600}>
+                              {reply.authorName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatDate(reply.created)}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                              {reply.content}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Collapse>
+                  </>
+                )}
+
+                {/* Reply input */}
                 <Box
-                  sx={{
-                    px: 1.5,
-                    pb: 1,
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                  }}
+                  sx={{ px: 1.5, pb: 1 }}
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
                 >
-                  <Button
-                    size="small"
-                    color="error"
-                    onClick={() => {
-                      handleDeleteClick(thread.id);
-                    }}
-                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                  >
-                    Delete
-                  </Button>
+                  {replyingTo === thread.id ? (
+                    <Box sx={{ mt: 1 }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        rows={2}
+                        placeholder="Write a reply..."
+                        value={replyText}
+                        onChange={(e) => {
+                          setReplyText(e.target.value);
+                        }}
+                        autoFocus
+                        sx={{ mb: 1 }}
+                      />
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            setReplyingTo(null);
+                            setReplyText('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => void handleReply(thread.id)}
+                          disabled={!replyText.trim()}
+                        >
+                          Reply
+                        </Button>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Button
+                      size="small"
+                      startIcon={<ReplyIcon sx={{ fontSize: 14 }} />}
+                      onClick={() => {
+                        setReplyingTo(thread.id);
+                      }}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Reply
+                    </Button>
+                  )}
                 </Box>
-              )}
-            </Paper>
-          ))
+
+                {/* Delete button (only for own comments) */}
+                {thread.authorId === CURRENT_USER_ID && (
+                  <Box
+                    sx={{
+                      px: 1.5,
+                      pb: 1,
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => {
+                        handleDeleteClick(thread.id);
+                      }}
+                      sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                    >
+                      Delete
+                    </Button>
+                  </Box>
+                )}
+              </Paper>
+            );
+          })
         )}
       </Box>
 

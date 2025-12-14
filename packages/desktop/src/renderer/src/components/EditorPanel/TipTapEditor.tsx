@@ -8,7 +8,7 @@
  * Syncs with main process CRDT via IPC.
  */
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import BulletList from '@tiptap/extension-bullet-list';
@@ -103,7 +103,7 @@ export interface TipTapEditorProps {
   /** Callback when a comment mark is clicked */
   onCommentClick?: (threadId: string) => void;
   /** Callback to add a comment on the current selection */
-  onAddComment?: (selection: { from: number; to: number; text: string }) => void;
+  onAddComment?: (selection: { from: number; to: number; text: string; threadId: string }) => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -1347,7 +1347,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   // Create a comment on the current selection
   // This function is used by both the keyboard shortcut and toolbar button
-  const handleAddCommentOnSelection = async () => {
+  const handleAddCommentOnSelection = useCallback(async () => {
     if (!editor || !noteId) return;
 
     // Get current selection
@@ -1396,11 +1396,11 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       console.log('[TipTapEditor] Comment mark applied');
 
       // Notify parent about the new comment (to open panel, select thread, etc.)
-      onAddComment?.({ from, to, text });
+      onAddComment?.({ from, to, text, threadId: result.threadId });
     } catch (err) {
       console.error('[TipTapEditor] Failed to create comment thread:', err);
     }
-  };
+  }, [editor, noteId, onAddComment]);
 
   // Keyboard shortcut for adding comments (Cmd+Alt+M / Ctrl+Alt+M like Google Docs)
   useEffect(() => {
@@ -1412,7 +1412,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifier = isMac ? event.metaKey : event.ctrlKey;
 
-      if (modifier && event.altKey && event.key.toLowerCase() === 'm') {
+      // Use event.code instead of event.key because Alt/Option modifies the character on Mac
+      if (modifier && event.altKey && event.code === 'KeyM') {
         event.preventDefault();
         event.stopPropagation();
         await handleAddCommentOnSelection();
@@ -1428,7 +1429,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     return () => {
       editorDom.removeEventListener('keydown', wrappedHandler);
     };
-  }, [editor, noteId, onAddComment]);
+  }, [editor, noteId, handleAddCommentOnSelection]);
 
   // Handler for the comment toolbar button
   const handleCommentButtonClick = () => {
@@ -1465,9 +1466,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         void loadCommentCount();
       }
     });
-    const unsubDeleted = window.electronAPI.comment.onThreadDeleted((deletedNoteId) => {
+    const unsubDeleted = window.electronAPI.comment.onThreadDeleted((deletedNoteId, threadId) => {
       if (deletedNoteId === noteId) {
         void loadCommentCount();
+        // Remove the comment mark from the editor
+        if (editor) {
+          editor.commands.removeCommentMarkById(threadId);
+        }
       }
     });
 
@@ -1476,7 +1481,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       unsubUpdated();
       unsubDeleted();
     };
-  }, [noteId]);
+  }, [noteId, editor]);
 
   // Manage link popover using tippy.js
   useEffect(() => {

@@ -8,24 +8,32 @@ import { CommentPanel } from '../CommentPanel';
 
 // Mock electronAPI
 const mockGetThreads = jest.fn();
+const mockGetReplies = jest.fn();
 const mockUpdateThread = jest.fn();
 const mockDeleteThread = jest.fn();
 const mockAddReply = jest.fn();
 const mockOnThreadAdded = jest.fn(() => jest.fn());
 const mockOnThreadUpdated = jest.fn(() => jest.fn());
 const mockOnThreadDeleted = jest.fn(() => jest.fn());
+const mockOnReplyAdded = jest.fn(() => jest.fn());
+const mockOnReplyUpdated = jest.fn(() => jest.fn());
+const mockOnReplyDeleted = jest.fn(() => jest.fn());
 
 Object.defineProperty(window, 'electronAPI', {
   writable: true,
   value: {
     comment: {
       getThreads: mockGetThreads,
+      getReplies: mockGetReplies,
       updateThread: mockUpdateThread,
       deleteThread: mockDeleteThread,
       addReply: mockAddReply,
       onThreadAdded: mockOnThreadAdded,
       onThreadUpdated: mockOnThreadUpdated,
       onThreadDeleted: mockOnThreadDeleted,
+      onReplyAdded: mockOnReplyAdded,
+      onReplyUpdated: mockOnReplyUpdated,
+      onReplyDeleted: mockOnReplyDeleted,
     },
   },
 });
@@ -36,6 +44,7 @@ describe('CommentPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetThreads.mockResolvedValue([]);
+    mockGetReplies.mockResolvedValue([]);
   });
 
   it('should render empty state when no noteId is provided', async () => {

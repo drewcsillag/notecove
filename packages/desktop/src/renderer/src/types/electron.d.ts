@@ -978,6 +978,22 @@ declare global {
             modified: number;
           }
         ) => Promise<{ success: boolean; replyId?: string; error?: string }>;
+        /** Get all replies for a thread */
+        getReplies: (
+          noteId: string,
+          threadId: string
+        ) => Promise<
+          {
+            id: string;
+            threadId: string;
+            authorId: string;
+            authorName: string;
+            authorHandle: string;
+            content: string;
+            created: number;
+            modified: number;
+          }[]
+        >;
         /** Update a reply */
         updateReply: (
           noteId: string,
