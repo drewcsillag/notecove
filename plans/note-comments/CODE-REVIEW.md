@@ -26,19 +26,19 @@ Code review of the comments feature implementation across 5 key files. The code 
 
 ### Medium Severity - Future Work
 
-| Issue | Description | Location |
-|-------|-------------|----------|
-| Race condition | Multiple rapid reloads could cause stale data | CommentPanel.tsx loadThreads |
-| Stale closures | Large dependency array in keyboard handler | CommentPanel.tsx |
-| Missing error boundary | Comment panel errors could crash app | All comment components |
+| Issue                  | Description                                   | Location                     |
+| ---------------------- | --------------------------------------------- | ---------------------------- |
+| Race condition         | Multiple rapid reloads could cause stale data | CommentPanel.tsx loadThreads |
+| Stale closures         | Large dependency array in keyboard handler    | CommentPanel.tsx             |
+| Missing error boundary | Comment panel errors could crash app          | All comment components       |
 
 ### Low Severity - Technical Debt
 
-| Issue | Description |
-|-------|-------------|
-| Magic numbers | Hardcoded timeout values without constants |
+| Issue                      | Description                                              |
+| -------------------------- | -------------------------------------------------------- |
+| Magic numbers              | Hardcoded timeout values without constants               |
 | Inconsistent error returns | Some handlers return arrays, others return error objects |
-| Missing accessibility | No aria-labels on icon buttons |
+| Missing accessibility      | No aria-labels on icon buttons                           |
 
 ## Not An Issue
 

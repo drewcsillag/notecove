@@ -294,7 +294,10 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
                     ) : (
                       <AddIcon fontSize="small" sx={{ color: 'grey.500' }} />
                     )}
-                    <Typography variant="caption" sx={{ color: isComment ? 'warning.main' : 'grey.400' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: isComment ? 'warning.main' : 'grey.400' }}
+                    >
                       {isComment ? commentOp : content.type}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'grey.500', ml: 'auto' }}>

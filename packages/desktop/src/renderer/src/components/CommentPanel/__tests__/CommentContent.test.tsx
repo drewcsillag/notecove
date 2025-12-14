@@ -32,9 +32,7 @@ describe('CommentContent', () => {
   });
 
   it('renders multiple mentions', () => {
-    const { container } = renderWithTheme(
-      <CommentContent content="@alice and @bob are here" />
-    );
+    const { container } = renderWithTheme(<CommentContent content="@alice and @bob are here" />);
     expect(screen.getByText('@alice')).toBeInTheDocument();
     expect(screen.getByText('@bob')).toBeInTheDocument();
     // Verify full content is present

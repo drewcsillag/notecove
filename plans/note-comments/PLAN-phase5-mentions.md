@@ -13,11 +13,13 @@ Enable @-mentioning users in comments with autocomplete from profile presence fi
 **Status:** 🟢 Complete
 
 **Files:**
+
 - `packages/desktop/src/main/ipc/handlers.ts` - Added `MentionUser` interface and `handleGetMentionUsers` handler
 - `packages/desktop/src/preload/index.ts` - Added `mention.getUsers` API
 - `packages/desktop/src/renderer/src/types/electron.d.ts` - Added type definitions
 
 **Implementation:**
+
 - Added `profileId` parameter to IPCHandlers constructor
 - Handler gets current user from database (AppStateKey.Username, AppStateKey.UserHandle)
 - Gets other users from profile presence cache for all SDs
@@ -32,6 +34,7 @@ Enable @-mentioning users in comments with autocomplete from profile presence fi
 **File:** `packages/desktop/src/renderer/src/components/CommentPanel/MentionAutocomplete.tsx`
 
 **Features:**
+
 - Fetches users on mount via `window.electronAPI.mention.getUsers()`
 - Filters users by query (handle or name match)
 - Keyboard navigation (Arrow keys, Enter/Tab to select, Escape to close)
@@ -47,6 +50,7 @@ Enable @-mentioning users in comments with autocomplete from profile presence fi
 **File:** `packages/desktop/src/renderer/src/components/CommentPanel/CommentPanel.tsx`
 
 **Implementation:**
+
 - Added mention state tracking for both reply and edit inputs
 - Added `handleReplyTextChange` and `handleEditTextChange` to detect `@(\w*)$` pattern
 - Added `handleReplyMentionSelect` and `handleEditMentionSelect` to insert mentions
@@ -62,6 +66,7 @@ Enable @-mentioning users in comments with autocomplete from profile presence fi
 **File:** `packages/desktop/src/renderer/src/components/CommentPanel/CommentContent.tsx`
 
 **Features:**
+
 - Parses content with `/@\w+/g` regex
 - Renders mentions with primary color, background, and rounded corners
 - Used for both thread.content and reply.content display
@@ -75,6 +80,7 @@ Enable @-mentioning users in comments with autocomplete from profile presence fi
 **File:** `packages/desktop/src/renderer/src/components/CommentPanel/__tests__/CommentContent.test.tsx`
 
 **Tests:**
+
 - Plain text rendering
 - Single mention styling
 - Multiple mentions

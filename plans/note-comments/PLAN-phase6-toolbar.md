@@ -197,6 +197,7 @@ Badge in toolbar (shown in 6.1).
 **File:** `packages/desktop/e2e/comments.spec.ts`
 
 Comprehensive E2E tests implemented covering:
+
 - Toolbar button visibility when text selected
 - Keyboard shortcut (Cmd+Alt+M) opens comment panel
 - Context menu shows "Add Comment" option
