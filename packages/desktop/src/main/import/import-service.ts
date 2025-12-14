@@ -8,10 +8,78 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import type { Database } from '@notecove/shared';
-import { markdownToProsemirror, prosemirrorJsonToYXmlFragment } from '@notecove/shared';
+import {
+  markdownToProsemirror,
+  prosemirrorJsonToYXmlFragment,
+  extractImageReferences,
+  resolveImportImages,
+  liftImagesToBlockLevel,
+  convertLinksToImportMarkers,
+  resolveImportLinkMarkers,
+  ImageStorage,
+  SyncDirectoryStructure,
+  type FileSystemAdapter,
+} from '@notecove/shared';
 import type { CRDTManager } from '../crdt';
 import type { ScanResult, ScannedFile, ImportOptions, ImportProgress, ImportResult } from './types';
 import { scanPath, getUniqueFolderPaths } from './file-scanner';
+
+/**
+ * Node.js implementation of FileSystemAdapter for ImageStorage
+ */
+class NodeFsAdapter implements FileSystemAdapter {
+  async exists(filepath: string): Promise<boolean> {
+    try {
+      await fs.access(filepath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async mkdir(dirpath: string): Promise<void> {
+    await fs.mkdir(dirpath, { recursive: true });
+  }
+
+  async readFile(filepath: string): Promise<Uint8Array> {
+    const buffer = await fs.readFile(filepath);
+    return new Uint8Array(buffer);
+  }
+
+  async writeFile(filepath: string, data: Uint8Array): Promise<void> {
+    await fs.writeFile(filepath, data);
+  }
+
+  async appendFile(filepath: string, data: Uint8Array): Promise<void> {
+    await fs.appendFile(filepath, data);
+  }
+
+  async deleteFile(filepath: string): Promise<void> {
+    await fs.unlink(filepath);
+  }
+
+  async listFiles(dirpath: string): Promise<string[]> {
+    const entries = await fs.readdir(dirpath);
+    return entries;
+  }
+
+  joinPath(...segments: string[]): string {
+    return path.join(...segments);
+  }
+
+  basename(filepath: string): string {
+    return path.basename(filepath);
+  }
+
+  async stat(filepath: string): Promise<{ size: number; mtimeMs: number; ctimeMs: number }> {
+    const stats = await fs.stat(filepath);
+    return {
+      size: stats.size,
+      mtimeMs: stats.mtimeMs,
+      ctimeMs: stats.ctimeMs,
+    };
+  }
+}
 
 /**
  * Callback for progress updates
@@ -70,10 +138,22 @@ export class ImportService {
         await this.createFolders(scanResult, options, pathToFolderId);
       }
 
-      // Phase 3: Create notes
+      // Phase 3a: Pre-assign note IDs for inter-note link resolution
+      // This allows links between notes to be resolved during creation
+      const pathToNoteId = new Map<string, string>();
+      for (const file of scanResult.files) {
+        const noteId = randomUUID();
+        pathToNoteId.set(file.relativePath, noteId);
+        // Also add without extension for convenience
+        if (file.relativePath.endsWith('.md')) {
+          pathToNoteId.set(file.relativePath.slice(0, -3), noteId);
+        }
+      }
+      console.log(`[Import] Pre-assigned ${pathToNoteId.size / 2} note IDs for link resolution`);
+
+      // Phase 3b: Create notes with resolved links
       this.updateProgress({ phase: 'notes' });
       const noteIds: string[] = [];
-      const pathToNoteId = new Map<string, string>();
 
       for (const file of scanResult.files) {
         // Check cancellation (can be set asynchronously via cancel() method)
@@ -85,9 +165,18 @@ export class ImportService {
         try {
           this.updateProgress({ currentFile: file.name });
 
-          const noteId = await this.createNote(file, options, pathToFolderId, pathToNoteId);
+          // Get the pre-assigned note ID
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- noteId was pre-assigned in the first pass
+          const noteId = pathToNoteId.get(file.relativePath)!;
+          const created = await this.createNote(
+            file,
+            options,
+            pathToFolderId,
+            pathToNoteId,
+            noteId
+          );
 
-          if (noteId) {
+          if (created) {
             noteIds.push(noteId);
             this.progress.notesCreated++;
           } else {
@@ -239,13 +328,15 @@ export class ImportService {
 
   /**
    * Create a note from a markdown file
+   * @returns true if note was created, false if skipped
    */
   private async createNote(
     file: ScannedFile,
     options: ImportOptions,
     pathToFolderId: Map<string, string>,
-    pathToNoteId: Map<string, string>
-  ): Promise<string | null> {
+    pathToNoteId: Map<string, string>,
+    noteId: string
+  ): Promise<boolean> {
     // Determine target folder
     let folderId: string | null = options.targetFolderId;
 
@@ -279,7 +370,7 @@ export class ImportService {
       const existingTitles = new Set(existingNotes.map((n) => n.title.toLowerCase()));
       if (existingTitles.has(title.toLowerCase())) {
         console.log(`[Import] Skipping duplicate: ${title}`);
-        return null;
+        return false;
       }
     }
 
@@ -295,8 +386,21 @@ export class ImportService {
       title = uniqueTitle;
     }
 
-    // Generate note ID
-    const noteId = randomUUID();
+    // Process images in the markdown
+    const imageMap = await this.importImages(prosemirrorJson, file.absolutePath, options.sdId);
+
+    // Resolve import images to notecoveImage nodes (or text placeholders)
+    resolveImportImages(prosemirrorJson, imageMap);
+
+    // Lift images from inline to block level
+    liftImagesToBlockLevel(prosemirrorJson);
+
+    // Convert inter-note links to import markers, then resolve them
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- convertLinksToImportMarkers mutates the JSON
+    convertLinksToImportMarkers(prosemirrorJson);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- resolveImportLinkMarkers mutates the JSON
+    resolveImportLinkMarkers(prosemirrorJson, pathToNoteId);
+
     const now = Date.now();
 
     // Load note (creates empty CRDT document)
@@ -341,16 +445,115 @@ export class ImportService {
       contentText,
     });
 
-    // Track mapping for later link resolution
-    pathToNoteId.set(file.relativePath, noteId);
-
     // Broadcast note creation
     if (this.broadcastCallback) {
       this.broadcastCallback('note:created', { sdId: options.sdId, noteId, folderId });
     }
 
-    console.log(`[Import] Created note: ${title} (${noteId})`);
-    return noteId;
+    console.log(`[Import] Created note: ${title} (${noteId}) with ${imageMap.size} images`);
+    return true;
+  }
+
+  /**
+   * Import images referenced in the markdown content
+   * Returns a map from original src to { imageId, sdId }
+   */
+  private async importImages(
+    prosemirrorJson: { type: string; content?: unknown[] },
+    markdownFilePath: string,
+    sdId: string
+  ): Promise<Map<string, { imageId: string; sdId: string }>> {
+    const imageMap = new Map<string, { imageId: string; sdId: string }>();
+
+    // Extract image references
+    const imageRefs = extractImageReferences(
+      prosemirrorJson as Parameters<typeof extractImageReferences>[0]
+    );
+
+    if (imageRefs.length === 0) {
+      return imageMap;
+    }
+
+    // Get SD info for ImageStorage
+    const sd = await this.database.getStorageDir(sdId);
+    if (!sd) {
+      console.warn(`[Import] Storage directory ${sdId} not found, skipping image import`);
+      return imageMap;
+    }
+
+    // Create ImageStorage instance
+    const fsAdapter = new NodeFsAdapter();
+    const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+      id: sdId,
+      path: sd.path,
+      label: sd.name,
+    });
+    const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+
+    // Get the directory containing the markdown file
+    const markdownDir = path.dirname(markdownFilePath);
+
+    for (const ref of imageRefs) {
+      try {
+        // Skip external URLs (http://, https://, data:)
+        if (
+          ref.src.startsWith('http://') ||
+          ref.src.startsWith('https://') ||
+          ref.src.startsWith('data:')
+        ) {
+          console.log(`[Import] Skipping external image: ${ref.src}`);
+          continue;
+        }
+
+        // Resolve relative path to absolute path
+        const imagePath = path.isAbsolute(ref.src) ? ref.src : path.resolve(markdownDir, ref.src);
+
+        // Check if file exists
+        try {
+          await fs.access(imagePath);
+        } catch {
+          console.warn(`[Import] Image not found: ${imagePath}`);
+          continue;
+        }
+
+        // Read image file
+        const imageData = await fs.readFile(imagePath);
+
+        // Determine MIME type from extension
+        const ext = path.extname(imagePath).slice(1).toLowerCase();
+        const mimeType = ImageStorage.getMimeTypeFromExtension(ext);
+
+        if (!mimeType) {
+          console.warn(`[Import] Unsupported image type: ${ext} (${imagePath})`);
+          continue;
+        }
+
+        // Save to NoteCove storage
+        const result = await imageStorage.saveImage(new Uint8Array(imageData), mimeType);
+
+        // Add to database cache
+        await this.database.upsertImage({
+          id: result.imageId,
+          sdId,
+          filename: result.filename,
+          mimeType,
+          width: null,
+          height: null,
+          size: imageData.length,
+          created: Date.now(),
+        });
+
+        // Track the mapping
+        imageMap.set(ref.src, { imageId: result.imageId, sdId });
+
+        console.log(`[Import] Imported image: ${path.basename(imagePath)} -> ${result.imageId}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[Import] Failed to import image ${ref.src}:`, message);
+      }
+    }
+
+    return imageMap;
   }
 
   /**

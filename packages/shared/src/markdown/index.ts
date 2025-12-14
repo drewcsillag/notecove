@@ -2,7 +2,17 @@
  * Markdown import/export utilities
  */
 
-export { markdownToProsemirror } from './markdown-to-prosemirror';
+export {
+  markdownToProsemirror,
+  extractImageReferences,
+  resolveImportImages,
+  liftImagesToBlockLevel,
+  extractLinkReferences,
+  convertLinksToImportMarkers,
+  resolveImportLinkMarkers,
+  type ImageReference,
+  type LinkReference,
+} from './markdown-to-prosemirror';
 export {
   prosemirrorJsonToYXmlFragment,
   type ProseMirrorNode,

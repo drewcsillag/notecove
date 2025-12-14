@@ -5,7 +5,15 @@
  * and transforms the tokens into ProseMirror JSON format.
  */
 
-import { markdownToProsemirror } from '../markdown-to-prosemirror';
+import {
+  markdownToProsemirror,
+  extractImageReferences,
+  resolveImportImages,
+  liftImagesToBlockLevel,
+  extractLinkReferences,
+  convertLinksToImportMarkers,
+  resolveImportLinkMarkers,
+} from '../markdown-to-prosemirror';
 import type { ProseMirrorNode } from '../prosemirror-to-yjs';
 
 describe('markdownToProsemirror', () => {
@@ -251,6 +259,304 @@ describe('markdownToProsemirror', () => {
       expect(result.content![0].type).toBe('table');
       // Table should have rows
       expect(result.content![0].content!.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('image import helpers', () => {
+  describe('extractImageReferences', () => {
+    it('should extract image references from markdown with images', () => {
+      const markdown = '# Title\n\n![My Image](./images/photo.png)';
+      const doc = markdownToProsemirror(markdown);
+      const refs = extractImageReferences(doc);
+
+      expect(refs).toHaveLength(1);
+      expect(refs[0].src).toBe('./images/photo.png');
+      expect(refs[0].alt).toBe('My Image');
+      expect(refs[0].path).toBeDefined();
+    });
+
+    it('should extract multiple images', () => {
+      const markdown = '![First](a.png)\n\n![Second](b.png)';
+      const doc = markdownToProsemirror(markdown);
+      const refs = extractImageReferences(doc);
+
+      expect(refs).toHaveLength(2);
+      expect(refs[0].src).toBe('a.png');
+      expect(refs[1].src).toBe('b.png');
+    });
+
+    it('should return empty array for markdown without images', () => {
+      const markdown = '# Just text\n\nNo images here.';
+      const doc = markdownToProsemirror(markdown);
+      const refs = extractImageReferences(doc);
+
+      expect(refs).toHaveLength(0);
+    });
+  });
+
+  describe('resolveImportImages', () => {
+    it('should convert importImage to notecoveImage when image is in map', () => {
+      const markdown = '![My Photo](photo.jpg)';
+      const doc = markdownToProsemirror(markdown);
+
+      const imageMap = new Map([['photo.jpg', { imageId: 'abc-123', sdId: 'default' }]]);
+
+      resolveImportImages(doc, imageMap);
+
+      // Find the notecoveImage node
+      const para = doc.content![0];
+      const imageNode = para.content![0];
+
+      expect(imageNode.type).toBe('notecoveImage');
+      expect(imageNode.attrs).toEqual({
+        imageId: 'abc-123',
+        sdId: 'default',
+        alt: 'My Photo',
+        caption: '',
+        width: null,
+        linkHref: null,
+      });
+    });
+
+    it('should convert importImage to text placeholder when image not in map', () => {
+      const markdown = '![Missing](missing.png)';
+      const doc = markdownToProsemirror(markdown);
+
+      const imageMap = new Map<string, { imageId: string; sdId: string }>();
+
+      resolveImportImages(doc, imageMap);
+
+      const para = doc.content![0];
+      const textNode = para.content![0];
+
+      expect(textNode.type).toBe('text');
+      expect(textNode.text).toBe('[Image: Missing]');
+    });
+  });
+
+  describe('liftImagesToBlockLevel', () => {
+    it('should lift notecoveImage from paragraph to block level', () => {
+      const markdown = '![Photo](photo.jpg)';
+      const doc = markdownToProsemirror(markdown);
+
+      const imageMap = new Map([['photo.jpg', { imageId: 'abc-123', sdId: 'default' }]]);
+
+      resolveImportImages(doc, imageMap);
+      liftImagesToBlockLevel(doc);
+
+      // The image should be a top-level block now
+      expect(doc.content![0].type).toBe('notecoveImage');
+    });
+
+    it('should split paragraph when image is inline with text', () => {
+      // Create a doc manually with text + image + text in a paragraph
+      const doc: ProseMirrorNode = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'Before ' },
+              {
+                type: 'notecoveImage',
+                attrs: {
+                  imageId: 'abc',
+                  sdId: 'sd1',
+                  alt: '',
+                  caption: '',
+                  width: null,
+                  linkHref: null,
+                },
+              },
+              { type: 'text', text: ' After' },
+            ],
+          },
+        ],
+      };
+
+      liftImagesToBlockLevel(doc);
+
+      // Should have: paragraph (Before), image, paragraph (After)
+      expect(doc.content!.length).toBe(3);
+      expect(doc.content![0].type).toBe('paragraph');
+      expect(doc.content![0].content![0].text).toBe('Before ');
+      expect(doc.content![1].type).toBe('notecoveImage');
+      expect(doc.content![2].type).toBe('paragraph');
+      expect(doc.content![2].content![0].text).toBe(' After');
+    });
+  });
+});
+
+describe('inter-note link helpers', () => {
+  describe('extractLinkReferences', () => {
+    it('should extract links to .md files', () => {
+      const markdown = 'See [Other Note](./other-note.md) for details.';
+      const doc = markdownToProsemirror(markdown);
+      const refs = extractLinkReferences(doc);
+
+      expect(refs).toHaveLength(1);
+      expect(refs[0].href).toBe('./other-note.md');
+      expect(refs[0].text).toBe('Other Note');
+      expect(refs[0].path).toBeDefined();
+    });
+
+    it('should extract multiple inter-note links', () => {
+      const markdown = 'See [Note A](a.md) and [Note B](b.md).';
+      const doc = markdownToProsemirror(markdown);
+      const refs = extractLinkReferences(doc);
+
+      expect(refs).toHaveLength(2);
+      expect(refs[0].href).toBe('a.md');
+      expect(refs[1].href).toBe('b.md');
+    });
+
+    it('should ignore external URLs', () => {
+      const markdown = 'Visit [Google](https://google.com) and [Note](note.md).';
+      const doc = markdownToProsemirror(markdown);
+      const refs = extractLinkReferences(doc);
+
+      expect(refs).toHaveLength(1);
+      expect(refs[0].href).toBe('note.md');
+    });
+
+    it('should return empty array for markdown without .md links', () => {
+      const markdown = 'Visit [Google](https://google.com) now.';
+      const doc = markdownToProsemirror(markdown);
+      const refs = extractLinkReferences(doc);
+
+      expect(refs).toHaveLength(0);
+    });
+  });
+
+  describe('convertLinksToImportMarkers', () => {
+    it('should convert .md links to import markers', () => {
+      const markdown = 'See [My Note](./notes/my-note.md) for details.';
+      const doc = markdownToProsemirror(markdown);
+
+      convertLinksToImportMarkers(doc);
+
+      // Find the text node that was the link
+      const para = doc.content![0];
+      const textContent = para.content!.map((n) => n.text).join('');
+
+      expect(textContent).toContain('[[import:./notes/my-note.md|My Note]]');
+    });
+
+    it('should preserve external links unchanged', () => {
+      const markdown = 'Visit [Google](https://google.com).';
+      const doc = markdownToProsemirror(markdown);
+
+      convertLinksToImportMarkers(doc);
+
+      // External link should still have link mark
+      const para = doc.content![0];
+      const linkNode = para.content!.find((n) => n.marks && n.marks.some((m) => m.type === 'link'));
+
+      expect(linkNode).toBeDefined();
+      expect(linkNode!.text).toBe('Google');
+    });
+  });
+
+  describe('resolveImportLinkMarkers', () => {
+    it('should resolve import markers to note IDs', () => {
+      // Create a doc with import marker
+      const doc: ProseMirrorNode = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'See [[import:other-note.md|Other Note]] for details.',
+              },
+            ],
+          },
+        ],
+      };
+
+      const pathToNoteId = new Map([['other-note.md', 'uuid-123-456']]);
+
+      resolveImportLinkMarkers(doc, pathToNoteId);
+
+      const text = doc.content![0].content![0].text;
+      expect(text).toBe('See [[uuid-123-456]] for details.');
+    });
+
+    it('should resolve markers with leading ./', () => {
+      const doc: ProseMirrorNode = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'See [[import:./folder/note.md|Note]] here.',
+              },
+            ],
+          },
+        ],
+      };
+
+      const pathToNoteId = new Map([['folder/note.md', 'uuid-789']]);
+
+      resolveImportLinkMarkers(doc, pathToNoteId);
+
+      const text = doc.content![0].content![0].text;
+      expect(text).toBe('See [[uuid-789]] here.');
+    });
+
+    it('should convert unresolved markers to plain text', () => {
+      const doc: ProseMirrorNode = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'See [[import:missing.md|Missing Note]] here.',
+              },
+            ],
+          },
+        ],
+      };
+
+      const pathToNoteId = new Map<string, string>();
+
+      resolveImportLinkMarkers(doc, pathToNoteId);
+
+      const text = doc.content![0].content![0].text;
+      expect(text).toBe('See [Missing Note] here.');
+    });
+
+    it('should handle multiple markers in same text node', () => {
+      const doc: ProseMirrorNode = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'See [[import:a.md|Note A]] and [[import:b.md|Note B]].',
+              },
+            ],
+          },
+        ],
+      };
+
+      const pathToNoteId = new Map([
+        ['a.md', 'uuid-a'],
+        ['b.md', 'uuid-b'],
+      ]);
+
+      resolveImportLinkMarkers(doc, pathToNoteId);
+
+      const text = doc.content![0].content![0].text;
+      expect(text).toBe('See [[uuid-a]] and [[uuid-b]].');
     });
   });
 });

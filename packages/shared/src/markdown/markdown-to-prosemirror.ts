@@ -481,10 +481,20 @@ function convertInlineTokens(tokens: Token[]): ProseMirrorNode[] {
         break;
 
       case 'image': {
-        // Convert images to text placeholder for now
+        // Create a notecoveImage node with the source path (to be resolved later)
+        // Note: Images in markdown are inline, but notecoveImage is a block node.
+        // We create a special inline marker that will be lifted to block level later.
         const alt = token.content || token.attrGet('alt') || '';
         const src = token.attrGet('src') || '';
-        result.push(createTextNode(`[Image: ${alt || src}]`, [...markStack]));
+        // Use a special node type that signals an image to be imported
+        // The import service will replace this with a proper notecoveImage block
+        result.push({
+          type: 'importImage',
+          attrs: {
+            src,
+            alt,
+          },
+        });
         break;
       }
 
@@ -525,4 +535,276 @@ function createTextNode(text: string, marks: ProseMirrorMark[]): ProseMirrorNode
     return { type: 'text', text };
   }
   return { type: 'text', text, marks };
+}
+
+/**
+ * Image reference found in markdown
+ */
+export interface ImageReference {
+  /** Original src path from markdown */
+  src: string;
+  /** Alt text */
+  alt: string;
+  /** Path to the node in the JSON tree (for updating) */
+  path: number[];
+}
+
+/**
+ * Extract all image references from a ProseMirror JSON document
+ * Returns paths to importImage nodes that can be used to update them
+ */
+export function extractImageReferences(doc: ProseMirrorNode): ImageReference[] {
+  const refs: ImageReference[] = [];
+
+  function walk(node: ProseMirrorNode, path: number[]): void {
+    if (node.type === 'importImage' && node.attrs) {
+      refs.push({
+        src: (node.attrs as { src?: string }).src ?? '',
+        alt: (node.attrs as { alt?: string }).alt ?? '',
+        path: [...path],
+      });
+    }
+
+    if (node.content) {
+      for (let i = 0; i < node.content.length; i++) {
+        walk(node.content[i], [...path, i]);
+      }
+    }
+  }
+
+  walk(doc, []);
+  return refs;
+}
+
+/**
+ * Update a node in the ProseMirror JSON tree at the given path
+ */
+export function updateNodeAtPath(
+  doc: ProseMirrorNode,
+  path: number[],
+  newNode: ProseMirrorNode
+): void {
+  if (path.length === 0) return;
+
+  let current: ProseMirrorNode = doc;
+  for (let i = 0; i < path.length - 1; i++) {
+    if (!current.content) return;
+    current = current.content[path[i]];
+  }
+
+  if (current.content) {
+    current.content[path[path.length - 1]] = newNode;
+  }
+}
+
+/**
+ * Convert importImage nodes to either notecoveImage (with imageId) or text placeholders
+ * This modifies the document in place
+ *
+ * @param doc The ProseMirror JSON document
+ * @param imageMap Map from src to { imageId, sdId } for successfully imported images
+ */
+export function resolveImportImages(
+  doc: ProseMirrorNode,
+  imageMap: Map<string, { imageId: string; sdId: string }>
+): void {
+  const refs = extractImageReferences(doc);
+
+  for (const ref of refs) {
+    const imported = imageMap.get(ref.src);
+    let newNode: ProseMirrorNode;
+
+    if (imported) {
+      // Successfully imported - create notecoveImage node
+      newNode = {
+        type: 'notecoveImage',
+        attrs: {
+          imageId: imported.imageId,
+          sdId: imported.sdId,
+          alt: ref.alt,
+          caption: '',
+          width: null,
+          linkHref: null,
+        },
+      };
+    } else {
+      // Image not found - create text placeholder
+      newNode = {
+        type: 'text',
+        text: `[Image: ${ref.alt || ref.src}]`,
+      };
+    }
+
+    updateNodeAtPath(doc, ref.path, newNode);
+  }
+}
+
+/**
+ * Link reference found in markdown pointing to another .md file
+ */
+export interface LinkReference {
+  /** Original href path from markdown (e.g., "./other-note.md") */
+  href: string;
+  /** Display text of the link */
+  text: string;
+  /** Path to the node in the JSON tree */
+  path: number[];
+}
+
+/**
+ * Extract all inter-note link references from a ProseMirror JSON document
+ * These are links where href ends with .md (pointing to other markdown files)
+ */
+export function extractLinkReferences(doc: ProseMirrorNode): LinkReference[] {
+  const refs: LinkReference[] = [];
+
+  function walk(node: ProseMirrorNode, path: number[]): void {
+    // Check text nodes with link marks
+    if (node.type === 'text' && node.text && node.marks) {
+      const linkMark = node.marks.find((m) => m.type === 'link');
+      if (linkMark && linkMark.attrs) {
+        const href = (linkMark.attrs as { href?: string }).href ?? '';
+        // Check if this is a link to a .md file (not external)
+        if (href.endsWith('.md') && !href.startsWith('http://') && !href.startsWith('https://')) {
+          refs.push({
+            href,
+            text: node.text,
+            path: [...path],
+          });
+        }
+      }
+    }
+
+    if (node.content) {
+      for (let i = 0; i < node.content.length; i++) {
+        walk(node.content[i], [...path, i]);
+      }
+    }
+  }
+
+  walk(doc, []);
+  return refs;
+}
+
+/**
+ * Convert inter-note markdown links to [[import:path]] format
+ * This modifies the document in place
+ *
+ * Links to .md files are converted from linked text to [[import:path.md]] plain text
+ * This allows the import service to resolve them to actual note IDs later
+ */
+export function convertLinksToImportMarkers(doc: ProseMirrorNode): void {
+  const refs = extractLinkReferences(doc);
+
+  for (const ref of refs) {
+    // Replace the linked text node with plain text containing the import marker
+    // Format: [[import:relative/path.md|Display Text]]
+    const markerText = `[[import:${ref.href}|${ref.text}]]`;
+    const newNode: ProseMirrorNode = {
+      type: 'text',
+      text: markerText,
+      // Remove the link mark - this is now plain text with a marker
+    };
+
+    updateNodeAtPath(doc, ref.path, newNode);
+  }
+}
+
+/**
+ * Resolve [[import:path|text]] markers to actual [[noteId]] inter-note links
+ * This should be called after all notes have been imported
+ *
+ * @param doc The ProseMirror JSON document
+ * @param pathToNoteId Map from relative file paths to note IDs
+ */
+export function resolveImportLinkMarkers(
+  doc: ProseMirrorNode,
+  pathToNoteId: Map<string, string>
+): void {
+  // Pattern to match [[import:path|text]] markers
+  const importLinkPattern = /\[\[import:([^|]+)\|([^\]]+)\]\]/g;
+
+  function processNode(node: ProseMirrorNode): void {
+    if (node.type === 'text' && node.text) {
+      // Replace import markers with actual note links
+      node.text = node.text.replace(importLinkPattern, (_match, path: string, text: string) => {
+        // Normalize the path (remove leading ./)
+        const normalizedPath = path.replace(/^\.\//, '');
+
+        // Look up the note ID
+        const noteId = pathToNoteId.get(normalizedPath) ?? pathToNoteId.get(path);
+
+        if (noteId) {
+          // Found the note - create inter-note link
+          return `[[${noteId}]]`;
+        } else {
+          // Note not found - keep as regular text with link indicator
+          return `[${text}]`;
+        }
+      });
+    }
+
+    if (node.content) {
+      for (const child of node.content) {
+        processNode(child);
+      }
+    }
+  }
+
+  processNode(doc);
+}
+
+/**
+ * Lift inline importImage nodes to block level (as separate paragraphs with notecoveImage)
+ * This handles the case where images appear inline in paragraphs
+ *
+ * Call this AFTER resolveImportImages, as it expects notecoveImage nodes
+ */
+export function liftImagesToBlockLevel(doc: ProseMirrorNode): void {
+  if (!doc.content) return;
+
+  const newContent: ProseMirrorNode[] = [];
+
+  for (const block of doc.content) {
+    if (block.type === 'paragraph' && block.content) {
+      // Check if this paragraph contains any notecoveImage nodes
+      const hasImages = block.content.some((n) => n.type === 'notecoveImage');
+
+      if (hasImages) {
+        // Split paragraph: text before, image, text after
+        let currentParagraphContent: ProseMirrorNode[] = [];
+
+        for (const node of block.content) {
+          if (node.type === 'notecoveImage') {
+            // Flush any accumulated text as a paragraph
+            if (currentParagraphContent.length > 0) {
+              newContent.push({
+                type: 'paragraph',
+                content: currentParagraphContent,
+              });
+              currentParagraphContent = [];
+            }
+            // Add the image as its own block
+            newContent.push(node);
+          } else {
+            currentParagraphContent.push(node);
+          }
+        }
+
+        // Flush remaining text
+        if (currentParagraphContent.length > 0) {
+          newContent.push({
+            type: 'paragraph',
+            content: currentParagraphContent,
+          });
+        }
+      } else {
+        newContent.push(block);
+      }
+    } else {
+      newContent.push(block);
+    }
+  }
+
+  doc.content = newContent;
 }
