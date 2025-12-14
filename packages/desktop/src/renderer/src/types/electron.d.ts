@@ -1007,6 +1007,21 @@ declare global {
           threadId: string,
           replyId: string
         ) => Promise<{ success: boolean; error?: string }>;
+        /** Get all reactions for a thread */
+        getReactions: (
+          noteId: string,
+          threadId: string
+        ) => Promise<
+          {
+            id: string;
+            targetType: 'thread' | 'reply';
+            targetId: string;
+            emoji: string;
+            authorId: string;
+            authorName: string;
+            created: number;
+          }[]
+        >;
         /** Add a reaction to a thread or reply */
         addReaction: (
           noteId: string,

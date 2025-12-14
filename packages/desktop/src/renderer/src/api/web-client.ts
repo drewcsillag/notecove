@@ -979,6 +979,7 @@ export const webClient: typeof window.electronAPI = {
     getReplies: browserNotAvailable('comment.getReplies'),
     updateReply: browserNotAvailable('comment.updateReply'),
     deleteReply: browserNotAvailable('comment.deleteReply'),
+    getReactions: browserNotAvailable('comment.getReactions'),
     addReaction: browserNotAvailable('comment.addReaction'),
     removeReaction: browserNotAvailable('comment.removeReaction'),
     onThreadAdded: noopSubscription,

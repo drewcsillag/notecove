@@ -2165,6 +2165,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }>,
 
     /**
+     * Get all reactions for a thread
+     * @param noteId Note ID
+     * @param threadId Thread ID
+     * @returns Array of reactions
+     */
+    getReactions: (
+      noteId: string,
+      threadId: string
+    ): Promise<
+      {
+        id: string;
+        targetType: 'thread' | 'reply';
+        targetId: string;
+        emoji: string;
+        authorId: string;
+        authorName: string;
+        created: number;
+      }[]
+    > =>
+      ipcRenderer.invoke('comment:getReactions', noteId, threadId) as Promise<
+        {
+          id: string;
+          targetType: 'thread' | 'reply';
+          targetId: string;
+          emoji: string;
+          authorId: string;
+          authorName: string;
+          created: number;
+        }[]
+      >,
+
+    /**
      * Add a reaction to a thread or reply
      * @param noteId Note ID
      * @param threadId Thread ID (reactions are stored per-thread)

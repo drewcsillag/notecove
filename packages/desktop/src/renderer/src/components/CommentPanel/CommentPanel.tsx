@@ -34,7 +34,9 @@ import {
   ExpandLess as ExpandLessIcon,
   Edit as EditIcon,
 } from '@mui/icons-material';
-import type { CommentThread, CommentReply } from '@notecove/shared/comments';
+import type { CommentThread, CommentReply, CommentReaction } from '@notecove/shared/comments';
+import { ReactionPicker } from './ReactionPicker';
+import { ReactionDisplay } from './ReactionDisplay';
 
 // TODO: Replace with actual user ID from authentication system
 const CURRENT_USER_ID = 'current-user';
@@ -47,8 +49,9 @@ export interface CommentPanelProps {
   onThreadSelect?: (threadId: string | null) => void;
 }
 
-interface ThreadWithReplies extends CommentThread {
+interface ThreadWithDetails extends CommentThread {
   replies: CommentReply[];
+  reactions: CommentReaction[];
 }
 
 export const CommentPanel: React.FC<CommentPanelProps> = ({
@@ -57,7 +60,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
   selectedThreadId,
   onThreadSelect,
 }) => {
-  const [threads, setThreads] = useState<ThreadWithReplies[]>([]);
+  const [threads, setThreads] = useState<ThreadWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showResolved, setShowResolved] = useState(false);
@@ -87,26 +90,30 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
 
       const fetchedThreads = await window.electronAPI.comment.getThreads(noteId);
 
-      // Load replies for each thread
-      const threadsWithReplies: ThreadWithReplies[] = await Promise.all(
+      // Load replies and reactions for each thread
+      const threadsWithDetails: ThreadWithDetails[] = await Promise.all(
         fetchedThreads.map(async (thread) => {
-          const replies = await window.electronAPI.comment.getReplies(noteId, thread.id);
+          const [replies, reactions] = await Promise.all([
+            window.electronAPI.comment.getReplies(noteId, thread.id),
+            window.electronAPI.comment.getReactions(noteId, thread.id),
+          ]);
           return {
             ...thread,
             replies,
+            reactions,
           };
         })
       );
 
       // Sort threads by their anchor position in the document
-      threadsWithReplies.sort((a, b) => {
+      threadsWithDetails.sort((a, b) => {
         // Decode anchorStart from Uint8Array (first 4 bytes are Uint32 position)
         const posA = new Uint32Array(a.anchorStart.buffer)[0] ?? 0;
         const posB = new Uint32Array(b.anchorStart.buffer)[0] ?? 0;
         return posA - posB;
       });
 
-      setThreads(threadsWithReplies);
+      setThreads(threadsWithDetails);
     } catch (err) {
       console.error('Failed to load comment threads:', err);
       setError('Failed to load comments');
@@ -170,6 +177,22 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       }
     );
 
+    const unsubscribeReactionAdded = window.electronAPI.comment.onReactionAdded(
+      (eventNoteId, _threadId, _reactionId) => {
+        if (eventNoteId === noteId) {
+          void loadThreads();
+        }
+      }
+    );
+
+    const unsubscribeReactionRemoved = window.electronAPI.comment.onReactionRemoved(
+      (eventNoteId, _threadId, _reactionId) => {
+        if (eventNoteId === noteId) {
+          void loadThreads();
+        }
+      }
+    );
+
     return () => {
       unsubscribeThreadAdded();
       unsubscribeThreadUpdated();
@@ -177,6 +200,8 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       unsubscribeReplyAdded();
       unsubscribeReplyUpdated();
       unsubscribeReplyDeleted();
+      unsubscribeReactionAdded();
+      unsubscribeReactionRemoved();
     };
   }, [noteId, loadThreads]);
 
@@ -555,6 +580,29 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                           <EditIcon sx={{ fontSize: 14 }} />
                         </IconButton>
                       )}
+                    </Box>
+                  )}
+
+                  {/* Reactions */}
+                  {noteId && (
+                    <ReactionDisplay
+                      noteId={noteId}
+                      threadId={thread.id}
+                      reactions={thread.reactions}
+                      targetType="thread"
+                      targetId={thread.id}
+                    />
+                  )}
+
+                  {/* Add reaction button - only show when selected */}
+                  {isSelected && noteId && (
+                    <Box sx={{ mt: 1 }}>
+                      <ReactionPicker
+                        noteId={noteId}
+                        threadId={thread.id}
+                        targetType="thread"
+                        targetId={thread.id}
+                      />
                     </Box>
                   )}
                 </Box>

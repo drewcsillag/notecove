@@ -295,6 +295,7 @@ export const browserApiStub: typeof window.electronAPI = {
     getReplies: notImplemented('comment.getReplies'),
     updateReply: notImplemented('comment.updateReply'),
     deleteReply: notImplemented('comment.deleteReply'),
+    getReactions: notImplemented('comment.getReactions'),
     addReaction: notImplemented('comment.addReaction'),
     removeReaction: notImplemented('comment.removeReaction'),
     onThreadAdded: stubEventSubscription,

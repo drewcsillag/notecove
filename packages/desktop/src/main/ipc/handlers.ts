@@ -458,6 +458,7 @@ export class IPCHandlers {
     ipcMain.handle('comment:updateReply', this.handleUpdateCommentReply.bind(this));
     ipcMain.handle('comment:deleteReply', this.handleDeleteCommentReply.bind(this));
     ipcMain.handle('comment:getReplies', this.handleGetCommentReplies.bind(this));
+    ipcMain.handle('comment:getReactions', this.handleGetCommentReactions.bind(this));
     ipcMain.handle('comment:addReaction', this.handleAddCommentReaction.bind(this));
     ipcMain.handle('comment:removeReaction', this.handleRemoveCommentReaction.bind(this));
 
@@ -4674,6 +4675,31 @@ export class IPCHandlers {
       return loadedNoteDoc.getReplies(threadId);
     }
     return noteDoc.getReplies(threadId);
+  }
+
+  /**
+   * Get all reactions for a comment thread
+   */
+  private async handleGetCommentReactions(
+    _event: IpcMainInvokeEvent,
+    noteId: string,
+    threadId: string
+  ): Promise<CommentReaction[]> {
+    const noteDoc = this.crdtManager.getNoteDoc(noteId);
+    if (!noteDoc) {
+      // Note not loaded yet, try to load it
+      const note = await this.database.getNote(noteId);
+      if (!note) {
+        return [];
+      }
+      await this.crdtManager.loadNote(noteId, note.sdId);
+      const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
+      if (!loadedNoteDoc) {
+        return [];
+      }
+      return loadedNoteDoc.getReactions(threadId);
+    }
+    return noteDoc.getReactions(threadId);
   }
 
   /**
