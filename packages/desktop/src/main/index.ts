@@ -1788,6 +1788,19 @@ function createMenu(): void {
         },
         { type: 'separator' },
         {
+          label: 'Import Markdown...',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:import-markdown');
+            } else if (mainWindow) {
+              mainWindow.webContents.send('menu:import-markdown');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'Switch Profile...',
           click: () => {
             // Show profile picker and restart with new profile if selected

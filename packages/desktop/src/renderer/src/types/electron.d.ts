@@ -538,6 +538,7 @@ declare global {
         onAbout: (callback: () => void) => () => void;
         onExportSelectedNotes: (callback: () => void) => () => void;
         onExportAllNotes: (callback: () => void) => () => void;
+        onImportMarkdown: (callback: () => void) => () => void;
         onReloadFromCRDTLogs: (callback: () => void) => () => void;
         onReindexNotes: (callback: () => void) => () => void;
         onSyncStatus: (callback: () => void) => () => void;
@@ -580,6 +581,63 @@ declare global {
           imageId: string,
           destPath: string
         ) => Promise<{ success: boolean; error?: string; extension?: string }>;
+      };
+
+      import: {
+        selectSource: (type: 'file' | 'folder') => Promise<string | null>;
+        scanSource: (sourcePath: string) => Promise<{
+          success: boolean;
+          result?: {
+            rootPath: string;
+            isDirectory: boolean;
+            totalFiles: number;
+            totalSize: number;
+            files: {
+              absolutePath: string;
+              relativePath: string;
+              name: string;
+              parentPath: string;
+              size: number;
+              modifiedAt: number;
+            }[];
+            tree: {
+              name: string;
+              path: string;
+              isFolder: boolean;
+              children?: unknown[];
+            };
+          };
+          error?: string;
+        }>;
+        execute: (
+          sourcePath: string,
+          options: {
+            sdId: string;
+            targetFolderId: string | null;
+            folderMode: 'preserve' | 'container' | 'flatten';
+            containerName?: string;
+            duplicateHandling: 'rename' | 'skip';
+          }
+        ) => Promise<{
+          success: boolean;
+          notesCreated?: number;
+          foldersCreated?: number;
+          skipped?: number;
+          error?: string;
+        }>;
+        cancel: () => Promise<{ success: boolean }>;
+        onProgress: (
+          callback: (progress: {
+            phase: 'scanning' | 'folders' | 'notes' | 'complete' | 'cancelled' | 'error';
+            processedFiles: number;
+            totalFiles: number;
+            currentFile?: string;
+            foldersCreated: number;
+            notesCreated: number;
+            notesSkipped: number;
+            errors: { type: string; item: string; message: string }[];
+          }) => void
+        ) => () => void;
       };
 
       testing: {
