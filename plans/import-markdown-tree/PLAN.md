@@ -1,6 +1,6 @@
 # Import Markdown Tree Feature - Implementation Plan
 
-**Overall Progress:** `~60%` (Phase 1-3 complete, Phase 4 in progress)
+**Overall Progress:** `~80%` (Phase 1-4 complete, Phase 5 in progress)
 
 **Branch:** `import-markdown-tree`
 
@@ -172,32 +172,32 @@ All extended parser features were implemented as part of Phase 1 (the parser sup
   - [x] ✅ `import:cancel` - Cancel in-progress import
   - [x] ✅ Progress broadcasting via `import:progress` event
 
-### Phase 4: Import Frontend (Renderer Process)
+### Phase 4: Import Frontend (Renderer Process) ✅ COMPLETE
 
-- [ ] 🟥 **4.1: Import Dialog component**
-  - [ ] 🟥 Create `ImportDialog.tsx` component
-  - [ ] 🟥 Source display with file count
-  - [ ] 🟥 Target folder dropdown (from NoteCove folders)
-  - [ ] 🟥 "Preserve folder structure" checkbox
-  - [ ] 🟥 "Create [name] folder" checkbox (dynamic name from source)
-  - [ ] 🟥 Cancel / Import buttons
-  - [ ] 🟥 Ensure dialog opens in focused window
+- [x] ✅ **4.1: Import Dialog component**
+  - [x] ✅ Create `ImportDialog.tsx` component with multi-step flow
+  - [x] ✅ Source display with file count
+  - [x] ✅ Target folder dropdown (from NoteCove folders)
+  - [x] ✅ "Preserve folder structure" checkbox
+  - [x] ✅ "Create [name] folder" checkbox (dynamic name from source)
+  - [x] ✅ Cancel / Import buttons
+  - [x] ✅ Dialog opens in focused window
 
-- [ ] 🟥 **4.2: Progress dialog**
-  - [ ] 🟥 Progress bar with "Importing X of Y"
-  - [ ] 🟥 Current file name display
-  - [ ] 🟥 Cancel button
-  - [ ] 🟥 Handle cancel gracefully
+- [x] ✅ **4.2: Progress dialog**
+  - [x] ✅ Progress bar with "Importing X of Y"
+  - [x] ✅ Current file name display
+  - [x] ✅ Cancel button
+  - [x] ✅ Handle cancel gracefully
 
-- [ ] 🟥 **4.3: Completion handling**
-  - [ ] 🟥 Success message with count
-  - [ ] 🟥 Error summary if any failures
-  - [ ] 🟥 Navigate to imported folder/note
+- [x] ✅ **4.3: Completion handling**
+  - [x] ✅ Success message with count
+  - [x] ✅ Error summary if any failures
+  - [ ] 🟥 Navigate to imported folder/note (deferred)
 
-- [ ] 🟥 **4.4: File menu integration**
-  - [ ] 🟥 Add "Import Markdown..." menu item
-  - [ ] 🟥 Wire up menu to open file picker then dialog
-  - [ ] 🟥 Ensure menu triggers in focused window context
+- [x] ✅ **4.4: File menu integration**
+  - [x] ✅ Add "Import Markdown..." menu item (Cmd/Ctrl+Shift+I)
+  - [x] ✅ Wire up menu to open import dialog
+  - [x] ✅ Menu triggers in focused window context
 
 ### Phase 5: Testing & Polish
 
@@ -254,10 +254,9 @@ packages/
 │       │           └── file-scanner.test.ts  # ✅ 20 test cases
 │       └── renderer/src/
 │           └── components/
-│               └── ImportDialog/        # 🟥 TODO: Phase 4
-│                   ├── ImportDialog.tsx
-│                   ├── ImportProgress.tsx
-│                   └── index.ts
+│               └── ImportDialog/        # ✅ Phase 4 complete
+│                   ├── ImportDialog.tsx # ✅ Multi-step dialog component
+│                   └── index.ts         # ✅ Module export
 ```
 
 ---
