@@ -3019,6 +3019,21 @@ void app.whenReady().then(async () => {
           const errorMessage = error instanceof Error ? error.message : String(error);
           return { success: false, error: errorMessage };
         }
+      },
+      // onUserSettingsChanged callback - update profile presence when user settings change
+      async (key: string, _value: string): Promise<void> => {
+        if (profilePresenceManager && database) {
+          console.log(`[User Settings] ${key} changed, updating profile presence`);
+          // Get all connected SD paths
+          const allSDs = await database.getAllStorageDirs();
+          const allSDPaths = [
+            storageDir,
+            ...allSDs
+              .filter((sd: { id: string; path: string }) => sd.id !== 'default')
+              .map((sd: { id: string; path: string }) => sd.path),
+          ];
+          await profilePresenceManager.writePresenceToAllSDs(allSDPaths);
+        }
       }
     );
 

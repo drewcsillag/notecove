@@ -78,6 +78,12 @@ export type RetryStaleEntryFn = (
   noteId: string,
   sourceInstanceId: string
 ) => Promise<{ success: boolean; error?: string }>;
+
+/**
+ * Callback type for user settings changes
+ * Called when Username or UserHandle changes so profile presence can be updated
+ */
+export type OnUserSettingsChangedFn = (key: string, value: string) => Promise<void>;
 import {
   type ActivitySession,
   type ReconstructionPoint,
@@ -132,7 +138,8 @@ export class IPCHandlers {
     private getSyncStatus?: GetSyncStatusFn,
     private getStaleSyncs?: GetStaleSyncsFn,
     private skipStaleEntry?: SkipStaleEntryFn,
-    private retryStaleEntry?: RetryStaleEntryFn
+    private retryStaleEntry?: RetryStaleEntryFn,
+    private onUserSettingsChanged?: OnUserSettingsChangedFn
   ) {
     // Initialize thumbnail generator with cache directory in userData
     const thumbnailCacheDir = path.join(app.getPath('userData'), 'thumbnails');
@@ -1942,6 +1949,11 @@ export class IPCHandlers {
     value: string
   ): Promise<void> {
     await this.database.setState(key, value);
+
+    // Notify if user settings changed (for profile presence updates)
+    if (this.onUserSettingsChanged && (key === 'username' || key === 'userHandle')) {
+      await this.onUserSettingsChanged(key, value);
+    }
   }
 
   // ============================================================================
