@@ -197,26 +197,42 @@ test.describe('Comments - Context Menu', () => {
   });
 });
 
-test.describe('Comments - Keyboard Navigation', () => {
-  test('should close comment panel with Escape', async () => {
-    // Open comment panel first
-    await typeInEditor(page, 'Some text.');
+test.describe('Comments - Editor Keyboard Input', () => {
+  test('should allow typing j/k/e in editor when comment panel is open', async () => {
+    // Type some initial text and add a comment to open the panel
+    await typeInEditor(page, 'Initial text.');
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Meta+Alt+m');
     await page.waitForTimeout(500);
 
-    // Check if panel/dialog is open
-    const panel = page.locator('[class*="comment" i]').first();
-    const panelWasVisible = await panel.isVisible().catch(() => false);
-
-    if (panelWasVisible) {
-      // Press Escape to close
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(300);
-
-      // Panel should be closed or input should be blurred
-      // (behavior depends on implementation)
+    // Fill in comment to ensure panel stays open
+    const textarea = page.locator('textarea').first();
+    if (await textarea.isVisible()) {
+      await textarea.fill('A test comment');
+      const submitBtn = page.locator('button:has-text("Save")').first();
+      if (await submitBtn.isVisible()) {
+        await submitBtn.click();
+        await page.waitForTimeout(500);
+      }
     }
+
+    // Verify comment panel is visible
+    const commentPanel = page.locator('text=Comments');
+    await expect(commentPanel.first()).toBeVisible({ timeout: 5000 });
+
+    // Click back into the editor to focus it
+    const editor = page.locator('.ProseMirror').first();
+    await editor.click();
+
+    // Move to end of text
+    await page.keyboard.press('Meta+End');
+
+    // Type characters that were previously captured by comment panel keyboard handler
+    await page.keyboard.type(' jke', { delay: 50 });
+
+    // Verify the characters appear in the editor content
+    const editorContent = await editor.textContent();
+    expect(editorContent).toContain('jke');
   });
 });
 
