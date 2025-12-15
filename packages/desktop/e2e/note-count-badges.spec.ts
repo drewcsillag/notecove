@@ -10,10 +10,12 @@ import fs from 'fs/promises';
 import os from 'os';
 
 /**
- * Wait for the first window with explicit timeout (more reliable than firstWindow())
+ * Get the first window. Uses firstWindow() which handles windows
+ * that were created during launch (before this call).
+ * waitForEvent('window') would miss already-created windows.
  */
-async function getFirstWindow(app: ElectronApplication, timeoutMs = 60000): Promise<Page> {
-  return app.waitForEvent('window', { timeout: timeoutMs });
+async function getFirstWindow(app: ElectronApplication): Promise<Page> {
+  return app.firstWindow();
 }
 
 // Helper function to create a test note
