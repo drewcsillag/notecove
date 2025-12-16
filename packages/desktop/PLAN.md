@@ -1,6 +1,6 @@
 # Image Sync & Storage Improvements Plan
 
-**Overall Progress: 25%**
+**Overall Progress: 50%**
 
 **Branch:** `fix/image-sync-discovery`
 
@@ -29,8 +29,8 @@ See [QUESTIONS-PLAN-1.md](./plans/image-sync-discovery/QUESTIONS-PLAN-1.md) for 
 
 | Phase                        | Description                                | Status   | Dependencies                      |
 | ---------------------------- | ------------------------------------------ | -------- | --------------------------------- |
-| [Phase 1](./PLAN-PHASE-1.md) | On-demand image discovery & registration   | 🟩 Done  | None                              |
-| [Phase 2](./PLAN-PHASE-2.md) | Startup scan + media watcher enhancement   | 🟥 To Do | Reuses Phase 1 discovery function |
+| [Phase 1](./PLAN-PHASE-1.md) | On-demand image discovery & registration   | 🟩 Done | None                              |
+| [Phase 2](./PLAN-PHASE-2.md) | Startup scan + media watcher enhancement   | 🟩 Done | Reuses Phase 1 discovery function |
 | [Phase 3](./PLAN-PHASE-3.md) | Unify SD ID files (switch to `SD_ID`)      | 🟥 To Do | Independent                       |
 | [Phase 4](./PLAN-PHASE-4.md) | Content-addressable storage for new images | 🟥 To Do | Phase 1 must support hex format   |
 
