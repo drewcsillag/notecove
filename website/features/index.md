@@ -24,7 +24,7 @@ Edit the same note on multiple devices simultaneously:
 - No "last write wins" - true collaborative editing
 - Mathematically guaranteed convergence
 
-[Learn more about CRDT sync →](/architecture/crdt-sync)
+[Learn more about sync mechanism →](/architecture/sync-mechanism)
 
 ### 🎨 Rich Text Editing
 

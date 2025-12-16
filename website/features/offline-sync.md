@@ -78,7 +78,7 @@ NoteCove uses **CRDTs** (Conflict-free Replicated Data Types) for automatic conf
 - Mathematically guaranteed convergence
 - No conflict dialogs or manual resolution
 
-[Learn more about CRDTs →](/architecture/crdt-sync)
+[Learn more about sync mechanism →](/architecture/sync-mechanism)
 
 ## Sync Features
 
@@ -368,5 +368,5 @@ Protect your synced data:
 ## Next Steps
 
 - [Configure sync settings](/guide/sync-configuration)
-- [Understand CRDT architecture](/architecture/crdt-sync)
-- [Learn about storage](/architecture/storage)
+- [Understand sync mechanism](/architecture/sync-mechanism)
+- [Learn about storage architecture](/architecture/storage-architecture)

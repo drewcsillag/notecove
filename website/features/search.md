@@ -351,5 +351,5 @@ _Times approximate, depends on hardware and note size_
 ## Next Steps
 
 - [Learn organization features](/features/folders-organization)
-- [Understand storage architecture](/architecture/storage)
+- [Understand storage architecture](/architecture/storage-architecture)
 - [View keyboard shortcuts](/guide/keyboard-shortcuts)

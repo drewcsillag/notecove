@@ -599,6 +599,6 @@ nc2/
 
 ## Next Steps
 
-- [Understand CRDT sync](/architecture/crdt-sync)
-- [Learn about storage](/architecture/storage)
+- [Understand sync mechanism](/architecture/sync-mechanism)
+- [Learn about storage architecture](/architecture/storage-architecture)
 - [Explore architecture overview](/architecture/)

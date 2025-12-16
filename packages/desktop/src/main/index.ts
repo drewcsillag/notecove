@@ -3365,6 +3365,35 @@ void app.whenReady().then(async () => {
       return webServerManager.getCertificateInfo();
     });
 
+    // Debug: Trigger note discovery manually (for testing the wake-from-sleep bug fix)
+    ipcMain.handle('debug:triggerNoteDiscovery', async () => {
+      console.log('[Debug] Manually triggering note discovery...');
+      const results: { sdId: string; discovered: string[] }[] = [];
+
+      if (!database) {
+        console.error('[Debug] Database not initialized');
+        return results;
+      }
+
+      try {
+        const storageDirs = await database.getAllStorageDirs();
+
+        for (const sd of storageDirs) {
+          console.log(`[Debug] Discovering notes for SD ${sd.id}...`);
+          const discovered = await discoverNewNotes(sd.id, sd.path);
+          results.push({
+            sdId: sd.id,
+            discovered: Array.from(discovered),
+          });
+        }
+      } catch (error: unknown) {
+        console.error('[Debug] Note discovery failed:', error);
+      }
+
+      console.log('[Debug] Note discovery complete:', results);
+      return results;
+    });
+
     // Create menu
     createMenu();
 
@@ -3445,6 +3474,208 @@ void app.on('window-all-closed', () => {
   }
 });
 
+/**
+ * Discover notes that exist on disk but not in the database.
+ *
+ * This handles the case where node A creates a new note while node B is sleeping.
+ * When node B wakes up, the activity sync may timeout waiting for CRDT files to sync.
+ * This function scans the notes directory and imports any notes that weren't discovered.
+ *
+ * @param sdId - Storage directory ID
+ * @param sdPath - Path to the storage directory
+ * @returns Set of discovered note IDs
+ */
+async function discoverNewNotes(sdId: string, sdPath: string): Promise<Set<string>> {
+  const discoveredNotes = new Set<string>();
+
+  if (!database || !crdtManager) {
+    console.error('[discoverNewNotes] Database or CRDT manager not initialized');
+    return discoveredNotes;
+  }
+
+  try {
+    // List all note directories on disk
+    const notesPath = join(sdPath, 'notes');
+    let noteIds: string[];
+
+    try {
+      const entries = await fs.readdir(notesPath);
+      // Filter to only directories (note folders are UUIDs)
+      noteIds = [];
+      for (const entry of entries) {
+        const entryPath = join(notesPath, entry);
+        const stats = await fs.stat(entryPath).catch(() => null);
+        if (stats?.isDirectory()) {
+          noteIds.push(entry);
+        }
+      }
+    } catch (error: unknown) {
+      // Notes directory doesn't exist or can't be read
+      console.log(`[discoverNewNotes] Cannot read notes directory for SD ${sdId}`, error);
+      return discoveredNotes;
+    }
+
+    console.log(`[discoverNewNotes] Found ${noteIds.length} note directories in SD ${sdId}`);
+
+    // Build set of deleted note IDs from all deletion logs
+    const deletedNoteIds = new Set<string>();
+    const deletionsPath = join(sdPath, 'deletions');
+    try {
+      const deletionFiles = await fs.readdir(deletionsPath);
+      for (const file of deletionFiles) {
+        if (!file.endsWith('.log')) continue;
+        try {
+          const filePath = join(deletionsPath, file);
+          const content = await fs.readFile(filePath, 'utf-8');
+          const lines = content.split('\n').filter((l) => l.length > 0);
+          for (const line of lines) {
+            const [noteId] = line.split('|');
+            if (noteId) {
+              deletedNoteIds.add(noteId);
+            }
+          }
+        } catch (error: unknown) {
+          // Skip unreadable files
+          console.log(`[discoverNewNotes] Failed to read deletion log ${file}:`, error);
+        }
+      }
+    } catch (error: unknown) {
+      // Deletions directory doesn't exist
+      console.log(`[discoverNewNotes] Cannot read deletions directory for SD ${sdId}:`, error);
+    }
+
+    console.log(`[discoverNewNotes] Found ${deletedNoteIds.size} deleted notes in logs`);
+
+    // Check each note against the database
+    for (const noteId of noteIds) {
+      // Skip if we know it was deleted
+      if (deletedNoteIds.has(noteId)) {
+        console.log(`[discoverNewNotes] Skipping deleted note ${noteId}`);
+        continue;
+      }
+
+      // Check if note exists in database
+      const existingNote = await database.getNote(noteId);
+      if (existingNote) {
+        // Note already known
+        continue;
+      }
+
+      console.log(`[discoverNewNotes] Discovered new note ${noteId}, attempting to import...`);
+
+      // Try to load the note from CRDT storage
+      try {
+        const doc = await crdtManager.loadNote(noteId, sdId);
+        const noteDoc = crdtManager.getNoteDoc(noteId);
+
+        if (!noteDoc) {
+          console.log(`[discoverNewNotes] Note doc not found for ${noteId}, will retry later`);
+          await crdtManager.unloadNote(noteId);
+          continue;
+        }
+
+        // Extract content
+        const content = doc.getXmlFragment('content');
+        if (content.length === 0) {
+          console.log(`[discoverNewNotes] Note ${noteId} has no content, will retry later`);
+          await crdtManager.unloadNote(noteId);
+          continue;
+        }
+
+        // Extract text content
+        let contentText = '';
+        content.forEach((item) => {
+          if (item instanceof Y.XmlText) {
+            contentText += String(item.toString()) + '\n';
+          } else if (item instanceof Y.XmlElement) {
+            const extractText = (el: Y.XmlElement | Y.XmlText): string => {
+              if (el instanceof Y.XmlText) {
+                return String(el.toString());
+              }
+              let text = '';
+              el.forEach((child: unknown) => {
+                const childElement = child as Y.XmlElement | Y.XmlText;
+                text += extractText(childElement);
+              });
+              return text;
+            };
+            contentText += extractText(item) + '\n';
+          }
+        });
+
+        // Generate content preview
+        const lines = contentText.split('\n');
+        const contentAfterTitle = lines.slice(1).join('\n').trim();
+        const contentPreview = contentAfterTitle.substring(0, 200);
+
+        // Extract title
+        let title = extractTitleFromDoc(doc, 'content');
+        title = title.replace(/<[^>]+>/g, '').trim() || 'Untitled';
+
+        // Get metadata from NoteDoc
+        const crdtMetadata = noteDoc.getMetadata();
+        const folderId = crdtMetadata.folderId;
+
+        // Upsert into database
+        await database.upsertNote({
+          id: noteId,
+          title,
+          sdId,
+          folderId,
+          created: crdtMetadata.created,
+          modified: crdtMetadata.modified,
+          deleted: crdtMetadata.deleted,
+          pinned: crdtMetadata.pinned,
+          contentPreview,
+          contentText,
+        });
+
+        // Unload the note (we just imported it, not opened it)
+        await crdtManager.unloadNote(noteId);
+
+        discoveredNotes.add(noteId);
+        console.log(`[discoverNewNotes] Successfully imported note ${noteId}: "${title}"`);
+
+        // Broadcast to all windows
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('note:created', { sdId, noteId, folderId });
+        }
+      } catch (error: unknown) {
+        console.error(`[discoverNewNotes] Failed to import note ${noteId}:`, error);
+        await crdtManager.unloadNote(noteId).catch(() => {
+          // Ignore unload errors
+        });
+      }
+    }
+
+    // If we discovered any notes, reload the folder tree to ensure folders are synced
+    if (discoveredNotes.size > 0) {
+      console.log(`[discoverNewNotes] Reloading folder tree for SD ${sdId}`);
+      try {
+        const folderTree = await crdtManager.loadFolderTree(sdId);
+        const folders = folderTree.getActiveFolders();
+
+        // Update folder cache
+        for (const folder of folders) {
+          await database.upsertFolder(folder);
+        }
+
+        // Broadcast folder update
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send('folder:updated', { sdId });
+        }
+      } catch (error) {
+        console.error(`[discoverNewNotes] Failed to reload folder tree for SD ${sdId}:`, error);
+      }
+    }
+
+    return discoveredNotes;
+  } catch (error) {
+    console.error(`[discoverNewNotes] Error discovering notes for SD ${sdId}:`, error);
+    return discoveredNotes;
+  }
+}
+
 // Handle system resume from sleep/suspend
 // This triggers a sync from other instances to catch up on changes made while sleeping
 powerMonitor.on('resume', () => {
@@ -3492,6 +3723,46 @@ powerMonitor.on('resume', () => {
       }
     })();
   }
+
+  // After a delay, scan for notes that exist on disk but not in the database
+  // This handles the case where activity sync timeout before CRDT files arrived
+  // The delay gives cloud storage time to finish syncing
+  setTimeout(() => {
+    console.log('[PowerMonitor] Starting note discovery scan...');
+
+    // Get all storage directories
+    void (async () => {
+      if (!database) {
+        console.error('[PowerMonitor] Database not initialized');
+        return;
+      }
+
+      try {
+        const storageDirs = await database.getAllStorageDirs();
+
+        for (const sd of storageDirs) {
+          console.log(`[PowerMonitor] Discovering notes for SD ${sd.id}...`);
+          try {
+            const discovered = await discoverNewNotes(sd.id, sd.path);
+            if (discovered.size > 0) {
+              console.log(
+                `[PowerMonitor] Discovered ${discovered.size} new notes in SD ${sd.id}:`,
+                Array.from(discovered)
+              );
+            } else {
+              console.log(`[PowerMonitor] No new notes discovered in SD ${sd.id}`);
+            }
+          } catch (error: unknown) {
+            console.error(`[PowerMonitor] Failed to discover notes for SD ${sd.id}:`, error);
+          }
+        }
+
+        console.log('[PowerMonitor] Note discovery scan complete');
+      } catch (error: unknown) {
+        console.error('[PowerMonitor] Failed to get storage directories:', error);
+      }
+    })();
+  }, 5000); // 5 second delay to let cloud storage catch up
 });
 
 // Clean up on app quit
