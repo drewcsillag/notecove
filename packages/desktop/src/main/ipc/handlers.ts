@@ -3322,6 +3322,10 @@ export class IPCHandlers {
 
   /**
    * Save an image to the media folder and database
+   *
+   * Uses content-addressable storage: the imageId is derived from content hash,
+   * providing automatic deduplication. If the image already exists (same content),
+   * returns the existing imageId without writing to disk or database.
    */
   private async handleImageSave(
     _event: IpcMainInvokeEvent,
@@ -3349,10 +3353,21 @@ export class IPCHandlers {
     });
     const imageStorage = new ImageStorage(fsAdapter, sdStructure);
 
-    // Save the image
+    // Save the image (uses content hash for dedup at file level)
     const result = await imageStorage.saveImage(data, mimeType);
 
-    // Add to database cache
+    // Check if image already exists in database (dedup at database level)
+    const existingImage = await this.database.getImage(result.imageId);
+    if (existingImage) {
+      // Image already registered, skip database upsert
+      console.log('[Image] Dedup: image already exists in database:', {
+        imageId: result.imageId,
+        sdId: existingImage.sdId,
+      });
+      return result;
+    }
+
+    // Add to database cache (new image)
     await this.database.upsertImage({
       id: result.imageId,
       sdId,
@@ -3649,22 +3664,29 @@ export class IPCHandlers {
           continue;
         }
 
-        // Save the image
-
+        // Save the image (uses content hash for dedup at file level)
         const saveResult = await imageStorage.saveImage(new Uint8Array(data), mimeType);
 
-        // Add to database cache
-        await this.database.upsertImage({
-          id: saveResult.imageId,
-          sdId,
-          filename: saveResult.filename,
-          mimeType,
-          width: null,
-          height: null,
-
-          size: data.length,
-          created: Date.now(),
-        });
+        // Check if image already exists in database (dedup at database level)
+        const existingImage = await this.database.getImage(saveResult.imageId);
+        if (!existingImage) {
+          // Add to database cache (new image)
+          await this.database.upsertImage({
+            id: saveResult.imageId,
+            sdId,
+            filename: saveResult.filename,
+            mimeType,
+            width: null,
+            height: null,
+            size: data.length,
+            created: Date.now(),
+          });
+        } else {
+          console.log('[Image] Dedup: picked image already exists in database:', {
+            imageId: saveResult.imageId,
+            sdId: existingImage.sdId,
+          });
+        }
 
         imageIds.push(saveResult.imageId);
       } catch (err) {
@@ -3743,10 +3765,21 @@ export class IPCHandlers {
     });
     const imageStorage = new ImageStorage(fsAdapter, sdStructure);
 
-    // Save the image
+    // Save the image (uses content hash for dedup at file level)
     const saveResult = await imageStorage.saveImage(imageData, mimeType);
 
-    // Add to database cache
+    // Check if image already exists in database (dedup at database level)
+    const existingImage = await this.database.getImage(saveResult.imageId);
+    if (existingImage) {
+      // Image already registered, skip database upsert
+      console.log('[Image] Dedup: downloaded image already exists in database:', {
+        imageId: saveResult.imageId,
+        sdId: existingImage.sdId,
+      });
+      return saveResult.imageId;
+    }
+
+    // Add to database cache (new image)
     await this.database.upsertImage({
       id: saveResult.imageId,
       sdId,

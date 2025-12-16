@@ -21,6 +21,7 @@ export {
   isSupportedMimeType,
   getExtensionFromMimeType,
   isValidImageId,
+  hashImageContent,
   type SaveImageResult,
   type ImageInfo,
   type ParsedImageFilename,

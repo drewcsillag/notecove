@@ -9,12 +9,38 @@ import type { FileSystemAdapter } from './types';
 import type { SyncDirectoryStructure } from './sd-structure';
 
 /**
- * Generate a UUID v4
- * Uses native crypto.randomUUID() for Node.js and browsers
+ * Hash image content using SHA-256 and return first 128 bits as hex string
+ *
+ * This creates a content-addressable ID for images:
+ * - Same content always produces same ID (deduplication)
+ * - 128 bits provides sufficient collision resistance
+ *   (Collision probability: ~1 in 2^128 ≈ 3.4×10^38, effectively impossible)
+ * - 32-char hex format is distinct from UUID format (36 chars with dashes)
+ * - Shorter than full SHA-256 (64 chars) for storage efficiency
+ *
+ * @param data Image binary data
+ * @returns 32-character lowercase hex string (128 bits)
  */
-function generateUuid(): string {
-  // Use native crypto.randomUUID() - available in Node.js 14.17+ and modern browsers
-  return crypto.randomUUID();
+export async function hashImageContent(data: Uint8Array): Promise<string> {
+  // Verify Web Crypto API is available
+  if (typeof crypto === 'undefined' || typeof crypto.subtle === 'undefined') {
+    throw new Error(
+      'Web Crypto API (crypto.subtle) is not available. ' +
+        'This requires Node.js ≥15.0.0 or modern Electron.'
+    );
+  }
+
+  // Ensure data is properly typed for Web Crypto API
+  // Use buffer.slice to create a proper ArrayBuffer (not SharedArrayBuffer)
+  const hashBuffer = await crypto.subtle.digest(
+    'SHA-256',
+    data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+  );
+  const hashArray = new Uint8Array(hashBuffer);
+  // Use first 16 bytes (128 bits) as hex string
+  return Array.from(hashArray.slice(0, 16))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -211,26 +237,52 @@ export class ImageStorage {
 
   /**
    * Save an image to the media directory
-   * @param data Image binary data
+   *
+   * Uses content-addressable storage: the imageId is derived from the content hash,
+   * providing automatic deduplication. Saving the same image twice returns the same
+   * imageId without writing a duplicate file.
+   *
+   * @param data Image binary data (must be non-empty)
    * @param mimeType MIME type of the image
-   * @param imageId Optional custom image ID (UUID generated if not provided)
+   * @param imageId Optional custom image ID (hash generated if not provided)
    * @returns The imageId and filename
-   * @throws Error if MIME type is not supported
+   * @throws Error if MIME type is not supported, data is empty, or imageId is invalid
    */
   async saveImage(data: Uint8Array, mimeType: string, imageId?: string): Promise<SaveImageResult> {
     if (!ImageStorage.isSupportedMimeType(mimeType)) {
       throw new Error(`Unsupported image MIME type: ${mimeType}`);
     }
 
-    const id = imageId || generateUuid();
+    // Validate non-empty data
+    if (data.length === 0) {
+      throw new Error('Cannot save empty image data');
+    }
+
+    // Validate custom ID if provided (security: prevent path traversal)
+    if (imageId !== undefined && !isValidImageId(imageId)) {
+      throw new Error(`Invalid imageId format: ${imageId}`);
+    }
+
+    // Use provided ID or compute content hash for deduplication
+    const id = imageId || (await hashImageContent(data));
     const extension = ImageStorage.getExtensionFromMimeType(mimeType)!;
     const filename = `${id}.${extension}`;
+    const filePath = this.getImagePath(id, mimeType);
+
+    // Check if file already exists (dedup)
+    const exists = await this.fs.exists(filePath);
+    if (exists) {
+      // Image already saved, return existing info
+      return {
+        imageId: id,
+        filename,
+      };
+    }
 
     // Ensure media directory exists
     await this.initializeMediaDir();
 
     // Write the image file
-    const filePath = this.getImagePath(id, mimeType);
     await this.fs.writeFile(filePath, data);
 
     return {

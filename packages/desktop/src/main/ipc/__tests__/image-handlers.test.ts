@@ -403,6 +403,41 @@ describe('IPCHandlers - Image Operations', () => {
         handler!({} as unknown, 'nonexistent-sd', new Uint8Array([0x89]), 'image/png')
       ).rejects.toThrow('Storage directory not found');
     });
+
+    // Phase 4.3: Dedup at database level
+    it('should skip upsert if image already exists in database', async () => {
+      const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+      const mimeType = 'image/png';
+      const sdId = 'sd-1';
+
+      // Set consistent imageId (simulating content-addressable storage)
+      mockSaveImageResult = { imageId: 'content-hash-id', filename: 'content-hash-id.png' };
+
+      // Mock: Image already exists in database
+      mockDatabase.getImage.mockResolvedValue({
+        id: 'content-hash-id',
+        sdId,
+        filename: 'content-hash-id.png',
+        mimeType: 'image/png',
+        width: null,
+        height: null,
+        size: imageData.length,
+        created: Date.now(),
+      });
+
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:save');
+      const result = (await handler!({} as unknown, sdId, imageData, mimeType)) as {
+        imageId: string;
+        filename: string;
+      };
+
+      expect(result.imageId).toBe('content-hash-id');
+      // Should NOT call upsertImage since image already exists
+      expect(mockDatabase.upsertImage).not.toHaveBeenCalled();
+    });
   });
 
   describe('image:getDataUrl', () => {
@@ -845,6 +880,45 @@ describe('IPCHandlers - Image Operations', () => {
       // Should return empty array since PDF is not a supported image type
       expect(result).toEqual([]);
     });
+
+    // Phase 4.5: Dedup at database level for picks
+    it('should skip upsert if picked image already exists in database', async () => {
+      // Restore mocks that may have been overridden by previous tests
+      jest.restoreAllMocks();
+      const { dialog } = await import('electron');
+      const sdId = 'sd-1';
+
+      // Set consistent imageId (simulating content-addressable storage)
+      mockSaveImageResult = { imageId: 'pick-hash-id', filename: 'pick-hash-id.png' };
+
+      // Mock: Image already exists in database
+      mockDatabase.getImage.mockResolvedValue({
+        id: 'pick-hash-id',
+        sdId,
+        filename: 'pick-hash-id.png',
+        mimeType: 'image/png',
+        width: null,
+        height: null,
+        size: 4,
+        created: Date.now(),
+      });
+
+      (dialog.showOpenDialog as jest.Mock).mockResolvedValue({
+        canceled: false,
+        filePaths: ['/path/to/image.png'],
+      });
+
+      (fs.readFile as jest.Mock).mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:pickAndSave');
+      const result = (await handler!({} as unknown, sdId)) as string[];
+
+      expect(result).toContain('pick-hash-id');
+      // Should NOT call upsertImage since image already exists
+      expect(mockDatabase.upsertImage).not.toHaveBeenCalled();
+    });
   });
 
   describe('image:downloadAndSave', () => {
@@ -983,6 +1057,48 @@ describe('IPCHandlers - Image Operations', () => {
       const handler = registeredHandlers.get('image:downloadAndSave');
 
       await expect(handler!({} as unknown, 'sd-1', url)).rejects.toThrow('Unsupported image type');
+    });
+
+    // Phase 4.4: Dedup at database level for downloads
+    it('should skip upsert if downloaded image already exists in database', async () => {
+      const { net } = await import('electron');
+      const sdId = 'sd-1';
+      const url = 'https://example.com/image.png';
+      const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
+      // Set consistent imageId (simulating content-addressable storage)
+      mockSaveImageResult = { imageId: 'download-hash-id', filename: 'download-hash-id.png' };
+
+      // Mock: Image already exists in database
+      mockDatabase.getImage.mockResolvedValue({
+        id: 'download-hash-id',
+        sdId,
+        filename: 'download-hash-id.png',
+        mimeType: 'image/png',
+        width: null,
+        height: null,
+        size: imageData.length,
+        created: Date.now(),
+      });
+
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: {
+          get: jest.fn().mockReturnValue('image/png'),
+        },
+        arrayBuffer: jest.fn().mockResolvedValue(imageData.buffer),
+      };
+      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
+      (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      const handler = registeredHandlers.get('image:downloadAndSave');
+      const result = (await handler!({} as unknown, sdId, url)) as string;
+
+      expect(result).toBe('download-hash-id');
+      // Should NOT call upsertImage since image already exists
+      expect(mockDatabase.upsertImage).not.toHaveBeenCalled();
     });
   });
 
