@@ -2184,26 +2184,17 @@ export class IPCHandlers {
     name: string,
     path: string
   ): Promise<string> {
-    // Check if SD already has an ID file (for cross-instance consistency)
-    const { promises: fs } = await import('fs');
-    const pathModule = await import('path');
-    const idFilePath = pathModule.join(path, '.sd-id');
+    // Use unified SD ID system (SD_ID file, with .sd-id migration)
+    const { migrateAndGetSdId } = await import('../sd-id-migration');
+    const result = await migrateAndGetSdId(path);
 
-    let id: string;
-    try {
-      const idContent = await fs.readFile(idFilePath, 'utf-8');
-      id = idContent.trim();
-      console.log(`[SD] Found existing SD ID in ${path}: ${id}`);
-    } catch {
-      // File doesn't exist, create new ID
-      id = crypto.randomUUID();
-      try {
-        await fs.writeFile(idFilePath, id, 'utf-8');
-        console.log(`[SD] Created new SD ID file in ${path}: ${id}`);
-      } catch (error) {
-        console.error(`[SD] Failed to write SD ID file:`, error);
-        // Continue anyway, we'll use the generated ID
-      }
+    const id = result.id;
+    if (result.wasGenerated) {
+      console.log(`[SD] Created new SD_ID in ${path}: ${id}`);
+    } else if (result.migrated) {
+      console.log(`[SD] Migrated legacy .sd-id to SD_ID in ${path}: ${id}`);
+    } else {
+      console.log(`[SD] Using existing SD_ID in ${path}: ${id}`);
     }
 
     await this.database.createStorageDir(id, name, path);
