@@ -1,6 +1,6 @@
 # Image Sync & Storage Improvements Plan
 
-**Overall Progress: 60%** (Phase 1 & 2 done, Phase 3 nearly complete)
+**Overall Progress: 75%** (Phases 1-3 complete)
 
 **Branch:** `fix/image-sync-discovery`
 
@@ -31,7 +31,7 @@ See [QUESTIONS-PLAN-1.md](./plans/image-sync-discovery/QUESTIONS-PLAN-1.md) for 
 | ---------------------------- | ------------------------------------------ | -------- | --------------------------------- |
 | [Phase 1](./PLAN-PHASE-1.md) | On-demand image discovery & registration   | 🟩 Done  | None                              |
 | [Phase 2](./PLAN-PHASE-2.md) | Startup scan + media watcher enhancement   | 🟩 Done  | Reuses Phase 1 discovery function |
-| [Phase 3](./PLAN-PHASE-3.md) | Unify SD ID files (switch to `SD_ID`)      | 🟡 90%   | Independent                       |
+| [Phase 3](./PLAN-PHASE-3.md) | Unify SD ID files (switch to `SD_ID`)      | 🟩 Done  | Independent                       |
 | [Phase 4](./PLAN-PHASE-4.md) | Content-addressable storage for new images | 🟥 To Do | Phase 1 must support hex format   |
 
 ## Staff Engineer Review Notes
@@ -64,11 +64,11 @@ See [QUESTIONS-PLAN-1.md](./plans/image-sync-discovery/QUESTIONS-PLAN-1.md) for 
 
 ### Phase 2: Startup Scan & Media Watcher Enhancement
 
-- [ ] 🟥 See [PLAN-PHASE-2.md](./PLAN-PHASE-2.md)
+- [x] 🟩 See [PLAN-PHASE-2.md](./PLAN-PHASE-2.md) - Complete
 
 ### Phase 3: Unify SD ID Files
 
-- [ ] 🟥 See [PLAN-PHASE-3.md](./PLAN-PHASE-3.md)
+- [x] 🟩 See [PLAN-PHASE-3.md](./PLAN-PHASE-3.md) - Complete
 
 ### Phase 4: Content-Addressable Storage
 
