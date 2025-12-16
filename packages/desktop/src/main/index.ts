@@ -32,6 +32,8 @@ import {
   ProfileLock,
   markdownToProsemirror,
   prosemirrorJsonToYXmlFragment,
+  ImageStorage,
+  isValidImageId,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import type { SyncStatus, StaleSyncEntry } from './ipc/types';
@@ -54,6 +56,7 @@ import { WebServerManager } from './web-server/manager';
 import { ProfilePresenceManager } from './profile-presence-manager';
 import { ProfilePresenceReader } from './profile-presence-reader';
 import { WindowStateManager } from './window-state-manager';
+import { scanAndRegisterMedia } from './media-sync';
 import * as os from 'os';
 
 let mainWindow: BrowserWindow | null = null;
@@ -1605,7 +1608,39 @@ async function setupSDWatchers(
       const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'heic', 'heif'];
       if (!imageExtensions.includes(extension)) return;
 
+      // Validate imageId format (security)
+      if (!isValidImageId(imageId)) {
+        console.log(`[MediaWatcher ${sdId}] Ignoring invalid imageId format:`, imageId);
+        return;
+      }
+
       console.log(`[MediaWatcher ${sdId}] Image file available:`, { imageId, filename });
+
+      // Register image in database (async, non-blocking)
+      const mimeType = ImageStorage.getMimeTypeFromExtension(extension);
+      if (mimeType) {
+        const filePath = `${mediaDir}/${filename}`;
+        fs.stat(filePath)
+          .then((stats) => {
+            return db.upsertImage({
+              id: imageId,
+              sdId,
+              filename,
+              mimeType,
+              width: null,
+              height: null,
+              size: stats.size,
+              created: Date.now(),
+            });
+          })
+          .then(() => {
+            console.log(`[MediaWatcher ${sdId}] Registered synced image:`, { imageId, filename });
+          })
+          .catch((err) => {
+            // File may have been deleted or moved, ignore
+            console.log(`[MediaWatcher ${sdId}] Failed to register image:`, imageId, err);
+          });
+      }
 
       // Broadcast to all renderer windows
       for (const window of BrowserWindow.getAllWindows()) {
@@ -1621,6 +1656,17 @@ async function setupSDWatchers(
   } else {
     console.log(`[Init] Media directory doesn't exist yet for SD: ${sdId}, skipping watcher`);
   }
+
+  // Background scan for synced images (non-blocking)
+  void scanAndRegisterMedia(sdId, sdPath, db)
+    .then((count) => {
+      if (count > 0) {
+        console.log(`[Init] Discovered ${count} synced images in SD: ${sdId}`);
+      }
+    })
+    .catch((error) => {
+      console.error(`[Init] Failed to scan media for SD ${sdId}:`, error);
+    });
 
   console.log(`[Init] Watchers set up successfully for SD: ${sdId}`);
 

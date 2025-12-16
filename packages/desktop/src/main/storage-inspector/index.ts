@@ -5,6 +5,9 @@ export type {
   SDContentsResult,
   FileInfoResult,
   ParsedFileResult,
+  DiskOnlyImage,
+  DbOnlyImage,
+  ImageSyncStatus,
 } from './storage-inspector-service';
 
 export { parseCrdtLogWithOffsets, parseSnapshotWithOffsets } from './binary-parser';

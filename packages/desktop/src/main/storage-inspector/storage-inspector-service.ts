@@ -6,7 +6,7 @@
  * for the Storage Inspector UI.
  */
 
-import type { FileSystemAdapter } from '@notecove/shared';
+import { ImageStorage, isValidImageId, type FileSystemAdapter } from '@notecove/shared';
 import {
   parseCrdtLogWithOffsets,
   parseSnapshotWithOffsets,
@@ -68,6 +68,50 @@ export interface ParsedFileResult {
   crdtLog?: ParsedCrdtLogResult;
   snapshot?: ParsedSnapshotResult;
   error?: string;
+}
+
+/**
+ * Image on disk but not in database
+ */
+export interface DiskOnlyImage {
+  imageId: string;
+  filename: string;
+  size: number;
+}
+
+/**
+ * Image in database but not on disk
+ */
+export interface DbOnlyImage {
+  imageId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+/**
+ * Image sync status for a storage directory
+ */
+export interface ImageSyncStatus {
+  onDiskCount: number;
+  onDiskTotalSize: number;
+  inDatabaseCount: number;
+  onDiskNotInDb: DiskOnlyImage[];
+  inDbNotOnDisk: DbOnlyImage[];
+}
+
+/**
+ * Minimal database interface needed for image sync status
+ */
+interface ImageDatabase {
+  getImagesBySd(sdId: string): Promise<
+    {
+      id: string;
+      filename: string;
+      mimeType: string;
+      size: number;
+    }[]
+  >;
 }
 
 /**
@@ -311,5 +355,81 @@ export class StorageInspectorService {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * Get image sync status for a storage directory
+   *
+   * Compares images on disk with images in database to find discrepancies.
+   * Useful for debugging sync issues.
+   */
+  async getImageSyncStatus(
+    sdPath: string,
+    sdId: string,
+    database: ImageDatabase
+  ): Promise<ImageSyncStatus> {
+    const mediaDir = this.fs.joinPath(sdPath, 'media');
+
+    // Get images from database
+    const dbImages = await database.getImagesBySd(sdId);
+    const dbImageIds = new Set(dbImages.map((img) => img.id));
+
+    // Get images on disk (single scan)
+    const onDiskNotInDb: DiskOnlyImage[] = [];
+    const allDiskImageIds = new Set<string>();
+    let onDiskTotalSize = 0;
+
+    // Check if media directory exists
+    if (await this.fs.exists(mediaDir)) {
+      try {
+        const files = await this.fs.listFiles(mediaDir);
+
+        for (const filename of files) {
+          const parsed = ImageStorage.parseImageFilename(filename);
+          if (!parsed) continue;
+
+          const { imageId } = parsed;
+          if (!isValidImageId(imageId)) continue;
+
+          // Track this image ID
+          allDiskImageIds.add(imageId);
+
+          // Get file size
+          const filePath = this.fs.joinPath(mediaDir, filename);
+          try {
+            const stats = await this.fs.stat(filePath);
+            const size = stats.size;
+            onDiskTotalSize += size;
+
+            // Check if this image is in the database
+            if (!dbImageIds.has(imageId)) {
+              onDiskNotInDb.push({ imageId, filename, size });
+            }
+          } catch {
+            // File may have been deleted, skip
+          }
+        }
+      } catch {
+        // Media directory may not be readable
+      }
+    }
+
+    // Find images in DB but not on disk
+    const inDbNotOnDisk: DbOnlyImage[] = dbImages
+      .filter((img) => !allDiskImageIds.has(img.id))
+      .map((img) => ({
+        imageId: img.id,
+        filename: img.filename,
+        mimeType: img.mimeType,
+        size: img.size,
+      }));
+
+    return {
+      onDiskCount: allDiskImageIds.size,
+      onDiskTotalSize,
+      inDatabaseCount: dbImages.length,
+      onDiskNotInDb,
+      inDbNotOnDisk,
+    };
   }
 }
