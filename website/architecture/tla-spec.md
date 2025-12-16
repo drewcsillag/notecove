@@ -208,6 +208,6 @@ These simplifications keep the state space tractable while capturing the essenti
 
 ## Next Steps
 
-- [Understand CRDT synchronization](/architecture/crdt-sync)
-- [Learn about storage layer](/architecture/storage)
+- [Understand sync mechanism](/architecture/sync-mechanism)
+- [Learn about storage architecture](/architecture/storage-architecture)
 - [Back to architecture overview](/architecture/)

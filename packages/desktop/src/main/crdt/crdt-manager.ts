@@ -97,6 +97,15 @@ export class CRDTManagerImpl implements CRDTManager {
         return;
       }
 
+      // Skip handling if this update came from applyUpdate() via IPC
+      // The update was already written to disk by applyUpdate(), so we don't need to
+      // call handleUpdate() which would write it again (double-write bug fix)
+      if (origin === 'ipc') {
+        console.log(`[CRDT Manager] Skipping disk write for ipc origin on note ${noteId}`);
+        // Don't broadcast here - applyUpdate() handles broadcasting after the write completes
+        return;
+      }
+
       const updatePromise = this.handleUpdate(noteId, update)
         .then(() => {
           // Broadcast to all windows and web clients after successful disk write
@@ -156,13 +165,16 @@ export class CRDTManagerImpl implements CRDTManager {
         const saveResult = await this.storageManager.writeNoteUpdate(state.sdId, noteId, update);
 
         // Apply update to snapshot with strict sequencing
+        // Pass 'ipc' origin so the doc.on('update') listener knows this update
+        // came from applyUpdate() and should NOT call handleUpdate() (which would double-write)
         const instanceId = this.storageManager.getInstanceId();
         state.snapshot.applyUpdate(
           update,
           instanceId,
           saveResult.sequence,
           saveResult.offset,
-          saveResult.file
+          saveResult.file,
+          'ipc' // Origin marker to prevent double writes
         );
 
         const now = Date.now();

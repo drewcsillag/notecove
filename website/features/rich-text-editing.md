@@ -189,7 +189,7 @@ NoteCove's editor is built on CRDTs (Conflict-free Replicated Data Types):
 - **Offline-capable**: Edits sync when connection is restored
 - **Guaranteed convergence**: All devices reach the same state
 
-Learn more about [CRDT synchronization](/architecture/crdt-sync).
+Learn more about [sync mechanism](/architecture/sync-mechanism).
 
 ## Performance
 
@@ -215,5 +215,5 @@ NoteCove follows accessibility best practices:
 ## Next Steps
 
 - [Learn organization features](/features/folders-organization)
-- [Understand CRDT sync](/architecture/crdt-sync)
+- [Understand sync mechanism](/architecture/sync-mechanism)
 - [View keyboard shortcuts](/guide/keyboard-shortcuts)

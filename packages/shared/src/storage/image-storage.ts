@@ -9,12 +9,38 @@ import type { FileSystemAdapter } from './types';
 import type { SyncDirectoryStructure } from './sd-structure';
 
 /**
- * Generate a UUID v4
- * Uses native crypto.randomUUID() for Node.js and browsers
+ * Hash image content using SHA-256 and return first 128 bits as hex string
+ *
+ * This creates a content-addressable ID for images:
+ * - Same content always produces same ID (deduplication)
+ * - 128 bits provides sufficient collision resistance
+ *   (Collision probability: ~1 in 2^128 ≈ 3.4×10^38, effectively impossible)
+ * - 32-char hex format is distinct from UUID format (36 chars with dashes)
+ * - Shorter than full SHA-256 (64 chars) for storage efficiency
+ *
+ * @param data Image binary data
+ * @returns 32-character lowercase hex string (128 bits)
  */
-function generateUuid(): string {
-  // Use native crypto.randomUUID() - available in Node.js 14.17+ and modern browsers
-  return crypto.randomUUID();
+export async function hashImageContent(data: Uint8Array): Promise<string> {
+  // Verify Web Crypto API is available
+  if (typeof crypto === 'undefined' || typeof crypto.subtle === 'undefined') {
+    throw new Error(
+      'Web Crypto API (crypto.subtle) is not available. ' +
+        'This requires Node.js ≥15.0.0 or modern Electron.'
+    );
+  }
+
+  // Ensure data is properly typed for Web Crypto API
+  // Use buffer.slice to create a proper ArrayBuffer (not SharedArrayBuffer)
+  const hashBuffer = await crypto.subtle.digest(
+    'SHA-256',
+    data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+  );
+  const hashArray = new Uint8Array(hashBuffer);
+  // Use first 16 bytes (128 bits) as hex string
+  return Array.from(hashArray.slice(0, 16))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -58,6 +84,16 @@ export interface ImageInfo {
 }
 
 /**
+ * Result of discovering an image on disk
+ * Used for registering synced images that exist on disk but not in database
+ */
+export interface DiscoveredImage {
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+/**
  * Parsed image filename
  */
 export interface ParsedImageFilename {
@@ -89,6 +125,28 @@ export function isSupportedMimeType(mimeType: string): boolean {
 export function getExtensionFromMimeType(mimeType: string): string | null {
   return MIME_TO_EXTENSION[mimeType] || null;
 }
+
+/**
+ * Validate an image ID format
+ * Accepts both UUID format (old images) and hex format (new content-addressed images)
+ *
+ * @param id The image ID to validate
+ * @returns true if valid, false otherwise
+ *
+ * Valid formats:
+ * - UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars with dashes)
+ * - Hex: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (32 chars, no dashes)
+ */
+export function isValidImageId(id: string): boolean {
+  // UUID format (old images) - 36 chars with dashes
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // Hex format (new images after Phase 4) - 32 chars, no dashes
+  const hexRegex = /^[0-9a-f]{32}$/i;
+  return uuidRegex.test(id) || hexRegex.test(id);
+}
+
+/** Supported image extensions for discovery */
+const SUPPORTED_EXTENSIONS = Object.keys(EXTENSION_TO_MIME);
 
 /**
  * ImageStorage class
@@ -179,26 +237,52 @@ export class ImageStorage {
 
   /**
    * Save an image to the media directory
-   * @param data Image binary data
+   *
+   * Uses content-addressable storage: the imageId is derived from the content hash,
+   * providing automatic deduplication. Saving the same image twice returns the same
+   * imageId without writing a duplicate file.
+   *
+   * @param data Image binary data (must be non-empty)
    * @param mimeType MIME type of the image
-   * @param imageId Optional custom image ID (UUID generated if not provided)
+   * @param imageId Optional custom image ID (hash generated if not provided)
    * @returns The imageId and filename
-   * @throws Error if MIME type is not supported
+   * @throws Error if MIME type is not supported, data is empty, or imageId is invalid
    */
   async saveImage(data: Uint8Array, mimeType: string, imageId?: string): Promise<SaveImageResult> {
     if (!ImageStorage.isSupportedMimeType(mimeType)) {
       throw new Error(`Unsupported image MIME type: ${mimeType}`);
     }
 
-    const id = imageId || generateUuid();
+    // Validate non-empty data
+    if (data.length === 0) {
+      throw new Error('Cannot save empty image data');
+    }
+
+    // Validate custom ID if provided (security: prevent path traversal)
+    if (imageId !== undefined && !isValidImageId(imageId)) {
+      throw new Error(`Invalid imageId format: ${imageId}`);
+    }
+
+    // Use provided ID or compute content hash for deduplication
+    const id = imageId || (await hashImageContent(data));
     const extension = ImageStorage.getExtensionFromMimeType(mimeType)!;
     const filename = `${id}.${extension}`;
+    const filePath = this.getImagePath(id, mimeType);
+
+    // Check if file already exists (dedup)
+    const exists = await this.fs.exists(filePath);
+    if (exists) {
+      // Image already saved, return existing info
+      return {
+        imageId: id,
+        filename,
+      };
+    }
 
     // Ensure media directory exists
     await this.initializeMediaDir();
 
     // Write the image file
-    const filePath = this.getImagePath(id, mimeType);
     await this.fs.writeFile(filePath, data);
 
     return {
@@ -282,5 +366,58 @@ export class ImageStorage {
       filename: `${imageId}.${extension}`,
       size: stats.size,
     };
+  }
+
+  /**
+   * Discover an image on disk by scanning for files matching the imageId
+   *
+   * This is used to find synced images that exist on disk but aren't registered
+   * in the database. It scans the media directory for any file matching
+   * {imageId}.{extension} where extension is a supported image type.
+   *
+   * @param imageId The image ID to look for (UUID or hex format)
+   * @returns Discovered image info or null if not found
+   *
+   * Security: Validates imageId format to prevent path traversal attacks
+   */
+  async discoverImageOnDisk(imageId: string): Promise<DiscoveredImage | null> {
+    // Security: Validate imageId format to prevent path traversal
+    if (!isValidImageId(imageId)) {
+      console.warn(`[ImageStorage] Invalid imageId format rejected: ${imageId}`);
+      return null;
+    }
+
+    const mediaPath = this.getMediaPath();
+
+    // Check if media directory exists
+    const mediaExists = await this.fs.exists(mediaPath);
+    if (!mediaExists) {
+      return null;
+    }
+
+    // Try each supported extension
+    for (const ext of SUPPORTED_EXTENSIONS) {
+      const filename = `${imageId}.${ext}`;
+      const filePath = this.fs.joinPath(mediaPath, filename);
+
+      try {
+        const exists = await this.fs.exists(filePath);
+        if (exists) {
+          const stats = await this.fs.stat(filePath);
+          const mimeType = ImageStorage.getMimeTypeFromExtension(ext)!;
+
+          return {
+            filename,
+            mimeType,
+            size: stats.size,
+          };
+        }
+      } catch {
+        // Continue trying other extensions
+        continue;
+      }
+    }
+
+    return null;
   }
 }

@@ -267,6 +267,127 @@ describe('CRDTManagerImpl - Integration', () => {
     jest.useRealTimers();
   });
 
+  describe('applyUpdate - double write bug', () => {
+    it('should only write to disk once when applyUpdate is called (not twice)', async () => {
+      // This test verifies the fix for the double-write bug where:
+      // 1. applyUpdate() writes to disk
+      // 2. applyUpdate() calls Y.applyUpdate() on the doc
+      // 3. doc.on('update') fires and calls handleUpdate()
+      // 4. handleUpdate() writes to disk AGAIN (BUG!)
+      //
+      // After the fix, the doc.on('update') listener should skip handleUpdate()
+      // when the origin is 'ipc' (indicating the update came from applyUpdate).
+
+      // Load a note first
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Create an update
+      const tempDoc = new Y.Doc();
+      const content = tempDoc.getXmlFragment('content');
+      const text = new Y.XmlText();
+      text.insert(0, 'Hello World');
+      content.insert(0, [text]);
+      const update = Y.encodeStateAsUpdate(tempDoc);
+
+      // Reset the mock to clear any calls from loading
+      mockStorageManager.writeNoteUpdate.mockClear();
+
+      // Apply the update via applyUpdate (IPC path)
+      await manager.applyUpdate('test-note', update);
+
+      // Give time for any async operations
+      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(100);
+
+      // CRITICAL: writeNoteUpdate should be called exactly ONCE
+      // If it's called twice, the double-write bug is present
+      expect(mockStorageManager.writeNoteUpdate).toHaveBeenCalledTimes(1);
+    }, 10000);
+  });
+
+  describe('applyUpdate - realistic double write bug', () => {
+    // This test uses a more realistic mock that actually triggers Y.Doc update events
+    // to properly demonstrate and verify the fix for the double-write bug
+    let realisticManager: CRDTManagerImpl;
+    let realisticMockStorageManager: jest.Mocked<AppendLogManager>;
+    let testDoc: Y.Doc;
+    let writeCallCount: number;
+
+    beforeEach(() => {
+      jest.useRealTimers(); // Need real timers for this test
+      writeCallCount = 0;
+
+      // Create a shared Y.Doc that will be returned by loadNote
+      testDoc = new Y.Doc();
+
+      // Track write calls with a counter that increments on each call
+      realisticMockStorageManager = {
+        getInstanceId: jest.fn().mockReturnValue('test-instance'),
+        getSDPath: jest.fn((sdId: string) => `/mock/storage/${sdId}`),
+        loadNote: jest.fn().mockImplementation(() => {
+          return Promise.resolve({
+            doc: testDoc,
+            vectorClock: {},
+          });
+        }),
+        writeNoteUpdate: jest.fn().mockImplementation(() => {
+          writeCallCount++;
+          return Promise.resolve({
+            sequence: writeCallCount,
+            offset: 0,
+            file: `test_${writeCallCount}.crdtlog`,
+          });
+        }),
+        loadFolderTree: jest.fn().mockResolvedValue({
+          doc: new Y.Doc(),
+        }),
+        writeFolderUpdate: jest.fn().mockResolvedValue(undefined),
+        saveNoteSnapshot: jest.fn().mockResolvedValue(undefined),
+      } as unknown as jest.Mocked<AppendLogManager>;
+
+      realisticManager = new CRDTManagerImpl(realisticMockStorageManager);
+    });
+
+    afterEach(() => {
+      realisticManager.destroy();
+      testDoc.destroy();
+    });
+
+    it('should NOT double-write when applyUpdate is called via IPC', async () => {
+      // Load a note - this sets up the doc.on('update') listener
+      await realisticManager.loadNote('test-note', 'test-sd');
+
+      // Create an update by modifying a different doc
+      const sourceDoc = new Y.Doc();
+      const content = sourceDoc.getXmlFragment('content');
+      const text = new Y.XmlText();
+      text.insert(0, 'Hello World');
+      content.insert(0, [text]);
+      const update = Y.encodeStateAsUpdate(sourceDoc);
+
+      // Reset write count
+      writeCallCount = 0;
+      realisticMockStorageManager.writeNoteUpdate.mockClear();
+
+      // Apply the update via applyUpdate (IPC path)
+      // This should:
+      // 1. Call writeNoteUpdate once
+      // 2. Call snapshot.applyUpdate() which calls Y.applyUpdate(doc, update, origin)
+      // 3. Y.Doc fires 'update' event
+      // 4. The listener should check origin and NOT call handleUpdate() for 'ipc' origin
+      await realisticManager.applyUpdate('test-note', update);
+
+      // Wait for any async handlers to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // CRITICAL: writeNoteUpdate should be called exactly ONCE
+      // If it's called twice, the double-write bug is still present
+      expect(realisticMockStorageManager.writeNoteUpdate).toHaveBeenCalledTimes(1);
+
+      sourceDoc.destroy();
+    });
+  });
+
   describe('loadFolderTree', () => {
     it('should load a folder tree for an SD', async () => {
       const folderTree = await manager.loadFolderTree('test-sd');

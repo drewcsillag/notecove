@@ -1,4 +1,4 @@
-import { ImageStorage } from '../image-storage';
+import { ImageStorage, isValidImageId, hashImageContent } from '../image-storage';
 import type { FileSystemAdapter, SyncDirectoryConfig, FileStats } from '../types';
 import { SyncDirectoryStructure } from '../sd-structure';
 
@@ -236,11 +236,11 @@ describe('ImageStorage', () => {
     });
 
     it('should save image with provided ID', async () => {
-      const customId = 'custom-image-id';
+      const customId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'; // Valid UUID format
       const result = await imageStorage.saveImage(testImageData, 'image/jpeg', customId);
 
       expect(result.imageId).toBe(customId);
-      expect(result.filename).toBe('custom-image-id.jpg');
+      expect(result.filename).toBe(`${customId}.jpg`);
     });
 
     it('should create media directory if it does not exist', async () => {
@@ -257,6 +257,99 @@ describe('ImageStorage', () => {
       await expect(imageStorage.saveImage(testImageData, 'application/pdf')).rejects.toThrow(
         'Unsupported image MIME type: application/pdf'
       );
+    });
+
+    // Phase 4.2: Content-addressable storage tests
+    describe('content-addressable storage (Phase 4)', () => {
+      it('should return same imageId for same image content', async () => {
+        const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+        const result1 = await imageStorage.saveImage(imageData, 'image/png');
+        const result2 = await imageStorage.saveImage(imageData, 'image/png');
+
+        expect(result1.imageId).toBe(result2.imageId);
+      });
+
+      it('should not write duplicate file when same image saved twice', async () => {
+        const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+        const result1 = await imageStorage.saveImage(imageData, 'image/png');
+
+        // Modify the stored file to detect if it gets overwritten
+        const filePath = imageStorage.getImagePath(result1.imageId, 'image/png');
+        const modifiedData = new Uint8Array([0xff, 0xff, 0xff, 0xff]);
+        fs.setFile(filePath, modifiedData);
+
+        // Save same image again - should not overwrite
+        await imageStorage.saveImage(imageData, 'image/png');
+
+        // File should still have modified data (was not overwritten)
+        const storedData = fs.getFile(filePath);
+        expect(storedData).toEqual(modifiedData);
+      });
+
+      it('should return different imageIds for different image content', async () => {
+        const imageData1 = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+        const imageData2 = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+
+        const result1 = await imageStorage.saveImage(imageData1, 'image/png');
+        const result2 = await imageStorage.saveImage(imageData2, 'image/jpeg');
+
+        expect(result1.imageId).not.toBe(result2.imageId);
+      });
+
+      it('should generate 32-char hex imageId (not UUID)', async () => {
+        const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
+        const result = await imageStorage.saveImage(imageData, 'image/png');
+
+        // New content-addressed format: 32 chars, no dashes
+        expect(result.imageId).toHaveLength(32);
+        expect(result.imageId).toMatch(/^[0-9a-f]{32}$/);
+      });
+
+      it('should use provided custom ID instead of hash when specified', async () => {
+        const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+        const customId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'; // Valid UUID format
+
+        const result = await imageStorage.saveImage(imageData, 'image/png', customId);
+
+        expect(result.imageId).toBe(customId);
+      });
+
+      it('should reject empty image data', async () => {
+        const emptyData = new Uint8Array(0);
+
+        await expect(imageStorage.saveImage(emptyData, 'image/png')).rejects.toThrow(
+          'Cannot save empty image data'
+        );
+      });
+
+      it('should reject invalid custom imageId (path traversal protection)', async () => {
+        const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
+        await expect(
+          imageStorage.saveImage(imageData, 'image/png', '../../../etc/passwd')
+        ).rejects.toThrow('Invalid imageId format');
+      });
+
+      it('should accept valid UUID custom imageId', async () => {
+        const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+        const validUuid = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
+        const result = await imageStorage.saveImage(imageData, 'image/png', validUuid);
+
+        expect(result.imageId).toBe(validUuid);
+      });
+
+      it('should accept valid hex custom imageId (32 chars)', async () => {
+        const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+        const validHex = 'a1b2c3d4e5f67890abcdef1234567890';
+
+        const result = await imageStorage.saveImage(imageData, 'image/png', validHex);
+
+        expect(result.imageId).toBe(validHex);
+      });
     });
   });
 
@@ -333,15 +426,20 @@ describe('ImageStorage', () => {
     });
 
     it('should list all images', async () => {
-      await imageStorage.saveImage(testImageData, 'image/png', 'img1');
-      await imageStorage.saveImage(testImageData, 'image/jpeg', 'img2');
-      await imageStorage.saveImage(testImageData, 'image/gif', 'img3');
+      // Use valid UUID format IDs
+      const img1 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      const img2 = 'b2c3d4e5-f678-9012-bcde-f12345678901';
+      const img3 = 'c3d4e5f6-7890-1234-cdef-123456789012';
+
+      await imageStorage.saveImage(testImageData, 'image/png', img1);
+      await imageStorage.saveImage(testImageData, 'image/jpeg', img2);
+      await imageStorage.saveImage(testImageData, 'image/gif', img3);
 
       const images = await imageStorage.listImages();
       expect(images).toHaveLength(3);
-      expect(images).toContain('img1.png');
-      expect(images).toContain('img2.jpg');
-      expect(images).toContain('img3.gif');
+      expect(images).toContain(`${img1}.png`);
+      expect(images).toContain(`${img2}.jpg`);
+      expect(images).toContain(`${img3}.gif`);
     });
 
     it('should return empty array when media directory does not exist', async () => {
@@ -430,5 +528,159 @@ describe('ImageStorage', () => {
       expect(ImageStorage.isSupportedMimeType('video/mp4')).toBe(false);
       expect(ImageStorage.isSupportedMimeType('image/bmp')).toBe(false);
     });
+  });
+
+  describe('discoverImageOnDisk', () => {
+    const testImageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
+    beforeEach(async () => {
+      await imageStorage.initializeMediaDir();
+    });
+
+    it('should discover existing image with UUID format ID', async () => {
+      // Manually place image file (simulating cloud sync)
+      const imageId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      fs.setFile(`/test/sd/media/${imageId}.png`, testImageData);
+
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+
+      expect(result).not.toBeNull();
+      expect(result!.filename).toBe(`${imageId}.png`);
+      expect(result!.mimeType).toBe('image/png');
+      expect(result!.size).toBe(testImageData.length);
+    });
+
+    it('should discover existing image with hex format ID (32 chars)', async () => {
+      // New content-addressed format (Phase 4)
+      const imageId = 'a1b2c3d4e5f67890abcdef1234567890';
+      fs.setFile(`/test/sd/media/${imageId}.jpg`, testImageData);
+
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+
+      expect(result).not.toBeNull();
+      expect(result!.filename).toBe(`${imageId}.jpg`);
+      expect(result!.mimeType).toBe('image/jpeg');
+      expect(result!.size).toBe(testImageData.length);
+    });
+
+    it('should return null for non-existent image', async () => {
+      const result = await imageStorage.discoverImageOnDisk('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for invalid imageId format (path traversal protection)', async () => {
+      // Attempt path traversal
+      const result = await imageStorage.discoverImageOnDisk('../../../etc/passwd');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty string', async () => {
+      const result = await imageStorage.discoverImageOnDisk('');
+      expect(result).toBeNull();
+    });
+
+    it('should return null when media directory does not exist', async () => {
+      fs.reset();
+      // Re-initialize SD structure without media dir
+      await sdStructure.initialize();
+
+      const result = await imageStorage.discoverImageOnDisk('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      expect(result).toBeNull();
+    });
+
+    it('should try multiple extensions and find the correct one', async () => {
+      const imageId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      // Place a GIF file
+      fs.setFile(`/test/sd/media/${imageId}.gif`, testImageData);
+
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+
+      expect(result).not.toBeNull();
+      expect(result!.filename).toBe(`${imageId}.gif`);
+      expect(result!.mimeType).toBe('image/gif');
+    });
+  });
+});
+
+describe('isValidImageId', () => {
+  it('should accept valid UUID format', () => {
+    expect(isValidImageId('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe(true);
+    expect(isValidImageId('A1B2C3D4-E5F6-7890-ABCD-EF1234567890')).toBe(true); // uppercase
+    expect(isValidImageId('00000000-0000-0000-0000-000000000000')).toBe(true);
+    expect(isValidImageId('ffffffff-ffff-ffff-ffff-ffffffffffff')).toBe(true);
+  });
+
+  it('should accept valid hex format (32 chars)', () => {
+    expect(isValidImageId('a1b2c3d4e5f67890abcdef1234567890')).toBe(true);
+    expect(isValidImageId('A1B2C3D4E5F67890ABCDEF1234567890')).toBe(true); // uppercase
+    expect(isValidImageId('00000000000000000000000000000000')).toBe(true);
+    expect(isValidImageId('ffffffffffffffffffffffffffffffff')).toBe(true);
+  });
+
+  it('should reject invalid formats', () => {
+    expect(isValidImageId('')).toBe(false);
+    expect(isValidImageId('invalid')).toBe(false);
+    expect(isValidImageId('too-short')).toBe(false);
+    expect(isValidImageId('../../../etc/passwd')).toBe(false);
+    expect(isValidImageId('a1b2c3d4-e5f6-7890-abcd')).toBe(false); // incomplete UUID
+    expect(isValidImageId('a1b2c3d4e5f67890abcdef123456789')).toBe(false); // 31 chars
+    expect(isValidImageId('a1b2c3d4e5f67890abcdef12345678901')).toBe(false); // 33 chars
+    expect(isValidImageId('a1b2c3d4-e5f6-7890-abcd-ef123456789g')).toBe(false); // invalid char 'g'
+  });
+});
+
+describe('hashImageContent', () => {
+  it('should return 32-character lowercase hex string', async () => {
+    const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+    const hash = await hashImageContent(data);
+
+    expect(hash).toHaveLength(32);
+    expect(hash).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('should produce same hash for same input (deterministic)', async () => {
+    const data = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+    const hash1 = await hashImageContent(data);
+    const hash2 = await hashImageContent(data);
+
+    expect(hash1).toBe(hash2);
+  });
+
+  it('should produce different hashes for different inputs', async () => {
+    const data1 = new Uint8Array([1, 2, 3, 4]);
+    const data2 = new Uint8Array([5, 6, 7, 8]);
+
+    const hash1 = await hashImageContent(data1);
+    const hash2 = await hashImageContent(data2);
+
+    expect(hash1).not.toBe(hash2);
+  });
+
+  it('should handle empty data', async () => {
+    const data = new Uint8Array(0);
+    const hash = await hashImageContent(data);
+
+    expect(hash).toHaveLength(32);
+    expect(hash).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('should handle large data', async () => {
+    // Create 1MB of data
+    const data = new Uint8Array(1024 * 1024);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = i % 256;
+    }
+
+    const hash = await hashImageContent(data);
+    expect(hash).toHaveLength(32);
+    expect(hash).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('should produce valid image ID format', async () => {
+    const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const hash = await hashImageContent(data);
+
+    // The hash should be a valid image ID
+    expect(isValidImageId(hash)).toBe(true);
   });
 });

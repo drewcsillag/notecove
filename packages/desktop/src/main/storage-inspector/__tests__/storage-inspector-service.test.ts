@@ -291,4 +291,211 @@ describe('StorageInspectorService', () => {
       expect(result.error).toContain('Permission denied');
     });
   });
+
+  describe('getImageSyncStatus', () => {
+    // Mock database for image queries
+    interface ImageDatabase {
+      getImagesBySd(sdId: string): Promise<
+        {
+          id: string;
+          filename: string;
+          mimeType: string;
+          size: number;
+        }[]
+      >;
+    }
+
+    const createMockDatabase = (): jest.Mocked<ImageDatabase> => ({
+      getImagesBySd: jest.fn(),
+    });
+
+    it('should return sync status with matching images', async () => {
+      const mockDb = createMockDatabase();
+      const imageId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
+      // Setup: media directory with one image
+      mockFs.exists.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue([`${imageId}.png`]);
+      mockFs.stat.mockResolvedValue({
+        isDirectory: false,
+        size: 1024,
+        mtimeMs: Date.now(),
+        ctimeMs: Date.now(),
+      });
+
+      // Database has the same image
+      mockDb.getImagesBySd.mockResolvedValue([
+        {
+          id: imageId,
+          filename: `${imageId}.png`,
+          mimeType: 'image/png',
+          size: 1024,
+        },
+      ]);
+
+      const result = await service.getImageSyncStatus('/test/sd', 'sd-1', mockDb);
+
+      expect(result.onDiskCount).toBe(1);
+      expect(result.onDiskTotalSize).toBe(1024);
+      expect(result.inDatabaseCount).toBe(1);
+      expect(result.onDiskNotInDb).toHaveLength(0);
+      expect(result.inDbNotOnDisk).toHaveLength(0);
+    });
+
+    it('should detect images on disk but not in database', async () => {
+      const mockDb = createMockDatabase();
+      const diskImageId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
+      // Disk has one image
+      mockFs.exists.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue([`${diskImageId}.png`]);
+      mockFs.stat.mockResolvedValue({
+        isDirectory: false,
+        size: 2048,
+        mtimeMs: Date.now(),
+        ctimeMs: Date.now(),
+      });
+
+      // Database is empty
+      mockDb.getImagesBySd.mockResolvedValue([]);
+
+      const result = await service.getImageSyncStatus('/test/sd', 'sd-1', mockDb);
+
+      expect(result.onDiskCount).toBe(1);
+      expect(result.inDatabaseCount).toBe(0);
+      expect(result.onDiskNotInDb).toHaveLength(1);
+      expect(result.onDiskNotInDb[0]).toEqual({
+        imageId: diskImageId,
+        filename: `${diskImageId}.png`,
+        size: 2048,
+      });
+      expect(result.inDbNotOnDisk).toHaveLength(0);
+    });
+
+    it('should detect images in database but not on disk', async () => {
+      const mockDb = createMockDatabase();
+      const dbImageId = 'b2c3d4e5-f678-9012-bcde-f12345678901';
+
+      // Disk is empty
+      mockFs.exists.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue([]);
+
+      // Database has one image
+      mockDb.getImagesBySd.mockResolvedValue([
+        {
+          id: dbImageId,
+          filename: `${dbImageId}.jpg`,
+          mimeType: 'image/jpeg',
+          size: 3072,
+        },
+      ]);
+
+      const result = await service.getImageSyncStatus('/test/sd', 'sd-1', mockDb);
+
+      expect(result.onDiskCount).toBe(0);
+      expect(result.inDatabaseCount).toBe(1);
+      expect(result.onDiskNotInDb).toHaveLength(0);
+      expect(result.inDbNotOnDisk).toHaveLength(1);
+      expect(result.inDbNotOnDisk[0]).toEqual({
+        imageId: dbImageId,
+        filename: `${dbImageId}.jpg`,
+        mimeType: 'image/jpeg',
+        size: 3072,
+      });
+    });
+
+    it('should handle mixed discrepancies', async () => {
+      const mockDb = createMockDatabase();
+      const matchingId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      const onDiskOnlyId = 'b2c3d4e5-f678-9012-bcde-f12345678901';
+      const inDbOnlyId = 'c3d4e5f6-7890-1234-cdef-123456789012';
+
+      // Disk has matching + one extra
+      mockFs.exists.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue([`${matchingId}.png`, `${onDiskOnlyId}.jpg`]);
+      mockFs.stat.mockResolvedValue({
+        isDirectory: false,
+        size: 1024,
+        mtimeMs: Date.now(),
+        ctimeMs: Date.now(),
+      });
+
+      // Database has matching + one extra (different)
+      mockDb.getImagesBySd.mockResolvedValue([
+        {
+          id: matchingId,
+          filename: `${matchingId}.png`,
+          mimeType: 'image/png',
+          size: 1024,
+        },
+        {
+          id: inDbOnlyId,
+          filename: `${inDbOnlyId}.gif`,
+          mimeType: 'image/gif',
+          size: 512,
+        },
+      ]);
+
+      const result = await service.getImageSyncStatus('/test/sd', 'sd-1', mockDb);
+
+      expect(result.onDiskCount).toBe(2);
+      expect(result.inDatabaseCount).toBe(2);
+      expect(result.onDiskNotInDb).toHaveLength(1);
+      expect(result.onDiskNotInDb[0]?.imageId).toBe(onDiskOnlyId);
+      expect(result.inDbNotOnDisk).toHaveLength(1);
+      expect(result.inDbNotOnDisk[0]?.imageId).toBe(inDbOnlyId);
+    });
+
+    it('should handle non-existent media directory', async () => {
+      const mockDb = createMockDatabase();
+      mockFs.exists.mockResolvedValue(false);
+      mockDb.getImagesBySd.mockResolvedValue([]);
+
+      const result = await service.getImageSyncStatus('/test/sd', 'sd-1', mockDb);
+
+      expect(result.onDiskCount).toBe(0);
+      expect(result.onDiskTotalSize).toBe(0);
+      expect(result.inDatabaseCount).toBe(0);
+      expect(result.onDiskNotInDb).toHaveLength(0);
+      expect(result.inDbNotOnDisk).toHaveLength(0);
+    });
+
+    it('should skip non-image files', async () => {
+      const mockDb = createMockDatabase();
+
+      // Disk has mix of files
+      mockFs.exists.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['readme.txt', '.DS_Store', 'data.json']);
+
+      // Database is empty
+      mockDb.getImagesBySd.mockResolvedValue([]);
+
+      const result = await service.getImageSyncStatus('/test/sd', 'sd-1', mockDb);
+
+      expect(result.onDiskCount).toBe(0);
+      expect(result.onDiskNotInDb).toHaveLength(0);
+    });
+
+    it('should handle hex format imageIds', async () => {
+      const mockDb = createMockDatabase();
+      const hexId = 'a1b2c3d4e5f67890abcdef1234567890'; // 32-char hex
+
+      mockFs.exists.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue([`${hexId}.webp`]);
+      mockFs.stat.mockResolvedValue({
+        isDirectory: false,
+        size: 4096,
+        mtimeMs: Date.now(),
+        ctimeMs: Date.now(),
+      });
+
+      mockDb.getImagesBySd.mockResolvedValue([]);
+
+      const result = await service.getImageSyncStatus('/test/sd', 'sd-1', mockDb);
+
+      expect(result.onDiskCount).toBe(1);
+      expect(result.onDiskNotInDb).toHaveLength(1);
+      expect(result.onDiskNotInDb[0]?.imageId).toBe(hexId);
+    });
+  });
 });

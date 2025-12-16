@@ -50,9 +50,11 @@ export default defineConfig({
           text: 'Architecture',
           items: [
             { text: 'Overview', link: '/architecture/' },
-            { text: 'CRDT Synchronization', link: '/architecture/crdt-sync' },
-            { text: 'Storage Layer', link: '/architecture/storage' },
+            { text: 'Storage Architecture', link: '/architecture/storage-architecture' },
+            { text: 'Sync Mechanism', link: '/architecture/sync-mechanism' },
+            { text: 'Data Models', link: '/architecture/data-models' },
             { text: 'Tech Stack', link: '/architecture/tech-stack' },
+            { text: 'TLA+ Specification', link: '/architecture/tla-spec' },
           ],
         },
       ],

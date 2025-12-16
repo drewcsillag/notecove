@@ -40,6 +40,7 @@ import {
   getMimeTypeFromExtension,
   getExtensionFromMimeType,
   isSupportedMimeType,
+  isValidImageId,
   SyncDirectoryStructure,
   AppStateKey,
 } from '@notecove/shared';
@@ -191,6 +192,80 @@ export class IPCHandlers {
     if (this.webBroadcastCallback) {
       this.webBroadcastCallback(channel, ...args);
     }
+  }
+
+  /**
+   * Discover an image across all registered storage directories
+   * First checks the primary SD, then iterates through all other SDs as fallback
+   *
+   * @param imageId The image ID to search for
+   * @param primarySdId The primary SD to check first
+   * @returns Discovery result with SD info, or null if not found
+   */
+  private async discoverImageAcrossSDs(
+    imageId: string,
+    primarySdId: string
+  ): Promise<{
+    sdId: string;
+    sdPath: string;
+    filename: string;
+    mimeType: string;
+    size: number;
+  } | null> {
+    // Validate imageId format for security
+    if (!isValidImageId(imageId)) {
+      console.warn(`[Image] Invalid imageId format rejected: ${imageId}`);
+      return null;
+    }
+
+    const fsAdapter = new NodeFileSystemAdapter();
+
+    // 1. Try primary SD first
+    const primarySD = await this.database.getStorageDir(primarySdId);
+    if (primarySD) {
+      const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+        id: primarySdId,
+        path: primarySD.path,
+        label: primarySD.name,
+      });
+      const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+      if (result) {
+        return {
+          sdId: primarySdId,
+          sdPath: primarySD.path,
+          filename: result.filename,
+          mimeType: result.mimeType,
+          size: result.size,
+        };
+      }
+    }
+
+    // 2. Try all other SDs as fallback
+    const allSDs = await this.database.getAllStorageDirs();
+    for (const sd of allSDs) {
+      if (sd.id === primarySdId) continue; // Already tried
+
+      const sdStructure = new SyncDirectoryStructure(fsAdapter, {
+        id: sd.id,
+        path: sd.path,
+        label: sd.name,
+      });
+      const imageStorage = new ImageStorage(fsAdapter, sdStructure);
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+      if (result) {
+        console.warn(`[Image] Found image ${imageId} in SD ${sd.id} instead of ${primarySdId}`);
+        return {
+          sdId: sd.id,
+          sdPath: sd.path,
+          filename: result.filename,
+          mimeType: result.mimeType,
+          size: result.size,
+        };
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -2109,26 +2184,17 @@ export class IPCHandlers {
     name: string,
     path: string
   ): Promise<string> {
-    // Check if SD already has an ID file (for cross-instance consistency)
-    const { promises: fs } = await import('fs');
-    const pathModule = await import('path');
-    const idFilePath = pathModule.join(path, '.sd-id');
+    // Use unified SD ID system (SD_ID file, with .sd-id migration)
+    const { migrateAndGetSdId } = await import('../sd-id-migration');
+    const result = await migrateAndGetSdId(path);
 
-    let id: string;
-    try {
-      const idContent = await fs.readFile(idFilePath, 'utf-8');
-      id = idContent.trim();
-      console.log(`[SD] Found existing SD ID in ${path}: ${id}`);
-    } catch {
-      // File doesn't exist, create new ID
-      id = crypto.randomUUID();
-      try {
-        await fs.writeFile(idFilePath, id, 'utf-8');
-        console.log(`[SD] Created new SD ID file in ${path}: ${id}`);
-      } catch (error) {
-        console.error(`[SD] Failed to write SD ID file:`, error);
-        // Continue anyway, we'll use the generated ID
-      }
+    const id = result.id;
+    if (result.wasGenerated) {
+      console.log(`[SD] Created new SD_ID in ${path}: ${id}`);
+    } else if (result.migrated) {
+      console.log(`[SD] Migrated legacy .sd-id to SD_ID in ${path}: ${id}`);
+    } else {
+      console.log(`[SD] Using existing SD_ID in ${path}: ${id}`);
     }
 
     await this.database.createStorageDir(id, name, path);
@@ -3256,6 +3322,10 @@ export class IPCHandlers {
 
   /**
    * Save an image to the media folder and database
+   *
+   * Uses content-addressable storage: the imageId is derived from content hash,
+   * providing automatic deduplication. If the image already exists (same content),
+   * returns the existing imageId without writing to disk or database.
    */
   private async handleImageSave(
     _event: IpcMainInvokeEvent,
@@ -3283,10 +3353,21 @@ export class IPCHandlers {
     });
     const imageStorage = new ImageStorage(fsAdapter, sdStructure);
 
-    // Save the image
+    // Save the image (uses content hash for dedup at file level)
     const result = await imageStorage.saveImage(data, mimeType);
 
-    // Add to database cache
+    // Check if image already exists in database (dedup at database level)
+    const existingImage = await this.database.getImage(result.imageId);
+    if (existingImage) {
+      // Image already registered, skip database upsert
+      console.log('[Image] Dedup: image already exists in database:', {
+        imageId: result.imageId,
+        sdId: existingImage.sdId,
+      });
+      return result;
+    }
+
+    // Add to database cache (new image)
     await this.database.upsertImage({
       id: result.imageId,
       sdId,
@@ -3318,19 +3399,53 @@ export class IPCHandlers {
     imageId: string
   ): Promise<string | null> {
     // Get image metadata from database
-    const image = await this.database.getImage(imageId);
-    if (!image) {
-      return null;
-    }
+    let image = await this.database.getImage(imageId);
+    let imagePath: string;
 
-    // Get SD from database
-    const sd = await this.database.getStorageDir(sdId);
-    if (!sd) {
-      return null;
-    }
+    if (image) {
+      // Image found in database - use stored metadata
+      const sd = await this.database.getStorageDir(image.sdId);
+      if (!sd) {
+        return null;
+      }
+      imagePath = path.join(sd.path, 'media', image.filename);
+    } else {
+      // Image not in database - try to discover it on disk
+      const discovered = await this.discoverImageAcrossSDs(imageId, sdId);
+      if (!discovered) {
+        return null;
+      }
 
-    // Get the file path
-    const imagePath = path.join(sd.path, 'media', image.filename);
+      // Register the discovered image in the database
+      await this.database.upsertImage({
+        id: imageId,
+        sdId: discovered.sdId,
+        filename: discovered.filename,
+        mimeType: discovered.mimeType,
+        width: null,
+        height: null,
+        size: discovered.size,
+        created: Date.now(),
+      });
+
+      console.log('[Image] Discovered and registered synced image:', {
+        imageId,
+        sdId: discovered.sdId,
+        filename: discovered.filename,
+      });
+
+      imagePath = path.join(discovered.sdPath, 'media', discovered.filename);
+      image = {
+        id: imageId,
+        sdId: discovered.sdId,
+        filename: discovered.filename,
+        mimeType: discovered.mimeType,
+        width: null,
+        height: null,
+        size: discovered.size,
+        created: Date.now(),
+      };
+    }
 
     try {
       // Read file and convert to base64
@@ -3353,17 +3468,41 @@ export class IPCHandlers {
   ): Promise<string | null> {
     // Get image metadata from database
     const image = await this.database.getImage(imageId);
-    if (!image) {
+
+    if (image) {
+      // Image found in database - use stored metadata
+      const sd = await this.database.getStorageDir(image.sdId);
+      if (!sd) {
+        return null;
+      }
+      return path.join(sd.path, 'media', image.filename);
+    }
+
+    // Image not in database - try to discover it on disk
+    const discovered = await this.discoverImageAcrossSDs(imageId, sdId);
+    if (!discovered) {
       return null;
     }
 
-    // Get SD from database
-    const sd = await this.database.getStorageDir(sdId);
-    if (!sd) {
-      return null;
-    }
+    // Register the discovered image in the database
+    await this.database.upsertImage({
+      id: imageId,
+      sdId: discovered.sdId,
+      filename: discovered.filename,
+      mimeType: discovered.mimeType,
+      width: null,
+      height: null,
+      size: discovered.size,
+      created: Date.now(),
+    });
 
-    return path.join(sd.path, 'media', image.filename);
+    console.log('[Image] Discovered and registered synced image (getPath):', {
+      imageId,
+      sdId: discovered.sdId,
+      filename: discovered.filename,
+    });
+
+    return path.join(discovered.sdPath, 'media', discovered.filename);
   }
 
   /**
@@ -3399,14 +3538,43 @@ export class IPCHandlers {
   }
 
   /**
-   * Check if an image exists in the database
+   * Check if an image exists (in database or on disk)
    */
   private async handleImageExists(
     _event: IpcMainInvokeEvent,
-    _sdId: string,
+    sdId: string,
     imageId: string
   ): Promise<boolean> {
-    return await this.database.imageExists(imageId);
+    // Check database first
+    if (await this.database.imageExists(imageId)) {
+      return true;
+    }
+
+    // Not in database - try to discover on disk
+    const discovered = await this.discoverImageAcrossSDs(imageId, sdId);
+    if (!discovered) {
+      return false;
+    }
+
+    // Found on disk - register it and return true
+    await this.database.upsertImage({
+      id: imageId,
+      sdId: discovered.sdId,
+      filename: discovered.filename,
+      mimeType: discovered.mimeType,
+      width: null,
+      height: null,
+      size: discovered.size,
+      created: Date.now(),
+    });
+
+    console.log('[Image] Discovered and registered synced image (exists):', {
+      imageId,
+      sdId: discovered.sdId,
+      filename: discovered.filename,
+    });
+
+    return true;
   }
 
   /**
@@ -3496,22 +3664,29 @@ export class IPCHandlers {
           continue;
         }
 
-        // Save the image
-
+        // Save the image (uses content hash for dedup at file level)
         const saveResult = await imageStorage.saveImage(new Uint8Array(data), mimeType);
 
-        // Add to database cache
-        await this.database.upsertImage({
-          id: saveResult.imageId,
-          sdId,
-          filename: saveResult.filename,
-          mimeType,
-          width: null,
-          height: null,
-
-          size: data.length,
-          created: Date.now(),
-        });
+        // Check if image already exists in database (dedup at database level)
+        const existingImage = await this.database.getImage(saveResult.imageId);
+        if (!existingImage) {
+          // Add to database cache (new image)
+          await this.database.upsertImage({
+            id: saveResult.imageId,
+            sdId,
+            filename: saveResult.filename,
+            mimeType,
+            width: null,
+            height: null,
+            size: data.length,
+            created: Date.now(),
+          });
+        } else {
+          console.log('[Image] Dedup: picked image already exists in database:', {
+            imageId: saveResult.imageId,
+            sdId: existingImage.sdId,
+          });
+        }
 
         imageIds.push(saveResult.imageId);
       } catch (err) {
@@ -3590,10 +3765,21 @@ export class IPCHandlers {
     });
     const imageStorage = new ImageStorage(fsAdapter, sdStructure);
 
-    // Save the image
+    // Save the image (uses content hash for dedup at file level)
     const saveResult = await imageStorage.saveImage(imageData, mimeType);
 
-    // Add to database cache
+    // Check if image already exists in database (dedup at database level)
+    const existingImage = await this.database.getImage(saveResult.imageId);
+    if (existingImage) {
+      // Image already registered, skip database upsert
+      console.log('[Image] Dedup: downloaded image already exists in database:', {
+        imageId: saveResult.imageId,
+        sdId: existingImage.sdId,
+      });
+      return saveResult.imageId;
+    }
+
+    // Add to database cache (new image)
     await this.database.upsertImage({
       id: saveResult.imageId,
       sdId,
@@ -3865,25 +4051,61 @@ export class IPCHandlers {
       }
     }
 
-    // Generate thumbnail
-    const image = await this.database.getImage(imageId);
-    if (!image) {
-      return null;
-    }
+    // Get image metadata from database or discover on disk
+    let image = await this.database.getImage(imageId);
+    let imagePath: string;
 
-    const sd = await this.database.getStorageDir(sdId);
-    if (!sd) {
-      return null;
-    }
+    if (image) {
+      // Image found in database - use stored metadata
+      const sd = await this.database.getStorageDir(image.sdId);
+      if (!sd) {
+        return null;
+      }
+      imagePath = path.join(sd.path, 'media', image.filename);
+    } else {
+      // Image not in database - try to discover it on disk
+      const discovered = await this.discoverImageAcrossSDs(imageId, sdId);
+      if (!discovered) {
+        return null;
+      }
 
-    const imagePath = path.join(sd.path, 'media', image.filename);
+      // Register the discovered image in the database
+      await this.database.upsertImage({
+        id: imageId,
+        sdId: discovered.sdId,
+        filename: discovered.filename,
+        mimeType: discovered.mimeType,
+        width: null,
+        height: null,
+        size: discovered.size,
+        created: Date.now(),
+      });
+
+      console.log('[Thumbnail] Discovered and registered synced image:', {
+        imageId,
+        sdId: discovered.sdId,
+        filename: discovered.filename,
+      });
+
+      imagePath = path.join(discovered.sdPath, 'media', discovered.filename);
+      image = {
+        id: imageId,
+        sdId: discovered.sdId,
+        filename: discovered.filename,
+        mimeType: discovered.mimeType,
+        width: null,
+        height: null,
+        size: discovered.size,
+        created: Date.now(),
+      };
+    }
 
     try {
       const imageData = await fs.readFile(imagePath);
       const result = await this.thumbnailGenerator.generateThumbnailForSd(
         imageData,
         image.mimeType,
-        sdId,
+        image.sdId,
         imageId
       );
       console.log(`[IPC] Generated thumbnail for ${imageId}: ${result.path}`);

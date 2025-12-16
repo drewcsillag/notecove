@@ -175,4 +175,4 @@ Choose which folders to sync on each device:
 ## Next Steps
 
 - [Learn keyboard shortcuts](/guide/keyboard-shortcuts)
-- [Understand CRDT synchronization](/architecture/crdt-sync)
+- [Understand sync mechanism](/architecture/sync-mechanism)

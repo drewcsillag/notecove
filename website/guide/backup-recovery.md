@@ -283,5 +283,5 @@ When running multiple NoteCove instances (different computers):
 ## Next Steps
 
 - [Learn about sync configuration](/guide/sync-configuration)
-- [Understand CRDT architecture](/architecture/crdt-sync)
+- [Understand sync mechanism](/architecture/sync-mechanism)
 - [Explore advanced features](/features/)

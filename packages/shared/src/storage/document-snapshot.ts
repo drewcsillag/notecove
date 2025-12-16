@@ -91,6 +91,12 @@ export class DocumentSnapshot {
    * This is the ONLY way to modify the document and vector clock.
    * Ensures sequence numbers are contiguous per instance.
    *
+   * @param update - The Yjs update bytes to apply
+   * @param instanceId - The instance that generated this update
+   * @param sequence - The sequence number from storage
+   * @param offset - The byte offset in the log file
+   * @param file - The log file name
+   * @param origin - Optional origin to pass to Y.applyUpdate (e.g., 'ipc' to prevent double writes)
    * @throws Error if sequence number is not the next expected sequence
    */
   applyUpdate(
@@ -98,7 +104,8 @@ export class DocumentSnapshot {
     instanceId: string,
     sequence: number,
     offset: number,
-    file: string
+    file: string,
+    origin?: unknown
   ): void {
     // Validate sequence is next in order for this instance
     const current = this.vectorClock[instanceId];
@@ -110,8 +117,10 @@ export class DocumentSnapshot {
       );
     }
 
-    // Apply update to document
-    Y.applyUpdate(this.doc, update);
+    // Apply update to document with origin so listeners can distinguish the source
+    // When origin is 'ipc', the doc.on('update') listener in CRDTManager will skip
+    // calling handleUpdate() to prevent double writes
+    Y.applyUpdate(this.doc, update, origin);
 
     // Update vector clock atomically
     this.vectorClock[instanceId] = { sequence, offset, file };

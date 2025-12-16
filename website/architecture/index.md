@@ -80,7 +80,7 @@ NoteCove is built with a modern, offline-first architecture designed for reliabi
 - Conflict-free merging
 - Update generation
 
-[Learn more about CRDT sync →](/architecture/crdt-sync)
+[Learn more about sync mechanism →](/architecture/sync-mechanism)
 
 ### Storage Layer
 
@@ -97,7 +97,7 @@ NoteCove is built with a modern, offline-first architecture designed for reliabi
 - Update file I/O
 - Database transactions
 
-[Learn more about storage →](/architecture/storage)
+[Learn more about storage architecture →](/architecture/storage-architecture)
 
 ## Data Flow
 
@@ -425,7 +425,8 @@ Support more devices:
 
 ## Next Steps
 
-- [Learn about CRDT synchronization](/architecture/crdt-sync)
-- [Understand storage layer](/architecture/storage)
+- [Learn about storage architecture](/architecture/storage-architecture)
+- [Understand sync mechanism](/architecture/sync-mechanism)
+- [Explore data models](/architecture/data-models)
 - [Explore tech stack](/architecture/tech-stack)
 - [View TLA+ formal specification](/architecture/tla-spec)

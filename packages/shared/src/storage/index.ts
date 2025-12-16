@@ -20,9 +20,12 @@ export {
   getMimeTypeFromExtension,
   isSupportedMimeType,
   getExtensionFromMimeType,
+  isValidImageId,
+  hashImageContent,
   type SaveImageResult,
   type ImageInfo,
   type ParsedImageFilename,
+  type DiscoveredImage,
 } from './image-storage';
 
 // New append-only log format (Phase 1-5)

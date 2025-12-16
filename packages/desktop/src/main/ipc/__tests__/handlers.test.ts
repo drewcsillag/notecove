@@ -23,31 +23,105 @@ jest.mock('electron', () => ({
   },
 }));
 
-// Mock Node.js crypto module
+// Mock Node.js crypto module and uuid package
 let uuidCounter = 0;
 
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
   randomUUID: jest.fn((): string => {
     uuidCounter++;
-    return `test-uuid-${uuidCounter.toString().padStart(8, '0')}-0000-0000-0000-000000000000`;
+    // Generate valid v4 UUID format (all hex digits): xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx
+    return `${uuidCounter.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
   }),
 }));
 
-// Mock fs/promises module for Note Info tests
+jest.mock('uuid', () => ({
+  v4: jest.fn((): string => {
+    uuidCounter++;
+    // Generate valid v4 UUID format (all hex digits): xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx
+    return `${uuidCounter.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
+  }),
+}));
+
+// Mock fs/promises module for Note Info tests and SD ID operations
 jest.mock('fs/promises', () => ({
   ...jest.requireActual('fs/promises'),
   readdir: jest.fn().mockResolvedValue([]),
+  readFile: jest.fn().mockRejectedValue({ code: 'ENOENT' }), // Default: file not found
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  access: jest.fn().mockRejectedValue({ code: 'ENOENT' }), // Default: file not found
 }));
 
-// Reset counter before each test
+// Mock NodeFileSystemAdapter to avoid actual filesystem operations in SD ID tests
+jest.mock('../../storage/node-fs-adapter', () => {
+  const path = jest.requireActual('path');
+  // In-memory file system for mocking
+  const fileStore = new Map<string, Uint8Array>();
+
+  return {
+    NodeFileSystemAdapter: jest.fn().mockImplementation(() => ({
+      exists: jest.fn().mockImplementation(async (filePath: string) => {
+        return fileStore.has(filePath);
+      }),
+      mkdir: jest.fn().mockResolvedValue(undefined),
+      readFile: jest.fn().mockImplementation(async (filePath: string) => {
+        if (fileStore.has(filePath)) {
+          return fileStore.get(filePath);
+        }
+        const error = new Error(
+          `ENOENT: no such file or directory, open '${filePath}'`
+        ) as NodeJS.ErrnoException;
+        error.code = 'ENOENT';
+        throw error;
+      }),
+      writeFile: jest.fn().mockImplementation(async (filePath: string, data: Uint8Array) => {
+        fileStore.set(filePath, data);
+      }),
+      appendFile: jest.fn().mockResolvedValue(undefined),
+      deleteFile: jest.fn().mockImplementation(async (filePath: string) => {
+        fileStore.delete(filePath);
+      }),
+      listFiles: jest.fn().mockResolvedValue([]),
+      joinPath: (...segments: string[]) => path.join(...segments),
+      dirname: (filePath: string) => path.dirname(filePath),
+      basename: (filePath: string) => path.basename(filePath),
+    })),
+    // Expose fileStore for test cleanup
+    __clearFileStore: () => {
+      fileStore.clear();
+    },
+  };
+});
+
+// Reset counter and fileStore before each test
 beforeEach(async () => {
   uuidCounter = 0;
-  // Access the mock through dynamic import to get the mocked version
+  // Access the crypto mock through dynamic import to get the mocked version
   const cryptoModule = await import('crypto');
   const cryptoMock = cryptoModule as unknown as { randomUUID: jest.Mock };
   if (typeof cryptoMock.randomUUID.mockClear === 'function') {
     cryptoMock.randomUUID.mockClear();
+  }
+
+  // Clear the uuid mock (imported from @notecove/shared dependencies)
+  try {
+    // @ts-expect-error - uuid is a transitive dependency through @notecove/shared
+    const uuidModule = await import('uuid');
+    const uuidMock = uuidModule as unknown as { v4?: jest.Mock };
+    if (uuidMock.v4 && typeof uuidMock.v4.mockClear === 'function') {
+      uuidMock.v4.mockClear();
+    }
+  } catch {
+    // uuid module not directly available, mock is still applied
+  }
+
+  // Clear the mock filesystem
+  const nodeFs = await import('../../storage/node-fs-adapter');
+  const nodeFsWithClear = nodeFs as unknown as { __clearFileStore?: () => void };
+  if (typeof nodeFsWithClear.__clearFileStore === 'function') {
+    nodeFsWithClear.__clearFileStore();
   }
 });
 
@@ -1103,7 +1177,7 @@ describe('IPCHandlers - SD Management', () => {
       const name = 'Work';
       const path = '/path/to/work';
       const createdSD = {
-        id: 'test-uuid-00000001-0000-0000-0000-000000000000',
+        id: '00000001-0000-4000-8000-000000000000',
         name,
         path,
         created: Date.now(),
@@ -1116,11 +1190,11 @@ describe('IPCHandlers - SD Management', () => {
       const result = await (handlers as any).handleCreateStorageDir(mockEvent, name, path);
 
       expect(mockDatabase.createStorageDir).toHaveBeenCalledWith(
-        'test-uuid-00000001-0000-0000-0000-000000000000',
+        '00000001-0000-4000-8000-000000000000',
         name,
         path
       );
-      expect(result).toEqual('test-uuid-00000001-0000-0000-0000-000000000000');
+      expect(result).toEqual('00000001-0000-4000-8000-000000000000');
     });
 
     it('should create first SD as active', async () => {
@@ -1128,7 +1202,7 @@ describe('IPCHandlers - SD Management', () => {
       const name = 'Work';
       const path = '/path/to/work';
       const createdSD = {
-        id: 'test-uuid-00000001-0000-0000-0000-000000000000',
+        id: '00000001-0000-4000-8000-000000000000',
         name,
         path,
         created: Date.now(),
@@ -1597,7 +1671,9 @@ describe('IPCHandlers - SD Management', () => {
       // Should create note in target SD with NEW ID
       expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: expect.stringMatching(/^test-uuid-/), // New UUID generated
+          id: expect.stringMatching(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+          ), // New UUID v4 generated
           sdId: targetSdId,
           title: 'Test Note',
         })
