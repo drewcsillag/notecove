@@ -48,6 +48,7 @@ CREATE TABLE storage_dirs (
 ```
 
 TypeScript interface:
+
 ```typescript
 interface StorageDirCache {
   id: string;
@@ -87,6 +88,7 @@ CREATE VIRTUAL TABLE notes_fts USING fts5(
 ```
 
 TypeScript interface:
+
 ```typescript
 interface NoteCache {
   id: UUID;
@@ -118,6 +120,7 @@ CREATE TABLE folders (
 ```
 
 TypeScript interface:
+
 ```typescript
 interface FolderCache {
   id: UUID;
@@ -147,6 +150,7 @@ CREATE TABLE note_tags (
 ```
 
 TypeScript interfaces:
+
 ```typescript
 interface Tag {
   id: UUID;
@@ -172,6 +176,7 @@ CREATE TABLE note_links (
 ```
 
 TypeScript interface:
+
 ```typescript
 interface NoteLink {
   sourceNoteId: UUID;
@@ -195,6 +200,7 @@ CREATE TABLE checkboxes (
 ```
 
 TypeScript interface:
+
 ```typescript
 interface Checkbox {
   id: UUID;
@@ -217,6 +223,7 @@ CREATE TABLE app_state (
 ```
 
 Common keys:
+
 ```typescript
 enum AppStateKey {
   LastOpenedNote = 'lastOpenedNote',
@@ -253,6 +260,7 @@ CREATE TABLE window_states (
 ```
 
 TypeScript interface:
+
 ```typescript
 interface WindowState {
   id: string;
@@ -286,6 +294,7 @@ CREATE TABLE note_moves (
 ```
 
 Move states:
+
 ```typescript
 type NoteMoveState =
   | 'initiated'
@@ -339,6 +348,7 @@ Y.Map ('folders')
 ```
 
 Tree visualization:
+
 ```
 root (null parentId)
 ├── Work (folder-1, order: 0)
@@ -352,14 +362,15 @@ root (null parentId)
 ```typescript
 interface VectorClock {
   [instanceId: string]: {
-    sequence: number;  // Last applied sequence number
-    offset: number;    // Byte offset in log file
-    file: string;      // Log file name
+    sequence: number; // Last applied sequence number
+    offset: number; // Byte offset in log file
+    file: string; // Log file name
   };
 }
 ```
 
 Example:
+
 ```json
 {
   "macbook-abc123": {
@@ -469,6 +480,7 @@ Each instance writes a presence file at `{SD_PATH}/profiles/{instanceId}.json`:
 ```
 
 This enables:
+
 - Showing who else is viewing a note
 - Displaying presence indicators in the UI
 - Detecting stale instances (not seen for >30 seconds)
@@ -477,12 +489,12 @@ This enables:
 
 All TypeScript types are defined in:
 
-| File | Purpose |
-|------|---------|
-| `packages/shared/src/database/schema.ts` | Database record types |
-| `packages/shared/src/types.ts` | Common types (UUID, etc.) |
-| `packages/shared/src/storage/document-snapshot.ts` | VectorClock interface |
-| `packages/shared/src/storage/types.ts` | FileSystemAdapter, etc. |
+| File                                               | Purpose                   |
+| -------------------------------------------------- | ------------------------- |
+| `packages/shared/src/database/schema.ts`           | Database record types     |
+| `packages/shared/src/types.ts`                     | Common types (UUID, etc.) |
+| `packages/shared/src/storage/document-snapshot.ts` | VectorClock interface     |
+| `packages/shared/src/storage/types.ts`             | FileSystemAdapter, etc.   |
 
 ## Schema Migrations
 
@@ -511,12 +523,12 @@ Current schema version: **9**
 
 ## Key Files Reference
 
-| File | Purpose |
-|------|---------|
-| `packages/shared/src/database/schema.ts` | TypeScript interfaces |
-| `packages/desktop/src/main/database.ts` | SQLite implementation |
-| `packages/shared/src/crdt/note-doc.ts` | NoteDoc CRDT wrapper |
-| `packages/shared/src/crdt/folder-tree-doc.ts` | FolderTreeDoc CRDT wrapper |
+| File                                               | Purpose                     |
+| -------------------------------------------------- | --------------------------- |
+| `packages/shared/src/database/schema.ts`           | TypeScript interfaces       |
+| `packages/desktop/src/main/database.ts`            | SQLite implementation       |
+| `packages/shared/src/crdt/note-doc.ts`             | NoteDoc CRDT wrapper        |
+| `packages/shared/src/crdt/folder-tree-doc.ts`      | FolderTreeDoc CRDT wrapper  |
 | `packages/shared/src/storage/document-snapshot.ts` | Y.Doc + VectorClock pairing |
 
 ## Next Steps

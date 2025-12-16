@@ -1,4 +1,4 @@
-import { ImageStorage } from '../image-storage';
+import { ImageStorage, isValidImageId } from '../image-storage';
 import type { FileSystemAdapter, SyncDirectoryConfig, FileStats } from '../types';
 import { SyncDirectoryStructure } from '../sd-structure';
 
@@ -430,5 +430,103 @@ describe('ImageStorage', () => {
       expect(ImageStorage.isSupportedMimeType('video/mp4')).toBe(false);
       expect(ImageStorage.isSupportedMimeType('image/bmp')).toBe(false);
     });
+  });
+
+  describe('discoverImageOnDisk', () => {
+    const testImageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
+    beforeEach(async () => {
+      await imageStorage.initializeMediaDir();
+    });
+
+    it('should discover existing image with UUID format ID', async () => {
+      // Manually place image file (simulating cloud sync)
+      const imageId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      fs.setFile(`/test/sd/media/${imageId}.png`, testImageData);
+
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+
+      expect(result).not.toBeNull();
+      expect(result!.filename).toBe(`${imageId}.png`);
+      expect(result!.mimeType).toBe('image/png');
+      expect(result!.size).toBe(testImageData.length);
+    });
+
+    it('should discover existing image with hex format ID (32 chars)', async () => {
+      // New content-addressed format (Phase 4)
+      const imageId = 'a1b2c3d4e5f67890abcdef1234567890';
+      fs.setFile(`/test/sd/media/${imageId}.jpg`, testImageData);
+
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+
+      expect(result).not.toBeNull();
+      expect(result!.filename).toBe(`${imageId}.jpg`);
+      expect(result!.mimeType).toBe('image/jpeg');
+      expect(result!.size).toBe(testImageData.length);
+    });
+
+    it('should return null for non-existent image', async () => {
+      const result = await imageStorage.discoverImageOnDisk('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for invalid imageId format (path traversal protection)', async () => {
+      // Attempt path traversal
+      const result = await imageStorage.discoverImageOnDisk('../../../etc/passwd');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty string', async () => {
+      const result = await imageStorage.discoverImageOnDisk('');
+      expect(result).toBeNull();
+    });
+
+    it('should return null when media directory does not exist', async () => {
+      fs.reset();
+      // Re-initialize SD structure without media dir
+      await sdStructure.initialize();
+
+      const result = await imageStorage.discoverImageOnDisk('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      expect(result).toBeNull();
+    });
+
+    it('should try multiple extensions and find the correct one', async () => {
+      const imageId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      // Place a GIF file
+      fs.setFile(`/test/sd/media/${imageId}.gif`, testImageData);
+
+      const result = await imageStorage.discoverImageOnDisk(imageId);
+
+      expect(result).not.toBeNull();
+      expect(result!.filename).toBe(`${imageId}.gif`);
+      expect(result!.mimeType).toBe('image/gif');
+    });
+  });
+});
+
+describe('isValidImageId', () => {
+  it('should accept valid UUID format', () => {
+    expect(isValidImageId('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe(true);
+    expect(isValidImageId('A1B2C3D4-E5F6-7890-ABCD-EF1234567890')).toBe(true); // uppercase
+    expect(isValidImageId('00000000-0000-0000-0000-000000000000')).toBe(true);
+    expect(isValidImageId('ffffffff-ffff-ffff-ffff-ffffffffffff')).toBe(true);
+  });
+
+  it('should accept valid hex format (32 chars)', () => {
+    expect(isValidImageId('a1b2c3d4e5f67890abcdef1234567890')).toBe(true);
+    expect(isValidImageId('A1B2C3D4E5F67890ABCDEF1234567890')).toBe(true); // uppercase
+    expect(isValidImageId('00000000000000000000000000000000')).toBe(true);
+    expect(isValidImageId('ffffffffffffffffffffffffffffffff')).toBe(true);
+  });
+
+  it('should reject invalid formats', () => {
+    expect(isValidImageId('')).toBe(false);
+    expect(isValidImageId('invalid')).toBe(false);
+    expect(isValidImageId('too-short')).toBe(false);
+    expect(isValidImageId('../../../etc/passwd')).toBe(false);
+    expect(isValidImageId('a1b2c3d4-e5f6-7890-abcd')).toBe(false); // incomplete UUID
+    expect(isValidImageId('a1b2c3d4e5f67890abcdef123456789')).toBe(false); // 31 chars
+    expect(isValidImageId('a1b2c3d4e5f67890abcdef12345678901')).toBe(false); // 33 chars
+    expect(isValidImageId('a1b2c3d4-e5f6-7890-abcd-ef123456789g')).toBe(false); // invalid char 'g'
   });
 });

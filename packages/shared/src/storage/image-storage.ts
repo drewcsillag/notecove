@@ -58,6 +58,16 @@ export interface ImageInfo {
 }
 
 /**
+ * Result of discovering an image on disk
+ * Used for registering synced images that exist on disk but not in database
+ */
+export interface DiscoveredImage {
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+/**
  * Parsed image filename
  */
 export interface ParsedImageFilename {
@@ -89,6 +99,28 @@ export function isSupportedMimeType(mimeType: string): boolean {
 export function getExtensionFromMimeType(mimeType: string): string | null {
   return MIME_TO_EXTENSION[mimeType] || null;
 }
+
+/**
+ * Validate an image ID format
+ * Accepts both UUID format (old images) and hex format (new content-addressed images)
+ *
+ * @param id The image ID to validate
+ * @returns true if valid, false otherwise
+ *
+ * Valid formats:
+ * - UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars with dashes)
+ * - Hex: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (32 chars, no dashes)
+ */
+export function isValidImageId(id: string): boolean {
+  // UUID format (old images) - 36 chars with dashes
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // Hex format (new images after Phase 4) - 32 chars, no dashes
+  const hexRegex = /^[0-9a-f]{32}$/i;
+  return uuidRegex.test(id) || hexRegex.test(id);
+}
+
+/** Supported image extensions for discovery */
+const SUPPORTED_EXTENSIONS = Object.keys(EXTENSION_TO_MIME);
 
 /**
  * ImageStorage class
@@ -282,5 +314,58 @@ export class ImageStorage {
       filename: `${imageId}.${extension}`,
       size: stats.size,
     };
+  }
+
+  /**
+   * Discover an image on disk by scanning for files matching the imageId
+   *
+   * This is used to find synced images that exist on disk but aren't registered
+   * in the database. It scans the media directory for any file matching
+   * {imageId}.{extension} where extension is a supported image type.
+   *
+   * @param imageId The image ID to look for (UUID or hex format)
+   * @returns Discovered image info or null if not found
+   *
+   * Security: Validates imageId format to prevent path traversal attacks
+   */
+  async discoverImageOnDisk(imageId: string): Promise<DiscoveredImage | null> {
+    // Security: Validate imageId format to prevent path traversal
+    if (!isValidImageId(imageId)) {
+      console.warn(`[ImageStorage] Invalid imageId format rejected: ${imageId}`);
+      return null;
+    }
+
+    const mediaPath = this.getMediaPath();
+
+    // Check if media directory exists
+    const mediaExists = await this.fs.exists(mediaPath);
+    if (!mediaExists) {
+      return null;
+    }
+
+    // Try each supported extension
+    for (const ext of SUPPORTED_EXTENSIONS) {
+      const filename = `${imageId}.${ext}`;
+      const filePath = this.fs.joinPath(mediaPath, filename);
+
+      try {
+        const exists = await this.fs.exists(filePath);
+        if (exists) {
+          const stats = await this.fs.stat(filePath);
+          const mimeType = ImageStorage.getMimeTypeFromExtension(ext)!;
+
+          return {
+            filename,
+            mimeType,
+            size: stats.size,
+          };
+        }
+      } catch {
+        // Continue trying other extensions
+        continue;
+      }
+    }
+
+    return null;
   }
 }

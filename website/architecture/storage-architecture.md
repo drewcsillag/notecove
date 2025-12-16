@@ -96,19 +96,24 @@ Notes use `Y.XmlFragment` to store rich text content compatible with ProseMirror
 // Simplified view of NoteDoc structure
 class NoteDoc {
   private doc: Y.Doc;
-  private fragment: Y.XmlFragment;  // Rich text content
+  private fragment: Y.XmlFragment; // Rich text content
 
   constructor() {
     this.doc = new Y.Doc();
     this.fragment = this.doc.getXmlFragment('content');
   }
 
-  getDoc(): Y.Doc { return this.doc; }
-  getFragment(): Y.XmlFragment { return this.fragment; }
+  getDoc(): Y.Doc {
+    return this.doc;
+  }
+  getFragment(): Y.XmlFragment {
+    return this.fragment;
+  }
 }
 ```
 
 The `Y.XmlFragment` maps directly to ProseMirror's document model:
+
 - Headings, paragraphs, lists are `Y.XmlElement` nodes
 - Text content is `Y.Text` with marks for formatting (bold, italic, etc.)
 - Checkboxes, code blocks, etc. are custom `Y.XmlElement` types
@@ -122,10 +127,10 @@ The folder hierarchy uses `Y.Map` for each folder:
 interface FolderData {
   id: string;
   name: string;
-  parentId: string | null;  // null = root folder
+  parentId: string | null; // null = root folder
   sdId: string;
-  order: number;            // Sort order within parent
-  deleted: boolean;         // Soft-delete flag
+  order: number; // Sort order within parent
+  deleted: boolean; // Soft-delete flag
 }
 
 // The FolderTreeDoc stores a Y.Map<string, FolderData>
@@ -157,6 +162,7 @@ class DocumentSnapshot {
 ```
 
 Key invariants:
+
 - Vector clock is ONLY updated when updates are applied to the document
 - Sequence numbers per instance must be contiguous (no gaps)
 - The `origin` parameter allows distinguishing update sources (e.g., `'ipc'` for renderer-initiated)
@@ -221,22 +227,28 @@ The vector clock tracks sync progress per instance:
 ```typescript
 interface VectorClock {
   [instanceId: string]: {
-    sequence: number;  // Highest applied sequence number
-    offset: number;    // Byte offset in the log file
-    file: string;      // Log file name
+    sequence: number; // Highest applied sequence number
+    offset: number; // Byte offset in the log file
+    file: string; // Log file name
   };
 }
 ```
 
 Example:
+
 ```json
 {
-  "macbook-abc123": { "sequence": 42, "offset": 8192, "file": "macbook-abc123_1702234567890.crdtlog" },
+  "macbook-abc123": {
+    "sequence": 42,
+    "offset": 8192,
+    "file": "macbook-abc123_1702234567890.crdtlog"
+  },
   "iphone-xyz789": { "sequence": 17, "offset": 2048, "file": "iphone-xyz789_1702234600000.crdtlog" }
 }
 ```
 
 This allows:
+
 - Detecting which updates have been applied
 - Resuming sync from the correct position
 - Validating update ordering (no gaps allowed)
@@ -291,19 +303,19 @@ Note: The `origin='ipc'` parameter prevents double-writes when the Y.Doc's `'upd
 
 ## Key Files Reference
 
-| File | Location | Purpose |
-|------|----------|---------|
-| `document-snapshot.ts` | `packages/shared/src/storage/` | Y.Doc + VectorClock pairing |
-| `note-storage-manager.ts` | `packages/shared/src/storage/` | Note CRDT persistence |
-| `folder-storage-manager.ts` | `packages/shared/src/storage/` | Folder tree persistence |
-| `binary-format.ts` | `packages/shared/src/storage/` | LEB128 varint encoding |
-| `log-reader.ts` | `packages/shared/src/storage/` | Read .crdtlog files |
-| `log-writer.ts` | `packages/shared/src/storage/` | Write .crdtlog files |
-| `snapshot-reader.ts` | `packages/shared/src/storage/` | Read .crdtsnapshot files |
-| `snapshot-writer.ts` | `packages/shared/src/storage/` | Write .crdtsnapshot files |
-| `crdt-manager.ts` | `packages/desktop/src/main/crdt/` | Main process orchestration |
-| `note-doc.ts` | `packages/shared/src/crdt/` | Note Y.XmlFragment wrapper |
-| `folder-tree-doc.ts` | `packages/shared/src/crdt/` | Folder Y.Map wrapper |
+| File                        | Location                          | Purpose                     |
+| --------------------------- | --------------------------------- | --------------------------- |
+| `document-snapshot.ts`      | `packages/shared/src/storage/`    | Y.Doc + VectorClock pairing |
+| `note-storage-manager.ts`   | `packages/shared/src/storage/`    | Note CRDT persistence       |
+| `folder-storage-manager.ts` | `packages/shared/src/storage/`    | Folder tree persistence     |
+| `binary-format.ts`          | `packages/shared/src/storage/`    | LEB128 varint encoding      |
+| `log-reader.ts`             | `packages/shared/src/storage/`    | Read .crdtlog files         |
+| `log-writer.ts`             | `packages/shared/src/storage/`    | Write .crdtlog files        |
+| `snapshot-reader.ts`        | `packages/shared/src/storage/`    | Read .crdtsnapshot files    |
+| `snapshot-writer.ts`        | `packages/shared/src/storage/`    | Write .crdtsnapshot files   |
+| `crdt-manager.ts`           | `packages/desktop/src/main/crdt/` | Main process orchestration  |
+| `note-doc.ts`               | `packages/shared/src/crdt/`       | Note Y.XmlFragment wrapper  |
+| `folder-tree-doc.ts`        | `packages/shared/src/crdt/`       | Folder Y.Map wrapper        |
 
 ## Next Steps
 

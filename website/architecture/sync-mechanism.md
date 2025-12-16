@@ -137,6 +137,7 @@ async pollAndReload(noteId: string, targetSequence: string): Promise<void> {
 ### Challenge
 
 Deleting a note is different from modifying it:
+
 - Modified notes: New log entries appear, activity log notifies
 - Deleted notes: Files are removed, but other instances need to know
 
@@ -199,6 +200,7 @@ Cloud storage services may sync partial files. A snapshot file that's only half-
 ### Solution
 
 Snapshots use a **status byte** at offset 5:
+
 - `0x00` = INCOMPLETE (file is being written)
 - `0x01` = COMPLETE (safe to read)
 
@@ -296,7 +298,7 @@ powerMonitor.on('resume', async () => {
     for (const sd of database.getAllStorageDirs()) {
       await discoverNewNotes(sd.id, sd.path);
     }
-  }, 5000);  // 5 second delay
+  }, 5000); // 5 second delay
 });
 ```
 
@@ -379,27 +381,27 @@ sequenceDiagram
 
 ## Key Files Reference
 
-| File | Location | Purpose |
-|------|----------|---------|
-| `activity-logger.ts` | `packages/shared/src/storage/` | Write activity log entries |
-| `activity-sync.ts` | `packages/desktop/src/main/sync/` | Watch and process activity logs |
-| `deletion-logger.ts` | `packages/desktop/src/main/sync/` | Write deletion log entries |
-| `deletion-sync.ts` | `packages/desktop/src/main/sync/` | Watch and process deletion logs |
-| `snapshot-writer.ts` | `packages/shared/src/storage/` | Write snapshots with flag byte |
-| `snapshot-reader.ts` | `packages/shared/src/storage/` | Read snapshots (skip incomplete) |
-| `index.ts` | `packages/desktop/src/main/` | Wake-from-sleep handler |
+| File                 | Location                          | Purpose                          |
+| -------------------- | --------------------------------- | -------------------------------- |
+| `activity-logger.ts` | `packages/shared/src/storage/`    | Write activity log entries       |
+| `activity-sync.ts`   | `packages/desktop/src/main/sync/` | Watch and process activity logs  |
+| `deletion-logger.ts` | `packages/desktop/src/main/sync/` | Write deletion log entries       |
+| `deletion-sync.ts`   | `packages/desktop/src/main/sync/` | Watch and process deletion logs  |
+| `snapshot-writer.ts` | `packages/shared/src/storage/`    | Write snapshots with flag byte   |
+| `snapshot-reader.ts` | `packages/shared/src/storage/`    | Read snapshots (skip incomplete) |
+| `index.ts`           | `packages/desktop/src/main/`      | Wake-from-sleep handler          |
 
 ## Configuration
 
 ### Timeouts and Delays
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| Poll base delay | 500ms | Initial delay before retry |
-| Poll max delay | 60s | Maximum retry delay |
-| Poll max attempts | 10 | Retries before giving up |
-| Wake-from-sleep delay | 5s | Wait for cloud sync after wake |
-| Activity log compact threshold | 1000 entries | Max entries before compaction |
+| Setting                        | Value        | Purpose                        |
+| ------------------------------ | ------------ | ------------------------------ |
+| Poll base delay                | 500ms        | Initial delay before retry     |
+| Poll max delay                 | 60s          | Maximum retry delay            |
+| Poll max attempts              | 10           | Retries before giving up       |
+| Wake-from-sleep delay          | 5s           | Wait for cloud sync after wake |
+| Activity log compact threshold | 1000 entries | Max entries before compaction  |
 
 ### Stale Entry Handling
 
