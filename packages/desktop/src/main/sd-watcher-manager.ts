@@ -481,7 +481,7 @@ export class SDWatcherManager {
             .then(() => {
               console.log(`[MediaWatcher ${sdId}] Registered synced image:`, { imageId, filename });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
               // File may have been deleted or moved, ignore
               console.log(`[MediaWatcher ${sdId}] Failed to register image:`, imageId, err);
             });

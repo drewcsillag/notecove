@@ -7,7 +7,12 @@
 
 import { BrowserWindow } from 'electron';
 import type { HandlerDependencies, HandlerContext, WebBroadcastCallback } from './types';
-import { isValidImageId, ImageStorage, SyncDirectoryStructure } from '@notecove/shared';
+import {
+  isValidImageId,
+  ImageStorage,
+  SyncDirectoryStructure,
+  type DiscoveredImage,
+} from '@notecove/shared';
 import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
 
 // Handler modules
@@ -147,7 +152,7 @@ export class IPCHandlers {
         label: primarySD.name,
       });
       const imageStorage = new ImageStorage(fsAdapter, sdStructure);
-      const result = await imageStorage.discoverImageOnDisk(imageId);
+      const result: DiscoveredImage | null = await imageStorage.discoverImageOnDisk(imageId);
       if (result) {
         return {
           sdId: primarySdId,
@@ -170,7 +175,7 @@ export class IPCHandlers {
         label: sd.name,
       });
       const imageStorage = new ImageStorage(fsAdapter, sdStructure);
-      const result = await imageStorage.discoverImageOnDisk(imageId);
+      const result: DiscoveredImage | null = await imageStorage.discoverImageOnDisk(imageId);
       if (result) {
         console.warn(`[Image] Found image ${imageId} in SD ${sd.id} instead of ${primarySdId}`);
         return {

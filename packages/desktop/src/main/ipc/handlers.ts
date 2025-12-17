@@ -43,6 +43,7 @@ import {
   isValidImageId,
   SyncDirectoryStructure,
   AppStateKey,
+  type DiscoveredImage,
 } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { ThumbnailGenerator, type ThumbnailResult } from '../thumbnail';
@@ -229,7 +230,7 @@ export class IPCHandlers {
         label: primarySD.name,
       });
       const imageStorage = new ImageStorage(fsAdapter, sdStructure);
-      const result = await imageStorage.discoverImageOnDisk(imageId);
+      const result: DiscoveredImage | null = await imageStorage.discoverImageOnDisk(imageId);
       if (result) {
         return {
           sdId: primarySdId,
@@ -252,7 +253,7 @@ export class IPCHandlers {
         label: sd.name,
       });
       const imageStorage = new ImageStorage(fsAdapter, sdStructure);
-      const result = await imageStorage.discoverImageOnDisk(imageId);
+      const result: DiscoveredImage | null = await imageStorage.discoverImageOnDisk(imageId);
       if (result) {
         console.warn(`[Image] Found image ${imageId} in SD ${sd.id} instead of ${primarySdId}`);
         return {

@@ -195,7 +195,7 @@ export class StorageInspectorService {
           modified: new Date(stats.mtimeMs),
         };
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`[StorageInspector] Error reading ${fullPath}:`, error);
       return null;
     }
@@ -228,7 +228,7 @@ export class StorageInspectorService {
         if (a.type !== 'directory' && b.type === 'directory') return 1;
         return a.name.localeCompare(b.name);
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`[StorageInspector] Error listing ${fullPath}:`, error);
     }
 

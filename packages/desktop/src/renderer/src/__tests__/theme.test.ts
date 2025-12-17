@@ -47,4 +47,64 @@ describe('Theme', () => {
       expect(theme.palette.mode).toBe('light');
     });
   });
+
+  describe('scrollbar styling', () => {
+    it('should define scrollbar styles in light mode', () => {
+      const lightTheme = createAppTheme('light');
+      const styleOverrides = lightTheme.components?.MuiCssBaseline?.styleOverrides as Record<
+        string,
+        unknown
+      >;
+
+      expect(styleOverrides).toBeDefined();
+      expect(styleOverrides['::-webkit-scrollbar']).toBeDefined();
+      expect(styleOverrides['::-webkit-scrollbar-track']).toBeDefined();
+      expect(styleOverrides['::-webkit-scrollbar-thumb']).toBeDefined();
+    });
+
+    it('should define scrollbar styles in dark mode', () => {
+      const darkTheme = createAppTheme('dark');
+      const styleOverrides = darkTheme.components?.MuiCssBaseline?.styleOverrides as Record<
+        string,
+        unknown
+      >;
+
+      expect(styleOverrides).toBeDefined();
+      expect(styleOverrides['::-webkit-scrollbar']).toBeDefined();
+      expect(styleOverrides['::-webkit-scrollbar-track']).toBeDefined();
+      expect(styleOverrides['::-webkit-scrollbar-thumb']).toBeDefined();
+    });
+
+    it('should have different thumb colors for light and dark modes', () => {
+      const lightTheme = createAppTheme('light');
+      const darkTheme = createAppTheme('dark');
+
+      const lightOverrides = lightTheme.components?.MuiCssBaseline?.styleOverrides as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const darkOverrides = darkTheme.components?.MuiCssBaseline?.styleOverrides as Record<
+        string,
+        Record<string, unknown>
+      >;
+
+      const lightThumbColor = lightOverrides['::-webkit-scrollbar-thumb']?.['backgroundColor'];
+      const darkThumbColor = darkOverrides['::-webkit-scrollbar-thumb']?.['backgroundColor'];
+
+      expect(lightThumbColor).toBeDefined();
+      expect(darkThumbColor).toBeDefined();
+      expect(lightThumbColor).not.toBe(darkThumbColor);
+    });
+
+    it('should set scrollbar width', () => {
+      const lightTheme = createAppTheme('light');
+      const styleOverrides = lightTheme.components?.MuiCssBaseline?.styleOverrides as Record<
+        string,
+        Record<string, unknown>
+      >;
+
+      const scrollbarWidth = styleOverrides['::-webkit-scrollbar']?.['width'];
+      expect(scrollbarWidth).toBeDefined();
+    });
+  });
 });

@@ -46,7 +46,7 @@ export async function scanAndRegisterMedia(
   let files: string[];
   try {
     files = await fs.readdir(mediaDir);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`[MediaSync] Failed to read media directory: ${mediaDir}`, error);
     return 0;
   }
