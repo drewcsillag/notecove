@@ -1140,6 +1140,20 @@ declare global {
           }[]
         >;
       };
+
+      /** Theme operations for dark mode sync across windows */
+      theme: {
+        /**
+         * Set the theme mode. This saves to database and broadcasts to all windows.
+         * Use this from Settings dialog to ensure all windows update.
+         */
+        set: (theme: 'light' | 'dark') => Promise<void>;
+        /**
+         * Listen for theme changes broadcast from main process.
+         * Called when any window changes the theme (via menu or Settings).
+         */
+        onChanged: (callback: (theme: 'light' | 'dark') => void) => () => void;
+      };
     };
   }
 }

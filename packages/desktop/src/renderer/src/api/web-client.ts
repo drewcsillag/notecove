@@ -1004,6 +1004,11 @@ export const webClient: typeof window.electronAPI = {
   mention: {
     getUsers: browserNotAvailable('mention.getUsers'),
   },
+
+  theme: {
+    set: browserNotAvailable('theme.set'),
+    onChanged: noopSubscription,
+  },
 };
 
 /**

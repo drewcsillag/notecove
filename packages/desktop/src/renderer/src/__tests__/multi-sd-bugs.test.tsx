@@ -152,6 +152,10 @@ const mockElectronAPI = {
     onReactionAdded: jest.fn(() => () => {}),
     onReactionRemoved: jest.fn(() => () => {}),
   },
+  theme: {
+    set: jest.fn().mockResolvedValue(undefined),
+    onChanged: jest.fn((_callback: (theme: 'light' | 'dark') => void) => () => {}),
+  },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */
 

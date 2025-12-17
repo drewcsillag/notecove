@@ -33,6 +33,7 @@ import {
   webServerApi,
   inspectorApi,
 } from './api/misc-api';
+import { themeApi } from './api/theme-api';
 
 // Expose IPC API to renderer
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -130,6 +131,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Mention operations
   mention: mentionApi,
+
+  // Theme operations
+  theme: themeApi,
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection

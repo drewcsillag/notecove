@@ -2,7 +2,7 @@
  * Main App Component
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { CssBaseline, ThemeProvider, Box, type PaletteMode } from '@mui/material';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -42,6 +42,8 @@ function App(): React.ReactElement {
   const [activeSdId, setActiveSdId] = useState<string | undefined>(undefined);
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
+  // Ref to track if theme change came from broadcast (skip redundant save)
+  const themeFromBroadcastRef = useRef(false);
   // Tag filters: tagId -> 'include' | 'exclude' (omitted = neutral/no filter)
   const [tagFilters, setTagFilters] = useState<Record<string, 'include' | 'exclude'>>({});
   const [showTagPanel, setShowTagPanel] = useState(true);
@@ -315,9 +317,27 @@ function App(): React.ReactElement {
     void loadTheme();
   }, []);
 
+  // Listen for theme change broadcasts from main process
+  useEffect(() => {
+    const cleanup = window.electronAPI.theme.onChanged((newTheme) => {
+      // Mark that this change came from broadcast (skip redundant save)
+      themeFromBroadcastRef.current = true;
+      setThemeMode(newTheme);
+    });
+
+    return cleanup;
+  }, []);
+
   // Save theme preference when it changes (only after initial load)
+  // Skip if the change came from a broadcast (already saved by main process)
   useEffect(() => {
     if (!themeLoaded) return;
+
+    // If theme change came from broadcast, skip save (already saved by main process)
+    if (themeFromBroadcastRef.current) {
+      themeFromBroadcastRef.current = false;
+      return;
+    }
 
     const saveTheme = async (): Promise<void> => {
       try {

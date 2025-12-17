@@ -7,7 +7,7 @@
 
 import { app, BrowserWindow, Menu, shell, clipboard } from 'electron';
 import { is } from '@electron-toolkit/utils';
-import type { Database } from '@notecove/shared';
+import { AppStateKey, type Database } from '@notecove/shared';
 import type { IPCHandlers } from './ipc/handlers';
 import type { WebServerManager } from './web-server/manager';
 import type { WindowStateManager } from './window-state-manager';
@@ -258,10 +258,23 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'Toggle Dark Mode',
           accelerator: 'CmdOrCtrl+Shift+D',
           click: () => {
-            // TODO: Toggle dark mode
-            if (mainWindow) {
-              mainWindow.webContents.send('menu:toggle-dark-mode');
-            }
+            void (async () => {
+              if (!database) return;
+
+              // Read current theme from database
+              const currentTheme = await database.getState(AppStateKey.ThemeMode);
+              const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+              // Save new theme to database
+              await database.setState(AppStateKey.ThemeMode, newTheme);
+
+              // Broadcast to ALL windows
+              for (const win of allWindows) {
+                if (!win.isDestroyed()) {
+                  win.webContents.send('theme:changed', newTheme);
+                }
+              }
+            })();
           },
         },
         { type: 'separator' },

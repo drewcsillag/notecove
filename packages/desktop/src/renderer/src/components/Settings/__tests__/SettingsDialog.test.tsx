@@ -24,6 +24,12 @@ const mockElectronAPI = {
     getDatabasePath: jest.fn().mockResolvedValue('/test/path/notecove.db'),
     setDatabasePath: jest.fn(),
   },
+  theme: {
+    set: jest.fn().mockResolvedValue(undefined),
+    onChanged: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+  },
 };
 
 // Set up global mocks before tests
@@ -199,6 +205,72 @@ describe('SettingsDialog', () => {
     await waitFor(() => {
       const sdTab = screen.getByRole('tab', { name: 'Storage Directories' });
       expect(sdTab).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  describe('Theme Broadcasting', () => {
+    it('should call theme.set IPC when dark mode is toggled', async () => {
+      const onClose = jest.fn();
+      const onThemeChange = jest.fn();
+      mockElectronAPI.sd.list.mockResolvedValue([]);
+
+      render(
+        <SettingsDialog
+          open={true}
+          onClose={onClose}
+          themeMode="light"
+          onThemeChange={onThemeChange}
+        />
+      );
+
+      // Navigate to Appearance tab
+      const appearanceTab = screen.getByText('Appearance');
+      fireEvent.click(appearanceTab);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Customize the look and feel/i)).toBeInTheDocument();
+      });
+
+      // Find and click the dark mode toggle
+      const darkModeSwitch = screen.getByRole('checkbox');
+      fireEvent.click(darkModeSwitch);
+
+      // Should call theme.set IPC to broadcast to all windows
+      await waitFor(() => {
+        expect(mockElectronAPI.theme.set).toHaveBeenCalledWith('dark');
+      });
+    });
+
+    it('should call theme.set with light when toggling off dark mode', async () => {
+      const onClose = jest.fn();
+      const onThemeChange = jest.fn();
+      mockElectronAPI.sd.list.mockResolvedValue([]);
+
+      render(
+        <SettingsDialog
+          open={true}
+          onClose={onClose}
+          themeMode="dark"
+          onThemeChange={onThemeChange}
+        />
+      );
+
+      // Navigate to Appearance tab
+      const appearanceTab = screen.getByText('Appearance');
+      fireEvent.click(appearanceTab);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Customize the look and feel/i)).toBeInTheDocument();
+      });
+
+      // Find and click the dark mode toggle (currently on, should turn off)
+      const darkModeSwitch = screen.getByRole('checkbox');
+      fireEvent.click(darkModeSwitch);
+
+      // Should call theme.set IPC with 'light'
+      await waitFor(() => {
+        expect(mockElectronAPI.theme.set).toHaveBeenCalledWith('light');
+      });
     });
   });
 });

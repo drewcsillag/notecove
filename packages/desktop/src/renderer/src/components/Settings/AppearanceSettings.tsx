@@ -16,11 +16,12 @@ export interface AppearanceSettingsProps {
 
 export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   themeMode,
-  onThemeChange,
+  onThemeChange: _onThemeChange, // kept for backward compatibility but not used
 }) => {
   const handleDarkModeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newMode = event.target.checked ? 'dark' : 'light';
-    onThemeChange(newMode);
+    // Use IPC to set theme - this broadcasts to all windows
+    void window.electronAPI.theme.set(newMode);
   };
 
   return (

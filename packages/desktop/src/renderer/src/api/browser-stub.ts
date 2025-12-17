@@ -320,6 +320,11 @@ export const browserApiStub: typeof window.electronAPI = {
   mention: {
     getUsers: notImplemented('mention.getUsers'),
   },
+
+  theme: {
+    set: notImplemented('theme.set'),
+    onChanged: stubEventSubscription,
+  },
 };
 
 /**

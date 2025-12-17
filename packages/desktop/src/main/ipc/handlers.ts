@@ -437,6 +437,9 @@ export class IPCHandlers {
     ipcMain.handle('appState:get', this.handleGetAppState.bind(this));
     ipcMain.handle('appState:set', this.handleSetAppState.bind(this));
 
+    // Theme operations (for cross-window sync)
+    ipcMain.handle('theme:set', this.handleSetTheme.bind(this));
+
     // Sync status operations
     ipcMain.handle('sync:getStatus', this.handleGetSyncStatus.bind(this));
     ipcMain.handle('sync:getStaleSyncs', this.handleGetStaleSyncs.bind(this));
@@ -2054,6 +2057,18 @@ export class IPCHandlers {
     if (this.onUserSettingsChanged && (key === 'username' || key === 'userHandle')) {
       await this.onUserSettingsChanged(key, value);
     }
+  }
+
+  /**
+   * Set theme and broadcast to all windows.
+   * Used by Settings dialog to ensure all windows update theme together.
+   */
+  private async handleSetTheme(_event: IpcMainInvokeEvent, theme: 'light' | 'dark'): Promise<void> {
+    // Save to database
+    await this.database.setState(AppStateKey.ThemeMode, theme);
+
+    // Broadcast to all windows
+    this.broadcastToAll('theme:changed', theme);
   }
 
   // ============================================================================
