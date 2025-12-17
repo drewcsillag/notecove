@@ -31,10 +31,7 @@ export interface CreateWindowOptions {
 /**
  * Get the window title based on current profile
  */
-export function getWindowTitle(
-  isPackaged: boolean,
-  selectedProfileName: string | null
-): string {
+export function getWindowTitle(isPackaged: boolean, selectedProfileName: string | null): string {
   const isDevBuild = !isPackaged;
   const devPrefix = isDevBuild ? '[DEV] ' : '';
   const profileSuffix = selectedProfileName ? ` - ${selectedProfileName}` : '';
@@ -61,11 +58,7 @@ export function createWindow(
   shouldSetAsSyncStatus: boolean;
 } {
   // If requesting sync status window and one already exists, just focus it
-  if (
-    options?.syncStatus &&
-    context.syncStatusWindow &&
-    !context.syncStatusWindow.isDestroyed()
-  ) {
+  if (options?.syncStatus && context.syncStatusWindow && !context.syncStatusWindow.isDestroyed()) {
     context.syncStatusWindow.focus();
     return {
       window: context.syncStatusWindow,

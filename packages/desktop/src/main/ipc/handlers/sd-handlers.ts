@@ -4,8 +4,6 @@
  * IPC handlers for storage directory operations: list, create, delete, rename, etc.
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import { ipcMain, dialog, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -53,11 +51,7 @@ function handleListStorageDirs(ctx: HandlerContext) {
 }
 
 function handleCreateStorageDir(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    name: string,
-    sdPath: string
-  ): Promise<string> => {
+  return async (_event: IpcMainInvokeEvent, name: string, sdPath: string): Promise<string> => {
     const { database, onStorageDirCreated, broadcastToAll } = ctx;
 
     // Use unified SD ID system (SD_ID file, with .sd-id migration)
@@ -109,21 +103,14 @@ function handleDeleteStorageDir(ctx: HandlerContext) {
 }
 
 function handleRenameStorageDir(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    newName: string
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, newName: string): Promise<void> => {
     await ctx.database.updateStorageDirName(sdId, newName);
     ctx.broadcastToAll('sd:updated', { operation: 'rename', sdId });
   };
 }
 
 function handleSelectSDPath(ctx: HandlerContext) {
-  return async (
-    event: IpcMainInvokeEvent,
-    defaultPath?: string
-  ): Promise<string | null> => {
+  return async (event: IpcMainInvokeEvent, defaultPath?: string): Promise<string | null> => {
     void ctx; // unused but part of handler pattern
 
     const window = BrowserWindow.fromWebContents(event.sender);

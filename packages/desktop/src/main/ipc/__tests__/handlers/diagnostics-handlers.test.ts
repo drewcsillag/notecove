@@ -27,6 +27,7 @@ jest.mock('electron', () => ({
 }));
 
 // Mock crypto and uuid
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
   randomUUID: jest.fn((): string => {
@@ -41,6 +42,7 @@ jest.mock('uuid', () => ({
     return nextUuid();
   }),
 }));
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 // Mock fs/promises
 jest.mock('fs/promises', () => ({
@@ -64,19 +66,29 @@ jest.mock('../../../storage/node-fs-adapter', () => {
       mkdir: jest.fn().mockResolvedValue(undefined),
       readFile: jest.fn().mockImplementation(async (filePath: string) => {
         if (fileStore.has(filePath)) return fileStore.get(filePath);
-        const error = new Error(`ENOENT: no such file or directory, open '${filePath}'`) as NodeJS.ErrnoException;
+        const error = new Error(
+          `ENOENT: no such file or directory, open '${filePath}'`
+        ) as NodeJS.ErrnoException;
         error.code = 'ENOENT';
         throw error;
       }),
-      writeFile: jest.fn().mockImplementation(async (filePath: string, data: Uint8Array) => fileStore.set(filePath, data)),
+      writeFile: jest
+        .fn()
+        .mockImplementation(async (filePath: string, data: Uint8Array) =>
+          fileStore.set(filePath, data)
+        ),
       appendFile: jest.fn().mockResolvedValue(undefined),
-      deleteFile: jest.fn().mockImplementation(async (filePath: string) => fileStore.delete(filePath)),
+      deleteFile: jest
+        .fn()
+        .mockImplementation(async (filePath: string) => fileStore.delete(filePath)),
       listFiles: jest.fn().mockResolvedValue([]),
       joinPath: (...segments: string[]) => path.join(...segments),
       dirname: (filePath: string) => path.dirname(filePath),
       basename: (filePath: string) => path.basename(filePath),
     })),
-    __clearFileStore: () => fileStore.clear(),
+    __clearFileStore: () => {
+      fileStore.clear();
+    },
   };
 });
 

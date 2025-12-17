@@ -27,10 +27,7 @@ import { NodeFileWatcher } from './storage/node-file-watcher';
 import { scanAndRegisterMedia } from './media-sync';
 import { ProfilePresenceReader } from './profile-presence-reader';
 import { reindexTagsForNotes } from './sd-watcher-helpers';
-import {
-  createActivitySyncCallbacks,
-  createDeletionSyncCallbacks,
-} from './sd-watcher-callbacks';
+import { createActivitySyncCallbacks, createDeletionSyncCallbacks } from './sd-watcher-callbacks';
 
 /**
  * Result of setting up SD watchers
@@ -184,7 +181,12 @@ export class SDWatcherManager {
       database: db,
     });
 
-    const deletionSync = new DeletionSync(fsAdapter, instanceId, deletionDir, deletionSyncCallbacks);
+    const deletionSync = new DeletionSync(
+      fsAdapter,
+      instanceId,
+      deletionDir,
+      deletionSyncCallbacks
+    );
 
     // Store the DeletionSync instance
     this.sdDeletionSyncs.set(sdId, deletionSync);
@@ -325,7 +327,10 @@ export class SDWatcherManager {
 
       // Ignore directory creation events and our own log file
       if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
-        console.log(`[ActivityWatcher ${sdId}] Ignoring own log file or directory:`, event.filename);
+        console.log(
+          `[ActivityWatcher ${sdId}] Ignoring own log file or directory:`,
+          event.filename
+        );
         // Broadcast for test debugging
         for (const window of BrowserWindow.getAllWindows()) {
           window.webContents.send('test:activity-watcher-debug', {
@@ -697,7 +702,7 @@ export class SDWatcherManager {
   /**
    * Wait for all pending syncs to complete with timeout
    */
-  async waitForPendingSyncs(timeoutMs: number = 5000): Promise<void> {
+  async waitForPendingSyncs(timeoutMs = 5000): Promise<void> {
     console.log('[App] Waiting for pending activity syncs...');
     const syncPromises: Promise<void>[] = [];
     for (const activitySync of this.sdActivitySyncs.values()) {
@@ -715,11 +720,7 @@ export class SDWatcherManager {
         ]);
         console.log('[App] All pending syncs completed');
       } catch {
-        console.warn(
-          '[App] Pending syncs timed out after',
-          timeoutMs,
-          'ms, continuing shutdown'
-        );
+        console.warn('[App] Pending syncs timed out after', timeoutMs, 'ms, continuing shutdown');
       }
     }
   }

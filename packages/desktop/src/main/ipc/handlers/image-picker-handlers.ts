@@ -5,8 +5,6 @@
  * pickAndSave, downloadAndSave, copyToClipboard, saveAs, openExternal, copyToSD
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import {
   ipcMain,
   dialog,
@@ -144,11 +142,7 @@ function handleImagePickAndSave(ctx: HandlerContext) {
 }
 
 function handleImageDownloadAndSave(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    url: string
-  ): Promise<string> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, url: string): Promise<string> => {
     const { database } = ctx;
 
     // Get SD from database
@@ -170,7 +164,7 @@ function handleImageDownloadAndSave(ctx: HandlerContext) {
         // Determine MIME type from extension
         const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
         mimeType = getMimeTypeFromExtension(ext);
-      } catch (err) {
+      } catch {
         throw new Error(`Failed to read local file: ${filePath}`);
       }
     } else {
@@ -259,11 +253,7 @@ function handleImageDownloadAndSave(ctx: HandlerContext) {
 }
 
 function handleImageCopyToClipboard(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    imageId: string
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, imageId: string): Promise<void> => {
     const { database } = ctx;
 
     // Get image metadata from database
@@ -342,11 +332,7 @@ function handleImageSaveAs(ctx: HandlerContext) {
 }
 
 function handleImageOpenExternal(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    imageId: string
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, imageId: string): Promise<void> => {
     const { database } = ctx;
 
     // Get image metadata from database

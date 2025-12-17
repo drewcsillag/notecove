@@ -7,8 +7,7 @@ import type { SyncProgress, SyncStatus, StaleSyncEntry } from '../../main/ipc/ty
 
 export const syncApi = {
   openWindow: (): Promise<void> => ipcRenderer.invoke('sync:openWindow') as Promise<void>,
-  getStatus: (): Promise<SyncStatus> =>
-    ipcRenderer.invoke('sync:getStatus') as Promise<SyncStatus>,
+  getStatus: (): Promise<SyncStatus> => ipcRenderer.invoke('sync:getStatus') as Promise<SyncStatus>,
   getStaleSyncs: (): Promise<StaleSyncEntry[]> =>
     ipcRenderer.invoke('sync:getStaleSyncs') as Promise<StaleSyncEntry[]>,
   skipStaleEntry: (

@@ -477,19 +477,17 @@ export function createMenu(deps: MenuDependencies): void {
               label: 'Copy Connection URL',
               enabled: webServerManager?.isRunning() ?? false,
               click: () => {
-                void (async () => {
-                  if (webServerManager?.isRunning()) {
-                    const status = webServerManager.getStatus();
-                    const connectionUrl = `${status.url}?token=${status.token}`;
-                    clipboard.writeText(connectionUrl);
-                    if (mainWindow) {
-                      mainWindow.webContents.send('notification:show', {
-                        title: 'Connection URL Copied',
-                        body: 'URL with token copied to clipboard',
-                      });
-                    }
+                if (webServerManager?.isRunning()) {
+                  const status = webServerManager.getStatus();
+                  const connectionUrl = `${status.url}?token=${status.token}`;
+                  clipboard.writeText(connectionUrl);
+                  if (mainWindow) {
+                    mainWindow.webContents.send('notification:show', {
+                      title: 'Connection URL Copied',
+                      body: 'URL with token copied to clipboard',
+                    });
                   }
-                })();
+                }
               },
             },
             { type: 'separator' as const },

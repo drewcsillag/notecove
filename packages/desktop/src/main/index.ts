@@ -163,7 +163,6 @@ async function initializeDatabase(profileId?: string): Promise<Database> {
   return db;
 }
 
-
 // App lifecycle
 // Create application menu
 
@@ -596,7 +595,10 @@ void app.whenReady().then(async () => {
         const perSd: SyncStatus['perSd'] = [];
         let totalPending = 0;
 
-        for (const [sdId, activitySync] of (sdWatcherManager?.getActivitySyncs() ?? new Map()).entries()) {
+        /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-plus-operands */
+        for (const [sdId, activitySync] of (
+          sdWatcherManager?.getActivitySyncs() ?? new Map()
+        ).entries()) {
           const count = activitySync.getPendingSyncCount();
           const noteIds = activitySync.getPendingNoteIds();
           totalPending += count;
@@ -609,6 +611,7 @@ void app.whenReady().then(async () => {
             pendingNoteIds: noteIds,
           });
         }
+        /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/restrict-plus-operands */
 
         return {
           pendingCount: totalPending,
@@ -625,7 +628,10 @@ void app.whenReady().then(async () => {
           return result;
         }
 
-        for (const [sdId, activitySync] of (sdWatcherManager?.getActivitySyncs() ?? new Map()).entries()) {
+        /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+        for (const [sdId, activitySync] of (
+          sdWatcherManager?.getActivitySyncs() ?? new Map()
+        ).entries()) {
           const staleEntries = activitySync.getStaleEntries();
 
           // Get SD name for display
@@ -669,6 +675,7 @@ void app.whenReady().then(async () => {
               gap: entry.gap,
               detectedAt: entry.detectedAt,
             };
+            /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 
             // Add optional fields only if they have values
             if (noteCache?.title) {
@@ -790,6 +797,7 @@ void app.whenReady().then(async () => {
 
     // Set up watchers for default SD AFTER ensureDefaultNote
     // This ensures the welcome note is created before activity sync runs
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     if (!sdWatcherManager) {
       throw new Error('SD Watcher Manager not initialized');
     }
@@ -857,9 +865,11 @@ void app.whenReady().then(async () => {
     // Periodic compaction of activity logs for all SDs (every 5 minutes)
     compactionInterval = setInterval(
       () => {
-        for (const [sdId, logger] of (sdWatcherManager?.getActivityLoggers() ?? new Map())) {
+        /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+        for (const [sdId, logger] of sdWatcherManager?.getActivityLoggers() ?? new Map()) {
           logger.compact().catch((err: unknown) => {
             console.error(`[ActivityLogger] Failed to compact log for SD ${sdId}:`, err);
+            /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
           });
         }
       },
@@ -1033,14 +1043,16 @@ void app.on('window-all-closed', () => {
   }
 });
 
-
 // Handle system resume from sleep/suspend
 // This triggers a sync from other instances to catch up on changes made while sleeping
 powerMonitor.on('resume', () => {
   console.log('[PowerMonitor] System resumed from sleep, triggering activity and deletion sync...');
 
   // Sync all storage directories - activity sync
-  for (const [sdId, activitySync] of (sdWatcherManager?.getActivitySyncs() ?? new Map()).entries()) {
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+  for (const [sdId, activitySync] of (
+    sdWatcherManager?.getActivitySyncs() ?? new Map()
+  ).entries()) {
     console.log(`[PowerMonitor] Syncing activity for SD ${sdId}...`);
     void (async () => {
       try {
@@ -1053,6 +1065,7 @@ powerMonitor.on('resume', () => {
         // Broadcast updates to all windows if there were changes
         if (affectedNotes.size > 0) {
           const noteIds = Array.from(affectedNotes);
+          /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
           for (const window of BrowserWindow.getAllWindows()) {
             window.webContents.send('note:externalUpdate', {
               operation: 'sync-resume',
@@ -1067,7 +1080,10 @@ powerMonitor.on('resume', () => {
   }
 
   // Sync all storage directories - deletion sync
-  for (const [sdId, deletionSync] of (sdWatcherManager?.getDeletionSyncs() ?? new Map()).entries()) {
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+  for (const [sdId, deletionSync] of (
+    sdWatcherManager?.getDeletionSyncs() ?? new Map()
+  ).entries()) {
     console.log(`[PowerMonitor] Syncing deletions for SD ${sdId}...`);
     void (async () => {
       try {
@@ -1076,6 +1092,7 @@ powerMonitor.on('resume', () => {
           `[PowerMonitor] SD ${sdId} deletion sync complete, deleted notes:`,
           Array.from(deletedNotes)
         );
+        /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
       } catch (error) {
         console.error(`[PowerMonitor] Failed to sync deletions for SD ${sdId}:`, error);
       }

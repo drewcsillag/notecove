@@ -5,8 +5,6 @@
  * duplicate, togglePin, move, moveToSD, updateTitle
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
@@ -250,14 +248,7 @@ function handleMoveNoteToSD(ctx: HandlerContext) {
 
     // Handle 'keepBoth' with legacy code path
     if (hasConflict && conflictResolution === 'keepBoth') {
-      await moveNoteToSD_Legacy(
-        ctx,
-        noteId,
-        sourceSdId,
-        targetSdId,
-        targetFolderId,
-        sourceNote
-      );
+      await moveNoteToSD_Legacy(ctx, noteId, sourceSdId, targetSdId, targetFolderId, sourceNote);
       return;
     }
 
@@ -407,12 +398,7 @@ async function copyNoteCRDTFiles(
     try {
       await fs.access(sourceNoteDir);
       await copyDirectoryRecursive(sourceNoteDir, targetNoteDir);
-      console.log(
-        '[IPC] Successfully copied CRDT files from',
-        sourceNoteDir,
-        'to',
-        targetNoteDir
-      );
+      console.log('[IPC] Successfully copied CRDT files from', sourceNoteDir, 'to', targetNoteDir);
     } catch {
       console.warn(`[IPC] Source note directory not found: ${sourceNoteDir}`);
     }

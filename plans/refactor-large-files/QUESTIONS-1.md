@@ -2,14 +2,14 @@
 
 ## Current State
 
-| File | Current Lines | Target | Over By |
-|------|--------------|--------|---------|
-| `handlers.ts` | 5,349 | <750 | 4,599 (needs ~8 files) |
-| `handlers.test.ts` | 4,464 | <750 | 3,714 (needs ~7 files) |
-| `main/index.ts` | 4,037 | <750 | 3,287 (needs ~6 files) |
-| `cross-machine-sync.spec.ts` | 3,145 | <750 | 2,395 (needs ~5 files) |
-| `preload/index.ts` | 2,515 | <750 | 1,765 (needs ~4 files) |
-| `database.ts` | 1,874 | <750 | 1,124 (needs ~3 files) |
+| File                         | Current Lines | Target | Over By                |
+| ---------------------------- | ------------- | ------ | ---------------------- |
+| `handlers.ts`                | 5,349         | <750   | 4,599 (needs ~8 files) |
+| `handlers.test.ts`           | 4,464         | <750   | 3,714 (needs ~7 files) |
+| `main/index.ts`              | 4,037         | <750   | 3,287 (needs ~6 files) |
+| `cross-machine-sync.spec.ts` | 3,145         | <750   | 2,395 (needs ~5 files) |
+| `preload/index.ts`           | 2,515         | <750   | 1,765 (needs ~4 files) |
+| `database.ts`                | 1,874         | <750   | 1,124 (needs ~3 files) |
 
 ## File Analysis & Proposed Splits
 
@@ -17,18 +17,19 @@
 
 The IPCHandlers class contains handlers grouped by domain. Natural split:
 
-- **note-handlers.ts** - note:* IPC handlers
-- **folder-handlers.ts** - folder:* IPC handlers
-- **sd-handlers.ts** - sd:* (storage directory) handlers
-- **sync-handlers.ts** - sync:* handlers
-- **image-handlers.ts** - image:*, thumbnail:* handlers
-- **window-handlers.ts** - window:*, windowState:* handlers
-- **diagnostics-handlers.ts** - diagnostics:*, recovery:*, backup:* handlers
-- **misc-handlers.ts** - history:*, tag:*, link:*, config:*, telemetry:*, export:*, import:*, comment:*, mention:*, inspector:*, tools:*, appState:*, testing:*, webServer:* handlers (or split further)
+- **note-handlers.ts** - note:\* IPC handlers
+- **folder-handlers.ts** - folder:\* IPC handlers
+- **sd-handlers.ts** - sd:\* (storage directory) handlers
+- **sync-handlers.ts** - sync:\* handlers
+- **image-handlers.ts** - image:_, thumbnail:_ handlers
+- **window-handlers.ts** - window:_, windowState:_ handlers
+- **diagnostics-handlers.ts** - diagnostics:_, recovery:_, backup:\* handlers
+- **misc-handlers.ts** - history:_, tag:_, link:_, config:_, telemetry:_, export:_, import:_, comment:_, mention:_, inspector:_, tools:_, appState:_, testing:_, webServer:_ handlers (or split further)
 
 ### 2. `handlers.test.ts` (~4,464 lines → aligned with handlers.ts)
 
 Should mirror the handler file structure:
+
 - **note-handlers.test.ts**
 - **folder-handlers.test.ts**
 - **sd-handlers.test.ts**
@@ -150,6 +151,7 @@ B
 ## No More Questions
 
 After analysis, I have sufficient clarity to proceed. The patterns are consistent across files:
+
 - Split by domain/entity type
 - Maintain aligned structure between handlers.ts and handlers.test.ts
 - Use barrel exports to maintain clean imports

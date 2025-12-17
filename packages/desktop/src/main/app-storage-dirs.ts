@@ -24,7 +24,7 @@ export async function initializeDefaultSD(
   fsAdapter: NodeFileSystemAdapter,
   sdMarker: SDMarker,
   currentSDType: SDType,
-  skipMarker: boolean = false
+  skipMarker = false
 ): Promise<void> {
   // Initialize SD structure with config
   const sdConfig: SDConfig = {
@@ -58,7 +58,7 @@ export async function loadAndRegisterSDs(
   sdMarker: SDMarker,
   currentSDType: SDType,
   isDevBuild: boolean,
-  skipMarker: boolean = false
+  skipMarker = false
 ): Promise<void> {
   const allSDs = await database.getAllStorageDirs();
 

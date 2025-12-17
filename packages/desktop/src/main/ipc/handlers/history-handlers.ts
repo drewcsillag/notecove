@@ -4,8 +4,6 @@
  * IPC handlers for note history operations: timeline, stats, reconstruction.
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import * as Y from 'yjs';
 import * as path from 'path';
@@ -213,15 +211,15 @@ function handleGetSessionPreview(ctx: HandlerContext) {
     const extractPreview = (doc: Y.Doc): string => {
       const content = doc.getXmlFragment('content');
       let text = '';
-      content.forEach((item) => {
+      content.forEach((item: Y.XmlText | Y.XmlElement) => {
         if (item instanceof Y.XmlText) {
-          text += item.toString();
+          text += String(item.toString());
         } else if (item instanceof Y.XmlElement) {
           const extractTextFromElement = (elem: Y.XmlElement): string => {
             let elemText = '';
-            elem.forEach((child) => {
+            elem.forEach((child: Y.XmlText | Y.XmlElement) => {
               if (child instanceof Y.XmlText) {
-                elemText += child.toString();
+                elemText += String(child.toString());
               } else if (child instanceof Y.XmlElement) {
                 elemText += extractTextFromElement(child);
               }

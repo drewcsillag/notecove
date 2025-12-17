@@ -9,16 +9,65 @@
 jest.mock('electron', () => ({
   ipcMain: { handle: jest.fn(), removeHandler: jest.fn() },
   BrowserWindow: { getAllWindows: jest.fn(() => []) },
-  app: { getPath: jest.fn((name: string) => name === 'userData' ? '/mock/user/data' : `/mock/${name}`) },
+  app: {
+    getPath: jest.fn((name: string) => (name === 'userData' ? '/mock/user/data' : `/mock/${name}`)),
+  },
 }));
 
-jest.mock('crypto', () => ({ ...jest.requireActual('crypto'), randomUUID: jest.fn((): string => { const { nextUuid } = require('./test-utils'); return nextUuid(); }) }));
-jest.mock('uuid', () => ({ v4: jest.fn((): string => { const { nextUuid } = require('./test-utils'); return nextUuid(); }) }));
-jest.mock('fs/promises', () => ({ ...jest.requireActual('fs/promises'), readdir: jest.fn().mockResolvedValue([]), readFile: jest.fn().mockRejectedValue({ code: 'ENOENT' }), writeFile: jest.fn().mockResolvedValue(undefined), unlink: jest.fn().mockResolvedValue(undefined), mkdir: jest.fn().mockResolvedValue(undefined), access: jest.fn().mockRejectedValue({ code: 'ENOENT' }) }));
-jest.mock('../../../storage/node-fs-adapter', () => { const path = jest.requireActual('path'); const fileStore = new Map(); return { NodeFileSystemAdapter: jest.fn().mockImplementation(() => ({ exists: jest.fn().mockImplementation(async (p: string) => fileStore.has(p)), mkdir: jest.fn().mockResolvedValue(undefined), readFile: jest.fn(), writeFile: jest.fn(), appendFile: jest.fn().mockResolvedValue(undefined), deleteFile: jest.fn(), listFiles: jest.fn().mockResolvedValue([]), joinPath: (...s: string[]) => path.join(...s), dirname: (p: string) => path.dirname(p), basename: (p: string) => path.basename(p) })), __clearFileStore: () => fileStore.clear() }; });
+/* eslint-disable @typescript-eslint/no-require-imports */
+jest.mock('crypto', () => ({
+  ...jest.requireActual('crypto'),
+  randomUUID: jest.fn((): string => {
+    const { nextUuid } = require('./test-utils');
+    return nextUuid();
+  }),
+}));
+jest.mock('uuid', () => ({
+  v4: jest.fn((): string => {
+    const { nextUuid } = require('./test-utils');
+    return nextUuid();
+  }),
+}));
+/* eslint-enable @typescript-eslint/no-require-imports */
+jest.mock('fs/promises', () => ({
+  ...jest.requireActual('fs/promises'),
+  readdir: jest.fn().mockResolvedValue([]),
+  readFile: jest.fn().mockRejectedValue({ code: 'ENOENT' }),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  access: jest.fn().mockRejectedValue({ code: 'ENOENT' }),
+}));
+jest.mock('../../../storage/node-fs-adapter', () => {
+  const path = jest.requireActual('path');
+  const fileStore = new Map();
+  return {
+    NodeFileSystemAdapter: jest.fn().mockImplementation(() => ({
+      exists: jest.fn().mockImplementation(async (p: string) => fileStore.has(p)),
+      mkdir: jest.fn().mockResolvedValue(undefined),
+      readFile: jest.fn(),
+      writeFile: jest.fn(),
+      appendFile: jest.fn().mockResolvedValue(undefined),
+      deleteFile: jest.fn(),
+      listFiles: jest.fn().mockResolvedValue([]),
+      joinPath: (...s: string[]) => path.join(...s),
+      dirname: (p: string) => path.dirname(p),
+      basename: (p: string) => path.basename(p),
+    })),
+    __clearFileStore: () => {
+      fileStore.clear();
+    },
+  };
+});
 
 import { IPCHandlers } from '../../handlers';
-import { createAllMocks, castMocksToReal, resetUuidCounter, createMockNoteDoc, type AllMocks } from './test-utils';
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  createMockNoteDoc,
+  type AllMocks,
+} from './test-utils';
 
 describe('Note Query Handlers', () => {
   let handlers: IPCHandlers;
@@ -28,10 +77,21 @@ describe('Note Query Handlers', () => {
     resetUuidCounter();
     mocks = createAllMocks();
     const realMocks = castMocksToReal(mocks);
-    handlers = new IPCHandlers(realMocks.crdtManager, realMocks.database, realMocks.configManager, realMocks.appendLogManager, realMocks.noteMoveManager, realMocks.diagnosticsManager, realMocks.backupManager, 'test-profile-id');
+    handlers = new IPCHandlers(
+      realMocks.crdtManager,
+      realMocks.database,
+      realMocks.configManager,
+      realMocks.appendLogManager,
+      realMocks.noteMoveManager,
+      realMocks.diagnosticsManager,
+      realMocks.backupManager,
+      'test-profile-id'
+    );
   });
 
-  afterEach(() => { handlers.destroy(); });
+  afterEach(() => {
+    handlers.destroy();
+  });
 
   describe('note:list', () => {
     it('should list notes in a folder', async () => {
@@ -49,7 +109,9 @@ describe('Note Query Handlers', () => {
     it('should search notes', async () => {
       const mockEvent = {} as any;
       const query = 'test';
-      const results = [{ noteId: 'note-1', title: 'Test Note', snippet: 'test content', rank: 0.5 }];
+      const results = [
+        { noteId: 'note-1', title: 'Test Note', snippet: 'test content', rank: 0.5 },
+      ];
       mocks.database.searchNotes.mockResolvedValue(results);
       const result = await (handlers as any).handleSearchNotes(mockEvent, query);
       expect(result).toEqual(results);
@@ -60,11 +122,41 @@ describe('Note Query Handlers', () => {
     it('should return note metadata', async () => {
       const mockEvent = {} as any;
       const noteId = 'note-123';
-      const metadata = { id: noteId, sdId: 'test-sd', folderId: null, deleted: false };
-      const mockNoteDoc = createMockNoteDoc({ getMetadata: jest.fn().mockReturnValue(metadata) });
+      const mockNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: 'test-sd',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        contentPreview: '',
+        contentText: '',
+        created: Date.now(),
+        modified: Date.now(),
+      };
+      const crdtMetadata = {
+        id: noteId,
+        sdId: 'test-sd',
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: Date.now(),
+        modified: Date.now(),
+      };
+      const mockNoteDoc = createMockNoteDoc({
+        getMetadata: jest.fn().mockReturnValue(crdtMetadata),
+      });
+      mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
-      const result = await (handlers as any).handleGetNoteMetadata(mockEvent, noteId);
-      expect(result).toEqual(metadata);
+      const result = await (handlers as any).handleGetMetadata(mockEvent, noteId);
+      expect(result).toMatchObject({
+        noteId: noteId,
+        title: 'Test Note',
+        folderId: '',
+        deleted: false,
+      });
+      expect(result.createdAt).toBeDefined();
+      expect(result.modifiedAt).toBeDefined();
     });
   });
 

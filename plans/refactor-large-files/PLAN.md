@@ -1,9 +1,11 @@
 # Refactoring Large Files - Implementation Plan
 
 ## Goal
+
 Refactor 6 large files to be under 750 lines each, maintaining aligned structure between related files (handlers.ts ↔ handlers.test.ts).
 
 ## Design Decisions (from Q&A)
+
 - **Q1**: Delegation pattern for handlers (functions, not classes)
 - **Q2**: Shared test utilities with centralized mock factories
 - **Q3**: Source-level split for preload, vite handles bundling
@@ -18,19 +20,19 @@ Refactor 6 large files to be under 750 lines each, maintaining aligned structure
 
 Create `/packages/desktop/src/main/ipc/handlers/` directory with:
 
-| File | IPC Prefixes | Est. Lines |
-|------|--------------|------------|
-| `note-handlers.ts` | `note:*` | ~600 |
-| `folder-handlers.ts` | `folder:*` | ~300 |
-| `sd-handlers.ts` | `sd:*` | ~400 |
-| `sync-handlers.ts` | `sync:*` | ~200 |
-| `image-handlers.ts` | `image:*`, `thumbnail:*` | ~500 |
-| `window-handlers.ts` | `window:*`, `windowState:*` | ~200 |
-| `diagnostics-handlers.ts` | `diagnostics:*`, `recovery:*`, `backup:*` | ~500 |
-| `export-import-handlers.ts` | `export:*`, `import:*` | ~400 |
-| `misc-handlers.ts` | `history:*`, `tag:*`, `link:*`, `config:*`, `telemetry:*`, `comment:*`, `mention:*`, `inspector:*`, `tools:*`, `appState:*`, `testing:*`, `webServer:*`, `app:*`, `profile:*`, `shell:*`, `clipboard:*` | ~600 |
-| `types.ts` | Callback types, shared interfaces | ~100 |
-| `index.ts` | IPCHandlers facade class | ~150 |
+| File                        | IPC Prefixes                                                                                                                                                                                            | Est. Lines |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `note-handlers.ts`          | `note:*`                                                                                                                                                                                                | ~600       |
+| `folder-handlers.ts`        | `folder:*`                                                                                                                                                                                              | ~300       |
+| `sd-handlers.ts`            | `sd:*`                                                                                                                                                                                                  | ~400       |
+| `sync-handlers.ts`          | `sync:*`                                                                                                                                                                                                | ~200       |
+| `image-handlers.ts`         | `image:*`, `thumbnail:*`                                                                                                                                                                                | ~500       |
+| `window-handlers.ts`        | `window:*`, `windowState:*`                                                                                                                                                                             | ~200       |
+| `diagnostics-handlers.ts`   | `diagnostics:*`, `recovery:*`, `backup:*`                                                                                                                                                               | ~500       |
+| `export-import-handlers.ts` | `export:*`, `import:*`                                                                                                                                                                                  | ~400       |
+| `misc-handlers.ts`          | `history:*`, `tag:*`, `link:*`, `config:*`, `telemetry:*`, `comment:*`, `mention:*`, `inspector:*`, `tools:*`, `appState:*`, `testing:*`, `webServer:*`, `app:*`, `profile:*`, `shell:*`, `clipboard:*` | ~600       |
+| `types.ts`                  | Callback types, shared interfaces                                                                                                                                                                       | ~100       |
+| `index.ts`                  | IPCHandlers facade class                                                                                                                                                                                | ~150       |
 
 ### 1.2 Handler Module Pattern
 
@@ -56,18 +58,18 @@ export function registerNoteHandlers(deps: HandlerDependencies): void {
 
 Create `/packages/desktop/src/main/ipc/__tests__/handlers/` directory with:
 
-| File | Tests For | Est. Lines |
-|------|-----------|------------|
-| `test-utils.ts` | Mock factories, setup helpers | ~300 |
-| `note-handlers.test.ts` | note-handlers.ts | ~600 |
-| `folder-handlers.test.ts` | folder-handlers.ts | ~400 |
-| `sd-handlers.test.ts` | sd-handlers.ts | ~400 |
-| `sync-handlers.test.ts` | sync-handlers.ts | ~200 |
-| `image-handlers.test.ts` | image-handlers.ts | ~500 |
-| `window-handlers.test.ts` | window-handlers.ts | ~200 |
-| `diagnostics-handlers.test.ts` | diagnostics-handlers.ts | ~500 |
-| `export-import-handlers.test.ts` | export-import-handlers.ts | ~400 |
-| `misc-handlers.test.ts` | misc-handlers.ts | ~500 |
+| File                             | Tests For                     | Est. Lines |
+| -------------------------------- | ----------------------------- | ---------- |
+| `test-utils.ts`                  | Mock factories, setup helpers | ~300       |
+| `note-handlers.test.ts`          | note-handlers.ts              | ~600       |
+| `folder-handlers.test.ts`        | folder-handlers.ts            | ~400       |
+| `sd-handlers.test.ts`            | sd-handlers.ts                | ~400       |
+| `sync-handlers.test.ts`          | sync-handlers.ts              | ~200       |
+| `image-handlers.test.ts`         | image-handlers.ts             | ~500       |
+| `window-handlers.test.ts`        | window-handlers.ts            | ~200       |
+| `diagnostics-handlers.test.ts`   | diagnostics-handlers.ts       | ~500       |
+| `export-import-handlers.test.ts` | export-import-handlers.ts     | ~400       |
+| `misc-handlers.test.ts`          | misc-handlers.ts              | ~500       |
 
 ### 1.4 Implementation Steps
 
@@ -91,15 +93,15 @@ Create `/packages/desktop/src/main/ipc/__tests__/handlers/` directory with:
 
 Create `/packages/desktop/src/main/` modules:
 
-| File | Responsibility | Est. Lines |
-|------|---------------|------------|
-| `app-lifecycle.ts` | App ready, quit, activate events | ~400 |
-| `window-management.ts` | BrowserWindow creation, tracking | ~500 |
-| `ipc-setup.ts` | IPC handler registration | ~300 |
-| `sd-watchers.ts` | File watchers, activity sync | ~500 |
-| `sync-coordination.ts` | Profile presence, stale sync | ~400 |
-| `menu-setup.ts` | Application menu creation | ~300 |
-| `index.ts` | Entry point, composition | ~200 |
+| File                   | Responsibility                   | Est. Lines |
+| ---------------------- | -------------------------------- | ---------- |
+| `app-lifecycle.ts`     | App ready, quit, activate events | ~400       |
+| `window-management.ts` | BrowserWindow creation, tracking | ~500       |
+| `ipc-setup.ts`         | IPC handler registration         | ~300       |
+| `sd-watchers.ts`       | File watchers, activity sync     | ~500       |
+| `sync-coordination.ts` | Profile presence, stale sync     | ~400       |
+| `menu-setup.ts`        | Application menu creation        | ~300       |
+| `index.ts`             | Entry point, composition         | ~200       |
 
 ### 2.2 Implementation Steps
 
@@ -122,14 +124,14 @@ Create `/packages/desktop/src/main/` modules:
 
 Split into `/packages/desktop/e2e/` files:
 
-| File | Test Suite | Est. Lines |
-|------|-----------|------------|
-| `sync-test-utils.ts` | getFirstWindow, typeWithMultipleSyncs, shared setup | ~150 |
-| `sync-smoke.spec.ts` | "cross-machine sync - smoke test" | ~250 |
-| `sync-file-simulator.spec.ts` | "cross-machine sync - file sync simulator" | ~500 |
-| `sync-two-instances.spec.ts` | "cross-machine sync - two instances" | ~700 |
-| `sync-note-move.spec.ts` | "cross-machine sync - note move" | ~400 |
-| `sync-move-conflict.spec.ts` | "cross-machine sync - move conflict" | ~400 |
+| File                          | Test Suite                                          | Est. Lines |
+| ----------------------------- | --------------------------------------------------- | ---------- |
+| `sync-test-utils.ts`          | getFirstWindow, typeWithMultipleSyncs, shared setup | ~150       |
+| `sync-smoke.spec.ts`          | "cross-machine sync - smoke test"                   | ~250       |
+| `sync-file-simulator.spec.ts` | "cross-machine sync - file sync simulator"          | ~500       |
+| `sync-two-instances.spec.ts`  | "cross-machine sync - two instances"                | ~700       |
+| `sync-note-move.spec.ts`      | "cross-machine sync - note move"                    | ~400       |
+| `sync-move-conflict.spec.ts`  | "cross-machine sync - move conflict"                | ~400       |
 
 ### 3.2 Implementation Steps
 
@@ -149,17 +151,17 @@ Split into `/packages/desktop/e2e/` files:
 
 Create `/packages/desktop/src/preload/` modules:
 
-| File | API Domains | Est. Lines |
-|------|------------|------------|
-| `note-api.ts` | note operations + events | ~300 |
-| `folder-api.ts` | folder operations + events | ~150 |
-| `sd-api.ts` | sd operations + events | ~150 |
-| `sync-api.ts` | sync, appState, shutdown | ~150 |
-| `media-api.ts` | image, thumbnail | ~300 |
-| `comment-api.ts` | comment, mention | ~400 |
-| `window-api.ts` | menu, window, windowState, clipboard, shell | ~300 |
-| `tools-api.ts` | diagnostics, backup, export, import, tools, config, telemetry, recovery, inspector, testing, webServer, profile, app | ~600 |
-| `index.ts` | Compose all APIs into electronAPI | ~100 |
+| File             | API Domains                                                                                                          | Est. Lines |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `note-api.ts`    | note operations + events                                                                                             | ~300       |
+| `folder-api.ts`  | folder operations + events                                                                                           | ~150       |
+| `sd-api.ts`      | sd operations + events                                                                                               | ~150       |
+| `sync-api.ts`    | sync, appState, shutdown                                                                                             | ~150       |
+| `media-api.ts`   | image, thumbnail                                                                                                     | ~300       |
+| `comment-api.ts` | comment, mention                                                                                                     | ~400       |
+| `window-api.ts`  | menu, window, windowState, clipboard, shell                                                                          | ~300       |
+| `tools-api.ts`   | diagnostics, backup, export, import, tools, config, telemetry, recovery, inspector, testing, webServer, profile, app | ~600       |
+| `index.ts`       | Compose all APIs into electronAPI                                                                                    | ~100       |
 
 ### 4.2 Module Pattern
 
@@ -194,18 +196,18 @@ export const noteAPI = {
 
 Create `/packages/desktop/src/main/database/` modules:
 
-| File | Operations | Est. Lines |
-|------|-----------|------------|
-| `note-operations.ts` | Note CRUD, FTS search | ~350 |
-| `folder-operations.ts` | Folder CRUD, tags | ~250 |
-| `link-operations.ts` | Inter-note links | ~100 |
-| `storage-operations.ts` | SD operations, cleanup | ~250 |
-| `sync-state-operations.ts` | NoteSyncState, FolderSyncState | ~150 |
-| `profile-operations.ts` | Profile presence cache | ~150 |
-| `image-operations.ts` | Image cache | ~150 |
-| `comment-operations.ts` | Comment threads, replies, reactions | ~300 |
-| `schema.ts` | Schema creation, migrations | ~150 |
-| `database.ts` | SqliteDatabase class, composition | ~200 |
+| File                       | Operations                          | Est. Lines |
+| -------------------------- | ----------------------------------- | ---------- |
+| `note-operations.ts`       | Note CRUD, FTS search               | ~350       |
+| `folder-operations.ts`     | Folder CRUD, tags                   | ~250       |
+| `link-operations.ts`       | Inter-note links                    | ~100       |
+| `storage-operations.ts`    | SD operations, cleanup              | ~250       |
+| `sync-state-operations.ts` | NoteSyncState, FolderSyncState      | ~150       |
+| `profile-operations.ts`    | Profile presence cache              | ~150       |
+| `image-operations.ts`      | Image cache                         | ~150       |
+| `comment-operations.ts`    | Comment threads, replies, reactions | ~300       |
+| `schema.ts`                | Schema creation, migrations         | ~150       |
+| `database.ts`              | SqliteDatabase class, composition   | ~200       |
 
 ### 5.2 Module Pattern
 

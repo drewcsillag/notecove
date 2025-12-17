@@ -24,6 +24,7 @@ jest.mock('electron', () => ({
 }));
 
 // Mock crypto and uuid
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
   randomUUID: jest.fn((): string => {
@@ -38,6 +39,7 @@ jest.mock('uuid', () => ({
     return nextUuid();
   }),
 }));
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 // Mock fs/promises
 jest.mock('fs/promises', () => ({
@@ -242,9 +244,7 @@ describe('Note Core Handlers', () => {
       mockNoteDoc.markDeleted = jest.fn();
 
       mocks.database.getNote.mockResolvedValue(mockNote);
-      mocks.crdtManager.getNoteDoc
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(mockNoteDoc);
+      mocks.crdtManager.getNoteDoc.mockReturnValueOnce(null).mockReturnValueOnce(mockNoteDoc);
 
       await (handlers as any).handleDeleteNote(mockEvent, noteId);
 
@@ -319,7 +319,7 @@ describe('Note Core Handlers', () => {
 
       await (handlers as any).handlePermanentDeleteNote(mockEvent, noteId);
 
-      expect(mocks.crdtManager.deleteDocument).toHaveBeenCalledWith(noteId, sdId);
+      expect(mocks.crdtManager.unloadNote).toHaveBeenCalledWith(noteId);
       expect(mocks.database.deleteNote).toHaveBeenCalledWith(noteId);
     });
   });
@@ -329,8 +329,34 @@ describe('Note Core Handlers', () => {
       const mockEvent = {} as any;
       const noteId = 'note-123';
       const sdId = 'test-sd';
+      const mockNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: sdId,
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        contentPreview: '',
+        contentText: '',
+        created: Date.now(),
+        modified: Date.now(),
+      };
 
-      await (handlers as any).handleLoadNote(mockEvent, noteId, sdId);
+      const mockNoteDoc = createMockNoteDoc();
+      mockNoteDoc.getMetadata = jest.fn().mockReturnValue({
+        id: noteId,
+        sdId: sdId,
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: Date.now(),
+        modified: Date.now(),
+      });
+
+      mocks.database.getNote.mockResolvedValue(mockNote);
+      mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+      await (handlers as any).handleLoadNote(mockEvent, noteId);
 
       expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(noteId, sdId);
     });
@@ -352,12 +378,10 @@ describe('Note Core Handlers', () => {
       const mockEvent = {} as any;
       const noteId = 'note-123';
       const mockDoc = new Y.Doc();
-      const mockNoteDoc = createMockNoteDoc();
-      mockNoteDoc.doc = mockDoc;
 
-      mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+      mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
 
-      const result = await (handlers as any).handleGetNoteState(mockEvent, noteId);
+      const result = await (handlers as any).handleGetState(mockEvent, noteId);
 
       expect(result).toBeInstanceOf(Uint8Array);
     });

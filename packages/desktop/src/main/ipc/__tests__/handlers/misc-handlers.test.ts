@@ -24,6 +24,7 @@ jest.mock('electron', () => ({
 }));
 
 // Mock crypto and uuid
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
   randomUUID: jest.fn((): string => {
@@ -38,6 +39,7 @@ jest.mock('uuid', () => ({
     return nextUuid();
   }),
 }));
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 // Mock fs/promises
 jest.mock('fs/promises', () => ({
@@ -90,12 +92,7 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import {
-  createAllMocks,
-  castMocksToReal,
-  resetUuidCounter,
-  type AllMocks,
-} from './test-utils';
+import { createAllMocks, castMocksToReal, resetUuidCounter, type AllMocks } from './test-utils';
 
 describe('Misc Handlers', () => {
   let handlers: IPCHandlers;

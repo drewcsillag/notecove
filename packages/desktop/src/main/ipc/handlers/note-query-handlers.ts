@@ -5,8 +5,6 @@
  * getMetadata, checkExistsInSD, list, search, counts, createSnapshot, getInfo, reloadFromCRDTLogs
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import * as Y from 'yjs';
 import * as crypto from 'crypto';
@@ -546,7 +544,7 @@ function handleReloadFromCRDTLogs(ctx: HandlerContext) {
       }
 
       const lines = contentText.split('\n');
-      const title = lines[0]?.trim() || 'Untitled';
+      const title = lines[0]?.trim() ?? 'Untitled';
       const contentAfterTitle = lines.slice(1).join('\n').trim();
       const contentPreview = contentAfterTitle.substring(0, 200);
 
@@ -554,11 +552,11 @@ function handleReloadFromCRDTLogs(ctx: HandlerContext) {
         id: noteId,
         title,
         sdId: note.sdId,
-        folderId: metadata.folderId ?? note.folderId,
-        created: metadata.created ?? note.created,
-        modified: metadata.modified ?? Date.now(),
-        deleted: metadata.deleted ?? note.deleted,
-        pinned: metadata.pinned ?? note.pinned,
+        folderId: metadata.folderId,
+        created: metadata.created,
+        modified: metadata.modified,
+        deleted: metadata.deleted,
+        pinned: metadata.pinned,
         contentPreview,
         contentText,
       });

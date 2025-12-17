@@ -119,11 +119,7 @@ function handleGetState(ctx: HandlerContext) {
 }
 
 function handleApplyUpdate(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    noteId: string,
-    update: Uint8Array
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, noteId: string, update: Uint8Array): Promise<void> => {
     const { crdtManager, database, broadcastToAll } = ctx;
 
     await crdtManager.applyUpdate(noteId, update);
@@ -402,7 +398,9 @@ export async function permanentlyDeleteNote(
     if (process.env['NODE_ENV'] === 'test') {
       void fs
         .appendFile('/var/tmp/auto-cleanup.log', `${new Date().toISOString()} ${msg}\n`)
-        .catch(() => {});
+        .catch(() => {
+          // Ignore logging errors
+        });
     }
   };
 
@@ -483,7 +481,9 @@ export async function runAutoCleanup(ctx: HandlerContext, thresholdDays = 30): P
     if (process.env['NODE_ENV'] === 'test') {
       void fs
         .appendFile('/var/tmp/auto-cleanup.log', `${new Date().toISOString()} ${msg}\n`)
-        .catch(() => {});
+        .catch(() => {
+          // Ignore logging errors
+        });
     }
   };
 
@@ -494,9 +494,7 @@ export async function runAutoCleanup(ctx: HandlerContext, thresholdDays = 30): P
   try {
     // Get old deleted notes from database
     const noteIds: string[] = await database.autoCleanupDeletedNotes(thresholdDays);
-    logMsg(
-      `[auto-cleanup] Found ${noteIds.length} old notes to clean: ${JSON.stringify(noteIds)}`
-    );
+    logMsg(`[auto-cleanup] Found ${noteIds.length} old notes to clean: ${JSON.stringify(noteIds)}`);
 
     if (noteIds.length > 0) {
       // Permanently delete each note (files + database entry)

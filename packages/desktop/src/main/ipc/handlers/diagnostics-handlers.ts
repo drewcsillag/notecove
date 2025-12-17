@@ -181,41 +181,25 @@ function handleRemoveStaleMigrationLock(ctx: HandlerContext) {
 }
 
 function handleCleanupOrphanedActivityLog(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: number,
-    instanceId: string
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, sdId: number, instanceId: string): Promise<void> => {
     await ctx.diagnosticsManager.cleanupOrphanedActivityLog(sdId, instanceId);
   };
 }
 
 function handleImportOrphanedCRDT(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    noteId: string,
-    sdId: number
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, noteId: string, sdId: number): Promise<void> => {
     await ctx.diagnosticsManager.importOrphanedCRDT(noteId, sdId);
   };
 }
 
 function handleDeleteMissingCRDTEntry(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    noteId: string,
-    sdId: number
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, noteId: string, sdId: number): Promise<void> => {
     await ctx.diagnosticsManager.deleteMissingCRDTEntry(noteId, sdId);
   };
 }
 
 function handleDeleteDuplicateNote(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    noteId: string,
-    sdId: number
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, noteId: string, sdId: number): Promise<void> => {
     await ctx.diagnosticsManager.deleteDuplicateNote(noteId, sdId);
   };
 }

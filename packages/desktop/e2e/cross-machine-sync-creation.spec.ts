@@ -14,11 +14,7 @@ import { resolve } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import {
-  FileSyncSimulator,
-  SimulatorLogger,
-  inspectSDContents,
-} from './utils/sync-simulator';
+import { FileSyncSimulator, SimulatorLogger, inspectSDContents } from './utils/sync-simulator';
 import { getFirstWindow } from './cross-machine-sync-helpers';
 
 test.describe('cross-machine sync - new note creation', () => {

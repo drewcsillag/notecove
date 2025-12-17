@@ -7,8 +7,6 @@
  * This file provides mock interfaces, factory functions, and reset helpers.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import type { CRDTManager } from '../../../crdt';
 import type { Database, AppendLogManager } from '@notecove/shared';
 import type { ConfigManager } from '../../../config/manager';
@@ -74,6 +72,7 @@ export interface MockDatabase {
   getStorageDir: jest.Mock;
   getFolder: jest.Mock;
   getTagsForNote: jest.Mock;
+  getLinksFromNote: jest.Mock;
   getState: jest.Mock;
   setState: jest.Mock;
   createStorageDir: jest.Mock;
@@ -185,9 +184,7 @@ export function createMockNoteDoc(overrides?: Partial<MockNoteDoc>): MockNoteDoc
 /**
  * Create a mock CRDTManager
  */
-export function createMockCRDTManager(
-  mockFolderTree?: MockFolderTreeDoc
-): MockCRDTManager {
+export function createMockCRDTManager(mockFolderTree?: MockFolderTreeDoc): MockCRDTManager {
   const folderTree = mockFolderTree ?? createMockFolderTree();
 
   return {
@@ -224,6 +221,7 @@ export function createMockDatabase(): MockDatabase {
     getStorageDir: jest.fn(),
     getFolder: jest.fn(),
     getTagsForNote: jest.fn().mockResolvedValue([]),
+    getLinksFromNote: jest.fn().mockResolvedValue([]),
     getState: jest.fn(),
     setState: jest.fn().mockResolvedValue(undefined),
     createStorageDir: jest.fn(),

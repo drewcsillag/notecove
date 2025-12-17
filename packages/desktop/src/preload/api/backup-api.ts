@@ -22,12 +22,7 @@ export const backupApi = {
     description?: string;
     backupPath: string;
   }> =>
-    ipcRenderer.invoke(
-      'backup:createPreOperationSnapshot',
-      sdId,
-      noteIds,
-      description
-    ) as Promise<{
+    ipcRenderer.invoke('backup:createPreOperationSnapshot', sdId, noteIds, description) as Promise<{
       backupId: string;
       sdUuid: string;
       sdName: string;

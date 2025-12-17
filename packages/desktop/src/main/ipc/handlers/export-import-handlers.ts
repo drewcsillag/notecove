@@ -261,10 +261,7 @@ function handleShowExportCompletion(_ctx: HandlerContext) {
 // =============================================================================
 
 function handleSelectImportSource(_ctx: HandlerContext) {
-  return async (
-    event: IpcMainInvokeEvent,
-    type: 'file' | 'folder'
-  ): Promise<string | null> => {
+  return async (event: IpcMainInvokeEvent, type: 'file' | 'folder'): Promise<string | null> => {
     const window = BrowserWindow.fromWebContents(event.sender);
     const targetWindow = window ?? BrowserWindow.getFocusedWindow();
     if (!targetWindow) {
@@ -336,9 +333,13 @@ function handleExecuteImport(ctx: HandlerContext) {
       console.log(`[Import] Options:`, JSON.stringify(options));
 
       // Create new import service
-      currentImport = new ImportService(crdtManager, database, (channel: string, ...args: unknown[]) => {
-        broadcastToAll(channel, ...args);
-      });
+      currentImport = new ImportService(
+        crdtManager,
+        database,
+        (channel: string, ...args: unknown[]) => {
+          broadcastToAll(channel, ...args);
+        }
+      );
 
       // Execute import with progress callback
       const result = await currentImport.importFromPath(

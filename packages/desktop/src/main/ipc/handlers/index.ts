@@ -6,16 +6,17 @@
  */
 
 import { BrowserWindow } from 'electron';
-import type {
-  HandlerDependencies,
-  HandlerContext,
-  WebBroadcastCallback,
-} from './types';
+import type { HandlerDependencies, HandlerContext, WebBroadcastCallback } from './types';
 import { isValidImageId, ImageStorage, SyncDirectoryStructure } from '@notecove/shared';
 import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
 
 // Handler modules
-import { registerNoteHandlers, unregisterNoteHandlers, runAutoCleanup, permanentlyDeleteNote } from './note-handlers';
+import {
+  registerNoteHandlers,
+  unregisterNoteHandlers,
+  runAutoCleanup,
+  permanentlyDeleteNote,
+} from './note-handlers';
 import { registerNoteEditHandlers, unregisterNoteEditHandlers } from './note-edit-handlers';
 import { registerNoteQueryHandlers, unregisterNoteQueryHandlers } from './note-query-handlers';
 import { registerFolderHandlers, unregisterFolderHandlers } from './folder-handlers';
@@ -23,10 +24,25 @@ import { registerSDHandlers, unregisterSDHandlers } from './sd-handlers';
 import { registerSyncHandlers, unregisterSyncHandlers } from './sync-handlers';
 import { registerWindowHandlers, unregisterWindowHandlers } from './window-handlers';
 import { registerDiagnosticsHandlers, unregisterDiagnosticsHandlers } from './diagnostics-handlers';
-import { registerImageHandlers, unregisterImageHandlers, initializeImageServices, runImageCleanup } from './image-handlers';
-import { registerImagePickerHandlers, unregisterImagePickerHandlers } from './image-picker-handlers';
-import { registerExportImportHandlers, unregisterExportImportHandlers } from './export-import-handlers';
-import { registerMiscHandlers, unregisterMiscHandlers, initializeMiscServices } from './misc-handlers';
+import {
+  registerImageHandlers,
+  unregisterImageHandlers,
+  initializeImageServices,
+  runImageCleanup,
+} from './image-handlers';
+import {
+  registerImagePickerHandlers,
+  unregisterImagePickerHandlers,
+} from './image-picker-handlers';
+import {
+  registerExportImportHandlers,
+  unregisterExportImportHandlers,
+} from './export-import-handlers';
+import {
+  registerMiscHandlers,
+  unregisterMiscHandlers,
+  initializeMiscServices,
+} from './misc-handlers';
 import { registerHistoryHandlers, unregisterHistoryHandlers } from './history-handlers';
 import { registerCommentHandlers, unregisterCommentHandlers } from './comment-handlers';
 
@@ -181,7 +197,10 @@ export class IPCHandlers {
   /**
    * Run image cleanup: Delete orphaned images that are no longer referenced by any note
    */
-  async runImageCleanup(gracePeriodDays = 14, dryRun = false): Promise<import('../../image-cleanup-manager').CleanupStats[]> {
+  async runImageCleanup(
+    gracePeriodDays = 14,
+    dryRun = false
+  ): Promise<import('../../image-cleanup-manager').CleanupStats[]> {
     return runImageCleanup(gracePeriodDays, dryRun);
   }
 

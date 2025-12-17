@@ -12,12 +12,27 @@ import { noteApi, historyApi, tagApi, linkApi } from './api/note-api';
 import { folderApi } from './api/folder-api';
 import { sdApi } from './api/sd-api';
 import { syncApi, recoveryApi } from './api/sync-api';
-import { appStateApi, configApi, telemetryApi, shellApi, clipboardApi, profileApi, appApi } from './api/app-api';
+import {
+  appStateApi,
+  configApi,
+  telemetryApi,
+  shellApi,
+  clipboardApi,
+  profileApi,
+  appApi,
+} from './api/app-api';
 import { backupApi, diagnosticsApi } from './api/backup-api';
 import { windowStateApi, windowApi, menuApi, shutdownApi } from './api/window-api';
 import { imageApi, thumbnailApi } from './api/image-api';
 import { commentApi, mentionApi } from './api/comment-api';
-import { toolsApi, exportApi, importApi, testingApi, webServerApi, inspectorApi } from './api/misc-api';
+import {
+  toolsApi,
+  exportApi,
+  importApi,
+  testingApi,
+  webServerApi,
+  inspectorApi,
+} from './api/misc-api';
 
 // Expose IPC API to renderer
 contextBridge.exposeInMainWorld('electronAPI', {

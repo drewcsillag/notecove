@@ -7,8 +7,7 @@ import type { NoteMetadata } from '../../main/ipc/types';
 import type { NoteCache } from '@notecove/shared';
 
 export const noteApi = {
-  load: (noteId: string): Promise<void> =>
-    ipcRenderer.invoke('note:load', noteId) as Promise<void>,
+  load: (noteId: string): Promise<void> => ipcRenderer.invoke('note:load', noteId) as Promise<void>,
   unload: (noteId: string): Promise<void> =>
     ipcRenderer.invoke('note:unload', noteId) as Promise<void>,
   getState: (noteId: string, stateVector?: Uint8Array): Promise<Uint8Array> =>

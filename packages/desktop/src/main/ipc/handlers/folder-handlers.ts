@@ -4,8 +4,6 @@
  * IPC handlers for folder operations: list, create, rename, delete, move, reorder.
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import * as crypto from 'crypto';
 import type { HandlerContext } from './types';
@@ -214,11 +212,7 @@ function handleRenameFolder(ctx: HandlerContext) {
 }
 
 function handleDeleteFolder(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    folderId: string
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, folderId: string): Promise<void> => {
     const { crdtManager, database, broadcastToAll } = ctx;
 
     const folderTree = await crdtManager.loadFolderTree(sdId);

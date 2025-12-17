@@ -24,6 +24,7 @@ jest.mock('electron', () => ({
 }));
 
 // Mock crypto and uuid
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('crypto', () => ({
   ...jest.requireActual('crypto'),
   randomUUID: jest.fn((): string => {
@@ -38,6 +39,7 @@ jest.mock('uuid', () => ({
     return nextUuid();
   }),
 }));
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 // Mock fs/promises
 jest.mock('fs/promises', () => ({
@@ -350,29 +352,28 @@ describe('Note Edit Handlers', () => {
         modified: Date.now(),
       };
 
-      const mockNoteDoc = createMockNoteDoc({
-        getMetadata: jest.fn().mockReturnValue({
-          id: originalNoteId,
-          sdId: 'test-sd',
-          folderId: 'folder-123',
-          deleted: false,
-          pinned: false,
-        }),
-        getText: jest.fn().mockReturnValue({ toJSON: () => 'Content' }),
+      // Create a real Y.Doc for the source note (needed for Y.encodeStateAsUpdate)
+      const sourceDoc = new (await import('yjs')).Doc();
+
+      // Create a real Y.Doc for the new note
+      const newDoc = new (await import('yjs')).Doc();
+      const newNoteDoc = createMockNoteDoc({
+        initializeNote: jest.fn(),
       });
 
       mocks.database.getNote.mockResolvedValue(mockNote);
-      mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
-      mocks.crdtManager.createDocument.mockResolvedValue('00000001-0000-4000-8000-000000000000');
+      // Return source doc, then new doc when called
+      mocks.crdtManager.getDocument.mockReturnValueOnce(sourceDoc).mockReturnValueOnce(newDoc);
+      mocks.crdtManager.getNoteDoc.mockReturnValueOnce(newNoteDoc);
 
       const duplicateId = await (handlers as any).handleDuplicateNote(mockEvent, originalNoteId);
 
       expect(duplicateId).toBe('00000001-0000-4000-8000-000000000000');
-      expect(mocks.crdtManager.createDocument).toHaveBeenCalled();
+      expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(duplicateId, 'test-sd');
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
           id: duplicateId,
-          title: 'Original Note (Copy)',
+          title: 'Copy of Original Note',
           sdId: 'test-sd',
           folderId: 'folder-123',
           pinned: false,

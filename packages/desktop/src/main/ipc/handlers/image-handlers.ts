@@ -8,18 +8,12 @@
  * - image-picker-handlers.ts for pickAndSave, downloadAndSave, copyToClipboard, saveAs, openExternal, copyToSD
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import { ipcMain, app, type IpcMainInvokeEvent } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { HandlerContext } from './types';
 import type { ImageCache } from '@notecove/shared';
-import {
-  ImageStorage,
-  isSupportedMimeType,
-  SyncDirectoryStructure,
-} from '@notecove/shared';
+import { ImageStorage, isSupportedMimeType, SyncDirectoryStructure } from '@notecove/shared';
 import { ThumbnailGenerator, type ThumbnailResult } from '../../thumbnail';
 import { ImageCleanupManager, type CleanupStats } from '../../image-cleanup-manager';
 import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
@@ -83,7 +77,10 @@ export function unregisterImageHandlers(): void {
  * Run image cleanup: Delete orphaned images that are no longer referenced by any note
  * Uses mark-and-sweep algorithm with 14-day grace period
  */
-export async function runImageCleanup(gracePeriodDays = 14, dryRun = false): Promise<CleanupStats[]> {
+export async function runImageCleanup(
+  gracePeriodDays = 14,
+  dryRun = false
+): Promise<CleanupStats[]> {
   console.log(
     `[image-cleanup] Starting image cleanup (grace period: ${gracePeriodDays} days, dryRun: ${dryRun})...`
   );
@@ -194,7 +191,7 @@ function handleImageGetDataUrl(ctx: HandlerContext) {
     const { database, discoverImageAcrossSDs } = ctx;
 
     // Get image metadata from database or discover on disk
-    let image = await database.getImage(imageId);
+    const image = await database.getImage(imageId);
 
     if (image) {
       // Image found in database - use stored metadata
@@ -260,7 +257,7 @@ function handleImageGetPath(ctx: HandlerContext) {
     const { database, discoverImageAcrossSDs } = ctx;
 
     // Get image metadata from database or discover on disk
-    let image = await database.getImage(imageId);
+    const image = await database.getImage(imageId);
 
     if (image) {
       // Image found in database - use stored metadata
@@ -301,11 +298,7 @@ function handleImageGetPath(ctx: HandlerContext) {
 }
 
 function handleImageDelete(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    imageId: string
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, imageId: string): Promise<void> => {
     const { database } = ctx;
 
     // Get SD from database
@@ -339,11 +332,7 @@ function handleImageDelete(ctx: HandlerContext) {
 }
 
 function handleImageExists(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    imageId: string
-  ): Promise<boolean> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, imageId: string): Promise<boolean> => {
     const { database, discoverImageAcrossSDs } = ctx;
 
     // Check database first
@@ -392,10 +381,7 @@ function handleImageExists(ctx: HandlerContext) {
 }
 
 function handleImageGetMetadata(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    imageId: string
-  ): Promise<ImageCache | null> => {
+  return async (_event: IpcMainInvokeEvent, imageId: string): Promise<ImageCache | null> => {
     return await ctx.database.getImage(imageId);
   };
 }
@@ -534,21 +520,13 @@ function handleThumbnailGetDataUrl(ctx: HandlerContext) {
 }
 
 function handleThumbnailExists(_ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    imageId: string
-  ): Promise<boolean> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, imageId: string): Promise<boolean> => {
     return thumbnailGenerator.thumbnailExists(sdId, imageId);
   };
 }
 
 function handleThumbnailDelete(_ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    imageId: string
-  ): Promise<void> => {
+  return async (_event: IpcMainInvokeEvent, sdId: string, imageId: string): Promise<void> => {
     await thumbnailGenerator.deleteThumbnail(sdId, imageId);
     console.log(`[IPC] Deleted thumbnail for ${imageId}`);
   };

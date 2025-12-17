@@ -264,7 +264,9 @@ function handleGetMentionUsers(ctx: HandlerContext) {
 // =============================================================================
 
 function handleGetTelemetrySettings(_ctx: HandlerContext) {
-  return async (_event: IpcMainInvokeEvent): Promise<{
+  return async (
+    _event: IpcMainInvokeEvent
+  ): Promise<{
     consoleMetricsEnabled: boolean;
     remoteMetricsEnabled: boolean;
     datadogApiKey?: string;
@@ -399,7 +401,7 @@ function handleSetNoteTimestamp(ctx: HandlerContext) {
       await database.upsertNote({ ...note, created: timestamp });
     } else if (field === 'modified') {
       await database.upsertNote({ ...note, modified: timestamp });
-    } else if (field === 'deleted_at') {
+    } else {
       // For deleted_at, we need to update the CRDT metadata
       const noteDoc = crdtManager.getNoteDoc(noteId);
       if (noteDoc) {

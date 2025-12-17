@@ -4,8 +4,6 @@
  * IPC handlers for comment operations: threads, replies, reactions.
  */
 
-/* eslint-disable @typescript-eslint/require-await */
-
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { HandlerContext } from './types';
 import type { CommentThread, CommentReply, CommentReaction } from '@notecove/shared/comments';

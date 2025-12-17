@@ -7,6 +7,7 @@
 **Risk**: Some handlers may call other handlers internally (e.g., note deletion might call image cleanup).
 
 **Mitigation**:
+
 - Before splitting, trace internal method calls
 - Keep shared helper functions in a separate `handler-utils.ts`
 - If handlers call each other, they should use the dependency injection pattern, not direct function calls
@@ -16,6 +17,7 @@
 **Risk**: The mock setup is tightly coupled and extracting it may break tests.
 
 **Mitigation**:
+
 - Create `test-utils.ts` FIRST before splitting any tests
 - Use factory functions that return fresh mocks for each test
 - Run tests after each extraction to catch breaks early
@@ -25,6 +27,7 @@
 **Risk**: The app initialization has a specific order (database → CRDT managers → watchers → windows). Splitting might disrupt this.
 
 **Mitigation**:
+
 - Keep initialization logic in index.ts, extract only the implementations
 - Use explicit dependency injection, not implicit module-level state
 - Document the initialization order in comments
@@ -34,6 +37,7 @@
 **Risk**: Vite might not correctly bundle the split modules into a single preload file.
 
 **Mitigation**:
+
 - Test the build after splitting
 - Check that `contextBridge.exposeInMainWorld` receives the complete API
 - May need to adjust vite.config.ts if issues arise
@@ -43,6 +47,7 @@
 **Risk**: The composition/mixin pattern may cause TypeScript issues with the Database interface.
 
 **Mitigation**:
+
 - Consider using interface extension instead of mixins
 - Each operation module can export functions that take the adapter
 - The SqliteDatabase class calls these functions, keeping the interface intact
@@ -52,6 +57,7 @@
 **Risk**: Moving test files might break Jest's test discovery or coverage reporting.
 
 **Mitigation**:
+
 - Verify jest.config paths cover new locations
 - Run `pnpm test` after each move
 - Update any test path patterns in CI config
@@ -63,9 +69,11 @@
 ### For handlers.ts
 
 **Alternative**: Use a registry pattern where handlers self-register
+
 ```typescript
 // Each module calls: registerHandler('note:load', handler)
 ```
+
 **Rejected because**: Adds complexity, harder to trace which handlers exist
 
 ### For database.ts
@@ -85,6 +93,7 @@
 ### 1. Add `handler-utils.ts`
 
 Add a utility file for shared handler functions:
+
 - `discoverImageAcrossSDs()`
 - `isValidImageId()`
 - Common error handling patterns
@@ -92,6 +101,7 @@ Add a utility file for shared handler functions:
 ### 2. Consolidate small handler groups
 
 The `misc-handlers.ts` at ~600 lines is close to the limit. Consider further splitting:
+
 - `comment-mention-handlers.ts` (~200 lines)
 - `testing-webserver-handlers.ts` (~200 lines)
 - `misc-handlers.ts` (~200 lines for truly miscellaneous)
@@ -141,6 +151,7 @@ This is clearer and maintains TypeScript compatibility.
 ## Conclusion
 
 The plan is solid with these refinements:
+
 1. Add `handler-utils.ts` for shared functions
 2. Consider splitting `misc-handlers.ts` further if needed
 3. Use simpler delegation pattern for database.ts

@@ -105,10 +105,7 @@ export const commentApi = {
    * @param noteId Note ID
    * @param threadId Thread ID
    */
-  deleteThread: (
-    noteId: string,
-    threadId: string
-  ): Promise<{ success: boolean; error?: string }> =>
+  deleteThread: (noteId: string, threadId: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('comment:deleteThread', noteId, threadId) as Promise<{
       success: boolean;
       error?: string;
