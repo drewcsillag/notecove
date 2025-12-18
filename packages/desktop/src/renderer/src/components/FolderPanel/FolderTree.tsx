@@ -1532,13 +1532,15 @@ export const FolderTree: FC<FolderTreeProps> = ({
             // SD nodes need a drag handle wrapper for reordering
             const nodeContent = (
               <ListItemButton
+                dense
                 data-testid={`folder-tree-node-${nodeId}`}
                 data-active-sd={belongsToActiveSD ? 'true' : undefined}
                 aria-label={node.text}
                 sx={{
                   pl: depth * 2,
-                  py: 0.5, // Reduce vertical padding
-                  minHeight: 32, // Set a compact minimum height
+                  py: 0,
+                  minHeight: 0,
+                  height: 26, // Force compact height
                   backgroundColor: isDropTarget
                     ? 'primary.light'
                     : isSelected
