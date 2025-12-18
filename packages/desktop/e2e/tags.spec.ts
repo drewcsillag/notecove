@@ -185,6 +185,54 @@ test.describe('Tags System - Basic Functionality', () => {
     expect(count).toBe(0);
   });
 
+  test('should NOT style URL fragments as hashtags', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type a URL with a fragment - the #section should NOT be styled as a hashtag
+    // Space at end triggers autolink
+    await page.keyboard.type('See https://example.com/page#section for details');
+    await page.waitForTimeout(500);
+
+    // The URL should be linked
+    const linkElement = page.locator('.ProseMirror a.web-link');
+    await expect(linkElement).toBeVisible();
+
+    // The #section should NOT have hashtag styling (it's part of the URL)
+    const hashtags = page.locator('.ProseMirror .hashtag');
+    const count = await hashtags.count();
+    expect(count).toBe(0);
+  });
+
+  test('should style real hashtags but not URL fragments in same note', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type content with both a real hashtag and a URL with fragment
+    await page.keyboard.type('#work See https://example.com#section then #project ');
+    await page.waitForTimeout(500);
+
+    // Should have exactly 2 hashtags (work and project, but NOT section)
+    const hashtags = page.locator('.ProseMirror .hashtag');
+    const count = await hashtags.count();
+    expect(count).toBe(2);
+
+    // Verify the hashtags are the correct ones
+    const tags = await hashtags.allTextContents();
+    expect(tags).toContain('#work');
+    expect(tags).toContain('#project');
+    // #section should NOT be in the list
+    expect(tags).not.toContain('#section');
+  });
+
   test('should update tag styling after editing', async () => {
     // Create a new note
     await page.click('button[title="Create note"]');

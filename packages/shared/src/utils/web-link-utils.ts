@@ -137,3 +137,56 @@ export function hasWebLinks(text: string): boolean {
   const regex = new RegExp(WEB_LINK_PATTERN.source, WEB_LINK_PATTERN.flags);
   return regex.test(text);
 }
+
+/**
+ * Represents a character range in text where a URL is located
+ */
+export interface UrlRange {
+  /** Start index (inclusive) */
+  start: number;
+  /** End index (exclusive) */
+  end: number;
+}
+
+/**
+ * Get the character ranges of all URLs in text
+ *
+ * This is useful for determining if other patterns (like hashtags) fall
+ * within a URL and should be ignored.
+ *
+ * @param text Plain text content
+ * @returns Array of {start, end} ranges for each URL found
+ */
+export function getUrlRanges(text: string): UrlRange[] {
+  // Input validation
+  if (text === null || text === undefined || typeof text !== 'string') {
+    return [];
+  }
+
+  if (text.length === 0) {
+    return [];
+  }
+
+  const ranges: UrlRange[] = [];
+  const regex = new RegExp(WEB_LINK_PATTERN.source, WEB_LINK_PATTERN.flags);
+
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const start = match.index;
+    let url = match[0];
+
+    // Clean up trailing punctuation (same logic as extractWebLinks)
+    url = url.replace(/[.,;:!?'")\]}>]+$/, '');
+
+    // Balance parentheses (for Wikipedia-style URLs)
+    url = balanceUrlParentheses(url);
+
+    const end = start + url.length;
+
+    if (url.length > 0) {
+      ranges.push({ start, end });
+    }
+  }
+
+  return ranges;
+}

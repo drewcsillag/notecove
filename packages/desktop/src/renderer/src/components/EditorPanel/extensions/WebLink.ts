@@ -140,6 +140,11 @@ export const WebLink = Link.extend({
       protocols: ['http', 'https'],
       // Auto-detect URLs when typing (on space/enter)
       autolink: true,
+      // Only auto-link URLs that have a scheme (http:// or https://)
+      // This prevents bare domains like "foo.bar" or "localhost" from being linked
+      shouldAutoLink: (url: string) => {
+        return url.startsWith('http://') || url.startsWith('https://');
+      },
       // Auto-link when pasting URLs
       linkOnPaste: true,
       // Don't open on click - we handle click events ourselves

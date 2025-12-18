@@ -153,6 +153,10 @@ export const Hashtag = Extension.create<HashtagOptions>({
 
 /**
  * Find all hashtags in the document and create decorations for them
+ *
+ * Hashtags inside links (like URL fragments) are NOT decorated.
+ * For example, in "https://example.com#section", the "#section" is a URL fragment
+ * and will not be styled as a hashtag.
  */
 function findHashtags(doc: PMNode): DecorationSet {
   const decorations: Decoration[] = [];
@@ -161,6 +165,13 @@ function findHashtags(doc: PMNode): DecorationSet {
 
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) {
+      return;
+    }
+
+    // Skip text nodes that are inside links (URL fragments should not be hashtags)
+    // Check if the node has a link mark
+    const hasLinkMark = node.marks.some((mark) => mark.type.name === 'link');
+    if (hasLinkMark) {
       return;
     }
 

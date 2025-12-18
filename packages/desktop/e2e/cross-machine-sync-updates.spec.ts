@@ -333,6 +333,10 @@ test.describe('cross-machine sync - note updates', () => {
    * Instance A don't update Instance B's note list until B opens the note.
    *
    * Expected behavior: Title should update in the note list even without opening.
+   *
+   * FLAKY: This test has timing issues with cross-instance sync detection.
+   * The note appears but locators sometimes fail to find it during rapid list updates.
+   * Fixed to use expect.poll() pattern but may still be flaky in CI environments.
    */
   test('should sync title change to note list even when note is NOT open in Instance 2', async () => {
     const mainPath = resolve(__dirname, '..', 'dist-electron', 'main', 'index.js');
@@ -410,12 +414,24 @@ test.describe('cross-machine sync - note updates', () => {
     await window1.keyboard.type('Initial Title For Test');
     await window1.waitForTimeout(2000);
 
-    // Wait for sync to Instance 2 - use retrying assertion with 60s timeout (matches other live sync tests)
+    // Wait for sync to Instance 2 - use polling pattern for stability during list updates
     console.log('[TitleSyncUnopened] Waiting for new note to sync to Instance 2...');
-    const notesList2 = window2.locator('[data-testid="notes-list"]');
-    const initialNote2 = notesList2.locator('li:has-text("Initial Title For Test")');
-    await expect(initialNote2).toBeVisible({ timeout: 60000 });
+    // Wait for notes list to be stable first
+    await window2.waitForSelector('[data-testid="notes-list"]', { timeout: 30000 });
+    // Use expect.poll for more robust checking during rapid list updates
+    await expect
+      .poll(
+        async () => {
+          const noteLocator = window2.locator(
+            '[data-testid="notes-list"] li:has-text("Initial Title For Test")'
+          );
+          return await noteLocator.count();
+        },
+        { timeout: 60000, intervals: [500, 1000, 2000] }
+      )
+      .toBeGreaterThan(0);
     console.log('[TitleSyncUnopened] Instance 2 has initial note: true');
+    const notesList2 = window2.locator('[data-testid="notes-list"]');
 
     // KEY: Switch Instance 2 back to welcome note so the new note is NOT open
     console.log('[TitleSyncUnopened] Switching Instance 2 to welcome note (closing test note)...');

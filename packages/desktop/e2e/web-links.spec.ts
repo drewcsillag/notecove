@@ -776,6 +776,114 @@ test.describe('Web Links - Edge Cases', () => {
     await expect(linkElement).toBeVisible();
     expect(await linkElement.getAttribute('href')).toBe('https://undo-test.com');
   });
+
+  test('should NOT auto-link bare domains without scheme', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type a bare domain without scheme - should NOT be linked
+    await page.keyboard.type('Visit google.com for search ');
+    await page.waitForTimeout(500);
+
+    // There should be no link created
+    const linkElement = page.locator('.ProseMirror a.web-link');
+    await expect(linkElement).toHaveCount(0);
+
+    // The text should still be there
+    const content = await editor.textContent();
+    expect(content).toContain('google.com');
+  });
+
+  test('should NOT auto-link localhost without scheme', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type localhost without scheme - should NOT be linked
+    await page.keyboard.type('Server at localhost for dev ');
+    await page.waitForTimeout(500);
+
+    // There should be no link created
+    const linkElement = page.locator('.ProseMirror a.web-link');
+    await expect(linkElement).toHaveCount(0);
+  });
+
+  test('should NOT auto-link localhost with port but without scheme', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type localhost:port without scheme - should NOT be linked
+    await page.keyboard.type('Server at localhost:3000 for dev ');
+    await page.waitForTimeout(500);
+
+    // There should be no link created
+    const linkElement = page.locator('.ProseMirror a.web-link');
+    await expect(linkElement).toHaveCount(0);
+  });
+
+  test('should auto-link localhost WITH http scheme', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type localhost WITH scheme - should be linked
+    await page.keyboard.type('Server at http://localhost:3000 for dev ');
+    await page.waitForTimeout(500);
+
+    // There should be a link
+    const linkElement = page.locator('.ProseMirror a.web-link');
+    await expect(linkElement).toBeVisible();
+    expect(await linkElement.getAttribute('href')).toBe('http://localhost:3000');
+  });
+
+  test('should NOT auto-link domain-like text (foo.bar)', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type something that looks like a domain but isn't intended as a URL
+    await page.keyboard.type('The foo.bar variable is set ');
+    await page.waitForTimeout(500);
+
+    // There should be no link created
+    const linkElement = page.locator('.ProseMirror a.web-link');
+    await expect(linkElement).toHaveCount(0);
+  });
+
+  test('should still auto-link URLs with https scheme', async () => {
+    // Create a new note
+    await page.click('button[title="Create note"]');
+    await page.waitForTimeout(500);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+
+    // Type a proper URL with scheme - should be linked
+    await page.keyboard.type('Visit https://example.com for info ');
+    await page.waitForTimeout(500);
+
+    // There should be a link
+    const linkElement = page.locator('.ProseMirror a.web-link');
+    await expect(linkElement).toBeVisible();
+    expect(await linkElement.getAttribute('href')).toBe('https://example.com');
+  });
 });
 
 test.describe('Web Links - Bare URL Sync', () => {

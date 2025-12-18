@@ -5,6 +5,8 @@
  * Pattern: #tagname (must start with a letter, followed by letters, numbers, or underscores)
  */
 
+import { getUrlRanges, type UrlRange } from './web-link-utils';
+
 /**
  * Maximum allowed length for a tag name (excluding the # prefix)
  * Tags longer than this will be truncated
@@ -18,7 +20,24 @@ export const MAX_TAG_LENGTH = 50;
 export const HASHTAG_PATTERN = /#[a-zA-Z][a-zA-Z0-9_]*/g;
 
 /**
+ * Check if a position falls within any URL range
+ */
+function isPositionInUrl(position: number, urlRanges: UrlRange[]): boolean {
+  for (const range of urlRanges) {
+    if (position >= range.start && position < range.end) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Extract all hashtags from text
+ *
+ * Hashtags that appear within URLs (as fragments or query params) are NOT extracted.
+ * For example, in "https://example.com/page#section", the "#section" is a URL fragment
+ * and will not be returned as a tag.
+ *
  * @param text Plain text content
  * @returns Array of unique tag names (lowercase, without # prefix)
  */
@@ -28,11 +47,21 @@ export function extractTags(text: string): string[] {
     return [];
   }
 
+  // Get all URL ranges first so we can skip hashtags inside URLs
+  const urlRanges = getUrlRanges(text);
+
   const tags = new Set<string>();
   const regex = new RegExp(HASHTAG_PATTERN.source, HASHTAG_PATTERN.flags);
 
   let match;
   while ((match = regex.exec(text)) !== null) {
+    const matchPosition = match.index;
+
+    // Skip this hashtag if it's inside a URL
+    if (isPositionInUrl(matchPosition, urlRanges)) {
+      continue;
+    }
+
     // Remove # prefix and convert to lowercase
     let tag = match[0].slice(1).toLowerCase();
 

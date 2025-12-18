@@ -111,6 +111,63 @@ Line 3 with #tag3`;
       expect(tags).toEqual(expect.arrayContaining(['work', 'project', 'test']));
       expect(tags).toHaveLength(3);
     });
+
+    // URL fragment tests - hashtags inside URLs should NOT be extracted
+    describe('URL fragment handling', () => {
+      it('should NOT extract hashtag that is a URL fragment', () => {
+        const tags = extractTags('See https://example.com/page#section for more');
+        expect(tags).toEqual([]);
+      });
+
+      it('should extract hashtag before URL but not URL fragment', () => {
+        const tags = extractTags('#work See https://example.com#section');
+        expect(tags).toEqual(['work']);
+      });
+
+      it('should extract hashtag after URL but not URL fragment', () => {
+        const tags = extractTags('Link https://example.com#section then #project');
+        expect(tags).toEqual(['project']);
+      });
+
+      it('should NOT extract hashtag from markdown link URL fragment', () => {
+        const tags = extractTags('Click [here](https://example.com#anchor) for info');
+        expect(tags).toEqual([]);
+      });
+
+      it('should NOT extract hashtag when URL has multiple fragments', () => {
+        // Edge case: technically invalid but possible
+        const tags = extractTags('See https://example.com#foo#bar');
+        expect(tags).toEqual([]);
+      });
+
+      it('should NOT extract hashtag from URL query param', () => {
+        const tags = extractTags('Link https://example.com?tag=#test here');
+        expect(tags).toEqual([]);
+      });
+
+      it('should handle mixed content with real tags and URL fragments', () => {
+        const tags = extractTags(
+          '#start https://example.com#section #middle http://test.com#anchor #end'
+        );
+        expect(tags).toEqual(expect.arrayContaining(['start', 'middle', 'end']));
+        expect(tags).toHaveLength(3);
+      });
+
+      it('should handle URL at start of text', () => {
+        const tags = extractTags('https://example.com#section is a link');
+        expect(tags).toEqual([]);
+      });
+
+      it('should handle URL at end of text', () => {
+        const tags = extractTags('Visit https://example.com#section');
+        expect(tags).toEqual([]);
+      });
+
+      it('should handle multiple URLs with fragments', () => {
+        const tags = extractTags('https://a.com#one and https://b.com#two');
+        expect(tags).toEqual([]);
+      });
+    });
   });
 
   describe('HASHTAG_PATTERN', () => {
