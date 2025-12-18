@@ -461,6 +461,10 @@ describe('Note Edit Handlers', () => {
       // Mock CRDT manager to return our doc with images
       mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
       mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+      mocks.crdtManager.getNoteDoc.mockReturnValue({
+        content: mockDoc.getXmlFragment('content'),
+        getMetadata: jest.fn().mockReturnValue(null),
+      });
 
       // Mock image existence in source SD
       mocks.database.getImage!.mockImplementation((imgId: string) => {
@@ -523,6 +527,10 @@ describe('Note Edit Handlers', () => {
 
       mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
       mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+      mocks.crdtManager.getNoteDoc.mockReturnValue({
+        content: mockDoc.getXmlFragment('content'),
+        getMetadata: jest.fn().mockReturnValue(null),
+      });
 
       // Mock image exists in source but copy will fail
       mocks.database.getImage!.mockResolvedValue({
@@ -563,6 +571,10 @@ describe('Note Edit Handlers', () => {
 
       mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
       mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+      mocks.crdtManager.getNoteDoc.mockReturnValue({
+        content: mockDoc.getXmlFragment('content'),
+        getMetadata: jest.fn().mockReturnValue(null),
+      });
 
       // Mock image already exists in TARGET SD
       mocks.database.getImage!.mockResolvedValue({
@@ -614,6 +626,10 @@ describe('Note Edit Handlers', () => {
 
       mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
       mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+      mocks.crdtManager.getNoteDoc.mockReturnValue({
+        content: mockDoc.getXmlFragment('content'),
+        getMetadata: jest.fn().mockReturnValue(null),
+      });
 
       // Call the move handler
       await (handlers as any).handleMoveNoteToSD(

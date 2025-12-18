@@ -99,17 +99,17 @@ For the TipTap Hashtag extension, we check if a text node has a `link` mark. If 
 
 ## Files Modified
 
-| File                                                         | Changes                            |
-| ------------------------------------------------------------ | ---------------------------------- |
-| `packages/shared/src/utils/web-link-utils.ts`                | Added `getUrlRanges()`             |
-| `packages/shared/src/utils/tag-extractor.ts`                 | Use URL ranges to filter tags      |
-| `packages/shared/src/utils/__tests__/tag-extractor.test.ts`  | Added URL fragment tests           |
-| `packages/shared/src/utils/__tests__/web-link-utils.test.ts` | Added `getUrlRanges()` tests       |
-| `packages/desktop/.../extensions/Hashtag.ts`                 | Skip tags in text with link marks  |
-| `packages/desktop/.../extensions/WebLink.ts`                 | Added `shouldAutoLink` option      |
-| `packages/desktop/e2e/web-links.spec.ts`                     | Added bare domain E2E tests        |
-| `packages/desktop/e2e/tags.spec.ts`                          | Added URL fragment E2E tests       |
-| `packages/desktop/e2e/cross-machine-sync-updates.spec.ts`    | Tagged flaky test (unrelated fix)  |
+| File                                                         | Changes                           |
+| ------------------------------------------------------------ | --------------------------------- |
+| `packages/shared/src/utils/web-link-utils.ts`                | Added `getUrlRanges()`            |
+| `packages/shared/src/utils/tag-extractor.ts`                 | Use URL ranges to filter tags     |
+| `packages/shared/src/utils/__tests__/tag-extractor.test.ts`  | Added URL fragment tests          |
+| `packages/shared/src/utils/__tests__/web-link-utils.test.ts` | Added `getUrlRanges()` tests      |
+| `packages/desktop/.../extensions/Hashtag.ts`                 | Skip tags in text with link marks |
+| `packages/desktop/.../extensions/WebLink.ts`                 | Added `shouldAutoLink` option     |
+| `packages/desktop/e2e/web-links.spec.ts`                     | Added bare domain E2E tests       |
+| `packages/desktop/e2e/tags.spec.ts`                          | Added URL fragment E2E tests      |
+| `packages/desktop/e2e/cross-machine-sync-updates.spec.ts`    | Tagged flaky test (unrelated fix) |
 
 ## Related Files
 

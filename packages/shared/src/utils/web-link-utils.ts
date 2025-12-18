@@ -190,3 +190,165 @@ export function getUrlRanges(text: string): UrlRange[] {
 
   return ranges;
 }
+
+/**
+ * Recognized top-level domains for URL detection
+ * Includes common gTLDs and country code TLDs
+ */
+const RECOGNIZED_TLDS = new Set([
+  // Common gTLDs
+  'com',
+  'org',
+  'net',
+  'edu',
+  'gov',
+  'io',
+  'dev',
+  'co',
+  'ai',
+  'app',
+  'me',
+  'info',
+  'biz',
+  'xyz',
+  'tech',
+  'online',
+  'site',
+  'blog',
+  'cloud',
+  'store',
+  // Country code TLDs
+  'uk',
+  'de',
+  'fr',
+  'jp',
+  'cn',
+  'au',
+  'ca',
+  'us',
+  'in',
+  'br',
+  'ru',
+  'nl',
+  'es',
+  'it',
+  'pl',
+  'se',
+  'no',
+  'fi',
+  'dk',
+  'ch',
+  'at',
+  'be',
+  'nz',
+]);
+
+/**
+ * Pattern for IPv4 addresses (e.g., 192.168.1.1)
+ */
+const IPV4_PATTERN = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+/**
+ * Check if a string is a valid IPv4 address
+ */
+function isIPv4Address(text: string): boolean {
+  // Extract just the IP part (before any port/path)
+  const ipPart = text.split(/[:/]/)[0];
+  const match = ipPart.match(IPV4_PATTERN);
+  if (!match) return false;
+
+  // Validate each octet is 0-255
+  for (let i = 1; i <= 4; i++) {
+    const octet = parseInt(match[i], 10);
+    if (octet < 0 || octet > 255) return false;
+  }
+  return true;
+}
+
+/**
+ * Extract the TLD from a hostname
+ * Returns null if no valid TLD structure found
+ */
+function extractTld(hostname: string): string | null {
+  // Remove any path, query, or fragment
+  const hostPart = hostname.split(/[/?#]/)[0];
+
+  // Remove any port
+  const hostWithoutPort = hostPart.split(':')[0];
+
+  // Split by dots and get the last part
+  const parts = hostWithoutPort.split('.');
+  if (parts.length < 2) return null;
+
+  return parts[parts.length - 1].toLowerCase();
+}
+
+/**
+ * Detect if selected text looks like a URL or hostname and format it
+ *
+ * This function is used to auto-populate the URL field when creating a link
+ * from selected text that looks like a URL or hostname.
+ *
+ * @param selection The selected text from the editor
+ * @returns A formatted URL string, or null if the text doesn't look like a URL
+ *
+ * Detection rules:
+ * - Full URLs (http:// or https://) are returned as-is
+ * - Bare hostnames with recognized TLDs get https:// prepended
+ * - localhost (with optional port/path) gets https:// prepended
+ * - IP addresses get http:// prepended (typically used for local dev)
+ * - Text with internal spaces is rejected
+ * - Email addresses are rejected
+ */
+export function detectUrlFromSelection(selection: string): string | null {
+  // Input validation
+  if (selection === null || selection === undefined || typeof selection !== 'string') {
+    return null;
+  }
+
+  // Trim whitespace
+  const trimmed = selection.trim();
+
+  // Empty string after trimming
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  // Reject if contains internal spaces (not a single URL/hostname)
+  if (/\s/.test(trimmed)) {
+    return null;
+  }
+
+  // Reject email addresses
+  if (trimmed.includes('@')) {
+    return null;
+  }
+
+  // If already has http:// or https://, return as-is
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  // Check for localhost
+  if (
+    trimmed === 'localhost' ||
+    trimmed.startsWith('localhost:') ||
+    trimmed.startsWith('localhost/')
+  ) {
+    return `https://${trimmed}`;
+  }
+
+  // Check for IP address
+  if (isIPv4Address(trimmed)) {
+    return `http://${trimmed}`;
+  }
+
+  // Check for recognized TLD
+  const tld = extractTld(trimmed);
+  if (tld && RECOGNIZED_TLDS.has(tld)) {
+    return `https://${trimmed}`;
+  }
+
+  // Not recognized as a URL or hostname
+  return null;
+}

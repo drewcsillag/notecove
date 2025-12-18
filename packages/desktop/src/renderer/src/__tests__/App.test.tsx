@@ -381,7 +381,6 @@ describe('App', () => {
       expect(themeChangedCallback).not.toBeNull();
 
       // Simulate receiving a theme change broadcast
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       themeChangedCallback!('dark');
 
       // The theme should update - we can verify by checking the MUI theme mode
@@ -421,7 +420,6 @@ describe('App', () => {
       mockElectronAPI.appState.set.mockClear();
 
       // Simulate receiving a theme change broadcast
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       themeChangedCallback!('dark');
 
       // Wait a bit for any potential saves

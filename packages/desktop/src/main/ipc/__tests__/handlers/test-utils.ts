@@ -40,6 +40,7 @@ export interface MockNoteDoc {
   markRestored?: jest.Mock;
   updateMetadata?: jest.Mock;
   doc?: any;
+  content?: any;
 }
 
 export interface MockCRDTManager {
@@ -171,12 +172,20 @@ export function createMockFolderTree(): MockFolderTreeDoc {
  * Create a mock NoteDoc
  */
 export function createMockNoteDoc(overrides?: Partial<MockNoteDoc>): MockNoteDoc {
+  // Create a mock XmlFragment for content
+  const mockContent = {
+    length: 0,
+    get: jest.fn(),
+    toArray: jest.fn().mockReturnValue([]),
+  } as any;
+
   return {
     getMetadata: jest.fn().mockReturnValue(null),
     getText: jest.fn().mockReturnValue({ toJSON: () => 'Content' }),
     getCommentThreads: jest.fn().mockReturnValue([]),
     setMetadata: jest.fn(),
     doc: {},
+    content: mockContent,
     ...overrides,
   };
 }

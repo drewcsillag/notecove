@@ -10,6 +10,7 @@ import {
   extractWebLinks,
   isValidWebUrl,
   balanceUrlParentheses,
+  detectUrlFromSelection,
 } from '../web-link-utils';
 
 describe('WEB_LINK_PATTERN', () => {
@@ -311,5 +312,239 @@ describe('getUrlRanges', () => {
     expect(ranges).toHaveLength(1);
     // end is 54 not 55 because trailing ) is stripped as punctuation
     expect(ranges[0]).toEqual({ start: 4, end: 54 });
+  });
+});
+
+describe('detectUrlFromSelection', () => {
+  describe('full URLs with scheme', () => {
+    it('should return http URL as-is', () => {
+      expect(detectUrlFromSelection('http://example.com')).toBe('http://example.com');
+    });
+
+    it('should return https URL as-is', () => {
+      expect(detectUrlFromSelection('https://example.com')).toBe('https://example.com');
+    });
+
+    it('should return URL with path as-is', () => {
+      expect(detectUrlFromSelection('https://example.com/path/to/page')).toBe(
+        'https://example.com/path/to/page'
+      );
+    });
+
+    it('should return URL with query string as-is', () => {
+      expect(detectUrlFromSelection('https://example.com?foo=bar&baz=qux')).toBe(
+        'https://example.com?foo=bar&baz=qux'
+      );
+    });
+
+    it('should return URL with fragment as-is', () => {
+      expect(detectUrlFromSelection('https://example.com#section')).toBe(
+        'https://example.com#section'
+      );
+    });
+
+    it('should return URL with port as-is', () => {
+      expect(detectUrlFromSelection('https://example.com:8080/api')).toBe(
+        'https://example.com:8080/api'
+      );
+    });
+  });
+
+  describe('bare hostnames with common TLDs', () => {
+    it('should prepend https:// to .com domain', () => {
+      expect(detectUrlFromSelection('example.com')).toBe('https://example.com');
+    });
+
+    it('should prepend https:// to .org domain', () => {
+      expect(detectUrlFromSelection('example.org')).toBe('https://example.org');
+    });
+
+    it('should prepend https:// to .net domain', () => {
+      expect(detectUrlFromSelection('example.net')).toBe('https://example.net');
+    });
+
+    it('should prepend https:// to .io domain', () => {
+      expect(detectUrlFromSelection('example.io')).toBe('https://example.io');
+    });
+
+    it('should prepend https:// to .dev domain', () => {
+      expect(detectUrlFromSelection('example.dev')).toBe('https://example.dev');
+    });
+
+    it('should prepend https:// to .co domain', () => {
+      expect(detectUrlFromSelection('example.co')).toBe('https://example.co');
+    });
+
+    it('should prepend https:// to .ai domain', () => {
+      expect(detectUrlFromSelection('example.ai')).toBe('https://example.ai');
+    });
+
+    it('should prepend https:// to .edu domain', () => {
+      expect(detectUrlFromSelection('stanford.edu')).toBe('https://stanford.edu');
+    });
+
+    it('should prepend https:// to .gov domain', () => {
+      expect(detectUrlFromSelection('whitehouse.gov')).toBe('https://whitehouse.gov');
+    });
+
+    it('should prepend https:// to subdomain.domain.tld', () => {
+      expect(detectUrlFromSelection('www.example.com')).toBe('https://www.example.com');
+    });
+
+    it('should prepend https:// to multi-level subdomain', () => {
+      expect(detectUrlFromSelection('api.v2.example.com')).toBe('https://api.v2.example.com');
+    });
+  });
+
+  describe('hostnames with paths', () => {
+    it('should prepend https:// to domain with path', () => {
+      expect(detectUrlFromSelection('example.com/path/to/page')).toBe(
+        'https://example.com/path/to/page'
+      );
+    });
+
+    it('should prepend https:// to domain with query string', () => {
+      expect(detectUrlFromSelection('example.com?search=test')).toBe(
+        'https://example.com?search=test'
+      );
+    });
+
+    it('should prepend https:// to domain with fragment', () => {
+      expect(detectUrlFromSelection('example.com#section')).toBe('https://example.com#section');
+    });
+  });
+
+  describe('IP addresses', () => {
+    it('should prepend http:// to IPv4 address', () => {
+      expect(detectUrlFromSelection('192.168.1.1')).toBe('http://192.168.1.1');
+    });
+
+    it('should prepend http:// to IPv4 address with port', () => {
+      expect(detectUrlFromSelection('192.168.1.1:8080')).toBe('http://192.168.1.1:8080');
+    });
+
+    it('should prepend http:// to IPv4 address with path', () => {
+      expect(detectUrlFromSelection('192.168.1.1/api/v1')).toBe('http://192.168.1.1/api/v1');
+    });
+
+    it('should prepend http:// to IPv4 with port and path', () => {
+      expect(detectUrlFromSelection('192.168.1.1:3000/api')).toBe('http://192.168.1.1:3000/api');
+    });
+
+    it('should prepend http:// to localhost IP', () => {
+      expect(detectUrlFromSelection('127.0.0.1')).toBe('http://127.0.0.1');
+    });
+
+    it('should prepend http:// to localhost IP with port', () => {
+      expect(detectUrlFromSelection('127.0.0.1:3000')).toBe('http://127.0.0.1:3000');
+    });
+  });
+
+  describe('localhost', () => {
+    it('should prepend https:// to localhost', () => {
+      expect(detectUrlFromSelection('localhost')).toBe('https://localhost');
+    });
+
+    it('should prepend https:// to localhost with port', () => {
+      expect(detectUrlFromSelection('localhost:3000')).toBe('https://localhost:3000');
+    });
+
+    it('should prepend https:// to localhost with path', () => {
+      expect(detectUrlFromSelection('localhost/api')).toBe('https://localhost/api');
+    });
+
+    it('should prepend https:// to localhost with port and path', () => {
+      expect(detectUrlFromSelection('localhost:8080/api/v1')).toBe('https://localhost:8080/api/v1');
+    });
+  });
+
+  describe('country code TLDs', () => {
+    it('should recognize .uk domain', () => {
+      expect(detectUrlFromSelection('example.co.uk')).toBe('https://example.co.uk');
+    });
+
+    it('should recognize .de domain', () => {
+      expect(detectUrlFromSelection('example.de')).toBe('https://example.de');
+    });
+
+    it('should recognize .jp domain', () => {
+      expect(detectUrlFromSelection('example.jp')).toBe('https://example.jp');
+    });
+
+    it('should recognize .au domain', () => {
+      expect(detectUrlFromSelection('example.com.au')).toBe('https://example.com.au');
+    });
+  });
+
+  describe('whitespace handling', () => {
+    it('should trim leading whitespace', () => {
+      expect(detectUrlFromSelection('  example.com')).toBe('https://example.com');
+    });
+
+    it('should trim trailing whitespace', () => {
+      expect(detectUrlFromSelection('example.com  ')).toBe('https://example.com');
+    });
+
+    it('should trim both leading and trailing whitespace', () => {
+      expect(detectUrlFromSelection('  example.com  ')).toBe('https://example.com');
+    });
+
+    it('should trim newlines', () => {
+      expect(detectUrlFromSelection('\nexample.com\n')).toBe('https://example.com');
+    });
+
+    it('should trim tabs', () => {
+      expect(detectUrlFromSelection('\texample.com\t')).toBe('https://example.com');
+    });
+  });
+
+  describe('rejection cases', () => {
+    it('should return null for text with internal spaces', () => {
+      expect(detectUrlFromSelection('example .com')).toBeNull();
+    });
+
+    it('should return null for sentence with URL', () => {
+      expect(detectUrlFromSelection('Visit example.com for more')).toBeNull();
+    });
+
+    it('should return null for plain text', () => {
+      expect(detectUrlFromSelection('hello world')).toBeNull();
+    });
+
+    it('should return null for single word', () => {
+      expect(detectUrlFromSelection('hello')).toBeNull();
+    });
+
+    it('should return null for non-TLD extension', () => {
+      expect(detectUrlFromSelection('foo.bar')).toBeNull();
+    });
+
+    it('should return null for file extension pattern', () => {
+      expect(detectUrlFromSelection('document.pdf')).toBeNull();
+    });
+
+    it('should return null for empty string', () => {
+      expect(detectUrlFromSelection('')).toBeNull();
+    });
+
+    it('should return null for whitespace only', () => {
+      expect(detectUrlFromSelection('   ')).toBeNull();
+    });
+
+    it('should return null for null input', () => {
+      expect(detectUrlFromSelection(null as unknown as string)).toBeNull();
+    });
+
+    it('should return null for undefined input', () => {
+      expect(detectUrlFromSelection(undefined as unknown as string)).toBeNull();
+    });
+
+    it('should return null for number-like input', () => {
+      expect(detectUrlFromSelection('12345')).toBeNull();
+    });
+
+    it('should return null for email address', () => {
+      expect(detectUrlFromSelection('user@example.com')).toBeNull();
+    });
   });
 });

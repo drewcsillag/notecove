@@ -273,7 +273,10 @@ describe('IPCHandlers - Folder CRUD', () => {
       deleteDocument: jest.fn().mockResolvedValue(undefined),
       loadDocument: jest.fn().mockResolvedValue({}),
       createDocument: jest.fn().mockResolvedValue('new-note-id'),
-      getNoteDoc: jest.fn().mockReturnValue({ getMetadata: jest.fn().mockReturnValue(null) }),
+      getNoteDoc: jest.fn().mockReturnValue({
+        getMetadata: jest.fn().mockReturnValue(null),
+        content: { length: 0, get: jest.fn(), toArray: jest.fn().mockReturnValue([]) },
+      }),
       getDocument: jest.fn().mockReturnValue({ getText: () => ({ toJSON: () => 'Content' }) }),
     };
 
@@ -1047,7 +1050,10 @@ describe('IPCHandlers - SD Management', () => {
       deleteDocument: jest.fn().mockResolvedValue(undefined),
       loadDocument: jest.fn().mockResolvedValue({}),
       createDocument: jest.fn().mockResolvedValue('new-note-id'),
-      getNoteDoc: jest.fn().mockReturnValue({ getMetadata: jest.fn().mockReturnValue(null) }),
+      getNoteDoc: jest.fn().mockReturnValue({
+        getMetadata: jest.fn().mockReturnValue(null),
+        content: { length: 0, get: jest.fn(), toArray: jest.fn().mockReturnValue([]) },
+      }),
       getDocument: jest.fn().mockReturnValue({ getText: () => ({ toJSON: () => 'Content' }) }),
     };
 

@@ -1480,21 +1480,21 @@ export class IPCHandlers {
     targetSdPath: string
   ): Promise<void> {
     // Load the note CRDT to extract image references
-    let doc = this.crdtManager.getDocument(noteId);
-    const wasLoaded = doc != null;
+    let noteDoc = this.crdtManager.getNoteDoc(noteId);
+    const wasLoaded = noteDoc != null;
 
     if (!wasLoaded) {
       await this.crdtManager.loadNote(noteId, sourceSdId);
-      doc = this.crdtManager.getDocument(noteId);
+      noteDoc = this.crdtManager.getNoteDoc(noteId);
     }
 
-    if (!doc) {
+    if (!noteDoc) {
       console.log(`[IPC] Could not load CRDT for note ${noteId}, skipping image copy`);
       return;
     }
 
     // Extract image IDs from the note content
-    const content = doc.getXmlFragment('content');
+    const content = noteDoc.content;
     const imageIds = extractImageReferencesFromXmlFragment(content);
 
     if (imageIds.length === 0) {

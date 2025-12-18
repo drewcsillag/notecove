@@ -57,6 +57,7 @@ import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { useWindowState } from '../../hooks/useWindowState';
+import { detectUrlFromSelection } from '@notecove/shared';
 
 /**
  * Map of file extensions to MIME types for image files.
@@ -174,6 +175,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     element: HTMLElement;
     selectionFrom: number;
     selectionTo: number;
+    initialUrl?: string;
   } | null>(null);
   const linkInputPopoverRef = useRef<TippyInstance | null>(null);
 
@@ -1640,7 +1642,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     const container = document.createElement('div');
 
     // Capture current values
-    const { element, selectionFrom, selectionTo } = linkInputPopoverData;
+    const { element, selectionFrom, selectionTo, initialUrl } = linkInputPopoverData;
 
     // Create the popover using tippy.js
     const instance = tippy(element, {
@@ -1662,6 +1664,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       const root = createRoot(container);
       root.render(
         <LinkInputPopover
+          {...(initialUrl ? { initialUrl } : {})}
           onSubmit={(url: string) => {
             console.log('[TipTapEditor] Creating link with URL:', url);
             // Select the original selection and apply link
@@ -1799,14 +1802,34 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     // Check if there's a text selection
     const { from, to } = editor.state.selection;
     if (from !== to) {
-      console.log('[TipTapEditor] Link button clicked with selection:', from, '-', to);
+      // Get selected text and check if it looks like a URL
+      const selectedText = editor.state.doc.textBetween(from, to);
+      const detectedUrl = detectUrlFromSelection(selectedText);
+
+      console.log(
+        '[TipTapEditor] Link button clicked with selection:',
+        from,
+        '-',
+        to,
+        'detected URL:',
+        detectedUrl
+      );
 
       // Show URL input popover
-      setLinkInputPopoverData({
-        element: buttonElement,
-        selectionFrom: from,
-        selectionTo: to,
-      });
+      setLinkInputPopoverData(
+        detectedUrl
+          ? {
+              element: buttonElement,
+              selectionFrom: from,
+              selectionTo: to,
+              initialUrl: detectedUrl,
+            }
+          : {
+              element: buttonElement,
+              selectionFrom: from,
+              selectionTo: to,
+            }
+      );
       return;
     }
 
@@ -1920,13 +1943,33 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     // Check if there's a text selection
     const { from, to } = editor.state.selection;
     if (from !== to) {
-      console.log('[TipTapEditor] Cmd+K pressed with selection:', from, '-', to);
+      // Get selected text and check if it looks like a URL
+      const selectedText = editor.state.doc.textBetween(from, to);
+      const detectedUrl = detectUrlFromSelection(selectedText);
 
-      setLinkInputPopoverData({
-        element: anchorElement,
-        selectionFrom: from,
-        selectionTo: to,
-      });
+      console.log(
+        '[TipTapEditor] Cmd+K pressed with selection:',
+        from,
+        '-',
+        to,
+        'detected URL:',
+        detectedUrl
+      );
+
+      setLinkInputPopoverData(
+        detectedUrl
+          ? {
+              element: anchorElement,
+              selectionFrom: from,
+              selectionTo: to,
+              initialUrl: detectedUrl,
+            }
+          : {
+              element: anchorElement,
+              selectionFrom: from,
+              selectionTo: to,
+            }
+      );
       return;
     }
 
