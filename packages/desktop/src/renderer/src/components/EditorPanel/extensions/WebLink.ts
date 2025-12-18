@@ -18,8 +18,11 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { InputRule } from '@tiptap/core';
 
 // Debug logging enabled in development mode
-// Use import.meta.env for Vite compatibility (process.env doesn't exist in renderer)
-const DEBUG = import.meta.env.DEV;
+// Check for Vite's import.meta.env or fallback to process.env for Jest
+const DEBUG: boolean =
+  typeof window !== 'undefined' &&
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+  (window as any).__NOTECOVE_DEV_MODE__ === true;
 
 /**
  * Regex pattern for markdown-style links: [text](url) followed by space
@@ -157,6 +160,13 @@ export const WebLink = Link.extend({
         rel: 'noopener noreferrer',
       },
     };
+  },
+
+  // Override inclusive to false - typing at link boundaries should NOT extend the link
+  // The parent Link extension ties inclusive to autolink, but we want autolink ON
+  // while still preventing text typed adjacent to links from becoming part of the link
+  inclusive() {
+    return false;
   },
 
   addKeyboardShortcuts() {
