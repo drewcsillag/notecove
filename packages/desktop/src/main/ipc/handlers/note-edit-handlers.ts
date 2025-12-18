@@ -12,7 +12,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { HandlerContext } from './types';
 import type { NoteCache, UUID } from '@notecove/shared';
-import { extractTags, extractLinks } from '@notecove/shared';
+import { extractTags, extractLinks, ImageStorage, SyncDirectoryStructure } from '@notecove/shared';
+import { extractImageReferencesFromXmlFragment } from '../../image-cleanup-manager';
+import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
 
 /**
  * Register all note edit IPC handlers
@@ -275,6 +277,9 @@ function handleMoveNoteToSD(ctx: HandlerContext) {
       throw new Error(`Target SD ${targetSdId} not found or missing UUID`);
     }
 
+    // Copy images BEFORE moving the note (atomic: fail if any image can't be copied)
+    await copyNoteImages(ctx, noteId, sourceSdId, targetSdId, sourceSD.path, targetSD.path);
+
     const moveId = await noteMoveManager.initiateMove({
       noteId,
       sourceSdUuid: sourceSD.uuid,
@@ -306,6 +311,178 @@ function handleMoveNoteToSD(ctx: HandlerContext) {
 // Helper Functions
 // =============================================================================
 
+/**
+ * Copy all images referenced by a note from source SD to target SD.
+ * This is called BEFORE moving the note to ensure atomic behavior:
+ * if any image copy fails, the note move is aborted.
+ *
+ * @param ctx Handler context
+ * @param noteId The note ID
+ * @param sourceSdId Source storage directory ID
+ * @param targetSdId Target storage directory ID
+ * @param sourceSdPath Source storage directory path
+ * @param targetSdPath Target storage directory path
+ * @throws Error if any image copy fails
+ */
+async function copyNoteImages(
+  ctx: HandlerContext,
+  noteId: string,
+  sourceSdId: string,
+  targetSdId: string,
+  sourceSdPath: string,
+  targetSdPath: string
+): Promise<void> {
+  const { crdtManager, database } = ctx;
+
+  // Load the note CRDT to extract image references
+  let doc = crdtManager.getDocument(noteId);
+  const wasLoaded = doc != null;
+
+  if (!wasLoaded) {
+    await crdtManager.loadNote(noteId, sourceSdId);
+    doc = crdtManager.getDocument(noteId);
+  }
+
+  if (!doc) {
+    console.log(`[IPC] Could not load CRDT for note ${noteId}, skipping image copy`);
+    return;
+  }
+
+  // Extract image IDs from the note content
+  const content = doc.getXmlFragment('content');
+  const imageIds = extractImageReferencesFromXmlFragment(content);
+
+  if (imageIds.length === 0) {
+    console.log(`[IPC] Note ${noteId} has no images to copy`);
+    if (!wasLoaded) {
+      await crdtManager.unloadNote(noteId);
+    }
+    return;
+  }
+
+  console.log(
+    `[IPC] Copying ${imageIds.length} images for note ${noteId} from SD ${sourceSdId} to ${targetSdId}`
+  );
+
+  // Copy each image to the target SD
+  for (const imageId of imageIds) {
+    const result = await copyImageToSD(
+      database,
+      sourceSdId,
+      targetSdId,
+      imageId,
+      sourceSdPath,
+      targetSdPath
+    );
+
+    if (!result.success && !result.alreadyExists) {
+      // Image copy failed - abort the move
+      if (!wasLoaded) {
+        await crdtManager.unloadNote(noteId);
+      }
+      throw new Error(`Failed to copy image ${imageId}: ${result.error}`);
+    }
+
+    if (result.alreadyExists) {
+      console.log(`[IPC] Image ${imageId} already exists in target SD ${targetSdId}`);
+    } else {
+      console.log(`[IPC] Copied image ${imageId} to target SD ${targetSdId}`);
+    }
+  }
+
+  // Unload the note if we loaded it
+  if (!wasLoaded) {
+    await crdtManager.unloadNote(noteId);
+  }
+}
+
+/**
+ * Copy a single image from source SD to target SD.
+ * Handles deduplication: if image already exists in target, returns success with alreadyExists flag.
+ */
+async function copyImageToSD(
+  database: HandlerContext['database'],
+  sourceSdId: string,
+  targetSdId: string,
+  imageId: string,
+  sourceSdPath: string,
+  targetSdPath: string
+): Promise<{ success: boolean; alreadyExists?: boolean; error?: string }> {
+  // Check if image already exists in target SD (in database cache)
+  const existingImage = await database.getImage(imageId);
+  if (existingImage?.sdId === targetSdId) {
+    return { success: true, alreadyExists: true };
+  }
+
+  // Look for the source image file
+  const sourceMediaPath = path.join(sourceSdPath, 'media');
+  let sourceFilePath: string | null = null;
+  let mimeType = existingImage?.mimeType;
+
+  try {
+    const files = await fs.readdir(sourceMediaPath);
+    for (const file of files) {
+      if (file.startsWith(imageId)) {
+        sourceFilePath = path.join(sourceMediaPath, file);
+        if (!mimeType) {
+          const ext = file.split('.').pop()?.toLowerCase();
+          mimeType = ImageStorage.getMimeTypeFromExtension(ext ?? '') ?? 'image/png';
+        }
+        break;
+      }
+    }
+  } catch {
+    // Media directory doesn't exist or can't be read
+  }
+
+  if (!sourceFilePath) {
+    console.log(`[IPC] Source image file not found: ${imageId} in SD ${sourceSdId}`);
+    return { success: false, error: 'Source image not found' };
+  }
+
+  // Read source image data
+  let imageData: Buffer;
+  try {
+    imageData = await fs.readFile(sourceFilePath);
+  } catch (err) {
+    console.log(`[IPC] Failed to read source image: ${sourceFilePath}`, err);
+    return { success: false, error: 'Failed to read source image' };
+  }
+
+  // Create target SD structure and save image
+  const fsAdapter = new NodeFileSystemAdapter();
+  const targetSdStructure = new SyncDirectoryStructure(fsAdapter, {
+    id: targetSdId,
+    path: targetSdPath,
+    label: 'Target SD',
+  });
+  const targetImageStorage = new ImageStorage(fsAdapter, targetSdStructure);
+
+  // Save with the same imageId
+  const filename = `${imageId}.${ImageStorage.getExtensionFromMimeType(mimeType ?? 'image/png')}`;
+  const targetPath = path.join(targetSdPath, 'media', filename);
+
+  // Ensure media directory exists
+  await targetImageStorage.initializeMediaDir();
+
+  // Write the file
+  await fs.writeFile(targetPath, imageData);
+
+  // Add to database cache for target SD
+  await database.upsertImage({
+    id: imageId,
+    sdId: targetSdId,
+    filename,
+    mimeType: mimeType ?? 'image/png',
+    width: existingImage?.width ?? null,
+    height: existingImage?.height ?? null,
+    size: imageData.length,
+    created: Date.now(),
+  });
+
+  return { success: true };
+}
+
 async function moveNoteToSD_Legacy(
   ctx: HandlerContext,
   noteId: string,
@@ -317,6 +494,16 @@ async function moveNoteToSD_Legacy(
   const { database, broadcastToAll } = ctx;
 
   const targetNoteId: string = crypto.randomUUID();
+
+  // Get SD paths for image copy
+  const sourceSD = await database.getStorageDir(sourceSdId);
+  const targetSD = await database.getStorageDir(targetSdId);
+  if (!sourceSD || !targetSD) {
+    throw new Error('Source or target SD not found');
+  }
+
+  // Copy images BEFORE copying CRDT files (atomic: fail if any image can't be copied)
+  await copyNoteImages(ctx, noteId, sourceSdId, targetSdId, sourceSD.path, targetSD.path);
 
   await copyNoteCRDTFiles(ctx, noteId, sourceSdId, targetNoteId, targetSdId);
 

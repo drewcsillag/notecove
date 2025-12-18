@@ -47,7 +47,11 @@ import {
 } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { ThumbnailGenerator, type ThumbnailResult } from '../thumbnail';
-import { ImageCleanupManager, type CleanupStats } from '../image-cleanup-manager';
+import {
+  ImageCleanupManager,
+  type CleanupStats,
+  extractImageReferencesFromXmlFragment,
+} from '../image-cleanup-manager';
 
 /**
  * Callback type for getting deletion logger by SD
@@ -1347,6 +1351,9 @@ export class IPCHandlers {
       throw new Error(`Target SD ${targetSdId} not found or missing UUID`);
     }
 
+    // Copy images BEFORE moving the note (atomic: fail if any image can't be copied)
+    await this.copyNoteImages(noteId, sourceSdId, targetSdId, sourceSD.path, targetSD.path);
+
     // Initiate the move using state machine
     const moveId = await this.noteMoveManager.initiateMove({
       noteId,
@@ -1393,6 +1400,16 @@ export class IPCHandlers {
   ): Promise<void> {
     // Generate new UUID for the target note (keepBoth)
     const targetNoteId: string = crypto.randomUUID();
+
+    // Get SD paths for image copy
+    const sourceSD = await this.database.getStorageDir(sourceSdId);
+    const targetSD = await this.database.getStorageDir(targetSdId);
+    if (!sourceSD || !targetSD) {
+      throw new Error('Source or target SD not found');
+    }
+
+    // Copy images BEFORE copying CRDT files (atomic: fail if any image can't be copied)
+    await this.copyNoteImages(noteId, sourceSdId, targetSdId, sourceSD.path, targetSD.path);
 
     // Copy CRDT files from source SD to target SD
     await this.copyNoteCRDTFiles(noteId, sourceSdId, targetNoteId, targetSdId);
@@ -1451,8 +1468,156 @@ export class IPCHandlers {
   }
 
   /**
-   * Copy note CRDT files from source SD to target SD
+   * Copy all images referenced by a note from source SD to target SD.
+   * This is called BEFORE moving the note to ensure atomic behavior:
+   * if any image copy fails, the note move is aborted.
    */
+  private async copyNoteImages(
+    noteId: string,
+    sourceSdId: string,
+    targetSdId: string,
+    sourceSdPath: string,
+    targetSdPath: string
+  ): Promise<void> {
+    // Load the note CRDT to extract image references
+    let doc = this.crdtManager.getDocument(noteId);
+    const wasLoaded = doc != null;
+
+    if (!wasLoaded) {
+      await this.crdtManager.loadNote(noteId, sourceSdId);
+      doc = this.crdtManager.getDocument(noteId);
+    }
+
+    if (!doc) {
+      console.log(`[IPC] Could not load CRDT for note ${noteId}, skipping image copy`);
+      return;
+    }
+
+    // Extract image IDs from the note content
+    const content = doc.getXmlFragment('content');
+    const imageIds = extractImageReferencesFromXmlFragment(content);
+
+    if (imageIds.length === 0) {
+      console.log(`[IPC] Note ${noteId} has no images to copy`);
+      if (!wasLoaded) {
+        await this.crdtManager.unloadNote(noteId);
+      }
+      return;
+    }
+
+    console.log(
+      `[IPC] Copying ${imageIds.length} images for note ${noteId} from SD ${sourceSdId} to ${targetSdId}`
+    );
+
+    // Copy each image to the target SD
+    for (const imageId of imageIds) {
+      const result = await this.copyImageToSDInternal(
+        sourceSdId,
+        targetSdId,
+        imageId,
+        sourceSdPath,
+        targetSdPath
+      );
+
+      if (!result.success && !result.alreadyExists) {
+        // Image copy failed - abort the move
+        if (!wasLoaded) {
+          await this.crdtManager.unloadNote(noteId);
+        }
+        throw new Error(`Failed to copy image ${imageId}: ${result.error}`);
+      }
+
+      if (result.alreadyExists) {
+        console.log(`[IPC] Image ${imageId} already exists in target SD ${targetSdId}`);
+      } else {
+        console.log(`[IPC] Copied image ${imageId} to target SD ${targetSdId}`);
+      }
+    }
+
+    // Unload the note if we loaded it
+    if (!wasLoaded) {
+      await this.crdtManager.unloadNote(noteId);
+    }
+  }
+
+  /**
+   * Internal helper for copying a single image to a target SD during note move.
+   * Similar to handleImageCopyToSD but takes paths directly.
+   */
+  private async copyImageToSDInternal(
+    sourceSdId: string,
+    targetSdId: string,
+    imageId: string,
+    sourceSdPath: string,
+    targetSdPath: string
+  ): Promise<{ success: boolean; alreadyExists?: boolean; error?: string }> {
+    // Check if image already exists in target SD (in database cache)
+    const existingImage = await this.database.getImage(imageId);
+    if (existingImage?.sdId === targetSdId) {
+      return { success: true, alreadyExists: true };
+    }
+
+    // Look for the source image file
+    const sourceMediaPath = path.join(sourceSdPath, 'media');
+    let sourceFilePath: string | null = null;
+    let mimeType = existingImage?.mimeType;
+
+    try {
+      const files = await fs.readdir(sourceMediaPath);
+      for (const file of files) {
+        if (file.startsWith(imageId)) {
+          sourceFilePath = path.join(sourceMediaPath, file);
+          if (!mimeType) {
+            const ext = file.split('.').pop()?.toLowerCase();
+            mimeType = getMimeTypeFromExtension(ext ?? '') ?? 'image/png';
+          }
+          break;
+        }
+      }
+    } catch {
+      // Media directory doesn't exist or can't be read
+    }
+
+    if (!sourceFilePath) {
+      console.log(`[IPC] Source image file not found: ${imageId} in SD ${sourceSdId}`);
+      return { success: false, error: 'Source image not found' };
+    }
+
+    // Read source image data
+    let imageData: Buffer;
+    try {
+      imageData = await fs.readFile(sourceFilePath);
+    } catch (err) {
+      console.log(`[IPC] Failed to read source image: ${sourceFilePath}`, err);
+      return { success: false, error: 'Failed to read source image' };
+    }
+
+    // Save with the same imageId
+    const filename = `${imageId}.${getExtensionFromMimeType(mimeType ?? 'image/png')}`;
+    const targetMediaDir = path.join(targetSdPath, 'media');
+    const targetPath = path.join(targetMediaDir, filename);
+
+    // Ensure media directory exists
+    await fs.mkdir(targetMediaDir, { recursive: true });
+
+    // Write the file
+    await fs.writeFile(targetPath, imageData);
+
+    // Add to database cache for target SD
+    await this.database.upsertImage({
+      id: imageId,
+      sdId: targetSdId,
+      filename,
+      mimeType: mimeType ?? 'image/png',
+      width: existingImage?.width ?? null,
+      height: existingImage?.height ?? null,
+      size: imageData.length,
+      created: Date.now(),
+    });
+
+    return { success: true };
+  }
+
   private async copyNoteCRDTFiles(
     sourceNoteId: string,
     sourceSdId: string,

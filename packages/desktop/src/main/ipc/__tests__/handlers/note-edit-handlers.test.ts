@@ -381,4 +381,253 @@ describe('Note Edit Handlers', () => {
       );
     });
   });
+
+  describe('note:moveToSD - image handling', () => {
+    const sourceSdId = 'source-sd';
+    const targetSdId = 'target-sd';
+    const noteId = 'note-with-images';
+    const imageId1 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const imageId2 = 'b2c3d4e5-f678-9012-cdef-123456789012';
+
+    beforeEach(() => {
+      // Setup source and target SDs
+      mocks.database.getStorageDir.mockImplementation((sdId: string) => {
+        if (sdId === sourceSdId) {
+          return Promise.resolve({
+            id: sourceSdId,
+            uuid: 'source-uuid',
+            name: 'Source SD',
+            path: '/test/source-sd',
+            created: Date.now(),
+            isActive: true,
+          });
+        }
+        if (sdId === targetSdId) {
+          return Promise.resolve({
+            id: targetSdId,
+            uuid: 'target-uuid',
+            name: 'Target SD',
+            path: '/test/target-sd',
+            created: Date.now(),
+            isActive: false,
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      // Setup note in source SD
+      mocks.database.getNote.mockResolvedValue({
+        id: noteId,
+        title: 'Note with Images',
+        sdId: sourceSdId,
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        contentPreview: 'Preview',
+        contentText: 'Content',
+        created: Date.now(),
+        modified: Date.now(),
+      });
+
+      // No conflict in target SD
+      mocks.database.getNotesBySd.mockResolvedValue([]);
+
+      // Setup move manager
+      mocks.noteMoveManager.initiateMove.mockResolvedValue('move-id-123');
+      mocks.noteMoveManager.executeMove.mockResolvedValue({ success: true, moveId: 'move-id-123' });
+    });
+
+    it('should copy images when moving note to different SD', async () => {
+      const mockEvent = {} as any;
+      const fsPromises = await import('fs/promises');
+
+      // Create a mock Y.Doc with image references (use transaction for proper Yjs behavior)
+      const Y = await import('yjs');
+      const mockDoc = new Y.Doc();
+      mockDoc.transact(() => {
+        const content = mockDoc.getXmlFragment('content');
+        // Add paragraph first
+        const paragraph = new Y.XmlElement('paragraph');
+        content.insert(0, [paragraph]);
+        // Add image nodes - insert them one at a time
+        const imageNode1 = new Y.XmlElement('notecoveImage');
+        imageNode1.setAttribute('imageId', imageId1);
+        content.insert(1, [imageNode1]);
+        const imageNode2 = new Y.XmlElement('notecoveImage');
+        imageNode2.setAttribute('imageId', imageId2);
+        content.insert(2, [imageNode2]);
+      });
+
+      // Mock CRDT manager to return our doc with images
+      mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
+      mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+
+      // Mock image existence in source SD
+      mocks.database.getImage!.mockImplementation((imgId: string) => {
+        if (imgId === imageId1 || imgId === imageId2) {
+          return Promise.resolve({
+            id: imgId,
+            sdId: sourceSdId,
+            filename: `${imgId}.png`,
+            mimeType: 'image/png',
+            size: 1000,
+            created: Date.now(),
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      // Mock filesystem to return image files in source media directory
+      (fsPromises.readdir as jest.Mock).mockResolvedValue([`${imageId1}.png`, `${imageId2}.png`]);
+      (fsPromises.readFile as jest.Mock).mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      (fsPromises.writeFile as jest.Mock).mockResolvedValue(undefined);
+      (fsPromises.mkdir as jest.Mock).mockResolvedValue(undefined);
+
+      // Call the move handler
+      await (handlers as any).handleMoveNoteToSD(
+        mockEvent,
+        noteId,
+        sourceSdId,
+        targetSdId,
+        null, // targetFolderId
+        null // conflictResolution
+      );
+
+      // Verify that image copy was attempted for both images
+      expect(mocks.database.upsertImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: imageId1,
+          sdId: targetSdId,
+        })
+      );
+      expect(mocks.database.upsertImage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: imageId2,
+          sdId: targetSdId,
+        })
+      );
+    });
+
+    it('should fail the move if image copy fails', async () => {
+      const mockEvent = {} as any;
+
+      // Create a mock Y.Doc with image references (use transaction for proper Yjs behavior)
+      const Y = await import('yjs');
+      const mockDoc = new Y.Doc();
+      mockDoc.transact(() => {
+        const content = mockDoc.getXmlFragment('content');
+        const imageNode = new Y.XmlElement('notecoveImage');
+        imageNode.setAttribute('imageId', imageId1);
+        content.insert(0, [imageNode]);
+      });
+
+      mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
+      mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+
+      // Mock image exists in source but copy will fail
+      mocks.database.getImage!.mockResolvedValue({
+        id: imageId1,
+        sdId: sourceSdId,
+        filename: `${imageId1}.png`,
+        mimeType: 'image/png',
+        size: 1000,
+        created: Date.now(),
+      });
+
+      // Simulate image copy failure (file read error)
+      const fsPromises = await import('fs/promises');
+      (fsPromises.readdir as jest.Mock).mockResolvedValue([`${imageId1}.png`]);
+      (fsPromises.readFile as jest.Mock).mockRejectedValue(new Error('ENOENT: file not found'));
+
+      // Move should throw error due to image copy failure
+      await expect(
+        (handlers as any).handleMoveNoteToSD(mockEvent, noteId, sourceSdId, targetSdId, null, null)
+      ).rejects.toThrow(/Failed to copy image/);
+
+      // Note move should NOT have been initiated
+      expect(mocks.noteMoveManager.initiateMove).not.toHaveBeenCalled();
+    });
+
+    it('should skip image copy if image already exists in target SD', async () => {
+      const mockEvent = {} as any;
+
+      // Create a mock Y.Doc with image references (use transaction for proper Yjs behavior)
+      const Y = await import('yjs');
+      const mockDoc = new Y.Doc();
+      mockDoc.transact(() => {
+        const content = mockDoc.getXmlFragment('content');
+        const imageNode = new Y.XmlElement('notecoveImage');
+        imageNode.setAttribute('imageId', imageId1);
+        content.insert(0, [imageNode]);
+      });
+
+      mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
+      mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+
+      // Mock image already exists in TARGET SD
+      mocks.database.getImage!.mockResolvedValue({
+        id: imageId1,
+        sdId: targetSdId, // Already in target!
+        filename: `${imageId1}.png`,
+        mimeType: 'image/png',
+        size: 1000,
+        created: Date.now(),
+      });
+
+      // Call the move handler
+      await (handlers as any).handleMoveNoteToSD(
+        mockEvent,
+        noteId,
+        sourceSdId,
+        targetSdId,
+        null,
+        null
+      );
+
+      // Move should succeed
+      expect(mocks.noteMoveManager.initiateMove).toHaveBeenCalled();
+      expect(mocks.noteMoveManager.executeMove).toHaveBeenCalled();
+
+      // Image should NOT be copied (already exists in target)
+      // upsertImage should not be called for the image copy
+      expect(mocks.database.upsertImage).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: imageId1,
+          sdId: targetSdId,
+        })
+      );
+    });
+
+    it('should move note without images successfully', async () => {
+      const mockEvent = {} as any;
+
+      // Create a mock Y.Doc with NO image references (use transaction for proper Yjs behavior)
+      const Y = await import('yjs');
+      const mockDoc = new Y.Doc();
+      mockDoc.transact(() => {
+        const content = mockDoc.getXmlFragment('content');
+        const paragraph = new Y.XmlElement('paragraph');
+        content.insert(0, [paragraph]);
+        const text = new Y.XmlText('Just text, no images');
+        paragraph.insert(0, [text]);
+      });
+
+      mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
+      mocks.crdtManager.loadNote.mockResolvedValue(mockDoc);
+
+      // Call the move handler
+      await (handlers as any).handleMoveNoteToSD(
+        mockEvent,
+        noteId,
+        sourceSdId,
+        targetSdId,
+        null,
+        null
+      );
+
+      // Move should proceed normally
+      expect(mocks.noteMoveManager.initiateMove).toHaveBeenCalled();
+      expect(mocks.noteMoveManager.executeMove).toHaveBeenCalled();
+    });
+  });
 });

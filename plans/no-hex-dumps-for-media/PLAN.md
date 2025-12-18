@@ -35,11 +35,11 @@ The hex viewer should still show for:
 
 ## File Changes
 
-| File | Change |
-| --- | --- |
-| `packages/desktop/src/renderer/src/components/StorageInspector/StorageInspectorWindow.tsx` | Added `shouldShowHexViewer()` helper and conditional rendering |
-| `packages/desktop/src/renderer/src/components/StorageInspector/__tests__/shouldShowHexViewer.test.ts` | Unit tests for the helper function (9 tests) |
-| `packages/desktop/e2e/web-links.spec.ts` | Fixed flaky test - use keyboard navigation instead of clicking link element |
+| File                                                                                                  | Change                                                                      |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `packages/desktop/src/renderer/src/components/StorageInspector/StorageInspectorWindow.tsx`            | Added `shouldShowHexViewer()` helper and conditional rendering              |
+| `packages/desktop/src/renderer/src/components/StorageInspector/__tests__/shouldShowHexViewer.test.ts` | Unit tests for the helper function (9 tests)                                |
+| `packages/desktop/e2e/web-links.spec.ts`                                                              | Fixed flaky test - use keyboard navigation instead of clicking link element |
 
 ## Design Decisions
 
