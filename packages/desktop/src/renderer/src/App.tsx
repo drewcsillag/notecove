@@ -29,10 +29,12 @@ import { ImportDialog } from './components/ImportDialog';
 import { AppStateKey } from '@notecove/shared';
 
 const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
+const LEFT_SIDEBAR_SIZES_KEY = AppStateKey.LeftSidebarPanelSizes;
 const THEME_MODE_KEY = AppStateKey.ThemeMode;
 
 function App(): React.ReactElement {
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
+  const [leftSidebarSizes, setLeftSidebarSizes] = useState<number[] | undefined>(undefined);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -165,8 +167,11 @@ function App(): React.ReactElement {
         console.log('[App] Enabling SD picker mode from URL parameter');
         setSdPickerMode(true);
       }
-    } catch (error) {
-      console.error('[App] Error parsing URL parameters:', error);
+    } catch (error: unknown) {
+      console.error(
+        '[App] Error parsing URL parameters:',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }, []);
 
@@ -178,8 +183,11 @@ function App(): React.ReactElement {
         const devPrefix = appInfo.isDevBuild ? '[DEV] ' : '';
         const profileSuffix = appInfo.profileName ? ` - ${appInfo.profileName}` : '';
         document.title = `${devPrefix}NoteCove${profileSuffix}`;
-      } catch (error) {
-        console.error('[App] Failed to get app info for title:', error);
+      } catch (error: unknown) {
+        console.error(
+          '[App] Failed to get app info for title:',
+          error instanceof Error ? error.message : String(error)
+        );
         // Fallback title
         document.title = 'NoteCove';
       }
@@ -291,12 +299,35 @@ function App(): React.ReactElement {
           const sizes = JSON.parse(saved) as number[];
           setInitialPanelSizes(sizes);
         }
-      } catch (error) {
-        console.error('Failed to load panel sizes:', error);
+      } catch (error: unknown) {
+        console.error(
+          'Failed to load panel sizes:',
+          error instanceof Error ? error.message : String(error)
+        );
       }
     };
 
     void loadPanelSizes();
+  }, []);
+
+  // Load saved left sidebar panel sizes on mount
+  useEffect(() => {
+    const loadLeftSidebarSizes = async (): Promise<void> => {
+      try {
+        const saved = await window.electronAPI.appState.get(LEFT_SIDEBAR_SIZES_KEY);
+        if (saved) {
+          const sizes = JSON.parse(saved) as number[];
+          setLeftSidebarSizes(sizes);
+        }
+      } catch (error: unknown) {
+        console.error(
+          'Failed to load left sidebar sizes:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    };
+
+    void loadLeftSidebarSizes();
   }, []);
 
   // Load saved theme preference on mount
@@ -307,8 +338,11 @@ function App(): React.ReactElement {
         if (saved === 'dark' || saved === 'light') {
           setThemeMode(saved as PaletteMode);
         }
-      } catch (error) {
-        console.error('Failed to load theme:', error);
+      } catch (error: unknown) {
+        console.error(
+          'Failed to load theme:',
+          error instanceof Error ? error.message : String(error)
+        );
       } finally {
         setThemeLoaded(true);
       }
@@ -342,8 +376,11 @@ function App(): React.ReactElement {
     const saveTheme = async (): Promise<void> => {
       try {
         await window.electronAPI.appState.set(THEME_MODE_KEY, themeMode);
-      } catch (error) {
-        console.error('Failed to save theme:', error);
+      } catch (error: unknown) {
+        console.error(
+          'Failed to save theme:',
+          error instanceof Error ? error.message : String(error)
+        );
       }
     };
 
@@ -360,8 +397,11 @@ function App(): React.ReactElement {
         if (defaultNote) {
           setSelectedNoteId('default-note');
         }
-      } catch (error) {
-        console.error('Failed to load default note:', error);
+      } catch (error: unknown) {
+        console.error(
+          'Failed to load default note:',
+          error instanceof Error ? error.message : String(error)
+        );
       }
     };
 
@@ -481,8 +521,11 @@ function App(): React.ReactElement {
               // TODO: Show error notification to user
             }
           })
-          .catch((error) => {
-            console.error('[Menu] Error creating snapshot:', error);
+          .catch((error: unknown) => {
+            console.error(
+              '[Menu] Error creating snapshot:',
+              error instanceof Error ? error.message : String(error)
+            );
           });
       } else {
         console.log('[Menu] No note selected for snapshot creation');
@@ -543,8 +586,11 @@ function App(): React.ReactElement {
             } else {
               console.error('[Menu] Failed to reload from CRDT logs:', result.error);
             }
-          } catch (error) {
-            console.error('[Menu] Error reloading from CRDT logs:', error);
+          } catch (error: unknown) {
+            console.error(
+              '[Menu] Error reloading from CRDT logs:',
+              error instanceof Error ? error.message : String(error)
+            );
           }
         })();
       } else {
@@ -591,12 +637,31 @@ function App(): React.ReactElement {
     const savePanelSizes = async (): Promise<void> => {
       try {
         await window.electronAPI.appState.set(PANEL_SIZES_KEY, JSON.stringify(sizes));
-      } catch (error) {
-        console.error('Failed to save panel sizes:', error);
+      } catch (error: unknown) {
+        console.error(
+          'Failed to save panel sizes:',
+          error instanceof Error ? error.message : String(error)
+        );
       }
     };
 
     void savePanelSizes();
+  };
+
+  const handleLeftSidebarLayoutChange = (sizes: number[]): void => {
+    // Persist left sidebar panel sizes to app state
+    const saveLeftSidebarSizes = async (): Promise<void> => {
+      try {
+        await window.electronAPI.appState.set(LEFT_SIDEBAR_SIZES_KEY, JSON.stringify(sizes));
+      } catch (error: unknown) {
+        console.error(
+          'Failed to save left sidebar sizes:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    };
+
+    void saveLeftSidebarSizes();
   };
 
   // Tag filter handlers - cycle through: neutral -> include -> exclude -> neutral
@@ -780,6 +845,8 @@ function App(): React.ReactElement {
                 onTagSelect={handleTagSelect}
                 onClearTagFilters={handleClearTagFilters}
                 showTagPanel={showTagPanel}
+                {...(leftSidebarSizes ? { initialSizes: leftSidebarSizes } : {})}
+                onLayoutChange={handleLeftSidebarLayoutChange}
               />
             }
             middlePanel={

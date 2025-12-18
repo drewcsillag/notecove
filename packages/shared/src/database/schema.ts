@@ -151,6 +151,7 @@ export enum AppStateKey {
   LeftPanelWidth = 'leftPanelWidth',
   RightPanelWidth = 'rightPanelWidth',
   PanelSizes = 'panelSizes', // Array of panel sizes: [left%, middle%, right%]
+  LeftSidebarPanelSizes = 'leftSidebarPanelSizes', // Array of left sidebar sizes: [folder%, tags%]
   FolderCollapseState = 'folderCollapseState',
   TagFilters = 'tagFilters',
   SearchText = 'searchText',

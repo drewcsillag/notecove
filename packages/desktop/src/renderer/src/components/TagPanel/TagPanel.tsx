@@ -5,9 +5,13 @@
  * Phase 4.1: Tags System
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Box, Typography, Chip, IconButton } from '@mui/material';
-import { LocalOffer as TagIcon, Clear as ClearIcon } from '@mui/icons-material';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { Box, Typography, Chip, IconButton, TextField, InputAdornment } from '@mui/material';
+import {
+  LocalOffer as TagIcon,
+  Clear as ClearIcon,
+  Search as SearchIcon,
+} from '@mui/icons-material';
 
 export interface TagPanelProps {
   tagFilters: Record<string, 'include' | 'exclude'>;
@@ -19,6 +23,7 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
   const [tags, setTags] = useState<{ id: string; name: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load tags from database
   const loadTags = useCallback(async () => {
@@ -61,6 +66,15 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
     };
   }, [loadTags]);
 
+  // Filter tags based on search query
+  const filteredTags = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return tags;
+    }
+    const query = searchQuery.toLowerCase();
+    return tags.filter((tag) => tag.name.toLowerCase().includes(query));
+  }, [tags, searchQuery]);
+
   if (loading) {
     return (
       <Box sx={{ p: 2 }}>
@@ -98,35 +112,73 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: 1,
           px: 2,
-          py: 1.5,
+          py: 1,
           borderBottom: 1,
           borderColor: 'divider',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TagIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
-          <Typography variant="subtitle2" fontWeight={600}>
-            Tags
-          </Typography>
-          {Object.keys(tagFilters).length > 0 && (
+        <TagIcon sx={{ fontSize: 20, color: 'text.secondary', flexShrink: 0 }} />
+        <Typography variant="subtitle2" fontWeight={600} sx={{ flexShrink: 0 }}>
+          Tags
+        </Typography>
+        <TextField
+          size="small"
+          placeholder="Filter tags..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchQuery ? (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setSearchQuery('');
+                  }}
+                  title="Clear search"
+                  sx={{ p: 0.25 }}
+                >
+                  <ClearIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            '& .MuiInputBase-root': {
+              height: 28,
+              fontSize: '0.8125rem',
+            },
+            '& .MuiInputBase-input': {
+              py: 0.5,
+            },
+          }}
+        />
+        {Object.keys(tagFilters).length > 0 && (
+          <>
             <Chip
               label={Object.keys(tagFilters).length}
               size="small"
-              sx={{ height: 20, minWidth: 20 }}
+              sx={{ height: 20, minWidth: 20, flexShrink: 0 }}
             />
-          )}
-        </Box>
-        {Object.keys(tagFilters).length > 0 && (
-          <IconButton
-            size="small"
-            onClick={onClearFilters}
-            title="Clear all filters"
-            sx={{ ml: 1 }}
-          >
-            <ClearIcon sx={{ fontSize: 18 }} />
-          </IconButton>
+            <IconButton
+              size="small"
+              onClick={onClearFilters}
+              title="Clear all filters"
+              sx={{ flexShrink: 0 }}
+            >
+              <ClearIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </>
         )}
       </Box>
 
@@ -142,7 +194,12 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
           alignContent: 'flex-start',
         }}
       >
-        {tags.map((tag) => {
+        {filteredTags.length === 0 && searchQuery && (
+          <Typography variant="body2" color="text.secondary">
+            No tags match your filter
+          </Typography>
+        )}
+        {filteredTags.map((tag) => {
           const filterState = tagFilters[tag.id]; // undefined | 'include' | 'exclude'
           const isInclude = filterState === 'include';
           const isExclude = filterState === 'exclude';

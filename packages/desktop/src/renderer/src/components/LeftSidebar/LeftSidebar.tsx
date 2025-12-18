@@ -19,6 +19,10 @@ export interface LeftSidebarProps {
   onTagSelect: (tagId: string) => void;
   onClearTagFilters: () => void;
   showTagPanel: boolean;
+  /** Initial sizes for folder/tags panels as percentages [folder%, tags%] */
+  initialSizes?: number[];
+  /** Callback when panel sizes change */
+  onLayoutChange?: (sizes: number[]) => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -29,6 +33,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onTagSelect,
   onClearTagFilters,
   showTagPanel,
+  initialSizes,
+  onLayoutChange,
 }) => {
   const theme = useTheme();
 
@@ -56,12 +62,21 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   }
 
   // Default sizes: 60% folder, 40% tags
+  const folderSize = initialSizes?.[0] ?? 60;
+  const tagsSize = initialSizes?.[1] ?? 40;
+
+  const handleLayoutChange = (sizes: number[]): void => {
+    if (onLayoutChange) {
+      onLayoutChange(sizes);
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Box sx={{ flex: 1, minHeight: 0 }}>
-        <PanelGroup direction="vertical">
+        <PanelGroup direction="vertical" onLayout={handleLayoutChange}>
           {/* Folder Panel */}
-          <Panel defaultSize={60} minSize={20}>
+          <Panel defaultSize={folderSize} minSize={20}>
             <Box sx={{ height: '100%', overflow: 'auto' }}>
               <FolderPanel {...folderPanelProps} />
             </Box>
@@ -86,7 +101,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           />
 
           {/* Tag Panel */}
-          <Panel defaultSize={40} minSize={20}>
+          <Panel defaultSize={tagsSize} minSize={20}>
             <Box sx={{ height: '100%', overflow: 'auto' }}>
               <TagPanel
                 tagFilters={tagFilters}
