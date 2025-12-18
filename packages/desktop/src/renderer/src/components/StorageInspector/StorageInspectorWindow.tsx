@@ -90,6 +90,17 @@ function ensureUint8Array(data: unknown): Uint8Array {
   return new Uint8Array();
 }
 
+/**
+ * Determines whether the hex viewer should be shown for a given file type.
+ * Files with dedicated previews (images, text files) don't need hex dumps.
+ * Binary files (CRDT logs, snapshots) and unknown types benefit from hex inspection.
+ */
+export function shouldShowHexViewer(fileType: string): boolean {
+  // Types with dedicated previews that don't need hex dumps
+  const noHexTypes = new Set(['image', 'activity', 'profile', 'identity', 'directory']);
+  return !noHexTypes.has(fileType);
+}
+
 export interface StorageInspectorWindowProps {
   sdId: string;
   sdPath: string;
@@ -539,24 +550,26 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
                   </Box>
                 )}
 
-              {/* Hex viewer */}
-              <Paper
-                variant="outlined"
-                sx={{
-                  flexGrow: 1,
-                  overflow: 'hidden',
-                  p: 1,
-                  bgcolor: 'grey.900',
-                  color: 'grey.100',
-                }}
-              >
-                <HexViewer
-                  data={fileData.data}
-                  fields={parsedFields}
-                  highlightRange={highlightRange}
-                  onHighlightChange={setHighlightRange}
-                />
-              </Paper>
+              {/* Hex viewer - only for binary file types that benefit from inspection */}
+              {shouldShowHexViewer(fileData.type) && (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    flexGrow: 1,
+                    overflow: 'hidden',
+                    p: 1,
+                    bgcolor: 'grey.900',
+                    color: 'grey.100',
+                  }}
+                >
+                  <HexViewer
+                    data={fileData.data}
+                    fields={parsedFields}
+                    highlightRange={highlightRange}
+                    onHighlightChange={setHighlightRange}
+                  />
+                </Paper>
+              )}
             </Box>
           ) : (
             <Box sx={{ p: 2 }}>

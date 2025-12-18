@@ -499,21 +499,17 @@ test.describe('Web Links - Cmd+K Shortcut', () => {
     const linkElement = page.locator('.ProseMirror a.web-link');
     await expect(linkElement).toBeVisible();
 
-    // Click inside the link to position cursor there
-    await linkElement.click();
-    await page.waitForTimeout(200);
-
-    // Close any popover that opened from the click
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
-
-    // Re-click link to ensure cursor is still in the link (Escape might have changed focus)
-    await linkElement.click();
+    // Position cursor inside the link using keyboard navigation
+    // (clicking on the link element triggers the popover handler which prevents cursor positioning)
+    // Go to start of line, then move right to enter the link
+    await page.keyboard.press('Home');
     await page.waitForTimeout(100);
 
-    // Close the popover again
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(100);
+    // Move right past "Check out " (10 chars) to enter the link
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press('ArrowRight');
+    }
+    await page.waitForTimeout(200);
 
     // Press Cmd+K while cursor is in the link - should show edit popover
     await page.keyboard.press('Meta+k');
