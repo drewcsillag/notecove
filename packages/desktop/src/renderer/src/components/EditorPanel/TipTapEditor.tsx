@@ -39,6 +39,8 @@ import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
 import { AtMention } from './extensions/AtMention';
 import { MentionNode } from './extensions/MentionNode';
+import { DateChip } from './extensions/DateChip';
+import { DatePickerDialog } from './DatePickerDialog';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
@@ -193,6 +195,21 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // Table size picker state
   const [tableSizePickerAnchor, setTableSizePickerAnchor] = useState<HTMLElement | null>(null);
 
+  // Date picker dialog state (for clicking date chips or selecting @date)
+  const [datePickerState, setDatePickerState] = useState<{
+    open: boolean;
+    anchorEl: HTMLElement | null;
+    initialDate: string | null;
+    from: number;
+    to: number;
+  }>({
+    open: false,
+    anchorEl: null,
+    initialDate: null,
+    from: 0,
+    to: 0,
+  });
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -251,6 +268,37 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     });
   }, []);
 
+  // Listen for date picker requests from AtMention extension (@date keyword)
+  useEffect(() => {
+    const handleShowDatePicker = (event: CustomEvent<{ from: number; to: number }>) => {
+      const { from, to } = event.detail;
+      console.log('[TipTapEditor] Date picker requested at', from, '-', to);
+
+      // Find the ProseMirror element to anchor the popover
+      const proseMirrorEl = document.querySelector<HTMLElement>('.ProseMirror');
+      if (!proseMirrorEl) return;
+
+      setDatePickerState({
+        open: true,
+        anchorEl: proseMirrorEl,
+        initialDate: null, // No initial date for new date picker
+        from,
+        to,
+      });
+    };
+
+    window.addEventListener(
+      'notecove:showDatePicker',
+      handleShowDatePicker as EventListener
+    );
+    return () => {
+      window.removeEventListener(
+        'notecove:showDatePicker',
+        handleShowDatePicker as EventListener
+      );
+    };
+  }, []);
+
   const editor = useEditor({
     extensions: [
       // Use StarterKit but exclude History and built-in lists
@@ -283,6 +331,23 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       AtMention,
       // Add MentionNode for inline user mention chips
       MentionNode,
+      // Add DateChip extension for YYYY-MM-DD date styling
+      DateChip.configure({
+        onDateClick: (date: string, from: number, to: number) => {
+          console.log('[DateChip] Clicked date:', date, 'at', from, '-', to);
+          // Find the date chip element that was clicked
+          const dateChipEl = document.querySelector(`.date-chip[data-date="${date}"][data-from="${from}"]`) as HTMLElement | null;
+          if (dateChipEl) {
+            setDatePickerState({
+              open: true,
+              anchorEl: dateChipEl,
+              initialDate: date,
+              from,
+              to,
+            });
+          }
+        },
+      }),
       // Add InterNoteLink extension for [[note-id]] support
       InterNoteLink.configure({
         onLinkClick: (linkNoteId: string) => {
@@ -1916,6 +1981,35 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle date selection from date picker dialog
+   * Replaces the date text at the stored position
+   */
+  const handleDateSelect = (newDate: string) => {
+    if (!editor) return;
+
+    const { from, to } = datePickerState;
+    console.log('[TipTapEditor] Replacing date at', from, '-', to, 'with', newDate);
+
+    // Replace the date text in the editor
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from, to })
+      .insertContentAt(from, newDate)
+      .run();
+
+    // Close the dialog
+    setDatePickerState((prev) => ({ ...prev, open: false }));
+  };
+
+  /**
+   * Handle date picker dialog close (cancelled)
+   */
+  const handleDatePickerClose = () => {
+    setDatePickerState((prev) => ({ ...prev, open: false }));
+  };
+
+  /**
    * Handle context menu open
    * Shows custom context menu with Cut, Copy, Paste, and Add Comment options
    */
@@ -2076,6 +2170,49 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             textDecoration: 'none',
             '&:hover': {
               textDecoration: 'underline',
+            },
+          },
+          // Date chip styling (YYYY-MM-DD dates)
+          '& .date-chip': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(144, 202, 249, 0.16)'
+                : 'rgba(25, 118, 210, 0.08)',
+            color: theme.palette.primary.main,
+            padding: '2px 6px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 500,
+            transition: 'background-color 0.15s ease',
+            '&:hover': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(144, 202, 249, 0.24)'
+                  : 'rgba(25, 118, 210, 0.16)',
+            },
+          },
+          // Mention node styling (user @mentions)
+          '& .mention-node': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(144, 202, 249, 0.16)'
+                : 'rgba(25, 118, 210, 0.08)',
+            color: theme.palette.primary.main,
+            padding: '2px 6px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            transition: 'background-color 0.15s ease',
+            '&:hover': {
+              backgroundColor:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(144, 202, 249, 0.24)'
+                  : 'rgba(25, 118, 210, 0.16)',
+            },
+            // Hide the handle prefix, show only display name
+            '& .mention-handle': {
+              display: 'none',
             },
           },
           // Comment highlight styling
@@ -2610,6 +2747,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           setTableSizePickerAnchor(null);
         }}
         onSelect={handleTableSizeSelect}
+      />
+      {/* Date picker dialog for editing dates */}
+      <DatePickerDialog
+        open={datePickerState.open}
+        anchorEl={datePickerState.anchorEl}
+        initialDate={datePickerState.initialDate}
+        onSelect={handleDateSelect}
+        onClose={handleDatePickerClose}
       />
       {/* Overlapping comments selection popover */}
       {overlapPopover && (

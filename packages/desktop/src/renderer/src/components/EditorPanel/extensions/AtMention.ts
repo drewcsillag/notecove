@@ -110,11 +110,21 @@ export const AtMention = Extension.create<AtMentionOptions>({
               // Insert the resolved date
               editor.chain().focus().deleteRange(range).insertContent(`${dateStr} `).run();
             } else if (item.id === 'date') {
-              // Date picker will be implemented in Phase 3
-              // For now, insert today's date as a placeholder
-              const today = format(new Date(), 'yyyy-MM-dd');
-              editor.chain().focus().deleteRange(range).insertContent(`${today} `).run();
-              console.log('[AtMention] Date picker will be implemented in Phase 3');
+              // Delete the @date text and dispatch event to show date picker
+              // Store the range where the date will be inserted
+              const insertFrom = range.from;
+              const insertTo = range.from; // After deletion, we insert at the same position
+
+              // Delete the @date text first
+              editor.chain().focus().deleteRange(range).run();
+
+              // Dispatch custom event to trigger the date picker in TipTapEditor
+              // Pass the position where the date should be inserted
+              const event = new CustomEvent('notecove:showDatePicker', {
+                detail: { from: insertFrom, to: insertTo },
+              });
+              window.dispatchEvent(event);
+              console.log('[AtMention] Dispatched date picker event at', insertFrom);
             }
           } else if (item.type === 'user') {
             // Insert mention node
