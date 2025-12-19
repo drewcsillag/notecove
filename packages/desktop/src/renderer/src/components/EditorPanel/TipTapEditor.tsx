@@ -55,6 +55,7 @@ import {
 } from './extensions/Table';
 import { TabIndent } from './extensions/TabIndent';
 import { NotecoveListItem } from './extensions/NotecoveListItem';
+import { MoveBlock } from './extensions/MoveBlock';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
 import { TableSizePickerDialog } from './TableSizePickerDialog';
@@ -407,6 +408,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       NotecoveTableRow,
       NotecoveTableHeader,
       NotecoveTableCell,
+      // Add MoveBlock extension for Alt-Up/Alt-Down to move blocks
+      MoveBlock,
       // Collaboration extension binds TipTap to Yjs
       // Use 'content' fragment to match NoteDoc structure
       Collaboration.configure({
