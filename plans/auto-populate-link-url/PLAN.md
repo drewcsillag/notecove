@@ -86,10 +86,10 @@ Based on [QUESTIONS-1.md](./QUESTIONS-1.md):
 
 ## Files Modified
 
-| File                                                                        | Changes                                                                             |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `packages/shared/src/utils/web-link-utils.ts`                               | Added `detectUrlFromSelection()` function with TLD list and IP detection            |
-| `packages/shared/src/utils/__tests__/web-link-utils.test.ts`                | Added 50+ tests for the new function                                                |
+| File                                                                        | Changes                                                                               |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `packages/shared/src/utils/web-link-utils.ts`                               | Added `detectUrlFromSelection()` function with TLD list and IP detection              |
+| `packages/shared/src/utils/__tests__/web-link-utils.test.ts`                | Added 50+ tests for the new function                                                  |
 | `packages/desktop/src/renderer/src/components/EditorPanel/TipTapEditor.tsx` | Modified state type, `handleCmdK()`, `handleLinkButtonClick()`, and popover rendering |
 
 ## TLD List
