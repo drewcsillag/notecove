@@ -8,6 +8,7 @@
  */
 
 import { Node, mergeAttributes } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 
 export interface MentionNodeAttributes {
   profileId: string;
@@ -18,6 +19,8 @@ export interface MentionNodeAttributes {
 export interface MentionNodeOptions {
   HTMLAttributes: Record<string, unknown>;
   renderLabel: (attrs: MentionNodeAttributes) => string;
+  /** Callback when a mention is clicked */
+  onMentionClick?: (attrs: MentionNodeAttributes, element: HTMLElement) => void;
 }
 
 declare module '@tiptap/core' {
@@ -125,5 +128,35 @@ export const MentionNode = Node.create<MentionNodeOptions>({
             .run();
         },
     };
+  },
+
+  addProseMirrorPlugins() {
+    const options = this.options;
+
+    return [
+      new Plugin({
+        key: new PluginKey('mentionNodeClick'),
+        props: {
+          handleClick(_view, _pos, event) {
+            // Check if click is on a mention node
+            const target = event.target as HTMLElement;
+            const mentionEl = target.closest('[data-mention-node]') as HTMLElement | null;
+
+            if (mentionEl && options.onMentionClick) {
+              const profileId = mentionEl.getAttribute('data-profile-id') || '';
+              const handle = mentionEl.getAttribute('data-handle') || '';
+              const displayName = mentionEl.getAttribute('data-display-name') || '';
+
+              options.onMentionClick(
+                { profileId, handle, displayName },
+                mentionEl
+              );
+              return true;
+            }
+            return false;
+          },
+        },
+      }),
+    ];
   },
 });

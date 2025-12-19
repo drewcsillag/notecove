@@ -38,9 +38,10 @@ import { yUndoPluginKey } from 'y-prosemirror';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
 import { AtMention } from './extensions/AtMention';
-import { MentionNode } from './extensions/MentionNode';
+import { MentionNode, type MentionNodeAttributes } from './extensions/MentionNode';
 import { DateChip } from './extensions/DateChip';
 import { DatePickerDialog } from './DatePickerDialog';
+import { MentionPopover } from './MentionPopover';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
@@ -210,6 +211,17 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     to: 0,
   });
 
+  // Mention popover state (for clicking mention chips)
+  const [mentionPopoverState, setMentionPopoverState] = useState<{
+    open: boolean;
+    anchorEl: HTMLElement | null;
+    attrs: MentionNodeAttributes | null;
+  }>({
+    open: false,
+    anchorEl: null,
+    attrs: null,
+  });
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -330,7 +342,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       // Add AtMention extension for @date and @mention support
       AtMention,
       // Add MentionNode for inline user mention chips
-      MentionNode,
+      MentionNode.configure({
+        onMentionClick: (attrs: MentionNodeAttributes, element: HTMLElement) => {
+          console.log('[MentionNode] Clicked mention:', attrs);
+          setMentionPopoverState({
+            open: true,
+            anchorEl: element,
+            attrs,
+          });
+        },
+      }),
       // Add DateChip extension for YYYY-MM-DD date styling
       DateChip.configure({
         onDateClick: (date: string, from: number, to: number) => {
@@ -2010,6 +2031,25 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
+   * Handle mention popover close
+   */
+  const handleMentionPopoverClose = () => {
+    setMentionPopoverState((prev) => ({ ...prev, open: false }));
+  };
+
+  /**
+   * Handle filter notes by author from mention popover
+   * TODO: Wire this up to the notes list filtering
+   */
+  const handleFilterByAuthor = (profileId: string) => {
+    console.log('[TipTapEditor] Filter notes by author:', profileId);
+    // TODO: Implement notes filtering by author
+    // This would need to call into the notes list or search system
+    // For now, just log and close the popover
+    handleMentionPopoverClose();
+  };
+
+  /**
    * Handle context menu open
    * Shows custom context menu with Cut, Copy, Paste, and Add Comment options
    */
@@ -2756,6 +2796,27 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         onSelect={handleDateSelect}
         onClose={handleDatePickerClose}
       />
+      {/* Mention popover for user mentions */}
+      {mentionPopoverState.open && mentionPopoverState.anchorEl && mentionPopoverState.attrs && (
+        <Popper
+          open
+          anchorEl={mentionPopoverState.anchorEl}
+          placement="bottom-start"
+          style={{ zIndex: 1400 }}
+        >
+          <ClickAwayListener onClickAway={handleMentionPopoverClose}>
+            <Box>
+              <MentionPopover
+                profileId={mentionPopoverState.attrs.profileId}
+                handle={mentionPopoverState.attrs.handle}
+                displayName={mentionPopoverState.attrs.displayName}
+                onFilterByAuthor={handleFilterByAuthor}
+                onClose={handleMentionPopoverClose}
+              />
+            </Box>
+          </ClickAwayListener>
+        </Popper>
+      )}
       {/* Overlapping comments selection popover */}
       {overlapPopover && (
         <Popper
