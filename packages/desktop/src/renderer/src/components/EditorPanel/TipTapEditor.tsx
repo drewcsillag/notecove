@@ -48,6 +48,8 @@ import {
   NotecoveTableHeader,
   NotecoveTableCell,
 } from './extensions/Table';
+import { TabIndent } from './extensions/TabIndent';
+import { NotecoveListItem } from './extensions/NotecoveListItem';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
 import { TableSizePickerDialog } from './TableSizePickerDialog';
@@ -255,6 +257,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         history: false, // Collaboration extension handles undo/redo
         bulletList: false, // Use custom version that accepts taskItem
         orderedList: false, // Use custom version that accepts taskItem
+        listItem: false, // Use NotecoveListItem with cursor-position-aware Tab
       }),
       // Custom BulletList that accepts both listItem and taskItem
       BulletList.extend({
@@ -264,6 +267,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       OrderedList.extend({
         content: '(listItem | taskItem)+',
       }),
+      // Custom ListItem with cursor-position-aware Tab/Shift-Tab
+      NotecoveListItem,
       // Add Underline extension (not in StarterKit)
       Underline,
       // Add tri-state task item extension (list-based checkboxes)
@@ -320,6 +325,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         document: yDoc,
         fragment: yDoc.getXmlFragment('content'),
       }),
+      // TabIndent handles Tab key for inserting tab characters
+      // Must be last so other extensions (Table, ListItem, TaskItem) can handle Tab first
+      TabIndent,
     ],
     // Don't set initial content - let Yjs/Collaboration handle it from loaded state
     // Setting content here causes onUpdate to fire before note loads
@@ -2002,6 +2010,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         '& .ProseMirror': {
           minHeight: '100%',
           outline: 'none',
+          // Preserve tab characters and multiple spaces while still allowing text wrap
+          whiteSpace: 'pre-wrap',
           '& h1': {
             fontSize: '2em',
             fontWeight: 600,

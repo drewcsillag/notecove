@@ -199,11 +199,37 @@ export const TriStateTaskItem = Node.create<TriStateTaskItemOptions>({
   addKeyboardShortcuts() {
     const shortcuts: Record<string, () => boolean> = {
       Enter: () => this.editor.commands.splitListItem(this.name),
-      'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
+      'Shift-Tab': () => {
+        // Only lift (outdent) if cursor is at start of content
+        // Otherwise, let TabIndent handle it (remove tab character)
+        const { $from } = this.editor.state.selection;
+
+        // Check if we're in a taskItem and cursor is at the start of its text content
+        // The taskItem has structure: taskItem > paragraph > text
+        // We check if the cursor is at offset 0 within its parent (paragraph)
+        if ($from.parentOffset === 0) {
+          return this.editor.commands.liftListItem(this.name);
+        }
+
+        // Not at start - let TabIndent handle it
+        return false;
+      },
     };
 
     if (this.options.nested) {
-      shortcuts['Tab'] = () => this.editor.commands.sinkListItem(this.name);
+      shortcuts['Tab'] = () => {
+        // Only sink (indent) if cursor is at start of content
+        // Otherwise, let TabIndent handle it (insert tab character)
+        const { $from } = this.editor.state.selection;
+
+        // Check if cursor is at the start of its parent node's content
+        if ($from.parentOffset === 0) {
+          return this.editor.commands.sinkListItem(this.name);
+        }
+
+        // Not at start - let TabIndent handle it
+        return false;
+      };
     }
 
     return shortcuts;
