@@ -14,6 +14,7 @@ import {
   SDMarker,
   type SDType,
   ProfileLock,
+  AppStateKey,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import type { SyncStatus, StaleSyncEntry } from './ipc/types';
@@ -283,9 +284,20 @@ void app.whenReady().then(async () => {
     );
 
     // Initialize AppendLogManager with database (multi-SD aware)
-    // Use profile ID as instanceId for stable identity across restarts
-    // This ensures activity logs persist and sync identifies this as the same instance
-    const instanceId = process.env['INSTANCE_ID'] ?? selectedProfileId ?? randomUUID();
+    // InstanceId is unique per app installation (NOT per profile)
+    // It's persisted in the database to remain stable across restarts
+    let instanceId: string = process.env['INSTANCE_ID'] ?? '';
+    if (!instanceId) {
+      const storedInstanceId = await database.getState(AppStateKey.InstanceId);
+      if (storedInstanceId) {
+        instanceId = storedInstanceId;
+        console.log(`[InstanceId] Loaded existing instanceId: ${instanceId}`);
+      } else {
+        instanceId = randomUUID();
+        await database.setState(AppStateKey.InstanceId, instanceId);
+        console.log(`[InstanceId] Generated new instanceId: ${instanceId}`);
+      }
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     storageManager = new AppendLogManager(fsAdapter as any, database, instanceId);
 

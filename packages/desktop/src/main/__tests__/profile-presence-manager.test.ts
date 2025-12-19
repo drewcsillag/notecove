@@ -94,6 +94,10 @@ describe('ProfilePresenceManager', () => {
 
       const presence: ProfilePresence = JSON.parse(writtenContent!);
       expect(presence.profileId).toBe('test-profile-123');
+      expect(presence.instanceId).toBe('test-instance-456');
+      // CRITICAL: instanceId must be different from profileId
+      // This ensures each app installation has a unique identity, separate from the profile
+      expect(presence.instanceId).not.toBe(presence.profileId);
       expect(presence.profileName).toBe('Test Profile');
       expect(presence.user).toBe('@testuser');
       expect(presence.username).toBe('Test User');

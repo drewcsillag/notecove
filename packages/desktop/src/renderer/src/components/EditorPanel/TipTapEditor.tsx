@@ -37,6 +37,8 @@ import * as Y from 'yjs';
 import { yUndoPluginKey } from 'y-prosemirror';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
+import { AtMention } from './extensions/AtMention';
+import { MentionNode } from './extensions/MentionNode';
 import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
@@ -277,6 +279,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }),
       // Add Hashtag extension for #tag support
       Hashtag,
+      // Add AtMention extension for @date and @mention support
+      AtMention,
+      // Add MentionNode for inline user mention chips
+      MentionNode,
       // Add InterNoteLink extension for [[note-id]] support
       InterNoteLink.configure({
         onLinkClick: (linkNoteId: string) => {

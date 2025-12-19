@@ -161,6 +161,7 @@ export enum AppStateKey {
   Username = 'username', // User's display name
   UserHandle = 'userHandle', // User's @mention handle
   WindowStates = 'windowStates', // Array of WindowState for session restoration
+  InstanceId = 'instanceId', // Unique per-installation identifier (separate from profileId)
 }
 
 /**
