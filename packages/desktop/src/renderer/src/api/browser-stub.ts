@@ -50,6 +50,7 @@ export const browserApiStub: typeof window.electronAPI = {
     getCountForFolder: notImplemented('note.getCountForFolder'),
     getAllNotesCount: notImplemented('note.getAllNotesCount'),
     getDeletedNoteCount: notImplemented('note.getDeletedNoteCount'),
+    emptyTrash: notImplemented('note.emptyTrash'),
     createSnapshot: notImplemented('note.createSnapshot'),
     checkExistsInSD: notImplemented('note.checkExistsInSD'),
     getInfo: notImplemented('note.getInfo'),

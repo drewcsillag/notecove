@@ -260,6 +260,47 @@ describe('Note Core Handlers', () => {
         (handlers as any).handleDeleteNote(mockEvent, 'non-existent-note')
       ).rejects.toThrow('Note non-existent-note not found');
     });
+
+    it('should unpin a pinned note when deleting', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'pinned-note-123';
+      const mockNote = {
+        id: noteId,
+        title: 'Pinned Note',
+        sdId: 'test-sd',
+        folderId: null,
+        deleted: false,
+        pinned: true, // Note is pinned
+        contentPreview: '',
+        contentText: '',
+        created: Date.now(),
+        modified: Date.now(),
+      };
+      const mockNoteDoc = createMockNoteDoc();
+      mockNoteDoc.markDeleted = jest.fn();
+      mockNoteDoc.updateMetadata = jest.fn();
+
+      mocks.database.getNote.mockResolvedValue(mockNote);
+      mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+      await (handlers as any).handleDeleteNote(mockEvent, noteId);
+
+      // Should update CRDT metadata to unpin
+      expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pinned: false,
+        })
+      );
+
+      // Should save unpinned state to database
+      expect(mocks.database.upsertNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: noteId,
+          deleted: true,
+          pinned: false,
+        })
+      );
+    });
   });
 
   describe('note:restore', () => {
@@ -321,6 +362,112 @@ describe('Note Core Handlers', () => {
 
       expect(mocks.crdtManager.unloadNote).toHaveBeenCalledWith(noteId);
       expect(mocks.database.deleteNote).toHaveBeenCalledWith(noteId);
+    });
+  });
+
+  describe('note:emptyTrash', () => {
+    it('should permanently delete all notes in trash', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+
+      const deletedNotes = [
+        {
+          id: 'note-1',
+          title: 'Deleted Note 1',
+          sdId,
+          folderId: null,
+          deleted: true,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        },
+        {
+          id: 'note-2',
+          title: 'Deleted Note 2',
+          sdId,
+          folderId: null,
+          deleted: true,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        },
+      ];
+
+      mocks.database.getDeletedNotes.mockResolvedValue(deletedNotes);
+      mocks.database.getNote
+        .mockResolvedValueOnce(deletedNotes[0])
+        .mockResolvedValueOnce(deletedNotes[1]);
+
+      const result = await (handlers as any).handleEmptyTrash(mockEvent, sdId);
+
+      expect(result).toBe(2);
+      expect(mocks.database.getDeletedNotes).toHaveBeenCalledWith(sdId);
+      expect(mocks.crdtManager.unloadNote).toHaveBeenCalledWith('note-1');
+      expect(mocks.crdtManager.unloadNote).toHaveBeenCalledWith('note-2');
+      expect(mocks.database.deleteNote).toHaveBeenCalledWith('note-1');
+      expect(mocks.database.deleteNote).toHaveBeenCalledWith('note-2');
+    });
+
+    it('should return 0 when trash is empty', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+
+      mocks.database.getDeletedNotes.mockResolvedValue([]);
+
+      const result = await (handlers as any).handleEmptyTrash(mockEvent, sdId);
+
+      expect(result).toBe(0);
+      expect(mocks.database.getDeletedNotes).toHaveBeenCalledWith(sdId);
+      expect(mocks.crdtManager.unloadNote).not.toHaveBeenCalled();
+      expect(mocks.database.deleteNote).not.toHaveBeenCalled();
+    });
+
+    it('should continue deleting if one note fails', async () => {
+      const mockEvent = {} as any;
+      const sdId = 'test-sd';
+
+      const deletedNotes = [
+        {
+          id: 'note-1',
+          title: 'Deleted Note 1',
+          sdId,
+          folderId: null,
+          deleted: true,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        },
+        {
+          id: 'note-2',
+          title: 'Deleted Note 2',
+          sdId,
+          folderId: null,
+          deleted: true,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+          created: Date.now(),
+          modified: Date.now(),
+        },
+      ];
+
+      mocks.database.getDeletedNotes.mockResolvedValue(deletedNotes);
+      // First note fails, second succeeds
+      mocks.database.getNote
+        .mockRejectedValueOnce(new Error('Failed to find note'))
+        .mockResolvedValueOnce(deletedNotes[1]);
+
+      const result = await (handlers as any).handleEmptyTrash(mockEvent, sdId);
+
+      // Should still return 1 since one note succeeded
+      expect(result).toBe(1);
+      expect(mocks.database.deleteNote).toHaveBeenCalledWith('note-2');
     });
   });
 

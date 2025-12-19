@@ -261,6 +261,7 @@ export const webClient: typeof window.electronAPI = {
       await apiRequest('POST', `/api/notes/${noteId}/restore`);
     },
     permanentDelete: browserNotAvailable('note.permanentDelete'),
+    emptyTrash: browserNotAvailable('note.emptyTrash'),
     duplicate: browserNotAvailable('note.duplicate'),
     togglePin: async (noteId: string) => {
       await apiRequest('POST', `/api/notes/${noteId}/toggle-pin`);

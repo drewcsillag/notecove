@@ -33,7 +33,7 @@ const checks = [
     name: 'Rebuild for Electron',
     cmd: 'cd packages/desktop && npx @electron/rebuild -f -w better-sqlite3',
   },
-  { name: 'E2E Tests', cmd: 'pnpm test:e2e' },
+  { name: 'E2E Tests', cmd: 'CI=true pnpm test:e2e' },
 ];
 
 console.log(

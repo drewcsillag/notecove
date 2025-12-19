@@ -277,7 +277,10 @@ describe('IPCHandlers - Folder CRUD', () => {
         getMetadata: jest.fn().mockReturnValue(null),
         content: { length: 0, get: jest.fn(), toArray: jest.fn().mockReturnValue([]) },
       }),
-      getDocument: jest.fn().mockReturnValue({ getText: () => ({ toJSON: () => 'Content' }) }),
+      getDocument: jest.fn().mockReturnValue({
+        getText: () => ({ toJSON: () => 'Content' }),
+        getXmlFragment: () => ({ toArray: () => [] }), // Empty content, no images
+      }),
     };
 
     // Create mock database
@@ -1054,7 +1057,10 @@ describe('IPCHandlers - SD Management', () => {
         getMetadata: jest.fn().mockReturnValue(null),
         content: { length: 0, get: jest.fn(), toArray: jest.fn().mockReturnValue([]) },
       }),
-      getDocument: jest.fn().mockReturnValue({ getText: () => ({ toJSON: () => 'Content' }) }),
+      getDocument: jest.fn().mockReturnValue({
+        getText: () => ({ toJSON: () => 'Content' }),
+        getXmlFragment: () => ({ toArray: () => [] }), // Empty content, no images
+      }),
     };
 
     // Create mock database

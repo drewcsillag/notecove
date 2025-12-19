@@ -102,6 +102,8 @@ export const noteApi = {
     ipcRenderer.invoke('note:getAllNotesCount', sdId) as Promise<number>,
   getDeletedNoteCount: (sdId: string): Promise<number> =>
     ipcRenderer.invoke('note:getDeletedNoteCount', sdId) as Promise<number>,
+  emptyTrash: (sdId: string): Promise<number> =>
+    ipcRenderer.invoke('note:emptyTrash', sdId) as Promise<number>,
   createSnapshot: (
     noteId: string
   ): Promise<{ success: boolean; filename?: string; error?: string }> =>

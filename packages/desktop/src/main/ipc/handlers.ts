@@ -384,6 +384,7 @@ export class IPCHandlers {
     ipcMain.handle('note:delete', this.handleDeleteNote.bind(this));
     ipcMain.handle('note:restore', this.handleRestoreNote.bind(this));
     ipcMain.handle('note:permanentDelete', this.handlePermanentDeleteNote.bind(this));
+    ipcMain.handle('note:emptyTrash', this.handleEmptyTrash.bind(this));
     ipcMain.handle('note:duplicate', this.handleDuplicateNote.bind(this));
     ipcMain.handle('note:togglePin', this.handleTogglePinNote.bind(this));
     ipcMain.handle('note:move', this.handleMoveNote.bind(this));
@@ -924,16 +925,25 @@ export class IPCHandlers {
       throw new Error(`Note ${noteId} not found`);
     }
 
+    const now = Date.now();
+
     // Update CRDT metadata to mark as deleted (soft delete)
     const noteDoc = this.crdtManager.getNoteDoc(noteId);
     if (noteDoc) {
       noteDoc.markDeleted();
+      // Unpin note when deleting - pinned notes in trash don't make sense
+      if (note.pinned) {
+        noteDoc.updateMetadata({ pinned: false, modified: now });
+      }
     } else {
       // Note not loaded in memory, load it first with its sdId
       await this.crdtManager.loadNote(noteId, note.sdId);
       const loadedNoteDoc = this.crdtManager.getNoteDoc(noteId);
       if (loadedNoteDoc) {
         loadedNoteDoc.markDeleted();
+        if (note.pinned) {
+          loadedNoteDoc.updateMetadata({ pinned: false, modified: now });
+        }
       } else {
         console.error(`[Note] Failed to load NoteDoc for ${noteId}`);
       }
@@ -943,7 +953,8 @@ export class IPCHandlers {
     await this.database.upsertNote({
       ...note,
       deleted: true,
-      modified: Date.now(),
+      pinned: false, // Always unpin when deleting
+      modified: now,
     });
 
     // Broadcast delete event to all windows
@@ -1078,6 +1089,34 @@ export class IPCHandlers {
     noteId: string
   ): Promise<void> {
     await this.permanentlyDeleteNote(noteId, false);
+  }
+
+  /**
+   * Empty trash - permanently delete all notes in the trash for a specific SD
+   * @returns The number of notes that were permanently deleted
+   */
+  private async handleEmptyTrash(_event: IpcMainInvokeEvent, sdId: string): Promise<number> {
+    // Get all deleted notes for this SD
+    const deletedNotes = await this.database.getDeletedNotes(sdId);
+
+    if (deletedNotes.length === 0) {
+      return 0;
+    }
+
+    let deletedCount = 0;
+
+    // Permanently delete each note
+    for (const note of deletedNotes) {
+      try {
+        await this.permanentlyDeleteNote(note.id, true); // Skip deleted check since we know they're deleted
+        deletedCount++;
+      } catch (err) {
+        console.error(`[EmptyTrash] Failed to permanently delete note ${note.id}:`, err);
+        // Continue with other notes even if one fails
+      }
+    }
+
+    return deletedCount;
   }
 
   private async handleDuplicateNote(
@@ -2674,6 +2713,7 @@ export class IPCHandlers {
     ipcMain.removeHandler('note:applyUpdate');
     ipcMain.removeHandler('note:create');
     ipcMain.removeHandler('note:delete');
+    ipcMain.removeHandler('note:emptyTrash');
     ipcMain.removeHandler('note:move');
     ipcMain.removeHandler('note:moveToSD');
     ipcMain.removeHandler('note:getMetadata');

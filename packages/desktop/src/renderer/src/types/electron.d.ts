@@ -66,6 +66,7 @@ declare global {
         getCountForFolder: (sdId: string, folderId: string | null) => Promise<number>;
         getAllNotesCount: (sdId: string) => Promise<number>;
         getDeletedNoteCount: (sdId: string) => Promise<number>;
+        emptyTrash: (sdId: string) => Promise<number>;
         createSnapshot: (
           noteId: string
         ) => Promise<{ success: boolean; filename?: string; error?: string }>;

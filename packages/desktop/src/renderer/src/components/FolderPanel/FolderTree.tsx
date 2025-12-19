@@ -455,6 +455,26 @@ export const FolderTree: FC<FolderTreeProps> = ({
     folderName: '',
   });
 
+  // Trash context menu state (separate from folder context menu)
+  const [trashContextMenu, setTrashContextMenu] = useState<{
+    anchorEl: HTMLElement;
+    sdId: string;
+  } | null>(null);
+
+  // Trash note count for Empty Trash menu item
+  const [trashNoteCount, setTrashNoteCount] = useState<number>(0);
+
+  // Empty Trash confirmation dialog state
+  const [emptyTrashDialog, setEmptyTrashDialog] = useState<{
+    open: boolean;
+    sdId: string;
+    noteCount: number;
+  }>({
+    open: false,
+    sdId: '',
+    noteCount: 0,
+  });
+
   // Cross-SD confirmation dialog state
   const [crossSDDialog, setCrossSDDialog] = useState<{
     open: boolean;
@@ -676,7 +696,19 @@ export const FolderTree: FC<FolderTreeProps> = ({
   // Context menu handlers
   const handleContextMenu = (event: MouseEvent<HTMLElement>, folderId: string): void => {
     event.preventDefault();
-    if (folderId === 'all-notes' || folderId === 'recently-deleted') {
+    // No context menu for all-notes
+    if (folderId === 'all-notes' || folderId.startsWith('all-notes:')) {
+      return;
+    }
+    // Handle Recently Deleted folders specially
+    if (folderId === 'recently-deleted' || folderId.startsWith('recently-deleted:')) {
+      // Extract sdId from folderId (format: "recently-deleted:sdId" or just "recently-deleted")
+      const sdId = folderId.includes(':')
+        ? (folderId.split(':')[1] ?? '')
+        : (activeSdId ?? sds[0]?.id ?? '');
+      if (sdId) {
+        void handleTrashContextMenu(event, sdId);
+      }
       return;
     }
     setContextMenu({
@@ -687,6 +719,60 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
   const handleCloseContextMenu = (): void => {
     setContextMenu(null);
+  };
+
+  // Trash context menu handlers
+  const handleTrashContextMenu = async (
+    event: MouseEvent<HTMLElement>,
+    sdId: string
+  ): Promise<void> => {
+    // Capture anchor element immediately before any async operations
+    const anchorEl = event.currentTarget;
+
+    // Show menu immediately with loading state (count 0)
+    setTrashNoteCount(0);
+    setTrashContextMenu({
+      anchorEl,
+      sdId,
+    });
+
+    // Fetch the current trash count and update
+    try {
+      const count = await window.electronAPI.note.getDeletedNoteCount(sdId);
+      setTrashNoteCount(count);
+    } catch (err) {
+      console.error('Failed to get deleted note count:', err);
+      setTrashNoteCount(0);
+    }
+  };
+
+  const handleCloseTrashContextMenu = (): void => {
+    setTrashContextMenu(null);
+  };
+
+  const handleEmptyTrashClick = (): void => {
+    if (!trashContextMenu) return;
+    setEmptyTrashDialog({
+      open: true,
+      sdId: trashContextMenu.sdId,
+      noteCount: trashNoteCount,
+    });
+    handleCloseTrashContextMenu();
+  };
+
+  const handleEmptyTrashConfirm = async (): Promise<void> => {
+    try {
+      await window.electronAPI.note.emptyTrash(emptyTrashDialog.sdId);
+      setEmptyTrashDialog({ open: false, sdId: '', noteCount: 0 });
+      // The notes list will update via note:permanentDeleted events
+    } catch (err) {
+      console.error('Failed to empty trash:', err);
+      setEmptyTrashDialog({ open: false, sdId: '', noteCount: 0 });
+    }
+  };
+
+  const handleEmptyTrashCancel = (): void => {
+    setEmptyTrashDialog({ open: false, sdId: '', noteCount: 0 });
   };
 
   // SD context menu handlers
@@ -1675,6 +1761,40 @@ export const FolderTree: FC<FolderTreeProps> = ({
         </MenuItem>
         <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
       </Menu>
+
+      {/* Trash Context Menu */}
+      <Menu
+        open={trashContextMenu !== null}
+        onClose={handleCloseTrashContextMenu}
+        anchorEl={trashContextMenu?.anchorEl}
+      >
+        <MenuItem onClick={handleEmptyTrashClick} disabled={trashNoteCount === 0}>
+          Empty Trash{trashNoteCount === 0 ? '' : ` (${trashNoteCount})`}
+        </MenuItem>
+      </Menu>
+
+      {/* Empty Trash Confirmation Dialog */}
+      <Dialog open={emptyTrashDialog.open} onClose={handleEmptyTrashCancel} maxWidth="xs" fullWidth>
+        <DialogTitle>Empty Trash?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Permanently delete {emptyTrashDialog.noteCount} note
+            {emptyTrashDialog.noteCount === 1 ? '' : 's'}? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEmptyTrashCancel}>Cancel</Button>
+          <Button
+            onClick={() => {
+              void handleEmptyTrashConfirm();
+            }}
+            variant="contained"
+            color="error"
+          >
+            Empty Trash
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Rename Dialog */}
       <Dialog open={renameDialog.open} onClose={handleRenameCancel} maxWidth="xs" fullWidth>
