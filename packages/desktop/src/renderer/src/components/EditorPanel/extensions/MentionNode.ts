@@ -140,17 +140,14 @@ export const MentionNode = Node.create<MentionNodeOptions>({
           handleClick(_view, _pos, event) {
             // Check if click is on a mention node
             const target = event.target as HTMLElement;
-            const mentionEl = target.closest('[data-mention-node]') as HTMLElement | null;
+            const mentionEl = target.closest<HTMLElement>('[data-mention-node]');
 
             if (mentionEl && options.onMentionClick) {
-              const profileId = mentionEl.getAttribute('data-profile-id') || '';
-              const handle = mentionEl.getAttribute('data-handle') || '';
-              const displayName = mentionEl.getAttribute('data-display-name') || '';
+              const profileId = mentionEl.getAttribute('data-profile-id') ?? '';
+              const handle = mentionEl.getAttribute('data-handle') ?? '';
+              const displayName = mentionEl.getAttribute('data-display-name') ?? '';
 
-              options.onMentionClick(
-                { profileId, handle, displayName },
-                mentionEl
-              );
+              options.onMentionClick({ profileId, handle, displayName }, mentionEl);
               return true;
             }
             return false;

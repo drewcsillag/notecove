@@ -299,15 +299,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       });
     };
 
-    window.addEventListener(
-      'notecove:showDatePicker',
-      handleShowDatePicker as EventListener
-    );
+    window.addEventListener('notecove:showDatePicker', handleShowDatePicker as EventListener);
     return () => {
-      window.removeEventListener(
-        'notecove:showDatePicker',
-        handleShowDatePicker as EventListener
-      );
+      window.removeEventListener('notecove:showDatePicker', handleShowDatePicker as EventListener);
     };
   }, []);
 
@@ -357,7 +351,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         onDateClick: (date: string, from: number, to: number) => {
           console.log('[DateChip] Clicked date:', date, 'at', from, '-', to);
           // Find the date chip element that was clicked
-          const dateChipEl = document.querySelector(`.date-chip[data-date="${date}"][data-from="${from}"]`) as HTMLElement | null;
+          const dateChipEl = document.querySelector<HTMLElement>(
+            `.date-chip[data-date="${date}"][data-from="${from}"]`
+          );
           if (dateChipEl) {
             setDatePickerState({
               open: true,
@@ -2012,12 +2008,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     console.log('[TipTapEditor] Replacing date at', from, '-', to, 'with', newDate);
 
     // Replace the date text in the editor
-    editor
-      .chain()
-      .focus()
-      .deleteRange({ from, to })
-      .insertContentAt(from, newDate)
-      .run();
+    editor.chain().focus().deleteRange({ from, to }).insertContentAt(from, newDate).run();
 
     // Close the dialog
     setDatePickerState((prev) => ({ ...prev, open: false }));
@@ -2038,14 +2029,20 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   };
 
   /**
-   * Handle filter notes by author from mention popover
-   * TODO: Wire this up to the notes list filtering
+   * Handle search for notes mentioning a person from mention popover
+   * Dispatches a custom event that NotesListPanel can listen to
    */
-  const handleFilterByAuthor = (profileId: string) => {
-    console.log('[TipTapEditor] Filter notes by author:', profileId);
-    // TODO: Implement notes filtering by author
-    // This would need to call into the notes list or search system
-    // For now, just log and close the popover
+  const handleSearchMentions = (_handle: string, displayName: string) => {
+    // Search for the display name (more likely to find matches)
+    const searchQuery = displayName;
+    console.log('[TipTapEditor] Search for notes mentioning:', searchQuery);
+
+    // Dispatch custom event for NotesListPanel to handle
+    const event = new CustomEvent('notecove:searchNotes', {
+      detail: { query: searchQuery },
+    });
+    window.dispatchEvent(event);
+
     handleMentionPopoverClose();
   };
 
@@ -2216,9 +2213,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           // Uses normal text color but with chip background
           '& .date-chip': {
             backgroundColor:
-              theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.08)'
-                : 'rgba(0, 0, 0, 0.06)',
+              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
             color: theme.palette.text.primary,
             padding: '2px 6px',
             borderRadius: '4px',
@@ -2227,9 +2222,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             transition: 'background-color 0.15s ease',
             '&:hover': {
               backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(255, 255, 255, 0.12)'
-                  : 'rgba(0, 0, 0, 0.1)',
+                theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
             },
           },
           // Mention chip styling (user @mentions)
@@ -2811,7 +2804,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                 profileId={mentionPopoverState.attrs.profileId}
                 handle={mentionPopoverState.attrs.handle}
                 displayName={mentionPopoverState.attrs.displayName}
-                onFilterByAuthor={handleFilterByAuthor}
+                onSearchMentions={handleSearchMentions}
                 onClose={handleMentionPopoverClose}
               />
             </Box>

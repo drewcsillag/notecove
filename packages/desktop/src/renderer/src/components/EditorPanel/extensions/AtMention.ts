@@ -184,9 +184,7 @@ export const AtMention = Extension.create<AtMentionOptions>({
             // Check if current user is missing from results (no handle set)
             // We need to check if any user in the original list has no handle
             // and add a hint for the current user
-            const currentUserMissingHandle = users.some(
-              (u) => !u.handle || u.handle.trim() === ''
-            );
+            const currentUserMissingHandle = users.some((u) => !u.handle || u.handle.trim() === '');
             if (currentUserMissingHandle && items.filter((i) => i.type === 'user').length === 0) {
               // Only show hint if no other users are shown
               items.push({
@@ -245,9 +243,7 @@ export const AtMention = Extension.create<AtMentionOptions>({
                 return true;
               }
 
-              return (
-                (component?.ref as AtSuggestionListRef | undefined)?.onKeyDown(props) ?? false
-              );
+              return (component?.ref as AtSuggestionListRef | undefined)?.onKeyDown(props) ?? false;
             },
 
             onExit() {

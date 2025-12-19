@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { Box, Typography, Button, Avatar, Paper, Stack } from '@mui/material';
-import FilterListIcon from '@mui/icons-material/FilterList';
+import SearchIcon from '@mui/icons-material/Search';
 
 export interface MentionPopoverProps {
   /** The profile ID of the mentioned user */
@@ -16,8 +16,8 @@ export interface MentionPopoverProps {
   handle: string;
   /** The display name of the mentioned user */
   displayName: string;
-  /** Callback when "Show notes by this person" is clicked */
-  onFilterByAuthor?: (profileId: string) => void;
+  /** Callback when "Search for mentions" is clicked */
+  onSearchMentions?: (handle: string, displayName: string) => void;
   /** Callback when the popover should close */
   onClose: () => void;
 }
@@ -26,7 +26,10 @@ export interface MentionPopoverProps {
  * Get initials from a display name for the avatar
  */
 function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter((p) => p.length > 0);
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length > 0);
   if (parts.length >= 2) {
     const first = parts[0]?.[0] ?? '';
     const last = parts[parts.length - 1]?.[0] ?? '';
@@ -54,12 +57,12 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
   profileId,
   handle,
   displayName,
-  onFilterByAuthor,
+  onSearchMentions,
   onClose,
 }) => {
-  const handleFilterClick = () => {
-    console.log('[MentionPopover] Filter by author:', profileId);
-    onFilterByAuthor?.(profileId);
+  const handleSearchClick = () => {
+    console.log('[MentionPopover] Search for mentions of:', handle, displayName);
+    onSearchMentions?.(handle, displayName);
     onClose();
   };
 
@@ -117,16 +120,16 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
         </Stack>
 
         {/* Action button */}
-        {onFilterByAuthor && (
+        {onSearchMentions && (
           <Button
             variant="outlined"
             size="small"
-            startIcon={<FilterListIcon />}
-            onClick={handleFilterClick}
+            startIcon={<SearchIcon />}
+            onClick={handleSearchClick}
             fullWidth
             sx={{ textTransform: 'none' }}
           >
-            Show notes by this person
+            Find notes mentioning this person
           </Button>
         )}
       </Stack>

@@ -1,10 +1,11 @@
 # Date & Mention Chips Implementation Plan
 
-**Overall Progress:** `80%`
+**Overall Progress:** `95%`
 
 ## Summary
 
 Implement Google Docs-style `@` chips for dates and mentions:
+
 - `@today`, `@yesterday`, `@tomorrow` insert formatted dates
 - `@date` opens a date picker
 - `@username` mentions people from profile presence data across all SDs
@@ -16,10 +17,12 @@ Both use a unified `@` trigger with combined autocomplete (date keywords at top,
 See [QUESTIONS-1.md](./QUESTIONS-1.md), [QUESTIONS-2.md](./QUESTIONS-2.md), and [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md).
 
 **Date Chips:**
+
 - Plain text storage (`2025-12-19`) with decoration styling
 - Click opens MUI DatePicker to change date
 
 **Mention Chips:**
+
 - **Atomic inline node** (not marks) - prevents editing corruption
 - Node stores: `{ profileId, handle, displayName }`
 - Renders as chip showing display name
@@ -27,12 +30,14 @@ See [QUESTIONS-1.md](./QUESTIONS-1.md), [QUESTIONS-2.md](./QUESTIONS-2.md), and 
 - Click shows popover with profile info + filter action
 
 **User Handle Requirement:**
+
 - Users without handles are excluded from autocomplete
 - Show hint in dropdown: "Set your @handle in Settings to be mentionable"
 
 ## Tasks
 
 ### Phase 0: Bug Fix & Setup
+
 - [x] 🟩 **0.1: Fix instanceId fallback bug**
   - [x] 🟩 Write failing test for instanceId persistence
   - [x] 🟩 Add `instanceId` to app_state table (AppStateKey.InstanceId)
@@ -44,6 +49,7 @@ See [QUESTIONS-1.md](./QUESTIONS-1.md), [QUESTIONS-2.md](./QUESTIONS-2.md), and 
   - [x] 🟩 Verify date-fns is available for formatting
 
 ### Phase 1: Date Keywords (Fast Feedback)
+
 - [x] 🟩 **1.1: AtMention extension - date keywords only**
   - [x] 🟩 Write tests for @ trigger and date keyword matching
   - [x] 🟩 Create `AtMention.ts` extension using TipTap Suggestion API
@@ -61,6 +67,7 @@ See [QUESTIONS-1.md](./QUESTIONS-1.md), [QUESTIONS-2.md](./QUESTIONS-2.md), and 
   - [x] 🟩 **CHECKPOINT: Type `@today` → see dropdown → select → date inserted**
 
 ### Phase 2: Add Users to Suggestion
+
 - [x] 🟩 **2.1: Fetch and display users**
   - [x] 🟩 Write tests for user fetching and filtering
   - [x] 🟩 Update `items()` to fetch users via `mention.getUsers()`
@@ -86,6 +93,7 @@ See [QUESTIONS-1.md](./QUESTIONS-1.md), [QUESTIONS-2.md](./QUESTIONS-2.md), and 
   - [x] 🟩 **CHECKPOINT: Type `@drew` → see user → select → chip inserted**
 
 ### Phase 3: Date Chip Decoration & Picker
+
 - [x] 🟩 **3.1: Date decoration plugin**
   - [x] 🟩 Write tests for date pattern detection
   - [x] 🟩 Add ProseMirror plugin to detect `YYYY-MM-DD` patterns
@@ -108,6 +116,7 @@ See [QUESTIONS-1.md](./QUESTIONS-1.md), [QUESTIONS-2.md](./QUESTIONS-2.md), and 
   - [x] 🟩 Insert selected date (or nothing if cancelled)
 
 ### Phase 4: Mention Interactions
+
 - [x] 🟩 **4.1: MentionPopover component**
   - [x] 🟩 Write tests for MentionPopover (component is simple, tests deferred)
   - [x] 🟩 Create `MentionPopover.tsx`
@@ -118,14 +127,15 @@ See [QUESTIONS-1.md](./QUESTIONS-1.md), [QUESTIONS-2.md](./QUESTIONS-2.md), and 
   - [x] 🟩 Add click handler to MentionNode (via onMentionClick option)
   - [x] 🟩 Show MentionPopover on click
 
-- [ ] 🟨 **4.3: Filter notes by person** (DEFERRED - requires notes list changes)
-  - [ ] 🟨 Add IPC handler `notes:filterByAuthor(profileId)`
-  - [ ] 🟨 Wire popover action to trigger filter
-  - [ ] 🟨 Update notes list to show filtered results
-  - [ ] 🟨 **CHECKPOINT: Click mention → popover → filter works**
-  - Note: Button is wired up but filtering not yet implemented (logs to console)
+- [x] 🟩 **4.3: Search notes mentioning a person**
+  - [x] 🟩 Changed from "filter by author" to "search for mentions" (notes don't track author)
+  - [x] 🟩 MentionPopover has "Find notes mentioning this person" button
+  - [x] 🟩 Dispatches `notecove:searchNotes` custom event
+  - [x] 🟩 NotesListPanel listens for event and triggers search
+  - [x] 🟩 **CHECKPOINT: Click mention → popover → search works**
 
 ### Phase 5: Styling & Polish
+
 - [x] 🟩 **5.1: Chip styling**
   - [x] 🟩 CSS for date and mention chips (background, border-radius, padding)
   - [x] 🟩 Same visual style for both (per Q11)
@@ -158,10 +168,12 @@ packages/desktop/src/renderer/src/components/EditorPanel/
 ## Dependencies
 
 **To Install:**
+
 - `@mui/x-date-pickers` - MUI DatePicker
 - `dayjs` - Date adapter for MUI (lighter than date-fns adapter)
 
 **Already Available:**
+
 - `@tiptap/suggestion`, `tippy.js` - Autocomplete infrastructure
 - `date-fns` - Date formatting
 - MUI components - UI

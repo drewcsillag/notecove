@@ -26,12 +26,15 @@
 ## Ordering Review
 
 ### Issue: Phase 1.3 is mostly done
+
 The "Add IPC for mention users" task is already complete. Update plan to reflect this.
 
 ### Issue: Faster feedback loop possible
+
 Current order builds the entire suggestion system before we can test anything.
 
 **Recommendation:** Restructure to get date keywords working first (simpler), then add users:
+
 1. Build AtMention extension with just date keywords
 2. Test that `@today` etc. work
 3. Add user fetching and combined list
@@ -44,22 +47,28 @@ This gets us to something testable faster.
 ## Edge Cases & Risks
 
 ### Risk 1: Dual-text storage editing
+
 If document stores `@drew Drew Colthorp` and user places cursor in the middle and edits:
+
 - Could corrupt the mention
 - Need mark's `inclusive` setting to control whether edits extend the mark
 
 **Mitigation:**
+
 - Use `inclusive: false` on the mention mark
 - If text inside mark changes, consider removing the mark entirely
 - OR make the entire mention an atomic inline node (more complex but safer)
 
 ### Risk 2: Cursor position after insertion
+
 After inserting `@drew Drew Colthorp ` (with trailing space), cursor should be after the space.
 
 **Mitigation:** Test this explicitly, may need to adjust `command()` to set selection.
 
 ### Risk 3: Date editing via picker
+
 When clicking a date chip and picking a new date:
+
 - Need to select the old date text
 - Replace with new date
 - Should work with undo
@@ -67,7 +76,9 @@ When clicking a date chip and picking a new date:
 **Mitigation:** Use editor transaction properly so it's undoable.
 
 ### Risk 4: Users without handles filtered out
+
 Per Q8, users without handles aren't shown. But what if:
+
 - Current user has no handle set?
 - Should we warn them in settings?
 
@@ -87,19 +98,23 @@ Per Q8, users without handles aren't shown. But what if:
 ## Questions for User
 
 ### Q1: Atomic mention nodes vs marks?
+
 The dual-text storage (`@handle Name`) has edge cases with editing. Two options:
 
 **Option A (Marks - current plan):**
+
 - Pros: Simpler, leverages existing patterns
 - Cons: User could edit and corrupt mention
 
 **Option B (Atomic inline nodes):**
+
 - Pros: Mention is a single unit, can't partially edit
 - Cons: More complex, different pattern than hashtags
 
 Recommendation: Start with marks, see if editing issues arise in practice. Can migrate to nodes later if needed.
 
 ### Q2: What if current user has no handle?
+
 Should we still show them in autocomplete? Or prompt them to set one?
 
 ---

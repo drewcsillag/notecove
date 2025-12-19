@@ -135,7 +135,9 @@ export const AtSuggestionList = forwardRef<AtSuggestionListRef, AtSuggestionList
                   <ListItem key={item.id} disablePadding>
                     <ListItemButton
                       selected={index === selectedIndex}
-                      onClick={() => selectItem(index)}
+                      onClick={() => {
+                        selectItem(index);
+                      }}
                       sx={{ py: 0.5, px: 2 }}
                     >
                       <ListItemIcon sx={{ minWidth: 36 }}>
@@ -171,12 +173,13 @@ export const AtSuggestionList = forwardRef<AtSuggestionListRef, AtSuggestionList
               </ListSubheader>
               {userItems.map((item) => {
                 const index = currentIndex++;
-                if (item.type !== 'user') return null;
                 return (
                   <ListItem key={item.id} disablePadding>
                     <ListItemButton
                       selected={index === selectedIndex}
-                      onClick={() => selectItem(index)}
+                      onClick={() => {
+                        selectItem(index);
+                      }}
                       sx={{ py: 0.5, px: 2 }}
                     >
                       <ListItemIcon sx={{ minWidth: 36 }}>
@@ -211,7 +214,6 @@ export const AtSuggestionList = forwardRef<AtSuggestionListRef, AtSuggestionList
 
           {/* Hint Section (not selectable) */}
           {hintItems.map((item) => {
-            if (item.type !== 'hint') return null;
             return (
               <ListItem key={item.id} sx={{ py: 1, px: 2 }}>
                 <ListItemIcon sx={{ minWidth: 36 }}>

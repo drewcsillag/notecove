@@ -486,6 +486,22 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedFolderId]);
 
+  // Listen for external search requests (e.g., from mention popover "Find notes mentioning this person")
+  useEffect(() => {
+    const handleExternalSearch = (event: CustomEvent<{ query: string }>) => {
+      const { query } = event.detail;
+      console.log('[NotesListPanel] External search request:', query);
+      setSearchQuery(query);
+      void saveSearchQuery(query);
+      void performSearch(query);
+    };
+
+    window.addEventListener('notecove:searchNotes', handleExternalSearch as EventListener);
+    return () => {
+      window.removeEventListener('notecove:searchNotes', handleExternalSearch as EventListener);
+    };
+  }, [performSearch, saveSearchQuery]);
+
   // Poll for selected folder changes (since we don't have cross-component events yet)
   useEffect(() => {
     const interval = setInterval(() => {

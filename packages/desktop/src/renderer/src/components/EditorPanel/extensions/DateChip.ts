@@ -21,8 +21,8 @@ export const DATE_PATTERN = /\b\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b
 /**
  * Find all date matches in a string
  */
-export function findDateMatches(text: string): Array<{ index: number; date: string }> {
-  const matches: Array<{ index: number; date: string }> = [];
+export function findDateMatches(text: string): { index: number; date: string }[] {
+  const matches: { index: number; date: string }[] = [];
   const regex = new RegExp(DATE_PATTERN.source, DATE_PATTERN.flags);
   let match;
 
@@ -78,13 +78,14 @@ export const DateChip = Extension.create<DateChipOptions>({
           handleClick(_view, _pos, event) {
             // Check if click is on a date chip
             const target = event.target as HTMLElement;
-            if (target.classList.contains('date-chip') || target.closest('.date-chip')) {
-              const dateEl = target.classList.contains('date-chip')
-                ? target
-                : (target.closest('.date-chip') as HTMLElement);
-              const date = dateEl?.getAttribute('data-date');
-              const from = parseInt(dateEl?.getAttribute('data-from') || '0', 10);
-              const to = parseInt(dateEl?.getAttribute('data-to') || '0', 10);
+            const dateEl = target.classList.contains('date-chip')
+              ? target
+              : target.closest('.date-chip');
+
+            if (dateEl) {
+              const date = dateEl.getAttribute('data-date');
+              const from = parseInt(dateEl.getAttribute('data-from') ?? '0', 10);
+              const to = parseInt(dateEl.getAttribute('data-to') ?? '0', 10);
 
               if (date && options.onDateClick) {
                 options.onDateClick(date, from, to);
