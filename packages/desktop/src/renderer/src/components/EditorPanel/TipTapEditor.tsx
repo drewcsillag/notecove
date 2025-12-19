@@ -2213,12 +2213,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             },
           },
           // Date chip styling (YYYY-MM-DD dates)
+          // Uses normal text color but with chip background
           '& .date-chip': {
             backgroundColor:
               theme.palette.mode === 'dark'
-                ? 'rgba(144, 202, 249, 0.16)'
-                : 'rgba(25, 118, 210, 0.08)',
-            color: theme.palette.primary.main,
+                ? 'rgba(255, 255, 255, 0.08)'
+                : 'rgba(0, 0, 0, 0.06)',
+            color: theme.palette.text.primary,
             padding: '2px 6px',
             borderRadius: '4px',
             cursor: 'pointer',
@@ -2227,12 +2228,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             '&:hover': {
               backgroundColor:
                 theme.palette.mode === 'dark'
-                  ? 'rgba(144, 202, 249, 0.24)'
-                  : 'rgba(25, 118, 210, 0.16)',
+                  ? 'rgba(255, 255, 255, 0.12)'
+                  : 'rgba(0, 0, 0, 0.1)',
             },
           },
-          // Mention node styling (user @mentions)
-          '& .mention-node': {
+          // Mention chip styling (user @mentions)
+          '& .mention-chip': {
             backgroundColor:
               theme.palette.mode === 'dark'
                 ? 'rgba(144, 202, 249, 0.16)'
@@ -2251,7 +2252,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                   : 'rgba(25, 118, 210, 0.16)',
             },
             // Hide the handle prefix, show only display name
-            '& .mention-handle': {
+            '& .mention-handle-hidden': {
               display: 'none',
             },
           },
