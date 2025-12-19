@@ -188,7 +188,7 @@ export interface EditorState {
  */
 export interface WindowState {
   id: string; // Unique window ID (UUID)
-  type: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector' | 'sdPicker';
+  type: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector' | 'sdPicker' | 'about';
   noteId?: string | undefined; // For minimal windows, or current note in main
   sdId?: string | undefined; // Storage Directory ID for the note
   bounds: WindowBounds;

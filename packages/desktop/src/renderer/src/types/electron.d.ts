@@ -536,7 +536,6 @@ declare global {
         onCreateSnapshot: (callback: () => void) => () => void;
         onViewHistory: (callback: () => void) => () => void;
         onNoteInfo: (callback: () => void) => () => void;
-        onAbout: (callback: () => void) => () => void;
         onExportSelectedNotes: (callback: () => void) => () => void;
         onExportAllNotes: (callback: () => void) => () => void;
         onImportMarkdown: (callback: () => void) => () => void;

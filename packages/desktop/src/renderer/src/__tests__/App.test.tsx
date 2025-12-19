@@ -117,9 +117,6 @@ const mockElectronAPI = {
     onToggleTagsPanel: jest.fn(() => () => {
       /* unsubscribe */
     }),
-    onAbout: jest.fn(() => () => {
-      /* unsubscribe */
-    }),
     onCreateSnapshot: jest.fn(() => () => {
       /* unsubscribe */
     }),

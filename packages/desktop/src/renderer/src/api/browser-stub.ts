@@ -186,7 +186,6 @@ export const browserApiStub: typeof window.electronAPI = {
     onCreateSnapshot: stubEventSubscription,
     onViewHistory: stubEventSubscription,
     onNoteInfo: stubEventSubscription,
-    onAbout: stubEventSubscription,
     onExportSelectedNotes: stubEventSubscription,
     onExportAllNotes: stubEventSubscription,
     onImportMarkdown: stubEventSubscription,

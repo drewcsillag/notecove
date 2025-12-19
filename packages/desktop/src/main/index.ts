@@ -290,7 +290,7 @@ void app.whenReady().then(async () => {
     // It's persisted in the database to remain stable across restarts
     let instanceId: string = process.env['INSTANCE_ID'] ?? '';
     if (!instanceId) {
-      const storedInstanceId = await database.getState(AppStateKey.InstanceId);
+      const storedInstanceId: string | null = await database.getState(AppStateKey.InstanceId);
       if (storedInstanceId) {
         instanceId = storedInstanceId;
         console.log(`[InstanceId] Loaded existing instanceId: ${instanceId}`);

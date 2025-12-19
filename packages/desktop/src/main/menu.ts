@@ -41,6 +41,7 @@ export interface MenuDependencies {
     noteInfo?: boolean;
     storageInspector?: boolean;
     sdPicker?: boolean;
+    about?: boolean;
     targetNoteId?: string;
     noteTitle?: string;
     parentWindow?: BrowserWindow;
@@ -80,10 +81,7 @@ export function createMenu(deps: MenuDependencies): void {
               {
                 label: 'About NoteCove',
                 click: () => {
-                  // TODO: Show About dialog
-                  if (mainWindow) {
-                    mainWindow.webContents.send('menu:about');
-                  }
+                  createWindow({ about: true });
                 },
               },
               { type: 'separator' as const },
@@ -586,10 +584,7 @@ export function createMenu(deps: MenuDependencies): void {
               {
                 label: 'About NoteCove',
                 click: () => {
-                  // TODO: Show About dialog
-                  if (mainWindow) {
-                    mainWindow.webContents.send('menu:about');
-                  }
+                  createWindow({ about: true });
                 },
               },
             ]

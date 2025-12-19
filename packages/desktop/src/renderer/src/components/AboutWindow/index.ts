@@ -1,0 +1,1 @@
+export { AboutWindow } from './AboutWindow';

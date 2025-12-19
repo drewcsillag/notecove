@@ -1,10 +1,13 @@
 /**
- * About Dialog Tests
+ * About Window Tests
+ *
+ * Tests for the standalone About window component that displays
+ * application information in its own window.
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { AboutDialog } from '../AboutDialog';
+import { AboutWindow } from '../AboutWindow';
 
 // Mock window.electronAPI
 const mockElectronAPI = {
@@ -18,10 +21,11 @@ const mockElectronAPI = {
 
 // Set up global mocks before tests
 beforeAll(() => {
-  (global as any).window.electronAPI = mockElectronAPI;
+  (global as unknown as { window: { electronAPI: typeof mockElectronAPI } }).window.electronAPI =
+    mockElectronAPI;
 });
 
-describe('AboutDialog', () => {
+describe('AboutWindow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockElectronAPI.app.getInfo.mockResolvedValue({
@@ -32,25 +36,16 @@ describe('AboutDialog', () => {
     });
   });
 
-  it('should render when open is true', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+  it('should render app name', async () => {
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText('NoteCove')).toBeInTheDocument();
     });
   });
 
-  it('should not render when open is false', () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={false} onClose={onClose} />);
-
-    expect(screen.queryByText('NoteCove')).not.toBeInTheDocument();
-  });
-
   it('should display version number', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText(/Version 1\.2\.3/)).toBeInTheDocument();
@@ -65,8 +60,7 @@ describe('AboutDialog', () => {
       profileName: 'Test Profile',
     });
 
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText('Development Build')).toBeInTheDocument();
@@ -74,8 +68,7 @@ describe('AboutDialog', () => {
   });
 
   it('should not display "Development Build" when isDevBuild is false', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText('NoteCove')).toBeInTheDocument();
@@ -84,8 +77,7 @@ describe('AboutDialog', () => {
   });
 
   it('should display profile name and ID', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText(/Test Profile/)).toBeInTheDocument();
@@ -94,8 +86,7 @@ describe('AboutDialog', () => {
   });
 
   it('should display copyright notice', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText(/© 2025 Drew Csillag/)).toBeInTheDocument();
@@ -103,8 +94,7 @@ describe('AboutDialog', () => {
   });
 
   it('should display license link', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText(/Apache 2\.0/)).toBeInTheDocument();
@@ -112,8 +102,7 @@ describe('AboutDialog', () => {
   });
 
   it('should open license URL when license link is clicked', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText(/Apache 2\.0/)).toBeInTheDocument();
@@ -127,22 +116,40 @@ describe('AboutDialog', () => {
     );
   });
 
-  it('should call onClose when close button is clicked', async () => {
-    const onClose = jest.fn();
-    render(<AboutDialog open={true} onClose={onClose} />);
+  it('should show loading state while fetching data', () => {
+    mockElectronAPI.app.getInfo.mockImplementation(
+      () =>
+        new Promise(() => {
+          // Never resolves - intentionally testing loading state
+        })
+    );
+
+    render(<AboutWindow />);
+
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+
+  it('should call getInfo on mount', async () => {
+    render(<AboutWindow />);
+
+    await waitFor(() => {
+      expect(mockElectronAPI.app.getInfo).toHaveBeenCalled();
+    });
+  });
+
+  it('should not display profile section when profileName is null', async () => {
+    mockElectronAPI.app.getInfo.mockResolvedValue({
+      version: '1.2.3',
+      isDevBuild: false,
+      profileId: null,
+      profileName: null,
+    });
+
+    render(<AboutWindow />);
 
     await waitFor(() => {
       expect(screen.getByText('NoteCove')).toBeInTheDocument();
     });
-
-    // Get all close buttons (one in header, one at bottom)
-    const closeButtons = screen.getAllByRole('button', { name: /close/i });
-    // Click the bottom "Close" button (last one)
-    const closeButton = closeButtons[closeButtons.length - 1];
-    if (closeButton) {
-      fireEvent.click(closeButton);
-    }
-
-    expect(onClose).toHaveBeenCalled();
+    expect(screen.queryByText('Profile:')).not.toBeInTheDocument();
   });
 });

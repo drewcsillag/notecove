@@ -22,7 +22,7 @@ import {
   SDPickerWindow,
   InspectorErrorBoundary,
 } from './components/StorageInspector';
-import { AboutDialog } from './components/AboutDialog/AboutDialog';
+import { AboutWindow } from './components/AboutWindow';
 import { StaleSyncToast } from './components/StaleSyncToast';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
 import { ImportDialog } from './components/ImportDialog';
@@ -37,7 +37,6 @@ function App(): React.ReactElement {
   const [leftSidebarSizes, setLeftSidebarSizes] = useState<number[] | undefined>(undefined);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [commentPanelOpen, setCommentPanelOpen] = useState(false);
@@ -86,6 +85,8 @@ function App(): React.ReactElement {
   const [storageInspectorSdName, setStorageInspectorSdName] = useState<string | null>(null);
   // SD Picker window mode (dedicated window for selecting SD to inspect)
   const [sdPickerMode, setSdPickerMode] = useState(false);
+  // About window mode (dedicated window for app information)
+  const [aboutMode, setAboutMode] = useState(false);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
   // Import dialog open state
@@ -110,6 +111,7 @@ function App(): React.ReactElement {
       let sdNameParam = searchParams.get('sdName');
 
       let sdPickerParam = searchParams.get('sdPicker');
+      let aboutParam = searchParams.get('about');
 
       // If not in search, try hash (for file:// protocol)
       if (
@@ -119,6 +121,7 @@ function App(): React.ReactElement {
         !noteInfoParam &&
         !storageInspectorParam &&
         !sdPickerParam &&
+        !aboutParam &&
         window.location.hash
       ) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -132,6 +135,7 @@ function App(): React.ReactElement {
         sdPathParam = hashParams.get('sdPath');
         sdNameParam = hashParams.get('sdName');
         sdPickerParam = hashParams.get('sdPicker');
+        aboutParam = hashParams.get('about');
       }
 
       if (noteIdParam) {
@@ -166,6 +170,11 @@ function App(): React.ReactElement {
       if (sdPickerParam === 'true') {
         console.log('[App] Enabling SD picker mode from URL parameter');
         setSdPickerMode(true);
+      }
+
+      if (aboutParam === 'true') {
+        console.log('[App] Enabling about mode from URL parameter');
+        setAboutMode(true);
       }
     } catch (error: unknown) {
       console.error(
@@ -502,11 +511,6 @@ function App(): React.ReactElement {
       setShowTagPanel((prev) => !prev);
     });
 
-    // About dialog
-    const cleanupAbout = window.electronAPI.menu.onAbout(() => {
-      setAboutOpen(true);
-    });
-
     // Create Snapshot
     const cleanupCreateSnapshot = window.electronAPI.menu.onCreateSnapshot(() => {
       if (selectedNoteId) {
@@ -619,7 +623,6 @@ function App(): React.ReactElement {
       cleanupToggleDarkMode();
       cleanupToggleFolderPanel();
       cleanupToggleTagsPanel();
-      cleanupAbout();
       cleanupCreateSnapshot();
       cleanupNoteInfo();
       cleanupViewHistory();
@@ -784,6 +787,25 @@ function App(): React.ReactElement {
     );
   }
 
+  // Render about window (standalone window for app information)
+  if (aboutMode) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <AboutWindow />
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
   // Render minimal layout (just editor, no sidebars)
   if (minimalMode) {
     return (
@@ -904,12 +926,6 @@ function App(): React.ReactElement {
             onThemeChange={setThemeMode}
           />
         )}
-        <AboutDialog
-          open={aboutOpen}
-          onClose={() => {
-            setAboutOpen(false);
-          }}
-        />
         <ImportDialog
           open={importDialogOpen}
           onClose={() => {

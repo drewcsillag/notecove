@@ -687,7 +687,6 @@ export const webClient: typeof window.electronAPI = {
     onCreateSnapshot: noopSubscription,
     onViewHistory: noopSubscription,
     onNoteInfo: noopSubscription,
-    onAbout: noopSubscription,
     onExportSelectedNotes: noopSubscription,
     onExportAllNotes: noopSubscription,
     onImportMarkdown: noopSubscription,

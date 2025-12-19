@@ -156,15 +156,6 @@ export const menuApi = {
       ipcRenderer.removeListener('menu:noteInfo', listener);
     };
   },
-  onAbout: (callback: () => void): (() => void) => {
-    const listener = (): void => {
-      callback();
-    };
-    ipcRenderer.on('menu:about', listener);
-    return () => {
-      ipcRenderer.removeListener('menu:about', listener);
-    };
-  },
   onExportSelectedNotes: (callback: () => void): (() => void) => {
     const listener = (): void => {
       callback();

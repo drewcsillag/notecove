@@ -17,6 +17,7 @@ export interface CreateWindowOptions {
   noteInfo?: boolean;
   storageInspector?: boolean;
   sdPicker?: boolean;
+  about?: boolean;
   targetNoteId?: string;
   noteTitle?: string;
   parentWindow?: BrowserWindow;
@@ -69,31 +70,37 @@ export function createWindow(
   }
 
   // Determine window dimensions
-  const defaultWidth = options?.storageInspector
-    ? 1200
-    : options?.sdPicker
-      ? 500
-      : options?.syncStatus || options?.noteInfo
-        ? 900
-        : options?.minimal
-          ? 800
-          : 1200;
-  const defaultHeight = options?.storageInspector
-    ? 800
-    : options?.sdPicker
-      ? 400
-      : options?.syncStatus || options?.noteInfo
-        ? 600
-        : 800;
+  const defaultWidth = options?.about
+    ? 400
+    : options?.storageInspector
+      ? 1200
+      : options?.sdPicker
+        ? 500
+        : options?.syncStatus || options?.noteInfo
+          ? 900
+          : options?.minimal
+            ? 800
+            : 1200;
+  const defaultHeight = options?.about
+    ? 350
+    : options?.storageInspector
+      ? 800
+      : options?.sdPicker
+        ? 400
+        : options?.syncStatus || options?.noteInfo
+          ? 600
+          : 800;
 
   // Determine window title
-  const windowTitle = options?.storageInspector
-    ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}`
-    : options?.sdPicker
-      ? 'Select Storage Directory'
-      : options?.noteInfo && options.noteTitle
-        ? `Note Info - ${options.noteTitle}`
-        : getWindowTitle(context.isPackaged, context.selectedProfileName);
+  const windowTitle = options?.about
+    ? 'About NoteCove'
+    : options?.storageInspector
+      ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}`
+      : options?.sdPicker
+        ? 'Select Storage Directory'
+        : options?.noteInfo && options.noteTitle
+          ? `Note Info - ${options.noteTitle}`
+          : getWindowTitle(context.isPackaged, context.selectedProfileName);
 
   // Create the browser window with saved bounds or defaults
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -125,6 +132,12 @@ export function createWindow(
 
   const newWindow = new BrowserWindow(windowOptions);
 
+  // Remove menu bar for About windows on Windows/Linux
+  // (On macOS, the app menu is global so this only affects Windows/Linux)
+  if (options?.about && process.platform !== 'darwin') {
+    newWindow.setMenu(null);
+  }
+
   // Determine window type for state tracking
   const windowType:
     | 'main'
@@ -132,17 +145,20 @@ export function createWindow(
     | 'syncStatus'
     | 'noteInfo'
     | 'storageInspector'
-    | 'sdPicker' = options?.syncStatus
-    ? 'syncStatus'
-    : options?.noteInfo
-      ? 'noteInfo'
-      : options?.storageInspector
-        ? 'storageInspector'
-        : options?.sdPicker
-          ? 'sdPicker'
-          : options?.minimal
-            ? 'minimal'
-            : 'main';
+    | 'sdPicker'
+    | 'about' = options?.about
+    ? 'about'
+    : options?.syncStatus
+      ? 'syncStatus'
+      : options?.noteInfo
+        ? 'noteInfo'
+        : options?.storageInspector
+          ? 'storageInspector'
+          : options?.sdPicker
+            ? 'sdPicker'
+            : options?.minimal
+              ? 'minimal'
+              : 'main';
 
   // Register window with state manager (if available)
   let windowId: string | undefined;
@@ -199,6 +215,9 @@ export function createWindow(
   }
   if (options?.sdPicker) {
     params.set('sdPicker', 'true');
+  }
+  if (options?.about) {
+    params.set('about', 'true');
   }
   if (options?.targetNoteId) {
     params.set('targetNoteId', options.targetNoteId);
