@@ -2238,7 +2238,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               theme.palette.mode === 'dark'
                 ? 'rgba(144, 202, 249, 0.16)'
                 : 'rgba(25, 118, 210, 0.08)',
-            color: theme.palette.primary.main,
+            color: theme.palette.text.primary,
             padding: '2px 6px',
             borderRadius: '4px',
             cursor: 'pointer',
