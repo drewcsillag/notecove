@@ -92,6 +92,8 @@ function createWindow(options?: CreateWindowOptions): BrowserWindow {
   // Update global references
   if (result.shouldSetAsMain) {
     mainWindow = result.window;
+    // Refresh menu so handlers have the updated mainWindow reference
+    createMenu();
   }
   if (result.shouldSetAsSyncStatus) {
     syncStatusWindow = result.window;
