@@ -218,7 +218,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <Tooltip title="Bullet List (⌘⇧8)">
         <IconButton
           size="small"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          onClick={() => {
+            // If on a taskItem in a bulletList, convert to regular listItem
+            // Otherwise, toggle bullet list (handles: ordered->bullet, paragraph->bullet, or toggle off)
+            if (editor.isActive('taskItem') && editor.isActive('bulletList')) {
+              editor.chain().focus().convertToListItem().run();
+            } else {
+              editor.chain().focus().toggleBulletList().run();
+            }
+          }}
           color={editor.isActive('bulletList') ? 'primary' : 'default'}
         >
           <FormatListBulleted fontSize="small" />
@@ -228,17 +236,25 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <Tooltip title="Numbered List (⌘⇧7)">
         <IconButton
           size="small"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          onClick={() => {
+            // If on a taskItem in an orderedList, convert to regular listItem
+            // Otherwise, toggle ordered list (handles: bullet->ordered, paragraph->ordered, or toggle off)
+            if (editor.isActive('taskItem') && editor.isActive('orderedList')) {
+              editor.chain().focus().convertToListItem().run();
+            } else {
+              editor.chain().focus().toggleOrderedList().run();
+            }
+          }}
           color={editor.isActive('orderedList') ? 'primary' : 'default'}
         >
           <FormatListNumbered fontSize="small" />
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Convert to Task Item">
+      <Tooltip title="Toggle Task Item">
         <IconButton
           size="small"
-          onClick={() => editor.chain().focus().convertToTaskItem().run()}
+          onClick={() => editor.chain().focus().toggleTaskItem().run()}
           color={editor.isActive('taskItem') ? 'primary' : 'default'}
         >
           <CheckBoxOutlineBlank fontSize="small" />

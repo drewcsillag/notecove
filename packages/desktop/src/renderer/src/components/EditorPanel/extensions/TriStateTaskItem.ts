@@ -25,6 +25,14 @@ declare module '@tiptap/core' {
        * Convert the current list item to a task item
        */
       convertToTaskItem: (state?: TaskItemState) => ReturnType;
+      /**
+       * Convert the current task item to a regular list item
+       */
+      convertToListItem: () => ReturnType;
+      /**
+       * Toggle between list item and task item
+       */
+      toggleTaskItem: () => ReturnType;
     };
   }
 }
@@ -467,6 +475,79 @@ export const TriStateTaskItem = Node.create<TriStateTaskItemOptions>({
             tr.setNodeMarkup(listItemPos, this.type, { checked: state });
           }
           return true;
+        },
+      convertToListItem:
+        () =>
+        ({ tr, state: editorState, dispatch, editor }) => {
+          const { selection } = editorState;
+          const $from = selection.$from;
+
+          // Find the parent taskItem
+          let taskItemDepth = -1;
+          for (let depth = $from.depth; depth > 0; depth--) {
+            const node = $from.node(depth);
+            if (node.type.name === 'taskItem') {
+              taskItemDepth = depth;
+              break;
+            }
+          }
+
+          // If not in a taskItem, return false
+          if (taskItemDepth === -1) return false;
+
+          const taskItemPos = $from.before(taskItemDepth);
+          const listItemType = editor.schema.nodes['listItem'];
+
+          if (!listItemType) return false;
+
+          if (dispatch) {
+            // Convert taskItem to listItem (remove the checked attribute)
+            tr.setNodeMarkup(taskItemPos, listItemType, {});
+          }
+          return true;
+        },
+      toggleTaskItem:
+        () =>
+        ({ state: editorState, chain, editor }) => {
+          const { selection } = editorState;
+          const $from = selection.$from;
+
+          // Check if we're in a taskItem
+          let inTaskItem = false;
+          for (let depth = $from.depth; depth > 0; depth--) {
+            const node = $from.node(depth);
+            if (node.type.name === 'taskItem') {
+              inTaskItem = true;
+              break;
+            }
+          }
+
+          if (inTaskItem) {
+            // Convert taskItem to listItem
+            return chain().convertToListItem().run();
+          }
+
+          // Check if we're in a listItem
+          let inListItem = false;
+          for (let depth = $from.depth; depth > 0; depth--) {
+            const node = $from.node(depth);
+            if (node.type.name === 'listItem') {
+              inListItem = true;
+              break;
+            }
+          }
+
+          if (inListItem) {
+            // Convert listItem to taskItem
+            return chain().convertToTaskItem().run();
+          }
+
+          // Not in a list - create a bullet list with a task item
+          // First toggle bullet list, then convert to task item
+          const listItemType = editor.schema.nodes['listItem'];
+          if (!listItemType) return false;
+
+          return chain().toggleBulletList().convertToTaskItem().run();
         },
     };
   },
