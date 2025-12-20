@@ -12,6 +12,7 @@ import {
   FormatUnderlined,
   FormatStrikethrough,
   Code,
+  DataObject,
   FormatQuote,
   FormatListBulleted,
   FormatListNumbered,
@@ -254,6 +255,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           color={editor.isActive('blockquote') ? 'primary' : 'default'}
         >
           <FormatQuote fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Code block (⌘⇧C)">
+        <IconButton
+          size="small"
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          color={editor.isActive('codeBlock') ? 'primary' : 'default'}
+          aria-label="Code block"
+        >
+          <DataObject fontSize="small" />
         </IconButton>
       </Tooltip>
 

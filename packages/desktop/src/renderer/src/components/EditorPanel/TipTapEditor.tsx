@@ -56,6 +56,8 @@ import {
 import { TabIndent } from './extensions/TabIndent';
 import { NotecoveListItem } from './extensions/NotecoveListItem';
 import { MoveBlock } from './extensions/MoveBlock';
+import { NotecoveCodeBlock } from './extensions/CodeBlockLowlight';
+import { getCodeBlockStyles } from './codeBlockTheme';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
 import { TableSizePickerDialog } from './TableSizePickerDialog';
@@ -315,7 +317,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         bulletList: false, // Use custom version that accepts taskItem
         orderedList: false, // Use custom version that accepts taskItem
         listItem: false, // Use NotecoveListItem with cursor-position-aware Tab
+        codeBlock: false, // Use NotecoveCodeBlock with syntax highlighting
       }),
+      // Add syntax-highlighted code blocks
+      NotecoveCodeBlock,
       // Custom BulletList that accepts both listItem and taskItem
       BulletList.extend({
         content: '(listItem | taskItem)+',
@@ -2178,22 +2183,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             paddingLeft: 2,
             marginBottom: 1,
           },
+          // Inline code (not in code blocks)
           '& code': {
             backgroundColor: 'action.hover',
             padding: '2px 4px',
             borderRadius: 0.5,
             fontSize: '0.9em',
           },
-          '& pre': {
-            backgroundColor: 'action.hover',
-            padding: 2,
-            borderRadius: 1,
-            overflow: 'auto',
-            '& code': {
-              padding: 0,
-              backgroundColor: 'transparent',
-            },
-          },
+          // Code block styles with syntax highlighting (One Dark/One Light theme)
+          ...getCodeBlockStyles(theme.palette.mode === 'dark'),
           '& blockquote': {
             borderLeft: '4px solid',
             borderColor: 'primary.main',

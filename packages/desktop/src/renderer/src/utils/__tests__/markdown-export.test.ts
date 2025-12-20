@@ -516,6 +516,22 @@ describe('prosemirrorToMarkdown', () => {
       const result = prosemirrorToMarkdown(content, noopLookup);
       expect(result).toBe('```python\n\n```');
     });
+
+    it('should ignore showLineNumbers attribute in export (UI-only)', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'codeBlock',
+            attrs: { language: 'typescript', showLineNumbers: true },
+            content: [{ type: 'text', text: 'const x = 1;' }],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      // showLineNumbers should not affect the markdown output
+      expect(result).toBe('```typescript\nconst x = 1;\n```');
+    });
   });
 
   describe('horizontal rule', () => {

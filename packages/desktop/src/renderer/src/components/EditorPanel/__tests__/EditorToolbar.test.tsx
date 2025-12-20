@@ -99,4 +99,75 @@ describe('EditorToolbar', () => {
       expect(container.firstChild).toBeNull();
     });
   });
+
+  describe('code block button', () => {
+    it('renders code block button with correct tooltip', () => {
+      const editor = createMockEditor();
+      render(<EditorToolbar editor={editor} />);
+
+      const codeBlockButton = screen.getByRole('button', { name: /code block/i });
+      expect(codeBlockButton).toBeInTheDocument();
+    });
+
+    it('toggles code block when clicked', () => {
+      const chainableMethods = {
+        focus: jest.fn().mockReturnThis(),
+        toggleBold: jest.fn().mockReturnThis(),
+        toggleItalic: jest.fn().mockReturnThis(),
+        toggleUnderline: jest.fn().mockReturnThis(),
+        toggleStrike: jest.fn().mockReturnThis(),
+        toggleCode: jest.fn().mockReturnThis(),
+        toggleCodeBlock: jest.fn().mockReturnThis(),
+        toggleHeading: jest.fn().mockReturnThis(),
+        toggleBulletList: jest.fn().mockReturnThis(),
+        toggleOrderedList: jest.fn().mockReturnThis(),
+        convertToTaskItem: jest.fn().mockReturnThis(),
+        toggleBlockquote: jest.fn().mockReturnThis(),
+        setHorizontalRule: jest.fn().mockReturnThis(),
+        undo: jest.fn().mockReturnThis(),
+        redo: jest.fn().mockReturnThis(),
+        run: jest.fn(),
+      };
+
+      const editor = createMockEditor({
+        chain: jest.fn().mockReturnValue(chainableMethods),
+      });
+
+      render(<EditorToolbar editor={editor} />);
+
+      const codeBlockButton = screen.getByRole('button', { name: /code block/i });
+      fireEvent.click(codeBlockButton);
+
+      expect(chainableMethods.focus).toHaveBeenCalled();
+      expect(chainableMethods.toggleCodeBlock).toHaveBeenCalled();
+      expect(chainableMethods.run).toHaveBeenCalled();
+    });
+
+    it('highlights button when cursor is in code block', () => {
+      const editor = createMockEditor({
+        isActive: jest.fn((type: string) => type === 'codeBlock'),
+      });
+
+      render(<EditorToolbar editor={editor} />);
+
+      const codeBlockButton = screen.getByRole('button', { name: /code block/i });
+      // Button should have primary color when active
+      expect(codeBlockButton).toHaveClass('MuiIconButton-colorPrimary');
+    });
+
+    it('code block button is positioned after blockquote', () => {
+      const editor = createMockEditor();
+      render(<EditorToolbar editor={editor} />);
+
+      const buttons = screen.getAllByRole('button');
+      const buttonLabels = buttons.map((btn) => btn.getAttribute('aria-label') ?? btn.textContent);
+
+      // Find positions
+      const blockquoteIndex = buttonLabels.findIndex((label) => label.includes('Blockquote'));
+      const codeBlockIndex = buttonLabels.findIndex((label) => label.includes('Code block'));
+
+      // Code block should come after blockquote
+      expect(codeBlockIndex).toBeGreaterThan(blockquoteIndex);
+    });
+  });
 });
