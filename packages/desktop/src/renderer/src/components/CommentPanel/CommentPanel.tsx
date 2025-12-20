@@ -41,8 +41,14 @@ import { ReactionDisplay } from './ReactionDisplay';
 import { MentionAutocomplete, type MentionUser } from './MentionAutocomplete';
 import { CommentContent } from './CommentContent';
 
-// TODO: Replace with actual user ID from authentication system
-const CURRENT_USER_ID = 'current-user';
+/**
+ * User profile for comment authorship
+ */
+interface UserProfile {
+  profileId: string;
+  username: string;
+  handle: string;
+}
 
 export interface CommentPanelProps {
   noteId: string | null;
@@ -103,6 +109,26 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
     startIndex: number;
   } | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Current user profile for comment authorship
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  // Fetch current user profile on mount
+  useEffect(() => {
+    window.electronAPI.user
+      .getCurrentProfile()
+      .then((profile) => {
+        setUserProfile(profile);
+      })
+      .catch((err) => {
+        console.error('[CommentPanel] Failed to get user profile:', err);
+        // Use fallback values if profile fetch fails
+        setUserProfile({
+          profileId: 'unknown',
+          username: 'Anonymous',
+          handle: '@anonymous',
+        });
+      });
+  }, []);
 
   // Load threads from the note
   const loadThreads = useCallback(async () => {
@@ -280,11 +306,15 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
     if (!selectedThread) return;
 
     // If it has empty content and belongs to current user, auto-enter edit mode
-    if (!selectedThread.content && selectedThread.authorId === CURRENT_USER_ID) {
+    if (
+      !selectedThread.content &&
+      userProfile &&
+      selectedThread.authorId === userProfile.profileId
+    ) {
       setEditingThreadId(selectedThreadId);
       setEditText('');
     }
-  }, [selectedThreadId, threads, editingThreadId]);
+  }, [selectedThreadId, threads, editingThreadId, userProfile]);
 
   // Auto-scroll to selected thread when it changes
   useEffect(() => {
@@ -311,8 +341,8 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
       const updates: { resolved: boolean; resolvedBy?: string; resolvedAt?: number } = {
         resolved,
       };
-      if (resolved) {
-        updates.resolvedBy = CURRENT_USER_ID;
+      if (resolved && userProfile) {
+        updates.resolvedBy = userProfile.profileId;
         updates.resolvedAt = Date.now();
       }
       if (noteId) {
@@ -345,14 +375,14 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
   };
 
   const handleReply = async (threadId: string) => {
-    if (!replyText.trim() || !noteId) return;
+    if (!replyText.trim() || !noteId || !userProfile) return;
 
     try {
       await window.electronAPI.comment.addReply(noteId, threadId, {
         threadId,
-        authorId: CURRENT_USER_ID,
-        authorName: 'You', // TODO: Get actual user name
-        authorHandle: '@you', // TODO: Get actual handle
+        authorId: userProfile.profileId,
+        authorName: userProfile.username || 'Anonymous',
+        authorHandle: userProfile.handle || '@anonymous',
         content: replyText.trim(),
         created: Date.now(),
         modified: Date.now(),
@@ -595,6 +625,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
             return (
               <Paper
                 key={thread.id}
+                data-testid="comment-thread"
                 ref={(el) => {
                   if (el) {
                     threadRefs.current.set(thread.id, el);
@@ -630,7 +661,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                   }}
                 >
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight={600}>
+                    <Typography variant="body2" fontWeight={600} data-testid="comment-author">
                       {thread.authorName}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -741,7 +772,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                           </Typography>
                         )}
                       </Box>
-                      {thread.authorId === CURRENT_USER_ID && (
+                      {userProfile && thread.authorId === userProfile.profileId && (
                         <IconButton
                           size="small"
                           onClick={(e) => {
@@ -899,7 +930,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                 </Box>
 
                 {/* Delete button (only for own comments) */}
-                {thread.authorId === CURRENT_USER_ID && (
+                {userProfile && thread.authorId === userProfile.profileId && (
                   <Box
                     sx={{
                       px: 1.5,
@@ -918,6 +949,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
                         handleDeleteClick(thread.id);
                       }}
                       sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      data-testid="delete-thread-button"
                     >
                       Delete
                     </Button>
@@ -943,13 +975,16 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button onClick={handleDeleteCancel} data-testid="delete-cancel-button">
+            Cancel
+          </Button>
           <Button
             onClick={() => {
               void handleDeleteConfirm();
             }}
             color="error"
             autoFocus
+            data-testid="delete-confirm-button"
           >
             Delete
           </Button>

@@ -45,6 +45,13 @@ Object.defineProperty(window, 'electronAPI', {
       onReactionAdded: mockOnReactionAdded,
       onReactionRemoved: mockOnReactionRemoved,
     },
+    user: {
+      getCurrentProfile: jest.fn().mockResolvedValue({
+        profileId: 'test-profile-id',
+        username: 'Test User',
+        handle: '@testuser',
+      }),
+    },
   },
 });
 
@@ -186,7 +193,7 @@ describe('CommentPanel', () => {
         {
           id: 'thread-1',
           noteId: 'test-note',
-          authorId: 'current-user', // Current user's comment
+          authorId: 'test-profile-id', // Current user's comment
           authorName: 'You',
           content: 'My comment',
           created: Date.now(),
@@ -223,7 +230,7 @@ describe('CommentPanel', () => {
         {
           id: 'thread-1',
           noteId: 'test-note',
-          authorId: 'current-user',
+          authorId: 'test-profile-id',
           authorName: 'You',
           content: 'Original comment',
           created: Date.now(),
@@ -256,7 +263,7 @@ describe('CommentPanel', () => {
         {
           id: 'thread-1',
           noteId: 'test-note',
-          authorId: 'current-user',
+          authorId: 'test-profile-id',
           authorName: 'You',
           content: 'Original comment',
           created: Date.now(),
@@ -297,7 +304,7 @@ describe('CommentPanel', () => {
         {
           id: 'thread-1',
           noteId: 'test-note',
-          authorId: 'current-user',
+          authorId: 'test-profile-id',
           authorName: 'You',
           content: 'My comment',
           created: Date.now(),
@@ -334,7 +341,7 @@ describe('CommentPanel', () => {
         {
           id: 'thread-1',
           noteId: 'test-note',
-          authorId: 'current-user',
+          authorId: 'test-profile-id',
           authorName: 'You',
           content: 'My comment',
           created: Date.now(),
@@ -369,7 +376,7 @@ describe('CommentPanel', () => {
         {
           id: 'thread-1',
           noteId: 'test-note',
-          authorId: 'current-user',
+          authorId: 'test-profile-id',
           authorName: 'You',
           content: 'My comment',
           created: Date.now(),
@@ -415,7 +422,7 @@ describe('CommentPanel', () => {
         {
           id: 'thread-1',
           noteId: 'test-note',
-          authorId: 'current-user',
+          authorId: 'test-profile-id',
           authorName: 'You',
           content: 'My comment',
           created: Date.now(),

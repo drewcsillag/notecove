@@ -224,6 +224,13 @@ const mockElectronAPI = {
       /* unsubscribe */
     }),
   },
+  user: {
+    getCurrentProfile: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      username: 'Test User',
+      handle: '@testuser',
+    }),
+  },
 };
 
 Object.defineProperty(window, 'electronAPI', {

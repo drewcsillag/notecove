@@ -41,6 +41,10 @@ declare module '@tiptap/core' {
 export const CommentMark = Mark.create<CommentMarkOptions>({
   name: 'commentMark',
 
+  // Allow multiple comment marks to stack on the same text range
+  // Each mark has a unique threadId, so they represent different comment threads
+  excludes: '',
+
   addOptions(): CommentMarkOptions {
     return {
       HTMLAttributes: {},
@@ -87,8 +91,18 @@ export const CommentMark = Mark.create<CommentMarkOptions>({
     return {
       setCommentMark:
         (threadId: string) =>
-        ({ commands }) => {
-          return commands.setMark(this.name, { threadId });
+        ({ tr, state, dispatch }) => {
+          const { from, to } = state.selection;
+          const markType = state.schema.marks[this.name];
+          if (!markType) return false;
+
+          // Use addMark to allow stacking multiple comment marks
+          const mark = markType.create({ threadId });
+          if (dispatch) {
+            tr.addMark(from, to, mark);
+            dispatch(tr);
+          }
+          return true;
         },
       toggleCommentMark:
         (threadId: string) =>

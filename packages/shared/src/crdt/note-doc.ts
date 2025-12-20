@@ -8,6 +8,30 @@ import {
 } from '../comments/types';
 
 /**
+ * Event types for comment changes detected by CRDT observers
+ */
+export type CommentChangeEventType =
+  | 'thread-add'
+  | 'thread-update'
+  | 'thread-delete'
+  | 'reply-add'
+  | 'reply-update'
+  | 'reply-delete'
+  | 'reaction-add'
+  | 'reaction-delete';
+
+/**
+ * Event fired when comments change in the CRDT document
+ */
+export interface CommentChangeEvent {
+  type: CommentChangeEventType;
+  threadId: string;
+  replyId?: string;
+  reactionId?: string;
+  isRemote: boolean;
+}
+
+/**
  * CRDT document for a single note
  * Uses Y.XmlFragment for rich text content (compatible with TipTap/ProseMirror)
  */
@@ -136,9 +160,11 @@ export class NoteDoc {
 
   /**
    * Apply an update from another instance
+   * @param update - The Yjs update bytes
+   * @param origin - Optional origin for the transaction (defaults to 'remote')
    */
-  applyUpdate(update: Uint8Array): void {
-    Y.applyUpdate(this.doc, update);
+  applyUpdate(update: Uint8Array, origin: unknown = 'remote'): void {
+    Y.applyUpdate(this.doc, update, origin);
   }
 
   /**
@@ -477,6 +503,144 @@ export class NoteDoc {
       authorId: map.get('authorId') as string,
       authorName: map.get('authorName') as string,
       created: map.get('created') as number,
+    };
+  }
+
+  // ============================================================================
+  // COMMENT OBSERVERS
+  // ============================================================================
+
+  /**
+   * Observe changes to comments (threads, replies, reactions).
+   *
+   * The callback is invoked for remote changes to the CRDT document.
+   * This enables live sync of comment updates without requiring a note switch.
+   *
+   * @param callback - Called when comments change
+   * @returns Unsubscribe function to remove all observers
+   */
+  observeComments(callback: (event: CommentChangeEvent) => void): () => void {
+    const cleanupFns: (() => void)[] = [];
+
+    // Track thread-level observers so we can clean them up
+    const threadObservers = new Map<string, (() => void)[]>();
+
+    /**
+     * Set up observers for a single thread's nested structures (replies, reactions)
+     */
+    const observeThread = (threadId: string, threadMap: Y.Map<unknown>) => {
+      const threadCleanups: (() => void)[] = [];
+
+      // Observe thread content changes
+      const threadObserver = (events: Y.YMapEvent<unknown>) => {
+        // Skip the initial replies/reactions array setup
+        const changedKeys = Array.from(events.keysChanged);
+        const isContentChange = changedKeys.some(
+          (key) =>
+            key === 'content' || key === 'resolved' || key === 'resolvedBy' || key === 'resolvedAt'
+        );
+
+        if (isContentChange) {
+          const isRemote = events.transaction.origin === 'remote';
+          callback({ type: 'thread-update', threadId, isRemote });
+        }
+      };
+      threadMap.observe(threadObserver);
+      threadCleanups.push(() => threadMap.unobserve(threadObserver));
+
+      // Observe replies array
+      const repliesArray = threadMap.get('replies') as Y.Array<Y.Map<unknown>> | undefined;
+      if (repliesArray) {
+        const repliesObserver = (events: Y.YArrayEvent<Y.Map<unknown>>) => {
+          const isRemote = events.transaction.origin === 'remote';
+
+          // Process deletions (items removed from array)
+          for (const delta of events.changes.delta) {
+            if ('delete' in delta && delta.delete) {
+              // We don't know which reply was deleted, but the UI will refresh
+              callback({ type: 'reply-delete', threadId, isRemote });
+            }
+            if ('insert' in delta && Array.isArray(delta.insert)) {
+              for (const item of delta.insert) {
+                const replyMap = item as Y.Map<unknown>;
+                const replyId = replyMap.get('id') as string;
+                callback({ type: 'reply-add', threadId, replyId, isRemote });
+              }
+            }
+          }
+        };
+        repliesArray.observe(repliesObserver);
+        threadCleanups.push(() => repliesArray.unobserve(repliesObserver));
+      }
+
+      // Observe reactions array
+      const reactionsArray = threadMap.get('reactions') as Y.Array<Y.Map<unknown>> | undefined;
+      if (reactionsArray) {
+        const reactionsObserver = (events: Y.YArrayEvent<Y.Map<unknown>>) => {
+          const isRemote = events.transaction.origin === 'remote';
+
+          for (const delta of events.changes.delta) {
+            if ('delete' in delta && delta.delete) {
+              callback({ type: 'reaction-delete', threadId, isRemote });
+            }
+            if ('insert' in delta && Array.isArray(delta.insert)) {
+              for (const item of delta.insert) {
+                const reactionMap = item as Y.Map<unknown>;
+                const reactionId = reactionMap.get('id') as string;
+                callback({ type: 'reaction-add', threadId, reactionId, isRemote });
+              }
+            }
+          }
+        };
+        reactionsArray.observe(reactionsObserver);
+        threadCleanups.push(() => reactionsArray.unobserve(reactionsObserver));
+      }
+
+      threadObservers.set(threadId, threadCleanups);
+    };
+
+    // Observe the main comments map for thread additions/deletions
+    const commentsObserver = (events: Y.YMapEvent<Y.Map<unknown>>) => {
+      const isRemote = events.transaction.origin === 'remote';
+
+      events.changes.keys.forEach((change, key) => {
+        if (change.action === 'add') {
+          // New thread added
+          callback({ type: 'thread-add', threadId: key, isRemote });
+
+          // Set up observers for the new thread
+          const threadMap = this.comments.get(key);
+          if (threadMap) {
+            observeThread(key, threadMap);
+          }
+        } else if (change.action === 'delete') {
+          // Thread deleted
+          callback({ type: 'thread-delete', threadId: key, isRemote });
+
+          // Clean up thread observers
+          const threadCleanups = threadObservers.get(key);
+          if (threadCleanups) {
+            threadCleanups.forEach((cleanup) => cleanup());
+            threadObservers.delete(key);
+          }
+        }
+      });
+    };
+    this.comments.observe(commentsObserver);
+    cleanupFns.push(() => this.comments.unobserve(commentsObserver));
+
+    // Set up observers for existing threads
+    this.comments.forEach((threadMap, threadId) => {
+      observeThread(threadId, threadMap);
+    });
+
+    // Return cleanup function
+    return () => {
+      cleanupFns.forEach((cleanup) => cleanup());
+      threadObservers.forEach((cleanups) => {
+        cleanups.forEach((cleanup) => cleanup());
+      });
+      threadObservers.clear();
     };
   }
 }

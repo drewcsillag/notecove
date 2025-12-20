@@ -22,6 +22,13 @@ const mockElectronAPI = {
   note: {
     getAll: jest.fn().mockResolvedValue([]),
   },
+  user: {
+    getCurrentProfile: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      username: 'Test User',
+      handle: '@testuser',
+    }),
+  },
 };
 (global as unknown as { window: { electronAPI: typeof mockElectronAPI } }).window = {
   electronAPI: mockElectronAPI,

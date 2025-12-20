@@ -5,6 +5,7 @@
  * - Tag operations
  * - Link operations (backlinks, autocomplete)
  * - Mention operations
+ * - User operations (current profile)
  * - Telemetry operations
  * - Storage inspector operations
  * - Tools operations (reindex)
@@ -41,6 +42,15 @@ export interface MentionUser {
   name: string;
 }
 
+/**
+ * Current user profile info for comment authorship
+ */
+export interface CurrentUserProfile {
+  profileId: string;
+  username: string;
+  handle: string;
+}
+
 // Module-level instance for storage inspector
 let storageInspectorService: StorageInspectorService;
 
@@ -64,6 +74,9 @@ export function registerMiscHandlers(ctx: HandlerContext): void {
 
   // Mention operations
   ipcMain.handle('mention:getUsers', handleGetMentionUsers(ctx));
+
+  // User operations
+  ipcMain.handle('user:getCurrentProfile', handleGetCurrentProfile(ctx));
 
   // Telemetry operations
   ipcMain.handle('telemetry:getSettings', handleGetTelemetrySettings(ctx));
@@ -96,6 +109,8 @@ export function unregisterMiscHandlers(): void {
   ipcMain.removeHandler('link:searchNotesForAutocomplete');
 
   ipcMain.removeHandler('mention:getUsers');
+
+  ipcMain.removeHandler('user:getCurrentProfile');
 
   ipcMain.removeHandler('telemetry:getSettings');
   ipcMain.removeHandler('telemetry:updateSettings');
@@ -256,6 +271,26 @@ function handleGetMentionUsers(ctx: HandlerContext) {
     }
 
     return users;
+  };
+}
+
+// =============================================================================
+// User Handler Factories
+// =============================================================================
+
+function handleGetCurrentProfile(ctx: HandlerContext) {
+  return async (_event: IpcMainInvokeEvent): Promise<CurrentUserProfile> => {
+    const { database, profileId } = ctx;
+
+    // Get username and handle from app state
+    const username = (await database.getState(AppStateKeys.Username)) ?? '';
+    const handle = (await database.getState(AppStateKeys.UserHandle)) ?? '';
+
+    return {
+      profileId,
+      username,
+      handle,
+    };
   };
 }
 

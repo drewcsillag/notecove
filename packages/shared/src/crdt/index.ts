@@ -2,7 +2,7 @@
  * CRDT Core - Yjs-based document management
  */
 
-export { NoteDoc } from './note-doc';
+export { NoteDoc, type CommentChangeEvent, type CommentChangeEventType } from './note-doc';
 export { FolderTreeDoc } from './folder-tree-doc';
 export {
   UpdateType,

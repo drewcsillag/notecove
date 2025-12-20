@@ -12,6 +12,18 @@ const mockElectronAPI = {
     getStaleMoves: jest.fn(),
     takeOverMove: jest.fn(),
     cancelMove: jest.fn(),
+    getBackups: jest.fn().mockResolvedValue([]),
+    restoreFromBackup: jest.fn(),
+  },
+  sd: {
+    list: jest.fn().mockResolvedValue([]),
+  },
+  user: {
+    getCurrentProfile: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      username: 'Test User',
+      handle: '@testuser',
+    }),
   },
 };
 

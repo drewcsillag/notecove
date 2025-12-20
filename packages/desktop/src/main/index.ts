@@ -18,7 +18,7 @@ import {
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import type { SyncStatus, StaleSyncEntry } from './ipc/types';
-import { CRDTManagerImpl, type CRDTManager } from './crdt';
+import { CRDTManagerImpl, CRDTCommentObserver, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
@@ -778,6 +778,17 @@ void app.whenReady().then(async () => {
     crdtManager.setBroadcastCallback((noteId: string, update: Uint8Array) => {
       ipcHandlers?.broadcastToAll('note:updated', noteId, update);
     });
+
+    // Set up comment observer for live comment sync
+    const commentObserver = new CRDTCommentObserver(
+      (channel: string, ...args: unknown[]) => {
+        ipcHandlers?.broadcastToAll(channel, ...args);
+      },
+      { debounceMs: 100 }
+    );
+    crdtManager.setCommentObserver(commentObserver);
+    console.log('[Init] Comment observer initialized for live sync');
+
     if (process.env['NODE_ENV'] === 'test') {
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',

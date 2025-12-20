@@ -12,6 +12,7 @@ Object.defineProperty(window, 'electronAPI', {
   value: {
     note: {
       updateTitle: jest.fn().mockResolvedValue(undefined),
+      getMetadata: jest.fn().mockResolvedValue({ deleted: false }),
     },
     comment: {
       createThread: jest.fn().mockResolvedValue('thread-1'),
@@ -46,6 +47,13 @@ Object.defineProperty(window, 'electronAPI', {
       }),
       onReactionRemoved: jest.fn(() => () => {
         /* unsubscribe */
+      }),
+    },
+    user: {
+      getCurrentProfile: jest.fn().mockResolvedValue({
+        profileId: 'test-profile-id',
+        username: 'Test User',
+        handle: '@testuser',
       }),
     },
   },

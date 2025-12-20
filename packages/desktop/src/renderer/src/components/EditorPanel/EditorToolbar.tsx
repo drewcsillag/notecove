@@ -32,8 +32,9 @@ import {
   FormatAlignLeft,
   FormatAlignCenter,
   FormatAlignRight,
-  // Comment icon
+  // Comment icons
   AddComment,
+  Comment,
 } from '@mui/icons-material';
 import type { Editor } from '@tiptap/react';
 import { canAddRow, canAddColumn, canDeleteRow, canDeleteColumn } from './extensions/Table';
@@ -67,6 +68,11 @@ export interface EditorToolbarProps {
    */
   onCommentButtonClick?: () => void;
   /**
+   * Callback when the "view all comments" button is clicked
+   * Opens the comment panel without selecting a specific thread
+   */
+  onViewCommentsClick?: () => void;
+  /**
    * Whether any text is currently selected (for enabling comment button)
    */
   hasTextSelection?: boolean;
@@ -82,6 +88,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onImageButtonClick,
   onTableButtonClick,
   onCommentButtonClick,
+  onViewCommentsClick,
   hasTextSelection = false,
   commentCount = 0,
 }) => {
@@ -323,23 +330,34 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             aria-label="Add comment"
             data-testid="comment-button"
           >
-            <Badge
-              badgeContent={commentCount}
-              color="primary"
-              max={99}
-              sx={{
-                '& .MuiBadge-badge': {
-                  fontSize: '0.6rem',
-                  minWidth: '14px',
-                  height: '14px',
-                  padding: '0 3px',
-                },
-              }}
-            >
-              <AddComment fontSize="small" />
-            </Badge>
+            <AddComment fontSize="small" />
           </IconButton>
         </span>
+      </Tooltip>
+
+      <Tooltip title="View comments">
+        <IconButton
+          size="small"
+          onClick={onViewCommentsClick}
+          aria-label="View comments"
+          data-testid="view-comments-button"
+        >
+          <Badge
+            badgeContent={commentCount}
+            color="primary"
+            max={99}
+            sx={{
+              '& .MuiBadge-badge': {
+                fontSize: '0.6rem',
+                minWidth: '14px',
+                height: '14px',
+                padding: '0 3px',
+              },
+            }}
+          >
+            <Comment fontSize="small" />
+          </Badge>
+        </IconButton>
       </Tooltip>
 
       {/* Table Manipulation - only shown when cursor is in a table */}

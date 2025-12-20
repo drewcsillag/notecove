@@ -321,6 +321,10 @@ export const browserApiStub: typeof window.electronAPI = {
     getUsers: notImplemented('mention.getUsers'),
   },
 
+  user: {
+    getCurrentProfile: notImplemented('user.getCurrentProfile'),
+  },
+
   theme: {
     set: notImplemented('theme.set'),
     onChanged: stubEventSubscription,

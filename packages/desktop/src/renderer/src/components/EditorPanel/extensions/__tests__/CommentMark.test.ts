@@ -139,4 +139,109 @@ describe('CommentMark Extension', () => {
     expect(commentMark).toBeDefined();
     expect(commentMark?.attrs['threadId']).toBe('parsed-thread');
   });
+
+  describe('overlapping marks', () => {
+    it('should allow multiple comment marks on the same text range', () => {
+      // Set content with a single word
+      editor.commands.setContent('<p>Hello World</p>');
+
+      // Apply first comment mark to "World"
+      editor.commands.setTextSelection({ from: 7, to: 12 });
+      editor.commands.setCommentMark('thread-1');
+
+      // Apply second comment mark to same "World" text
+      editor.commands.setTextSelection({ from: 7, to: 12 });
+      editor.commands.setCommentMark('thread-2');
+
+      // Check that both marks are present
+      const marks = editor.state.doc.resolve(8).marks();
+      const commentMarks = marks.filter((m) => m.type.name === 'commentMark');
+
+      expect(commentMarks.length).toBe(2);
+      const threadIds = commentMarks.map((m) => m.attrs['threadId']);
+      expect(threadIds).toContain('thread-1');
+      expect(threadIds).toContain('thread-2');
+    });
+
+    it('should allow partially overlapping comment marks', () => {
+      // Set content
+      editor.commands.setContent('<p>Hello World Test</p>');
+
+      // Apply first comment mark to "Hello World"
+      editor.commands.setTextSelection({ from: 1, to: 12 });
+      editor.commands.setCommentMark('thread-1');
+
+      // Apply second comment mark to "World Test"
+      editor.commands.setTextSelection({ from: 7, to: 17 });
+      editor.commands.setCommentMark('thread-2');
+
+      // Check "Hello" has only thread-1 (position 2)
+      const helloMarks = editor.state.doc.resolve(2).marks();
+      const helloCommentMarks = helloMarks.filter((m) => m.type.name === 'commentMark');
+      expect(helloCommentMarks.length).toBe(1);
+      expect(helloCommentMarks[0]?.attrs['threadId']).toBe('thread-1');
+
+      // Check "World" has both thread-1 and thread-2 (position 8)
+      const worldMarks = editor.state.doc.resolve(8).marks();
+      const worldCommentMarks = worldMarks.filter((m) => m.type.name === 'commentMark');
+      expect(worldCommentMarks.length).toBe(2);
+      const worldThreadIds = worldCommentMarks.map((m) => m.attrs['threadId']);
+      expect(worldThreadIds).toContain('thread-1');
+      expect(worldThreadIds).toContain('thread-2');
+
+      // Check "Test" has only thread-2 (position 14)
+      const testMarks = editor.state.doc.resolve(14).marks();
+      const testCommentMarks = testMarks.filter((m) => m.type.name === 'commentMark');
+      expect(testCommentMarks.length).toBe(1);
+      expect(testCommentMarks[0]?.attrs['threadId']).toBe('thread-2');
+    });
+
+    it('should render overlapping marks as nested HTML spans', () => {
+      // Set content
+      editor.commands.setContent('<p>Hello World</p>');
+
+      // Apply two comment marks to "World"
+      editor.commands.setTextSelection({ from: 7, to: 12 });
+      editor.commands.setCommentMark('thread-a');
+
+      editor.commands.setTextSelection({ from: 7, to: 12 });
+      editor.commands.setCommentMark('thread-b');
+
+      // Get HTML output
+      const html = editor.getHTML();
+
+      // Both thread IDs should be in the HTML
+      expect(html).toContain('data-thread-id="thread-a"');
+      expect(html).toContain('data-thread-id="thread-b"');
+
+      // Should have nested comment-highlight spans
+      expect(html).toContain('class="comment-highlight"');
+    });
+
+    it('should remove only the specified mark when overlapping', () => {
+      // Set content
+      editor.commands.setContent('<p>Hello World</p>');
+
+      // Apply two comment marks to "World"
+      editor.commands.setTextSelection({ from: 7, to: 12 });
+      editor.commands.setCommentMark('thread-x');
+
+      editor.commands.setTextSelection({ from: 7, to: 12 });
+      editor.commands.setCommentMark('thread-y');
+
+      // Verify both marks exist
+      let marks = editor.state.doc.resolve(8).marks();
+      let commentMarks = marks.filter((m) => m.type.name === 'commentMark');
+      expect(commentMarks.length).toBe(2);
+
+      // Remove only thread-x
+      editor.commands.removeCommentMarkById('thread-x');
+
+      // Check that only thread-y remains
+      marks = editor.state.doc.resolve(8).marks();
+      commentMarks = marks.filter((m) => m.type.name === 'commentMark');
+      expect(commentMarks.length).toBe(1);
+      expect(commentMarks[0]?.attrs['threadId']).toBe('thread-y');
+    });
+  });
 });

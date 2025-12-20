@@ -4,11 +4,17 @@
  * Displays quick reaction buttons for adding emoji reactions to comments.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, IconButton, Tooltip } from '@mui/material';
 import { AddReaction as AddReactionIcon } from '@mui/icons-material';
 
 const QUICK_REACTIONS = ['👍', '👎', '❤️', '🎉', '😄', '🤔'];
+
+interface UserProfile {
+  profileId: string;
+  username: string;
+  handle: string;
+}
 
 export interface ReactionPickerProps {
   noteId: string;
@@ -25,14 +31,31 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({
   targetId,
   onReactionAdded,
 }) => {
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const profile = await window.electronAPI.user.getCurrentProfile();
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+      }
+    };
+    void fetchProfile();
+  }, []);
+
   const handleAddReaction = async (emoji: string) => {
+    if (!userProfile) return;
+
     try {
       await window.electronAPI.comment.addReaction(noteId, threadId, {
         targetType,
         targetId,
         emoji,
-        authorId: 'current-user', // TODO: Get actual user ID
-        authorName: 'You', // TODO: Get actual user name
+        authorId: userProfile.profileId,
+        authorName: userProfile.username || userProfile.handle || 'Anonymous',
         created: Date.now(),
       });
       onReactionAdded?.();

@@ -468,6 +468,9 @@ export class FileSyncSimulator {
   async start(): Promise<void> {
     const chokidar = await import('chokidar');
 
+    // Reset stopped flag to allow syncing (important when restarting after stop())
+    this.stopped = false;
+
     this.config.logger.log(`Starting file sync simulator`);
     this.config.logger.log(`  SD1: ${this.sd1Path}`);
     this.config.logger.log(`  SD2: ${this.sd2Path}`);

@@ -4,12 +4,18 @@
  * Displays aggregated reactions with hover tooltips showing who reacted.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Chip, Tooltip } from '@mui/material';
 import { aggregateReactions, type CommentReaction } from '@notecove/shared/comments';
 
-// TODO: Replace with actual user ID from authentication system
-const CURRENT_USER_ID = 'current-user';
+/**
+ * User profile for reaction authorship
+ */
+interface UserProfile {
+  profileId: string;
+  username: string;
+  handle: string;
+}
 
 export interface ReactionDisplayProps {
   noteId: string;
@@ -28,23 +34,47 @@ export const ReactionDisplay: React.FC<ReactionDisplayProps> = ({
   targetId,
   onReactionToggled,
 }) => {
+  // Current user profile for reaction authorship
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  // Fetch current user profile on mount
+  useEffect(() => {
+    window.electronAPI.user
+      .getCurrentProfile()
+      .then((profile) => {
+        setUserProfile(profile);
+      })
+      .catch((err) => {
+        console.error('[ReactionDisplay] Failed to get user profile:', err);
+        // Use fallback values if profile fetch fails
+        setUserProfile({
+          profileId: 'unknown',
+          username: 'Anonymous',
+          handle: '@anonymous',
+        });
+      });
+  }, []);
+
   // Filter reactions for this specific target
   const targetReactions = reactions.filter(
     (r) => r.targetType === targetType && r.targetId === targetId
   );
 
-  const aggregated = aggregateReactions(targetReactions, CURRENT_USER_ID);
+  const currentUserId = userProfile?.profileId ?? '';
+  const aggregated = aggregateReactions(targetReactions, currentUserId);
 
   if (aggregated.length === 0) {
     return null;
   }
 
   const handleToggleReaction = async (emoji: string, currentUserReacted: boolean) => {
+    if (!userProfile) return;
+
     try {
       if (currentUserReacted) {
         // Find and remove the user's reaction
         const userReaction = targetReactions.find(
-          (r) => r.emoji === emoji && r.authorId === CURRENT_USER_ID
+          (r) => r.emoji === emoji && r.authorId === userProfile.profileId
         );
         if (userReaction) {
           await window.electronAPI.comment.removeReaction(noteId, threadId, userReaction.id);
@@ -55,8 +85,8 @@ export const ReactionDisplay: React.FC<ReactionDisplayProps> = ({
           targetType,
           targetId,
           emoji,
-          authorId: CURRENT_USER_ID,
-          authorName: 'You', // TODO: Get actual user name
+          authorId: userProfile.profileId,
+          authorName: userProfile.username || 'Anonymous',
           created: Date.now(),
         });
       }

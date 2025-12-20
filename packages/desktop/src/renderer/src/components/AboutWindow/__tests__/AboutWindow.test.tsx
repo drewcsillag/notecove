@@ -17,6 +17,13 @@ const mockElectronAPI = {
   shell: {
     openExternal: jest.fn(),
   },
+  user: {
+    getCurrentProfile: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      username: 'Test User',
+      handle: '@testuser',
+    }),
+  },
 };
 
 // Set up global mocks before tests

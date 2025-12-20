@@ -13,6 +13,7 @@ import type { AppendLogManager } from '@shared/storage';
 import type { UUID, FolderData } from '@shared/types';
 import type { Database } from '@notecove/shared';
 import { getCRDTMetrics } from '../telemetry/crdt-metrics';
+import { CRDTCommentObserver } from './crdt-comment-observer';
 
 export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
@@ -23,6 +24,8 @@ export class CRDTManagerImpl implements CRDTManager {
   private pendingUpdates = new Set<Promise<void>>();
   // Callback to broadcast updates to renderer windows
   private broadcastCallback?: (noteId: string, update: Uint8Array) => void;
+  // Observer for comment CRDT changes (enables live sync)
+  private commentObserver?: CRDTCommentObserver;
 
   constructor(
     private storageManager: AppendLogManager,
@@ -38,6 +41,19 @@ export class CRDTManagerImpl implements CRDTManager {
    */
   setBroadcastCallback(callback: (noteId: string, update: Uint8Array) => void): void {
     this.broadcastCallback = callback;
+  }
+
+  /**
+   * Set the comment observer for live comment sync.
+   * This should be called after the manager is created, once the broadcast function is available.
+   */
+  setCommentObserver(observer: CRDTCommentObserver): void {
+    this.commentObserver = observer;
+
+    // Register any already-loaded notes with the new observer
+    for (const [noteId, state] of this.documents) {
+      observer.registerNote(noteId, state.noteDoc);
+    }
   }
 
   /**
@@ -85,6 +101,11 @@ export class CRDTManagerImpl implements CRDTManager {
       lastSnapshotCheck: now,
       lastSnapshotCreated: now,
     });
+
+    // Register with comment observer for live sync
+    if (this.commentObserver) {
+      this.commentObserver.registerNote(noteId, noteDoc);
+    }
 
     // Set up update listener to write changes to disk
     doc.on('update', (update: Uint8Array, origin: unknown) => {
@@ -143,6 +164,11 @@ export class CRDTManagerImpl implements CRDTManager {
     if (state.refCount <= 0) {
       // Check if we should create a snapshot before unloading
       await this.checkAndCreateSnapshot(noteId);
+
+      // Unregister from comment observer
+      if (this.commentObserver) {
+        this.commentObserver.unregisterNote(noteId);
+      }
 
       state.snapshot.destroy();
       this.documents.delete(noteId);
@@ -400,6 +426,23 @@ export class CRDTManagerImpl implements CRDTManager {
       // replaceWith() destroys the old Y.Doc and creates a new one, so the
       // old NoteDoc wrapper would be pointing to a destroyed document
       state.noteDoc = new NoteDoc(noteId, state.snapshot.getDoc());
+
+      // CRITICAL: Re-register with comment observer for live sync
+      // The old observer was attached to the destroyed NoteDoc
+      if (this.commentObserver) {
+        // Unregister old observer (if any) and register with new NoteDoc
+        this.commentObserver.unregisterNote(noteId);
+        this.commentObserver.registerNote(noteId, state.noteDoc);
+
+        // Notify about any existing threads in the reloaded state
+        // This is necessary because the observer was registered AFTER the state was applied,
+        // so it won't fire for existing threads - only for future changes
+        const threads = state.noteDoc.getCommentThreads();
+        if (threads.length > 0) {
+          const threadIds = threads.map((t) => t.id);
+          this.commentObserver.notifyThreadsReloaded(noteId, threadIds);
+        }
+      }
 
       // CRITICAL: Re-attach the update event listener to the new Y.Doc
       // The old listener was attached to the destroyed doc

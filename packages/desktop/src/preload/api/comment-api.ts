@@ -420,3 +420,20 @@ export const mentionApi = {
       }[]
     >,
 };
+
+export const userApi = {
+  /**
+   * Get the current user's profile information
+   * @returns Current user's profileId, username, and handle
+   */
+  getCurrentProfile: (): Promise<{
+    profileId: string;
+    username: string;
+    handle: string;
+  }> =>
+    ipcRenderer.invoke('user:getCurrentProfile') as Promise<{
+      profileId: string;
+      username: string;
+      handle: string;
+    }>,
+};

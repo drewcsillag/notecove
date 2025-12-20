@@ -150,4 +150,11 @@ export interface CRDTManager {
    * @param callback Function that broadcasts updates to renderers
    */
   setBroadcastCallback(callback: (noteId: string, update: Uint8Array) => void): void;
+
+  /**
+   * Set the comment observer for live comment sync.
+   * This should be called after the manager is created, once the broadcast function is available.
+   * @param observer The CRDTCommentObserver instance
+   */
+  setCommentObserver(observer: import('./crdt-comment-observer').CRDTCommentObserver): void;
 }

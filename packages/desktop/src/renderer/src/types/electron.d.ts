@@ -1141,6 +1141,16 @@ declare global {
         >;
       };
 
+      /** User operations for getting current user profile */
+      user: {
+        /** Get the current user's profile information for comment authorship */
+        getCurrentProfile: () => Promise<{
+          profileId: string;
+          username: string;
+          handle: string;
+        }>;
+      };
+
       /** Theme operations for dark mode sync across windows */
       theme: {
         /**

@@ -24,7 +24,7 @@ import {
 import { backupApi, diagnosticsApi } from './api/backup-api';
 import { windowStateApi, windowApi, menuApi, shutdownApi } from './api/window-api';
 import { imageApi, thumbnailApi } from './api/image-api';
-import { commentApi, mentionApi } from './api/comment-api';
+import { commentApi, mentionApi, userApi } from './api/comment-api';
 import {
   toolsApi,
   exportApi,
@@ -131,6 +131,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Mention operations
   mention: mentionApi,
+
+  // User operations
+  user: userApi,
 
   // Theme operations
   theme: themeApi,

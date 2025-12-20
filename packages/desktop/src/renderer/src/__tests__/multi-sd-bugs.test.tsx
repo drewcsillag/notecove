@@ -155,6 +155,13 @@ const mockElectronAPI = {
     set: jest.fn().mockResolvedValue(undefined),
     onChanged: jest.fn((_callback: (theme: 'light' | 'dark') => void) => () => {}),
   },
+  user: {
+    getCurrentProfile: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      username: 'Test User',
+      handle: '@testuser',
+    }),
+  },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */
 

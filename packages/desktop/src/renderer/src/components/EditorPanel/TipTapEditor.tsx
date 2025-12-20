@@ -108,8 +108,14 @@ function getImageMimeType(file: File): string | null {
   return getMimeTypeFromFilename(file.name);
 }
 
-// TODO: Replace with actual user ID from authentication system
-const CURRENT_USER_ID = 'current-user';
+/**
+ * User profile for comment authorship
+ */
+interface UserProfile {
+  profileId: string;
+  username: string;
+  handle: string;
+}
 
 export interface TipTapEditorProps {
   noteId: string | null;
@@ -130,6 +136,8 @@ export interface TipTapEditorProps {
   onCommentClick?: (threadId: string) => void;
   /** Callback to add a comment on the current selection */
   onAddComment?: (selection: { from: number; to: number; text: string; threadId: string }) => void;
+  /** Callback when "view comments" button is clicked (opens panel without thread selection) */
+  onViewComments?: () => void;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -143,9 +151,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   onNavigateToNote,
   searchTerm = '',
   onSearchTermChange,
-  selectedThreadId: _selectedThreadId, // TODO: Use for highlighting active thread
+  selectedThreadId: _selectedThreadId, // Future: Could highlight the selected thread's mark in editor
   onCommentClick,
   onAddComment,
+  onViewComments,
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
@@ -155,6 +164,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const [hasTextSelection, setHasTextSelection] = useState(false);
   // Track open (unresolved) comment count for badge
   const [openCommentCount, setOpenCommentCount] = useState(0);
+  // Current user profile for comment authorship
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const syncIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Loading state - start with loading=true to prevent title extraction before note loads
   // Use both state (for rendering) and ref (for callbacks that need synchronous access)
@@ -281,6 +292,24 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }
       },
     });
+  }, []);
+
+  // Fetch current user profile on mount for comment authorship
+  useEffect(() => {
+    window.electronAPI.user
+      .getCurrentProfile()
+      .then((profile) => {
+        setUserProfile(profile);
+      })
+      .catch((err) => {
+        console.error('[TipTapEditor] Failed to get user profile:', err);
+        // Use fallback values if profile fetch fails
+        setUserProfile({
+          profileId: 'unknown',
+          username: 'Anonymous',
+          handle: '@anonymous',
+        });
+      });
   }, []);
 
   // Listen for date picker requests from AtMention extension (@date keyword)
@@ -1503,7 +1532,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // Create a comment on the current selection
   // This function is used by both the keyboard shortcut and toolbar button
   const handleAddCommentOnSelection = useCallback(async () => {
-    if (!editor || !noteId) return;
+    if (!editor || !noteId || !userProfile) return;
 
     // Get current selection
     const { from, to, empty } = editor.state.selection;
@@ -1519,7 +1548,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
     try {
       // Encode positions as simple Uint8Array for now
-      // TODO: Use proper Yjs RelativePosition encoding for robust anchor tracking
+      // Future enhancement: Use Yjs RelativePosition for anchors that survive text edits
       const anchorStart = new Uint8Array(new Uint32Array([from]).buffer);
       const anchorEnd = new Uint8Array(new Uint32Array([to]).buffer);
 
@@ -1528,9 +1557,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         noteId,
         anchorStart,
         anchorEnd,
-        authorId: CURRENT_USER_ID,
-        authorName: 'You', // TODO: Get actual user name
-        authorHandle: '@you', // TODO: Get actual handle
+        authorId: userProfile.profileId,
+        authorName: userProfile.username || 'Anonymous',
+        authorHandle: userProfile.handle || '@anonymous',
         content: '', // Empty content - user will fill in via panel
         originalText: text,
         created: Date.now(),
@@ -1555,7 +1584,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     } catch (err) {
       console.error('[TipTapEditor] Failed to create comment thread:', err);
     }
-  }, [editor, noteId, onAddComment]);
+  }, [editor, noteId, onAddComment, userProfile]);
 
   // Keyboard shortcut for adding comments (Cmd+Alt+M / Ctrl+Alt+M like Google Docs)
   useEffect(() => {
@@ -2706,6 +2735,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         onImageButtonClick={() => void handleImageButtonClick()}
         onTableButtonClick={handleTableButtonClick}
         onCommentButtonClick={handleCommentButtonClick}
+        {...(onViewComments && { onViewCommentsClick: onViewComments })}
         hasTextSelection={hasTextSelection}
         commentCount={openCommentCount}
       />

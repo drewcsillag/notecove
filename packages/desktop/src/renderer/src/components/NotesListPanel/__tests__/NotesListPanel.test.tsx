@@ -54,6 +54,13 @@ const mockElectronAPI = {
     }),
     set: jest.fn().mockResolvedValue(undefined),
   },
+  user: {
+    getCurrentProfile: jest.fn().mockResolvedValue({
+      profileId: 'test-profile-id',
+      username: 'Test User',
+      handle: '@testuser',
+    }),
+  },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */
 

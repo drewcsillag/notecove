@@ -61,16 +61,20 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     const saved = localStorage.getItem(COMMENT_PANEL_STORAGE_KEY);
     return saved ? parseFloat(saved) : DEFAULT_COMMENT_PANEL_SIZE;
   });
+  // Track if panel was opened via "view all" (prevents auto-close when no thread selected)
+  const [openedViaViewAll, setOpenedViaViewAll] = useState(false);
 
   // Clear search term and selected thread when note changes
   useEffect(() => {
     setSearchTerm('');
     setSelectedThreadId(null);
+    setOpenedViaViewAll(false);
   }, [selectedNoteId]);
 
   // Auto-close panel when no thread is selected (after a small delay to allow for switching)
+  // But don't auto-close if opened via "view all" button
   useEffect(() => {
-    if (!selectedThreadId && showCommentPanel) {
+    if (!selectedThreadId && showCommentPanel && !openedViaViewAll) {
       const timer = setTimeout(() => {
         onCommentPanelClose?.();
       }, 300);
@@ -79,7 +83,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
       };
     }
     return undefined;
-  }, [selectedThreadId, showCommentPanel, onCommentPanelClose]);
+  }, [selectedThreadId, showCommentPanel, onCommentPanelClose, openedViaViewAll]);
 
   // Expand/collapse comment panel based on showCommentPanel prop
   useEffect(() => {
@@ -158,11 +162,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               selectedThreadId={selectedThreadId}
               onCommentClick={(threadId) => {
                 setSelectedThreadId(threadId);
+                setOpenedViaViewAll(false); // Clicked a specific thread
                 onCommentAdded?.(); // Open the panel when clicking on a comment
               }}
               onAddComment={({ threadId }) => {
                 // Select the new thread and notify parent (to open panel if needed)
                 setSelectedThreadId(threadId);
+                setOpenedViaViewAll(false); // Added a specific thread
+                onCommentAdded?.();
+              }}
+              onViewComments={() => {
+                // Open panel without selecting a thread
+                setOpenedViaViewAll(true);
                 onCommentAdded?.();
               }}
             />
@@ -210,11 +221,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               noteId={selectedNoteId}
               onClose={() => {
                 setSelectedThreadId(null);
+                setOpenedViaViewAll(false);
                 onCommentPanelClose?.();
               }}
               selectedThreadId={selectedThreadId}
               onThreadSelect={(threadId) => {
                 setSelectedThreadId(threadId);
+                setOpenedViaViewAll(false); // Selected a specific thread
               }}
             />
           </Box>

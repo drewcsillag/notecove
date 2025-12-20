@@ -577,6 +577,9 @@ export class IPCHandlers {
     // Mention operations
     ipcMain.handle('mention:getUsers', this.handleGetMentionUsers.bind(this));
 
+    // User operations
+    ipcMain.handle('user:getCurrentProfile', this.handleGetCurrentProfile.bind(this));
+
     // Test-only operations (only available in NODE_ENV=test)
     if (process.env['NODE_ENV'] === 'test') {
       ipcMain.handle('test:setNoteTimestamp', this.handleSetNoteTimestamp.bind(this));
@@ -701,28 +704,27 @@ export class IPCHandlers {
           // Defensive fallbacks are handled in getMetadata() itself
           const deleted = crdtMetadata.deleted;
           const folderId = crdtMetadata.folderId;
-          const sdId = crdtMetadata.sdId;
           const modified = crdtMetadata.modified;
+          // NOTE: We intentionally do NOT sync sdId from CRDT metadata to the database.
+          // Different profiles may have different SD IDs for the same path on disk.
+          // The database's sdId represents which LOCAL SD the note belongs to, not
+          // which SD the creating instance used.
 
           // Check if metadata has changed and needs to be synced to SQLite
           const metadataChanged =
-            cachedNote.deleted !== deleted ||
-            cachedNote.folderId !== folderId ||
-            cachedNote.sdId !== sdId;
+            cachedNote.deleted !== deleted || cachedNote.folderId !== folderId;
 
           if (metadataChanged) {
             console.log(`[IPC] Syncing CRDT metadata to SQLite cache for note ${noteId}:`, {
               deleted,
               folderId,
-              sdId,
             });
 
-            // Update SQLite cache with CRDT metadata
+            // Update SQLite cache with CRDT metadata (keeping local sdId)
             await this.database.upsertNote({
               ...cachedNote,
               deleted,
               folderId,
-              sdId,
               modified,
             });
 
@@ -5455,6 +5457,25 @@ export class IPCHandlers {
     }
 
     return users;
+  }
+
+  /**
+   * Get the current user's profile information
+   * @returns Current user's profileId, username, and handle
+   */
+  private async handleGetCurrentProfile(): Promise<{
+    profileId: string;
+    username: string;
+    handle: string;
+  }> {
+    const username = (await this.database.getState(AppStateKey.Username)) ?? '';
+    const handle = (await this.database.getState(AppStateKey.UserHandle)) ?? '';
+
+    return {
+      profileId: this.profileId,
+      username,
+      handle,
+    };
   }
 }
 
