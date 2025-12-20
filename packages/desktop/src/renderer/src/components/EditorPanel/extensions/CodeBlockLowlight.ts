@@ -7,6 +7,11 @@
  * @see plans/syntax-highlighting-triple-quotes/PLAN.md
  */
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { all, createLowlight } from 'lowlight';
@@ -58,12 +63,14 @@ const lowlight = createLowlight(all);
  */
 export const NotecoveCodeBlock = CodeBlockLowlight.extend({
   addAttributes() {
+    const parentAttributes = this.parent?.() ?? {};
     return {
-      ...this.parent?.(),
+      ...parentAttributes,
       showLineNumbers: {
         default: false,
-        parseHTML: (element) => element.getAttribute('data-show-line-numbers') === 'true',
-        renderHTML: (attributes) => {
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-show-line-numbers') === 'true',
+        renderHTML: (attributes: Record<string, unknown>) => {
           if (!attributes['showLineNumbers']) {
             return {};
           }
