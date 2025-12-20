@@ -545,4 +545,101 @@ describe('Note Core Handlers', () => {
       expect(mocks.crdtManager.applyUpdate).toHaveBeenCalledWith(noteId, update);
     });
   });
+
+  describe('note:applyUpdate - cross-profile sdId bug', () => {
+    it('should NOT overwrite local sdId with CRDT metadata sdId from another profile', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-123';
+      const update = new Uint8Array([1, 2, 3]);
+
+      // Local profile uses SD ID 'local-sd-id' for this path
+      const localSdId = 'local-sd-id';
+      // Another profile created the note with a different SD ID for the same path
+      const foreignSdId = 'foreign-sd-id-from-other-profile';
+
+      const mockNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: localSdId, // Local database has local SD ID
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        contentPreview: '',
+        contentText: '',
+        created: Date.now(),
+        modified: Date.now(),
+      };
+
+      // CRDT metadata has the foreign SD ID (from when the note was created by another profile)
+      const mockNoteDoc = createMockNoteDoc();
+      mockNoteDoc.getMetadata = jest.fn().mockReturnValue({
+        id: noteId,
+        sdId: foreignSdId, // Foreign SD ID from CRDT
+        folderId: null,
+        deleted: false,
+        pinned: false,
+        created: Date.now(),
+        modified: Date.now(),
+      });
+
+      mocks.database.getNote.mockResolvedValue(mockNote);
+      mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+      await (handlers as any).handleApplyUpdate(mockEvent, noteId, update);
+
+      // The upsertNote should NOT be called because:
+      // 1. We removed sdId from metadataChanged check
+      // 2. Other metadata (deleted, folderId) hasn't changed
+      // Previously this would have been called with the foreign sdId, corrupting the database
+      expect(mocks.database.upsertNote).not.toHaveBeenCalled();
+    });
+
+    it('should still sync other metadata changes but preserve local sdId', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-123';
+      const update = new Uint8Array([1, 2, 3]);
+
+      const localSdId = 'local-sd-id';
+      const foreignSdId = 'foreign-sd-id-from-other-profile';
+
+      const mockNote = {
+        id: noteId,
+        title: 'Test Note',
+        sdId: localSdId,
+        folderId: null,
+        deleted: false, // Note is not deleted locally
+        pinned: false,
+        contentPreview: '',
+        contentText: '',
+        created: Date.now(),
+        modified: Date.now(),
+      };
+
+      // CRDT says note was deleted (synced from another instance)
+      const mockNoteDoc = createMockNoteDoc();
+      mockNoteDoc.getMetadata = jest.fn().mockReturnValue({
+        id: noteId,
+        sdId: foreignSdId,
+        folderId: null,
+        deleted: true, // Deletion synced from another instance
+        pinned: false,
+        created: Date.now(),
+        modified: Date.now(),
+      });
+
+      mocks.database.getNote.mockResolvedValue(mockNote);
+      mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+      await (handlers as any).handleApplyUpdate(mockEvent, noteId, update);
+
+      // Should update deleted status but preserve local sdId
+      expect(mocks.database.upsertNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: noteId,
+          sdId: localSdId, // Local SD ID preserved, not foreign one
+          deleted: true, // Deletion status synced
+        })
+      );
+    });
+  });
 });

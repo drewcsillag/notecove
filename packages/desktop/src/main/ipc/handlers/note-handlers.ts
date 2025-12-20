@@ -136,26 +136,25 @@ function handleApplyUpdate(ctx: HandlerContext) {
         if (cachedNote) {
           const deleted = crdtMetadata.deleted;
           const folderId = crdtMetadata.folderId;
-          const sdId = crdtMetadata.sdId;
           const modified = crdtMetadata.modified;
+          // NOTE: We intentionally do NOT sync sdId from CRDT metadata to the database.
+          // Different profiles may have different SD IDs for the same path on disk.
+          // The database's sdId represents which LOCAL SD the note belongs to, not
+          // which SD the creating instance used.
 
           const metadataChanged =
-            cachedNote.deleted !== deleted ||
-            cachedNote.folderId !== folderId ||
-            cachedNote.sdId !== sdId;
+            cachedNote.deleted !== deleted || cachedNote.folderId !== folderId;
 
           if (metadataChanged) {
             console.log(`[IPC] Syncing CRDT metadata to SQLite cache for note ${noteId}:`, {
               deleted,
               folderId,
-              sdId,
             });
 
             await database.upsertNote({
               ...cachedNote,
               deleted,
               folderId,
-              sdId,
               modified,
             });
 
