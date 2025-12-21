@@ -1620,6 +1620,42 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     void handleAddCommentOnSelection();
   };
 
+  // Keyboard shortcut for moving blocks (Alt+Up / Alt+Down)
+  // This DOM-level handler is needed because on Mac, Option+Arrow keys are intercepted
+  // by the browser for paragraph navigation before TipTap's keyboard shortcuts fire.
+  // Using event.code instead of event.key ensures reliable detection on Mac.
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleMoveBlockKeyDown = (event: KeyboardEvent) => {
+      // Only handle Alt+ArrowUp/Down (no other modifiers like Cmd/Ctrl/Shift)
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) {
+        return;
+      }
+
+      if (event.code === 'ArrowUp') {
+        const success = editor.commands.moveBlockUp();
+        if (success) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      } else if (event.code === 'ArrowDown') {
+        const success = editor.commands.moveBlockDown();
+        if (success) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }
+    };
+
+    const editorDom = editor.view.dom;
+    editorDom.addEventListener('keydown', handleMoveBlockKeyDown);
+
+    return () => {
+      editorDom.removeEventListener('keydown', handleMoveBlockKeyDown);
+    };
+  }, [editor]);
+
   // Load and track open comment count for toolbar badge
   useEffect(() => {
     if (!noteId) {
