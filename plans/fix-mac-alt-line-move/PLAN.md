@@ -1,6 +1,6 @@
 # Fix Mac Option+Up/Down Line Move
 
-**Overall Progress:** `0%`
+**Overall Progress:** `100%`
 
 ## Problem Analysis
 
@@ -24,29 +24,29 @@ Use the same pattern as the comment shortcut - add a direct DOM `keydown` listen
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Verify hypothesis with debug logging**
-  - [ ] 🟥 Add temporary console.log in TipTapEditor to log all keydown events
-  - [ ] 🟥 Test on Mac to see what happens with Option+Up/Down
-  - [ ] 🟥 Confirm whether events reach DOM but not TipTap, or don't reach at all
-  - [ ] 🟥 Remove debug logging after verification
+- [x] 🟩 **Step 1: Verify hypothesis with debug logging**
+  - [x] 🟩 Add temporary console.log in TipTapEditor to log all keydown events
+  - [x] 🟩 Test on Mac to see what happens with Option+Up/Down
+  - [x] 🟩 Confirm whether events reach DOM but not TipTap, or don't reach at all
+  - [x] 🟩 Remove debug logging after verification
 
-- [ ] 🟥 **Step 2: Add failing test for keyboard shortcut handling**
-  - [ ] 🟥 Create test that simulates Alt+ArrowUp/Down keydown event with correct event properties
-  - [ ] 🟥 Verify it triggers the moveBlockUp/moveBlockDown commands
+- [x] 🟩 **Step 2: Add failing test for keyboard shortcut handling**
+  - [x] 🟩 Create test that simulates Alt+ArrowUp/Down keydown event with correct event properties
+  - [x] 🟩 Verify it triggers the moveBlockUp/moveBlockDown commands
 
-- [ ] 🟥 **Step 3: Add DOM keydown listener for line movement**
-  - [ ] 🟥 Add useEffect in TipTapEditor.tsx (similar to comment shortcut pattern at lines 1589-1616)
-  - [ ] 🟥 Listen for Alt+ArrowUp/Down using `event.code` ('ArrowUp'/'ArrowDown') and `event.altKey`
-  - [ ] 🟥 Call editor.commands.moveBlockUp/moveBlockDown
-  - [ ] 🟥 preventDefault and stopPropagation to stop native paragraph navigation
+- [x] 🟩 **Step 3: Add DOM keydown listener for line movement**
+  - [x] 🟩 Add useEffect in TipTapEditor.tsx (similar to comment shortcut pattern at lines 1589-1616)
+  - [x] 🟩 Listen for Alt+ArrowUp/Down using `event.code` ('ArrowUp'/'ArrowDown') and `event.altKey`
+  - [x] 🟩 Call editor.commands.moveBlockUp/moveBlockDown
+  - [x] 🟩 preventDefault and stopPropagation to stop native paragraph navigation
 
-- [ ] 🟥 **Step 4: Keep TipTap shortcuts as fallback**
-  - [ ] 🟥 Keep existing `'Alt-Up'` and `'Alt-Down'` in MoveBlock.ts
-  - [ ] 🟥 Both handlers can coexist - DOM listener catches Mac, TipTap catches if DOM misses
+- [x] 🟩 **Step 4: Keep TipTap shortcuts as fallback**
+  - [x] 🟩 Keep existing `'Alt-Up'` and `'Alt-Down'` in MoveBlock.ts
+  - [x] 🟩 Both handlers can coexist - DOM listener catches Mac, TipTap catches if DOM misses
 
-- [ ] 🟥 **Step 5: Verify and test**
-  - [ ] 🟥 Run existing MoveBlock tests (should still pass)
-  - [ ] 🟥 Run full CI
+- [x] 🟩 **Step 5: Verify and test**
+  - [x] 🟩 Run existing MoveBlock tests (should still pass)
+  - [x] 🟩 Run full CI
 
 ## Files to Modify
 
