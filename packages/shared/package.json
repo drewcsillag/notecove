@@ -1,6 +1,6 @@
 {
   "name": "@notecove/shared",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Shared TypeScript code for NoteCove (CRDT logic, types)",
   "main": "./dist/cjs/index.js",

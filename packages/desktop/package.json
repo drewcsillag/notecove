@@ -1,6 +1,6 @@
 {
   "name": "@notecove/desktop",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "NoteCove Desktop App (Electron)",
   "main": "dist-electron/main/index.js",
   "author": "NoteCove Contributors",
