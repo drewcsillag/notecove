@@ -233,3 +233,123 @@ test.describe('Markdown Export - Context Menu', () => {
     expect(allContent).toContain('Second Export Note');
   });
 });
+
+test.describe('Markdown Export - File Menu', () => {
+  test('should export all notes via File menu "Export All Notes to Markdown..."', async () => {
+    // Create first note with specific content
+    const createButton = page.locator('#middle-panel button[title="Create note"]');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    let editor = page.locator('.tiptap.ProseMirror');
+    await editor.click();
+    await editor.type('First Menu Export Note');
+    await editor.press('Enter');
+    await editor.type('Content of the first note.');
+    await page.waitForTimeout(1500);
+
+    // Create second note with specific content
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    editor = page.locator('.tiptap.ProseMirror');
+    await editor.click();
+    await editor.type('Second Menu Export Note');
+    await editor.press('Enter');
+    await editor.type('Content of the second note.');
+    await page.waitForTimeout(1500);
+
+    // Click "Export All Notes to Markdown..." from File menu
+    await electronApp.evaluate(({ Menu }) => {
+      const menu = Menu.getApplicationMenu();
+      if (!menu) throw new Error('No application menu found');
+      const fileMenu = menu.items.find((item) => item.label === 'File');
+      if (!fileMenu || !fileMenu.submenu) throw new Error('File menu not found');
+      const exportAllItem = fileMenu.submenu.items.find(
+        (item) => item.label === 'Export All Notes to Markdown...'
+      );
+      if (!exportAllItem) throw new Error('Export All Notes menu item not found');
+      if (exportAllItem.click) {
+        exportAllItem.click({}, undefined as any, undefined as any);
+      }
+    });
+
+    // Wait for export to complete
+    await page.waitForTimeout(4000);
+
+    // Verify files were created
+    const files = readdirSync(exportDir).filter((f) => f.endsWith('.md'));
+    console.log('[E2E Export] Files created via File menu:', files);
+    expect(files.length).toBeGreaterThanOrEqual(2);
+
+    // Verify both notes were exported
+    const allContent = files.map((f) => readFileSync(join(exportDir, f), 'utf-8')).join('\n');
+    expect(allContent).toContain('First Menu Export Note');
+    expect(allContent).toContain('Second Menu Export Note');
+    expect(allContent).toContain('Content of the first note.');
+    expect(allContent).toContain('Content of the second note.');
+  });
+
+  test('should export notes from folder when viewing a specific folder', async () => {
+    // Create a folder first
+    const folderPanel = page.locator('#left-panel');
+    const createFolderButton = folderPanel.locator('button[title="Create folder"]');
+    await createFolderButton.click();
+    await page.waitForTimeout(500);
+
+    // Name the folder
+    const folderNameInput = page.locator('input[placeholder*="folder"]').first();
+    await folderNameInput.fill('Test Export Folder');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(1000);
+
+    // Click on the folder to select it
+    const testFolder = folderPanel.locator('text=Test Export Folder');
+    await testFolder.click();
+    await page.waitForTimeout(500);
+
+    // Create a note in this folder
+    const createButton = page.locator('#middle-panel button[title="Create note"]');
+    await createButton.click();
+    await page.waitForTimeout(1000);
+
+    const editor = page.locator('.tiptap.ProseMirror');
+    await editor.click();
+    await editor.type('Note in Folder');
+    await editor.press('Enter');
+    await editor.type('This note is inside the Test Export Folder.');
+    await page.waitForTimeout(1500);
+
+    // Click "Export All Notes to Markdown..." from File menu
+    await electronApp.evaluate(({ Menu }) => {
+      const menu = Menu.getApplicationMenu();
+      if (!menu) throw new Error('No application menu found');
+      const fileMenu = menu.items.find((item) => item.label === 'File');
+      if (!fileMenu || !fileMenu.submenu) throw new Error('File menu not found');
+      const exportAllItem = fileMenu.submenu.items.find(
+        (item) => item.label === 'Export All Notes to Markdown...'
+      );
+      if (!exportAllItem) throw new Error('Export All Notes menu item not found');
+      if (exportAllItem.click) {
+        exportAllItem.click({}, undefined as any, undefined as any);
+      }
+    });
+
+    // Wait for export to complete
+    await page.waitForTimeout(4000);
+
+    // Verify files were created (should include the note in folder)
+    const files = readdirSync(exportDir).filter((f) => f.endsWith('.md'));
+    console.log('[E2E Export] Files created via File menu from folder view:', files);
+    expect(files.length).toBeGreaterThanOrEqual(1);
+
+    // Check that folder structure was created
+    const exportDirContents = readdirSync(exportDir);
+    console.log('[E2E Export] Export directory contents:', exportDirContents);
+
+    // The note should be exported (either in folder or at root depending on implementation)
+    const allContent = files.map((f) => readFileSync(join(exportDir, f), 'utf-8')).join('\n');
+    expect(allContent).toContain('Note in Folder');
+    expect(allContent).toContain('This note is inside the Test Export Folder.');
+  });
+});

@@ -558,22 +558,13 @@ export function createMenu(deps: MenuDependencies): void {
         {
           label: 'Documentation',
           click: () => {
-            // TODO: Update with actual docs URL when available
-            void shell.openExternal('https://github.com/anthropics/notecove/wiki');
+            void shell.openExternal('https://github.com/drewcsillag/notecove/');
           },
         },
         {
           label: 'Report Issue',
           click: () => {
-            void shell.openExternal('https://github.com/anthropics/notecove/issues/new');
-          },
-        },
-        { type: 'separator' },
-        {
-          label: 'Show Logs',
-          click: () => {
-            const logsPath = app.getPath('logs');
-            void shell.openPath(logsPath);
+            void shell.openExternal('https://github.com/drewcsillag/notecove/issues/new');
           },
         },
         ...(!isMac

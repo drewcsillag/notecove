@@ -2,7 +2,36 @@
  * Tests for Export Service
  */
 
-import { buildNoteTitleLookup, type FolderInfo } from '../export-service';
+import {
+  buildNoteTitleLookup,
+  exportNotes,
+  exportAllNotes,
+  type FolderInfo,
+} from '../export-service';
+import type { JSONContent } from '@tiptap/core';
+
+// Mock window.electronAPI
+const mockElectronAPI = {
+  export: {
+    selectDirectory: jest.fn(),
+    getNotesForExport: jest.fn(),
+    writeFile: jest.fn(),
+    copyImageFile: jest.fn(),
+    createDirectory: jest.fn(),
+    showCompletionMessage: jest.fn(),
+  },
+};
+
+// Set up global mock
+beforeAll(() => {
+  (global as any).window = {
+    electronAPI: mockElectronAPI,
+  };
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
+});
 
 // Extract buildFolderPaths for testing by reimplementing
 // (it's a private function in the module)
@@ -167,5 +196,252 @@ describe('Export Service Utilities', () => {
       expect(path1).toBe(path2);
       expect(path1).toBe('Parent/Child');
     });
+  });
+});
+
+describe('exportNotes', () => {
+  const mockNoteContent: JSONContent = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Test content' }],
+      },
+    ],
+  };
+
+  it('should export single note successfully', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.getNotesForExport.mockResolvedValue([
+      { id: 'note-1', title: 'Test Note', content: mockNoteContent, folderId: null },
+    ]);
+    mockElectronAPI.export.writeFile.mockResolvedValue({ success: true });
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const noteTitleLookup = buildNoteTitleLookup([{ id: 'note-1', title: 'Test Note' }]);
+    const progressCallback = jest.fn();
+
+    await exportNotes(['note-1'], noteTitleLookup, progressCallback);
+
+    expect(mockElectronAPI.export.selectDirectory).toHaveBeenCalled();
+    expect(mockElectronAPI.export.getNotesForExport).toHaveBeenCalledWith(['note-1']);
+    expect(mockElectronAPI.export.writeFile).toHaveBeenCalledWith(
+      '/export/path/Test Note.md',
+      expect.stringContaining('Test content')
+    );
+    expect(progressCallback).toHaveBeenCalledWith({
+      current: 1,
+      total: 1,
+      currentNoteName: 'Test Note',
+    });
+    expect(mockElectronAPI.export.showCompletionMessage).toHaveBeenCalled();
+  });
+
+  it('should handle user cancelling directory selection', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue(null);
+
+    const noteTitleLookup = buildNoteTitleLookup([]);
+    const progressCallback = jest.fn();
+
+    await exportNotes(['note-1'], noteTitleLookup, progressCallback);
+
+    expect(mockElectronAPI.export.selectDirectory).toHaveBeenCalled();
+    expect(mockElectronAPI.export.getNotesForExport).not.toHaveBeenCalled();
+    expect(mockElectronAPI.export.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('should handle empty notes array', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.getNotesForExport.mockResolvedValue([]);
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const noteTitleLookup = buildNoteTitleLookup([]);
+    const progressCallback = jest.fn();
+
+    await exportNotes([], noteTitleLookup, progressCallback);
+
+    expect(mockElectronAPI.export.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('should export multiple notes', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.getNotesForExport.mockResolvedValue([
+      { id: 'note-1', title: 'First Note', content: mockNoteContent, folderId: null },
+      { id: 'note-2', title: 'Second Note', content: mockNoteContent, folderId: null },
+    ]);
+    mockElectronAPI.export.writeFile.mockResolvedValue({ success: true });
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const noteTitleLookup = buildNoteTitleLookup([
+      { id: 'note-1', title: 'First Note' },
+      { id: 'note-2', title: 'Second Note' },
+    ]);
+    const progressCallback = jest.fn();
+
+    await exportNotes(['note-1', 'note-2'], noteTitleLookup, progressCallback);
+
+    expect(mockElectronAPI.export.writeFile).toHaveBeenCalledTimes(2);
+    expect(progressCallback).toHaveBeenCalledTimes(2);
+  });
+
+  it('should sanitize note title for filename', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.getNotesForExport.mockResolvedValue([
+      { id: 'note-1', title: 'Note/With:Special*Chars', content: mockNoteContent, folderId: null },
+    ]);
+    mockElectronAPI.export.writeFile.mockResolvedValue({ success: true });
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const noteTitleLookup = buildNoteTitleLookup([
+      { id: 'note-1', title: 'Note/With:Special*Chars' },
+    ]);
+
+    await exportNotes(['note-1'], noteTitleLookup, jest.fn());
+
+    // Special characters should be replaced with underscores
+    expect(mockElectronAPI.export.writeFile).toHaveBeenCalledWith(
+      expect.stringMatching(/Note_With_Special_Chars\.md$/),
+      expect.any(String)
+    );
+  });
+});
+
+describe('exportAllNotes', () => {
+  const mockNoteContent: JSONContent = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Test content' }],
+      },
+    ],
+  };
+
+  it('should export all notes in SD', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.getNotesForExport.mockResolvedValue([
+      { id: 'note-1', title: 'Note One', content: mockNoteContent, folderId: null },
+      { id: 'note-2', title: 'Note Two', content: mockNoteContent, folderId: 'folder-1' },
+    ]);
+    mockElectronAPI.export.createDirectory.mockResolvedValue({ success: true });
+    mockElectronAPI.export.writeFile.mockResolvedValue({ success: true });
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const folders: FolderInfo[] = [{ id: 'folder-1', name: 'My Folder', parentId: null }];
+    const notes = [
+      { id: 'note-1', title: 'Note One', folderId: null, deleted: false },
+      { id: 'note-2', title: 'Note Two', folderId: 'folder-1', deleted: false },
+    ];
+    const noteTitleLookup = buildNoteTitleLookup(notes);
+    const progressCallback = jest.fn();
+
+    await exportAllNotes(
+      'sd-1',
+      folders,
+      notes.map((n) => ({ id: n.id, folderId: n.folderId, deleted: n.deleted })),
+      noteTitleLookup,
+      progressCallback
+    );
+
+    expect(mockElectronAPI.export.selectDirectory).toHaveBeenCalled();
+    expect(mockElectronAPI.export.writeFile).toHaveBeenCalledTimes(2);
+    expect(progressCallback).toHaveBeenCalledTimes(2);
+  });
+
+  it('should filter out deleted notes', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.getNotesForExport.mockResolvedValue([
+      { id: 'note-1', title: 'Active Note', content: mockNoteContent, folderId: null },
+    ]);
+    mockElectronAPI.export.writeFile.mockResolvedValue({ success: true });
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const notes = [
+      { id: 'note-1', title: 'Active Note', folderId: null, deleted: false },
+      { id: 'note-2', title: 'Deleted Note', folderId: null, deleted: true },
+    ];
+    const noteTitleLookup = buildNoteTitleLookup(notes);
+    const progressCallback = jest.fn();
+
+    await exportAllNotes(
+      'sd-1',
+      [],
+      notes.map((n) => ({ id: n.id, folderId: n.folderId, deleted: n.deleted })),
+      noteTitleLookup,
+      progressCallback
+    );
+
+    // Only the active note should be requested for export
+    expect(mockElectronAPI.export.getNotesForExport).toHaveBeenCalledWith(['note-1']);
+    expect(mockElectronAPI.export.writeFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('should create folder structure for nested folders', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.getNotesForExport.mockResolvedValue([
+      { id: 'note-1', title: 'Nested Note', content: mockNoteContent, folderId: 'child-folder' },
+    ]);
+    mockElectronAPI.export.createDirectory.mockResolvedValue({ success: true });
+    mockElectronAPI.export.writeFile.mockResolvedValue({ success: true });
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const folders: FolderInfo[] = [
+      { id: 'parent-folder', name: 'Parent', parentId: null },
+      { id: 'child-folder', name: 'Child', parentId: 'parent-folder' },
+    ];
+    const notes = [
+      { id: 'note-1', title: 'Nested Note', folderId: 'child-folder', deleted: false },
+    ];
+    const noteTitleLookup = buildNoteTitleLookup(notes);
+
+    await exportAllNotes(
+      'sd-1',
+      folders,
+      notes.map((n) => ({ id: n.id, folderId: n.folderId, deleted: n.deleted })),
+      noteTitleLookup,
+      jest.fn()
+    );
+
+    // Should create the nested folder structure
+    expect(mockElectronAPI.export.createDirectory).toHaveBeenCalledWith(
+      expect.stringContaining('Parent/Child')
+    );
+    // Note should be written to the nested folder
+    expect(mockElectronAPI.export.writeFile).toHaveBeenCalledWith(
+      expect.stringContaining('Parent/Child/Nested Note.md'),
+      expect.any(String)
+    );
+  });
+
+  it('should handle user cancelling directory selection', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue(null);
+
+    const notes = [{ id: 'note-1', title: 'Note', folderId: null, deleted: false }];
+    const noteTitleLookup = buildNoteTitleLookup(notes);
+
+    await exportAllNotes(
+      'sd-1',
+      [],
+      notes.map((n) => ({ id: n.id, folderId: n.folderId, deleted: n.deleted })),
+      noteTitleLookup,
+      jest.fn()
+    );
+
+    expect(mockElectronAPI.export.getNotesForExport).not.toHaveBeenCalled();
+    expect(mockElectronAPI.export.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('should handle empty notes array', async () => {
+    mockElectronAPI.export.selectDirectory.mockResolvedValue('/export/path');
+    mockElectronAPI.export.showCompletionMessage.mockResolvedValue(undefined);
+
+    const noteTitleLookup = buildNoteTitleLookup([]);
+
+    await exportAllNotes('sd-1', [], [], noteTitleLookup, jest.fn());
+
+    expect(mockElectronAPI.export.getNotesForExport).not.toHaveBeenCalled();
+    expect(mockElectronAPI.export.writeFile).not.toHaveBeenCalled();
+    // Should still show completion message
+    expect(mockElectronAPI.export.showCompletionMessage).toHaveBeenCalled();
   });
 });
