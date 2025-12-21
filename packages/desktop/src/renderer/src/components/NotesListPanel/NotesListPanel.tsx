@@ -794,12 +794,22 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     if (!exportTrigger) return;
 
     const runExport = async (): Promise<void> => {
-      const noteTitleLookup = buildNoteTitleLookup(notes);
-
       setIsExporting(true);
       setExportProgress({ current: 0, total: 0, currentNoteName: '' });
 
       try {
+        // Build a complete note title lookup from ALL SDs
+        // This ensures cross-SD links resolve to proper titles in exported markdown
+        const allSds = await window.electronAPI.sd.list();
+        const allNotesForLookup: { id: string; title: string }[] = [];
+        for (const sd of allSds) {
+          const sdNotes = await window.electronAPI.note.list(sd.id, undefined);
+          for (const note of sdNotes) {
+            allNotesForLookup.push({ id: note.id, title: note.title });
+          }
+        }
+        const noteTitleLookup = buildNoteTitleLookup(allNotesForLookup);
+
         if (exportTrigger === 'selected') {
           // Export selected notes (multi-select or current note)
           const noteIdsToExport =
@@ -849,7 +859,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     };
 
     void runExport();
-  }, [exportTrigger, notes, selectedNoteIds, selectedNoteId, activeSdId, onExportComplete]);
+  }, [exportTrigger, selectedNoteIds, selectedNoteId, activeSdId, onExportComplete]);
 
   // Handle context menu open
   const handleContextMenu = useCallback(
