@@ -585,7 +585,8 @@ void app.whenReady().then(async () => {
 
     // Initialize BackupManager for backup and restore operations
     const userDataPath = app.getPath('userData');
-    backupManager = new BackupManager(database, userDataPath, undefined, handleNewStorageDir);
+    const testBackupDir = process.env['TEST_BACKUP_DIR'];
+    backupManager = new BackupManager(database, userDataPath, testBackupDir, handleNewStorageDir);
     console.log('[Init] BackupManager initialized');
 
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)

@@ -97,6 +97,7 @@ test.describe('Backup and Restore', () => {
         TEST_DB_PATH: testDbPath,
         TEST_STORAGE_DIR: testStorageDir,
         TEST_CONFIG_PATH: testConfigPath,
+        TEST_BACKUP_DIR: backupDir,
       },
     });
 
