@@ -42,8 +42,14 @@ export interface CRDTManager {
    * Apply an update to a note's CRDT
    * @param noteId Note ID
    * @param update Yjs update bytes
+   * @param options Optional settings for the update
+   * @param options.skipTimestampUpdate If true, don't automatically update the modified timestamp
    */
-  applyUpdate(noteId: string, update: Uint8Array): Promise<void>;
+  applyUpdate(
+    noteId: string,
+    update: Uint8Array,
+    options?: { skipTimestampUpdate?: boolean }
+  ): Promise<void>;
 
   /**
    * Get a note's current CRDT document (if loaded)
@@ -157,4 +163,11 @@ export interface CRDTManager {
    * @param observer The CRDTCommentObserver instance
    */
   setCommentObserver(observer: import('./crdt-comment-observer').CRDTCommentObserver): void;
+
+  /**
+   * Set the callback for notifying when a note's modified timestamp is updated
+   * This is called when note content changes (via applyUpdate)
+   * @param callback Function that receives noteId and new modified timestamp
+   */
+  setModifiedUpdateCallback(callback: (noteId: string, modified: number) => void): void;
 }

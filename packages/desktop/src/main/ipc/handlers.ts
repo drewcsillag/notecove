@@ -1808,6 +1808,19 @@ export class IPCHandlers {
 
     console.log(`[IPC] Found note in database, current title: "${note.title}"`);
 
+    // Check if anything actually changed before updating
+    const titleChanged = note.title !== title;
+    let contentChanged = false;
+    if (contentText !== undefined) {
+      const newPreview = contentText.split('\n').slice(1).join('\n').trim().substring(0, 200);
+      contentChanged = note.contentText !== contentText || note.contentPreview !== newPreview;
+    }
+
+    if (!titleChanged && !contentChanged) {
+      console.log(`[IPC] No changes detected, skipping update`);
+      return;
+    }
+
     // Update title, content (if provided), and modified timestamp
     const updates: Partial<typeof note> = {
       ...note,
@@ -1909,7 +1922,8 @@ export class IPCHandlers {
     }
 
     // Broadcast title update to all windows so they can refresh their notes list
-    this.broadcastToAll('note:title-updated', { noteId, title });
+    // Include modified timestamp so note list can update ordering
+    this.broadcastToAll('note:title-updated', { noteId, title, modified: updates.modified });
   }
 
   private async handleListNotes(
@@ -2674,8 +2688,9 @@ export class IPCHandlers {
 
     // Manually trigger a write by applying the current state as an update
     // This ensures the update is written to disk immediately
+    // Pass skipTimestampUpdate to prevent applyUpdate from overwriting the timestamp we just set
     const fullUpdate = noteDoc.encodeStateAsUpdate();
-    await this.crdtManager.applyUpdate(noteId, fullUpdate);
+    await this.crdtManager.applyUpdate(noteId, fullUpdate, { skipTimestampUpdate: true });
 
     // Also update the SQLite cache
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any

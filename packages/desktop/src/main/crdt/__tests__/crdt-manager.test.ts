@@ -21,24 +21,53 @@ jest.mock('@shared/storage', () => {
     ...actual,
     DocumentSnapshot: {
       ...actual.DocumentSnapshot,
-      createEmpty: jest.fn(() => ({
-        getDoc: jest.fn(() => new (jest.requireActual('yjs').Doc)()),
-        destroy: jest.fn(),
-        applyUpdate: jest.fn(),
-        getSnapshot: jest.fn().mockResolvedValue({ state: new Uint8Array(), vectorClock: {} }),
-        replaceWith: jest.fn(),
-      })),
-      fromStorage: jest.fn((state: Uint8Array, _vectorClock: VectorClock) => ({
-        getDoc: jest.fn(() => {
-          const doc = new (jest.requireActual('yjs').Doc)() as Y.Doc;
-          Y.applyUpdate(doc, state);
-          return doc;
-        }),
-        destroy: jest.fn(),
-        applyUpdate: jest.fn(),
-        getSnapshot: jest.fn().mockResolvedValue({ state: new Uint8Array(), vectorClock: {} }),
-        replaceWith: jest.fn(),
-      })),
+      createEmpty: jest.fn(() => {
+        // Create one doc that persists for this snapshot instance
+        const doc = new (jest.requireActual('yjs').Doc)() as Y.Doc;
+        return {
+          getDoc: jest.fn(() => doc),
+          destroy: jest.fn(),
+          applyUpdate: jest.fn(
+            (
+              update: Uint8Array,
+              _instanceId: string,
+              _sequence: number,
+              _offset: number,
+              _file: string,
+              origin?: unknown
+            ) => {
+              // Actually apply the update to the doc with origin
+              Y.applyUpdate(doc, update, origin);
+            }
+          ),
+          getSnapshot: jest.fn().mockResolvedValue({ state: new Uint8Array(), vectorClock: {} }),
+          replaceWith: jest.fn(),
+        };
+      }),
+      fromStorage: jest.fn((state: Uint8Array, _vectorClock: VectorClock) => {
+        // Create one doc that persists for this snapshot instance
+        const doc = new (jest.requireActual('yjs').Doc)() as Y.Doc;
+        Y.applyUpdate(doc, state);
+        return {
+          getDoc: jest.fn(() => doc),
+          destroy: jest.fn(),
+          applyUpdate: jest.fn(
+            (
+              update: Uint8Array,
+              _instanceId: string,
+              _sequence: number,
+              _offset: number,
+              _file: string,
+              origin?: unknown
+            ) => {
+              // Actually apply the update to the doc with origin
+              Y.applyUpdate(doc, update, origin);
+            }
+          ),
+          getSnapshot: jest.fn().mockResolvedValue({ state: new Uint8Array(), vectorClock: {} }),
+          replaceWith: jest.fn(),
+        };
+      }),
     },
   };
 });
@@ -417,6 +446,208 @@ describe('CRDTManagerImpl - Integration', () => {
     it('should return false when log directory does not exist', async () => {
       const result = await manager.checkCRDTLogExists('note-123', 'test-sd', 'instance-1', 5);
       expect(result).toBe(false);
+    });
+  });
+});
+
+describe('CRDTManagerImpl - Modified Timestamp Updates', () => {
+  // Tests for the feature: "When a note is edited, its modified timestamp should update"
+  // This test suite verifies that applyUpdate updates the modified timestamp in:
+  // 1. CRDT metadata (via NoteDoc.updateMetadata)
+  // 2. Database cache (via database.upsertNote)
+  // 3. Broadcasts an event to renderer (via modifiedUpdateCallback)
+
+  let manager: CRDTManagerImpl;
+  let mockStorageManager: jest.Mocked<AppendLogManager>;
+  let mockDatabase: jest.Mocked<Database>;
+  let testDoc: Y.Doc;
+
+  beforeEach(() => {
+    jest.useRealTimers(); // Need real timers for async operations
+
+    // Create a shared Y.Doc that will be returned by loadNote
+    testDoc = new Y.Doc();
+
+    mockStorageManager = {
+      getInstanceId: jest.fn().mockReturnValue('test-instance'),
+      getSDPath: jest.fn((sdId: string) => `/mock/storage/${sdId}`),
+      loadNote: jest.fn().mockImplementation(() => {
+        return Promise.resolve({
+          doc: testDoc,
+          vectorClock: {},
+        });
+      }),
+      writeNoteUpdate: jest.fn().mockImplementation(() => {
+        return Promise.resolve({
+          sequence: 1,
+          offset: 0,
+          file: 'test.crdtlog',
+        });
+      }),
+      loadFolderTree: jest.fn().mockResolvedValue({
+        doc: new Y.Doc(),
+      }),
+      writeFolderUpdate: jest.fn().mockResolvedValue(undefined),
+      saveNoteSnapshot: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AppendLogManager>;
+
+    mockDatabase = {
+      getNote: jest.fn().mockResolvedValue({
+        id: 'test-note',
+        sdId: 'test-sd',
+        title: 'Test Note',
+        modified: 1000, // Old timestamp
+      }),
+      upsertNote: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<Database>;
+
+    manager = new CRDTManagerImpl(mockStorageManager, mockDatabase);
+  });
+
+  afterEach(() => {
+    manager.destroy();
+    testDoc.destroy();
+  });
+
+  describe('applyUpdate - modified timestamp update', () => {
+    it('should update NoteDoc metadata with new modified timestamp when content changes', async () => {
+      // Load the note
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Get the NoteDoc and spy on updateMetadata
+      const noteDoc = manager.getNoteDoc('test-note');
+      expect(noteDoc).toBeDefined();
+      const updateMetadataSpy = jest.spyOn(noteDoc!, 'updateMetadata');
+
+      // Create an update (simulating user typing)
+      const sourceDoc = new Y.Doc();
+      const content = sourceDoc.getXmlFragment('content');
+      const text = new Y.XmlText();
+      text.insert(0, 'Hello World');
+      content.insert(0, [text]);
+      const update = Y.encodeStateAsUpdate(sourceDoc);
+
+      // Apply the update
+      const beforeTime = Date.now();
+      await manager.applyUpdate('test-note', update);
+      const afterTime = Date.now();
+
+      // Wait for async operations
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify NoteDoc.updateMetadata was called with a reasonable timestamp
+      // The second argument is 'ipc' origin to prevent double writes
+      expect(updateMetadataSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modified: expect.any(Number),
+        }),
+        'ipc'
+      );
+
+      // Verify the timestamp is within expected range
+      const call = updateMetadataSpy.mock.calls[0];
+      const modifiedArg = call?.[0] as { modified: number } | undefined;
+      expect(modifiedArg?.modified).toBeGreaterThanOrEqual(beforeTime);
+      expect(modifiedArg?.modified).toBeLessThanOrEqual(afterTime + 100);
+
+      sourceDoc.destroy();
+    });
+
+    it('should update database cache with new modified timestamp when content changes', async () => {
+      // Load the note
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Create an update
+      const sourceDoc = new Y.Doc();
+      const content = sourceDoc.getXmlFragment('content');
+      const text = new Y.XmlText();
+      text.insert(0, 'Hello World');
+      content.insert(0, [text]);
+      const update = Y.encodeStateAsUpdate(sourceDoc);
+
+      // Apply the update
+      const beforeTime = Date.now();
+      await manager.applyUpdate('test-note', update);
+      const afterTime = Date.now();
+
+      // Wait for async operations
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify database.upsertNote was called with updated modified timestamp
+      expect(mockDatabase.upsertNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'test-note',
+          modified: expect.any(Number),
+        })
+      );
+
+      // Verify the timestamp is within expected range
+      const upsertCall = mockDatabase.upsertNote.mock.calls[0];
+      const noteArg = upsertCall?.[0] as { modified: number } | undefined;
+      expect(noteArg?.modified).toBeGreaterThanOrEqual(beforeTime);
+      expect(noteArg?.modified).toBeLessThanOrEqual(afterTime + 100);
+
+      sourceDoc.destroy();
+    });
+
+    it('should call modifiedUpdateCallback with noteId and new timestamp when content changes', async () => {
+      // Set up the callback
+      const modifiedUpdateCallback = jest.fn();
+      manager.setModifiedUpdateCallback(modifiedUpdateCallback);
+
+      // Load the note
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Create an update
+      const sourceDoc = new Y.Doc();
+      const content = sourceDoc.getXmlFragment('content');
+      const text = new Y.XmlText();
+      text.insert(0, 'Hello World');
+      content.insert(0, [text]);
+      const update = Y.encodeStateAsUpdate(sourceDoc);
+
+      // Apply the update
+      const beforeTime = Date.now();
+      await manager.applyUpdate('test-note', update);
+      const afterTime = Date.now();
+
+      // Wait for async operations
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify the callback was called with correct arguments
+      expect(modifiedUpdateCallback).toHaveBeenCalledWith('test-note', expect.any(Number));
+
+      // Verify the timestamp is within expected range
+      const callArgs = modifiedUpdateCallback.mock.calls[0];
+      const timestamp = callArgs?.[1] as number | undefined;
+      expect(timestamp).toBeGreaterThanOrEqual(beforeTime);
+      expect(timestamp).toBeLessThanOrEqual(afterTime + 100);
+
+      sourceDoc.destroy();
+    });
+
+    it('should not update modified timestamp when applyUpdate fails', async () => {
+      // Load the note
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Make writeNoteUpdate fail
+      mockStorageManager.writeNoteUpdate.mockRejectedValueOnce(new Error('Write failed'));
+
+      // Create an update
+      const sourceDoc = new Y.Doc();
+      const content = sourceDoc.getXmlFragment('content');
+      const text = new Y.XmlText();
+      text.insert(0, 'Hello World');
+      content.insert(0, [text]);
+      const update = Y.encodeStateAsUpdate(sourceDoc);
+
+      // Apply the update - should throw
+      await expect(manager.applyUpdate('test-note', update)).rejects.toThrow('Write failed');
+
+      // Verify database was NOT updated (no upsertNote call)
+      expect(mockDatabase.upsertNote).not.toHaveBeenCalled();
+
+      sourceDoc.destroy();
     });
   });
 });

@@ -402,13 +402,17 @@ export const webClient: typeof window.electronAPI = {
       }),
     onTitleUpdated: (callback) =>
       subscribe('note:title-updated', (data) => {
-        callback(data as { noteId: string; title: string });
+        callback(data as { noteId: string; title: string; modified: number });
       }),
     onMoved: (callback) =>
       subscribe('note:moved', (data) => {
         callback(
           data as { noteId: string; oldFolderId: string | null; newFolderId: string | null }
         );
+      }),
+    onModifiedUpdated: (callback) =>
+      subscribe('note:modified-updated', (data) => {
+        callback(data as { noteId: string; modified: number });
       }),
   },
 

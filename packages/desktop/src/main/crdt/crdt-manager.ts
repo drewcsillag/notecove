@@ -26,6 +26,8 @@ export class CRDTManagerImpl implements CRDTManager {
   private broadcastCallback?: (noteId: string, update: Uint8Array) => void;
   // Observer for comment CRDT changes (enables live sync)
   private commentObserver?: CRDTCommentObserver;
+  // Callback to notify when a note's modified timestamp is updated
+  private modifiedUpdateCallback?: (noteId: string, modified: number) => void;
 
   constructor(
     private storageManager: AppendLogManager,
@@ -57,11 +59,28 @@ export class CRDTManagerImpl implements CRDTManager {
   }
 
   /**
+   * Set the callback for notifying when a note's modified timestamp is updated
+   * This is called when note content changes (via applyUpdate)
+   */
+  setModifiedUpdateCallback(callback: (noteId: string, modified: number) => void): void {
+    this.modifiedUpdateCallback = callback;
+  }
+
+  /**
    * Broadcast an update to all renderer windows
    */
   private broadcastUpdate(noteId: string, update: Uint8Array): void {
     if (this.broadcastCallback) {
       this.broadcastCallback(noteId, update);
+    }
+  }
+
+  /**
+   * Notify that a note's modified timestamp was updated
+   */
+  private notifyModifiedUpdate(noteId: string, modified: number): void {
+    if (this.modifiedUpdateCallback) {
+      this.modifiedUpdateCallback(noteId, modified);
     }
   }
 
@@ -175,7 +194,11 @@ export class CRDTManagerImpl implements CRDTManager {
     }
   }
 
-  async applyUpdate(noteId: string, update: Uint8Array): Promise<void> {
+  async applyUpdate(
+    noteId: string,
+    update: Uint8Array,
+    options?: { skipTimestampUpdate?: boolean }
+  ): Promise<void> {
     const state = this.documents.get(noteId);
 
     if (!state) {
@@ -183,6 +206,9 @@ export class CRDTManagerImpl implements CRDTManager {
     }
 
     console.log(`[CRDT Manager] Applying update to note ${noteId}, size: ${update.length} bytes`);
+
+    // Capture content before update for comparison (to detect actual content changes)
+    const contentBefore = state.noteDoc.getContentText();
 
     // Write update to disk first to get sequence information
     const writePromise = (async () => {
@@ -244,6 +270,37 @@ export class CRDTManagerImpl implements CRDTManager {
       // Broadcast update to renderer windows so they can apply it
       // This is critical for web→desktop sync
       this.broadcastUpdate(noteId, update);
+
+      // Update modified timestamp when content changes (unless explicitly skipped)
+      // This allows the note list to reorder based on recent edits
+      // IMPORTANT: Only update timestamp if actual content changed, not for structural updates
+      if (!options?.skipTimestampUpdate) {
+        // Get content after update to compare with before
+        const contentAfter = state.noteDoc.getContentText();
+        const contentChanged = contentBefore !== contentAfter;
+
+        if (contentChanged) {
+          const now = Date.now();
+
+          // Update CRDT metadata (syncs to other machines)
+          // Use 'ipc' origin to prevent the doc.on('update') listener from double-writing
+          state.noteDoc.updateMetadata({ modified: now }, 'ipc');
+
+          // Update database cache
+          if (this.database) {
+            const note = await this.database.getNote(noteId);
+            if (note) {
+              await this.database.upsertNote({
+                ...note,
+                modified: now,
+              });
+            }
+          }
+
+          // Notify renderer to update note list ordering
+          this.notifyModifiedUpdate(noteId, now);
+        }
+      }
     } finally {
       // Remove from pending set when complete
       this.pendingUpdates.delete(writePromise);

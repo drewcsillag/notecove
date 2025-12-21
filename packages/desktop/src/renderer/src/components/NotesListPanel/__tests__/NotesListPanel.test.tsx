@@ -31,6 +31,7 @@ const mockElectronAPI = {
     onTitleUpdated: jest.fn().mockReturnValue(() => {}),
     onPinned: jest.fn().mockReturnValue(() => {}),
     onMoved: jest.fn().mockReturnValue(() => {}),
+    onModifiedUpdated: jest.fn().mockReturnValue(() => {}),
   },
   folder: {
     list: jest.fn().mockResolvedValue([]),

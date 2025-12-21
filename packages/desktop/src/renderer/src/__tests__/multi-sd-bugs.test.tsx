@@ -44,6 +44,7 @@ const mockElectronAPI = {
     onTitleUpdated: jest.fn(() => () => {}),
     onPinned: jest.fn(() => () => {}),
     onMoved: jest.fn(() => () => {}),
+    onModifiedUpdated: jest.fn(() => () => {}),
     updateTitle: jest.fn(),
     createSnapshot: jest.fn().mockResolvedValue({ success: true, filename: 'test-snapshot.yjson' }),
     getInfo: jest.fn().mockResolvedValue(null),

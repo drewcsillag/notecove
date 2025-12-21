@@ -38,6 +38,7 @@ const mockElectronAPI = {
     onTitleUpdated: jest.fn(),
     onPinned: jest.fn(),
     onMoved: jest.fn(),
+    onModifiedUpdated: jest.fn(),
     updateTitle: jest.fn(),
     togglePin: jest.fn(),
     createSnapshot: jest.fn().mockResolvedValue({ success: true, filename: 'test-snapshot.yjson' }),
@@ -270,6 +271,9 @@ describe('App', () => {
       /* unsubscribe */
     });
     mockElectronAPI.note.onMoved.mockReturnValue(() => {
+      /* unsubscribe */
+    });
+    mockElectronAPI.note.onModifiedUpdated.mockReturnValue(() => {
       /* unsubscribe */
     });
     mockElectronAPI.sd.onUpdated.mockReturnValue(() => {

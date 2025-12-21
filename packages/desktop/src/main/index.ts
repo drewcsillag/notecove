@@ -789,6 +789,12 @@ void app.whenReady().then(async () => {
     crdtManager.setCommentObserver(commentObserver);
     console.log('[Init] Comment observer initialized for live sync');
 
+    // Set up callback to notify renderer when a note's modified timestamp updates
+    // This allows the note list to reorder based on recent edits
+    crdtManager.setModifiedUpdateCallback((noteId: string, modified: number) => {
+      ipcHandlers?.broadcastToAll('note:modified-updated', { noteId, modified });
+    });
+
     if (process.env['NODE_ENV'] === 'test') {
       await fs.appendFile(
         '/var/tmp/auto-cleanup.log',

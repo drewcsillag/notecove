@@ -631,6 +631,19 @@ function handleUpdateTitle(ctx: HandlerContext) {
 
     console.log(`[IPC] Found note in database, current title: "${note.title}"`);
 
+    // Check if anything actually changed before updating
+    const titleChanged = note.title !== title;
+    let contentChanged = false;
+    if (contentText !== undefined) {
+      const newPreview = contentText.split('\n').slice(1).join('\n').trim().substring(0, 200);
+      contentChanged = note.contentText !== contentText || note.contentPreview !== newPreview;
+    }
+
+    if (!titleChanged && !contentChanged) {
+      console.log(`[IPC] No changes detected, skipping update`);
+      return;
+    }
+
     const updates: Partial<typeof note> = {
       ...note,
       title,
@@ -707,6 +720,7 @@ function handleUpdateTitle(ctx: HandlerContext) {
       }
     }
 
-    broadcastToAll('note:title-updated', { noteId, title });
+    // Include modified timestamp so note list can update ordering
+    broadcastToAll('note:title-updated', { noteId, title, modified: updates.modified });
   };
 }

@@ -110,8 +110,10 @@ export class NoteDoc {
 
   /**
    * Update note metadata (e.g., move to different folder)
+   * @param updates The metadata fields to update
+   * @param origin Optional origin to pass to the transaction (for preventing double writes)
    */
-  updateMetadata(updates: Partial<Omit<NoteMetadata, 'id' | 'created'>>): void {
+  updateMetadata(updates: Partial<Omit<NoteMetadata, 'id' | 'created'>>, origin?: unknown): void {
     this.doc.transact(() => {
       if (updates.modified !== undefined) {
         this.metadata.set('modified', updates.modified);
@@ -128,7 +130,7 @@ export class NoteDoc {
       if (updates.pinned !== undefined) {
         this.metadata.set('pinned', updates.pinned);
       }
-    });
+    }, origin);
   }
 
   /**
@@ -181,6 +183,14 @@ export class NoteDoc {
    */
   destroy(): void {
     this.doc.destroy();
+  }
+
+  /**
+   * Get the content as plain text (useful for comparison)
+   * Uses Y.XmlFragment's toJSON() which extracts the structure
+   */
+  getContentText(): string {
+    return JSON.stringify(this.content.toJSON());
   }
 
   // ============================================================================

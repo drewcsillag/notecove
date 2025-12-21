@@ -281,11 +281,13 @@ export function createActivitySyncCallbacks(
               contentText,
             });
 
-            // Broadcast title update to all windows
+            // Broadcast title update to all windows (include modified for list reordering)
+            const syncedModified = crdtMetadata?.modified ?? Date.now();
             for (const window of BrowserWindow.getAllWindows()) {
               window.webContents.send('note:title-updated', {
                 noteId,
                 title: newTitle,
+                modified: syncedModified,
               });
             }
 

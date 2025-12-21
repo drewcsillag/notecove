@@ -234,10 +234,12 @@ export const noteApi = {
       ipcRenderer.removeListener('note:external-update', listener);
     };
   },
-  onTitleUpdated: (callback: (data: { noteId: string; title: string }) => void): (() => void) => {
+  onTitleUpdated: (
+    callback: (data: { noteId: string; title: string; modified: number }) => void
+  ): (() => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      data: { noteId: string; title: string }
+      data: { noteId: string; title: string; modified: number }
     ): void => {
       callback(data);
     };
@@ -258,6 +260,20 @@ export const noteApi = {
     ipcRenderer.on('note:moved', listener);
     return () => {
       ipcRenderer.removeListener('note:moved', listener);
+    };
+  },
+  onModifiedUpdated: (
+    callback: (data: { noteId: string; modified: number }) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: { noteId: string; modified: number }
+    ): void => {
+      callback(data);
+    };
+    ipcRenderer.on('note:modified-updated', listener);
+    return () => {
+      ipcRenderer.removeListener('note:modified-updated', listener);
     };
   },
 };

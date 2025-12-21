@@ -87,6 +87,8 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Track previous SD ID to detect actual SD changes (not initial load)
   const previousSdIdRef = useRef<string | undefined>(undefined);
+  // Debounce timer for re-sorting notes list when modified timestamps change
+  const resortTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Multi-select state
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
@@ -583,7 +585,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     });
 
     const unsubscribeTitleUpdated = window.electronAPI.note.onTitleUpdated((data) => {
-      // Update title in notes list without refetching (more efficient and prevents selection clearing)
+      // Update title and modified timestamp in notes list without refetching
       setNotes((prevNotes) => {
         const noteIndex = prevNotes.findIndex((note) => note.id === data.noteId);
         if (noteIndex !== -1) {
@@ -592,11 +594,64 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             ...updatedNotes[noteIndex]!,
             title: data.title,
+            modified: data.modified,
           };
           return updatedNotes;
         }
         return prevNotes;
       });
+
+      // Debounce the re-sort to avoid flicker during rapid edits
+      if (resortTimeoutRef.current) {
+        clearTimeout(resortTimeoutRef.current);
+      }
+      resortTimeoutRef.current = setTimeout(() => {
+        setNotes((prevNotes) => {
+          const sorted = [...prevNotes];
+          sorted.sort((a, b) => {
+            if (a.pinned !== b.pinned) {
+              return a.pinned ? -1 : 1;
+            }
+            return b.modified - a.modified;
+          });
+          return sorted;
+        });
+      }, 500);
+    });
+
+    // Listen for modified timestamp updates to re-sort the notes list
+    const unsubscribeModifiedUpdated = window.electronAPI.note.onModifiedUpdated((data) => {
+      // Update modified timestamp in notes list
+      setNotes((prevNotes) => {
+        const noteIndex = prevNotes.findIndex((note) => note.id === data.noteId);
+        if (noteIndex !== -1) {
+          const updatedNotes = [...prevNotes];
+          updatedNotes[noteIndex] = {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            ...updatedNotes[noteIndex]!,
+            modified: data.modified,
+          };
+          return updatedNotes;
+        }
+        return prevNotes;
+      });
+
+      // Debounce the re-sort to avoid flicker during rapid edits
+      if (resortTimeoutRef.current) {
+        clearTimeout(resortTimeoutRef.current);
+      }
+      resortTimeoutRef.current = setTimeout(() => {
+        setNotes((prevNotes) => {
+          const sorted = [...prevNotes];
+          sorted.sort((a, b) => {
+            if (a.pinned !== b.pinned) {
+              return a.pinned ? -1 : 1;
+            }
+            return b.modified - a.modified;
+          });
+          return sorted;
+        });
+      }, 500);
     });
 
     const unsubscribePinned = window.electronAPI.note.onPinned((data) => {
@@ -672,8 +727,14 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       unsubscribePermanentDeleted();
       unsubscribeExternal();
       unsubscribeTitleUpdated();
+      unsubscribeModifiedUpdated();
       unsubscribePinned();
       unsubscribeMoved();
+      // Clear the re-sort timer on cleanup
+      if (resortTimeoutRef.current) {
+        clearTimeout(resortTimeoutRef.current);
+        resortTimeoutRef.current = null;
+      }
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
 

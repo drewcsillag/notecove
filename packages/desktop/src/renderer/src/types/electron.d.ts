@@ -112,13 +112,18 @@ declare global {
         onExternalUpdate: (
           callback: (data: { operation: string; noteIds: string[] }) => void
         ) => () => void;
-        onTitleUpdated: (callback: (data: { noteId: string; title: string }) => void) => () => void;
+        onTitleUpdated: (
+          callback: (data: { noteId: string; title: string; modified: number }) => void
+        ) => () => void;
         onMoved: (
           callback: (data: {
             noteId: string;
             oldFolderId: string | null;
             newFolderId: string | null;
           }) => void
+        ) => () => void;
+        onModifiedUpdated: (
+          callback: (data: { noteId: string; modified: number }) => void
         ) => () => void;
       };
 

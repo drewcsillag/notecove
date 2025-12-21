@@ -64,6 +64,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onExternalUpdate: stubEventSubscription,
     onTitleUpdated: stubEventSubscription,
     onMoved: stubEventSubscription,
+    onModifiedUpdated: stubEventSubscription,
   },
 
   history: {
