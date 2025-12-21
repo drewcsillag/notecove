@@ -218,11 +218,20 @@ test.describe('cross-machine sync - comments', () => {
    * Helper to delete a comment thread via the sidebar
    */
   async function deleteFirstComment(window: Page): Promise<void> {
-    // First open the comment sidebar
-    // Use force:true to bypass any tooltip that might be intercepting clicks
-    const viewCommentsButton = window.locator('[data-testid="view-comments-button"]');
-    await viewCommentsButton.click({ force: true });
-    await window.waitForTimeout(500);
+    // Check if comment sidebar is already open by looking for the close button
+    const closeButton = window.locator('[data-testid="close-comments-button"]');
+    const sidebarIsOpen = await closeButton.isVisible().catch(() => false);
+
+    if (!sidebarIsOpen) {
+      // Move mouse away from toolbar to dismiss any tooltips
+      await window.mouse.move(0, 0);
+      await window.waitForTimeout(100);
+
+      // Open the comment sidebar if not already open
+      const viewCommentsButton = window.locator('[data-testid="view-comments-button"]');
+      await viewCommentsButton.click({ force: true });
+      await window.waitForTimeout(500);
+    }
 
     // Click the delete button on the first thread
     const deleteButton = window.locator('[data-testid="delete-thread-button"]').first();
@@ -541,11 +550,20 @@ test.describe('cross-machine sync - comments', () => {
     await addCommentButton.click();
     await window1.waitForTimeout(1000);
 
-    // Open comment sidebar to see the comment
-    // Use force:true to bypass any tooltip that might be intercepting clicks
-    const viewCommentsButton = window1.locator('[data-testid="view-comments-button"]');
-    await viewCommentsButton.click({ force: true });
-    await window1.waitForTimeout(500);
+    // Check if comment sidebar is already open (it should be after adding a comment)
+    const closeButton = window1.locator('[data-testid="close-comments-button"]');
+    const sidebarIsOpen = await closeButton.isVisible().catch(() => false);
+
+    if (!sidebarIsOpen) {
+      // Move mouse away from toolbar to dismiss any tooltips
+      await window1.mouse.move(0, 0);
+      await window1.waitForTimeout(100);
+
+      // Open comment sidebar to see the comment
+      const viewCommentsButton = window1.locator('[data-testid="view-comments-button"]');
+      await viewCommentsButton.click({ force: true });
+      await window1.waitForTimeout(500);
+    }
 
     // Get author names from the sidebar
     const authors = await getCommentAuthors(window1);

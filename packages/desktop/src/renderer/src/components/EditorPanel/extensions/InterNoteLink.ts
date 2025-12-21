@@ -12,6 +12,7 @@
 
 import { Extension } from '@tiptap/react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import type { Transaction } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
@@ -24,6 +25,7 @@ import { LinkSuggestionList, type LinkSuggestionListRef } from './LinkSuggestion
 import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion';
 import tippy from 'tippy.js';
 import type { Instance as TippyInstance } from 'tippy.js';
+import { getChangedRanges, expandRanges, isFullDocumentReload } from './utils/transaction-ranges';
 
 export interface InterNoteLinkOptions {
   HTMLAttributes: Record<string, unknown>;
@@ -71,8 +73,6 @@ export function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch 
   const textTo = $position.pos;
   const text = $position.doc.textBetween(textFrom, textTo, '\0', '\0');
 
-  console.log('[findDoubleBracketMatch] text:', JSON.stringify(text), 'pos:', $position.pos);
-
   // Look for [[ followed by any characters that aren't ] (the query)
   // Must be at the end of the text (where cursor is)
   // Pattern: [[ followed by any non-] characters, ending at cursor position
@@ -80,11 +80,8 @@ export function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch 
   const match = regex.exec(text);
 
   if (!match) {
-    console.log('[findDoubleBracketMatch] no match found');
     return null;
   }
-
-  console.log('[findDoubleBracketMatch] match found:', match[0], 'query:', match[1]);
 
   // Calculate the actual position in the document
   const matchStart = textFrom + match.index;
@@ -134,17 +131,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
 
         items: async ({ query }) => {
           try {
-            console.log('[InterNoteLink] items() called with query:', JSON.stringify(query));
-            // Fetch notes matching the query
             const notes = await window.electronAPI.link.searchNotesForAutocomplete(query);
-            console.log(
-              '[InterNoteLink] searchNotesForAutocomplete returned',
-              notes.length,
-              'notes'
-            );
-            if (notes.length > 0) {
-              console.log('[InterNoteLink] First note:', notes[0]?.title);
-            }
             return notes.slice(0, 10);
           } catch (error) {
             console.error('[InterNoteLink] Failed to fetch notes for autocomplete:', error);
@@ -229,11 +216,24 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
             return findAndDecorateLinks(doc, editorView);
           },
           apply(transaction, oldState) {
-            // Regenerate decorations if document changed or if forced via metadata
-            if (transaction.docChanged || transaction.getMeta('forceDecoration')) {
+            // forceDecoration is used when title cache updates
+            // We still need full regeneration for this case
+            if (transaction.getMeta('forceDecoration')) {
               return findAndDecorateLinks(transaction.doc, editorView);
             }
-            return oldState.map(transaction.mapping, transaction.doc);
+
+            // No document change - just return old state
+            if (!transaction.docChanged) {
+              return oldState;
+            }
+
+            // Full document reload (CRDT sync, etc) - do full re-scan
+            if (isFullDocumentReload(transaction)) {
+              return findAndDecorateLinks(transaction.doc, editorView);
+            }
+
+            // Incremental update: only re-scan changed regions
+            return updateLinksIncrementally(transaction, oldState, editorView);
           },
         },
         view(view) {
@@ -309,6 +309,24 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
   },
 });
 
+// Counter for testing - tracks how many times decorations are regenerated
+let decorationRegenerationCount = 0;
+
+/**
+ * Get the number of times decorations have been regenerated.
+ * Used for testing to verify we're not doing unnecessary work.
+ */
+export function getDecorationRegenerationCount(): number {
+  return decorationRegenerationCount;
+}
+
+/**
+ * Reset the regeneration counter. Call this at the start of each test.
+ */
+export function resetDecorationRegenerationCount(): void {
+  decorationRegenerationCount = 0;
+}
+
 /**
  * Find all inter-note links in the document and create decorations for them
  * This function needs to:
@@ -317,68 +335,149 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
  * 3. Create decorations that display the title instead of the ID
  */
 function findAndDecorateLinks(doc: PMNode, editorView?: EditorView | null): DecorationSet {
-  const decorations: Decoration[] = [];
+  decorationRegenerationCount++;
+  const decorations = findLinksInRange(doc, 0, doc.content.size, editorView);
+  return DecorationSet.create(doc, decorations);
+}
 
-  doc.descendants((node, pos) => {
+/**
+ * Find inter-note links within a specific range of the document.
+ *
+ * @param doc - The document node
+ * @param rangeFrom - Start of the range to search
+ * @param rangeTo - End of the range to search
+ * @param editorView - Optional editor view for triggering title fetches
+ * @returns Array of decorations for links found in the range
+ */
+function findLinksInRange(
+  doc: PMNode,
+  rangeFrom: number,
+  rangeTo: number,
+  editorView?: EditorView | null
+): Decoration[] {
+  const decorations: Decoration[] = [];
+  const regex = new RegExp(LINK_PATTERN.source, LINK_PATTERN.flags);
+
+  doc.nodesBetween(rangeFrom, rangeTo, (node, pos) => {
     if (!node.isText || !node.text) {
       return;
     }
 
     const text = node.text;
-    // Create a new regex for each text node to avoid stateful lastIndex issues
-    const regex = new RegExp(LINK_PATTERN.source, LINK_PATTERN.flags);
     let match;
 
     while ((match = regex.exec(text)) !== null) {
       const from = pos + match.index;
       const to = from + match[0].length;
-      const noteId = (match[1] ?? '').toLowerCase();
 
-      // If we don't have the title cached, fetch it asynchronously
-      if (!noteTitleCache.has(noteId)) {
-        // Set placeholder immediately to prevent multiple fetches
-        noteTitleCache.set(noteId, 'Loading...');
-        void fetchNoteTitle(noteId, editorView);
-      }
+      // Include decorations that OVERLAP with the specified range
+      // This matches the behavior of DecorationSet.find() used when removing stale decorations
+      if (from < rangeTo && to > rangeFrom) {
+        const noteId = (match[1] ?? '').toLowerCase();
 
-      // Create a widget that replaces the [[note-id]] text
-      const widget = Decoration.widget(
-        to,
-        () => {
-          // Read from cache inside the factory function so it picks up updates
-          const title = noteTitleCache.get(noteId) ?? 'Loading...';
-          const isBroken = brokenLinkCache.has(noteId);
-
-          const span = document.createElement('span');
-          span.className = isBroken ? 'inter-note-link-broken' : 'inter-note-link';
-          span.setAttribute('data-note-id', noteId);
-          span.setAttribute('role', isBroken ? 'text' : 'link');
-          span.setAttribute(
-            'aria-label',
-            isBroken ? `Broken link to ${title}` : `Link to ${title}`
-          );
-          if (!isBroken) {
-            span.setAttribute('tabindex', '0');
-          }
-          // Display as [[title]] to make it clear it's a link
-          span.textContent = `[[${title}]]`;
-          return span;
-        },
-        {
-          side: -1, // Place widget before the position
+        // If we don't have the title cached, fetch it asynchronously
+        if (!noteTitleCache.has(noteId)) {
+          noteTitleCache.set(noteId, 'Loading...');
+          void fetchNoteTitle(noteId, editorView);
         }
-      );
 
-      // Hide the original [[note-id]] text
-      const hideDecoration = Decoration.inline(from, to, {
-        class: 'inter-note-link-hidden',
-      });
+        // Create a widget that replaces the [[note-id]] text
+        const widget = Decoration.widget(
+          to,
+          () => {
+            const title = noteTitleCache.get(noteId) ?? 'Loading...';
+            const isBroken = brokenLinkCache.has(noteId);
 
-      decorations.push(hideDecoration, widget);
+            const span = document.createElement('span');
+            span.className = isBroken ? 'inter-note-link-broken' : 'inter-note-link';
+            span.setAttribute('data-note-id', noteId);
+            span.setAttribute('role', isBroken ? 'text' : 'link');
+            span.setAttribute(
+              'aria-label',
+              isBroken ? `Broken link to ${title}` : `Link to ${title}`
+            );
+            if (!isBroken) {
+              span.setAttribute('tabindex', '0');
+            }
+            span.textContent = `[[${title}]]`;
+            return span;
+          },
+          {
+            side: -1,
+          }
+        );
+
+        // Hide the original [[note-id]] text
+        const hideDecoration = Decoration.inline(from, to, {
+          class: 'inter-note-link-hidden',
+        });
+
+        decorations.push(hideDecoration, widget);
+      }
     }
   });
 
-  return DecorationSet.create(doc, decorations);
+  return decorations;
+}
+
+/**
+ * Incrementally update link decorations based on transaction changes.
+ * Only re-scans the changed regions instead of the entire document.
+ *
+ * @param transaction - The transaction that caused the change
+ * @param oldState - The previous decoration set
+ * @param editorView - Optional editor view for triggering title fetches
+ * @returns Updated decoration set
+ */
+function updateLinksIncrementally(
+  transaction: Transaction,
+  oldState: DecorationSet,
+  editorView?: EditorView | null
+): DecorationSet {
+  const doc = transaction.doc;
+
+  // Get the ranges that were changed
+  let changedRanges = getChangedRanges(transaction);
+
+  // If no specific changes detected, fall back to full scan
+  if (changedRanges.length === 0) {
+    return findAndDecorateLinks(doc, editorView);
+  }
+
+  // Expand ranges to catch links that might span the edit boundary
+  // A link like [[uuid]] could be up to 50 chars
+  changedRanges = expandRanges(changedRanges, 50, doc.content.size);
+
+  // Map old decorations through the transaction (updates positions)
+  let decorations = oldState.map(transaction.mapping, doc);
+
+  // Process each changed range
+  for (const range of changedRanges) {
+    let searchFrom = range.from;
+    let searchTo = range.to;
+
+    // Find existing decorations in this range
+    const existingInRange = decorations.find(searchFrom, searchTo, () => true);
+
+    // CRITICAL: If we have existing decorations, we MUST include their full range
+    // in our search. Otherwise, we might remove a decoration but not re-add it
+    // because part of it falls outside our search range.
+    for (const deco of existingInRange) {
+      searchFrom = Math.min(searchFrom, deco.from);
+      searchTo = Math.max(searchTo, deco.to);
+    }
+
+    // Remove decorations that overlap with this range
+    decorations = decorations.remove(existingInRange);
+
+    // Find new links in the expanded range and add them
+    const newDecorations = findLinksInRange(doc, searchFrom, searchTo, editorView);
+    if (newDecorations.length > 0) {
+      decorations = decorations.add(doc, newDecorations);
+    }
+  }
+
+  return decorations;
 }
 
 /**

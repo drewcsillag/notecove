@@ -12,6 +12,7 @@
 
 import { Extension } from '@tiptap/react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import type { Transaction } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { HASHTAG_PATTERN, MAX_TAG_LENGTH } from '@notecove/shared';
@@ -21,6 +22,7 @@ import { TagSuggestionList, type TagSuggestionListRef } from './TagSuggestionLis
 import type { SuggestionOptions } from '@tiptap/suggestion';
 import tippy from 'tippy.js';
 import type { Instance as TippyInstance } from 'tippy.js';
+import { getChangedRanges, isFullDocumentReload } from './utils/transaction-ranges';
 
 export interface HashtagOptions {
   HTMLAttributes: Record<string, unknown>;
@@ -127,13 +129,22 @@ export const Hashtag = Extension.create<HashtagOptions>({
             return findHashtags(doc);
           },
           apply(transaction, oldState) {
-            // Always recalculate decorations when document changes
-            // This ensures hashtags render correctly even after loading from CRDT
-            if (transaction.docChanged) {
+            // No document change - just return old state
+            if (!transaction.docChanged) {
+              return oldState;
+            }
+
+            // Full document reload (CRDT sync, etc) - do full re-scan
+            if (isFullDocumentReload(transaction)) {
+              console.log(
+                '[Hashtag] Full reload triggered, origin:',
+                transaction.getMeta('y-sync$')
+              );
               return findHashtags(transaction.doc);
             }
-            // Map old decorations through the transaction
-            return oldState.map(transaction.mapping, transaction.doc);
+
+            // Incremental update: only re-scan changed regions
+            return updateHashtagsIncrementally(transaction, oldState);
           },
         },
         props: {
@@ -151,6 +162,24 @@ export const Hashtag = Extension.create<HashtagOptions>({
   },
 });
 
+// Counter for testing - tracks how many times decorations are regenerated
+let decorationRegenerationCount = 0;
+
+/**
+ * Get the number of times decorations have been regenerated.
+ * Used for testing to verify we're not doing unnecessary work.
+ */
+export function getHashtagDecorationRegenerationCount(): number {
+  return decorationRegenerationCount;
+}
+
+/**
+ * Reset the regeneration counter. Call this at the start of each test.
+ */
+export function resetHashtagDecorationRegenerationCount(): void {
+  decorationRegenerationCount = 0;
+}
+
 /**
  * Find all hashtags in the document and create decorations for them
  *
@@ -159,17 +188,29 @@ export const Hashtag = Extension.create<HashtagOptions>({
  * and will not be styled as a hashtag.
  */
 function findHashtags(doc: PMNode): DecorationSet {
+  decorationRegenerationCount++;
+  const decorations = findHashtagsInRange(doc, 0, doc.content.size);
+  return DecorationSet.create(doc, decorations);
+}
+
+/**
+ * Find hashtags within a specific range of the document.
+ *
+ * @param doc - The document node
+ * @param rangeFrom - Start of the range to search
+ * @param rangeTo - End of the range to search
+ * @returns Array of decorations for hashtags found in the range
+ */
+function findHashtagsInRange(doc: PMNode, rangeFrom: number, rangeTo: number): Decoration[] {
   const decorations: Decoration[] = [];
-  // Create a new RegExp instance from the shared pattern
   const regex = new RegExp(HASHTAG_PATTERN.source, HASHTAG_PATTERN.flags);
 
-  doc.descendants((node, pos) => {
+  doc.nodesBetween(rangeFrom, rangeTo, (node, pos) => {
     if (!node.isText || !node.text) {
       return;
     }
 
     // Skip text nodes that are inside links (URL fragments should not be hashtags)
-    // Check if the node has a link mark
     const hasLinkMark = node.marks.some((mark) => mark.type.name === 'link');
     if (hasLinkMark) {
       return;
@@ -181,25 +222,91 @@ function findHashtags(doc: PMNode): DecorationSet {
     while ((match = regex.exec(text)) !== null) {
       const from = pos + match.index;
       const to = from + match[0].length;
-      // Remove # prefix and normalize to lowercase for consistency with database
-      let tag = match[0].slice(1).toLowerCase();
 
-      // Enforce max length (truncate if needed)
-      if (tag.length > MAX_TAG_LENGTH) {
-        tag = tag.slice(0, MAX_TAG_LENGTH);
+      // Include decorations that OVERLAP with the specified range
+      // This matches the behavior of DecorationSet.find() used when removing stale decorations
+      if (from < rangeTo && to > rangeFrom) {
+        let tag = match[0].slice(1).toLowerCase();
+
+        if (tag.length > MAX_TAG_LENGTH) {
+          tag = tag.slice(0, MAX_TAG_LENGTH);
+        }
+
+        decorations.push(
+          Decoration.inline(from, to, {
+            class: 'hashtag',
+            'data-tag': tag,
+            role: 'button',
+            'aria-label': `Tag: ${tag}`,
+            tabindex: '0',
+          })
+        );
       }
-
-      decorations.push(
-        Decoration.inline(from, to, {
-          class: 'hashtag',
-          'data-tag': tag,
-          role: 'button',
-          'aria-label': `Tag: ${tag}`,
-          tabindex: '0',
-        })
-      );
     }
   });
 
-  return DecorationSet.create(doc, decorations);
+  return decorations;
+}
+
+/**
+ * Incrementally update hashtag decorations based on transaction changes.
+ * Only re-scans the changed regions instead of the entire document.
+ *
+ * @param transaction - The transaction that caused the change
+ * @param oldState - The previous decoration set
+ * @returns Updated decoration set
+ */
+function updateHashtagsIncrementally(
+  transaction: Transaction,
+  oldState: DecorationSet
+): DecorationSet {
+  const doc = transaction.doc;
+
+  // Get the ranges that were changed
+  const changedRanges = getChangedRanges(transaction);
+
+  // If no specific changes detected, fall back to full scan
+  if (changedRanges.length === 0) {
+    return findHashtags(doc);
+  }
+
+  // Map old decorations through the transaction (updates positions automatically)
+  let decorations = oldState.map(transaction.mapping, doc);
+
+  // For each changed range, check if we actually need to update decorations
+  for (const range of changedRanges) {
+    // Expand the search area slightly to catch hashtags at boundaries
+    let searchFrom = Math.max(0, range.from - 30);
+    let searchTo = Math.min(doc.content.size, range.to + 30);
+
+    // Check if any existing decoration overlaps with this range
+    const existingInRange = decorations.find(searchFrom, searchTo);
+
+    // CRITICAL: If we have existing decorations, we MUST include their full range
+    // in our search. Otherwise, we might remove a decoration but not re-add it
+    // because part of it falls outside our search range.
+    for (const deco of existingInRange) {
+      searchFrom = Math.min(searchFrom, deco.from);
+      searchTo = Math.max(searchTo, deco.to);
+    }
+
+    // Get the text in this range to see if it might contain hashtags
+    const textInRange = doc.textBetween(searchFrom, searchTo, ' ');
+    const mightHaveHashtag = textInRange.includes('#');
+
+    // Only update if there are existing decorations OR we might have new hashtags
+    if (existingInRange.length > 0 || mightHaveHashtag) {
+      // Remove only the decorations that overlap with the change
+      decorations = decorations.remove(existingInRange);
+
+      // Re-scan for hashtags in this area
+      const newDecorations = findHashtagsInRange(doc, searchFrom, searchTo);
+      if (newDecorations.length > 0) {
+        decorations = decorations.add(doc, newDecorations);
+      }
+    }
+    // If no decorations overlap AND no # in the text, do nothing - mapping handled it
+  }
+
+  return decorations;
 }
