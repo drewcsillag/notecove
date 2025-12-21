@@ -128,6 +128,7 @@ After generating your report:
 
 ## Critical Rules
 
+- NEVER assume that your execution of `pnpm run ci-local` is the only one running. There may reasonably be more than one.
 - NEVER claim there were "pre-existing failures" - if a test fails, it fails NOW
 - NEVER skip reporting a failure because you think it's unrelated
 - NEVER truncate error messages or stack traces for brevity

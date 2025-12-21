@@ -48,6 +48,10 @@ import {
 import { ensureDefaultNote } from './note-init';
 import { discoverNewNotes } from './note-discovery';
 
+// Set the app name early, before any Electron APIs that depend on it are called.
+// This ensures menus show "NoteCove" instead of the package.json name "@notecove/desktop".
+app.setName('NoteCove');
+
 let mainWindow: BrowserWindow | null = null;
 let webServerManager: WebServerManager | null = null;
 let database: Database | null = null;
