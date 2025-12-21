@@ -42,7 +42,7 @@ import { MentionNode, type MentionNodeAttributes } from './extensions/MentionNod
 import { DateChip } from './extensions/DateChip';
 import { DatePickerDialog } from './DatePickerDialog';
 import { MentionPopover } from './MentionPopover';
-import { InterNoteLink, clearNoteTitleCache } from './extensions/InterNoteLink';
+import { InterNoteLink, clearNoteTitleCache, prefetchNoteTitles } from './extensions/InterNoteLink';
 import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
 import { CommentMark } from './extensions/CommentMark';
@@ -983,11 +983,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         setLoadingState(true);
         console.log(`[TipTapEditor] Loading note ${noteId}`);
 
-        // Clear the title cache to ensure we fetch fresh titles
+        // Clear the title cache and prefetch fresh titles in parallel with note loading
+        // This prevents "Loading..." flicker when links are rendered
         clearNoteTitleCache();
+        const prefetchPromise = prefetchNoteTitles();
 
-        // Tell main process to load this note
+        // Tell main process to load this note (in parallel with title prefetch)
         await window.electronAPI.note.load(noteId);
+
+        // Wait for prefetch to complete before rendering content
+        await prefetchPromise;
 
         // Get the current state from main process
         const state = await window.electronAPI.note.getState(noteId);

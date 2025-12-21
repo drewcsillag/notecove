@@ -56,6 +56,23 @@ export function clearNoteTitleCache(noteId?: string): void {
 }
 
 /**
+ * Pre-fetch all note titles into the cache.
+ * Call this before loading a note to avoid "Loading..." flicker.
+ * Returns a promise that resolves when all titles are cached.
+ */
+export async function prefetchNoteTitles(): Promise<void> {
+  try {
+    const notes = await window.electronAPI.link.searchNotesForAutocomplete('');
+    for (const note of notes) {
+      noteTitleCache.set(note.id, note.title);
+      brokenLinkCache.delete(note.id);
+    }
+  } catch (error) {
+    console.error('[InterNoteLink] Failed to prefetch note titles:', error);
+  }
+}
+
+/**
  * Custom find suggestion match function for [[ trigger
  * Based on TipTap's default findSuggestionMatch but modified for [[ pattern
  *
