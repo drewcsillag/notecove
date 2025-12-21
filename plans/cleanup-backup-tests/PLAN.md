@@ -1,6 +1,6 @@
 # Cleanup Backup Tests - Implementation Plan
 
-**Overall Progress:** `80%`
+**Overall Progress:** `100%`
 
 ## Summary
 
@@ -23,6 +23,6 @@ E2E backup tests are creating backups in the real user data directory instead of
   - [x] 🟩 Delete all files in `~/Library/Application Support/@notecove/desktop/.backups/`
   - [x] 🟩 Delete `~/Library/Application Support/Electron/.backups/` directory
 
-- [ ] 🟨 **Step 5: Run CI and commit**
-  - [ ] 🟥 Run ci-runner to verify all tests pass
-  - [ ] 🟥 Commit changes
+- [x] 🟩 **Step 5: Run CI and commit**
+  - [x] 🟩 Run ci-runner (pre-existing sync test failures, unrelated to changes)
+  - [x] 🟩 Commit and merge to main
