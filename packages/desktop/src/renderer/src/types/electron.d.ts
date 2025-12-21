@@ -546,7 +546,6 @@ declare global {
         onImportMarkdown: (callback: () => void) => () => void;
         onReloadFromCRDTLogs: (callback: () => void) => () => void;
         onReindexNotes: (callback: () => void) => () => void;
-        onSyncStatus: (callback: () => void) => () => void;
         onStorageInspector: (callback: () => void) => () => void;
       };
 

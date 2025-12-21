@@ -93,6 +93,12 @@ export type CreateWindowFn = (options?: CreateWindowOptions) => void;
 export type OnStorageDirCreatedFn = (sdId: string, sdPath: string) => Promise<void>;
 
 /**
+ * Callback when a storage directory is deleted
+ * Used to clean up watchers, sync state, and cached presence data
+ */
+export type OnStorageDirDeletedFn = (sdId: string) => Promise<void>;
+
+/**
  * Dependencies required by IPC handlers
  */
 export interface HandlerDependencies {
@@ -106,6 +112,7 @@ export interface HandlerDependencies {
   profileId: string;
   createWindowFn?: CreateWindowFn;
   onStorageDirCreated?: OnStorageDirCreatedFn;
+  onStorageDirDeleted?: OnStorageDirDeletedFn;
   getDeletionLogger?: GetDeletionLoggerFn;
   getSyncStatus?: GetSyncStatusFn;
   getStaleSyncs?: GetStaleSyncsFn;

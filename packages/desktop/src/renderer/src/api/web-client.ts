@@ -698,7 +698,6 @@ export const webClient: typeof window.electronAPI = {
     onImportMarkdown: noopSubscription,
     onReloadFromCRDTLogs: noopSubscription,
     onReindexNotes: noopSubscription,
-    onSyncStatus: noopSubscription,
     onStorageInspector: noopSubscription,
   },
 

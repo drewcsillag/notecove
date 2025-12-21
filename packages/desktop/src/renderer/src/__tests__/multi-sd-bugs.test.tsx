@@ -112,7 +112,6 @@ const mockElectronAPI = {
     onExportAllNotes: jest.fn(() => () => {}),
     onReloadFromCRDTLogs: jest.fn(() => () => {}),
     onReindexNotes: jest.fn(() => () => {}),
-    onSyncStatus: jest.fn(() => () => {}),
     onStorageInspector: jest.fn(() => () => {}),
     onImportMarkdown: jest.fn(() => () => {}),
   },

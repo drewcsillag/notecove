@@ -97,6 +97,11 @@ function handleGetActiveStorageDir(ctx: HandlerContext) {
 
 function handleDeleteStorageDir(ctx: HandlerContext) {
   return async (_event: IpcMainInvokeEvent, sdId: string): Promise<void> => {
+    // Clean up watchers, sync state, and cached data before deleting from database
+    if (ctx.onStorageDirDeleted) {
+      await ctx.onStorageDirDeleted(sdId);
+    }
+
     await ctx.database.deleteStorageDir(sdId);
     ctx.broadcastToAll('sd:updated', { operation: 'delete', sdId });
   };

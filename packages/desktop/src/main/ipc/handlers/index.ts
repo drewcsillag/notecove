@@ -65,6 +65,7 @@ export type {
   RetryStaleEntryFn,
   OnUserSettingsChangedFn,
   OnStorageDirCreatedFn,
+  OnStorageDirDeletedFn,
   MentionUser,
 } from './types';
 

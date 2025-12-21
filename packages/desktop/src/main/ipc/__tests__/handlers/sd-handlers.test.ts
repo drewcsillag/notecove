@@ -253,6 +253,45 @@ describe('SD Handlers', () => {
 
       expect(mocks.database.deleteStorageDir).toHaveBeenCalledWith('test-sd');
     });
+
+    it('should call onStorageDirDeleted callback before deleting from database', async () => {
+      const mockEvent = {} as any;
+      const onStorageDirDeleted = jest.fn().mockResolvedValue(undefined);
+      const callOrder: string[] = [];
+
+      // Track call order
+      onStorageDirDeleted.mockImplementation(async () => {
+        callOrder.push('onStorageDirDeleted');
+      });
+      mocks.database.deleteStorageDir.mockImplementation(async () => {
+        callOrder.push('deleteStorageDir');
+      });
+
+      // Create handlers with the callback
+      const realMocks = castMocksToReal(mocks);
+      const handlersWithCallback = new IPCHandlers(
+        realMocks.crdtManager,
+        realMocks.database,
+        realMocks.configManager,
+        realMocks.appendLogManager,
+        realMocks.noteMoveManager,
+        realMocks.diagnosticsManager,
+        realMocks.backupManager,
+        'test-profile-id',
+        undefined, // createWindowFn
+        undefined, // onStorageDirCreated
+        onStorageDirDeleted // onStorageDirDeleted
+      );
+
+      await (handlersWithCallback as any).handleDeleteStorageDir(mockEvent, 'test-sd');
+
+      expect(onStorageDirDeleted).toHaveBeenCalledWith('test-sd');
+      expect(mocks.database.deleteStorageDir).toHaveBeenCalledWith('test-sd');
+      // Verify callback is called BEFORE database delete
+      expect(callOrder).toEqual(['onStorageDirDeleted', 'deleteStorageDir']);
+
+      handlersWithCallback.destroy();
+    });
   });
 
   describe('sd:getCloudStoragePaths', () => {

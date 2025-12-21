@@ -666,12 +666,7 @@ function App(): React.ReactElement {
       void window.electronAPI.tools.reindexNotes();
     });
 
-    // Sync Status - open in dedicated window
-    const cleanupSyncStatus = window.electronAPI.menu.onSyncStatus(() => {
-      void window.electronAPI.sync.openWindow();
-    });
-
-    // Storage Inspector - now handled directly by main process (no renderer callback needed)
+    // Storage Inspector and Sync Status - now handled directly by main process (no renderer callback needed)
 
     return () => {
       cleanupNewNote();
@@ -689,7 +684,6 @@ function App(): React.ReactElement {
       cleanupImportMarkdown();
       cleanupReloadFromCRDTLogs();
       cleanupReindexNotes();
-      cleanupSyncStatus();
     };
   }, [selectedNoteId]);
 

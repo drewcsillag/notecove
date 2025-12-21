@@ -192,7 +192,6 @@ export const browserApiStub: typeof window.electronAPI = {
     onImportMarkdown: stubEventSubscription,
     onReloadFromCRDTLogs: stubEventSubscription,
     onReindexNotes: stubEventSubscription,
-    onSyncStatus: stubEventSubscription,
     onStorageInspector: stubEventSubscription,
   },
 

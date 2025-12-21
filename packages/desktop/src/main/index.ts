@@ -430,10 +430,12 @@ void app.whenReady().then(async () => {
           crdtManager,
           database
         );
-        // For runtime SD addition, run initial sync immediately (blocking)
-        // since the user is actively waiting for the SD to be ready
-        await sdWatcherResult.runInitialSync();
-        console.log(`[Init] Step 5: Watchers set up and initial sync complete`);
+        // For runtime SD addition, run initial sync in background (non-blocking)
+        // This allows the UI to respond immediately while sync happens asynchronously
+        void sdWatcherResult.runInitialSync().then(() => {
+          console.log(`[Init] Step 5: Initial sync complete for SD: ${sdId}`);
+        });
+        console.log(`[Init] Step 5: Watchers set up, initial sync running in background`);
 
         // 5.5 Write profile presence to the new SD
         if (profilePresenceManager) {
@@ -604,6 +606,27 @@ void app.whenReady().then(async () => {
       selectedProfileId ?? instanceId, // profileId for @-mentions
       createWindow,
       handleNewStorageDir,
+      // onStorageDirDeleted callback - clean up watchers, sync state, and cached data
+      async (sdId: string): Promise<void> => {
+        console.log(`[SD Delete] Cleaning up SD: ${sdId}`);
+
+        // Clean up watchers and sync state
+        if (sdWatcherManager) {
+          await sdWatcherManager.cleanupWatchers(sdId);
+        }
+
+        // Unregister from storage manager
+        if (storageManager) {
+          storageManager.unregisterSD(sdId);
+        }
+
+        // Clean up cached profile presence data
+        if (database) {
+          await database.deleteProfilePresenceCacheBySd(sdId);
+        }
+
+        console.log(`[SD Delete] Cleanup complete for SD: ${sdId}`);
+      },
       (sdId: string) => sdWatcherManager?.getDeletionLogger(sdId),
       // getSyncStatus callback - returns sync status for UI indicator
       (): SyncStatus => {

@@ -201,15 +201,6 @@ export const menuApi = {
       ipcRenderer.removeListener('menu:reindexNotes', listener);
     };
   },
-  onSyncStatus: (callback: () => void): (() => void) => {
-    const listener = (): void => {
-      callback();
-    };
-    ipcRenderer.on('menu:syncStatus', listener);
-    return () => {
-      ipcRenderer.removeListener('menu:syncStatus', listener);
-    };
-  },
   onStorageInspector: (callback: () => void): (() => void) => {
     const listener = (): void => {
       callback();

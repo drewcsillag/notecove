@@ -139,9 +139,6 @@ const mockElectronAPI = {
     onReindexNotes: jest.fn(() => () => {
       /* unsubscribe */
     }),
-    onSyncStatus: jest.fn(() => () => {
-      /* unsubscribe */
-    }),
     onStorageInspector: jest.fn(() => () => {
       /* unsubscribe */
     }),

@@ -342,9 +342,7 @@ export function createMenu(deps: MenuDependencies): void {
         {
           label: 'Sync Status',
           click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('menu:syncStatus');
-            }
+            createWindow({ syncStatus: true });
           },
         },
         {

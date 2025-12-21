@@ -155,6 +155,7 @@ export class IPCHandlers {
       sdName?: string;
     }) => void,
     private onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>,
+    private onStorageDirDeleted?: (sdId: string) => Promise<void>,
     private getDeletionLogger?: GetDeletionLoggerFn,
     private getSyncStatus?: GetSyncStatusFn,
     private getStaleSyncs?: GetStaleSyncsFn,
@@ -2460,6 +2461,11 @@ export class IPCHandlers {
   }
 
   private async handleDeleteStorageDir(_event: IpcMainInvokeEvent, sdId: string): Promise<void> {
+    // Clean up watchers, sync state, and cached data before deleting from database
+    if (this.onStorageDirDeleted) {
+      await this.onStorageDirDeleted(sdId);
+    }
+
     await this.database.deleteStorageDir(sdId);
 
     // Broadcast SD update to all windows
