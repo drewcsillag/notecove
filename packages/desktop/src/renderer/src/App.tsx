@@ -461,6 +461,64 @@ function App(): React.ReactElement {
     return cleanup;
   }, []);
 
+  // Handle SD deletion - clear selected note if it belongs to deleted SD, switch active SD
+  useEffect(() => {
+    const cleanup = window.electronAPI.sd.onUpdated((data) => {
+      void (async () => {
+        if (data.operation !== 'delete') {
+          return;
+        }
+
+        const deletedSdId = data.sdId;
+        console.log('[App] SD deleted:', deletedSdId);
+
+        // Check if currently selected note belongs to deleted SD
+        if (selectedNoteId) {
+          try {
+            const metadata = await window.electronAPI.note.getMetadata(selectedNoteId);
+            if (metadata.sdId === deletedSdId) {
+              // In minimal mode, close the window since the note no longer exists
+              if (minimalMode) {
+                console.log('[App] Closing minimal window - note belongs to deleted SD');
+                window.close();
+                return;
+              }
+              console.log('[App] Clearing selectedNoteId - note belongs to deleted SD');
+              setSelectedNoteId(null);
+            }
+          } catch {
+            // Note not found (already deleted from DB)
+            if (minimalMode) {
+              console.log('[App] Closing minimal window - note no longer exists');
+              window.close();
+              return;
+            }
+            console.log('[App] Clearing selectedNoteId - note no longer exists');
+            setSelectedNoteId(null);
+          }
+        }
+
+        // Check if active SD was deleted - switch to another SD (not applicable in minimal mode)
+        if (!minimalMode && activeSdId === deletedSdId) {
+          console.log('[App] Active SD was deleted, switching to another SD');
+          try {
+            const remainingSds = await window.electronAPI.sd.list();
+            if (remainingSds.length > 0 && remainingSds[0]) {
+              setActiveSdId(remainingSds[0].id);
+            } else {
+              setActiveSdId(undefined);
+            }
+          } catch (error) {
+            console.error('[App] Failed to fetch remaining SDs:', error);
+            setActiveSdId(undefined);
+          }
+        }
+      })();
+    });
+
+    return cleanup;
+  }, [selectedNoteId, activeSdId, minimalMode]);
+
   // Listen for menu commands
   useEffect(() => {
     // New Note

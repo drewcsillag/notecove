@@ -434,4 +434,149 @@ describe('App', () => {
       expect(mockElectronAPI.appState.set).not.toHaveBeenCalledWith('themeMode', 'dark');
     });
   });
+
+  describe('SD Deletion Handling', () => {
+    it('should call getMetadata to check if selected note belongs to deleted SD', async () => {
+      // Capture the sd.onUpdated callback
+      let sdUpdatedCallback: ((data: { operation: string; sdId: string }) => void) | null = null;
+      mockElectronAPI.sd.onUpdated.mockImplementation(
+        (callback: (data: { operation: string; sdId: string }) => void) => {
+          sdUpdatedCallback = callback;
+          return () => {
+            /* unsubscribe */
+          };
+        }
+      );
+
+      // Set up note.getMetadata to return a note in the SD that will be deleted
+      mockElectronAPI.note.getMetadata.mockResolvedValue({
+        noteId: 'note-123',
+        sdId: 'sd-to-delete',
+        title: 'Test Note',
+        folderId: null,
+        createdAt: Date.now(),
+        modifiedAt: Date.now(),
+        deleted: false,
+      });
+
+      // Set up note.list to return a note - this triggers auto-selection of default note
+      mockElectronAPI.note.list.mockResolvedValue([
+        {
+          id: 'default-note',
+          title: 'Default Note',
+          sdId: 'sd-to-delete',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+      ]);
+
+      render(<App />);
+
+      // Wait for component to mount and register listeners
+      await waitFor(() => {
+        expect(mockElectronAPI.sd.onUpdated).toHaveBeenCalled();
+      });
+
+      // Clear any previous calls
+      mockElectronAPI.note.getMetadata.mockClear();
+
+      // Verify callback was captured
+      expect(sdUpdatedCallback).not.toBeNull();
+
+      // Simulate SD deletion
+      sdUpdatedCallback!({ operation: 'delete', sdId: 'sd-to-delete' });
+
+      // The app should call getMetadata to check if selected note belongs to deleted SD
+      // Note: The selectedNoteId is set to 'default-note' on mount via the loadDefaultNote effect
+      await waitFor(() => {
+        expect(mockElectronAPI.note.getMetadata).toHaveBeenCalledWith('default-note');
+      });
+    });
+
+    it('should not call getMetadata when operation is not delete', async () => {
+      // Capture the sd.onUpdated callback
+      let sdUpdatedCallback: ((data: { operation: string; sdId: string }) => void) | null = null;
+      mockElectronAPI.sd.onUpdated.mockImplementation(
+        (callback: (data: { operation: string; sdId: string }) => void) => {
+          sdUpdatedCallback = callback;
+          return () => {
+            /* unsubscribe */
+          };
+        }
+      );
+
+      render(<App />);
+
+      // Wait for component to mount and any initial loading to complete
+      await waitFor(() => {
+        expect(mockElectronAPI.sd.onUpdated).toHaveBeenCalled();
+      });
+
+      // Wait a bit for any async operations to settle
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Clear any previous calls (from initial mount/loading)
+      mockElectronAPI.note.getMetadata.mockClear();
+
+      // Simulate a non-delete operation
+      sdUpdatedCallback!({ operation: 'create', sdId: 'new-sd' });
+
+      // Wait a bit and verify getMetadata was NOT called by our SD deletion handler
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockElectronAPI.note.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should fetch remaining SDs when active SD is deleted', async () => {
+      // Capture the sd.onUpdated callback
+      let sdUpdatedCallback: ((data: { operation: string; sdId: string }) => void) | null = null;
+      mockElectronAPI.sd.onUpdated.mockImplementation(
+        (callback: (data: { operation: string; sdId: string }) => void) => {
+          sdUpdatedCallback = callback;
+          return () => {
+            /* unsubscribe */
+          };
+        }
+      );
+
+      // Set up sd.getActive to return the SD that will be deleted
+      mockElectronAPI.sd.getActive.mockResolvedValue('sd-to-delete');
+
+      // Set up sd.list to return remaining SDs after deletion
+      mockElectronAPI.sd.list.mockResolvedValue([
+        {
+          id: 'remaining-sd',
+          name: 'Remaining SD',
+          path: '/path',
+          created: Date.now(),
+          isActive: false,
+        },
+      ]);
+
+      render(<App />);
+
+      // Wait for component to mount and activeSdId to be set
+      await waitFor(() => {
+        expect(mockElectronAPI.sd.onUpdated).toHaveBeenCalled();
+      });
+
+      // Clear previous sd.list calls from mount
+      mockElectronAPI.sd.list.mockClear();
+
+      // Verify callback was captured
+      expect(sdUpdatedCallback).not.toBeNull();
+
+      // Simulate active SD deletion
+      sdUpdatedCallback!({ operation: 'delete', sdId: 'sd-to-delete' });
+
+      // App should fetch remaining SDs to switch to one
+      await waitFor(() => {
+        expect(mockElectronAPI.sd.list).toHaveBeenCalled();
+      });
+    });
+  });
 });

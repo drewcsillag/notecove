@@ -677,6 +677,37 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
 
+  // Handle SD deletion - clear notes list and search if viewing deleted SD
+  useEffect(() => {
+    const unsubscribeSdUpdated = window.electronAPI.sd.onUpdated((data) => {
+      if (data.operation !== 'delete') {
+        return;
+      }
+
+      const deletedSdId = data.sdId;
+      console.log('[NotesListPanel] SD deleted:', deletedSdId);
+
+      // If we're viewing the deleted SD, clear everything
+      if (activeSdId === deletedSdId) {
+        console.log('[NotesListPanel] Clearing notes list - viewing deleted SD');
+        setNotes([]);
+        setSearchQuery('');
+        void saveSearchQuery('');
+        setIsSearching(false);
+
+        // Cancel any pending search timeout
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+          searchTimeoutRef.current = null;
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeSdUpdated();
+    };
+  }, [activeSdId, saveSearchQuery]);
+
   // Listen for folder selection events to clear search
   useEffect(() => {
     const unsubscribeFolderSelected = window.electronAPI.folder.onSelected(() => {

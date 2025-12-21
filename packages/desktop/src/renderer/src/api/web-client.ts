@@ -275,6 +275,7 @@ export const webClient: typeof window.electronAPI = {
         id: string;
         title: string;
         folderId: string | null;
+        sdId: string;
         created: number;
         modified: number;
         deleted: boolean;
@@ -285,6 +286,7 @@ export const webClient: typeof window.electronAPI = {
         noteId: response.id,
         title: response.title,
         folderId: response.folderId ?? '',
+        sdId: response.sdId,
         createdAt: response.created,
         modifiedAt: response.modified,
         deleted: response.deleted,

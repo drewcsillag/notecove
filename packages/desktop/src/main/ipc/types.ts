@@ -71,6 +71,7 @@ export interface IPCEvents {
  */
 export interface NoteMetadata {
   noteId: string;
+  sdId: string;
   title: string;
   folderId: string;
   createdAt: number;

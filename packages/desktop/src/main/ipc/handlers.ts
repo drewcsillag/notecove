@@ -1765,6 +1765,7 @@ export class IPCHandlers {
     // Return metadata, preferring CRDT metadata for folderId
     return {
       noteId: noteId,
+      sdId: note.sdId,
       title: note.title,
       folderId: crdtMetadata?.folderId ?? note.folderId ?? '',
       createdAt: crdtMetadata?.created ?? note.created,

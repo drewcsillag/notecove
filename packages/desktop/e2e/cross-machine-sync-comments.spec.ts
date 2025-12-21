@@ -219,8 +219,9 @@ test.describe('cross-machine sync - comments', () => {
    */
   async function deleteFirstComment(window: Page): Promise<void> {
     // First open the comment sidebar
+    // Use force:true to bypass any tooltip that might be intercepting clicks
     const viewCommentsButton = window.locator('[data-testid="view-comments-button"]');
-    await viewCommentsButton.click();
+    await viewCommentsButton.click({ force: true });
     await window.waitForTimeout(500);
 
     // Click the delete button on the first thread
@@ -541,8 +542,9 @@ test.describe('cross-machine sync - comments', () => {
     await window1.waitForTimeout(1000);
 
     // Open comment sidebar to see the comment
+    // Use force:true to bypass any tooltip that might be intercepting clicks
     const viewCommentsButton = window1.locator('[data-testid="view-comments-button"]');
-    await viewCommentsButton.click();
+    await viewCommentsButton.click({ force: true });
     await window1.waitForTimeout(500);
 
     // Get author names from the sidebar

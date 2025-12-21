@@ -61,8 +61,14 @@ const mockElectronAPI = {
       handle: '@testuser',
     }),
   },
+  sd: {
+    onUpdated: jest.fn().mockReturnValue(() => {}),
+  },
 };
 /* eslint-enable @typescript-eslint/no-empty-function */
+
+// Store for sd.onUpdated callbacks so tests can trigger them
+let sdUpdatedCallbacks: ((data: { operation: string; sdId: string }) => void)[] = [];
 
 // Helper to simulate folder selection event
 const simulateFolderSelected = (folderId: string): void => {
@@ -81,6 +87,17 @@ describe('NotesListPanel', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     folderSelectedCallbacks = [];
+    sdUpdatedCallbacks = [];
+
+    // Set up sd.onUpdated to capture callbacks
+    mockElectronAPI.sd.onUpdated.mockImplementation(
+      (callback: (data: { operation: string; sdId: string }) => void) => {
+        sdUpdatedCallbacks.push(callback);
+        return () => {
+          sdUpdatedCallbacks = sdUpdatedCallbacks.filter((cb) => cb !== callback);
+        };
+      }
+    );
   });
 
   afterEach(() => {
@@ -704,6 +721,103 @@ describe('NotesListPanel', () => {
       });
 
       unmount();
+    });
+  });
+
+  describe('SD Deletion Handling', () => {
+    it('should clear notes list when viewing deleted SD', async () => {
+      jest.useRealTimers();
+
+      const mockNotes = [
+        {
+          id: 'note1',
+          title: 'Test Note',
+          sdId: 'sd-to-delete',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Test content',
+          contentText: 'Test content text',
+        },
+      ];
+
+      mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        if (key === 'searchQuery') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const onNoteSelect = jest.fn();
+      render(
+        <NotesListPanel
+          selectedNoteId={null}
+          onNoteSelect={onNoteSelect}
+          activeSdId="sd-to-delete"
+        />
+      );
+
+      // Wait for notes to load
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+      });
+
+      // Simulate SD deletion
+      sdUpdatedCallbacks.forEach((cb) => {
+        cb({ operation: 'delete', sdId: 'sd-to-delete' });
+      });
+
+      // Notes should be cleared
+      await waitFor(() => {
+        expect(screen.queryByText('Test Note')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should not clear notes when different SD is deleted', async () => {
+      jest.useRealTimers();
+
+      const mockNotes = [
+        {
+          id: 'note1',
+          title: 'Test Note',
+          sdId: 'my-sd',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Test content',
+          contentText: 'Test content text',
+        },
+      ];
+
+      mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        if (key === 'searchQuery') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const onNoteSelect = jest.fn();
+      render(
+        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="my-sd" />
+      );
+
+      // Wait for notes to load
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+      });
+
+      // Simulate a DIFFERENT SD being deleted
+      sdUpdatedCallbacks.forEach((cb) => {
+        cb({ operation: 'delete', sdId: 'other-sd' });
+      });
+
+      // Wait a bit and verify notes are still there
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByText('Test Note')).toBeInTheDocument();
     });
   });
 });

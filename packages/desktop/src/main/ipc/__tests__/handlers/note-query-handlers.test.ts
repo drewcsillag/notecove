@@ -151,12 +151,49 @@ describe('Note Query Handlers', () => {
       const result = await (handlers as any).handleGetMetadata(mockEvent, noteId);
       expect(result).toMatchObject({
         noteId: noteId,
+        sdId: 'test-sd',
         title: 'Test Note',
         folderId: '',
         deleted: false,
       });
       expect(result.createdAt).toBeDefined();
       expect(result.modifiedAt).toBeDefined();
+    });
+
+    it('should return sdId from database record', async () => {
+      const mockEvent = {} as any;
+      const noteId = 'note-456';
+      const expectedSdId = 'my-custom-sd';
+      const mockNote = {
+        id: noteId,
+        title: 'Another Note',
+        sdId: expectedSdId,
+        folderId: 'folder-1',
+        deleted: false,
+        pinned: false,
+        contentPreview: '',
+        contentText: '',
+        created: Date.now(),
+        modified: Date.now(),
+      };
+      const crdtMetadata = {
+        id: noteId,
+        sdId: expectedSdId,
+        folderId: 'folder-1',
+        deleted: false,
+        pinned: false,
+        created: Date.now(),
+        modified: Date.now(),
+      };
+      const mockNoteDoc = createMockNoteDoc({
+        getMetadata: jest.fn().mockReturnValue(crdtMetadata),
+      });
+      mocks.database.getNote.mockResolvedValue(mockNote);
+      mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+      const result = await (handlers as any).handleGetMetadata(mockEvent, noteId);
+
+      expect(result.sdId).toBe(expectedSdId);
     });
   });
 
