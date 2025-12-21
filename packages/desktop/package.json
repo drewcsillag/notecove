@@ -25,7 +25,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "rebuild": "npx @electron/rebuild",
-    "rebuild:node": "cd ../../node_modules/.pnpm/better-sqlite3@12.4.1/node_modules/better-sqlite3 && npm run build-release",
+    "rebuild:node": "cd ../../node_modules/.pnpm/better-sqlite3@12.5.0/node_modules/better-sqlite3 && npm run build-release",
     "rebuild:electron": "pnpm exec electron-rebuild -f -w better-sqlite3 && pnpm exec electron-rebuild -f -w @mongodb-js/zstd && pnpm exec electron-rebuild -f -w sharp",
     "migrate:flag-byte": "tsx src/main/storage/migrate-flag-byte.ts"
   },
@@ -68,7 +68,7 @@
     "@tiptap/react": "^2.26.4",
     "@tiptap/starter-kit": "^2.26.4",
     "@tiptap/suggestion": "^2.27.1",
-    "better-sqlite3": "^12.4.1",
+    "better-sqlite3": "^12.5.0",
     "bonjour-service": "^1.3.0",
     "chokidar": "^3.6.0",
     "date-fns": "^4.1.0",

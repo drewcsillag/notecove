@@ -9,16 +9,15 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Paper, List, ListItem, ListItemButton, ListItemText, Box } from '@mui/material';
 import type { SuggestionProps } from '@tiptap/suggestion';
 
-export interface LinkSuggestionListProps
-  extends SuggestionProps<{
-    id: string;
-    title: string;
-    sdId: string;
-    folderId: string | null;
-    folderPath: string;
-    created: number;
-    modified: number;
-  }> {
+export interface LinkSuggestionListProps extends SuggestionProps<{
+  id: string;
+  title: string;
+  sdId: string;
+  folderId: string | null;
+  folderPath: string;
+  created: number;
+  modified: number;
+}> {
   // Props from TipTap's suggestion API
   items: {
     id: string;

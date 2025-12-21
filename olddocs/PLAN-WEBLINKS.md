@@ -40,7 +40,7 @@ See [QUESTIONS.md](./PLAN-WEBLINKS-QUESTIONS.md#architecture-marks-vs-decoration
 
 | Risk                                         | Likelihood | Impact | Mitigation                                                                                                               |
 | -------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Bare URL text↔href sync complexity          | High       | Medium | Spike in Phase 1, may need custom mark behavior. See [Q10](./PLAN-WEBLINKS-QUESTIONS.md#q10-bare-url-edit--non-url-text) |
+| Bare URL text↔href sync complexity           | High       | Medium | Spike in Phase 1, may need custom mark behavior. See [Q10](./PLAN-WEBLINKS-QUESTIONS.md#q10-bare-url-edit--non-url-text) |
 | Markdown input rule edge cases               | Medium     | Low    | Use battle-tested regex from established parser                                                                          |
 | Popover positioning edge cases               | Low        | Low    | Reuse tippy.js pattern from InterNoteLink                                                                                |
 | Confusion between mark/decoration approaches | Low        | Medium | Documented in Architecture section                                                                                       |

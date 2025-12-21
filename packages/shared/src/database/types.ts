@@ -676,7 +676,8 @@ export enum MigrationResult {
  * Complete database interface
  */
 export interface Database
-  extends NoteCacheOperations,
+  extends
+    NoteCacheOperations,
     FolderCacheOperations,
     TagOperations,
     LinkOperations,
