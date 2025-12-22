@@ -330,7 +330,9 @@ function handleGetNoteInfo(ctx: HandlerContext) {
         .split(/\s+/)
         .filter((word) => word.length > 0).length;
 
-      vectorClock = storageManager.getNoteVectorClock(note.sdId, noteId);
+      // Get vector clock from in-memory document snapshot (not storageManager's map)
+      // The storageManager map only tracks local writes, but the snapshot has the full clock
+      vectorClock = crdtManager.getVectorClock(noteId) ?? {};
 
       documentHash = crypto
         .createHash('sha256')
@@ -396,7 +398,7 @@ function handleGetNoteInfo(ctx: HandlerContext) {
           loadResult.doc.destroy();
         } catch (err) {
           console.error(`[NoteInfo] Failed to load note ${noteId} from disk:`, err);
-          vectorClock = storageManager.getNoteVectorClock(note.sdId, noteId);
+          // Leave vectorClock as empty - the load failed so we have no reliable source
         }
       }
     }

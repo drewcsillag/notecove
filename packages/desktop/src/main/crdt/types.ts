@@ -74,6 +74,16 @@ export interface CRDTManager {
   getNoteDoc(noteId: string): import('@shared/crdt').NoteDoc | undefined;
 
   /**
+   * Get a note's vector clock (if loaded)
+   * Returns the vector clock from the in-memory document snapshot
+   * @param noteId Note ID
+   * @returns The vector clock or undefined if note not loaded
+   */
+  getVectorClock(
+    noteId: string
+  ): Record<string, { sequence: number; offset: number; file: string }> | undefined;
+
+  /**
    * Load a folder tree document for an SD
    * @param sdId Sync Directory ID
    * @returns Promise resolving to the FolderTreeDoc instance

@@ -337,6 +337,12 @@ export class CRDTManagerImpl implements CRDTManager {
     return this.documents.get(noteId)?.noteDoc;
   }
 
+  getVectorClock(
+    noteId: string
+  ): Record<string, { sequence: number; offset: number; file: string }> | undefined {
+    return this.documents.get(noteId)?.snapshot.getVectorClock();
+  }
+
   /**
    * Handle document update by writing to disk
    * Called when the doc emits 'update' event (user-generated changes)
