@@ -297,8 +297,9 @@ test.describe('Markdown Export - File Menu', () => {
     await createFolderButton.click();
     await page.waitForTimeout(500);
 
-    // Name the folder
-    const folderNameInput = page.locator('input[placeholder*="folder"]').first();
+    // Name the folder - the dialog has a labeled textbox "Folder Name"
+    const folderDialog = page.locator('[role="dialog"]').last();
+    const folderNameInput = folderDialog.locator('input').first();
     await folderNameInput.fill('Test Export Folder');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1000);
@@ -339,16 +340,25 @@ test.describe('Markdown Export - File Menu', () => {
     await page.waitForTimeout(4000);
 
     // Verify files were created (should include the note in folder)
-    const files = readdirSync(exportDir).filter((f) => f.endsWith('.md'));
-    console.log('[E2E Export] Files created via File menu from folder view:', files);
-    expect(files.length).toBeGreaterThanOrEqual(1);
+    const rootFiles = readdirSync(exportDir).filter((f) => f.endsWith('.md'));
+    console.log('[E2E Export] Files created via File menu from folder view:', rootFiles);
 
     // Check that folder structure was created
     const exportDirContents = readdirSync(exportDir);
     console.log('[E2E Export] Export directory contents:', exportDirContents);
 
-    // The note should be exported (either in folder or at root depending on implementation)
-    const allContent = files.map((f) => readFileSync(join(exportDir, f), 'utf-8')).join('\n');
+    // The note should be in the folder subdirectory
+    const folderPath = join(exportDir, 'Test Export Folder');
+    const folderExists = readdirSync(exportDir).includes('Test Export Folder');
+    expect(folderExists).toBe(true);
+
+    // Check files in the folder
+    const folderFiles = readdirSync(folderPath).filter((f) => f.endsWith('.md'));
+    console.log('[E2E Export] Files in folder:', folderFiles);
+
+    // Collect all content from root and folder
+    let allContent = rootFiles.map((f) => readFileSync(join(exportDir, f), 'utf-8')).join('\n');
+    allContent += folderFiles.map((f) => readFileSync(join(folderPath, f), 'utf-8')).join('\n');
     expect(allContent).toContain('Note in Folder');
     expect(allContent).toContain('This note is inside the Test Export Folder.');
   });

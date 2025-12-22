@@ -174,7 +174,9 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     await menu.locator('text=Delete').click();
     await window.waitForTimeout(300);
     await window.locator('button:has-text("Delete")').click();
-    await window.waitForTimeout(1000);
+
+    // Wait for the note to actually be removed from the list (soft delete moves it to Recently Deleted)
+    await expect(getNotesList(window)).toHaveCount(1, { timeout: 5000 });
 
     // Restart the app to trigger auto-cleanup
     await electronApp.close();

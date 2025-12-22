@@ -22,16 +22,17 @@ export interface BackupInfo extends BackupMetadata {
 
 export class BackupManager {
   private backupDir: string;
-  private userDataPath: string;
+  private databasePath: string;
   private onNewStorageDir?: (sdId: string, sdPath: string) => Promise<void>;
 
   constructor(
     private readonly database: Database,
     userDataPath: string,
     customBackupPath?: string,
-    onNewStorageDir?: (sdId: string, sdPath: string) => Promise<void>
+    onNewStorageDir?: (sdId: string, sdPath: string) => Promise<void>,
+    databasePath?: string
   ) {
-    this.userDataPath = userDataPath;
+    this.databasePath = databasePath ?? path.join(userDataPath, 'notecove.db');
     this.backupDir = customBackupPath ?? path.join(userDataPath, '.backups');
     if (onNewStorageDir) {
       this.onNewStorageDir = onNewStorageDir;
@@ -241,8 +242,8 @@ export class BackupManager {
       console.log('[BackupManager] Pack and snapshot not yet implemented, copying as-is');
     }
 
-    // Copy database file (from user data directory, not SD path)
-    const dbSourcePath = path.join(this.userDataPath, 'notecove.db');
+    // Copy database file (from the configured database path)
+    const dbSourcePath = this.databasePath;
     const dbBackupPath = path.join(backupPath, 'database.db');
 
     console.log(`[BackupManager] Copying database from ${dbSourcePath} to ${dbBackupPath}`);

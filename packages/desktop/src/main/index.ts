@@ -585,7 +585,16 @@ void app.whenReady().then(async () => {
     // Initialize BackupManager for backup and restore operations
     const userDataPath = app.getPath('userData');
     const testBackupDir = process.env['TEST_BACKUP_DIR'];
-    backupManager = new BackupManager(database, userDataPath, testBackupDir, handleNewStorageDir);
+    // In test mode, pass the explicit database path (TEST_DB_PATH)
+    // since the database is not in the default userData location
+    const testDbPathForBackup = process.env['TEST_DB_PATH'];
+    backupManager = new BackupManager(
+      database,
+      userDataPath,
+      testBackupDir,
+      handleNewStorageDir,
+      testDbPathForBackup
+    );
     console.log('[Init] BackupManager initialized');
 
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)
