@@ -21,14 +21,16 @@ export interface TagPanelProps {
 
 export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onClearFilters }) => {
   const [tags, setTags] = useState<{ id: string; name: string; count: number }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Load tags from database
-  const loadTags = useCallback(async () => {
+  // Load tags from database (initial load shows loading state)
+  const loadTags = useCallback(async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setInitialLoading(true);
+      }
       setError(null);
       const allTags = await window.electronAPI.tag.getAll();
       setTags(allTags);
@@ -36,31 +38,48 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
       console.error('Failed to load tags:', err);
       setError('Failed to load tags');
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setInitialLoading(false);
+      }
     }
   }, []);
 
   // Initial load
   useEffect(() => {
-    void loadTags();
+    void loadTags(true); // Pass true for initial load to show loading state
   }, [loadTags]);
 
-  // Listen for tag updates
+  // Listen for tag updates with debouncing to prevent flicker
   useEffect(() => {
+    let debounceTimeout: NodeJS.Timeout | null = null;
+
+    const debouncedLoadTags = () => {
+      // Debounce rapid updates (e.g., typing triggers many note:updated events)
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+      }
+      debounceTimeout = setTimeout(() => {
+        void loadTags();
+        debounceTimeout = null;
+      }, 500); // Wait 500ms after last update before refreshing
+    };
+
     // When tags are updated (via note edits), refresh the list
     // This will be triggered by the note:updated event which updates tags
     const unsubscribeNote = window.electronAPI.note.onUpdated(() => {
-      void loadTags();
+      debouncedLoadTags();
     });
 
-    // When Storage Directories are created/deleted, refresh tags
-    // Deleting an SD removes all its notes and orphaned tags
-    // Creating/restoring an SD may add new tags
+    // When Storage Directories are created/deleted, refresh tags immediately
+    // (these are less frequent and user expects immediate feedback)
     const unsubscribeSD = window.electronAPI.sd.onUpdated(() => {
       void loadTags();
     });
 
     return () => {
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+      }
       unsubscribeNote();
       unsubscribeSD();
     };
@@ -75,7 +94,7 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
     return tags.filter((tag) => tag.name.toLowerCase().includes(query));
   }, [tags, searchQuery]);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <Box sx={{ p: 2 }}>
         <Typography variant="body2" color="text.secondary">

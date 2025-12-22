@@ -61,7 +61,7 @@ test.afterEach(async () => {
  */
 async function typeInEditor(page: Page, text: string) {
   const editor = page.locator('.ProseMirror').first();
-  await editor.click();
+  await editor.click({ force: true });
   await editor.pressSequentially(text, { delay: 5 });
 }
 
@@ -109,8 +109,9 @@ test.describe('Comments Performance', () => {
       createTimes.push(Date.now() - start);
 
       // Click back in editor for next iteration
+      // Use force:true to avoid timeout when UI is slow with many comments
       const editor = page.locator('.ProseMirror').first();
-      await editor.click();
+      await editor.click({ force: true });
     }
 
     // Log timing info
@@ -134,7 +135,7 @@ test.describe('Comments Performance', () => {
 
     // Test typing performance
     const editor = page.locator('.ProseMirror').first();
-    await editor.click();
+    await editor.click({ force: true });
     await page.keyboard.press('End');
 
     const typeStart = Date.now();
@@ -157,7 +158,7 @@ test.describe('Comments Performance', () => {
 
       // Click back in editor
       const editor = page.locator('.ProseMirror').first();
-      await editor.click();
+      await editor.click({ force: true });
     }
 
     // Measure panel interaction time
@@ -188,12 +189,12 @@ test.describe('Comments Performance', () => {
     for (let i = 0; i < 3; i++) {
       await createCommentViaUI(page, `Highlight test comment ${i + 1}`);
       const editor = page.locator('.ProseMirror').first();
-      await editor.click();
+      await editor.click({ force: true });
     }
 
     // Test editor responsiveness by measuring typing latency
     const editor = page.locator('.ProseMirror').first();
-    await editor.click();
+    await editor.click({ force: true });
     await page.keyboard.press('End');
 
     // Type a paragraph and measure

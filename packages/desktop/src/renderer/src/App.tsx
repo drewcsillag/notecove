@@ -2,7 +2,7 @@
  * Main App Component
  */
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { CssBaseline, ThemeProvider, Box, type PaletteMode } from '@mui/material';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -94,6 +94,18 @@ function App(): React.ReactElement {
 
   // Create theme based on mode
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+
+  // Memoized callback for when a note finishes loading
+  // This prevents TipTapEditor's useEffect from re-running when unrelated state changes
+  const handleNoteLoaded = useCallback(() => {
+    // Clear the newly created flag once the note has been loaded
+    setNewlyCreatedNoteId((currentNewlyCreatedId) => {
+      if (currentNewlyCreatedId === selectedNoteId) {
+        return null;
+      }
+      return currentNewlyCreatedId;
+    });
+  }, [selectedNoteId]);
 
   // Parse URL parameters on mount (for minimal window mode with specific noteId)
   useEffect(() => {
@@ -875,9 +887,7 @@ function App(): React.ReactElement {
             <EditorPanel
               selectedNoteId={selectedNoteId}
               isNewlyCreated={false}
-              onNoteLoaded={() => {
-                // No-op in minimal mode
-              }}
+              onNoteLoaded={handleNoteLoaded}
               showHistoryPanel={historyPanelOpen}
               onHistoryPanelClose={() => {
                 setHistoryPanelOpen(false);
@@ -940,12 +950,7 @@ function App(): React.ReactElement {
               <EditorPanel
                 selectedNoteId={selectedNoteId}
                 isNewlyCreated={selectedNoteId === newlyCreatedNoteId}
-                onNoteLoaded={() => {
-                  // Clear the newly created flag once the note has been loaded
-                  if (newlyCreatedNoteId === selectedNoteId) {
-                    setNewlyCreatedNoteId(null);
-                  }
-                }}
+                onNoteLoaded={handleNoteLoaded}
                 showHistoryPanel={historyPanelOpen}
                 onHistoryPanelClose={() => {
                   setHistoryPanelOpen(false);

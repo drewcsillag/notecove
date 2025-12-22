@@ -172,6 +172,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const isLoadingRef = useRef(true);
   const noteIdRef = useRef<string | null>(noteId);
+  // Track which note has been successfully loaded to skip redundant loads
+  const loadedNoteIdRef = useRef<string | null>(null);
   const titleUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const updateHandlerRef = useRef<((update: Uint8Array, origin: unknown) => void) | null>(null);
   // Track updates we've sent to main process so we can skip them when they bounce back
@@ -979,6 +981,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
     // Load note from main process
     const loadNote = async () => {
+      // Skip if this note is already loaded (prevents redundant loads when
+      // unrelated state changes trigger useEffect re-runs)
+      if (loadedNoteIdRef.current === noteId) {
+        return;
+      }
+
       try {
         setLoadingState(true);
         console.log(`[TipTapEditor] Loading note ${noteId}`);
@@ -1026,6 +1034,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         // IMPORTANT: Clear loading flag AFTER all content manipulation to prevent
         // spurious title updates from setContent/setHeading operations
         setLoadingState(false);
+
+        // Mark this note as successfully loaded to prevent redundant reloads
+        loadedNoteIdRef.current = noteId;
 
         // Enable editing now that loading is complete
         editor.setEditable(!readOnly);
