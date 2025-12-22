@@ -11,7 +11,7 @@
  */
 
 import { Extension } from '@tiptap/react';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import type { Transaction } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
@@ -116,6 +116,63 @@ export function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch 
   };
 }
 
+/**
+ * Find a complete [[uuid]] link ending exactly at the given position
+ * @param doc - The ProseMirror document
+ * @param pos - The position to check (cursor position)
+ * @returns The range { from, to } of the link, or null if no link ends at this position
+ */
+export function findLinkEndingAt(doc: PMNode, pos: number): { from: number; to: number } | null {
+  // Get the text node at this position by looking backwards
+  const $pos = doc.resolve(pos);
+
+  // Get text content of the parent node up to the cursor
+  const parentStart = $pos.start();
+  const textBefore = doc.textBetween(parentStart, pos, '\0', '\0');
+
+  // Check if there's a complete [[uuid]] pattern ending at the cursor
+  // The pattern must end exactly at the cursor position
+  const regex = new RegExp(LINK_PATTERN.source + '$', 'i');
+  const match = regex.exec(textBefore);
+
+  if (!match) {
+    return null;
+  }
+
+  const from = parentStart + match.index;
+  const to = pos;
+
+  return { from, to };
+}
+
+/**
+ * Find a complete [[uuid]] link starting exactly at the given position
+ * @param doc - The ProseMirror document
+ * @param pos - The position to check (cursor position)
+ * @returns The range { from, to } of the link, or null if no link starts at this position
+ */
+export function findLinkStartingAt(doc: PMNode, pos: number): { from: number; to: number } | null {
+  const $pos = doc.resolve(pos);
+
+  // Get text content from cursor to end of parent node
+  const parentEnd = $pos.end();
+  const textAfter = doc.textBetween(pos, parentEnd, '\0', '\0');
+
+  // Check if there's a complete [[uuid]] pattern starting at the cursor
+  // The pattern must start exactly at position 0 of the textAfter
+  const regex = new RegExp('^' + LINK_PATTERN.source, 'i');
+  const match = regex.exec(textAfter);
+
+  if (!match) {
+    return null;
+  }
+
+  const from = pos;
+  const to = pos + match[0].length;
+
+  return { from, to };
+}
+
 export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
   name: 'interNoteLink',
 
@@ -211,6 +268,73 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
             },
           };
         },
+      },
+    };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Backspace: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a link ending at the cursor position
+        const linkRange = findLinkEndingAt(state.doc, pos);
+        if (!linkRange) {
+          return false;
+        }
+
+        // Check if the link is already selected
+        // (selection spans exactly the link range)
+        if (selection.from === linkRange.from && selection.to === linkRange.to) {
+          // Link already selected, let default behavior delete it
+          return false;
+        }
+
+        // Select the link
+        const tr = state.tr.setSelection(
+          TextSelection.create(state.doc, linkRange.from, linkRange.to)
+        );
+        view.dispatch(tr);
+        return true;
+      },
+
+      Delete: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a link starting at the cursor position
+        const linkRange = findLinkStartingAt(state.doc, pos);
+        if (!linkRange) {
+          return false;
+        }
+
+        // Check if the link is already selected
+        if (selection.from === linkRange.from && selection.to === linkRange.to) {
+          // Link already selected, let default behavior delete it
+          return false;
+        }
+
+        // Select the link
+        const tr = state.tr.setSelection(
+          TextSelection.create(state.doc, linkRange.from, linkRange.to)
+        );
+        view.dispatch(tr);
+        return true;
       },
     };
   },
