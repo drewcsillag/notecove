@@ -231,8 +231,10 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'Find...',
           accelerator: 'CmdOrCtrl+F',
           click: () => {
-            // TODO: Focus search box in UI
-            if (mainWindow) {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:find');
+            } else if (mainWindow) {
               mainWindow.webContents.send('menu:find');
             }
           },
@@ -241,8 +243,10 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'Find in Note',
           accelerator: 'CmdOrCtrl+Shift+F',
           click: () => {
-            // TODO: Open in-editor search
-            if (mainWindow) {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:find-in-note');
+            } else if (mainWindow) {
               mainWindow.webContents.send('menu:find-in-note');
             }
           },
@@ -315,7 +319,12 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'Note Info',
           accelerator: 'CmdOrCtrl+Shift+I',
           click: () => {
-            if (mainWindow) {
+            // Send to focused window, not mainWindow, so the correct note context is used
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:noteInfo');
+            } else if (mainWindow) {
+              // Fallback to mainWindow if no focused window
               mainWindow.webContents.send('menu:noteInfo');
             }
           },
@@ -324,7 +333,10 @@ export function createMenu(deps: MenuDependencies): void {
         {
           label: 'Create Snapshot',
           click: () => {
-            if (mainWindow) {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:createSnapshot');
+            } else if (mainWindow) {
               mainWindow.webContents.send('menu:createSnapshot');
             }
           },
@@ -333,7 +345,10 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'View History',
           accelerator: 'CmdOrCtrl+Alt+H',
           click: () => {
-            if (mainWindow) {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:viewHistory');
+            } else if (mainWindow) {
               mainWindow.webContents.send('menu:viewHistory');
             }
           },
@@ -381,7 +396,10 @@ export function createMenu(deps: MenuDependencies): void {
             {
               label: 'Reload Note from CRDT Logs',
               click: () => {
-                if (mainWindow) {
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('menu:reloadFromCRDTLogs');
+                } else if (mainWindow) {
                   mainWindow.webContents.send('menu:reloadFromCRDTLogs');
                 }
               },

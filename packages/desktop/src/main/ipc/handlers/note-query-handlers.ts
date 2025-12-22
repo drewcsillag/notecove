@@ -321,6 +321,7 @@ function handleGetNoteInfo(ctx: HandlerContext) {
     let documentHash = '';
 
     if (doc) {
+      console.log(`[NoteInfo] Note ${noteId} is loaded in memory`);
       const content = doc.getXmlFragment('content');
       contentText = extractTextFromContent(content);
       paragraphCount = countParagraphs(content);
@@ -333,6 +334,7 @@ function handleGetNoteInfo(ctx: HandlerContext) {
       // Get vector clock from in-memory document snapshot (not storageManager's map)
       // The storageManager map only tracks local writes, but the snapshot has the full clock
       vectorClock = crdtManager.getVectorClock(noteId) ?? {};
+      console.log(`[NoteInfo] Vector clock from snapshot:`, JSON.stringify(vectorClock));
 
       documentHash = crypto
         .createHash('sha256')
@@ -340,9 +342,11 @@ function handleGetNoteInfo(ctx: HandlerContext) {
         .digest('hex')
         .substring(0, 16);
     } else {
+      console.log(`[NoteInfo] Note ${noteId} NOT in memory, checking DB cache`);
       const syncState = await database.getNoteSyncState(noteId, note.sdId);
 
       if (syncState) {
+        console.log(`[NoteInfo] Found DB sync state, vectorClock from DB:`, syncState.vectorClock);
         try {
           vectorClock = JSON.parse(syncState.vectorClock) as Record<
             string,
@@ -379,6 +383,7 @@ function handleGetNoteInfo(ctx: HandlerContext) {
         try {
           const loadResult = await storageManager.loadNote(note.sdId, noteId);
           vectorClock = loadResult.vectorClock;
+          console.log(`[NoteInfo] Loaded from disk, vectorClock:`, JSON.stringify(vectorClock));
 
           const content = loadResult.doc.getXmlFragment('content');
           contentText = extractTextFromContent(content);
