@@ -379,7 +379,7 @@ export interface CommentReactionCache {
  * - Sync state tables: Safe to recreate (will rebuild from files)
  * - Comment tables: Cache only, safe to recreate (rebuilt from CRDT)
  */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 /**
  * SQL schema definitions

@@ -131,53 +131,8 @@ test.describe('Phase 2.6 Low Priority Settings', () => {
     ).toBeVisible();
     await expect(window.locator('button[role="tab"]', { hasText: 'User' })).toBeVisible();
     await expect(window.locator('button[role="tab"]', { hasText: 'Appearance' })).toBeVisible();
-    await expect(window.locator('button[role="tab"]', { hasText: 'Database' })).toBeVisible();
-  });
-
-  test('should show current database path in Database settings', async () => {
-    // Open Settings dialog
-    await window.keyboard.press(process.platform === 'darwin' ? 'Meta+,' : 'Control+,');
-    await expect(window.locator('text=Settings')).toBeVisible({ timeout: 5000 });
-
-    // Click on Database tab
-    const databaseTab = window.locator('button[role="tab"]', { hasText: 'Database' });
-    await databaseTab.click();
-
-    // Wait for database settings to load
-    await window.waitForTimeout(500);
-
-    // Verify current database path is shown
-    const dbPathField = window
-      .locator('input[label="Current Database Path"]')
-      .or(
-        window
-          .locator('input')
-          .filter({ has: window.locator('label:has-text("Current Database Path")') })
-      )
-      .or(window.locator('input[readonly]').first());
-
-    await expect(dbPathField).toBeVisible();
-
-    // Get the actual value - should contain either testDbPath or the default path
-    const dbPathValue = await dbPathField.inputValue();
-    expect(dbPathValue).toBeTruthy();
-    expect(dbPathValue).toContain('.db');
-  });
-
-  test('should show warning dialog when changing database path', async () => {
-    // Open Settings dialog
-    await window.keyboard.press(process.platform === 'darwin' ? 'Meta+,' : 'Control+,');
-    await expect(window.locator('text=Settings')).toBeVisible({ timeout: 5000 });
-
-    // Click on Database tab
-    const databaseTab = window.locator('button[role="tab"]', { hasText: 'Database' });
-    await databaseTab.click();
-    await window.waitForTimeout(500);
-
-    // Note: We can't actually test the file picker dialog in E2E tests easily,
-    // but we can verify the UI elements are present
-    const changeLocationButton = window.locator('button', { hasText: 'Change Location' });
-    await expect(changeLocationButton).toBeVisible();
-    await expect(changeLocationButton).toBeEnabled();
+    await expect(window.locator('button[role="tab"]', { hasText: 'Telemetry' })).toBeVisible();
+    await expect(window.locator('button[role="tab"]', { hasText: 'Web Server' })).toBeVisible();
+    await expect(window.locator('button[role="tab"]', { hasText: 'Recovery' })).toBeVisible();
   });
 });

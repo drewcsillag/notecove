@@ -25,7 +25,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import { StorageDirectorySettings } from './StorageDirectorySettings';
 import { UserSettings } from './UserSettings';
 import { AppearanceSettings } from './AppearanceSettings';
-import { DatabaseSettings } from './DatabaseSettings';
 import { TelemetrySettings } from './TelemetrySettings';
 import { RecoverySettings } from './RecoverySettings';
 import { WebServerSettings } from './WebServerSettings';
@@ -108,11 +107,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         label: 'Telemetry',
         electronOnly: true,
         component: <TelemetrySettings />,
-      },
-      {
-        label: 'Database',
-        electronOnly: true,
-        component: <DatabaseSettings />,
       },
       {
         label: 'Web Server',

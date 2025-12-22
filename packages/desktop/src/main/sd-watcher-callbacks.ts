@@ -12,6 +12,8 @@ import * as Y from 'yjs';
 import type { Database } from '@notecove/shared';
 import {
   extractTitleFromDoc,
+  extractTextAndSnippet,
+  resolveLinks,
   type ActivitySyncCallbacks,
   type DeletionSyncCallbacks,
 } from '@notecove/shared';
@@ -125,45 +127,30 @@ export function createActivitySyncCallbacks(
             throw new Error('Note is incomplete - content is empty');
           }
 
-          let contentText = '';
-          content.forEach((item) => {
-            if (item instanceof Y.XmlText) {
-              contentText += String(item.toString()) + '\n';
-            } else if (item instanceof Y.XmlElement) {
-              const extractText = (el: Y.XmlElement | Y.XmlText): string => {
-                if (el instanceof Y.XmlText) {
-                  return String(el.toString());
-                }
-                let text = '';
-                el.forEach((child: unknown) => {
-                  const childElement = child as Y.XmlElement | Y.XmlText;
-                  text += extractText(childElement);
-                });
-                return text;
-              };
-              contentText += extractText(item) + '\n';
-            }
-          });
-
-          // Generate content preview (first 200 chars after title)
-          const lines = contentText.split('\n');
-          const contentAfterTitle = lines.slice(1).join('\n').trim();
-          const contentPreview = contentAfterTitle.substring(0, 200);
+          const { contentText, contentPreview } = extractTextAndSnippet(content, 200);
 
           // Extract title and strip any HTML/XML tags
           let newNoteTitle = extractTitleFromDoc(doc, 'content');
           newNoteTitle = newNoteTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
+          // Resolve [[uuid]] links to [[title]] in title and preview
+          const linkResolver = async (linkNoteId: string) => {
+            const linkedNote = await database.getNote(linkNoteId);
+            return linkedNote?.title ?? null;
+          };
+          const resolvedTitle = await resolveLinks(newNoteTitle, linkResolver);
+          const resolvedPreview = await resolveLinks(contentPreview, linkResolver);
+
           await database.upsertNote({
             id: noteId,
-            title: newNoteTitle,
+            title: resolvedTitle,
             sdId: sdIdFromSync,
             folderId,
             created: crdtMetadata?.created ?? Date.now(),
             modified: crdtMetadata?.modified ?? Date.now(),
             deleted: crdtMetadata?.deleted ?? false,
             pinned: crdtMetadata?.pinned ?? false,
-            contentPreview,
+            contentPreview: resolvedPreview,
             contentText,
           });
 
@@ -231,37 +218,20 @@ export function createActivitySyncCallbacks(
             let newTitle = extractTitleFromDoc(doc, 'content');
             newTitle = newTitle.replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
-            // Extract content if not already cached
-            let contentText = existingNote.contentText;
-            let contentPreview = existingNote.contentPreview;
+            // Always re-extract content from CRDT to ensure proper formatting
+            // (cached contentText may have old format without proper newlines)
+            const content = doc.getXmlFragment('content');
+            const extracted = extractTextAndSnippet(content, 200);
+            const contentText = extracted.contentText;
+            const contentPreview = extracted.contentPreview;
 
-            if (!contentText) {
-              const content = doc.getXmlFragment('content');
-              contentText = '';
-              content.forEach((item) => {
-                if (item instanceof Y.XmlText) {
-                  contentText += String(item.toString()) + '\n';
-                } else if (item instanceof Y.XmlElement) {
-                  const extractText = (el: Y.XmlElement | Y.XmlText): string => {
-                    if (el instanceof Y.XmlText) {
-                      return String(el.toString());
-                    }
-                    let text = '';
-                    el.forEach((child: unknown) => {
-                      const childElement = child as Y.XmlElement | Y.XmlText;
-                      text += extractText(childElement);
-                    });
-                    return text;
-                  };
-                  contentText += extractText(item) + '\n';
-                }
-              });
-
-              // Generate content preview
-              const lines = contentText.split('\n');
-              const contentAfterTitle = lines.slice(1).join('\n').trim();
-              contentPreview = contentAfterTitle.substring(0, 200);
-            }
+            // Resolve [[uuid]] links to [[title]] in title and preview
+            const linkResolver = async (linkNoteId: string) => {
+              const linkedNote = await database.getNote(linkNoteId);
+              return linkedNote?.title ?? null;
+            };
+            const resolvedTitle = await resolveLinks(newTitle, linkResolver);
+            const resolvedPreview = await resolveLinks(contentPreview, linkResolver);
 
             // Detect folder change (for note:moved event)
             const oldFolderId = existingNote.folderId;
@@ -270,14 +240,14 @@ export function createActivitySyncCallbacks(
 
             await database.upsertNote({
               id: noteId,
-              title: newTitle,
+              title: resolvedTitle,
               sdId: existingNote.sdId,
               folderId: newFolderId,
               created: existingNote.created,
               modified: crdtMetadata?.modified ?? Date.now(),
               deleted: crdtMetadata?.deleted ?? false,
               pinned: crdtMetadata?.pinned ?? existingNote.pinned,
-              contentPreview,
+              contentPreview: resolvedPreview,
               contentText,
             });
 
@@ -286,8 +256,9 @@ export function createActivitySyncCallbacks(
             for (const window of BrowserWindow.getAllWindows()) {
               window.webContents.send('note:title-updated', {
                 noteId,
-                title: newTitle,
+                title: resolvedTitle,
                 modified: syncedModified,
+                contentPreview: resolvedPreview,
               });
             }
 

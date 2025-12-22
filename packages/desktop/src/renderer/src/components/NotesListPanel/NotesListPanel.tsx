@@ -585,7 +585,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     });
 
     const unsubscribeTitleUpdated = window.electronAPI.note.onTitleUpdated((data) => {
-      // Update title and modified timestamp in notes list without refetching
+      // Update title, modified timestamp, and contentPreview in notes list without refetching
       setNotes((prevNotes) => {
         const noteIndex = prevNotes.findIndex((note) => note.id === data.noteId);
         if (noteIndex !== -1) {
@@ -595,6 +595,8 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
             ...updatedNotes[noteIndex]!,
             title: data.title,
             modified: data.modified,
+            // Update contentPreview if provided (snippet update)
+            ...(data.contentPreview !== undefined && { contentPreview: data.contentPreview }),
           };
           return updatedNotes;
         }

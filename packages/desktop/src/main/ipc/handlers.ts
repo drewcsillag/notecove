@@ -36,6 +36,8 @@ import type { CommentThread, CommentReply, CommentReaction } from '@notecove/sha
 import {
   extractTags,
   extractLinks,
+  extractSnippet,
+  resolveLinks,
   ImageStorage,
   getMimeTypeFromExtension,
   getExtensionFromMimeType,
@@ -1813,7 +1815,7 @@ export class IPCHandlers {
     const titleChanged = note.title !== title;
     let contentChanged = false;
     if (contentText !== undefined) {
-      const newPreview = contentText.split('\n').slice(1).join('\n').trim().substring(0, 200);
+      const newPreview = extractSnippet(contentText, 200);
       contentChanged = note.contentText !== contentText || note.contentPreview !== newPreview;
     }
 
@@ -1822,20 +1824,27 @@ export class IPCHandlers {
       return;
     }
 
+    // Resolve [[uuid]] links to [[title]] for display
+    const linkResolver = async (linkNoteId: string) => {
+      const linkedNote = await this.database.getNote(linkNoteId);
+      return linkedNote?.title ?? null;
+    };
+    const resolvedTitle = await resolveLinks(title, linkResolver);
+
     // Update title, content (if provided), and modified timestamp
     const updates: Partial<typeof note> = {
       ...note,
-      title,
+      title: resolvedTitle,
       modified: Date.now(),
     };
 
     if (contentText !== undefined) {
       updates.contentText = contentText;
       // Extract preview from content after first line (which is the title)
-      // This prevents the title from appearing twice in the notes list
-      const lines = contentText.split('\n');
-      const contentAfterTitle = lines.slice(1).join('\n').trim();
-      updates.contentPreview = contentAfterTitle.substring(0, 200);
+      // Skip empty lines to get actual content
+      const contentPreview = extractSnippet(contentText, 200);
+      const resolvedPreview = await resolveLinks(contentPreview, linkResolver);
+      updates.contentPreview = resolvedPreview;
     }
 
     await this.database.upsertNote(updates as typeof note);
@@ -1924,7 +1933,13 @@ export class IPCHandlers {
 
     // Broadcast title update to all windows so they can refresh their notes list
     // Include modified timestamp so note list can update ordering
-    this.broadcastToAll('note:title-updated', { noteId, title, modified: updates.modified });
+    // Include contentPreview so snippet updates are reflected immediately
+    this.broadcastToAll('note:title-updated', {
+      noteId,
+      title: resolvedTitle,
+      modified: updates.modified,
+      contentPreview: updates.contentPreview,
+    });
   }
 
   private async handleListNotes(

@@ -4,9 +4,8 @@
  * Shared utility functions for SD watcher operations
  */
 
-import * as Y from 'yjs';
 import type { Database } from '@notecove/shared';
-import { extractTags } from '@notecove/shared';
+import { extractTags, extractTextFromFragment } from '@notecove/shared';
 import type { CRDTManager } from './crdt';
 
 /**
@@ -41,28 +40,7 @@ export async function reindexTagsForNotes(
 
       // Extract plain text from the document
       const content = doc.getXmlFragment('content');
-      let contentText = '';
-
-      // Simple text extraction from Y.XmlFragment
-      content.forEach((item) => {
-        if (item instanceof Y.XmlText) {
-          contentText += String(item.toString()) + '\n';
-        } else if (item instanceof Y.XmlElement) {
-          // Recursively extract text from elements
-          const extractText = (elem: Y.XmlElement): string => {
-            let text = '';
-            elem.forEach((child) => {
-              if (child instanceof Y.XmlText) {
-                text += String(child.toString());
-              } else if (child instanceof Y.XmlElement) {
-                text += extractText(child);
-              }
-            });
-            return text;
-          };
-          contentText += extractText(item) + '\n';
-        }
-      });
+      const contentText = extractTextFromFragment(content);
 
       // Extract and update tags
       const tags = extractTags(contentText);

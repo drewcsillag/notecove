@@ -10,7 +10,9 @@ import {
   AppendLogManager,
   SyncDirectoryStructure,
   extractTitleFromDoc,
+  extractTextAndSnippet,
   extractTags,
+  resolveLinks,
   SDMarker,
   type SDType,
   ProfileLock,
@@ -22,7 +24,6 @@ import { CRDTManagerImpl, CRDTCommentObserver, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
-import * as Y from 'yjs';
 import { ConfigManager } from './config/manager';
 import { initializeTelemetry } from './telemetry/config';
 import { NoteMoveManager } from './note-move-manager';
@@ -273,8 +274,14 @@ void app.whenReady().then(async () => {
     const isDevBuild = !app.isPackaged;
     const currentSDType: SDType = isDevBuild ? 'dev' : 'prod';
 
-    // Determine storage directory (shared across instances for sync)
-    const storageDir = process.env['TEST_STORAGE_DIR'] ?? join(app.getPath('userData'), 'storage');
+    // Determine storage directory (profile-specific to prevent cross-profile pollution)
+    // Each profile gets its own default storage at profiles/<profileId>/storage
+    // Test mode or no profile falls back to shared 'storage' for backwards compatibility
+    const storageDir =
+      process.env['TEST_STORAGE_DIR'] ??
+      (selectedProfileId
+        ? join(app.getPath('userData'), 'profiles', selectedProfileId, 'storage')
+        : join(app.getPath('userData'), 'storage'));
 
     // Initialize default SD structure
     await initializeDefaultSD(
@@ -497,42 +504,28 @@ void app.whenReady().then(async () => {
 
                 // Extract text content for tag indexing and caching
                 const content = doc.getXmlFragment('content');
-                let contentText = '';
-                content.forEach((item) => {
-                  if (item instanceof Y.XmlText) {
-                    const textStr = String(item.toString());
-                    contentText += textStr + '\n';
-                  } else if (item instanceof Y.XmlElement) {
-                    const extractText = (el: Y.XmlElement | Y.XmlText): string => {
-                      if (el instanceof Y.XmlText) {
-                        return String(el.toString());
-                      }
-                      let text = '';
-                      el.forEach((child: unknown) => {
-                        const childElement = child as Y.XmlElement | Y.XmlText;
-                        text += extractText(childElement);
-                      });
-                      return text;
-                    };
-                    contentText += extractText(item) + '\n';
-                  }
-                });
+                const { contentText, contentPreview } = extractTextAndSnippet(content, 200);
 
-                // Generate content preview (first 200 chars after title)
-                const lines = contentText.split('\n');
-                const contentAfterTitle = lines.slice(1).join('\n').trim();
-                const contentPreview = contentAfterTitle.substring(0, 200);
+                // Resolve [[uuid]] links to [[title]] in title and preview
+                const linkResolver = async (linkNoteId: string) => {
+                  // database is guaranteed to be non-null at this point (checked above)
+                  if (!database) return null;
+                  const linkedNote = await database.getNote(linkNoteId);
+                  return linkedNote?.title ?? null;
+                };
+                const resolvedTitle = await resolveLinks(title, linkResolver);
+                const resolvedPreview = await resolveLinks(contentPreview, linkResolver);
 
                 await database.upsertNote({
                   id: noteId,
-                  title,
+                  title: resolvedTitle,
                   sdId,
                   folderId,
                   created: crdtMetadata?.created ?? Date.now(),
                   modified: crdtMetadata?.modified ?? Date.now(),
                   deleted: crdtMetadata?.deleted ?? false,
                   pinned: crdtMetadata?.pinned ?? false,
-                  contentPreview,
+                  contentPreview: resolvedPreview,
                   contentText,
                 });
 
