@@ -606,13 +606,18 @@ export class IPCHandlers {
 
       // Only update if note exists in cache and CRDT has initialized metadata
       if (note && crdtMetadata.id) {
-        // Defensive fallbacks are handled in getMetadata() itself
+        // Preserve deleted state from database if already deleted.
+        // This prevents "undeleting" notes when CRDT writes didn't complete
+        // before shutdown. Once a note is deleted locally, it should stay
+        // deleted unless explicitly restored.
+        const deletedState = note.deleted ? true : crdtMetadata.deleted;
+
         await this.database.upsertNote({
           ...note,
           folderId: crdtMetadata.folderId,
           created: crdtMetadata.created,
           modified: crdtMetadata.modified,
-          deleted: crdtMetadata.deleted,
+          deleted: deletedState,
         });
       }
     }

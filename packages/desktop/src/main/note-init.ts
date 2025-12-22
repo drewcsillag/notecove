@@ -157,15 +157,22 @@ export async function ensureDefaultNote(
       const folderId = crdtMetadata.folderId;
       const deleted = crdtMetadata.deleted;
       const modified = crdtMetadata.modified;
-      if (folderId !== defaultNoteInAnySD.folderId || deleted !== defaultNoteInAnySD.deleted) {
+      // Preserve deleted state: if database says deleted, keep it deleted.
+      // This prevents "undeleting" notes when CRDT writes didn't complete before shutdown.
+      const preservedDeleted = defaultNoteInAnySD.deleted ? true : deleted;
+
+      if (
+        folderId !== defaultNoteInAnySD.folderId ||
+        preservedDeleted !== defaultNoteInAnySD.deleted
+      ) {
         console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
           folderId,
-          deleted,
+          deleted: preservedDeleted,
         });
         await db.upsertNote({
           ...defaultNoteInAnySD,
           folderId,
-          deleted,
+          deleted: preservedDeleted,
           modified,
         });
       }
@@ -200,15 +207,19 @@ export async function ensureDefaultNote(
         const folderId = crdtMetadata.folderId;
         const deleted = crdtMetadata.deleted;
         const modified = crdtMetadata.modified;
-        if (folderId !== defaultNote.folderId || deleted !== defaultNote.deleted) {
+
+        // Preserve deleted state: if database says deleted, keep it deleted.
+        const preservedDeleted = defaultNote.deleted ? true : deleted;
+
+        if (folderId !== defaultNote.folderId || preservedDeleted !== defaultNote.deleted) {
           console.log('[ensureDefaultNote] Syncing CRDT metadata to database:', {
             folderId,
-            deleted,
+            deleted: preservedDeleted,
           });
           await db.upsertNote({
             ...defaultNote,
             folderId,
-            deleted,
+            deleted: preservedDeleted,
             modified,
           });
         }

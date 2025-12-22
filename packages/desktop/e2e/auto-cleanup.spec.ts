@@ -178,8 +178,62 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     // Wait for the note to actually be removed from the list (soft delete moves it to Recently Deleted)
     await expect(getNotesList(window)).toHaveCount(1, { timeout: 5000 });
 
+    // Debug: Check what notes are in the database before restart
+    const notesBeforeRestart = await window.evaluate(async () => {
+      // Get all notes (including deleted) from the default SD
+      const allNotes = await window.electronAPI.note.list('default', null);
+      const deletedNotes = await window.electronAPI.note.list(
+        'default',
+        'recently-deleted:default'
+      );
+      return {
+        all: allNotes.map((n) => ({
+          id: n.id,
+          title: n.title,
+          deleted: n.deleted,
+          modified: n.modified,
+        })),
+        deleted: deletedNotes.map((n) => ({
+          id: n.id,
+          title: n.title,
+          deleted: n.deleted,
+          modified: n.modified,
+        })),
+      };
+    });
+    console.log('[Test] Notes before restart - all:', notesBeforeRestart.all);
+    console.log('[Test] Notes before restart - deleted:', notesBeforeRestart.deleted);
+
+    // Query database directly using sqlite3 before restart
+    const { execSync } = await import('child_process');
+    const dbContentBefore = execSync(
+      `sqlite3 "${testDbPath}" "SELECT id, title, deleted, modified FROM notes"`,
+      {
+        encoding: 'utf-8',
+      }
+    );
+    console.log('[Test] Database contents before restart:\n', dbContentBefore);
+
     // Restart the app to trigger auto-cleanup
     await electronApp.close();
+
+    // Query database after close but before restart
+    const dbContentAfterClose = execSync(
+      `sqlite3 "${testDbPath}" "SELECT id, title, deleted, modified FROM notes"`,
+      {
+        encoding: 'utf-8',
+      }
+    );
+    console.log('[Test] Database contents after close (before restart):\n', dbContentAfterClose);
+
+    // Also check the storage directory for CRDT files
+    const notesDirContent = execSync(
+      `ls -la "${testStorageDir}/notes/" 2>/dev/null || echo "no notes dir"`,
+      {
+        encoding: 'utf-8',
+      }
+    );
+    console.log('[Test] Notes directory after close:\n', notesDirContent);
 
     electronApp = await electron.launch({
       args: ['.'],
@@ -194,6 +248,49 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     window = await electronApp.firstWindow();
     await window.waitForLoadState('domcontentloaded');
     await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
+
+    // Debug: Check what notes are in the database after restart (before navigating to Recently Deleted)
+    const notesAfterRestart = await window.evaluate(async () => {
+      const allNotes = await window.electronAPI.note.list('default', null);
+      const deletedNotes = await window.electronAPI.note.list(
+        'default',
+        'recently-deleted:default'
+      );
+      return {
+        all: allNotes.map((n) => ({
+          id: n.id,
+          title: n.title,
+          deleted: n.deleted,
+          modified: n.modified,
+        })),
+        deleted: deletedNotes.map((n) => ({
+          id: n.id,
+          title: n.title,
+          deleted: n.deleted,
+          modified: n.modified,
+        })),
+      };
+    });
+    console.log('[Test] Notes after restart - all:', notesAfterRestart.all);
+    console.log('[Test] Notes after restart - deleted:', notesAfterRestart.deleted);
+
+    // Query database directly after restart
+    const dbContentAfterRestart = execSync(
+      `sqlite3 "${testDbPath}" "SELECT id, title, deleted, modified FROM notes"`,
+      {
+        encoding: 'utf-8',
+      }
+    );
+    console.log('[Test] Database contents after restart (via sqlite3):\n', dbContentAfterRestart);
+
+    // Check auto-cleanup log
+    try {
+      const fs = await import('fs/promises');
+      const logContent = await fs.readFile('/var/tmp/auto-cleanup.log', 'utf-8');
+      console.log('[Test] Auto-cleanup log:', logContent || '(empty)');
+    } catch {
+      console.log('[Test] Auto-cleanup log: (file not found)');
+    }
 
     // Navigate to Recently Deleted
     await window.click('text=Recently Deleted');

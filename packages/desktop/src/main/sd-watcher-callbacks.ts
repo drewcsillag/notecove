@@ -238,6 +238,12 @@ export function createActivitySyncCallbacks(
             const newFolderId = crdtMetadata?.folderId ?? existingNote.folderId;
             const folderChanged = oldFolderId !== newFolderId;
 
+            // Preserve deleted state from database if already deleted.
+            // This prevents the sync from "undeleting" notes when CRDT writes
+            // didn't complete before shutdown. Once a note is deleted locally,
+            // it should stay deleted unless explicitly restored.
+            const deletedState = existingNote.deleted ? true : (crdtMetadata?.deleted ?? false);
+
             await database.upsertNote({
               id: noteId,
               title: resolvedTitle,
@@ -245,7 +251,7 @@ export function createActivitySyncCallbacks(
               folderId: newFolderId,
               created: existingNote.created,
               modified: crdtMetadata?.modified ?? Date.now(),
-              deleted: crdtMetadata?.deleted ?? false,
+              deleted: deletedState,
               pinned: crdtMetadata?.pinned ?? existingNote.pinned,
               contentPreview: resolvedPreview,
               contentText,
