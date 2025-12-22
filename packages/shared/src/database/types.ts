@@ -241,8 +241,9 @@ export interface TagOperations {
 export interface LinkOperations {
   /**
    * Add a link from one note to another
+   * @returns true if link was added, false if target note doesn't exist yet
    */
-  addLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<void>;
+  addLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<boolean>;
 
   /**
    * Remove a link from one note to another

@@ -1099,6 +1099,20 @@ describe('SqliteDatabase', () => {
       expect(links).toContain('note-1');
     });
 
+    it('should return true when link is added successfully', async () => {
+      const result = await db.addLink('note-1', 'note-2');
+      expect(result).toBe(true);
+    });
+
+    it('should return false when target note does not exist', async () => {
+      // Link to a non-existent note should return false, not throw
+      const result = await db.addLink('note-1', 'non-existent-note');
+      expect(result).toBe(false);
+      // The link should not be created
+      const links = await db.getLinksFromNote('note-1');
+      expect(links).not.toContain('non-existent-note');
+    });
+
     it('should remove a link', async () => {
       await db.addLink('note-1', 'note-2');
       await db.removeLink('note-1', 'note-2');

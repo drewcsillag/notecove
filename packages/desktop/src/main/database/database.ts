@@ -224,7 +224,7 @@ export class SqliteDatabase implements Database {
   // Inter-Note Link Operations - Delegated to LinkRepository
   // ============================================================================
 
-  async addLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<void> {
+  async addLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<boolean> {
     return this.linkRepo.addLink(sourceNoteId, targetNoteId);
   }
 

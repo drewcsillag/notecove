@@ -12,12 +12,29 @@ export class LinkRepository {
    * Add a link from source note to target note
    * @param sourceNoteId Note containing the link
    * @param targetNoteId Note being linked to
+   * @returns true if link was added, false if target note doesn't exist yet
    */
-  async addLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<void> {
-    await this.adapter.exec(
-      'INSERT OR IGNORE INTO note_links (source_note_id, target_note_id) VALUES (?, ?)',
-      [sourceNoteId, targetNoteId]
-    );
+  async addLink(sourceNoteId: UUID, targetNoteId: UUID): Promise<boolean> {
+    try {
+      await this.adapter.exec(
+        'INSERT OR IGNORE INTO note_links (source_note_id, target_note_id) VALUES (?, ?)',
+        [sourceNoteId, targetNoteId]
+      );
+      return true;
+    } catch (error: unknown) {
+      // Handle FOREIGN KEY constraint failure gracefully
+      // This happens when the target note hasn't been discovered/synced yet
+      if (
+        error instanceof Error &&
+        error.message.includes('FOREIGN KEY constraint failed')
+      ) {
+        console.log(
+          `[LinkRepository] Skipping link ${sourceNoteId} -> ${targetNoteId}: target note not yet in database`
+        );
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**
