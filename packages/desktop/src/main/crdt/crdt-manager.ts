@@ -194,6 +194,28 @@ export class CRDTManagerImpl implements CRDTManager {
     }
   }
 
+  async forceUnloadNote(noteId: string): Promise<void> {
+    const state = this.documents.get(noteId);
+
+    if (!state) {
+      return;
+    }
+
+    console.log(`[CRDT Manager] Force unloading note ${noteId} (refCount was ${state.refCount})`);
+
+    // Check if we should create a snapshot before unloading
+    await this.checkAndCreateSnapshot(noteId);
+
+    // Unregister from comment observer
+    if (this.commentObserver) {
+      this.commentObserver.unregisterNote(noteId);
+    }
+
+    // Force cleanup regardless of refCount
+    state.snapshot.destroy();
+    this.documents.delete(noteId);
+  }
+
   async applyUpdate(
     noteId: string,
     update: Uint8Array,

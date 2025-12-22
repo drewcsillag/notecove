@@ -3542,8 +3542,10 @@ export class IPCHandlers {
       // Step 1: Delete the DB cache (sync state) for this note
       await this.database.deleteNoteSyncState(noteId, note.sdId);
 
-      // Step 2: Unload the note from CRDTManager (clears in-memory state)
-      await this.crdtManager.unloadNote(noteId);
+      // Step 2: Force unload the note from CRDTManager (clears in-memory state)
+      // Use forceUnloadNote to ignore refCount - we need to guarantee the doc
+      // is removed from memory so loadNote will actually reload from disk
+      await this.crdtManager.forceUnloadNote(noteId);
 
       // Step 3: Reload the note fresh from CRDT logs
       // This will perform a cold load since the DB cache is now cleared

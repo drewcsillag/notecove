@@ -26,7 +26,8 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
   const [searchQuery, setSearchQuery] = useState('');
 
   // Load tags from database (initial load shows loading state)
-  const loadTags = useCallback(async (isInitial = false) => {
+  const loadTags = useCallback(async (isInitial?: boolean) => {
+    isInitial = isInitial ?? false;
     try {
       if (isInitial) {
         setInitialLoading(true);

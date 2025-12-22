@@ -501,11 +501,10 @@ function handleReloadFromCRDTLogs(ctx: HandlerContext) {
         throw new Error(`Note ${noteId} not found`);
       }
 
-      // Unload the note if it's currently loaded
-      const existingDoc = crdtManager.getNoteDoc(noteId);
-      if (existingDoc) {
-        await crdtManager.unloadNote(noteId);
-      }
+      // Force unload the note to ensure it's removed from memory
+      // This is necessary because refCount may be > 1 due to multiple handlers
+      // calling loadNote(), and we need to guarantee a fresh reload from disk
+      await crdtManager.forceUnloadNote(noteId);
 
       // Clear the sync state cache
       await database.deleteNoteSyncState(noteId, note.sdId);

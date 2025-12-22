@@ -39,6 +39,14 @@ export interface CRDTManager {
   unloadNote(noteId: string): Promise<void>;
 
   /**
+   * Force unload a note from memory, ignoring ref count.
+   * Use this when you need to guarantee the document is removed from memory,
+   * such as when reloading from CRDT logs.
+   * @param noteId Note ID
+   */
+  forceUnloadNote(noteId: string): Promise<void>;
+
+  /**
    * Apply an update to a note's CRDT
    * @param noteId Note ID
    * @param update Yjs update bytes

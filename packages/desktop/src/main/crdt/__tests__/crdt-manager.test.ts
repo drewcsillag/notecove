@@ -239,6 +239,59 @@ describe('CRDTManagerImpl', () => {
     it('should not throw for non-existent notes', async () => {
       await expect(manager.unloadNote('non-existent')).resolves.toBeUndefined();
     });
+
+    it('should only decrement refCount when refCount > 1', async () => {
+      // Load note twice to get refCount = 2
+      await manager.loadNote('test-note', 'test-sd');
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Note should still be loaded
+      expect(manager.getLoadedNotes()).toContain('test-note');
+
+      // First unload - decrements refCount to 1, note stays loaded
+      await manager.unloadNote('test-note');
+      expect(manager.getLoadedNotes()).toContain('test-note');
+
+      // Second unload - decrements refCount to 0, note is removed
+      await manager.unloadNote('test-note');
+      expect(manager.getLoadedNotes()).not.toContain('test-note');
+    });
+  });
+
+  describe('forceUnloadNote', () => {
+    it('should not throw for non-existent notes', async () => {
+      await expect(manager.forceUnloadNote('non-existent')).resolves.toBeUndefined();
+    });
+
+    it('should unload note even when refCount > 1', async () => {
+      // Load note twice to get refCount = 2
+      await manager.loadNote('test-note', 'test-sd');
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Note should be loaded
+      expect(manager.getLoadedNotes()).toContain('test-note');
+
+      // Force unload should remove it regardless of refCount
+      await manager.forceUnloadNote('test-note');
+      expect(manager.getLoadedNotes()).not.toContain('test-note');
+    });
+
+    it('should allow fresh reload after force unload', async () => {
+      // Load note multiple times
+      await manager.loadNote('test-note', 'test-sd');
+      await manager.loadNote('test-note', 'test-sd');
+      await manager.loadNote('test-note', 'test-sd');
+
+      // Force unload
+      await manager.forceUnloadNote('test-note');
+
+      // Verify note is not loaded
+      expect(manager.getDocument('test-note')).toBeUndefined();
+
+      // Should be able to load it fresh
+      await manager.loadNote('test-note', 'test-sd');
+      expect(manager.getDocument('test-note')).toBeDefined();
+    });
   });
 
   describe('applyUpdate', () => {
