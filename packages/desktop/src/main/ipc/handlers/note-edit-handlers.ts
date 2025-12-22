@@ -12,7 +12,14 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { HandlerContext } from './types';
 import type { NoteCache, UUID } from '@notecove/shared';
-import { extractTags, extractLinks, ImageStorage, SyncDirectoryStructure } from '@notecove/shared';
+import {
+  extractTags,
+  extractLinks,
+  extractSnippet,
+  resolveLinks,
+  ImageStorage,
+  SyncDirectoryStructure,
+} from '@notecove/shared';
 import { extractImageReferencesFromXmlFragment } from '../../image-cleanup-manager';
 import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
 
@@ -635,7 +642,7 @@ function handleUpdateTitle(ctx: HandlerContext) {
     const titleChanged = note.title !== title;
     let contentChanged = false;
     if (contentText !== undefined) {
-      const newPreview = contentText.split('\n').slice(1).join('\n').trim().substring(0, 200);
+      const newPreview = extractSnippet(contentText, 200);
       contentChanged = note.contentText !== contentText || note.contentPreview !== newPreview;
     }
 
@@ -644,17 +651,24 @@ function handleUpdateTitle(ctx: HandlerContext) {
       return;
     }
 
+    // Resolve [[uuid]] links to [[title]] for display
+    const linkResolver = async (linkNoteId: string) => {
+      const linkedNote = await database.getNote(linkNoteId);
+      return linkedNote?.title ?? null;
+    };
+    const resolvedTitle = await resolveLinks(title, linkResolver);
+
     const updates: Partial<typeof note> = {
       ...note,
-      title,
+      title: resolvedTitle,
       modified: Date.now(),
     };
 
     if (contentText !== undefined) {
       updates.contentText = contentText;
-      const lines = contentText.split('\n');
-      const contentAfterTitle = lines.slice(1).join('\n').trim();
-      updates.contentPreview = contentAfterTitle.substring(0, 200);
+      const contentPreview = extractSnippet(contentText, 200);
+      const resolvedPreview = await resolveLinks(contentPreview, linkResolver);
+      updates.contentPreview = resolvedPreview;
     }
 
     await database.upsertNote(updates as typeof note);
@@ -721,6 +735,10 @@ function handleUpdateTitle(ctx: HandlerContext) {
     }
 
     // Include modified timestamp so note list can update ordering
-    broadcastToAll('note:title-updated', { noteId, title, modified: updates.modified });
+    broadcastToAll('note:title-updated', {
+      noteId,
+      title: resolvedTitle,
+      modified: updates.modified,
+    });
   };
 }

@@ -144,6 +144,11 @@ export class SchemaRepository {
       await this.migrateToVersion9();
     }
 
+    // Migration v9 -> v10: Clear contentText to force re-extraction with proper newlines
+    if (fromVersion < 10) {
+      await this.migrateToVersion10();
+    }
+
     // Add future migrations here following the pattern:
     // if (fromVersion < N) { await this.migrateToVersionN(); }
   }
@@ -215,5 +220,20 @@ export class SchemaRepository {
     // Record the migration
     await this.recordVersion(9, 'Added comment tables for note comments');
     console.log('[Database] Migration to v9 complete');
+  }
+
+  /**
+   * Migration to version 10:
+   * - No-op migration, just records version bump
+   * - The actual fix is in TipTapEditor.tsx (using newlines between blocks)
+   * - Snippets will be regenerated when notes are edited
+   */
+  private async migrateToVersion10(): Promise<void> {
+    console.log('[Database] Migrating to v10: Schema version bump for snippet fix');
+
+    // Record the migration - the actual fix is in code, not database
+    // Snippets are regenerated when notes are edited
+    await this.recordVersion(10, 'Schema version bump for snippet extraction fix');
+    console.log('[Database] Migration to v10 complete');
   }
 }

@@ -402,7 +402,9 @@ export const webClient: typeof window.electronAPI = {
       }),
     onTitleUpdated: (callback) =>
       subscribe('note:title-updated', (data) => {
-        callback(data as { noteId: string; title: string; modified: number });
+        callback(
+          data as { noteId: string; title: string; modified: number; contentPreview?: string }
+        );
       }),
     onMoved: (callback) =>
       subscribe('note:moved', (data) => {

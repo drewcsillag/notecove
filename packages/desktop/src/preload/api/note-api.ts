@@ -235,11 +235,16 @@ export const noteApi = {
     };
   },
   onTitleUpdated: (
-    callback: (data: { noteId: string; title: string; modified: number }) => void
+    callback: (data: {
+      noteId: string;
+      title: string;
+      modified: number;
+      contentPreview?: string;
+    }) => void
   ): (() => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      data: { noteId: string; title: string; modified: number }
+      data: { noteId: string; title: string; modified: number; contentPreview?: string }
     ): void => {
       callback(data);
     };

@@ -44,6 +44,9 @@ export {
   type GCStats,
   extractTitleFromFragment,
   extractTitleFromDoc,
+  extractTextFromFragment,
+  extractSnippet,
+  extractTextAndSnippet,
 } from './crdt';
 export * from './storage';
 export * from './database';

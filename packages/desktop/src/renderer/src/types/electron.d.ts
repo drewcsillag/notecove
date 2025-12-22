@@ -113,7 +113,12 @@ declare global {
           callback: (data: { operation: string; noteIds: string[] }) => void
         ) => () => void;
         onTitleUpdated: (
-          callback: (data: { noteId: string; title: string; modified: number }) => void
+          callback: (data: {
+            noteId: string;
+            title: string;
+            modified: number;
+            contentPreview?: string;
+          }) => void
         ) => () => void;
         onMoved: (
           callback: (data: {

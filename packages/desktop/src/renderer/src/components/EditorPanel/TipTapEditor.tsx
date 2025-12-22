@@ -760,9 +760,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           editor.state.doc.descendants((node) => {
             if (node.isText) {
               text += node.text ?? '';
-            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
-              // Add space between blocks to preserve word boundaries
-              text += ' ';
+            } else if (node.isBlock && text.length > 0 && !text.endsWith('\n')) {
+              // Add newline between blocks for proper snippet generation
+              text += '\n';
             }
             return true;
           });
@@ -871,8 +871,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           editor.state.doc.descendants((node) => {
             if (node.isText) {
               text += node.text ?? '';
-            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
-              text += ' ';
+            } else if (node.isBlock && text.length > 0 && !text.endsWith('\n')) {
+              text += '\n';
             }
             return true;
           });
@@ -898,8 +898,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           editor.state.doc.descendants((node) => {
             if (node.isText) {
               text += node.text ?? '';
-            } else if (node.isBlock && text.length > 0 && !text.endsWith(' ')) {
-              text += ' ';
+            } else if (node.isBlock && text.length > 0 && !text.endsWith('\n')) {
+              text += '\n';
             }
             return true;
           });

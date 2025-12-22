@@ -40,3 +40,4 @@ export {
 } from './pack-format';
 export { DEFAULT_GC_CONFIG, type GCConfig, type GCStats } from './gc-config';
 export { extractTitleFromFragment, extractTitleFromDoc } from './title-extractor';
+export { extractTextFromFragment, extractSnippet, extractTextAndSnippet } from './text-extractor';

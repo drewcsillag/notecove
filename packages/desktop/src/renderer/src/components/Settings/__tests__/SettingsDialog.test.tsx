@@ -20,10 +20,6 @@ const mockElectronAPI = {
     get: jest.fn(),
     set: jest.fn(),
   },
-  config: {
-    getDatabasePath: jest.fn().mockResolvedValue('/test/path/notecove.db'),
-    setDatabasePath: jest.fn(),
-  },
   theme: {
     set: jest.fn().mockResolvedValue(undefined),
     onChanged: jest.fn(() => () => {
@@ -90,7 +86,7 @@ describe('SettingsDialog', () => {
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
   });
 
-  it('should show four tabs', () => {
+  it('should show all tabs', () => {
     const onClose = jest.fn();
     render(
       <SettingsDialog
@@ -104,7 +100,9 @@ describe('SettingsDialog', () => {
     expect(screen.getByText('Storage Directories')).toBeInTheDocument();
     expect(screen.getByText('User')).toBeInTheDocument();
     expect(screen.getByText('Appearance')).toBeInTheDocument();
-    expect(screen.getByText('Database')).toBeInTheDocument();
+    expect(screen.getByText('Telemetry')).toBeInTheDocument();
+    expect(screen.getByText('Web Server')).toBeInTheDocument();
+    expect(screen.getByText('Recovery')).toBeInTheDocument();
   });
 
   it('should call onClose when close button is clicked', () => {
