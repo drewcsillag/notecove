@@ -52,7 +52,7 @@ This is a FEATURE - it prevents context degradation from causing mistakes.
 - **NEVER EVER** claim failures are "pre-existing" without verifying against previous commit
 - **NEVER EVER** skip tests without asking first
 - If tests are broken: FIX THEM, even if unrelated to current work
-- **ALWAYS** ask before running CI, it's expensive in time and CPU and there may be other CI runs going at the same time. 
+- **ALWAYS** ask before running CI, it's expensive in time and CPU and there may be other CI runs going at the same time.
 
 ## Test-Driven Development - MANDATORY
 

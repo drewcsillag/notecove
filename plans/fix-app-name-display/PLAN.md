@@ -5,6 +5,7 @@
 ## Problem
 
 In production builds, the macOS application menu shows "@notecove/desktop" instead of "NoteCove" for:
+
 - "Hide @notecove/desktop" → should be "Hide NoteCove"
 - "Quit @notecove/desktop" → should be "Quit NoteCove"
 

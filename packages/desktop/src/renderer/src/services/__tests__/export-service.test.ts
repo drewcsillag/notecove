@@ -22,15 +22,14 @@ const mockElectronAPI = {
   },
 };
 
-// Set up global mock
-beforeAll(() => {
-  (global as any).window = {
-    electronAPI: mockElectronAPI,
-  };
+// Set up global mock - set on existing window object, don't replace it
+beforeEach(() => {
+  (window as unknown as Record<string, unknown>)['electronAPI'] = mockElectronAPI;
 });
 
 afterEach(() => {
   jest.clearAllMocks();
+  delete (window as unknown as Record<string, unknown>)['electronAPI'];
 });
 
 // Extract buildFolderPaths for testing by reimplementing
