@@ -3,9 +3,25 @@
  * Handles window creation, restoration, and state management
  */
 
-import { BrowserWindow, screen } from 'electron';
+import { app, BrowserWindow, screen } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
+
+/**
+ * Get the path to the preload script.
+ * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ */
+function getPreloadPath(): string {
+  return join(app.getAppPath(), 'dist-electron/preload/index.js');
+}
+
+/**
+ * Get the path to the renderer HTML file.
+ * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ */
+function getRendererPath(): string {
+  return join(app.getAppPath(), 'dist-electron/renderer/index.html');
+}
 import type { Database } from '@notecove/shared';
 import { WindowStateManager } from './window-state-manager';
 import * as fs from 'fs/promises';
@@ -110,7 +126,7 @@ export function createWindow(
     autoHideMenuBar: false,
     title: windowTitle,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: getPreloadPath(),
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false,
@@ -238,7 +254,7 @@ export function createWindow(
   // Load the renderer
   // In test mode, always use the built files, not the dev server
   if (process.env['NODE_ENV'] === 'test' || !is.dev || !process.env['ELECTRON_RENDERER_URL']) {
-    void newWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: queryString });
+    void newWindow.loadFile(getRendererPath(), { hash: queryString });
   } else {
     const url = process.env['ELECTRON_RENDERER_URL'] + hash;
     void newWindow.loadURL(url);
@@ -289,62 +305,84 @@ export async function restoreWindows(
   console.log(`[WindowState] Restoring ${savedStates.length} window(s)...`);
 
   // Get current display configuration for position validation
-  const displays = screen.getAllDisplays();
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const primaryBounds = primaryDisplay.bounds;
+  // Handle edge cases where display APIs might fail (headless, remote sessions, etc.)
+  let displays: Electron.Display[];
+  let primaryBounds: { x: number; y: number; width: number; height: number };
+  try {
+    displays = screen.getAllDisplays();
+    const primaryDisplay = screen.getPrimaryDisplay();
+    primaryBounds = primaryDisplay.bounds;
+
+    // Sanity check - if no displays, fall back to defaults
+    if (displays.length === 0) {
+      console.warn('[WindowState] No displays detected, using default bounds');
+      primaryBounds = { x: 0, y: 0, width: 1920, height: 1080 };
+      displays = [{ bounds: primaryBounds } as Electron.Display];
+    }
+  } catch (displayError) {
+    console.error('[WindowState] Failed to get display info:', displayError);
+    // Fall back to reasonable defaults
+    primaryBounds = { x: 0, y: 0, width: 1920, height: 1080 };
+    displays = [{ bounds: primaryBounds } as Electron.Display];
+  }
 
   let restoredCount = 0;
 
   // Restore each window
   for (const state of savedStates) {
-    // Step 11: Validate SD exists and is accessible
-    const sdValid = await windowStateManager.validateSDForRestore(
-      state.sdId,
-      database,
-      (path: string) => fs.access(path)
-    );
+    try {
+      // Step 11: Validate SD exists and is accessible
+      const sdValid = await windowStateManager.validateSDForRestore(
+        state.sdId,
+        database,
+        (path: string) => fs.access(path)
+      );
 
-    if (!sdValid) {
-      console.log(`[WindowState] Skipping window with invalid SD: ${state.sdId}`);
-      continue;
+      if (!sdValid) {
+        console.log(`[WindowState] Skipping window with invalid SD: ${state.sdId}`);
+        continue;
+      }
+
+      // Step 10: Validate note exists and is not deleted
+      const { noteId: validatedNoteId, sdId: validatedSdId } =
+        await windowStateManager.validateNoteForRestore(state.noteId, state.sdId, database);
+
+      // Validate position against current displays
+      const validatedState = windowStateManager.validateWindowState(
+        state,
+        displays.map((d) => ({ bounds: d.bounds })),
+        primaryBounds
+      );
+
+      // Determine window type options
+      const minimal = state.type === 'minimal';
+      const syncStatus = state.type === 'syncStatus';
+
+      console.log(
+        `[WindowState] Restoring ${state.type} window at (${validatedState.bounds.x}, ${validatedState.bounds.y})`
+      );
+
+      // Create window with restored state
+      // Build options, only including noteId/sdId if defined
+      const windowOpts: CreateWindowOptions = {
+        minimal,
+        syncStatus,
+        bounds: validatedState.bounds,
+        isMaximized: validatedState.isMaximized,
+        isFullScreen: validatedState.isFullScreen,
+      };
+      if (validatedNoteId !== undefined) {
+        windowOpts.noteId = validatedNoteId;
+      }
+      if (validatedSdId !== undefined) {
+        windowOpts.sdId = validatedSdId;
+      }
+      createWindowFn(windowOpts);
+      restoredCount++;
+    } catch (windowError) {
+      // Log error but continue trying to restore other windows
+      console.error(`[WindowState] Failed to restore window ${state.id}:`, windowError);
     }
-
-    // Step 10: Validate note exists and is not deleted
-    const { noteId: validatedNoteId, sdId: validatedSdId } =
-      await windowStateManager.validateNoteForRestore(state.noteId, state.sdId, database);
-
-    // Validate position against current displays
-    const validatedState = windowStateManager.validateWindowState(
-      state,
-      displays.map((d) => ({ bounds: d.bounds })),
-      primaryBounds
-    );
-
-    // Determine window type options
-    const minimal = state.type === 'minimal';
-    const syncStatus = state.type === 'syncStatus';
-
-    console.log(
-      `[WindowState] Restoring ${state.type} window at (${validatedState.bounds.x}, ${validatedState.bounds.y})`
-    );
-
-    // Create window with restored state
-    // Build options, only including noteId/sdId if defined
-    const windowOpts: CreateWindowOptions = {
-      minimal,
-      syncStatus,
-      bounds: validatedState.bounds,
-      isMaximized: validatedState.isMaximized,
-      isFullScreen: validatedState.isFullScreen,
-    };
-    if (validatedNoteId !== undefined) {
-      windowOpts.noteId = validatedNoteId;
-    }
-    if (validatedSdId !== undefined) {
-      windowOpts.sdId = validatedSdId;
-    }
-    createWindowFn(windowOpts);
-    restoredCount++;
   }
 
   console.log(

@@ -351,7 +351,11 @@ export function createActivitySyncCallbacks(
         return [];
       }
     },
-    onSkipStaleEntry: async (noteId: string, sourceInstanceId: string): Promise<void> => {
+    onSkipStaleEntry: async (
+      noteId: string,
+      sourceInstanceId: string,
+      skipSequence: number
+    ): Promise<void> => {
       const stateKey = `skippedStaleEntries:${sdId}`;
       const stored = await database.getState(stateKey);
       let entries: string[] = [];
@@ -362,11 +366,13 @@ export function createActivitySyncCallbacks(
           entries = [];
         }
       }
-      const key = `${noteId}:${sourceInstanceId}`;
-      if (!entries.includes(key)) {
-        entries.push(key);
-        await database.setState(stateKey, JSON.stringify(entries));
-      }
+      // Include sequence in the key so we can skip up to this sequence but not future ones
+      const key = `${noteId}:${sourceInstanceId}:${skipSequence}`;
+      // Also remove any legacy entries (without sequence) for this note+instance
+      const legacyKey = `${noteId}:${sourceInstanceId}`;
+      entries = entries.filter((e) => e !== legacyKey && !e.startsWith(`${legacyKey}:`));
+      entries.push(key);
+      await database.setState(stateKey, JSON.stringify(entries));
     },
   };
 }

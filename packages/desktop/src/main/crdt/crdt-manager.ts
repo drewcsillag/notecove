@@ -6,7 +6,7 @@
  */
 
 import * as Y from 'yjs';
-import type { CRDTManager, DocumentState } from './types';
+import type { CRDTManager, DocumentState, SyncEvent } from './types';
 import { NoteDoc, FolderTreeDoc } from '@shared/crdt';
 import { DocumentSnapshot } from '@shared/storage';
 import type { AppendLogManager } from '@shared/storage';
@@ -14,6 +14,7 @@ import type { UUID, FolderData } from '@shared/types';
 import type { Database } from '@notecove/shared';
 import { getCRDTMetrics } from '../telemetry/crdt-metrics';
 import { CRDTCommentObserver } from './crdt-comment-observer';
+import { randomUUID } from 'crypto';
 
 export class CRDTManagerImpl implements CRDTManager {
   private documents = new Map<string, DocumentState>();
@@ -28,6 +29,11 @@ export class CRDTManagerImpl implements CRDTManager {
   private commentObserver?: CRDTCommentObserver;
   // Callback to notify when a note's modified timestamp is updated
   private modifiedUpdateCallback?: (noteId: string, modified: number) => void;
+  // Sync event storage for the sync event viewer (circular buffer per note)
+  private syncEvents = new Map<string, SyncEvent[]>();
+  private static readonly MAX_SYNC_EVENTS_PER_NOTE = 100;
+  // Callback for live sync event notifications
+  private syncEventCallback?: (event: SyncEvent) => void;
 
   constructor(
     private storageManager: AppendLogManager,
@@ -64,6 +70,61 @@ export class CRDTManagerImpl implements CRDTManager {
    */
   setModifiedUpdateCallback(callback: (noteId: string, modified: number) => void): void {
     this.modifiedUpdateCallback = callback;
+  }
+
+  /**
+   * Set callback for sync event notifications (for live updates in UI)
+   */
+  setSyncEventCallback(callback: (event: SyncEvent) => void): void {
+    this.syncEventCallback = callback;
+  }
+
+  /**
+   * Get sync events for a note (newest first)
+   */
+  getSyncEvents(noteId: string): SyncEvent[] {
+    return [...(this.syncEvents.get(noteId) ?? [])].reverse();
+  }
+
+  /**
+   * Record a sync event (internal helper)
+   */
+  private recordSyncEvent(
+    noteId: string,
+    direction: 'outgoing' | 'incoming',
+    instanceId: string,
+    summary: string,
+    sequence: number,
+    updateSize: number
+  ): void {
+    const event: SyncEvent = {
+      id: randomUUID(),
+      timestamp: Date.now(),
+      noteId,
+      direction,
+      instanceId,
+      summary,
+      sequence,
+      updateSize,
+    };
+
+    // Get or create event array for this note
+    let events = this.syncEvents.get(noteId);
+    if (!events) {
+      events = [];
+      this.syncEvents.set(noteId, events);
+    }
+
+    // Add event and trim to max size
+    events.push(event);
+    if (events.length > CRDTManagerImpl.MAX_SYNC_EVENTS_PER_NOTE) {
+      events.shift(); // Remove oldest
+    }
+
+    // Notify callback for live updates
+    if (this.syncEventCallback) {
+      this.syncEventCallback(event);
+    }
   }
 
   /**
@@ -255,6 +316,16 @@ export class CRDTManagerImpl implements CRDTManager {
         state.lastModified = now;
         state.editCount++; // Track edits for adaptive snapshot frequency
 
+        // Record sync event for the event viewer (local edit via IPC)
+        this.recordSyncEvent(
+          noteId,
+          'outgoing',
+          instanceId,
+          `Local edit (${update.length} bytes)`,
+          saveResult.sequence,
+          update.length
+        );
+
         // Record activity for cross-instance sync using the correct SD's activity logger
         const activityLogger = this.activityLoggers.get(state.sdId);
         if (activityLogger) {
@@ -340,7 +411,14 @@ export class CRDTManagerImpl implements CRDTManager {
   getVectorClock(
     noteId: string
   ): Record<string, { sequence: number; offset: number; file: string }> | undefined {
-    return this.documents.get(noteId)?.snapshot.getVectorClock();
+    const state = this.documents.get(noteId);
+    if (!state) {
+      console.log(`[CRDT Manager] getVectorClock: note ${noteId} not loaded`);
+      return undefined;
+    }
+    const clock = state.snapshot.getVectorClock();
+    console.log(`[CRDT Manager] getVectorClock(${noteId}):`, JSON.stringify(clock));
+    return clock;
   }
 
   /**
@@ -391,6 +469,16 @@ export class CRDTManagerImpl implements CRDTManager {
       );
       console.warn(`[CRDT Manager] Available loggers:`, Array.from(this.activityLoggers.keys()));
     }
+
+    // Record sync event for the event viewer
+    this.recordSyncEvent(
+      noteId,
+      'outgoing',
+      instanceId,
+      `Local edit (${update.length} bytes)`,
+      saveResult.sequence,
+      update.length
+    );
   }
 
   /**
@@ -427,47 +515,61 @@ export class CRDTManagerImpl implements CRDTManager {
     try {
       const logFiles = await LogReader.listLogFiles(logsPath, fsAdapter);
 
-      // Find the log file for this instance
-      const matchingFile = logFiles.find((f) => f.instanceId === instanceId);
-      if (!matchingFile) {
+      // Find ALL log files for this instance (there can be multiple from log rotation)
+      const matchingFiles = logFiles.filter((f) => f.instanceId === instanceId);
+      if (matchingFiles.length === 0) {
         console.log(
-          `[CRDT Manager] checkCRDTLogExists(${noteId}, ${instanceId}, seq=${expectedSequence}): no log file found`
+          `[CRDT Manager] checkCRDTLogExists(${noteId}, ${instanceId}, seq=${expectedSequence}): no log files found`
         );
         return false;
       }
 
-      // Read the log file to check its highest sequence number
-      const logPath = fsAdapter.joinPath(logsPath, matchingFile.filename);
-      try {
-        let highestSeq = 0;
+      // Check all log files for this instance, tracking the highest sequence across all
+      let highestSeq = 0;
+      let hasIncompleteFile = false;
 
-        // Read all records to find the highest sequence (static method)
-        for await (const record of LogReader.readRecords(logPath, fsAdapter)) {
-          if (record.sequence > highestSeq) {
-            highestSeq = record.sequence;
+      for (const logFile of matchingFiles) {
+        const logPath = fsAdapter.joinPath(logsPath, logFile.filename);
+        try {
+          // Read all records to find the highest sequence
+          for await (const record of LogReader.readRecords(logPath, fsAdapter)) {
+            if (record.sequence > highestSeq) {
+              highestSeq = record.sequence;
+            }
+          }
+        } catch (readError) {
+          // File might be incomplete (partial sync)
+          const errorMessage = String(readError);
+          if (
+            errorMessage.includes('Truncated') ||
+            errorMessage.includes('incomplete') ||
+            errorMessage.includes('still being written')
+          ) {
+            console.log(
+              `[CRDT Manager] checkCRDTLogExists: log file ${logFile.filename} incomplete/truncated`
+            );
+            hasIncompleteFile = true;
+            // Continue checking other files - they might have the sequence we need
+          } else {
+            throw readError;
           }
         }
-
-        const hasExpectedSeq = highestSeq >= expectedSequence;
-        console.log(
-          `[CRDT Manager] checkCRDTLogExists(${noteId}, ${instanceId}, expected=${expectedSequence}): highestSeq=${highestSeq}, ready=${hasExpectedSeq}`
-        );
-        return hasExpectedSeq;
-      } catch (readError) {
-        // File might be incomplete (partial sync)
-        const errorMessage = String(readError);
-        if (
-          errorMessage.includes('Truncated') ||
-          errorMessage.includes('incomplete') ||
-          errorMessage.includes('still being written')
-        ) {
-          console.log(
-            `[CRDT Manager] checkCRDTLogExists: log file incomplete/truncated, not ready`
-          );
-          return false;
-        }
-        throw readError;
       }
+
+      const hasExpectedSeq = highestSeq >= expectedSequence;
+      console.log(
+        `[CRDT Manager] checkCRDTLogExists(${noteId}, ${instanceId}, expected=${expectedSequence}): ` +
+          `checked ${matchingFiles.length} files, highestSeq=${highestSeq}, ready=${hasExpectedSeq}` +
+          (hasIncompleteFile ? ' (some files incomplete)' : '')
+      );
+
+      // If we haven't found the expected sequence and there are incomplete files,
+      // return false to trigger retry (the sequence might be in the incomplete file)
+      if (!hasExpectedSeq && hasIncompleteFile) {
+        return false;
+      }
+
+      return hasExpectedSeq;
     } catch (error) {
       // Directory might not exist yet
       console.log(`[CRDT Manager] checkCRDTLogExists error:`, error);
@@ -559,6 +661,21 @@ export class CRDTManagerImpl implements CRDTManager {
       console.log(
         `[CRDT Manager] After reload, content length: ${beforeContent.length} → ${afterContent.length}`
       );
+
+      // Record sync events for each remote instance that had updates
+      const myInstanceId = this.storageManager.getInstanceId();
+      for (const [instanceId, entry] of Object.entries(loadResult.vectorClock)) {
+        if (instanceId !== myInstanceId) {
+          this.recordSyncEvent(
+            noteId,
+            'incoming',
+            instanceId,
+            `Remote sync (seq ${entry.sequence})`,
+            entry.sequence,
+            encodedState.length
+          );
+        }
+      }
 
       state.lastModified = Date.now();
     } catch (error) {
@@ -782,14 +899,17 @@ export class CRDTManagerImpl implements CRDTManager {
       try {
         const loadResult = await this.storageManager.loadNote(sdId, noteId);
 
+        console.log(
+          `[CRDT Manager] Loaded note ${noteId} from storage, vectorClock:`,
+          JSON.stringify(loadResult.vectorClock)
+        );
+
         // Create snapshot from loaded state
         const snapshot = DocumentSnapshot.fromStorage(
           Y.encodeStateAsUpdate(loadResult.doc),
           loadResult.vectorClock
         );
         loadResult.doc.destroy(); // Clean up the temporary doc
-
-        console.log(`[CRDT Manager] Loaded note ${noteId} from storage`);
         return snapshot;
       } catch (error) {
         const errorObj = error as Error;

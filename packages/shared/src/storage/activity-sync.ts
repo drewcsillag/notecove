@@ -109,8 +109,15 @@ export interface ActivitySyncCallbacks {
   /**
    * Persist a skipped stale entry
    * Called when user clicks "Skip" on a stale entry
+   * @param noteId The note ID
+   * @param sourceInstanceId The source instance ID
+   * @param skipSequence The highest sequence to skip (entries at or below this are stale)
    */
-  onSkipStaleEntry?: (noteId: string, sourceInstanceId: string) => Promise<void>;
+  onSkipStaleEntry?: (
+    noteId: string,
+    sourceInstanceId: string,
+    skipSequence: number
+  ) => Promise<void>;
 }
 
 export class ActivitySync {
@@ -126,8 +133,9 @@ export class ActivitySync {
   // Stale entries tracking for UI display
   private staleEntries: StaleEntry[] = [];
 
-  // Skipped stale entries (persisted) - "noteId:sourceInstanceId" format
-  private skippedEntries = new Set<string>();
+  // Skipped stale entries (persisted) - maps "noteId:sourceInstanceId" to max skipped sequence
+  // This allows new activity with higher sequences to sync while skipping stale entries
+  private skippedEntries = new Map<string, number>();
   private skippedEntriesLoaded = false;
 
   constructor(
@@ -141,6 +149,8 @@ export class ActivitySync {
   /**
    * Load previously skipped entries from persistence
    * Should be called once during initialization
+   *
+   * Entry format: "noteId:sourceInstanceId" (legacy) or "noteId:sourceInstanceId:sequence"
    */
   async loadSkippedEntries(): Promise<void> {
     if (this.skippedEntriesLoaded) return;
@@ -149,9 +159,23 @@ export class ActivitySync {
       try {
         const entries = await this.callbacks.getSkippedStaleEntries();
         for (const entry of entries) {
-          this.skippedEntries.add(entry);
+          // Parse entry - format is "noteId:sourceInstanceId" or "noteId:sourceInstanceId:sequence"
+          const parts = entry.split(':');
+          if (parts.length >= 2) {
+            const noteId = parts[0];
+            const sourceInstanceId = parts[1];
+            // Legacy entries (without sequence) should not block anything - use -1
+            // If the stale entry is still relevant, it will reappear and user can skip again
+            const sequence = parts.length >= 3 ? parseInt(parts[2] ?? '0', 10) : -1;
+            const key = `${noteId}:${sourceInstanceId}`;
+            // Keep the highest skipped sequence for this key
+            const existing = this.skippedEntries.get(key);
+            if (existing === undefined || sequence > existing) {
+              this.skippedEntries.set(key, sequence);
+            }
+          }
         }
-        console.log(`[ActivitySync] Loaded ${entries.length} skipped stale entries`);
+        console.log(`[ActivitySync] Loaded ${this.skippedEntries.size} skipped stale entries`);
       } catch (error) {
         console.error('[ActivitySync] Failed to load skipped entries:', error);
       }
@@ -161,9 +185,20 @@ export class ActivitySync {
 
   /**
    * Check if a stale entry has been skipped
+   * Only returns true if the sequence is at or below the skipped sequence
    */
-  private isSkipped(noteId: string, sourceInstanceId: string): boolean {
-    return this.skippedEntries.has(`${noteId}:${sourceInstanceId}`);
+  private isSkipped(noteId: string, sourceInstanceId: string, sequence?: number): boolean {
+    const key = `${noteId}:${sourceInstanceId}`;
+    const skippedSequence = this.skippedEntries.get(key);
+    if (skippedSequence === undefined) {
+      return false;
+    }
+    // If no sequence provided, check if any skip exists (legacy behavior for stale detection)
+    if (sequence === undefined) {
+      return true;
+    }
+    // Only skip if the current sequence is at or below the skipped sequence
+    return sequence <= skippedSequence;
   }
 
   /**
@@ -212,21 +247,49 @@ export class ActivitySync {
   }
 
   /**
+   * Clear skipped entries for a specific note
+   * Called when user manually reloads from CRDT logs - they've resolved the issue
+   * so we should allow future syncs from all instances for this note
+   */
+  clearSkippedEntriesForNote(noteId: string): void {
+    // Find and remove all entries for this note
+    const keysToRemove: string[] = [];
+    for (const key of this.skippedEntries.keys()) {
+      if (key.startsWith(`${noteId}:`)) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      this.skippedEntries.delete(key);
+      console.log(`[ActivitySync] Cleared skipped entry for ${key} (note reloaded manually)`);
+    }
+    // Also clear any stale entries for this note
+    this.staleEntries = this.staleEntries.filter((e) => e.noteId !== noteId);
+  }
+
+  /**
    * Remove a specific stale entry (e.g., after user skips it)
    */
   async removeStaleEntry(noteId: string, sourceInstanceId: string): Promise<void> {
+    // Find the stale entry to get its sequence info
+    const staleEntry = this.staleEntries.find(
+      (e) => e.noteId === noteId && e.sourceInstanceId === sourceInstanceId
+    );
+    // Use the highest sequence for this note - entries below this are stale
+    const skipSequence = staleEntry?.highestSequenceForNote ?? Infinity;
+
     // Remove from in-memory list
     this.staleEntries = this.staleEntries.filter(
       (e) => !(e.noteId === noteId && e.sourceInstanceId === sourceInstanceId)
     );
 
-    // Add to skipped set (prevents re-detection)
+    // Add to skipped map with sequence (prevents re-detection for this and lower sequences)
     const key = `${noteId}:${sourceInstanceId}`;
-    this.skippedEntries.add(key);
+    this.skippedEntries.set(key, skipSequence);
 
-    // Persist the skip
+    // Persist the skip with sequence info
     if (this.callbacks.onSkipStaleEntry) {
-      await this.callbacks.onSkipStaleEntry(noteId, sourceInstanceId);
+      await this.callbacks.onSkipStaleEntry(noteId, sourceInstanceId, skipSequence);
     }
   }
 
@@ -482,9 +545,10 @@ export class ActivitySync {
     );
 
     // Check if this entry was skipped by the user (stale sync they chose to ignore)
-    if (this.isSkipped(noteId, sourceInstanceId)) {
+    // Pass the sequence so we only skip if this sequence is at or below the skipped sequence
+    if (this.isSkipped(noteId, sourceInstanceId, expectedSequence)) {
       console.log(
-        `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} was skipped by user, aborting sync`
+        `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} at seq ${expectedSequence} was skipped by user, aborting sync`
       );
       return true; // Return true to update watermark and skip this entry
     }
@@ -504,9 +568,9 @@ export class ActivitySync {
 
     for (let attempt = 0; attempt < delays.length; attempt++) {
       // Check if skipped between retry attempts (user may have skipped during polling)
-      if (this.isSkipped(noteId, sourceInstanceId)) {
+      if (this.isSkipped(noteId, sourceInstanceId, expectedSequence)) {
         console.log(
-          `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} was skipped during retry, aborting sync`
+          `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} at seq ${expectedSequence} was skipped during retry, aborting sync`
         );
         return true;
       }

@@ -101,6 +101,18 @@ declare global {
           contentPreview: string;
         } | null>;
         reloadFromCRDTLogs: (noteId: string) => Promise<{ success: boolean; error?: string }>;
+        getSyncEvents: (noteId: string) => Promise<
+          {
+            id: string;
+            timestamp: number;
+            noteId: string;
+            direction: 'outgoing' | 'incoming';
+            instanceId: string;
+            summary: string;
+            sequence: number;
+            updateSize: number;
+          }[]
+        >;
         onUpdated: (callback: (noteId: string, update: Uint8Array) => void) => () => void;
         onDeleted: (callback: (noteId: string) => void) => () => void;
         onRestored: (callback: (noteId: string) => void) => () => void;
@@ -129,6 +141,18 @@ declare global {
         ) => () => void;
         onModifiedUpdated: (
           callback: (data: { noteId: string; modified: number }) => void
+        ) => () => void;
+        onSyncEvent: (
+          callback: (event: {
+            id: string;
+            timestamp: number;
+            noteId: string;
+            direction: 'outgoing' | 'incoming';
+            instanceId: string;
+            summary: string;
+            sequence: number;
+            updateSize: number;
+          }) => void
         ) => () => void;
       };
 

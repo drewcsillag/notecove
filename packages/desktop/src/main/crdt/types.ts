@@ -5,6 +5,20 @@
 import type * as Y from 'yjs';
 
 /**
+ * Sync event for the sync event viewer
+ */
+export interface SyncEvent {
+  id: string;
+  timestamp: number;
+  noteId: string;
+  direction: 'outgoing' | 'incoming';
+  instanceId: string;
+  summary: string;
+  sequence: number;
+  updateSize: number;
+}
+
+/**
  * Document state in memory
  */
 export interface DocumentState {
@@ -188,4 +202,18 @@ export interface CRDTManager {
    * @param callback Function that receives noteId and new modified timestamp
    */
   setModifiedUpdateCallback(callback: (noteId: string, modified: number) => void): void;
+
+  /**
+   * Get sync events for a note (for the sync event viewer)
+   * Returns the most recent events, newest first
+   * @param noteId Note ID
+   * @returns Array of sync events
+   */
+  getSyncEvents(noteId: string): SyncEvent[];
+
+  /**
+   * Set callback for sync event notifications (for live updates)
+   * @param callback Function called when a new sync event occurs
+   */
+  setSyncEventCallback(callback: (event: SyncEvent) => void): void;
 }

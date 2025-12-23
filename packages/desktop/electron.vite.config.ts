@@ -7,6 +7,12 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: ['bonjour-service'] })],
     build: {
       outDir: 'dist-electron/main',
+      rollupOptions: {
+        input: {
+          // Use bootstrap as entry point to fix cwd issues on macOS Finder launch
+          index: resolve(__dirname, 'src/main/bootstrap.ts'),
+        },
+      },
     },
     resolve: {
       alias: {

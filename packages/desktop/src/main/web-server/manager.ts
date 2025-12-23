@@ -121,10 +121,10 @@ export class WebServerManager {
     setRouteContext({ services });
 
     // Path to browser bundle
-    // In dev: __dirname is dist-electron/main/, so ../../ goes to packages/desktop/
+    // Use app.getAppPath() for reliable resolution regardless of chunking
     const distBrowserPath = app.isPackaged
       ? join(process.resourcesPath, 'dist-browser')
-      : join(__dirname, '../../dist-browser');
+      : join(app.getAppPath(), 'dist-browser');
 
     // Determine host based on localhostOnly setting
     const host = localhostOnly ? '127.0.0.1' : '0.0.0.0';

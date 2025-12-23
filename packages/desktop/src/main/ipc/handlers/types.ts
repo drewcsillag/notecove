@@ -47,6 +47,12 @@ export type RetryStaleEntryFn = (
 ) => Promise<{ success: boolean; error?: string }>;
 
 /**
+ * Callback type for clearing skipped entries for a note
+ * Called when user manually reloads from CRDT logs
+ */
+export type ClearSkippedEntriesForNoteFn = (noteId: string, sdId: string) => void;
+
+/**
  * Callback type for user settings changes
  * Called when Username or UserHandle changes so profile presence can be updated
  */
@@ -118,6 +124,7 @@ export interface HandlerDependencies {
   getStaleSyncs?: GetStaleSyncsFn;
   skipStaleEntry?: SkipStaleEntryFn;
   retryStaleEntry?: RetryStaleEntryFn;
+  clearSkippedEntriesForNote?: ClearSkippedEntriesForNoteFn;
   onUserSettingsChanged?: OnUserSettingsChangedFn;
 }
 

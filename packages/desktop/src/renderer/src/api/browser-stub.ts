@@ -55,6 +55,7 @@ export const browserApiStub: typeof window.electronAPI = {
     checkExistsInSD: notImplemented('note.checkExistsInSD'),
     getInfo: notImplemented('note.getInfo'),
     reloadFromCRDTLogs: notImplemented('note.reloadFromCRDTLogs'),
+    getSyncEvents: notImplemented('note.getSyncEvents'),
     onUpdated: stubEventSubscription,
     onDeleted: stubEventSubscription,
     onRestored: stubEventSubscription,
@@ -65,6 +66,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onTitleUpdated: stubEventSubscription,
     onMoved: stubEventSubscription,
     onModifiedUpdated: stubEventSubscription,
+    onSyncEvent: stubEventSubscription,
   },
 
   history: {

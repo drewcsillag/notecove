@@ -124,6 +124,9 @@ export class DocumentSnapshot {
 
     // Update vector clock atomically
     this.vectorClock[instanceId] = { sequence, offset, file };
+    console.log(
+      `[DocumentSnapshot] applyUpdate: updated vector clock for ${instanceId} to seq=${sequence}`
+    );
   }
 
   /**
@@ -182,6 +185,9 @@ export class DocumentSnapshot {
 
       // Update vector clock (doc was already modified externally)
       this.vectorClock[instanceId] = { sequence, offset, file };
+      console.log(
+        `[DocumentSnapshot] recordExternalUpdate: updated vector clock for ${instanceId} to seq=${sequence}`
+      );
     });
 
     // Return the lock so caller can await it

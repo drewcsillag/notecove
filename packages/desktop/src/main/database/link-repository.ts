@@ -24,10 +24,7 @@ export class LinkRepository {
     } catch (error: unknown) {
       // Handle FOREIGN KEY constraint failure gracefully
       // This happens when the target note hasn't been discovered/synced yet
-      if (
-        error instanceof Error &&
-        error.message.includes('FOREIGN KEY constraint failed')
-      ) {
+      if (error instanceof Error && error.message.includes('FOREIGN KEY constraint failed')) {
         console.log(
           `[LinkRepository] Skipping link ${sourceNoteId} -> ${targetNoteId}: target note not yet in database`
         );

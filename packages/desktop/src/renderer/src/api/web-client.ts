@@ -372,6 +372,10 @@ export const webClient: typeof window.electronAPI = {
       return null;
     },
     reloadFromCRDTLogs: browserNotAvailable('note.reloadFromCRDTLogs'),
+    getSyncEvents: (_noteId: string) => {
+      // Sync events not exposed in web client
+      return Promise.resolve([]);
+    },
     onUpdated: (callback) =>
       subscribe('note:updated', (noteId, update) => {
         callback(noteId as string, new Uint8Array(update as number[]));
@@ -415,6 +419,21 @@ export const webClient: typeof window.electronAPI = {
     onModifiedUpdated: (callback) =>
       subscribe('note:modified-updated', (data) => {
         callback(data as { noteId: string; modified: number });
+      }),
+    onSyncEvent: (callback) =>
+      subscribe('note:syncEvent', (data) => {
+        callback(
+          data as {
+            id: string;
+            timestamp: number;
+            noteId: string;
+            direction: 'outgoing' | 'incoming';
+            instanceId: string;
+            summary: string;
+            sequence: number;
+            updateSize: number;
+          }
+        );
       }),
   },
 

@@ -89,6 +89,12 @@ export type RetryStaleEntryFn = (
 ) => Promise<{ success: boolean; error?: string }>;
 
 /**
+ * Callback type for clearing skipped entries for a note
+ * Called when user manually reloads from CRDT logs
+ */
+export type ClearSkippedEntriesForNoteFn = (noteId: string, sdId: string) => void;
+
+/**
  * Callback type for user settings changes
  * Called when Username or UserHandle changes so profile presence can be updated
  */
@@ -163,6 +169,7 @@ export class IPCHandlers {
     private getStaleSyncs?: GetStaleSyncsFn,
     private skipStaleEntry?: SkipStaleEntryFn,
     private retryStaleEntry?: RetryStaleEntryFn,
+    private clearSkippedEntriesForNote?: ClearSkippedEntriesForNoteFn,
     private onUserSettingsChanged?: OnUserSettingsChangedFn
   ) {
     // Initialize thumbnail generator with cache directory in userData
@@ -403,6 +410,7 @@ export class IPCHandlers {
     ipcMain.handle('note:checkExistsInSD', this.handleCheckNoteExistsInSD.bind(this));
     ipcMain.handle('note:getInfo', this.handleGetNoteInfo.bind(this));
     ipcMain.handle('note:reloadFromCRDTLogs', this.handleReloadFromCRDTLogs.bind(this));
+    ipcMain.handle('note:getSyncEvents', this.handleGetSyncEvents.bind(this));
 
     // History operations
     ipcMain.handle('history:getTimeline', this.handleGetTimeline.bind(this));
@@ -3335,6 +3343,7 @@ export class IPCHandlers {
     let documentHash = '';
 
     if (doc) {
+      console.log(`[NoteInfo] Note ${noteId} is loaded in memory`);
       // Note is loaded in memory - use it directly
       const content = doc.getXmlFragment('content');
       contentText = extractTextFromContent(content);
@@ -3345,8 +3354,11 @@ export class IPCHandlers {
         .split(/\s+/)
         .filter((word) => word.length > 0).length;
 
-      // Get vector clock from memory
-      vectorClock = this.storageManager.getNoteVectorClock(note.sdId, noteId);
+      // Get vector clock from the in-memory DocumentSnapshot (not storageManager's map)
+      // The storageManager's map is only updated when snapshots are saved, but the
+      // DocumentSnapshot's clock is updated with every write
+      vectorClock = this.crdtManager.getVectorClock(noteId) ?? {};
+      console.log(`[NoteInfo] Vector clock from snapshot:`, JSON.stringify(vectorClock));
 
       // Create document hash
       documentHash = crypto
@@ -3355,10 +3367,12 @@ export class IPCHandlers {
         .digest('hex')
         .substring(0, 16);
     } else {
+      console.log(`[NoteInfo] Note ${noteId} NOT in memory, checking DB cache`);
       // Note not in memory - try to get from DB sync state cache
       const syncState = await this.database.getNoteSyncState(noteId, note.sdId);
 
       if (syncState) {
+        console.log(`[NoteInfo] Found DB sync state, vectorClock from DB:`, syncState.vectorClock);
         // Parse vector clock from DB
         try {
           vectorClock = JSON.parse(syncState.vectorClock) as Record<
@@ -3551,6 +3565,12 @@ export class IPCHandlers {
       // This will perform a cold load since the DB cache is now cleared
       await this.crdtManager.loadNote(noteId, note.sdId);
 
+      // Step 4: Clear any skipped entries for this note
+      // This allows future syncs from instances that were previously blocked
+      if (this.clearSkippedEntriesForNote) {
+        this.clearSkippedEntriesForNote(noteId, note.sdId);
+      }
+
       console.log(`[ReloadFromCRDTLogs] Successfully reloaded note ${noteId} from CRDT logs`);
 
       return { success: true };
@@ -3559,6 +3579,25 @@ export class IPCHandlers {
       console.error(`[ReloadFromCRDTLogs] Error:`, error);
       return { success: false, error: errorMessage };
     }
+  }
+
+  /**
+   * Get sync events for a note (for the sync event viewer)
+   */
+  private handleGetSyncEvents(
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): {
+    id: string;
+    timestamp: number;
+    noteId: string;
+    direction: 'outgoing' | 'incoming';
+    instanceId: string;
+    summary: string;
+    sequence: number;
+    updateSize: number;
+  }[] {
+    return this.crdtManager.getSyncEvents(noteId);
   }
 
   // Test-only handlers

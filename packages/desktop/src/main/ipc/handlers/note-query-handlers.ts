@@ -28,6 +28,7 @@ export function registerNoteQueryHandlers(ctx: HandlerContext): void {
   ipcMain.handle('note:createSnapshot', handleCreateSnapshot(ctx));
   ipcMain.handle('note:getInfo', handleGetNoteInfo(ctx));
   ipcMain.handle('note:reloadFromCRDTLogs', handleReloadFromCRDTLogs(ctx));
+  ipcMain.handle('note:getSyncEvents', handleGetSyncEvents(ctx));
 }
 
 /**
@@ -44,6 +45,7 @@ export function unregisterNoteQueryHandlers(): void {
   ipcMain.removeHandler('note:createSnapshot');
   ipcMain.removeHandler('note:getInfo');
   ipcMain.removeHandler('note:reloadFromCRDTLogs');
+  ipcMain.removeHandler('note:getSyncEvents');
 }
 
 // =============================================================================
@@ -576,5 +578,27 @@ function handleReloadFromCRDTLogs(ctx: HandlerContext) {
       console.error(`[ReloadFromCRDTLogs] Error:`, error);
       return { success: false, error: errorMessage };
     }
+  };
+}
+
+/**
+ * Get sync events for a note (for the sync event viewer)
+ */
+function handleGetSyncEvents(ctx: HandlerContext) {
+  return (
+    _event: IpcMainInvokeEvent,
+    noteId: string
+  ): {
+    id: string;
+    timestamp: number;
+    noteId: string;
+    direction: 'outgoing' | 'incoming';
+    instanceId: string;
+    summary: string;
+    sequence: number;
+    updateSize: number;
+  }[] => {
+    const { crdtManager } = ctx;
+    return crdtManager.getSyncEvents(noteId);
   };
 }

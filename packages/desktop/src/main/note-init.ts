@@ -3,6 +3,7 @@
  * Handles default note creation and welcome content
  */
 
+import { app } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import type { Database } from '@notecove/shared';
@@ -19,7 +20,8 @@ import * as Y from 'yjs';
 function getResourcePath(filename: string): string {
   if (is.dev) {
     // In development, resources are in packages/desktop/resources
-    return join(__dirname, '..', '..', 'resources', filename);
+    // Use app.getAppPath() for reliable resolution regardless of chunking
+    return join(app.getAppPath(), 'resources', filename);
   } else {
     // In production, resources are in the app's resources folder
     return join(process.resourcesPath, 'resources', filename);

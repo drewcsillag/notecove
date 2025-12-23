@@ -152,6 +152,32 @@ export const noteApi = {
       success: boolean;
       error?: string;
     }>,
+  getSyncEvents: (
+    noteId: string
+  ): Promise<
+    {
+      id: string;
+      timestamp: number;
+      noteId: string;
+      direction: 'outgoing' | 'incoming';
+      instanceId: string;
+      summary: string;
+      sequence: number;
+      updateSize: number;
+    }[]
+  > =>
+    ipcRenderer.invoke('note:getSyncEvents', noteId) as Promise<
+      {
+        id: string;
+        timestamp: number;
+        noteId: string;
+        direction: 'outgoing' | 'incoming';
+        instanceId: string;
+        summary: string;
+        sequence: number;
+        updateSize: number;
+      }[]
+    >,
 
   // Event listeners
   onUpdated: (callback: (noteId: string, update: Uint8Array) => void): (() => void) => {
@@ -279,6 +305,38 @@ export const noteApi = {
     ipcRenderer.on('note:modified-updated', listener);
     return () => {
       ipcRenderer.removeListener('note:modified-updated', listener);
+    };
+  },
+  onSyncEvent: (
+    callback: (event: {
+      id: string;
+      timestamp: number;
+      noteId: string;
+      direction: 'outgoing' | 'incoming';
+      instanceId: string;
+      summary: string;
+      sequence: number;
+      updateSize: number;
+    }) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      syncEvent: {
+        id: string;
+        timestamp: number;
+        noteId: string;
+        direction: 'outgoing' | 'incoming';
+        instanceId: string;
+        summary: string;
+        sequence: number;
+        updateSize: number;
+      }
+    ): void => {
+      callback(syncEvent);
+    };
+    ipcRenderer.on('note:syncEvent', listener);
+    return () => {
+      ipcRenderer.removeListener('note:syncEvent', listener);
     };
   },
 };

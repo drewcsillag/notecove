@@ -786,6 +786,16 @@ void app.whenReady().then(async () => {
           return { success: false, error: errorMessage };
         }
       },
+      // clearSkippedEntriesForNote callback - called when user reloads from CRDT logs
+      (noteId: string, sdId: string): void => {
+        const activitySync = sdWatcherManager?.getActivitySyncs().get(sdId);
+        if (activitySync) {
+          activitySync.clearSkippedEntriesForNote(noteId);
+          console.log(
+            `[Activity Sync] Cleared skipped entries for note ${noteId} in SD ${sdId} (user reloaded from CRDT logs)`
+          );
+        }
+      },
       // onUserSettingsChanged callback - update profile presence when user settings change
       async (key: string, _value: string): Promise<void> => {
         if (profilePresenceManager && database) {
@@ -823,6 +833,11 @@ void app.whenReady().then(async () => {
     // This allows the note list to reorder based on recent edits
     crdtManager.setModifiedUpdateCallback((noteId: string, modified: number) => {
       ipcHandlers?.broadcastToAll('note:modified-updated', { noteId, modified });
+    });
+
+    // Set up callback for sync event notifications (for live sync event viewer)
+    crdtManager.setSyncEventCallback((event) => {
+      ipcHandlers?.broadcastToAll('note:syncEvent', event);
     });
 
     if (process.env['NODE_ENV'] === 'test') {
@@ -1033,7 +1048,20 @@ void app.whenReady().then(async () => {
     if (freshStartRequested) {
       console.log('[WindowState] Skipping restoration due to fresh start');
     } else {
-      windowsRestored = await restoreWindows();
+      try {
+        windowsRestored = await restoreWindows();
+      } catch (error) {
+        // Window restoration failed - log error and fall back to default window
+        // This prevents app crashes from corrupted window state or inaccessible displays
+        console.error('[WindowState] Failed to restore windows, falling back to default:', error);
+        // Clear corrupted state to prevent future failures
+        try {
+          await windowStateManager.clearState();
+        } catch (clearError) {
+          console.error('[WindowState] Failed to clear corrupted state:', clearError);
+        }
+        windowsRestored = false;
+      }
     }
     if (!windowsRestored) {
       // No saved state or fresh start, create default window

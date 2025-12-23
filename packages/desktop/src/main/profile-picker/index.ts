@@ -6,11 +6,27 @@
  * and returns the selected profile ID.
  */
 
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 import { ProfileStorage, type Profile } from '@notecove/shared';
 import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
+
+/**
+ * Get the path to the profile picker preload script.
+ * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ */
+function getProfilePickerPreloadPath(): string {
+  return join(app.getAppPath(), 'dist-electron/preload/profile-picker.js');
+}
+
+/**
+ * Get the path to the profile picker HTML file.
+ * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ */
+function getProfilePickerRendererPath(): string {
+  return join(app.getAppPath(), 'dist-electron/renderer/profile-picker/index.html');
+}
 
 /** Result from showing the profile picker */
 export interface ProfilePickerResult {
@@ -221,7 +237,7 @@ export async function showProfilePicker(
       title: 'Select Profile - NoteCove',
       show: false,
       webPreferences: {
-        preload: join(__dirname, '../preload/profile-picker.js'),
+        preload: getProfilePickerPreloadPath(),
         sandbox: false,
         contextIsolation: true,
         nodeIntegration: false,
@@ -248,7 +264,7 @@ export async function showProfilePicker(
 
     // Load the picker renderer
     if (process.env['NODE_ENV'] === 'test' || !is.dev || !process.env['ELECTRON_RENDERER_URL']) {
-      void pickerWindow.loadFile(join(__dirname, '../renderer/profile-picker/index.html'));
+      void pickerWindow.loadFile(getProfilePickerRendererPath());
     } else {
       void pickerWindow.loadURL(
         `${process.env['ELECTRON_RENDERER_URL']}/profile-picker/index.html`

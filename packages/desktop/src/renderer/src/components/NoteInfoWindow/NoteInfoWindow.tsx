@@ -6,7 +6,7 @@
  * Shows all information inline without accordion sections.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -18,8 +18,11 @@ import {
   TableCell,
   Chip,
   CircularProgress,
+  Paper,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 interface NoteInfo {
   id: string;
@@ -48,6 +51,17 @@ interface NoteInfo {
   contentPreview: string;
 }
 
+interface SyncEvent {
+  id: string;
+  timestamp: number;
+  noteId: string;
+  direction: 'outgoing' | 'incoming';
+  instanceId: string;
+  summary: string;
+  sequence: number;
+  updateSize: number;
+}
+
 export interface NoteInfoWindowProps {
   noteId: string;
 }
@@ -56,6 +70,8 @@ export const NoteInfoWindow: React.FC<NoteInfoWindowProps> = ({ noteId }) => {
   const [noteInfo, setNoteInfo] = useState<NoteInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncEvents, setSyncEvents] = useState<SyncEvent[]>([]);
+  const syncEventsEndRef = useRef<HTMLDivElement>(null);
 
   // Load note info when component mounts or noteId changes
   useEffect(() => {
@@ -78,6 +94,31 @@ export const NoteInfoWindow: React.FC<NoteInfoWindowProps> = ({ noteId }) => {
     };
 
     void loadNoteInfo();
+  }, [noteId]);
+
+  // Load sync events and subscribe to live updates
+  useEffect(() => {
+    const loadSyncEvents = async () => {
+      try {
+        const events = await window.electronAPI.note.getSyncEvents(noteId);
+        setSyncEvents(events);
+      } catch (err) {
+        console.error('[NoteInfoWindow] Failed to load sync events:', err);
+      }
+    };
+
+    void loadSyncEvents();
+
+    // Subscribe to live sync event updates
+    const unsubscribe = window.electronAPI.note.onSyncEvent((event) => {
+      if (event.noteId === noteId) {
+        setSyncEvents((prev) => [event, ...prev].slice(0, 100)); // Keep max 100 events
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [noteId]);
 
   const formatDate = (timestamp: number): string => {
@@ -419,6 +460,138 @@ export const NoteInfoWindow: React.FC<NoteInfoWindowProps> = ({ noteId }) => {
           </TableRow>
         </TableBody>
       </Table>
+
+      <Divider sx={{ my: 2 }} />
+
+      {/* Sync Event Viewer */}
+      <Typography variant="h6" gutterBottom>
+        Sync Events
+        <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+          (Live)
+        </Typography>
+      </Typography>
+      <Paper
+        variant="outlined"
+        sx={{
+          maxHeight: 300,
+          overflow: 'auto',
+          backgroundColor: 'action.hover',
+        }}
+      >
+        {syncEvents.length === 0 ? (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              No sync events yet. Events will appear here as edits are made or synced.
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ p: 1 }}>
+            {syncEvents.map((event) => (
+              <Box
+                key={event.id}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1,
+                  p: 1,
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                  '&:last-child': {
+                    borderBottom: 'none',
+                  },
+                }}
+              >
+                {/* Direction indicator */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    backgroundColor:
+                      event.direction === 'outgoing' ? 'primary.main' : 'success.main',
+                    color: 'white',
+                    flexShrink: 0,
+                  }}
+                  title={
+                    event.direction === 'outgoing' ? 'Local edit sent' : 'Remote edit received'
+                  }
+                >
+                  {event.direction === 'outgoing' ? (
+                    <ArrowUpwardIcon sx={{ fontSize: 14 }} />
+                  ) : (
+                    <ArrowDownwardIcon sx={{ fontSize: 14 }} />
+                  )}
+                </Box>
+
+                {/* Event details */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                      {event.summary}
+                    </Typography>
+                    <Chip
+                      label={event.direction === 'outgoing' ? 'OUT' : 'IN'}
+                      size="small"
+                      sx={{
+                        height: 18,
+                        fontSize: '0.65rem',
+                        backgroundColor:
+                          event.direction === 'outgoing' ? 'primary.light' : 'success.light',
+                        color:
+                          event.direction === 'outgoing'
+                            ? 'primary.contrastText'
+                            : 'success.contrastText',
+                      }}
+                    />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: 'block',
+                      fontFamily: 'monospace',
+                      fontSize: '0.65rem',
+                      color: 'text.secondary',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    Instance: {event.instanceId.slice(0, 8)}...
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      gap: 2,
+                      mt: 0.5,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'text.secondary', fontSize: '0.65rem' }}
+                    >
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'text.secondary', fontSize: '0.65rem' }}
+                    >
+                      Seq: {event.sequence}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'text.secondary', fontSize: '0.65rem' }}
+                    >
+                      {event.updateSize.toLocaleString()} bytes
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+            <div ref={syncEventsEndRef} />
+          </Box>
+        )}
+      </Paper>
     </Box>
   );
 };
