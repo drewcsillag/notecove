@@ -48,6 +48,10 @@ describe('NotecoveCodeBlock Extension', () => {
       expect(SUPPORTED_LANGUAGES).toContain('typescript');
       expect(SUPPORTED_LANGUAGES).toContain('python');
     });
+
+    it('should include plaintext for no syntax highlighting', () => {
+      expect(SUPPORTED_LANGUAGES).toContain('plaintext');
+    });
   });
 
   describe('Code Block Creation', () => {

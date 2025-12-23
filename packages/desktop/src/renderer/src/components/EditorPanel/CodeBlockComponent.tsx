@@ -29,6 +29,7 @@ import { SUPPORTED_LANGUAGES } from './extensions/CodeBlockLowlight';
  * Display names for languages in the dropdown
  */
 const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  plaintext: 'Plain Text',
   javascript: 'JavaScript',
   typescript: 'TypeScript',
   python: 'Python',
@@ -49,6 +50,20 @@ const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
   shell: 'Shell',
   xml: 'XML',
   diff: 'Diff',
+};
+
+/**
+ * Get sorted languages for dropdown display.
+ * Plain Text appears first, followed by other languages sorted alphabetically by display name.
+ */
+const getSortedLanguages = (): readonly string[] => {
+  const otherLanguages = SUPPORTED_LANGUAGES.filter((lang) => lang !== 'plaintext');
+  const sorted = [...otherLanguages].sort((a, b) => {
+    const nameA = LANGUAGE_DISPLAY_NAMES[a] ?? a;
+    const nameB = LANGUAGE_DISPLAY_NAMES[b] ?? b;
+    return nameA.localeCompare(nameB);
+  });
+  return ['plaintext', ...sorted];
 };
 
 /**
@@ -260,7 +275,7 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = ({ node, updateAttrib
               <MenuItem value="">
                 <em>Auto-detect</em>
               </MenuItem>
-              {SUPPORTED_LANGUAGES.map((lang) => (
+              {getSortedLanguages().map((lang) => (
                 <MenuItem key={lang} value={lang}>
                   {LANGUAGE_DISPLAY_NAMES[lang] ?? lang}
                 </MenuItem>

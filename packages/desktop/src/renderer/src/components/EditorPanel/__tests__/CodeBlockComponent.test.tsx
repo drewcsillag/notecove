@@ -154,6 +154,35 @@ describe('CodeBlockComponent', () => {
 
       expect(updateAttributes).toHaveBeenCalledWith({ language: 'python' });
     });
+
+    it('includes Plain Text option in dropdown', async () => {
+      const props = createMockNodeViewProps();
+      renderWithTheme(<CodeBlockComponent {...props} />);
+
+      // Open dropdown
+      const languageSelect = screen.getByRole('combobox');
+      fireEvent.mouseDown(languageSelect);
+
+      // Plain Text should be available
+      const plainTextOption = await screen.findByRole('option', { name: /plain text/i });
+      expect(plainTextOption).toBeInTheDocument();
+    });
+
+    it('shows Plain Text as first language option after Auto-detect', async () => {
+      const props = createMockNodeViewProps();
+      renderWithTheme(<CodeBlockComponent {...props} />);
+
+      // Open dropdown
+      const languageSelect = screen.getByRole('combobox');
+      fireEvent.mouseDown(languageSelect);
+
+      // Get all options
+      const options = await screen.findAllByRole('option');
+
+      // First should be Auto-detect, second should be Plain Text
+      expect(options[0]).toHaveTextContent('Auto-detect');
+      expect(options[1]).toHaveTextContent('Plain Text');
+    });
   });
 
   describe('Line Numbers', () => {

@@ -18,6 +18,7 @@ import { CodeBlockComponent } from '../CodeBlockComponent';
  * Lowlight supports many more languages via auto-detection.
  */
 export const SUPPORTED_LANGUAGES = [
+  'plaintext',
   'javascript',
   'typescript',
   'python',
