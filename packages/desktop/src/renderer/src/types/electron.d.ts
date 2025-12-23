@@ -258,9 +258,17 @@ declare global {
           order: number;
           deleted: boolean;
         } | null>;
+        getChildInfo: (
+          sdId: string,
+          folderId: string
+        ) => Promise<{ hasChildren: boolean; childCount: number; descendantCount: number }>;
         create: (sdId: string, parentId: string | null, name: string) => Promise<string>;
         rename: (sdId: string, folderId: string, newName: string) => Promise<void>;
-        delete: (sdId: string, folderId: string) => Promise<void>;
+        delete: (
+          sdId: string,
+          folderId: string,
+          mode?: 'simple' | 'cascade' | 'reparent'
+        ) => Promise<void>;
         move: (sdId: string, folderId: string, newParentId: string | null) => Promise<void>;
         reorder: (sdId: string, folderId: string, newIndex: number) => Promise<void>;
         onUpdated: (

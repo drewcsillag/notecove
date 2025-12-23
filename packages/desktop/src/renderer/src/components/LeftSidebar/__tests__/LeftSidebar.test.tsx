@@ -38,6 +38,8 @@ const defaultProps = {
   onTagSelect: jest.fn(),
   onClearTagFilters: jest.fn(),
   showTagPanel: true,
+  selectedFolderId: null as string | null,
+  onFolderSelect: jest.fn(),
 };
 
 const renderLeftSidebar = (props = {}) => {

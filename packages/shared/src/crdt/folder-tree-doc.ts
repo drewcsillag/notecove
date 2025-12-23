@@ -147,6 +147,84 @@ export class FolderTreeDoc {
   }
 
   /**
+   * Get all descendant folders (children, grandchildren, etc.)
+   * Returns folders in breadth-first order
+   */
+  getDescendants(folderId: UUID): FolderData[] {
+    const allFolders = this.getAllFolders();
+    const descendants: FolderData[] = [];
+    const queue: UUID[] = [folderId];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      // Find all direct children of the current folder
+      const children = allFolders.filter(
+        (f) => f.parentId === currentId && !f.deleted && f.id !== folderId
+      );
+      for (const child of children) {
+        descendants.push(child);
+        queue.push(child.id);
+      }
+    }
+
+    return descendants;
+  }
+
+  /**
+   * Check if a folder has any deleted ancestor
+   * Used to filter out orphaned folders whose parent was deleted
+   */
+  hasDeletedAncestor(folderId: UUID): boolean {
+    let currentId: UUID | null = folderId;
+    const allFolders = this.getAllFolders();
+
+    while (currentId !== null) {
+      const folder = allFolders.find((f) => f.id === currentId);
+      if (!folder) {
+        // Folder not found - treat as orphaned
+        return true;
+      }
+
+      if (folder.parentId === null) {
+        // Reached root without finding deleted ancestor
+        return false;
+      }
+
+      const parent = allFolders.find((f) => f.id === folder.parentId);
+      if (!parent) {
+        // Parent not found - orphaned
+        return true;
+      }
+
+      if (parent.deleted) {
+        // Found a deleted ancestor
+        return true;
+      }
+
+      currentId = parent.id;
+    }
+
+    return false;
+  }
+
+  /**
+   * Get all visible folders (non-deleted AND without deleted ancestors)
+   * This filters out both directly deleted folders and orphaned children
+   */
+  getVisibleFolders(): FolderData[] {
+    return this.getAllFolders()
+      .filter((f) => !f.deleted && !this.hasDeletedAncestor(f.id))
+      .sort((a, b) => {
+        // Primary sort by order
+        if (a.order !== b.order) {
+          return a.order - b.order;
+        }
+        // Secondary sort by name (case-insensitive) for stability
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
+  }
+
+  /**
    * Mark folder as deleted (soft delete)
    */
   deleteFolder(folderId: UUID): void {

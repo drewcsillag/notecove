@@ -40,6 +40,9 @@ function App(): React.ReactElement {
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [commentPanelOpen, setCommentPanelOpen] = useState(false);
   const [activeSdId, setActiveSdId] = useState<string | undefined>(undefined);
+  // Selected folder ID - lifted from FolderPanel for window isolation
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedFolderLoaded, setSelectedFolderLoaded] = useState(false);
   const [themeMode, setThemeMode] = useState<PaletteMode>('light');
   const [themeLoaded, setThemeLoaded] = useState(false);
   // Ref to track if theme change came from broadcast (skip redundant save)
@@ -349,6 +352,49 @@ function App(): React.ReactElement {
 
     void loadLeftSidebarSizes();
   }, []);
+
+  // Load selected folder from appState on mount (for window isolation)
+  useEffect(() => {
+    const loadSelectedFolder = async (): Promise<void> => {
+      try {
+        const saved = await window.electronAPI.appState.get(AppStateKey.SelectedFolderId);
+        if (saved) {
+          setSelectedFolderId(saved);
+        } else {
+          // Default to "all-notes" if no saved selection
+          setSelectedFolderId('all-notes');
+        }
+      } catch (error: unknown) {
+        console.error(
+          'Failed to load selected folder:',
+          error instanceof Error ? error.message : String(error)
+        );
+        setSelectedFolderId('all-notes');
+      } finally {
+        setSelectedFolderLoaded(true);
+      }
+    };
+
+    void loadSelectedFolder();
+  }, []);
+
+  // Save selected folder to appState when it changes (after initial load)
+  useEffect(() => {
+    if (!selectedFolderLoaded || selectedFolderId === null) return;
+
+    const saveSelectedFolder = async (): Promise<void> => {
+      try {
+        await window.electronAPI.appState.set(AppStateKey.SelectedFolderId, selectedFolderId);
+      } catch (error: unknown) {
+        console.error(
+          'Failed to save selected folder:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    };
+
+    void saveSelectedFolder();
+  }, [selectedFolderId, selectedFolderLoaded]);
 
   // Load saved theme preference on mount
   useEffect(() => {
@@ -924,6 +970,8 @@ function App(): React.ReactElement {
                 }}
                 activeSdId={activeSdId}
                 onActiveSdChange={setActiveSdId}
+                selectedFolderId={selectedFolderId}
+                onFolderSelect={setSelectedFolderId}
                 tagFilters={tagFilters}
                 onTagSelect={handleTagSelect}
                 onClearTagFilters={handleClearTagFilters}
@@ -938,6 +986,7 @@ function App(): React.ReactElement {
                 onNoteSelect={setSelectedNoteId}
                 onNoteCreated={setNewlyCreatedNoteId}
                 activeSdId={activeSdId}
+                selectedFolderId={selectedFolderId}
                 tagFilters={tagFilters}
                 exportTrigger={exportTrigger}
                 onExportComplete={() => {

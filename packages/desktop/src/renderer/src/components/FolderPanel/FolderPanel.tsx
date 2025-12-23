@@ -24,14 +24,19 @@ export interface FolderPanelProps {
   onOpenSettings?: () => void;
   activeSdId?: string;
   onActiveSdChange?: (sdId: string) => void;
+  /** Controlled selected folder ID (lifted state for window isolation) */
+  selectedFolderId: string | null;
+  /** Callback when folder selection changes */
+  onFolderSelect: (folderId: string | null) => void;
 }
 
 export const FolderPanel: React.FC<FolderPanelProps> = ({
   onOpenSettings,
   activeSdId,
   onActiveSdChange,
+  selectedFolderId,
+  onFolderSelect,
 }) => {
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<string[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -47,16 +52,7 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
         onActiveSdChange(loadedActiveSdId);
       }
 
-      // Load selected folder
-      const selectedState = await window.electronAPI.appState.get('selectedFolderId');
-      if (selectedState) {
-        setSelectedFolderId(selectedState);
-      } else {
-        // Default to "All Notes" for the active SD
-        if (loadedActiveSdId) {
-          setSelectedFolderId(`all-notes:${loadedActiveSdId}`);
-        }
-      }
+      // Note: selectedFolderId is now controlled by parent (App.tsx) for window isolation
 
       // Load expanded folders
       const expandedState = await window.electronAPI.appState.get('expandedFolderIds');
@@ -71,8 +67,6 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
       setStateLoaded(true);
     } catch (err) {
       console.error('Failed to load folder state:', err);
-      // Default to "All Notes" on error
-      setSelectedFolderId('all-notes');
       setStateLoaded(true); // Still mark as loaded even on error
     }
   }, [onActiveSdChange]);
@@ -113,21 +107,13 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
     };
   }, [onActiveSdChange]);
 
-  const handleFolderSelect = useCallback((folderId: string | null): void => {
-    setSelectedFolderId(folderId);
-
-    // Persist selection
-    if (folderId) {
-      window.electronAPI.appState.set('selectedFolderId', folderId).catch((err) => {
-        console.error('Failed to save selected folder:', err);
-      });
-
-      // Emit folder selected event (clears search in NotesListPanel)
-      window.electronAPI.folder.emitSelected(folderId).catch((err) => {
-        console.error('Failed to emit folder selected event:', err);
-      });
-    }
-  }, []);
+  const handleFolderSelect = useCallback(
+    (folderId: string | null): void => {
+      // Delegate to parent for window-isolated state management
+      onFolderSelect(folderId);
+    },
+    [onFolderSelect]
+  );
 
   const handleExpandedChange = useCallback((expandedIds: string[]): void => {
     setExpandedFolderIds(expandedIds);
@@ -219,11 +205,8 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
           });
       }
 
-      // Select the new folder
-      setSelectedFolderId(newFolderId);
-      window.electronAPI.appState.set('selectedFolderId', newFolderId).catch((err) => {
-        console.error('Failed to save selected folder:', err);
-      });
+      // Select the new folder (parent handles persistence)
+      onFolderSelect(newFolderId);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create folder');
     }

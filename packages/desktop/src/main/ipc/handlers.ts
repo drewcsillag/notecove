@@ -2020,7 +2020,8 @@ export class IPCHandlers {
     sdId: string
   ): Promise<import('@notecove/shared').FolderData[]> {
     const folderTree = await this.crdtManager.loadFolderTree(sdId);
-    return folderTree.getActiveFolders();
+    // Use getVisibleFolders to exclude orphaned folders (those with deleted ancestors)
+    return folderTree.getVisibleFolders();
   }
 
   /**
@@ -2044,7 +2045,8 @@ export class IPCHandlers {
         return {
           sdId: sd.id,
           sdName: sd.name,
-          folders: folderTree.getActiveFolders(),
+          // Use getVisibleFolders to exclude orphaned folders (those with deleted ancestors)
+          folders: folderTree.getVisibleFolders(),
         };
       })
     );

@@ -89,6 +89,7 @@ export const browserApiStub: typeof window.electronAPI = {
     list: notImplemented('folder.list'),
     listAll: notImplemented('folder.listAll'),
     get: notImplemented('folder.get'),
+    getChildInfo: notImplemented('folder.getChildInfo'),
     create: notImplemented('folder.create'),
     rename: notImplemented('folder.rename'),
     delete: notImplemented('folder.delete'),

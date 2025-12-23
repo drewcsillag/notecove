@@ -449,10 +449,18 @@ export const FolderTree: FC<FolderTreeProps> = ({
     open: boolean;
     folderId: string;
     folderName: string;
+    sdId: string;
+    hasChildren: boolean;
+    childCount: number;
+    descendantCount: number;
   }>({
     open: false,
     folderId: '',
     folderName: '',
+    sdId: '',
+    hasChildren: false,
+    childCount: 0,
+    descendantCount: 0,
   });
 
   // Trash context menu state (separate from folder context menu)
@@ -887,38 +895,78 @@ export const FolderTree: FC<FolderTreeProps> = ({
     });
   };
 
-  const handleDeleteClick = (): void => {
+  const handleDeleteClick = async (): Promise<void> => {
     if (!contextMenu) return;
     const folder = folders.find((f) => f.id === contextMenu.folderId);
     if (!folder) return;
 
-    setDeleteDialog({
-      open: true,
-      folderId: folder.id,
-      folderName: folder.name,
-    });
+    // Check if folder has children
+    try {
+      const childInfo = await window.electronAPI.folder.getChildInfo(folder.sdId, folder.id);
+      setDeleteDialog({
+        open: true,
+        folderId: folder.id,
+        folderName: folder.name,
+        sdId: folder.sdId,
+        hasChildren: childInfo.hasChildren,
+        childCount: childInfo.childCount,
+        descendantCount: childInfo.descendantCount,
+      });
+    } catch (err) {
+      console.error('Failed to get folder child info:', err);
+      // Fallback to simple delete dialog without child info
+      setDeleteDialog({
+        open: true,
+        folderId: folder.id,
+        folderName: folder.name,
+        sdId: folder.sdId,
+        hasChildren: false,
+        childCount: 0,
+        descendantCount: 0,
+      });
+    }
     handleCloseContextMenu();
   };
 
-  const handleDeleteConfirm = async (): Promise<void> => {
+  const handleDeleteConfirm = async (
+    mode: 'simple' | 'cascade' | 'reparent' = 'simple'
+  ): Promise<void> => {
     try {
-      // Find the folder to get its SD ID
-      const folder = folders.find((f) => f.id === deleteDialog.folderId);
-      if (!folder) {
-        throw new Error('Folder not found');
-      }
-
-      await window.electronAPI.folder.delete(folder.sdId, deleteDialog.folderId);
-      setDeleteDialog({ open: false, folderId: '', folderName: '' });
+      await window.electronAPI.folder.delete(deleteDialog.sdId, deleteDialog.folderId, mode);
+      setDeleteDialog({
+        open: false,
+        folderId: '',
+        folderName: '',
+        sdId: '',
+        hasChildren: false,
+        childCount: 0,
+        descendantCount: 0,
+      });
       onRefresh?.();
     } catch (err) {
       console.error('Failed to delete folder:', err);
-      setDeleteDialog({ open: false, folderId: '', folderName: '' });
+      setDeleteDialog({
+        open: false,
+        folderId: '',
+        folderName: '',
+        sdId: '',
+        hasChildren: false,
+        childCount: 0,
+        descendantCount: 0,
+      });
     }
   };
 
   const handleDeleteCancel = (): void => {
-    setDeleteDialog({ open: false, folderId: '', folderName: '' });
+    setDeleteDialog({
+      open: false,
+      folderId: '',
+      folderName: '',
+      sdId: '',
+      hasChildren: false,
+      childCount: 0,
+      descendantCount: 0,
+    });
   };
 
   const handleMoveToTopLevel = async (): Promise<void> => {
@@ -1759,7 +1807,13 @@ export const FolderTree: FC<FolderTreeProps> = ({
         >
           Move to Top Level
         </MenuItem>
-        <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
+        <MenuItem
+          onClick={() => {
+            void handleDeleteClick();
+          }}
+        >
+          Delete
+        </MenuItem>
       </Menu>
 
       {/* Trash Context Menu */}
@@ -1834,25 +1888,72 @@ export const FolderTree: FC<FolderTreeProps> = ({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog.open} onClose={handleDeleteCancel} maxWidth="xs" fullWidth>
+      <Dialog open={deleteDialog.open} onClose={handleDeleteCancel} maxWidth="sm" fullWidth>
         <DialogTitle>Delete Folder</DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to delete &ldquo;{deleteDialog.folderName}&rdquo;? This action
-            cannot be undone.
-          </Typography>
+          {deleteDialog.hasChildren ? (
+            <Box>
+              <Typography sx={{ mb: 2 }}>
+                &ldquo;{deleteDialog.folderName}&rdquo; contains {deleteDialog.descendantCount}{' '}
+                subfolder{deleteDialog.descendantCount === 1 ? '' : 's'}. How would you like to
+                proceed?
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Notes in deleted folders will be moved to the parent folder.
+              </Typography>
+            </Box>
+          ) : (
+            <Typography>
+              Are you sure you want to delete &ldquo;{deleteDialog.folderName}&rdquo;? Notes in this
+              folder will be moved to the parent folder.
+            </Typography>
+          )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDeleteCancel}>Cancel</Button>
-          <Button
-            onClick={() => {
-              void handleDeleteConfirm();
-            }}
-            variant="contained"
-            color="error"
-          >
-            Delete
-          </Button>
+        <DialogActions sx={{ flexDirection: deleteDialog.hasChildren ? 'column' : 'row', gap: 1 }}>
+          {deleteDialog.hasChildren ? (
+            <>
+              <Box
+                sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: 1, mb: 1 }}
+              >
+                <Button onClick={handleDeleteCancel}>Cancel</Button>
+              </Box>
+              <Button
+                onClick={() => {
+                  void handleDeleteConfirm('reparent');
+                }}
+                variant="outlined"
+                fullWidth
+                sx={{ textTransform: 'none' }}
+              >
+                Delete folder only, move subfolders to parent
+              </Button>
+              <Button
+                onClick={() => {
+                  void handleDeleteConfirm('cascade');
+                }}
+                variant="contained"
+                color="error"
+                fullWidth
+                sx={{ textTransform: 'none' }}
+              >
+                Delete folder and all {deleteDialog.descendantCount} subfolder
+                {deleteDialog.descendantCount === 1 ? '' : 's'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={handleDeleteCancel}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  void handleDeleteConfirm('simple');
+                }}
+                variant="contained"
+                color="error"
+              >
+                Delete
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 

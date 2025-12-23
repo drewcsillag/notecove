@@ -48,9 +48,16 @@ global.window.electronAPI = {
   },
 } as unknown as typeof window.electronAPI;
 
+// Default props for tests (selectedFolderId and onFolderSelect are now required)
+const defaultProps = {
+  selectedFolderId: null as string | null,
+  onFolderSelect: jest.fn(),
+};
+
 describe('FolderPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    defaultProps.onFolderSelect.mockClear();
     // Make onUpdated return an unsubscribe function
     mockFolderOnUpdated.mockReturnValue(() => {
       /* unsubscribe */
@@ -65,7 +72,7 @@ describe('FolderPanel', () => {
   it('should render the folder panel with header', async () => {
     mockAppStateGet.mockResolvedValue(null);
 
-    render(<FolderPanel />);
+    render(<FolderPanel {...defaultProps} />);
 
     expect(screen.getByText('Folders')).toBeInTheDocument();
 
@@ -79,7 +86,7 @@ describe('FolderPanel', () => {
     mockAppStateGet.mockResolvedValue(null);
     mockFolderList.mockResolvedValue([]);
 
-    render(<FolderPanel />);
+    render(<FolderPanel {...defaultProps} />);
 
     // Wait for state to load and FolderTree to render
     await waitFor(() => {
@@ -87,26 +94,26 @@ describe('FolderPanel', () => {
     });
   });
 
-  it('should load persisted folder selection on mount', async () => {
+  it('should load persisted expanded folders on mount', async () => {
     mockAppStateGet.mockImplementation((key: string) => {
-      if (key === 'selectedFolderId') return Promise.resolve('folder-1');
       if (key === 'expandedFolderIds')
         return Promise.resolve(JSON.stringify(['folder-1', 'folder-2']));
       return Promise.resolve(null);
     });
 
-    render(<FolderPanel />);
+    // Note: selectedFolderId is now passed as prop, not loaded from appState
+    render(<FolderPanel {...defaultProps} selectedFolderId="folder-1" />);
 
     await waitFor(() => {
-      expect(mockAppStateGet).toHaveBeenCalledWith('selectedFolderId');
+      // selectedFolderId is now passed as prop, only expandedFolderIds is loaded from appState
       expect(mockAppStateGet).toHaveBeenCalledWith('expandedFolderIds');
     });
   });
 
-  it('should default to "all-notes" when no persisted selection', async () => {
+  it('should render correctly with null selectedFolderId', async () => {
     mockAppStateGet.mockResolvedValue(null);
 
-    render(<FolderPanel />);
+    render(<FolderPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockAppStateGet).toHaveBeenCalled();
@@ -119,7 +126,7 @@ describe('FolderPanel', () => {
   it('should handle appState load errors gracefully', async () => {
     mockAppStateGet.mockRejectedValue(new Error('Failed to load'));
 
-    render(<FolderPanel />);
+    render(<FolderPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockAppStateGet).toHaveBeenCalled();

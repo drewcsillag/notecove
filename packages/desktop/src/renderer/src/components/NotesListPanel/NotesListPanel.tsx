@@ -59,6 +59,8 @@ interface NotesListPanelProps {
   onNoteSelect: (noteId: string | null) => void;
   onNoteCreated?: (noteId: string) => void;
   activeSdId?: string | undefined;
+  /** Selected folder ID (controlled by parent for window isolation) */
+  selectedFolderId: string | null;
   tagFilters?: Record<string, 'include' | 'exclude'>;
   exportTrigger?: 'selected' | 'all' | null;
   onExportComplete?: () => void;
@@ -69,12 +71,13 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   onNoteSelect,
   onNoteCreated,
   activeSdId,
+  selectedFolderId,
   tagFilters = {},
   exportTrigger,
   onExportComplete,
 }) => {
   const [notes, setNotes] = useState<Note[]>([]);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  // Note: selectedFolderId is now passed as prop for window isolation
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Folders for building folder paths in notes list
@@ -142,16 +145,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Load selected folder from app state
-  const loadSelectedFolder = useCallback(async () => {
-    try {
-      const selected = await window.electronAPI.appState.get('selectedFolderId');
-      setSelectedFolderId(selected ?? 'all-notes');
-    } catch (err) {
-      console.error('Failed to load selected folder:', err);
-      setSelectedFolderId('all-notes');
-    }
-  }, []);
+  // Note: selectedFolderId loading is now handled by App.tsx for window isolation
 
   // Load search query from app state
   const loadSearchQuery = useCallback(async () => {
@@ -438,16 +432,15 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     }
   }, [creating, selectedFolderId, handleNoteSelect, fetchNotes, activeSdId, onNoteCreated]);
 
-  // Load selected folder, search query, and folders on mount
+  // Load search query and folders on mount (selectedFolderId is passed as prop)
   useEffect(() => {
-    void loadSelectedFolder();
     void loadSearchQuery();
     void loadFolders();
-  }, [loadSelectedFolder, loadSearchQuery, loadFolders]);
+  }, [loadSearchQuery, loadFolders]);
 
-  // Reset to "all-notes", reload folders, and clear search when active SD changes
+  // Reload folders and clear search when active SD changes
+  // Note: selectedFolderId is managed by parent (App.tsx) for window isolation
   useEffect(() => {
-    setSelectedFolderId('all-notes');
     void loadFolders();
 
     // Only clear search when SD actually changes (not on initial load)
@@ -504,16 +497,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     };
   }, [performSearch, saveSearchQuery]);
 
-  // Poll for selected folder changes (since we don't have cross-component events yet)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      void loadSelectedFolder();
-    }, 500); // Check every 500ms
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [loadSelectedFolder]);
+  // Note: Polling removed - selectedFolderId is now passed as prop for window isolation
 
   // NOTE: We intentionally DON'T clear the selected note when changing folders
   // This allows users to browse folders while keeping their current note open in the editor
@@ -771,10 +755,18 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
     };
   }, [activeSdId, saveSearchQuery]);
 
-  // Listen for folder selection events to clear search
+  // Clear search when folder selection changes (but not on initial load)
+  // This replaces the old folder:selected broadcast listener
+  const previousFolderIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    const unsubscribeFolderSelected = window.electronAPI.folder.onSelected(() => {
-      // Clear search when a folder is selected
+    // Skip initial render (undefined means first render)
+    if (previousFolderIdRef.current === undefined) {
+      previousFolderIdRef.current = selectedFolderId;
+      return;
+    }
+
+    // Only clear if the folder actually changed
+    if (previousFolderIdRef.current !== selectedFolderId) {
       setSearchQuery('');
       void saveSearchQuery('');
       setIsSearching(false);
@@ -784,12 +776,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         clearTimeout(searchTimeoutRef.current);
         searchTimeoutRef.current = null;
       }
-    });
 
-    return () => {
-      unsubscribeFolderSelected();
-    };
-  }, [saveSearchQuery]);
+      previousFolderIdRef.current = selectedFolderId;
+    }
+  }, [selectedFolderId, saveSearchQuery]);
 
   // Handle export trigger from app menu
   useEffect(() => {

@@ -83,12 +83,21 @@ Object.defineProperty(window, 'electronAPI', {
   writable: true,
 });
 
+// Default props for tests (selectedFolderId is now required)
+const defaultProps = {
+  selectedNoteId: null as string | null,
+  onNoteSelect: jest.fn(),
+  activeSdId: 'default',
+  selectedFolderId: null as string | null,
+};
+
 describe('NotesListPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     folderSelectedCallbacks = [];
     sdUpdatedCallbacks = [];
+    defaultProps.onNoteSelect.mockClear();
 
     // Set up sd.onUpdated to capture callbacks
     mockElectronAPI.sd.onUpdated.mockImplementation(
@@ -106,10 +115,7 @@ describe('NotesListPanel', () => {
   });
 
   it('should show loading state initially', () => {
-    const onNoteSelect = jest.fn();
-    render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    render(<NotesListPanel {...defaultProps} />);
     expect(screen.getByText('Loading notes...')).toBeInTheDocument();
   });
 
@@ -124,10 +130,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const onNoteSelect = jest.fn();
-    render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    render(<NotesListPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('No notes in this folder')).toBeInTheDocument();
@@ -170,10 +173,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const onNoteSelect = jest.fn();
-    render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    render(<NotesListPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('Notes (2)')).toBeInTheDocument();
@@ -209,10 +209,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const onNoteSelect = jest.fn();
-    render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    render(<NotesListPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('Untitled Note')).toBeInTheDocument();
@@ -231,10 +228,7 @@ describe('NotesListPanel', () => {
     });
     mockElectronAPI.note.list.mockResolvedValue([]);
 
-    const onNoteSelect = jest.fn();
-    render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    render(<NotesListPanel {...defaultProps} />);
 
     // Advance timers to trigger the polling interval
     jest.advanceTimersByTime(1000);
@@ -252,10 +246,7 @@ describe('NotesListPanel', () => {
     });
     mockElectronAPI.note.list.mockResolvedValue([]);
 
-    const onNoteSelect = jest.fn();
-    render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    render(<NotesListPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockElectronAPI.note.list).toHaveBeenCalledWith('default');
@@ -288,9 +279,7 @@ describe('NotesListPanel', () => {
     });
 
     const onNoteSelect = jest.fn();
-    const { getByText, unmount } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    const { getByText, unmount } = render(<NotesListPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(getByText('Test Note')).toBeInTheDocument();
@@ -323,9 +312,7 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.create.mockResolvedValue('new-note-id');
 
     const onNoteSelect = jest.fn();
-    const { getByTitle, unmount } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    const { getByTitle, unmount } = render(<NotesListPanel {...defaultProps} />);
 
     await waitFor(() => {
       expect(getByTitle('Create note')).toBeInTheDocument();
@@ -375,10 +362,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const onNoteSelect = jest.fn();
-    const { unmount } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    const { unmount } = render(<NotesListPanel {...defaultProps} />);
 
     // Wait for the folder path to appear
     await waitFor(() => {
@@ -414,10 +398,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const onNoteSelect = jest.fn();
-    const { unmount, container } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    const { unmount, container } = render(<NotesListPanel {...defaultProps} />);
 
     // Wait for the note to appear
     await waitFor(() => {
@@ -461,10 +442,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const onNoteSelect = jest.fn();
-    const { unmount } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    const { unmount } = render(<NotesListPanel {...defaultProps} />);
 
     // Wait for the note to appear
     await waitFor(() => {
@@ -513,10 +491,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const onNoteSelect = jest.fn();
-    const { unmount } = render(
-      <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-    );
+    const { unmount } = render(<NotesListPanel {...defaultProps} />);
 
     // Wait for the note to appear
     await waitFor(() => {
@@ -551,10 +526,7 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const onNoteSelect = jest.fn();
-      const { unmount } = render(
-        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-      );
+      const { unmount } = render(<NotesListPanel {...defaultProps} />);
 
       // Wait for component to load and search to be populated
       await waitFor(() => {
@@ -589,10 +561,7 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const onNoteSelect = jest.fn();
-      const { unmount } = render(
-        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-      );
+      const { unmount } = render(<NotesListPanel {...defaultProps} />);
 
       // Wait for search to be populated
       await waitFor(() => {
@@ -624,10 +593,7 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const onNoteSelect = jest.fn();
-      const { unmount } = render(
-        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-      );
+      const { unmount } = render(<NotesListPanel {...defaultProps} />);
 
       // Wait for search to be populated
       await waitFor(() => {
@@ -659,10 +625,7 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const onNoteSelect = jest.fn();
-      const { unmount, rerender } = render(
-        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="sd-1" />
-      );
+      const { unmount, rerender } = render(<NotesListPanel {...defaultProps} activeSdId="sd-1" />);
 
       // Wait for search to be populated
       await waitFor(() => {
@@ -671,9 +634,7 @@ describe('NotesListPanel', () => {
       });
 
       // Change activeSdId
-      rerender(
-        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="sd-2" />
-      );
+      rerender(<NotesListPanel {...defaultProps} activeSdId="sd-2" />);
 
       // Search should be cleared
       await waitFor(() => {
@@ -699,10 +660,7 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const onNoteSelect = jest.fn();
-      const { unmount } = render(
-        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="default" />
-      );
+      const { unmount } = render(<NotesListPanel {...defaultProps} />);
 
       // Wait for search to be populated
       await waitFor(() => {
@@ -751,14 +709,7 @@ describe('NotesListPanel', () => {
         return Promise.resolve(null);
       });
 
-      const onNoteSelect = jest.fn();
-      render(
-        <NotesListPanel
-          selectedNoteId={null}
-          onNoteSelect={onNoteSelect}
-          activeSdId="sd-to-delete"
-        />
-      );
+      render(<NotesListPanel {...defaultProps} activeSdId="sd-to-delete" />);
 
       // Wait for notes to load
       await waitFor(() => {
@@ -801,10 +752,7 @@ describe('NotesListPanel', () => {
         return Promise.resolve(null);
       });
 
-      const onNoteSelect = jest.fn();
-      render(
-        <NotesListPanel selectedNoteId={null} onNoteSelect={onNoteSelect} activeSdId="my-sd" />
-      );
+      render(<NotesListPanel {...defaultProps} activeSdId="my-sd" />);
 
       // Wait for notes to load
       await waitFor(() => {

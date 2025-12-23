@@ -15,6 +15,10 @@ export interface LeftSidebarProps {
   onOpenSettings?: () => void;
   activeSdId?: string | undefined;
   onActiveSdChange?: (sdId: string) => void;
+  /** Currently selected folder ID (lifted state for window isolation) */
+  selectedFolderId: string | null;
+  /** Callback when folder selection changes */
+  onFolderSelect: (folderId: string | null) => void;
   tagFilters: Record<string, 'include' | 'exclude'>;
   onTagSelect: (tagId: string) => void;
   onClearTagFilters: () => void;
@@ -29,6 +33,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onOpenSettings,
   activeSdId,
   onActiveSdChange,
+  selectedFolderId,
+  onFolderSelect,
   tagFilters,
   onTagSelect,
   onClearTagFilters,
@@ -43,7 +49,12 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     onOpenSettings?: () => void;
     activeSdId?: string;
     onActiveSdChange?: (sdId: string) => void;
-  } = {};
+    selectedFolderId: string | null;
+    onFolderSelect: (folderId: string | null) => void;
+  } = {
+    selectedFolderId,
+    onFolderSelect,
+  };
 
   if (onOpenSettings) folderPanelProps.onOpenSettings = onOpenSettings;
   if (activeSdId) folderPanelProps.activeSdId = activeSdId;

@@ -74,12 +74,24 @@ export const folderApi = {
       order: number;
       deleted: boolean;
     } | null>,
+  getChildInfo: (
+    sdId: string,
+    folderId: string
+  ): Promise<{ hasChildren: boolean; childCount: number; descendantCount: number }> =>
+    ipcRenderer.invoke('folder:getChildInfo', sdId, folderId) as Promise<{
+      hasChildren: boolean;
+      childCount: number;
+      descendantCount: number;
+    }>,
   create: (sdId: string, parentId: string | null, name: string): Promise<string> =>
     ipcRenderer.invoke('folder:create', sdId, parentId, name) as Promise<string>,
   rename: (sdId: string, folderId: string, newName: string): Promise<void> =>
     ipcRenderer.invoke('folder:rename', sdId, folderId, newName) as Promise<void>,
-  delete: (sdId: string, folderId: string): Promise<void> =>
-    ipcRenderer.invoke('folder:delete', sdId, folderId) as Promise<void>,
+  delete: (
+    sdId: string,
+    folderId: string,
+    mode: 'simple' | 'cascade' | 'reparent' = 'simple'
+  ): Promise<void> => ipcRenderer.invoke('folder:delete', sdId, folderId, mode) as Promise<void>,
   move: (sdId: string, folderId: string, newParentId: string | null): Promise<void> =>
     ipcRenderer.invoke('folder:move', sdId, folderId, newParentId) as Promise<void>,
   reorder: (sdId: string, folderId: string, newIndex: number): Promise<void> =>

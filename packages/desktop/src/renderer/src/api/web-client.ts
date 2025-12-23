@@ -532,6 +532,44 @@ export const webClient: typeof window.electronAPI = {
       if (!folder) return null;
       return folder;
     },
+    getChildInfo: async (sdId: string, folderId: string) => {
+      // Calculate child info from folder list
+      const folders = await apiRequest<
+        {
+          id: string;
+          name: string;
+          parentId: string | null;
+          sdId: string;
+          order: number;
+          deleted: boolean;
+        }[]
+      >('GET', `/api/folders?sdId=${sdId}`);
+
+      // Count direct children
+      const children = folders.filter((f) => f.parentId === folderId && !f.deleted);
+      const childCount = children.length;
+
+      // Count all descendants (BFS)
+      const descendants: string[] = [];
+      const queue = [folderId];
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+        if (!currentId) break;
+        const childFolders = folders.filter(
+          (f) => f.parentId === currentId && !f.deleted && f.id !== folderId
+        );
+        for (const child of childFolders) {
+          descendants.push(child.id);
+          queue.push(child.id);
+        }
+      }
+
+      return {
+        hasChildren: childCount > 0,
+        childCount,
+        descendantCount: descendants.length,
+      };
+    },
     create: async (sdId: string, parentId: string | null, name: string) => {
       const response = await apiRequest<{ folderId: string }>('POST', '/api/folders', {
         sdId,

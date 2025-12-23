@@ -16,6 +16,7 @@ export function registerFolderHandlers(ctx: HandlerContext): void {
   ipcMain.handle('folder:list', handleListFolders(ctx));
   ipcMain.handle('folder:listAll', handleListAllFolders(ctx));
   ipcMain.handle('folder:get', handleGetFolder(ctx));
+  ipcMain.handle('folder:getChildInfo', handleGetFolderChildInfo(ctx));
   ipcMain.handle('folder:create', handleCreateFolder(ctx));
   ipcMain.handle('folder:rename', handleRenameFolder(ctx));
   ipcMain.handle('folder:delete', handleDeleteFolder(ctx));
@@ -31,6 +32,7 @@ export function unregisterFolderHandlers(): void {
   ipcMain.removeHandler('folder:list');
   ipcMain.removeHandler('folder:listAll');
   ipcMain.removeHandler('folder:get');
+  ipcMain.removeHandler('folder:getChildInfo');
   ipcMain.removeHandler('folder:create');
   ipcMain.removeHandler('folder:rename');
   ipcMain.removeHandler('folder:delete');
@@ -46,7 +48,8 @@ export function unregisterFolderHandlers(): void {
 function handleListFolders(ctx: HandlerContext) {
   return async (_event: IpcMainInvokeEvent, sdId: string): Promise<FolderData[]> => {
     const folderTree = await ctx.crdtManager.loadFolderTree(sdId);
-    return folderTree.getActiveFolders();
+    // Use getVisibleFolders to exclude orphaned folders (those with deleted ancestors)
+    return folderTree.getVisibleFolders();
   };
 }
 
@@ -64,7 +67,8 @@ function handleListAllFolders(ctx: HandlerContext) {
         return {
           sdId: sd.id,
           sdName: sd.name,
-          folders: folderTree.getActiveFolders(),
+          // Use getVisibleFolders to exclude orphaned folders (those with deleted ancestors)
+          folders: folderTree.getVisibleFolders(),
         };
       })
     );
@@ -211,8 +215,48 @@ function handleRenameFolder(ctx: HandlerContext) {
   };
 }
 
+/**
+ * Get info about folder's children for confirmation dialog
+ */
+function handleGetFolderChildInfo(ctx: HandlerContext) {
+  return async (
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string
+  ): Promise<{ hasChildren: boolean; childCount: number; descendantCount: number }> => {
+    const { crdtManager } = ctx;
+
+    const folderTree = await crdtManager.loadFolderTree(sdId);
+    const folder = folderTree.getFolder(folderId);
+
+    if (!folder) {
+      throw new Error(`Folder ${folderId} not found`);
+    }
+
+    const children = folderTree.getChildFolders(folderId);
+    const descendants = folderTree.getDescendants(folderId);
+
+    return {
+      hasChildren: children.length > 0,
+      childCount: children.length,
+      descendantCount: descendants.length,
+    };
+  };
+}
+
+/**
+ * Delete folder with mode:
+ * - 'simple': Just delete the folder (no children check - UI handles confirmation)
+ * - 'cascade': Delete folder and all descendants, move all notes to parent
+ * - 'reparent': Delete folder only, move children to parent, move notes to parent
+ */
 function handleDeleteFolder(ctx: HandlerContext) {
-  return async (_event: IpcMainInvokeEvent, sdId: string, folderId: string): Promise<void> => {
+  return async (
+    _event: IpcMainInvokeEvent,
+    sdId: string,
+    folderId: string,
+    mode: 'simple' | 'cascade' | 'reparent' = 'simple'
+  ): Promise<void> => {
     const { crdtManager, database, broadcastToAll } = ctx;
 
     const folderTree = await crdtManager.loadFolderTree(sdId);
@@ -222,14 +266,70 @@ function handleDeleteFolder(ctx: HandlerContext) {
       throw new Error(`Folder ${folderId} not found`);
     }
 
-    // Soft delete in CRDT
-    folderTree.deleteFolder(folderId);
+    const parentFolderId = folder.parentId; // null means root
 
-    // Update SQLite cache
-    await database.upsertFolder({
-      ...folder,
-      deleted: true,
-    });
+    if (mode === 'cascade') {
+      // Get all descendants before deleting
+      const descendants = folderTree.getDescendants(folderId);
+      const allFolderIds = [folderId, ...descendants.map((d) => d.id)];
+
+      // Move all notes from all deleted folders to the parent folder
+      for (const deletedFolderId of allFolderIds) {
+        const notes = await database.getNotesByFolder(deletedFolderId);
+        for (const note of notes) {
+          // Update note's folderId to parent
+          await database.upsertNote({
+            ...note,
+            folderId: parentFolderId,
+          });
+        }
+      }
+
+      // Delete all folders (folder + all descendants)
+      for (const deletedFolderId of allFolderIds) {
+        const folderToDelete = folderTree.getFolder(deletedFolderId);
+        if (folderToDelete) {
+          folderTree.deleteFolder(deletedFolderId);
+          await database.upsertFolder({
+            ...folderToDelete,
+            deleted: true,
+          });
+        }
+      }
+    } else if (mode === 'reparent') {
+      // Move notes from this folder to parent
+      const notes = await database.getNotesByFolder(folderId);
+      for (const note of notes) {
+        await database.upsertNote({
+          ...note,
+          folderId: parentFolderId,
+        });
+      }
+
+      // Move child folders to parent
+      const children = folderTree.getChildFolders(folderId);
+      for (const child of children) {
+        folderTree.updateFolder(child.id, { parentId: parentFolderId });
+        await database.upsertFolder({
+          ...child,
+          parentId: parentFolderId,
+        });
+      }
+
+      // Delete just this folder
+      folderTree.deleteFolder(folderId);
+      await database.upsertFolder({
+        ...folder,
+        deleted: true,
+      });
+    } else {
+      // Simple mode - just delete the folder (legacy behavior)
+      folderTree.deleteFolder(folderId);
+      await database.upsertFolder({
+        ...folder,
+        deleted: true,
+      });
+    }
 
     // Broadcast folder update to all windows
     broadcastToAll('folder:updated', { sdId, operation: 'delete', folderId });
