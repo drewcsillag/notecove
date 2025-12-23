@@ -247,6 +247,21 @@ export class ActivitySync {
   }
 
   /**
+   * Clear stale entries for a specific note.
+   * Called automatically on successful sync to remove false positives.
+   */
+  clearStaleEntriesForNote(noteId: string): void {
+    const before = this.staleEntries.length;
+    this.staleEntries = this.staleEntries.filter((e) => e.noteId !== noteId);
+    const removed = before - this.staleEntries.length;
+    if (removed > 0) {
+      console.log(
+        `[ActivitySync] Cleared ${removed} stale entries for note ${noteId} (sync succeeded)`
+      );
+    }
+  }
+
+  /**
    * Clear skipped entries for a specific note
    * Called when user manually reloads from CRDT logs - they've resolved the issue
    * so we should allow future syncs from all instances for this note
@@ -393,6 +408,21 @@ export class ActivitySync {
               if (this.isSkipped(noteId, otherInstanceId)) {
                 // User already skipped this - don't show it again
                 continue;
+              }
+
+              // NEW: Before marking as stale, check if CRDT log already has the highest sequence.
+              // If it does, we already have all the data - this is a false positive (e.g., first
+              // time reading an activity log with long history). Skip silently.
+              if (this.callbacks.checkCRDTLogExists) {
+                const hasLatestData = await this.callbacks.checkCRDTLogExists(
+                  noteId,
+                  otherInstanceId,
+                  highestSeqForNote
+                );
+                if (hasLatestData) {
+                  // Not stale - we already have all the data, skip silently
+                  continue;
+                }
               }
 
               console.warn(
@@ -606,6 +636,11 @@ export class ActivitySync {
         console.log(
           `[ActivitySync] SUCCESS on attempt ${attempt + 1} for note ${noteId}, sequence ${instanceSeq}`
         );
+
+        // Defense-in-depth: Clear any stale entries for this note on successful sync.
+        // This handles edge cases where stale detection had a false positive that wasn't
+        // caught by the checkCRDTLogExists check (e.g., callback not provided).
+        this.clearStaleEntriesForNote(noteId);
 
         // Record success metrics
         const latencyMs = Date.now() - startTime;

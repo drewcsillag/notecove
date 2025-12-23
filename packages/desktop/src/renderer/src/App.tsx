@@ -23,7 +23,6 @@ import {
   InspectorErrorBoundary,
 } from './components/StorageInspector';
 import { AboutWindow } from './components/AboutWindow';
-import { StaleSyncToast } from './components/StaleSyncToast';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
 import { ImportDialog } from './components/ImportDialog';
 import { AppStateKey } from '@notecove/shared';
@@ -1025,7 +1024,6 @@ function App(): React.ReactElement {
           total={reindexProgress.total}
           {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
         />
-        <StaleSyncToast />
       </DndProvider>
     </ThemeProvider>
   );
