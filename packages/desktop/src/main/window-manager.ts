@@ -9,18 +9,20 @@ import { is } from '@electron-toolkit/utils';
 
 /**
  * Get the path to the preload script.
- * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ * app.getAppPath() returns dist-electron/main, so we go up one level
+ * to get to dist-electron, then into preload.
  */
 function getPreloadPath(): string {
-  return join(app.getAppPath(), 'dist-electron/preload/index.js');
+  return join(app.getAppPath(), '..', 'preload/index.js');
 }
 
 /**
  * Get the path to the renderer HTML file.
- * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ * app.getAppPath() returns dist-electron/main, so we go up one level
+ * to get to dist-electron, then into renderer.
  */
 function getRendererPath(): string {
-  return join(app.getAppPath(), 'dist-electron/renderer/index.html');
+  return join(app.getAppPath(), '..', 'renderer/index.html');
 }
 import type { Database } from '@notecove/shared';
 import { WindowStateManager } from './window-state-manager';

@@ -452,7 +452,7 @@ describe('Folder Handlers', () => {
   });
 
   describe('folder:list', () => {
-    it('should list all active folders for SD', async () => {
+    it('should list all visible folders for SD', async () => {
       const mockEvent = {} as any;
       const sdId = 'test-sd';
       const folders: FolderData[] = [
@@ -474,12 +474,12 @@ describe('Folder Handlers', () => {
         },
       ];
 
-      mocks.folderTree.getActiveFolders.mockReturnValue(folders);
+      mocks.folderTree.getVisibleFolders.mockReturnValue(folders);
 
       const result = await (handlers as any).handleListFolders(mockEvent, sdId);
 
       expect(mocks.crdtManager.loadFolderTree).toHaveBeenCalledWith(sdId);
-      expect(mocks.folderTree.getActiveFolders).toHaveBeenCalled();
+      expect(mocks.folderTree.getVisibleFolders).toHaveBeenCalled();
       expect(result).toEqual(folders);
     });
   });
@@ -787,7 +787,9 @@ describe('Folder Handlers', () => {
       ];
 
       mocks.database.getAllStorageDirs.mockResolvedValue([sd1, sd2]);
-      mocks.folderTree.getActiveFolders.mockReturnValueOnce(folders1).mockReturnValueOnce(folders2);
+      mocks.folderTree.getVisibleFolders
+        .mockReturnValueOnce(folders1)
+        .mockReturnValueOnce(folders2);
 
       const result = await (handlers as any).handleListAllFolders(mockEvent);
 

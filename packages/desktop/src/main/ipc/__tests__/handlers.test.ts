@@ -137,6 +137,7 @@ import { BrowserWindow } from 'electron';
 // Mock types
 interface MockFolderTreeDoc {
   getActiveFolders: jest.Mock;
+  getVisibleFolders: jest.Mock;
   getFolder: jest.Mock;
   getRootFolders: jest.Mock;
   getChildFolders: jest.Mock;
@@ -252,6 +253,7 @@ describe('IPCHandlers - Folder CRUD', () => {
     // Create mock folder tree
     mockFolderTree = {
       getActiveFolders: jest.fn(),
+      getVisibleFolders: jest.fn(),
       getFolder: jest.fn(),
       getRootFolders: jest.fn(),
       getChildFolders: jest.fn(),
@@ -724,7 +726,7 @@ describe('IPCHandlers - Folder CRUD', () => {
   });
 
   describe('folder:list', () => {
-    it('should list all active folders for SD', async () => {
+    it('should list all visible folders for SD', async () => {
       const mockEvent = {} as any;
       const sdId = 'test-sd';
       const folders: FolderData[] = [
@@ -746,12 +748,12 @@ describe('IPCHandlers - Folder CRUD', () => {
         },
       ];
 
-      mockFolderTree.getActiveFolders.mockReturnValue(folders);
+      mockFolderTree.getVisibleFolders.mockReturnValue(folders);
 
       const result = await (handlers as any).handleListFolders(mockEvent, sdId);
 
       expect(mockCRDTManager.loadFolderTree).toHaveBeenCalledWith(sdId);
-      expect(mockFolderTree.getActiveFolders).toHaveBeenCalled();
+      expect(mockFolderTree.getVisibleFolders).toHaveBeenCalled();
       expect(result).toEqual(folders);
     });
   });
@@ -1032,6 +1034,7 @@ describe('IPCHandlers - SD Management', () => {
     // Create mock folder tree
     mockFolderTree = {
       getActiveFolders: jest.fn(),
+      getVisibleFolders: jest.fn(),
       getFolder: jest.fn(),
       getRootFolders: jest.fn(),
       getChildFolders: jest.fn(),
@@ -3789,11 +3792,11 @@ describe('IPCHandlers - SD Management', () => {
 
         const mockFolderTree1 = {
           ...mockFolderTree,
-          getActiveFolders: jest.fn().mockReturnValue(mockSd1Folders),
+          getVisibleFolders: jest.fn().mockReturnValue(mockSd1Folders),
         };
         const mockFolderTree2 = {
           ...mockFolderTree,
-          getActiveFolders: jest.fn().mockReturnValue(mockSd2Folders),
+          getVisibleFolders: jest.fn().mockReturnValue(mockSd2Folders),
         };
 
         mockDatabase.getAllStorageDirs.mockResolvedValue([

@@ -20,6 +20,7 @@ import type { BackupManager } from '../../../backup-manager';
 
 export interface MockFolderTreeDoc {
   getActiveFolders: jest.Mock;
+  getVisibleFolders: jest.Mock;
   getFolder: jest.Mock;
   getRootFolders: jest.Mock;
   getChildFolders: jest.Mock;
@@ -157,6 +158,7 @@ export interface MockBackupManager {
 export function createMockFolderTree(): MockFolderTreeDoc {
   return {
     getActiveFolders: jest.fn(),
+    getVisibleFolders: jest.fn(),
     getFolder: jest.fn(),
     getRootFolders: jest.fn(),
     getChildFolders: jest.fn(),

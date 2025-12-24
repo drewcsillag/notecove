@@ -42,6 +42,8 @@ const mockNoteInfo = {
 
 // Mock window.electronAPI
 const mockGetInfo = jest.fn();
+const mockGetSyncEvents = jest.fn();
+const mockOnSyncEvent = jest.fn();
 
 // Set up global mocks before tests
 beforeAll(() => {
@@ -49,6 +51,8 @@ beforeAll(() => {
     value: {
       note: {
         getInfo: mockGetInfo,
+        getSyncEvents: mockGetSyncEvents,
+        onSyncEvent: mockOnSyncEvent,
       },
     },
     writable: true,
@@ -59,6 +63,9 @@ describe('NoteInfoWindow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetInfo.mockResolvedValue(mockNoteInfo);
+    mockGetSyncEvents.mockResolvedValue([]);
+    // Return a no-op unsubscribe function
+    mockOnSyncEvent.mockReturnValue(() => undefined);
   });
 
   it('should render all info sections inline without accordion', async () => {

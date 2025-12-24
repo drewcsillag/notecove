@@ -71,13 +71,6 @@ const mockElectronAPI = {
 // Store for sd.onUpdated callbacks so tests can trigger them
 let sdUpdatedCallbacks: ((data: { operation: string; sdId: string }) => void)[] = [];
 
-// Helper to simulate folder selection event
-const simulateFolderSelected = (folderId: string): void => {
-  folderSelectedCallbacks.forEach((cb) => {
-    cb(folderId);
-  });
-};
-
 Object.defineProperty(window, 'electronAPI', {
   value: mockElectronAPI,
   writable: true,
@@ -246,7 +239,7 @@ describe('NotesListPanel', () => {
     });
     mockElectronAPI.note.list.mockResolvedValue([]);
 
-    render(<NotesListPanel {...defaultProps} />);
+    render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     await waitFor(() => {
       expect(mockElectronAPI.note.list).toHaveBeenCalledWith('default');
@@ -279,7 +272,9 @@ describe('NotesListPanel', () => {
     });
 
     const onNoteSelect = jest.fn();
-    const { getByText, unmount } = render(<NotesListPanel {...defaultProps} />);
+    const { getByText, unmount } = render(
+      <NotesListPanel {...defaultProps} selectedFolderId="all-notes" onNoteSelect={onNoteSelect} />
+    );
 
     await waitFor(() => {
       expect(getByText('Test Note')).toBeInTheDocument();
@@ -312,7 +307,9 @@ describe('NotesListPanel', () => {
     mockElectronAPI.note.create.mockResolvedValue('new-note-id');
 
     const onNoteSelect = jest.fn();
-    const { getByTitle, unmount } = render(<NotesListPanel {...defaultProps} />);
+    const { getByTitle, unmount } = render(
+      <NotesListPanel {...defaultProps} selectedFolderId="all-notes" onNoteSelect={onNoteSelect} />
+    );
 
     await waitFor(() => {
       expect(getByTitle('Create note')).toBeInTheDocument();
@@ -362,7 +359,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const { unmount } = render(<NotesListPanel {...defaultProps} />);
+    const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     // Wait for the folder path to appear
     await waitFor(() => {
@@ -398,7 +395,9 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const { unmount, container } = render(<NotesListPanel {...defaultProps} />);
+    const { unmount, container } = render(
+      <NotesListPanel {...defaultProps} selectedFolderId="all-notes" />
+    );
 
     // Wait for the note to appear
     await waitFor(() => {
@@ -442,7 +441,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const { unmount } = render(<NotesListPanel {...defaultProps} />);
+    const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     // Wait for the note to appear
     await waitFor(() => {
@@ -491,7 +490,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    const { unmount } = render(<NotesListPanel {...defaultProps} />);
+    const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     // Wait for the note to appear
     await waitFor(() => {
@@ -514,7 +513,7 @@ describe('NotesListPanel', () => {
   });
 
   describe('clear search on folder selection', () => {
-    it('should clear search when folder:selected event is received', async () => {
+    it('should clear search when folder selection changes', async () => {
       jest.useRealTimers();
 
       // Start with a search query
@@ -526,7 +525,9 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const { unmount } = render(<NotesListPanel {...defaultProps} />);
+      const { unmount, rerender } = render(
+        <NotesListPanel {...defaultProps} selectedFolderId="all-notes" />
+      );
 
       // Wait for component to load and search to be populated
       await waitFor(() => {
@@ -534,8 +535,8 @@ describe('NotesListPanel', () => {
         expect(searchInput).toHaveValue('test search');
       });
 
-      // Simulate folder selection event
-      simulateFolderSelected('folder-123');
+      // Change folder selection via props (how it now works)
+      rerender(<NotesListPanel {...defaultProps} selectedFolderId="folder-123" />);
 
       // Search should be cleared
       await waitFor(() => {
@@ -561,7 +562,9 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const { unmount } = render(<NotesListPanel {...defaultProps} />);
+      const { unmount, rerender } = render(
+        <NotesListPanel {...defaultProps} selectedFolderId="folder-1" />
+      );
 
       // Wait for search to be populated
       await waitFor(() => {
@@ -569,8 +572,8 @@ describe('NotesListPanel', () => {
         expect(searchInput).toHaveValue('my search');
       });
 
-      // Simulate "All Notes" selection
-      simulateFolderSelected('all-notes');
+      // Change to "All Notes" via props
+      rerender(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
       // Search should be cleared
       await waitFor(() => {
@@ -593,7 +596,9 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const { unmount } = render(<NotesListPanel {...defaultProps} />);
+      const { unmount, rerender } = render(
+        <NotesListPanel {...defaultProps} selectedFolderId="folder-1" />
+      );
 
       // Wait for search to be populated
       await waitFor(() => {
@@ -601,8 +606,8 @@ describe('NotesListPanel', () => {
         expect(searchInput).toHaveValue('another search');
       });
 
-      // Simulate "Recently Deleted" selection
-      simulateFolderSelected('recently-deleted');
+      // Change to "Recently Deleted" via props
+      rerender(<NotesListPanel {...defaultProps} selectedFolderId="recently-deleted" />);
 
       // Search should be cleared
       await waitFor(() => {
@@ -660,7 +665,9 @@ describe('NotesListPanel', () => {
       mockElectronAPI.note.list.mockResolvedValue([]);
       mockElectronAPI.note.search.mockResolvedValue([]);
 
-      const { unmount } = render(<NotesListPanel {...defaultProps} />);
+      const { unmount, rerender } = render(
+        <NotesListPanel {...defaultProps} selectedFolderId="all-notes" />
+      );
 
       // Wait for search to be populated
       await waitFor(() => {
@@ -671,8 +678,8 @@ describe('NotesListPanel', () => {
       // Clear the mock to track new calls
       mockElectronAPI.appState.set.mockClear();
 
-      // Simulate folder selection
-      simulateFolderSelected('new-folder');
+      // Change folder selection via props
+      rerender(<NotesListPanel {...defaultProps} selectedFolderId="new-folder" />);
 
       // Wait for the search to be cleared and persisted
       await waitFor(() => {
@@ -709,7 +716,9 @@ describe('NotesListPanel', () => {
         return Promise.resolve(null);
       });
 
-      render(<NotesListPanel {...defaultProps} activeSdId="sd-to-delete" />);
+      render(
+        <NotesListPanel {...defaultProps} activeSdId="sd-to-delete" selectedFolderId="all-notes" />
+      );
 
       // Wait for notes to load
       await waitFor(() => {
@@ -752,7 +761,7 @@ describe('NotesListPanel', () => {
         return Promise.resolve(null);
       });
 
-      render(<NotesListPanel {...defaultProps} activeSdId="my-sd" />);
+      render(<NotesListPanel {...defaultProps} activeSdId="my-sd" selectedFolderId="all-notes" />);
 
       // Wait for notes to load
       await waitFor(() => {

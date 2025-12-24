@@ -14,18 +14,20 @@ import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
 
 /**
  * Get the path to the profile picker preload script.
- * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ * app.getAppPath() returns dist-electron/main, so we go up one level
+ * to get to dist-electron, then into preload.
  */
 function getProfilePickerPreloadPath(): string {
-  return join(app.getAppPath(), 'dist-electron/preload/profile-picker.js');
+  return join(app.getAppPath(), '..', 'preload/profile-picker.js');
 }
 
 /**
  * Get the path to the profile picker HTML file.
- * Uses app.getAppPath() for reliable resolution regardless of chunking.
+ * app.getAppPath() returns dist-electron/main, so we go up one level
+ * to get to dist-electron, then into renderer.
  */
 function getProfilePickerRendererPath(): string {
-  return join(app.getAppPath(), 'dist-electron/renderer/profile-picker/index.html');
+  return join(app.getAppPath(), '..', 'renderer/profile-picker/index.html');
 }
 
 /** Result from showing the profile picker */
