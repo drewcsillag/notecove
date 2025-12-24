@@ -22,6 +22,7 @@ export interface LeftSidebarProps {
   tagFilters: Record<string, 'include' | 'exclude'>;
   onTagSelect: (tagId: string) => void;
   onClearTagFilters: () => void;
+  showFolderPanel: boolean;
   showTagPanel: boolean;
   /** Initial sizes for folder/tags panels as percentages [folder%, tags%] */
   initialSizes?: number[];
@@ -38,6 +39,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   tagFilters,
   onTagSelect,
   onClearTagFilters,
+  showFolderPanel,
   showTagPanel,
   initialSizes,
   onLayoutChange,
@@ -60,13 +62,39 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   if (activeSdId) folderPanelProps.activeSdId = activeSdId;
   if (onActiveSdChange) folderPanelProps.onActiveSdChange = onActiveSdChange;
 
-  // If tag panel is hidden, just show folder panel
-  if (!showTagPanel) {
+  // If only folder panel is shown (tags hidden)
+  if (showFolderPanel && !showTagPanel) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box sx={{ flex: 1, overflow: 'auto' }}>
           <FolderPanel {...folderPanelProps} />
         </Box>
+        <SyncStatusIndicator />
+      </Box>
+    );
+  }
+
+  // If only tag panel is shown (folder hidden)
+  if (!showFolderPanel && showTagPanel) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <TagPanel
+            tagFilters={tagFilters}
+            onTagSelect={onTagSelect}
+            onClearFilters={onClearTagFilters}
+          />
+        </Box>
+        <SyncStatusIndicator />
+      </Box>
+    );
+  }
+
+  // If both panels are hidden, show a minimal sidebar
+  if (!showFolderPanel && !showTagPanel) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box sx={{ flex: 1 }} />
         <SyncStatusIndicator />
       </Box>
     );
@@ -82,12 +110,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     }
   };
 
+  // Both panels are shown - render resizable layout
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ flex: 1, minHeight: 0 }}>
+      <Box sx={{ flex: 1, minHeight: 0 }} data-testid="left-sidebar-panel-group">
         <PanelGroup direction="vertical" onLayout={handleLayoutChange}>
           {/* Folder Panel */}
-          <Panel defaultSize={folderSize} minSize={20}>
+          <Panel defaultSize={folderSize} minSize={20} data-testid="panel">
             <Box sx={{ height: '100%', overflow: 'auto' }}>
               <FolderPanel {...folderPanelProps} />
             </Box>
@@ -95,6 +124,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
           {/* Resize Handle */}
           <PanelResizeHandle
+            data-testid="resize-handle"
             style={{
               height: '4px',
               backgroundColor: theme.palette.divider,

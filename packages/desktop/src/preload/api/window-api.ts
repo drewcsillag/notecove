@@ -4,6 +4,18 @@
 
 import { ipcRenderer } from 'electron';
 
+/** Panel layout state for per-window panel configuration */
+export interface PanelLayout {
+  /** Main layout panel sizes: [leftSidebar%, notesListAndEditor%] */
+  panelSizes?: number[];
+  /** Left sidebar panel sizes: [folderPanel%, tagsPanel%] */
+  leftSidebarSizes?: number[];
+  /** Whether the folder panel is visible */
+  showFolderPanel?: boolean;
+  /** Whether the tags panel is visible */
+  showTagPanel?: boolean;
+}
+
 export const windowStateApi = {
   /**
    * Report the current note being viewed in this window.
@@ -23,8 +35,15 @@ export const windowStateApi = {
     ipcRenderer.invoke('windowState:reportEditorState', windowId, editorState) as Promise<void>,
 
   /**
+   * Report the current panel layout (sizes and visibility).
+   * Called when panel sizes change or panels are toggled.
+   */
+  reportPanelLayout: (windowId: string, panelLayout: PanelLayout): Promise<void> =>
+    ipcRenderer.invoke('windowState:reportPanelLayout', windowId, panelLayout) as Promise<void>,
+
+  /**
    * Get the saved window state for this window (used for restoration).
-   * Returns the saved state including editor scroll/cursor position.
+   * Returns the saved state including editor scroll/cursor position and panel layout.
    */
   getSavedState: (
     windowId: string
@@ -32,11 +51,13 @@ export const windowStateApi = {
     noteId?: string;
     sdId?: string;
     editorState?: { scrollTop: number; cursorPosition: number };
+    panelLayout?: PanelLayout;
   } | null> =>
     ipcRenderer.invoke('windowState:getSavedState', windowId) as Promise<{
       noteId?: string;
       sdId?: string;
       editorState?: { scrollTop: number; cursorPosition: number };
+      panelLayout?: PanelLayout;
     } | null>,
 };
 

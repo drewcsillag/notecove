@@ -11,6 +11,7 @@ import type { BrowserWindow } from 'electron';
 import {
   type WindowState,
   type EditorState,
+  type PanelLayoutState,
   AppStateKey,
   serializeWindowStates,
   deserializeWindowStates,
@@ -29,6 +30,7 @@ interface TrackedWindow {
   noteId?: string | undefined;
   sdId?: string | undefined;
   editorState?: EditorState | undefined;
+  panelLayout?: PanelLayoutState | undefined;
   debounceTimer?: NodeJS.Timeout | undefined;
   moveHandler: () => void;
   resizeHandler: () => void;
@@ -61,6 +63,7 @@ export class WindowStateManager {
    * @param type - Window type (main, minimal, syncStatus)
    * @param noteId - Optional note ID being displayed
    * @param sdId - Optional storage directory ID
+   * @param savedWindowId - Optional windowId from previous session (for restoration)
    * @returns The assigned window ID (use for IPC communication)
    */
   registerWindow(
@@ -74,9 +77,11 @@ export class WindowStateManager {
       | 'sdPicker'
       | 'about',
     noteId?: string,
-    sdId?: string
+    sdId?: string,
+    savedWindowId?: string
   ): string {
-    const windowId = randomUUID();
+    // Use saved windowId if provided (for session restoration), otherwise generate new
+    const windowId = savedWindowId ?? randomUUID();
 
     // Create handlers that capture the current state
     const moveHandler = this.createBoundsHandler(windowId);
@@ -156,6 +161,25 @@ export class WindowStateManager {
   }
 
   /**
+   * Update panel layout (sizes and visibility) for a window
+   */
+  updatePanelLayout(windowId: string, panelLayout: PanelLayoutState): void {
+    const tracked = this.windows.get(windowId);
+    if (tracked) {
+      // Merge with existing layout to allow partial updates
+      tracked.panelLayout = { ...tracked.panelLayout, ...panelLayout };
+    }
+  }
+
+  /**
+   * Get panel layout for a specific window
+   */
+  getPanelLayout(windowId: string): PanelLayoutState | undefined {
+    const tracked = this.windows.get(windowId);
+    return tracked?.panelLayout;
+  }
+
+  /**
    * Get current state of all tracked windows
    */
   getCurrentState(): WindowState[] {
@@ -182,6 +206,7 @@ export class WindowStateManager {
         isMaximized: tracked.window.isMaximized(),
         isFullScreen: tracked.window.isFullScreen(),
         editorState: tracked.editorState,
+        panelLayout: tracked.panelLayout,
       };
 
       states.push(state);

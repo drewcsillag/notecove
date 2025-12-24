@@ -37,6 +37,7 @@ const defaultProps = {
   tagFilters: {} as Record<string, 'include' | 'exclude'>,
   onTagSelect: jest.fn(),
   onClearTagFilters: jest.fn(),
+  showFolderPanel: true,
   showTagPanel: true,
   selectedFolderId: null as string | null,
   onFolderSelect: jest.fn(),
@@ -66,7 +67,7 @@ describe('LeftSidebar', () => {
     it('should render PanelGroup for resizable layout', () => {
       renderLeftSidebar({ showTagPanel: true });
 
-      expect(screen.getByTestId('panel-group')).toBeInTheDocument();
+      expect(screen.getByTestId('left-sidebar-panel-group')).toBeInTheDocument();
       expect(screen.getByTestId('resize-handle')).toBeInTheDocument();
     });
 
@@ -106,27 +107,64 @@ describe('LeftSidebar', () => {
       // onLayoutChange will be called by react-resizable-panels
       // when the layout changes. The mock doesn't trigger this,
       // but we verify the component accepts the prop.
-      expect(screen.getByTestId('panel-group')).toBeInTheDocument();
+      expect(screen.getByTestId('left-sidebar-panel-group')).toBeInTheDocument();
     });
   });
 
   describe('with tag panel hidden', () => {
     it('should render only FolderPanel when showTagPanel is false', () => {
-      renderLeftSidebar({ showTagPanel: false });
+      renderLeftSidebar({ showFolderPanel: true, showTagPanel: false });
 
       expect(screen.getByTestId('folder-panel')).toBeInTheDocument();
       expect(screen.queryByTestId('tag-panel')).not.toBeInTheDocument();
     });
 
     it('should not render PanelGroup when tag panel is hidden', () => {
-      renderLeftSidebar({ showTagPanel: false });
+      renderLeftSidebar({ showFolderPanel: true, showTagPanel: false });
 
-      expect(screen.queryByTestId('panel-group')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('left-sidebar-panel-group')).not.toBeInTheDocument();
       expect(screen.queryByTestId('resize-handle')).not.toBeInTheDocument();
     });
 
     it('should still render SyncStatusIndicator', () => {
-      renderLeftSidebar({ showTagPanel: false });
+      renderLeftSidebar({ showFolderPanel: true, showTagPanel: false });
+
+      expect(screen.getByTestId('sync-status')).toBeInTheDocument();
+    });
+  });
+
+  describe('with folder panel hidden', () => {
+    it('should render only TagPanel when showFolderPanel is false', () => {
+      renderLeftSidebar({ showFolderPanel: false, showTagPanel: true });
+
+      expect(screen.queryByTestId('folder-panel')).not.toBeInTheDocument();
+      expect(screen.getByTestId('tag-panel')).toBeInTheDocument();
+    });
+
+    it('should not render PanelGroup when folder panel is hidden', () => {
+      renderLeftSidebar({ showFolderPanel: false, showTagPanel: true });
+
+      expect(screen.queryByTestId('left-sidebar-panel-group')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('resize-handle')).not.toBeInTheDocument();
+    });
+
+    it('should still render SyncStatusIndicator', () => {
+      renderLeftSidebar({ showFolderPanel: false, showTagPanel: true });
+
+      expect(screen.getByTestId('sync-status')).toBeInTheDocument();
+    });
+  });
+
+  describe('with both panels hidden', () => {
+    it('should render neither FolderPanel nor TagPanel', () => {
+      renderLeftSidebar({ showFolderPanel: false, showTagPanel: false });
+
+      expect(screen.queryByTestId('folder-panel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('tag-panel')).not.toBeInTheDocument();
+    });
+
+    it('should still render SyncStatusIndicator', () => {
+      renderLeftSidebar({ showFolderPanel: false, showTagPanel: false });
 
       expect(screen.getByTestId('sync-status')).toBeInTheDocument();
     });
@@ -138,7 +176,7 @@ describe('LeftSidebar', () => {
       const { container } = renderLeftSidebar({ showTagPanel: true });
 
       expect(container).toBeTruthy();
-      expect(screen.getByTestId('panel-group')).toBeInTheDocument();
+      expect(screen.getByTestId('left-sidebar-panel-group')).toBeInTheDocument();
     });
   });
 });

@@ -724,13 +724,33 @@ declare global {
         ) => Promise<void>;
 
         /**
+         * Report the current panel layout (sizes and visibility).
+         * Called when panel sizes change or panels are toggled.
+         */
+        reportPanelLayout: (
+          windowId: string,
+          panelLayout: {
+            panelSizes?: number[];
+            leftSidebarSizes?: number[];
+            showFolderPanel?: boolean;
+            showTagPanel?: boolean;
+          }
+        ) => Promise<void>;
+
+        /**
          * Get the saved window state for this window (used for restoration).
-         * Returns the saved state including editor scroll/cursor position.
+         * Returns the saved state including editor scroll/cursor position and panel layout.
          */
         getSavedState: (windowId: string) => Promise<{
           noteId?: string;
           sdId?: string;
           editorState?: { scrollTop: number; cursorPosition: number };
+          panelLayout?: {
+            panelSizes?: number[];
+            leftSidebarSizes?: number[];
+            showFolderPanel?: boolean;
+            showTagPanel?: boolean;
+          };
         } | null>;
       };
 

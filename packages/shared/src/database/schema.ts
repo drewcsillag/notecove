@@ -152,6 +152,9 @@ export enum AppStateKey {
   RightPanelWidth = 'rightPanelWidth',
   PanelSizes = 'panelSizes', // Array of panel sizes: [left%, middle%, right%]
   LeftSidebarPanelSizes = 'leftSidebarPanelSizes', // Array of left sidebar sizes: [folder%, tags%]
+  ShowFolderPanel = 'showFolderPanel', // Whether the folder panel is visible
+  ShowTagPanel = 'showTagPanel', // Whether the tag panel is visible
+  NoteScrollPositions = 'noteScrollPositions', // JSON object of noteId -> scrollTop
   FolderCollapseState = 'folderCollapseState',
   TagFilters = 'tagFilters',
   SearchText = 'searchText',
@@ -184,6 +187,21 @@ export interface EditorState {
 }
 
 /**
+ * Panel layout state for a window
+ * Stores sizes and visibility of resizable panels
+ */
+export interface PanelLayoutState {
+  /** Main layout panel sizes: [leftSidebar%, notesListAndEditor%] */
+  panelSizes?: number[];
+  /** Left sidebar panel sizes: [folderPanel%, tagsPanel%] */
+  leftSidebarSizes?: number[];
+  /** Whether the folder panel is visible */
+  showFolderPanel?: boolean;
+  /** Whether the tags panel is visible */
+  showTagPanel?: boolean;
+}
+
+/**
  * Window state for session restoration
  * Stores position, size, and content state for each window
  */
@@ -196,6 +214,7 @@ export interface WindowState {
   isMaximized: boolean;
   isFullScreen: boolean;
   editorState?: EditorState | undefined; // Scroll/cursor position
+  panelLayout?: PanelLayoutState | undefined; // Panel sizes and visibility
 }
 
 /**

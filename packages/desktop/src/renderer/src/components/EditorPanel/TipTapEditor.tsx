@@ -68,6 +68,7 @@ import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { useWindowState } from '../../hooks/useWindowState';
+import { useNoteScrollPosition } from '../../hooks/useNoteScrollPosition';
 import { detectUrlFromSelection } from '@notecove/shared';
 import { sanitizeClipboardHtml } from '../../utils/clipboard-sanitizer';
 
@@ -264,11 +265,17 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const {
     windowId,
     reportCurrentNote,
-    reportScrollPosition,
+    reportScrollPosition: reportWindowScrollPosition,
     reportCursorPosition,
     getSavedState,
     reportFinalState,
   } = useWindowState();
+
+  // Per-note scroll position persistence (across app restarts)
+  const {
+    getScrollPosition: getSavedNoteScrollPosition,
+    reportScrollPosition: reportNoteScrollPosition,
+  } = useNoteScrollPosition();
 
   // Track saved state for restoration after note loads
   const savedStateRef = useRef<{ scrollTop: number; cursorPosition: number } | null>(null);
@@ -1155,7 +1162,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     }
   }, [noteId, windowId, reportCurrentNote]);
 
-  // Load saved state when note loads (for session restoration)
+  // Load saved state when note loads (for session restoration or per-note persistence)
   useEffect(() => {
     if (!noteId || isLoading) return;
 
@@ -1164,15 +1171,24 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     hasRestoredStateRef.current = true;
 
     const loadSavedState = async () => {
-      const savedState = await getSavedState();
-      if (savedState) {
-        savedStateRef.current = savedState;
-        console.log('[TipTapEditor] Loaded saved state for restoration:', savedState);
+      // First try window state (for session restoration within same app run)
+      const windowState = await getSavedState();
+      if (windowState) {
+        savedStateRef.current = windowState;
+        console.log('[TipTapEditor] Loaded window state for restoration:', windowState);
+        return;
+      }
+
+      // Fall back to per-note scroll position (for cross-restart persistence)
+      const noteScrollPosition = await getSavedNoteScrollPosition(noteId);
+      if (noteScrollPosition > 0) {
+        savedStateRef.current = { scrollTop: noteScrollPosition, cursorPosition: 0 };
+        console.log('[TipTapEditor] Loaded per-note scroll position:', noteScrollPosition);
       }
     };
 
     void loadSavedState();
-  }, [noteId, isLoading, getSavedState]);
+  }, [noteId, isLoading, getSavedState, getSavedNoteScrollPosition]);
 
   // Restore scroll and cursor position after note content is ready
   useEffect(() => {
@@ -1217,14 +1233,20 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     if (!container) return;
 
     const handleScroll = () => {
-      reportScrollPosition(container.scrollTop);
+      const scrollTop = container.scrollTop;
+      // Report to window state (for session restoration)
+      reportWindowScrollPosition(scrollTop);
+      // Report to per-note storage (for cross-restart persistence)
+      if (noteId) {
+        reportNoteScrollPosition(noteId, scrollTop);
+      }
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [reportScrollPosition]);
+  }, [reportWindowScrollPosition, reportNoteScrollPosition, noteId]);
 
   // Track cursor position changes
   useEffect(() => {

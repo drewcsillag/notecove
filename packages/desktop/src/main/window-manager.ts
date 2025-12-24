@@ -61,6 +61,8 @@ export interface CreateWindowOptions {
   bounds?: { x: number; y: number; width: number; height: number };
   isMaximized?: boolean;
   isFullScreen?: boolean;
+  /** Preserved windowId from previous session (for state restoration) */
+  savedWindowId?: string;
 }
 
 /**
@@ -201,7 +203,8 @@ export function createWindow(
       newWindow,
       windowType,
       options?.noteId,
-      options?.sdId
+      options?.sdId,
+      options?.savedWindowId // Use saved ID for session restoration
     );
   }
 
@@ -388,6 +391,7 @@ export async function restoreWindows(
         bounds: validatedState.bounds,
         isMaximized: validatedState.isMaximized,
         isFullScreen: validatedState.isFullScreen,
+        savedWindowId: state.id, // Preserve windowId for panel layout restoration
       };
       if (validatedNoteId !== undefined) {
         windowOpts.noteId = validatedNoteId;

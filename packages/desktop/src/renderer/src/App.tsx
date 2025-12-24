@@ -26,14 +26,16 @@ import { AboutWindow } from './components/AboutWindow';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
 import { ImportDialog } from './components/ImportDialog';
 import { AppStateKey } from '@notecove/shared';
+import { useWindowState } from './hooks/useWindowState';
 
-const PANEL_SIZES_KEY = AppStateKey.PanelSizes;
-const LEFT_SIDEBAR_SIZES_KEY = AppStateKey.LeftSidebarPanelSizes;
-const THEME_MODE_KEY = AppStateKey.ThemeMode;
+const THEME_MODE_KEY = AppStateKey.ThemeMode as string;
 
 function App(): React.ReactElement {
+  // Get windowId for per-window panel state
+  const { windowId } = useWindowState();
   const [initialPanelSizes, setInitialPanelSizes] = useState<number[] | undefined>(undefined);
   const [leftSidebarSizes, setLeftSidebarSizes] = useState<number[] | undefined>(undefined);
+  const [panelSizesLoaded, setPanelSizesLoaded] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
@@ -49,6 +51,7 @@ function App(): React.ReactElement {
   const themeFromBroadcastRef = useRef(false);
   // Tag filters: tagId -> 'include' | 'exclude' (omitted = neutral/no filter)
   const [tagFilters, setTagFilters] = useState<Record<string, 'include' | 'exclude'>>({});
+  const [showFolderPanel, setShowFolderPanel] = useState(true);
   const [showTagPanel, setShowTagPanel] = useState(true);
   // Track newly created notes (to apply initial formatting)
   const [newlyCreatedNoteId, setNewlyCreatedNoteId] = useState<string | null>(null);
@@ -313,45 +316,72 @@ function App(): React.ReactElement {
     };
   }, []);
 
-  // Load saved panel sizes on mount
+  // Load saved panel layout - per-window state if windowId available, otherwise global appState
   useEffect(() => {
-    const loadPanelSizes = async (): Promise<void> => {
+    const loadPanelLayout = async (): Promise<void> => {
       try {
-        const saved = await window.electronAPI.appState.get(PANEL_SIZES_KEY);
-        if (saved) {
-          const sizes = JSON.parse(saved) as number[];
+        // Try per-window state first if we have a windowId (restored window)
+        if (windowId) {
+          const savedState = await window.electronAPI.windowState.getSavedState(windowId);
+          if (savedState?.panelLayout) {
+            const {
+              panelSizes,
+              leftSidebarSizes: sidebarSizes,
+              showFolderPanel: folder,
+              showTagPanel: tag,
+            } = savedState.panelLayout;
+            if (panelSizes) {
+              setInitialPanelSizes(panelSizes);
+            }
+            if (sidebarSizes) {
+              setLeftSidebarSizes(sidebarSizes);
+            }
+            if (folder !== undefined) {
+              setShowFolderPanel(folder);
+            }
+            if (tag !== undefined) {
+              setShowTagPanel(tag);
+            }
+            return; // Loaded from per-window state, done
+          }
+        }
+
+        // Fall back to global appState for windows without windowId or no per-window state
+        const [panelSizesResult, leftSidebarResult, showFolderResult, showTagResult] =
+          await Promise.all([
+            window.electronAPI.appState.get(AppStateKey.PanelSizes),
+            window.electronAPI.appState.get(AppStateKey.LeftSidebarPanelSizes),
+            window.electronAPI.appState.get(AppStateKey.ShowFolderPanel),
+            window.electronAPI.appState.get(AppStateKey.ShowTagPanel),
+          ]);
+
+        if (panelSizesResult) {
+          const sizes = JSON.parse(panelSizesResult) as number[];
           setInitialPanelSizes(sizes);
         }
-      } catch (error: unknown) {
-        console.error(
-          'Failed to load panel sizes:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-    };
-
-    void loadPanelSizes();
-  }, []);
-
-  // Load saved left sidebar panel sizes on mount
-  useEffect(() => {
-    const loadLeftSidebarSizes = async (): Promise<void> => {
-      try {
-        const saved = await window.electronAPI.appState.get(LEFT_SIDEBAR_SIZES_KEY);
-        if (saved) {
-          const sizes = JSON.parse(saved) as number[];
+        if (leftSidebarResult) {
+          const sizes = JSON.parse(leftSidebarResult) as number[];
           setLeftSidebarSizes(sizes);
+        }
+        if (showFolderResult !== null) {
+          setShowFolderPanel(showFolderResult === 'true');
+        }
+        if (showTagResult !== null) {
+          setShowTagPanel(showTagResult === 'true');
         }
       } catch (error: unknown) {
         console.error(
-          'Failed to load left sidebar sizes:',
+          'Failed to load panel layout:',
           error instanceof Error ? error.message : String(error)
         );
+      } finally {
+        // Always mark as loaded so UI can render (with defaults if load failed)
+        setPanelSizesLoaded(true);
       }
     };
 
-    void loadLeftSidebarSizes();
-  }, []);
+    void loadPanelLayout();
+  }, [windowId]);
 
   // Load selected folder from appState on mount (for window isolation)
   useEffect(() => {
@@ -452,6 +482,27 @@ function App(): React.ReactElement {
 
     void saveTheme();
   }, [themeMode, themeLoaded]);
+
+  // Save panel visibility changes - per-window if windowId available, otherwise global appState
+  useEffect(() => {
+    if (!panelSizesLoaded) return;
+
+    if (windowId) {
+      void window.electronAPI.windowState.reportPanelLayout(windowId, { showFolderPanel });
+    } else {
+      void window.electronAPI.appState.set(AppStateKey.ShowFolderPanel, String(showFolderPanel));
+    }
+  }, [showFolderPanel, panelSizesLoaded, windowId]);
+
+  useEffect(() => {
+    if (!panelSizesLoaded) return;
+
+    if (windowId) {
+      void window.electronAPI.windowState.reportPanelLayout(windowId, { showTagPanel });
+    } else {
+      void window.electronAPI.appState.set(AppStateKey.ShowTagPanel, String(showTagPanel));
+    }
+  }, [showTagPanel, panelSizesLoaded, windowId]);
 
   // Auto-select default note on first load
   useEffect(() => {
@@ -615,10 +666,9 @@ function App(): React.ReactElement {
       setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'));
     });
 
-    // Toggle Folder Panel (not implemented - would need panel collapse state)
+    // Toggle Folder Panel
     const cleanupToggleFolderPanel = window.electronAPI.menu.onToggleFolderPanel(() => {
-      console.log('[Menu] Toggle Folder Panel - not yet implemented');
-      // TODO: Would need to add collapsible state to ThreePanelLayout
+      setShowFolderPanel((prev) => !prev);
     });
 
     // Toggle Tags Panel
@@ -745,35 +795,24 @@ function App(): React.ReactElement {
   }, [selectedNoteId]);
 
   const handleLayoutChange = (sizes: number[]): void => {
-    // Persist panel sizes to app state
-    const savePanelSizes = async (): Promise<void> => {
-      try {
-        await window.electronAPI.appState.set(PANEL_SIZES_KEY, JSON.stringify(sizes));
-      } catch (error: unknown) {
-        console.error(
-          'Failed to save panel sizes:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-    };
-
-    void savePanelSizes();
+    // Save panel sizes - per-window if windowId available, otherwise global appState
+    if (windowId) {
+      void window.electronAPI.windowState.reportPanelLayout(windowId, { panelSizes: sizes });
+    } else {
+      void window.electronAPI.appState.set(AppStateKey.PanelSizes, JSON.stringify(sizes));
+    }
   };
 
   const handleLeftSidebarLayoutChange = (sizes: number[]): void => {
-    // Persist left sidebar panel sizes to app state
-    const saveLeftSidebarSizes = async (): Promise<void> => {
-      try {
-        await window.electronAPI.appState.set(LEFT_SIDEBAR_SIZES_KEY, JSON.stringify(sizes));
-      } catch (error: unknown) {
-        console.error(
-          'Failed to save left sidebar sizes:',
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-    };
-
-    void saveLeftSidebarSizes();
+    // Save left sidebar sizes - per-window if windowId available, otherwise global appState
+    if (windowId) {
+      void window.electronAPI.windowState.reportPanelLayout(windowId, { leftSidebarSizes: sizes });
+    } else {
+      void window.electronAPI.appState.set(
+        AppStateKey.LeftSidebarPanelSizes,
+        JSON.stringify(sizes)
+      );
+    }
   };
 
   // Tag filter handlers - cycle through: neutral -> include -> exclude -> neutral
@@ -956,6 +995,26 @@ function App(): React.ReactElement {
     );
   }
 
+  // Wait for panel sizes to load before rendering layout
+  // This ensures defaultSize is set correctly on first mount
+  if (!panelSizesLoaded) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            height: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Brief loading state while panel sizes load from database */}
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
   // Render full layout (with sidebars)
   return (
     <ThemeProvider theme={theme}>
@@ -975,6 +1034,7 @@ function App(): React.ReactElement {
                 tagFilters={tagFilters}
                 onTagSelect={handleTagSelect}
                 onClearTagFilters={handleClearTagFilters}
+                showFolderPanel={showFolderPanel}
                 showTagPanel={showTagPanel}
                 {...(leftSidebarSizes ? { initialSizes: leftSidebarSizes } : {})}
                 onLayoutChange={handleLeftSidebarLayoutChange}

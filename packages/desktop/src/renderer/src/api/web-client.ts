@@ -839,6 +839,9 @@ export const webClient: typeof window.electronAPI = {
     reportEditorState: async () => {
       // No-op in web client - no session restoration
     },
+    reportPanelLayout: async () => {
+      // No-op in web client - no per-window state
+    },
     // eslint-disable-next-line @typescript-eslint/require-await
     getSavedState: async () => {
       // No saved state in web client

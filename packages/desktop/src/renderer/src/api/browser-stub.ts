@@ -256,6 +256,7 @@ export const browserApiStub: typeof window.electronAPI = {
   windowState: {
     reportCurrentNote: notImplemented('windowState.reportCurrentNote'),
     reportEditorState: notImplemented('windowState.reportEditorState'),
+    reportPanelLayout: notImplemented('windowState.reportPanelLayout'),
     getSavedState: notImplemented('windowState.getSavedState'),
   },
 

@@ -990,6 +990,24 @@ void app.whenReady().then(async () => {
       }
     );
 
+    ipcMain.handle(
+      'windowState:reportPanelLayout',
+      (
+        _event,
+        windowId: string,
+        panelLayout: {
+          panelSizes?: number[];
+          leftSidebarSizes?: number[];
+          showFolderPanel?: boolean;
+          showTagPanel?: boolean;
+        }
+      ) => {
+        if (windowStateManager) {
+          windowStateManager.updatePanelLayout(windowId, panelLayout);
+        }
+      }
+    );
+
     ipcMain.handle('windowState:getSavedState', async (_event, windowId: string) => {
       // Get saved state for a specific window from the last session
       // This is used when a restored window wants to know its previous state
@@ -1005,6 +1023,7 @@ void app.whenReady().then(async () => {
         noteId: state.noteId,
         sdId: state.sdId,
         editorState: state.editorState,
+        panelLayout: state.panelLayout,
       };
     });
 
