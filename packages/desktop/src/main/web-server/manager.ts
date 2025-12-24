@@ -10,17 +10,20 @@ import * as fs from 'fs';
 import { app } from 'electron';
 
 /**
- * Check if app.getAppPath() returns dist-electron/main (vs package root).
+ * Check if app.getAppPath() returns dist-electron/main (vs package root or asar).
  *
  * This varies by launch method:
  * - Dev mode (`pnpm dev`): package root
  * - Test with `args: ['.']`: package root
  * - Test with explicit main path: dist-electron/main
- * - Production (asar): inside asar, treat like dist-electron/main
+ * - Production (asar): path to asar file (NOT dist-electron/main inside)
+ *
+ * Note: For dist-browser path resolution, production uses app.isPackaged check
+ * with process.resourcesPath, so this function is only used for dev/test cases.
  */
 function isAppPathInDistElectronMain(): boolean {
   const appPath = app.getAppPath();
-  return appPath.endsWith('dist-electron/main') || appPath.includes('.asar');
+  return appPath.endsWith('dist-electron/main');
 }
 import { WebServer, ConnectedClientInfo } from './server';
 import { AuthManager } from './auth';

@@ -8,17 +8,21 @@ import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 
 /**
- * Check if app.getAppPath() returns dist-electron/main (vs package root).
+ * Check if app.getAppPath() returns dist-electron/main (vs package root or asar).
  *
  * This varies by launch method:
- * - Dev mode (`pnpm dev`): package root
- * - Test with `args: ['.']`: package root
- * - Test with explicit main path: dist-electron/main
- * - Production (asar): inside asar, treat like dist-electron/main
+ * - Dev mode (`pnpm dev`): package root → use dist-electron/preload/...
+ * - Test with `args: ['.']`: package root → use dist-electron/preload/...
+ * - Test with explicit main path: dist-electron/main → use ../preload/...
+ * - Production (asar): path to asar file → use dist-electron/preload/...
+ *
+ * Note: asar mode uses the same paths as dev mode because app.getAppPath()
+ * returns the asar file path, and Electron's virtual filesystem allows
+ * accessing files inside via asar-path/dist-electron/...
  */
 function isAppPathInDistElectronMain(): boolean {
   const appPath = app.getAppPath();
-  return appPath.endsWith('dist-electron/main') || appPath.includes('.asar');
+  return appPath.endsWith('dist-electron/main');
 }
 
 /**
