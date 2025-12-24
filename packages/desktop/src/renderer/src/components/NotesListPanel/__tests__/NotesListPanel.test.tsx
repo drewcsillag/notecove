@@ -71,6 +71,13 @@ const mockElectronAPI = {
 // Store for sd.onUpdated callbacks so tests can trigger them
 let sdUpdatedCallbacks: ((data: { operation: string; sdId: string }) => void)[] = [];
 
+// Store for note.onMoved callbacks so tests can trigger them
+let noteMovedCallbacks: ((data: {
+  noteId: string;
+  oldFolderId: string | null;
+  newFolderId: string;
+}) => void)[] = [];
+
 Object.defineProperty(window, 'electronAPI', {
   value: mockElectronAPI,
   writable: true,
@@ -90,6 +97,7 @@ describe('NotesListPanel', () => {
     jest.useFakeTimers();
     folderSelectedCallbacks = [];
     sdUpdatedCallbacks = [];
+    noteMovedCallbacks = [];
     defaultProps.onNoteSelect.mockClear();
 
     // Set up sd.onUpdated to capture callbacks
@@ -98,6 +106,22 @@ describe('NotesListPanel', () => {
         sdUpdatedCallbacks.push(callback);
         return () => {
           sdUpdatedCallbacks = sdUpdatedCallbacks.filter((cb) => cb !== callback);
+        };
+      }
+    );
+
+    // Set up note.onMoved to capture callbacks
+    mockElectronAPI.note.onMoved.mockImplementation(
+      (
+        callback: (data: {
+          noteId: string;
+          oldFolderId: string | null;
+          newFolderId: string;
+        }) => void
+      ) => {
+        noteMovedCallbacks.push(callback);
+        return () => {
+          noteMovedCallbacks = noteMovedCallbacks.filter((cb) => cb !== callback);
         };
       }
     );
@@ -776,6 +800,264 @@ describe('NotesListPanel', () => {
       // Wait a bit and verify notes are still there
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(screen.getByText('Test Note')).toBeInTheDocument();
+    });
+  });
+
+  describe('Note Move Handling in All Notes view', () => {
+    it('should keep note in list when moved to a folder while viewing All Notes', async () => {
+      jest.useRealTimers();
+
+      const mockFolders = [{ id: 'folder1', name: 'Projects', parentId: null, deleted: false }];
+
+      const mockNotes = [
+        {
+          id: 'note1',
+          title: 'Test Note',
+          sdId: 'default',
+          folderId: null, // Note starts in root
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Test content',
+          contentText: 'Test content text',
+        },
+      ];
+
+      mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+      mockElectronAPI.folder.list.mockResolvedValue(mockFolders);
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        if (key === 'searchQuery') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
+
+      // Wait for note to load
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+      });
+
+      // Simulate note being moved to a folder
+      noteMovedCallbacks.forEach((cb) => {
+        cb({ noteId: 'note1', oldFolderId: null, newFolderId: 'folder1' });
+      });
+
+      // Note should still be in the list (not removed)
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+      });
+
+      unmount();
+    });
+
+    it('should update folder path display when note is moved to a folder', async () => {
+      jest.useRealTimers();
+
+      const mockFolders = [{ id: 'folder1', name: 'Projects', parentId: null, deleted: false }];
+
+      const mockNotes = [
+        {
+          id: 'note1',
+          title: 'Test Note',
+          sdId: 'default',
+          folderId: null, // Note starts in root (no folder)
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Test content',
+          contentText: 'Test content text',
+        },
+      ];
+
+      mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+      mockElectronAPI.folder.list.mockResolvedValue(mockFolders);
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        if (key === 'searchQuery') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
+
+      // Wait for note to load
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+      });
+
+      // Initially no folder path should be displayed
+      expect(screen.queryByText('Projects')).not.toBeInTheDocument();
+
+      // Simulate note being moved to the Projects folder
+      noteMovedCallbacks.forEach((cb) => {
+        cb({ noteId: 'note1', oldFolderId: null, newFolderId: 'folder1' });
+      });
+
+      // Folder path should now be displayed
+      await waitFor(() => {
+        expect(screen.getByText('Projects')).toBeInTheDocument();
+      });
+
+      unmount();
+    });
+
+    it('should clear folder path when note is moved back to root', async () => {
+      jest.useRealTimers();
+
+      const mockFolders = [{ id: 'folder1', name: 'Projects', parentId: null, deleted: false }];
+
+      const mockNotes = [
+        {
+          id: 'note1',
+          title: 'Test Note',
+          sdId: 'default',
+          folderId: 'folder1', // Note starts in a folder
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Test content',
+          contentText: 'Test content text',
+        },
+      ];
+
+      mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+      mockElectronAPI.folder.list.mockResolvedValue(mockFolders);
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        if (key === 'searchQuery') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
+
+      // Wait for note to load with folder path
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+        expect(screen.getByText('Projects')).toBeInTheDocument();
+      });
+
+      // Simulate note being moved back to root (null folderId, empty string in event)
+      noteMovedCallbacks.forEach((cb) => {
+        cb({ noteId: 'note1', oldFolderId: 'folder1', newFolderId: '' });
+      });
+
+      // Folder path should be cleared
+      await waitFor(() => {
+        expect(screen.queryByText('Projects')).not.toBeInTheDocument();
+      });
+
+      unmount();
+    });
+
+    it('should update folder path when note is moved between folders', async () => {
+      jest.useRealTimers();
+
+      const mockFolders = [
+        { id: 'folder1', name: 'Projects', parentId: null, deleted: false },
+        { id: 'folder2', name: 'Archive', parentId: null, deleted: false },
+      ];
+
+      const mockNotes = [
+        {
+          id: 'note1',
+          title: 'Test Note',
+          sdId: 'default',
+          folderId: 'folder1', // Note starts in Projects folder
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Test content',
+          contentText: 'Test content text',
+        },
+      ];
+
+      mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+      mockElectronAPI.folder.list.mockResolvedValue(mockFolders);
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes');
+        if (key === 'searchQuery') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
+
+      // Wait for note to load with initial folder path
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+        expect(screen.getByText('Projects')).toBeInTheDocument();
+      });
+
+      // Simulate note being moved to Archive folder
+      noteMovedCallbacks.forEach((cb) => {
+        cb({ noteId: 'note1', oldFolderId: 'folder1', newFolderId: 'folder2' });
+      });
+
+      // Folder path should update to Archive
+      await waitFor(() => {
+        expect(screen.queryByText('Projects')).not.toBeInTheDocument();
+        expect(screen.getByText('Archive')).toBeInTheDocument();
+      });
+
+      unmount();
+    });
+
+    it('should keep note in list when viewing all-notes:sdId variant', async () => {
+      jest.useRealTimers();
+
+      const mockFolders = [{ id: 'folder1', name: 'Projects', parentId: null, deleted: false }];
+
+      const mockNotes = [
+        {
+          id: 'note1',
+          title: 'Test Note',
+          sdId: 'sd-123',
+          folderId: null,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: 'Test content',
+          contentText: 'Test content text',
+        },
+      ];
+
+      mockElectronAPI.note.list.mockResolvedValue(mockNotes);
+      mockElectronAPI.folder.list.mockResolvedValue(mockFolders);
+      mockElectronAPI.appState.get.mockImplementation((key: string) => {
+        if (key === 'selectedFolderId') return Promise.resolve('all-notes:sd-123');
+        if (key === 'searchQuery') return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+
+      const { unmount } = render(
+        <NotesListPanel {...defaultProps} activeSdId="sd-123" selectedFolderId="all-notes:sd-123" />
+      );
+
+      // Wait for note to load
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+      });
+
+      // Simulate note being moved to a folder
+      noteMovedCallbacks.forEach((cb) => {
+        cb({ noteId: 'note1', oldFolderId: null, newFolderId: 'folder1' });
+      });
+
+      // Note should still be in the list
+      await waitFor(() => {
+        expect(screen.getByText('Test Note')).toBeInTheDocument();
+      });
+
+      // And folder path should be displayed
+      await waitFor(() => {
+        expect(screen.getByText('Projects')).toBeInTheDocument();
+      });
+
+      unmount();
     });
   });
 });

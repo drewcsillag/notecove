@@ -7,5 +7,11 @@ export const DndProvider = ({ children }: { children: React.ReactNode }): React.
   return React.createElement('div', { 'data-testid': 'dnd-provider' }, children);
 };
 
-export const useDrag = () => [{}, () => null];
+export const useDrag = () => [{ isDragging: false }, () => null, () => null];
 export const useDrop = () => [{}, () => null];
+export const useDragLayer = () => ({
+  item: null,
+  itemType: null,
+  currentOffset: null,
+  isDragging: false,
+});

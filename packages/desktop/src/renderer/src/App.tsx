@@ -11,6 +11,7 @@ import './i18n';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
 import { LeftSidebar } from './components/LeftSidebar/LeftSidebar';
 import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
+import { NoteDragLayer } from './components/NotesListPanel/NoteDragLayer';
 import { EditorPanel } from './components/EditorPanel/EditorPanel';
 import { SettingsDialog } from './components/Settings/SettingsDialog';
 import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgressDialog';
@@ -960,6 +961,7 @@ function App(): React.ReactElement {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <DndProvider backend={HTML5Backend}>
+          <NoteDragLayer />
           <Box
             sx={{
               height: '100vh',
@@ -1020,6 +1022,7 @@ function App(): React.ReactElement {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <DndProvider backend={HTML5Backend}>
+        <NoteDragLayer />
         <div data-testid="app-root" data-active-sd-id={activeSdId}>
           <ThreePanelLayout
             leftPanel={

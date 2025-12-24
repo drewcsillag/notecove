@@ -675,21 +675,18 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         return prev;
       });
 
-      // Remove note from list if it's no longer in the current folder
+      // Update note in list based on move
       setNotes((prevNotes) => {
         const note = prevNotes.find((n) => n.id === data.noteId);
         if (!note) return prevNotes;
 
+        // Normalize newFolderId: empty string means root (null)
+        const newFolderId = data.newFolderId === '' ? null : data.newFolderId;
+
         // If we're viewing "All Notes" (can be 'all-notes' or 'all-notes:sdId'),
-        // we need to check if the note is moving INTO a folder
-        // (it should disappear from "All Notes" when moved to any folder)
+        // keep the note in the list and update its folderId so folder path displays correctly
         if (selectedFolderId === 'all-notes' || selectedFolderId?.startsWith('all-notes:')) {
-          // Note is moving to a specific folder, remove it from "All Notes" view
-          if (data.newFolderId !== null && data.newFolderId !== '') {
-            return prevNotes.filter((n) => n.id !== data.noteId);
-          }
-          // Note is moving back to "All Notes", keep it
-          return prevNotes;
+          return prevNotes.map((n) => (n.id === data.noteId ? { ...n, folderId: newFolderId } : n));
         }
 
         // If the note is moving OUT of the current folder, remove it

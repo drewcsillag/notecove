@@ -5,8 +5,9 @@
  * Phase 2.5.7.3: Drag & Drop
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useDrag } from 'react-dnd';
+import { getEmptyImage } from 'react-dnd-html5-backend';
 import { ListItem, ListItemButton, ListItemText, Typography, Box } from '@mui/material';
 import { PushPin as PushPinIcon, Folder as FolderIcon } from '@mui/icons-material';
 
@@ -53,8 +54,8 @@ export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
   formatDate,
   folderPath,
 }) => {
-  // Set up drag
-  const [{ isDragging }, drag] = useDrag(
+  // Set up drag with preview connector
+  const [{ isDragging }, drag, preview] = useDrag(
     () => ({
       type: ItemTypes.NOTE,
       item: () => {
@@ -64,6 +65,7 @@ export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
             noteIds: Array.from(selectedNoteIds),
             count: selectedNoteIds.size,
             sdId: note.sdId, // Include SD ID for cross-SD detection
+            noteTitle: note.title || 'Untitled Note',
           };
         }
         // Otherwise, drag just this note
@@ -71,14 +73,21 @@ export const DraggableNoteItem: React.FC<DraggableNoteItemProps> = ({
           noteIds: [note.id],
           count: 1,
           sdId: note.sdId, // Include SD ID for cross-SD detection
+          noteTitle: note.title || 'Untitled Note',
         };
       },
       collect: (monitor) => ({
         isDragging: monitor.isDragging(),
       }),
     }),
-    [note.id, selectedNoteIds, note.sdId]
+    [note.id, selectedNoteIds, note.sdId, note.title]
   );
+
+  // Use empty image as drag preview to prevent browser's default preview
+  // Our custom NoteDragLayer will render the preview instead
+  useEffect(() => {
+    preview(getEmptyImage(), { captureDraggingState: true });
+  }, [preview]);
 
   return (
     <ListItem ref={drag} key={note.id} disablePadding sx={{ opacity: isDragging ? 0.5 : 1 }}>
