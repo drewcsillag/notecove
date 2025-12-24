@@ -64,6 +64,7 @@ Investigating a sync issue where:
 ## Current Status
 
 **Phase 1 COMPLETE** - The refCount bug is fixed:
+
 - Added `forceUnloadNote()` method to CRDTManager
 - Updated both `handleReloadFromCRDTLogs` implementations to use it
 - All tests pass, CI green

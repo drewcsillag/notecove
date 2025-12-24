@@ -8,27 +8,28 @@ Started with 8 E2E test failures. Fixed 6 of them:
 
 ## Fixed Tests ✅
 
-| #   | Test                                    | Fix Applied                                                                     |
-| --- | --------------------------------------- | ------------------------------------------------------------------------------- |
-| 1   | `auto-cleanup.spec.ts:165`              | Preserve deleted state when loading notes from CRDT (prevents "undeleting")     |
-| 2-4 | `backup-restore.spec.ts` (3 tests)      | Added `databasePath` parameter to BackupManager to support TEST_DB_PATH         |
-| 7   | `markdown-export.spec.ts` folder export | Fixed folder dialog selector + check files in subdirectory                      |
-| 8   | `web-server.spec.ts` auth timeout       | Simplified wait logic to check HTML content instead of DOM                      |
+| #   | Test                                    | Fix Applied                                                                 |
+| --- | --------------------------------------- | --------------------------------------------------------------------------- |
+| 1   | `auto-cleanup.spec.ts:165`              | Preserve deleted state when loading notes from CRDT (prevents "undeleting") |
+| 2-4 | `backup-restore.spec.ts` (3 tests)      | Added `databasePath` parameter to BackupManager to support TEST_DB_PATH     |
+| 7   | `markdown-export.spec.ts` folder export | Fixed folder dialog selector + check files in subdirectory                  |
+| 8   | `web-server.spec.ts` auth timeout       | Simplified wait logic to check HTML content instead of DOM                  |
 
 ## Remaining Tests ❌ (Pre-existing Flaky Tests)
 
-| #   | Test File                                       | Issue                    | Status                   |
-| --- | ----------------------------------------------- | ------------------------ | ------------------------ |
-| 5   | `cross-machine-sync-comments.spec.ts:384`       | Sidebar timing           | Flaky - sync timing race |
-| 6   | `cross-machine-sync-deletion-sloppy.spec.ts:87` | UI not refreshing        | Flaky - sync timing race |
+| #   | Test File                                       | Issue             | Status                   |
+| --- | ----------------------------------------------- | ----------------- | ------------------------ |
+| 5   | `cross-machine-sync-comments.spec.ts:384`       | Sidebar timing    | Flaky - sync timing race |
+| 6   | `cross-machine-sync-deletion-sloppy.spec.ts:87` | UI not refreshing | Flaky - sync timing race |
 
 ## Auto-cleanup Fix Details
 
 ### Root Cause
 
 When loading a note via IPC (`handleLoadNote`), the code unconditionally synced CRDT metadata to database:
+
 ```typescript
-deleted: crdtMetadata.deleted  // Overwrites database!
+deleted: crdtMetadata.deleted; // Overwrites database!
 ```
 
 If the app shutdown before CRDT could flush `deleted=true` to disk, the CRDT on disk would have stale data (`deleted=false`). On restart, loading the note would overwrite the correct database value with the stale CRDT value.
@@ -36,6 +37,7 @@ If the app shutdown before CRDT could flush `deleted=true` to disk, the CRDT on 
 ### Fix Applied
 
 Changed all CRDT→database sync points to preserve deleted state:
+
 ```typescript
 const deletedState = existingNote.deleted ? true : crdtMetadata.deleted;
 ```
