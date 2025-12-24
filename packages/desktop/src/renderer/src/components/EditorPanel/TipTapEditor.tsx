@@ -35,6 +35,7 @@ import {
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
 import { yUndoPluginKey } from 'y-prosemirror';
+import { DOMSerializer } from '@tiptap/pm/model';
 import { EditorToolbar } from './EditorToolbar';
 import { Hashtag } from './extensions/Hashtag';
 import { AtMention } from './extensions/AtMention';
@@ -238,8 +239,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     attrs: null,
   });
 
-  // Context menu state
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  // Context menu state - includes selection bounds for clipboard operations
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    from: number;
+    to: number;
+  } | null>(null);
 
   // Overlapping comments popover state
   const [overlapPopover, setOverlapPopover] = useState<{
@@ -2138,10 +2144,150 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   /**
    * Handle context menu open
    * Shows custom context menu with Cut, Copy, Paste, and Add Comment options
+   * Captures selection bounds for clipboard operations since focus is lost when menu opens
    */
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY });
+    // Capture selection bounds - needed because editor loses focus when menu opens
+    const { from, to } = editor?.state.selection ?? { from: 0, to: 0 };
+    setContextMenu({ x: e.clientX, y: e.clientY, from, to });
+  };
+
+  /**
+   * Serialize a selection range to HTML and plain text for clipboard operations
+   */
+  const serializeSelectionToClipboard = (
+    from: number,
+    to: number
+  ): { html: string; plainText: string } => {
+    if (!editor) return { html: '', plainText: '' };
+
+    const slice = editor.state.doc.slice(from, to);
+    const fragment = DOMSerializer.fromSchema(editor.schema).serializeFragment(slice.content);
+    const div = document.createElement('div');
+    div.appendChild(fragment);
+    const html = div.innerHTML;
+    const plainText = editor.state.doc.textBetween(from, to);
+    return { html, plainText };
+  };
+
+  /**
+   * Write content to clipboard with both HTML and plain text formats
+   */
+  const writeToClipboard = async (html: string, plainText: string): Promise<void> => {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plainText], { type: 'text/plain' }),
+      }),
+    ]);
+  };
+
+  /**
+   * Helper to read blob as text (for clipboard reading)
+   */
+  const readBlobAsText = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(blob);
+    });
+  };
+
+  /**
+   * Handle context menu Cut operation
+   */
+  const handleContextMenuCut = async () => {
+    if (!editor || !contextMenu) return;
+
+    const { from, to } = contextMenu;
+    if (from === to) {
+      // Nothing selected
+      handleContextMenuClose();
+      return;
+    }
+
+    try {
+      const { html, plainText } = serializeSelectionToClipboard(from, to);
+      await writeToClipboard(html, plainText);
+      // Focus editor, restore selection, and delete
+      editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
+      console.log('[TipTapEditor] Cut operation completed');
+    } catch (err) {
+      console.error('[TipTapEditor] Cut failed:', err);
+    }
+
+    handleContextMenuClose();
+  };
+
+  /**
+   * Handle context menu Copy operation
+   */
+  const handleContextMenuCopy = async () => {
+    if (!editor || !contextMenu) return;
+
+    const { from, to } = contextMenu;
+    if (from === to) {
+      // Nothing selected
+      handleContextMenuClose();
+      return;
+    }
+
+    try {
+      const { html, plainText } = serializeSelectionToClipboard(from, to);
+      await writeToClipboard(html, plainText);
+      console.log('[TipTapEditor] Copy operation completed');
+    } catch (err) {
+      console.error('[TipTapEditor] Copy failed:', err);
+    }
+
+    handleContextMenuClose();
+  };
+
+  /**
+   * Handle context menu Paste operation
+   */
+  const handleContextMenuPaste = async () => {
+    if (!editor || !contextMenu) return;
+
+    const { from, to } = contextMenu;
+
+    try {
+      const items = await navigator.clipboard.read();
+      let pasted = false;
+
+      for (const item of items) {
+        if (item.types.includes('text/html')) {
+          const blob = await item.getType('text/html');
+          const html = await readBlobAsText(blob);
+          // Focus editor, set position (delete selection if any), and insert
+          if (from !== to) {
+            editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
+          }
+          editor.chain().focus().setTextSelection(from).insertContent(html).run();
+          pasted = true;
+          break;
+        }
+      }
+
+      if (!pasted) {
+        // Fallback to plain text
+        const text = await navigator.clipboard.readText();
+        if (from !== to) {
+          editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
+        }
+        editor.chain().focus().setTextSelection(from).insertContent(text).run();
+      }
+
+      console.log('[TipTapEditor] Paste operation completed');
+    } catch (err) {
+      console.error('[TipTapEditor] Paste failed:', err);
+      // Show toast notification for paste failures
+      // TODO: Integrate with app's toast system when available
+    }
+
+    handleContextMenuClose();
   };
 
   /**
@@ -2946,33 +3092,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           anchorReference="anchorPosition"
           anchorPosition={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          <MenuItem
-            onClick={() => {
-              // eslint-disable-next-line @typescript-eslint/no-deprecated
-              document.execCommand('cut');
-              handleContextMenuClose();
-            }}
-          >
-            Cut
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              // eslint-disable-next-line @typescript-eslint/no-deprecated
-              document.execCommand('copy');
-              handleContextMenuClose();
-            }}
-          >
-            Copy
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              // eslint-disable-next-line @typescript-eslint/no-deprecated
-              document.execCommand('paste');
-              handleContextMenuClose();
-            }}
-          >
-            Paste
-          </MenuItem>
+          <MenuItem onClick={() => void handleContextMenuCut()}>Cut</MenuItem>
+          <MenuItem onClick={() => void handleContextMenuCopy()}>Copy</MenuItem>
+          <MenuItem onClick={() => void handleContextMenuPaste()}>Paste</MenuItem>
           <Divider />
           <MenuItem
             onClick={() => {

@@ -27,10 +27,6 @@ export const TagPanel: React.FC<TagPanelProps> = ({ tagFilters, onTagSelect, onC
 
   // Load tags from database (initial load shows loading state)
   const loadTags = useCallback(async (isInitial?: boolean) => {
-<<<<<<< Updated upstream
-    isInitial = isInitial ?? false;
-=======
->>>>>>> Stashed changes
     try {
       if (isInitial) {
         setInitialLoading(true);
