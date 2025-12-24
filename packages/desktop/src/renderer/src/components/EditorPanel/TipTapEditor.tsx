@@ -69,6 +69,7 @@ import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { useWindowState } from '../../hooks/useWindowState';
 import { detectUrlFromSelection } from '@notecove/shared';
+import { sanitizeClipboardHtml } from '../../utils/clipboard-sanitizer';
 
 /**
  * Map of file extensions to MIME types for image files.
@@ -2189,8 +2190,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const readBlobAsText = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = () => {
+        reject(new Error(reader.error?.message ?? 'Failed to read blob'));
+      };
       reader.readAsText(blob);
     });
   };
@@ -2260,7 +2265,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       for (const item of items) {
         if (item.types.includes('text/html')) {
           const blob = await item.getType('text/html');
-          const html = await readBlobAsText(blob);
+          const rawHtml = await readBlobAsText(blob);
+          // Sanitize HTML to remove <meta charset>, <style>, and other unwanted elements
+          const html = sanitizeClipboardHtml(rawHtml);
           // Focus editor, set position (delete selection if any), and insert
           if (from !== to) {
             editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
@@ -2285,6 +2292,30 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       console.error('[TipTapEditor] Paste failed:', err);
       // Show toast notification for paste failures
       // TODO: Integrate with app's toast system when available
+    }
+
+    handleContextMenuClose();
+  };
+
+  /**
+   * Handle context menu Paste Without Formatting operation
+   * Pastes clipboard content as plain text, stripping all HTML formatting
+   */
+  const handleContextMenuPasteAsPlainText = async () => {
+    if (!editor || !contextMenu) return;
+
+    const { from, to } = contextMenu;
+
+    try {
+      const text = await navigator.clipboard.readText();
+      // Focus editor, set position (delete selection if any), and insert
+      if (from !== to) {
+        editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
+      }
+      editor.chain().focus().setTextSelection(from).insertContent(text).run();
+      console.log('[TipTapEditor] Paste without formatting completed');
+    } catch (err) {
+      console.error('[TipTapEditor] Paste without formatting failed:', err);
     }
 
     handleContextMenuClose();
@@ -3095,6 +3126,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           <MenuItem onClick={() => void handleContextMenuCut()}>Cut</MenuItem>
           <MenuItem onClick={() => void handleContextMenuCopy()}>Copy</MenuItem>
           <MenuItem onClick={() => void handleContextMenuPaste()}>Paste</MenuItem>
+          <MenuItem onClick={() => void handleContextMenuPasteAsPlainText()}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <span>Paste without formatting</span>
+              <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>
+                ⇧⌘V
+              </Typography>
+            </Box>
+          </MenuItem>
           <Divider />
           <MenuItem
             onClick={() => {

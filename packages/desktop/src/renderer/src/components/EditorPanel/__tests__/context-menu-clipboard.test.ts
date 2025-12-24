@@ -13,6 +13,7 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { DOMSerializer } from '@tiptap/pm/model';
+import { sanitizeClipboardHtml } from '../../../utils/clipboard-sanitizer';
 
 // Mock Clipboard API
 const mockClipboardWrite = jest.fn().mockResolvedValue(undefined);
@@ -124,7 +125,8 @@ async function performCopy(editor: Editor, from: number, to: number): Promise<vo
 }
 
 /**
- * Performs a paste operation: reads clipboard and inserts at position
+ * Performs a paste operation: reads clipboard, sanitizes HTML, and inserts at position
+ * This mirrors the actual implementation in TipTapEditor.tsx
  */
 async function performPaste(editor: Editor, position: number): Promise<void> {
   try {
@@ -133,7 +135,9 @@ async function performPaste(editor: Editor, position: number): Promise<void> {
       if (item.types.includes('text/html')) {
         const blob = await item.getType('text/html');
         const html = await readBlobAsText(blob);
-        editor.chain().focus().setTextSelection(position).insertContent(html).run();
+        // Sanitize HTML before insertion (fixes meta charset and other issues)
+        const sanitizedHtml = sanitizeClipboardHtml(html);
+        editor.chain().focus().setTextSelection(position).insertContent(sanitizedHtml).run();
         return;
       }
     }
@@ -142,6 +146,20 @@ async function performPaste(editor: Editor, position: number): Promise<void> {
     editor.chain().focus().setTextSelection(position).insertContent(text).run();
   } catch (err) {
     console.error('[ContextMenu] Paste failed:', err);
+    throw err;
+  }
+}
+
+/**
+ * Performs a paste-as-plain-text operation: reads plain text and inserts at position
+ * Ignores any HTML formatting in the clipboard
+ */
+async function performPasteAsPlainText(editor: Editor, position: number): Promise<void> {
+  try {
+    const text = await navigator.clipboard.readText();
+    editor.chain().focus().setTextSelection(position).insertContent(text).run();
+  } catch (err) {
+    console.error('[ContextMenu] Paste as plain text failed:', err);
     throw err;
   }
 }
@@ -325,6 +343,146 @@ describe('Context Menu Clipboard Operations', () => {
 
       expect(html).toContain('<em>');
       expect(html).toContain('<strong>');
+    });
+  });
+
+  describe('Paste with HTML Sanitization (Bug Fixes)', () => {
+    it('should not insert <meta charset> when pasting browser-copied content', async () => {
+      // This is the exact bug from the report: pasting adds <meta charset="utf-8"> before text
+      mockClipboardRead.mockResolvedValue([
+        new MockClipboardItem({
+          'text/html': new Blob(['<meta charset="utf-8">wolf'], { type: 'text/html' }),
+          'text/plain': new Blob(['wolf'], { type: 'text/plain' }),
+        }),
+      ]);
+
+      // Paste at end of existing content
+      const position = 12; // End of "Hello World"
+
+      await performPaste(editor, position);
+
+      const text = editor.getText();
+      expect(text).not.toContain('<meta');
+      expect(text).not.toContain('charset');
+      expect(text).toContain('wolf');
+    });
+
+    it('should extract content from full HTML document wrapper', async () => {
+      // Browser may copy content wrapped in full HTML document structure
+      const fullHtmlDoc =
+        '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><p>Content</p></body></html>';
+
+      mockClipboardRead.mockResolvedValue([
+        new MockClipboardItem({
+          'text/html': new Blob([fullHtmlDoc], { type: 'text/html' }),
+          'text/plain': new Blob(['Content'], { type: 'text/plain' }),
+        }),
+      ]);
+
+      const position = 7;
+      await performPaste(editor, position);
+
+      const text = editor.getText();
+      expect(text).not.toContain('DOCTYPE');
+      expect(text).not.toContain('<html');
+      expect(text).toContain('Content');
+    });
+
+    it('should strip style tags but preserve content', async () => {
+      const htmlWithStyles = '<style>.red{color:red}</style><p>Styled content</p>';
+
+      mockClipboardRead.mockResolvedValue([
+        new MockClipboardItem({
+          'text/html': new Blob([htmlWithStyles], { type: 'text/html' }),
+          'text/plain': new Blob(['Styled content'], { type: 'text/plain' }),
+        }),
+      ]);
+
+      const position = 7;
+      await performPaste(editor, position);
+
+      const text = editor.getText();
+      expect(text).not.toContain('style');
+      expect(text).not.toContain('color:red');
+      expect(text).toContain('Styled content');
+    });
+
+    it('should preserve formatting (bold, italic) through paste', async () => {
+      // Note: Link preservation requires Link extension which isn't in StarterKit
+      // The sanitizer preserves links (tested in unit tests), but this test editor
+      // won't render them. This test verifies bold/italic are preserved.
+      const formattedHtml = '<p><strong>Bold</strong> and <em>italic</em> text</p>';
+
+      mockClipboardRead.mockResolvedValue([
+        new MockClipboardItem({
+          'text/html': new Blob([formattedHtml], { type: 'text/html' }),
+          'text/plain': new Blob(['Bold and italic text'], { type: 'text/plain' }),
+        }),
+      ]);
+
+      // Clear editor and paste
+      editor.commands.setContent('');
+      const position = 1;
+      await performPaste(editor, position);
+
+      // Check HTML structure is preserved
+      const html = editor.getHTML();
+      expect(html).toContain('<strong>Bold</strong>');
+      expect(html).toContain('<em>italic</em>');
+    });
+
+    it('should handle Microsoft Office HTML (mso-* styles)', async () => {
+      // Typical Word/Office HTML with mso-* styles
+      const officeHtml = `
+        <p style="mso-spacerun:yes; font-weight:bold;">Office text</p>
+      `;
+
+      mockClipboardRead.mockResolvedValue([
+        new MockClipboardItem({
+          'text/html': new Blob([officeHtml], { type: 'text/html' }),
+          'text/plain': new Blob(['Office text'], { type: 'text/plain' }),
+        }),
+      ]);
+
+      editor.commands.setContent('');
+      const position = 1;
+      await performPaste(editor, position);
+
+      const html = editor.getHTML();
+      expect(html).not.toContain('mso-');
+      expect(html).toContain('Office text');
+    });
+  });
+
+  describe('Paste Without Formatting', () => {
+    it('should insert plain text only, ignoring HTML formatting', async () => {
+      // Clipboard has both HTML and plain text
+      mockClipboardRead.mockResolvedValue([
+        new MockClipboardItem({
+          'text/html': new Blob(['<p><strong>Formatted</strong></p>'], { type: 'text/html' }),
+          'text/plain': new Blob(['Formatted'], { type: 'text/plain' }),
+        }),
+      ]);
+      mockClipboardReadText.mockResolvedValue('Formatted');
+
+      editor.commands.setContent('');
+      const position = 1;
+      await performPasteAsPlainText(editor, position);
+
+      // Should be plain text without formatting
+      const html = editor.getHTML();
+      expect(html).not.toContain('<strong>');
+      expect(editor.getText()).toContain('Formatted');
+    });
+
+    it('should work when clipboard only has plain text', async () => {
+      mockClipboardReadText.mockResolvedValue('Just plain text');
+
+      editor.commands.setContent('');
+      const position = 1;
+      await performPasteAsPlainText(editor, position);
+
+      expect(editor.getText()).toContain('Just plain text');
     });
   });
 });
