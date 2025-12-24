@@ -77,13 +77,25 @@ export function ProfilePicker(): React.ReactElement {
         setIsDevBuild(data.isDevBuild);
 
         // Pre-select the default or most recently used profile
-        if (data.defaultProfileId && filteredProfiles.some((p) => p.id === data.defaultProfileId)) {
+        // In dev builds, only consider dev profiles for pre-selection to prevent
+        // accidentally defaulting to a production profile
+        const preSelectCandidates = data.isDevBuild
+          ? filteredProfiles.filter((p) => p.isDev)
+          : filteredProfiles;
+
+        // Check if defaultProfileId is valid for pre-selection
+        const defaultIsValid =
+          data.defaultProfileId && preSelectCandidates.some((p) => p.id === data.defaultProfileId);
+
+        if (defaultIsValid) {
           setSelectedId(data.defaultProfileId);
-        } else if (filteredProfiles.length > 0) {
+        } else if (preSelectCandidates.length > 0) {
           // Sort by lastUsed and select the most recent
-          const sorted = [...filteredProfiles].sort((a, b) => b.lastUsed - a.lastUsed);
+          const sorted = [...preSelectCandidates].sort((a, b) => b.lastUsed - a.lastUsed);
           setSelectedId(sorted[0]?.id ?? null);
         }
+        // If no candidates (dev build with only prod profiles), leave selectedId as null
+        // User must explicitly click to select a production profile
 
         setLoading(false);
       } catch (err) {
