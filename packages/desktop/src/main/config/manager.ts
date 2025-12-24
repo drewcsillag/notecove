@@ -9,6 +9,12 @@
 import { app } from 'electron';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
+import {
+  FeatureFlag,
+  FeatureFlagConfig,
+  DEFAULT_FEATURE_FLAGS,
+  isValidFeatureFlag,
+} from '@notecove/shared';
 
 export type TLSMode = 'off' | 'self-signed' | 'custom';
 
@@ -25,6 +31,7 @@ export interface WebServerConfig {
 export interface AppConfig {
   databasePath?: string;
   webServer?: WebServerConfig;
+  featureFlags?: Partial<FeatureFlagConfig>;
 }
 
 export class ConfigManager {
@@ -122,6 +129,43 @@ export class ConfigManager {
   async setWebServerConfig(webServerConfig: Partial<WebServerConfig>): Promise<void> {
     const config = await this.load();
     config.webServer = { ...config.webServer, ...webServerConfig };
+    await this.save(config);
+  }
+
+  /**
+   * Get all feature flags with defaults applied
+   */
+  async getFeatureFlags(): Promise<FeatureFlagConfig> {
+    const config = await this.load();
+    return { ...DEFAULT_FEATURE_FLAGS, ...config.featureFlags };
+  }
+
+  /**
+   * Get a specific feature flag value
+   */
+  async getFeatureFlag(flag: FeatureFlag): Promise<boolean> {
+    const flags = await this.getFeatureFlags();
+    return flags[flag];
+  }
+
+  /**
+   * Set a specific feature flag value
+   */
+  async setFeatureFlag(flag: FeatureFlag, enabled: boolean): Promise<void> {
+    if (!isValidFeatureFlag(flag)) {
+      throw new Error(`Invalid feature flag: ${String(flag)}`);
+    }
+    const config = await this.load();
+    config.featureFlags = { ...config.featureFlags, [flag]: enabled };
+    await this.save(config);
+  }
+
+  /**
+   * Set multiple feature flags at once
+   */
+  async setFeatureFlags(flags: Partial<FeatureFlagConfig>): Promise<void> {
+    const config = await this.load();
+    config.featureFlags = { ...config.featureFlags, ...flags };
     await this.save(config);
   }
 }

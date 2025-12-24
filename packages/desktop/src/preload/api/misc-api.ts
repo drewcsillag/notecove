@@ -1,9 +1,9 @@
 /**
- * Miscellaneous APIs: tools, export, import, testing, webServer, inspector
+ * Miscellaneous APIs: tools, export, import, testing, webServer, inspector, featureFlags
  */
 
 import { ipcRenderer } from 'electron';
-import type { NoteCache } from '@notecove/shared';
+import type { NoteCache, FeatureFlag, FeatureFlagMetadata } from '@notecove/shared';
 
 export const toolsApi = {
   reindexNotes: (): Promise<{ success: boolean; error?: string }> =>
@@ -564,4 +564,61 @@ export const inspectorApi = {
       };
       error?: string;
     }>,
+};
+
+/**
+ * Feature flag info returned from the API
+ */
+export interface FeatureFlagInfo {
+  flag: FeatureFlag;
+  enabled: boolean;
+  metadata: FeatureFlagMetadata;
+}
+
+export const featureFlagsApi = {
+  /**
+   * Get all feature flags with their current values and metadata
+   */
+  getAll: (): Promise<FeatureFlagInfo[]> =>
+    ipcRenderer.invoke('featureFlags:getAll') as Promise<FeatureFlagInfo[]>,
+
+  /**
+   * Get a specific feature flag value
+   * @param flag The feature flag to get
+   */
+  get: (flag: FeatureFlag): Promise<boolean> =>
+    ipcRenderer.invoke('featureFlags:get', flag) as Promise<boolean>,
+
+  /**
+   * Set a feature flag value
+   * @param flag The feature flag to set
+   * @param enabled Whether to enable or disable the feature
+   * @returns Object with success status and whether restart is required
+   */
+  set: (
+    flag: FeatureFlag,
+    enabled: boolean
+  ): Promise<{ success: boolean; requiresRestart: boolean }> =>
+    ipcRenderer.invoke('featureFlags:set', flag, enabled) as Promise<{
+      success: boolean;
+      requiresRestart: boolean;
+    }>,
+
+  /**
+   * Subscribe to feature flag changes
+   * @param callback Called when a feature flag changes
+   * @returns Cleanup function to unsubscribe
+   */
+  onChange: (callback: (data: { flag: FeatureFlag; enabled: boolean }) => void): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: { flag: FeatureFlag; enabled: boolean }
+    ): void => {
+      callback(data);
+    };
+    ipcRenderer.on('featureFlags:changed', listener);
+    return () => {
+      ipcRenderer.removeListener('featureFlags:changed', listener);
+    };
+  },
 };

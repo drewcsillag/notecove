@@ -7,7 +7,7 @@
 
 import { app, BrowserWindow, Menu, shell, clipboard } from 'electron';
 import { is } from '@electron-toolkit/utils';
-import { AppStateKey, type Database } from '@notecove/shared';
+import { AppStateKey, type Database, type FeatureFlagConfig } from '@notecove/shared';
 import type { IPCHandlers } from './ipc/handlers';
 import type { WebServerManager } from './web-server/manager';
 import type { WindowStateManager } from './window-state-manager';
@@ -33,6 +33,8 @@ export interface MenuDependencies {
   windowStateManager: WindowStateManager | null;
   /** Currently selected profile ID */
   selectedProfileId: string | null;
+  /** Feature flags configuration (loaded at startup) */
+  featureFlags?: FeatureFlagConfig;
   /** Function to create new windows */
   createWindow: (options?: {
     noteId?: string;
@@ -69,6 +71,7 @@ export function createMenu(deps: MenuDependencies): void {
     windowStateManager,
     selectedProfileId,
     createWindow,
+    featureFlags,
   } = deps;
 
   const template: Electron.MenuItemConstructorOptions[] = [
@@ -316,83 +319,88 @@ export function createMenu(deps: MenuDependencies): void {
       label: 'Tools',
       submenu: [
         {
-          label: 'Note Info',
-          accelerator: 'CmdOrCtrl+Shift+I',
-          click: () => {
-            // Send to focused window, not mainWindow, so the correct note context is used
-            const focusedWindow = BrowserWindow.getFocusedWindow();
-            if (focusedWindow) {
-              focusedWindow.webContents.send('menu:noteInfo');
-            } else if (mainWindow) {
-              // Fallback to mainWindow if no focused window
-              mainWindow.webContents.send('menu:noteInfo');
-            }
-          },
-        },
-        { type: 'separator' },
-        {
-          label: 'Create Snapshot',
-          click: () => {
-            const focusedWindow = BrowserWindow.getFocusedWindow();
-            if (focusedWindow) {
-              focusedWindow.webContents.send('menu:createSnapshot');
-            } else if (mainWindow) {
-              mainWindow.webContents.send('menu:createSnapshot');
-            }
-          },
-        },
-        {
-          label: 'View History',
-          accelerator: 'CmdOrCtrl+Alt+H',
-          click: () => {
-            const focusedWindow = BrowserWindow.getFocusedWindow();
-            if (focusedWindow) {
-              focusedWindow.webContents.send('menu:viewHistory');
-            } else if (mainWindow) {
-              mainWindow.webContents.send('menu:viewHistory');
-            }
-          },
-        },
-        { type: 'separator' },
-        {
-          label: 'Sync Status',
-          click: () => {
-            createWindow({ syncStatus: true });
-          },
-        },
-        {
-          label: 'Storage Inspector',
-          click: () => {
-            void (async () => {
-              if (!database) return;
-
-              // Get all SDs
-              const sds = await database.getAllStorageDirs();
-              if (sds.length === 0) return;
-
-              // If only one SD, open inspector directly
-              if (sds.length === 1 && sds[0]) {
-                const sd = sds[0];
-                createWindow({
-                  storageInspector: true,
-                  sdId: sd.id,
-                  sdPath: sd.path,
-                  sdName: sd.name,
-                });
-                return;
-              }
-
-              // Multiple SDs - open picker window
-              createWindow({
-                sdPicker: true,
-              });
-            })();
-          },
-        },
-        { type: 'separator' },
-        {
           label: 'Advanced',
           submenu: [
+            {
+              label: 'Note Info',
+              accelerator: 'CmdOrCtrl+Shift+I',
+              click: () => {
+                // Send to focused window, not mainWindow, so the correct note context is used
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('menu:noteInfo');
+                } else if (mainWindow) {
+                  // Fallback to mainWindow if no focused window
+                  mainWindow.webContents.send('menu:noteInfo');
+                }
+              },
+            },
+            { type: 'separator' as const },
+            {
+              label: 'Create Snapshot',
+              click: () => {
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('menu:createSnapshot');
+                } else if (mainWindow) {
+                  mainWindow.webContents.send('menu:createSnapshot');
+                }
+              },
+            },
+            // View History - only shown when viewHistory feature flag is enabled
+            ...(featureFlags?.viewHistory
+              ? [
+                  {
+                    label: 'View History',
+                    accelerator: 'CmdOrCtrl+Alt+H',
+                    click: () => {
+                      const focusedWindow = BrowserWindow.getFocusedWindow();
+                      if (focusedWindow) {
+                        focusedWindow.webContents.send('menu:viewHistory');
+                      } else if (mainWindow) {
+                        mainWindow.webContents.send('menu:viewHistory');
+                      }
+                    },
+                  },
+                ]
+              : []),
+            { type: 'separator' as const },
+            {
+              label: 'Sync Status',
+              click: () => {
+                createWindow({ syncStatus: true });
+              },
+            },
+            {
+              label: 'Storage Inspector',
+              click: () => {
+                void (async () => {
+                  if (!database) return;
+
+                  // Get all SDs
+                  const sds = await database.getAllStorageDirs();
+                  if (sds.length === 0) return;
+
+                  // If only one SD, open inspector directly
+                  if (sds.length === 1 && sds[0]) {
+                    const sd = sds[0];
+                    createWindow({
+                      storageInspector: true,
+                      sdId: sd.id,
+                      sdPath: sd.path,
+                      sdName: sd.name,
+                    });
+                    return;
+                  }
+
+                  // Multiple SDs - open picker window
+                  createWindow({
+                    sdPicker: true,
+                  });
+                })();
+              },
+            },
+            { type: 'separator' as const },
             {
               label: 'Reload Note from CRDT Logs',
               click: () => {
@@ -447,92 +455,109 @@ export function createMenu(deps: MenuDependencies): void {
                   },
                 ]
               : []),
-          ],
-        },
-        { type: 'separator' },
-        {
-          label: 'Reindex Notes',
-          click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('menu:reindexNotes');
-            }
-          },
-        },
-        { type: 'separator' },
-        {
-          label: 'Web Server',
-          submenu: [
-            {
-              id: 'web-server-toggle',
-              label: webServerManager?.isRunning() ? 'Stop Server' : 'Start Server',
-              click: () => {
-                void (async () => {
-                  if (!webServerManager) return;
-                  if (webServerManager.isRunning()) {
-                    await webServerManager.stop();
-                    console.log('[Menu] Web server stopped');
-                  } else {
-                    const status = await webServerManager.start();
-                    console.log(`[Menu] Web server started at ${status.url}`);
-                    // Copy connection info to clipboard
-                    if (mainWindow && status.url && status.token) {
-                      const connectionUrl = `${status.url}?token=${status.token}`;
-                      clipboard.writeText(connectionUrl);
-                      mainWindow.webContents.send('notification:show', {
-                        title: 'Web Server Started',
-                        body: `URL copied to clipboard: ${status.url}`,
-                      });
-                    }
-                  }
-                  // Refresh menu to update label
-                  createMenu(deps);
-                })();
-              },
-            },
             { type: 'separator' as const },
             {
-              label: 'Show Connection Info',
-              enabled: webServerManager?.isRunning() ?? false,
+              label: 'Reindex Notes',
               click: () => {
-                if (mainWindow && webServerManager?.isRunning()) {
-                  const status = webServerManager.getStatus();
-                  mainWindow.webContents.send('menu:webServerInfo', status);
+                if (mainWindow) {
+                  mainWindow.webContents.send('menu:reindexNotes');
                 }
               },
             },
-            {
-              label: 'Copy Connection URL',
-              enabled: webServerManager?.isRunning() ?? false,
-              click: () => {
-                if (webServerManager?.isRunning()) {
-                  const status = webServerManager.getStatus();
-                  const connectionUrl = `${status.url}?token=${status.token}`;
-                  clipboard.writeText(connectionUrl);
-                  if (mainWindow) {
-                    mainWindow.webContents.send('notification:show', {
-                      title: 'Connection URL Copied',
-                      body: 'URL with token copied to clipboard',
-                    });
-                  }
-                }
-              },
-            },
+            // Web Server - only shown when webServer feature flag is enabled
+            ...(featureFlags?.webServer
+              ? [
+                  { type: 'separator' as const },
+                  {
+                    label: 'Web Server',
+                    submenu: [
+                      {
+                        id: 'web-server-toggle',
+                        label: webServerManager?.isRunning() ? 'Stop Server' : 'Start Server',
+                        click: () => {
+                          void (async () => {
+                            if (!webServerManager) return;
+                            if (webServerManager.isRunning()) {
+                              await webServerManager.stop();
+                              console.log('[Menu] Web server stopped');
+                            } else {
+                              const status = await webServerManager.start();
+                              console.log(`[Menu] Web server started at ${status.url}`);
+                              // Copy connection info to clipboard
+                              if (mainWindow && status.url && status.token) {
+                                const connectionUrl = `${status.url}?token=${status.token}`;
+                                clipboard.writeText(connectionUrl);
+                                mainWindow.webContents.send('notification:show', {
+                                  title: 'Web Server Started',
+                                  body: `URL copied to clipboard: ${status.url}`,
+                                });
+                              }
+                            }
+                            // Refresh menu to update label
+                            createMenu(deps);
+                          })();
+                        },
+                      },
+                      { type: 'separator' as const },
+                      {
+                        label: 'Show Connection Info',
+                        enabled: webServerManager?.isRunning() ?? false,
+                        click: () => {
+                          if (mainWindow && webServerManager?.isRunning()) {
+                            const status = webServerManager.getStatus();
+                            mainWindow.webContents.send('menu:webServerInfo', status);
+                          }
+                        },
+                      },
+                      {
+                        label: 'Copy Connection URL',
+                        enabled: webServerManager?.isRunning() ?? false,
+                        click: () => {
+                          if (webServerManager?.isRunning()) {
+                            const status = webServerManager.getStatus();
+                            const connectionUrl = `${status.url}?token=${status.token}`;
+                            clipboard.writeText(connectionUrl);
+                            if (mainWindow) {
+                              mainWindow.webContents.send('notification:show', {
+                                title: 'Connection URL Copied',
+                                body: 'URL with token copied to clipboard',
+                              });
+                            }
+                          }
+                        },
+                      },
+                      { type: 'separator' as const },
+                      {
+                        label: 'Regenerate Token',
+                        enabled: webServerManager !== null,
+                        click: () => {
+                          void (async () => {
+                            if (webServerManager) {
+                              await webServerManager.regenerateToken();
+                              if (mainWindow) {
+                                mainWindow.webContents.send('notification:show', {
+                                  title: 'Token Regenerated',
+                                  body: 'A new access token has been generated. All connected clients will need to reconnect.',
+                                });
+                              }
+                            }
+                          })();
+                        },
+                      },
+                    ],
+                  },
+                ]
+              : []),
             { type: 'separator' as const },
             {
-              label: 'Regenerate Token',
-              enabled: webServerManager !== null,
+              label: 'Feature Flags...',
               click: () => {
-                void (async () => {
-                  if (webServerManager) {
-                    await webServerManager.regenerateToken();
-                    if (mainWindow) {
-                      mainWindow.webContents.send('notification:show', {
-                        title: 'Token Regenerated',
-                        body: 'A new access token has been generated. All connected clients will need to reconnect.',
-                      });
-                    }
-                  }
-                })();
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('menu:featureFlags');
+                } else if (mainWindow) {
+                  mainWindow.webContents.send('menu:featureFlags');
+                }
               },
             },
           ],

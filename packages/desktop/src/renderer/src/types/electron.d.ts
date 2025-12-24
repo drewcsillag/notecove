@@ -584,6 +584,7 @@ declare global {
         onReloadFromCRDTLogs: (callback: () => void) => () => void;
         onReindexNotes: (callback: () => void) => () => void;
         onStorageInspector: (callback: () => void) => () => void;
+        onFeatureFlags: (callback: () => void) => () => void;
       };
 
       tools: {
@@ -1224,6 +1225,36 @@ declare global {
          * Called when any window changes the theme (via menu or Settings).
          */
         onChanged: (callback: (theme: 'light' | 'dark') => void) => () => void;
+      };
+
+      /** Feature flags operations for experimental features */
+      featureFlags: {
+        /** Get all feature flags with their current values and metadata */
+        getAll: () => Promise<
+          {
+            flag: 'telemetry' | 'viewHistory' | 'webServer';
+            enabled: boolean;
+            metadata: {
+              name: string;
+              description: string;
+              requiresRestart: boolean;
+            };
+          }[]
+        >;
+        /** Get a specific feature flag value */
+        get: (flag: 'telemetry' | 'viewHistory' | 'webServer') => Promise<boolean>;
+        /** Set a feature flag value */
+        set: (
+          flag: 'telemetry' | 'viewHistory' | 'webServer',
+          enabled: boolean
+        ) => Promise<{ success: boolean; requiresRestart: boolean }>;
+        /** Subscribe to feature flag changes */
+        onChange: (
+          callback: (data: {
+            flag: 'telemetry' | 'viewHistory' | 'webServer';
+            enabled: boolean;
+          }) => void
+        ) => () => void;
       };
     };
   }

@@ -231,6 +231,15 @@ export const menuApi = {
       ipcRenderer.removeListener('menu:storageInspector', listener);
     };
   },
+  onFeatureFlags: (callback: () => void): (() => void) => {
+    const listener = (): void => {
+      callback();
+    };
+    ipcRenderer.on('menu:featureFlags', listener);
+    return () => {
+      ipcRenderer.removeListener('menu:featureFlags', listener);
+    };
+  },
 };
 
 export const shutdownApi = {

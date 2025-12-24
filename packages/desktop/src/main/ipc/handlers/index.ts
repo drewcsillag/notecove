@@ -50,6 +50,10 @@ import {
 } from './misc-handlers';
 import { registerHistoryHandlers, unregisterHistoryHandlers } from './history-handlers';
 import { registerCommentHandlers, unregisterCommentHandlers } from './comment-handlers';
+import {
+  registerFeatureFlagHandlers,
+  unregisterFeatureFlagHandlers,
+} from './feature-flag-handlers';
 
 // Re-export types for external use
 export type {
@@ -227,6 +231,7 @@ export class IPCHandlers {
     registerExportImportHandlers(this.ctx);
     registerHistoryHandlers(this.ctx);
     registerCommentHandlers(this.ctx);
+    registerFeatureFlagHandlers(this.ctx);
     registerMiscHandlers(this.ctx);
   }
 
@@ -248,6 +253,7 @@ export class IPCHandlers {
     unregisterExportImportHandlers();
     unregisterHistoryHandlers();
     unregisterCommentHandlers();
+    unregisterFeatureFlagHandlers();
     unregisterMiscHandlers();
   }
 }

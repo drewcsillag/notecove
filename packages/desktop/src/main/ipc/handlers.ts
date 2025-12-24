@@ -46,6 +46,11 @@ import {
   SyncDirectoryStructure,
   AppStateKey,
   type DiscoveredImage,
+  FeatureFlag,
+  FEATURE_FLAG_METADATA,
+  getAllFeatureFlags,
+  isValidFeatureFlag,
+  type FeatureFlagMetadata,
 } from '@notecove/shared';
 import type { ConfigManager } from '../config/manager';
 import { ThumbnailGenerator, type ThumbnailResult } from '../thumbnail';
@@ -101,6 +106,11 @@ export type ClearSkippedEntriesForNoteFn = (noteId: string, sdId: string) => voi
 export type OnUserSettingsChangedFn = (key: string, value: string) => Promise<void>;
 
 /**
+ * Callback type for stopping the web server when feature flag is disabled
+ */
+export type StopWebServerFn = () => Promise<void>;
+
+/**
  * User info for @-mentions autocomplete
  */
 export interface MentionUser {
@@ -113,7 +123,7 @@ import {
   type ReconstructionPoint,
   TimelineBuilder,
 } from '@notecove/shared/history';
-import { getTelemetryManager } from '../telemetry/config';
+import { getTelemetryManager, shutdownTelemetry, initializeTelemetry } from '../telemetry/config';
 import type { NoteMoveManager } from '../note-move-manager';
 import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
 import type { DiagnosticsManager } from '../diagnostics-manager';
@@ -170,7 +180,8 @@ export class IPCHandlers {
     private skipStaleEntry?: SkipStaleEntryFn,
     private retryStaleEntry?: RetryStaleEntryFn,
     private clearSkippedEntriesForNote?: ClearSkippedEntriesForNoteFn,
-    private onUserSettingsChanged?: OnUserSettingsChangedFn
+    private onUserSettingsChanged?: OnUserSettingsChangedFn,
+    private stopWebServer?: StopWebServerFn
   ) {
     // Initialize thumbnail generator with cache directory in userData
     const thumbnailCacheDir = path.join(app.getPath('userData'), 'thumbnails');
@@ -470,6 +481,11 @@ export class IPCHandlers {
     // Telemetry operations
     ipcMain.handle('telemetry:getSettings', this.handleGetTelemetrySettings.bind(this));
     ipcMain.handle('telemetry:updateSettings', this.handleUpdateTelemetrySettings.bind(this));
+
+    // Feature flags operations
+    ipcMain.handle('featureFlags:getAll', this.handleGetAllFeatureFlags.bind(this));
+    ipcMain.handle('featureFlags:get', this.handleGetFeatureFlag.bind(this));
+    ipcMain.handle('featureFlags:set', this.handleSetFeatureFlag.bind(this));
 
     // Recovery operations
     ipcMain.handle('recovery:getStaleMoves', this.handleGetStaleMoves.bind(this));
@@ -2867,6 +2883,81 @@ export class IPCHandlers {
     console.log(
       `[Telemetry] Settings updated: consoleMetricsEnabled=${settings.consoleMetricsEnabled ?? 'unchanged'}, remoteMetricsEnabled=${settings.remoteMetricsEnabled ?? 'unchanged'}`
     );
+  }
+
+  // Feature flag handlers
+
+  /**
+   * Feature flag info returned to renderer
+   */
+  private async handleGetAllFeatureFlags(): Promise<
+    {
+      flag: FeatureFlag;
+      enabled: boolean;
+      metadata: FeatureFlagMetadata;
+    }[]
+  > {
+    const flags = await this.configManager.getFeatureFlags();
+
+    return getAllFeatureFlags().map((flag) => ({
+      flag,
+      enabled: flags[flag],
+      metadata: FEATURE_FLAG_METADATA[flag],
+    }));
+  }
+
+  /**
+   * Get a specific feature flag value
+   */
+  private async handleGetFeatureFlag(_event: IpcMainInvokeEvent, flag: string): Promise<boolean> {
+    if (!isValidFeatureFlag(flag)) {
+      throw new Error(`Invalid feature flag: ${flag}`);
+    }
+
+    return await this.configManager.getFeatureFlag(flag);
+  }
+
+  /**
+   * Set a feature flag value and broadcast the change
+   */
+  private async handleSetFeatureFlag(
+    _event: IpcMainInvokeEvent,
+    flag: string,
+    enabled: boolean
+  ): Promise<{ success: boolean; requiresRestart: boolean }> {
+    if (!isValidFeatureFlag(flag)) {
+      throw new Error(`Invalid feature flag: ${flag}`);
+    }
+
+    await this.configManager.setFeatureFlag(flag, enabled);
+
+    // Handle telemetry flag changes - stop/start telemetry immediately
+    if (flag === FeatureFlag.Telemetry) {
+      if (enabled) {
+        console.log('[FeatureFlags] Telemetry flag enabled, initializing telemetry...');
+        await initializeTelemetry({
+          devMode: process.env['NODE_ENV'] !== 'production',
+        });
+      } else {
+        console.log('[FeatureFlags] Telemetry flag disabled, shutting down telemetry...');
+        await shutdownTelemetry();
+      }
+    }
+
+    // Handle web server flag changes - stop server immediately when disabled
+    if (flag === FeatureFlag.WebServer && !enabled && this.stopWebServer) {
+      console.log('[FeatureFlags] Web server flag disabled, stopping server...');
+      await this.stopWebServer();
+    }
+
+    // Broadcast the change to all windows
+    this.broadcastToAll('featureFlags:changed', { flag, enabled });
+
+    const metadata = FEATURE_FLAG_METADATA[flag as FeatureFlag];
+    return {
+      success: true,
+      requiresRestart: metadata.requiresRestart,
+    };
   }
 
   /**

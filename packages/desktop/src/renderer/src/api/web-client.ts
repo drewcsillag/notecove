@@ -758,6 +758,7 @@ export const webClient: typeof window.electronAPI = {
     onReloadFromCRDTLogs: noopSubscription,
     onReindexNotes: noopSubscription,
     onStorageInspector: noopSubscription,
+    onFeatureFlags: noopSubscription,
   },
 
   tools: {
@@ -1079,6 +1080,14 @@ export const webClient: typeof window.electronAPI = {
   theme: {
     set: browserNotAvailable('theme.set'),
     onChanged: noopSubscription,
+  },
+
+  // Feature flags are not available in browser mode (desktop-only feature)
+  featureFlags: {
+    getAll: browserNotAvailable('featureFlags.getAll'),
+    get: browserNotAvailable('featureFlags.get'),
+    set: browserNotAvailable('featureFlags.set'),
+    onChange: noopSubscription,
   },
 };
 

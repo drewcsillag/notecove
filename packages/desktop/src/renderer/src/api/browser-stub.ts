@@ -196,6 +196,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onReloadFromCRDTLogs: stubEventSubscription,
     onReindexNotes: stubEventSubscription,
     onStorageInspector: stubEventSubscription,
+    onFeatureFlags: stubEventSubscription,
   },
 
   tools: {
@@ -332,6 +333,13 @@ export const browserApiStub: typeof window.electronAPI = {
   theme: {
     set: notImplemented('theme.set'),
     onChanged: stubEventSubscription,
+  },
+
+  featureFlags: {
+    getAll: notImplemented('featureFlags.getAll'),
+    get: notImplemented('featureFlags.get'),
+    set: notImplemented('featureFlags.set'),
+    onChange: stubEventSubscription,
   },
 };
 

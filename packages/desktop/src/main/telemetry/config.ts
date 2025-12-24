@@ -42,7 +42,7 @@ export interface TelemetryConfig {
 }
 
 export const DEFAULT_TELEMETRY_CONFIG: TelemetryConfig = {
-  consoleMetricsEnabled: true,
+  consoleMetricsEnabled: false,
   remoteMetricsEnabled: false,
   datadogEndpoint: 'https://api.datadoghq.com',
   exportIntervalMs: 60000, // 1 minute

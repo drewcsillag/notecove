@@ -105,6 +105,10 @@ export interface MockDatabase {
 export interface MockConfigManager {
   getDatabasePath: jest.Mock;
   setDatabasePath: jest.Mock;
+  getFeatureFlags: jest.Mock;
+  getFeatureFlag: jest.Mock;
+  setFeatureFlag: jest.Mock;
+  setFeatureFlags: jest.Mock;
 }
 
 export interface MockAppendLogManager {
@@ -268,6 +272,14 @@ export function createMockConfigManager(): MockConfigManager {
   return {
     getDatabasePath: jest.fn().mockResolvedValue('/test/path/notecove.db'),
     setDatabasePath: jest.fn().mockResolvedValue(undefined),
+    getFeatureFlags: jest.fn().mockResolvedValue({
+      telemetry: false,
+      viewHistory: false,
+      webServer: false,
+    }),
+    getFeatureFlag: jest.fn().mockResolvedValue(false),
+    setFeatureFlag: jest.fn().mockResolvedValue(undefined),
+    setFeatureFlags: jest.fn().mockResolvedValue(undefined),
   };
 }
 

@@ -145,6 +145,32 @@ const mockElectronAPI = {
     onImportMarkdown: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    onFeatureFlags: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+  },
+  featureFlags: {
+    get: jest.fn().mockResolvedValue(false),
+    getAll: jest.fn().mockResolvedValue([
+      {
+        flag: 'telemetry',
+        enabled: false,
+        metadata: { name: 'Telemetry', description: '', requiresRestart: false },
+      },
+      {
+        flag: 'viewHistory',
+        enabled: false,
+        metadata: { name: 'View History', description: '', requiresRestart: true },
+      },
+      {
+        flag: 'webServer',
+        enabled: false,
+        metadata: { name: 'Web Server', description: '', requiresRestart: true },
+      },
+    ]),
+    onChange: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   export: {
     selectDirectory: jest.fn(() => Promise.resolve(null)),

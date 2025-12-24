@@ -2,9 +2,11 @@
  * Settings Dialog Tests
  */
 
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { SettingsDialog } from '../SettingsDialog';
+import { FeatureFlagsProvider } from '../../../contexts/FeatureFlagsContext';
 
 // Mock window.electronAPI
 const mockElectronAPI = {
@@ -33,7 +35,37 @@ const mockElectronAPI = {
       handle: '@testuser',
     }),
   },
+  featureFlags: {
+    get: jest.fn().mockResolvedValue(true),
+    getAll: jest.fn().mockResolvedValue([
+      {
+        flag: 'telemetry',
+        enabled: true,
+        metadata: { name: 'Telemetry', description: '', requiresRestart: false },
+      },
+      {
+        flag: 'viewHistory',
+        enabled: true,
+        metadata: { name: 'View History', description: '', requiresRestart: true },
+      },
+      {
+        flag: 'webServer',
+        enabled: true,
+        metadata: { name: 'Web Server', description: '', requiresRestart: true },
+      },
+    ]),
+    onChange: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
+  },
 };
+
+/**
+ * Wrapper that provides FeatureFlagsProvider context for tests
+ */
+function TestWrapper({ children }: { children: React.ReactNode }) {
+  return <FeatureFlagsProvider>{children}</FeatureFlagsProvider>;
+}
 
 // Set up global mocks before tests
 beforeAll(() => {
@@ -86,23 +118,29 @@ describe('SettingsDialog', () => {
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
   });
 
-  it('should show all tabs', () => {
+  it('should show all tabs when feature flags are enabled', async () => {
     const onClose = jest.fn();
     render(
-      <SettingsDialog
-        open={true}
-        onClose={onClose}
-        themeMode="light"
-        onThemeChange={mockOnThemeChange}
-      />
+      <TestWrapper>
+        <SettingsDialog
+          open={true}
+          onClose={onClose}
+          themeMode="light"
+          onThemeChange={mockOnThemeChange}
+        />
+      </TestWrapper>
     );
 
-    expect(screen.getByText('Storage Directories')).toBeInTheDocument();
-    expect(screen.getByText('User')).toBeInTheDocument();
-    expect(screen.getByText('Appearance')).toBeInTheDocument();
-    expect(screen.getByText('Telemetry')).toBeInTheDocument();
-    expect(screen.getByText('Web Server')).toBeInTheDocument();
-    expect(screen.getByText('Recovery')).toBeInTheDocument();
+    // Wait for feature flags to load (async)
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Telemetry' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('tab', { name: 'Storage Directories' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'User' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Appearance' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Web Server' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Recovery' })).toBeInTheDocument();
   });
 
   it('should call onClose when close button is clicked', () => {

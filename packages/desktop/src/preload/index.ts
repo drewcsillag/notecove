@@ -32,6 +32,7 @@ import {
   testingApi,
   webServerApi,
   inspectorApi,
+  featureFlagsApi,
 } from './api/misc-api';
 import { themeApi } from './api/theme-api';
 
@@ -137,6 +138,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Theme operations
   theme: themeApi,
+
+  // Feature flags operations
+  featureFlags: featureFlagsApi,
 });
 
 // Set window.__NOTECOVE_PROFILE__ for DevTools inspection

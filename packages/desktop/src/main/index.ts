@@ -17,6 +17,7 @@ import {
   type SDType,
   ProfileLock,
   AppStateKey,
+  type FeatureFlagConfig,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc/handlers';
 import type { SyncStatus, StaleSyncEntry } from './ipc/types';
@@ -77,6 +78,9 @@ let freshStartRequested = false;
 
 // SD Watcher Manager: manages all watchers and sync state for Storage Directories
 let sdWatcherManager: SDWatcherManager | null = null;
+
+// Feature flags - cached at startup for menu creation
+let cachedFeatureFlags: FeatureFlagConfig | null = null;
 
 /**
  * Wrapper for createWindow that manages global state
@@ -188,6 +192,7 @@ function createMenu(): void {
     windowStateManager,
     selectedProfileId,
     createWindow,
+    ...(cachedFeatureFlags ? { featureFlags: cachedFeatureFlags } : {}),
   };
   createMenuImpl(deps);
 }
@@ -212,12 +217,27 @@ void app.whenReady().then(async () => {
       console.log(JSON.stringify(config, null, 2));
     }
 
-    // Initialize telemetry (local mode always on, remote opt-in)
-    await initializeTelemetry({
-      remoteMetricsEnabled: false, // Will be controlled via settings panel
-      devMode: process.env['NODE_ENV'] !== 'production',
-    });
-    console.log('[Telemetry] OpenTelemetry initialized');
+    // Initialize config manager early (needed for feature flag check)
+    // This is also initialized in initializeDatabase, but we need it here first
+    if (!configManager) {
+      const configPath = process.env['TEST_CONFIG_PATH'] ?? undefined;
+      configManager = new ConfigManager(configPath);
+    }
+
+    // Load and cache all feature flags at startup (for menu creation and feature gating)
+    cachedFeatureFlags = await configManager.getFeatureFlags();
+    console.log('[FeatureFlags] Loaded at startup:', cachedFeatureFlags);
+
+    // Check telemetry feature flag before initializing
+    if (cachedFeatureFlags.telemetry) {
+      await initializeTelemetry({
+        remoteMetricsEnabled: false, // Will be controlled via settings panel
+        devMode: process.env['NODE_ENV'] !== 'production',
+      });
+      console.log('[Telemetry] OpenTelemetry initialized');
+    } else {
+      console.log('[Telemetry] Feature flag disabled, skipping initialization');
+    }
 
     // Debug logging for environment (test mode only)
     if (process.env['NODE_ENV'] === 'test') {
@@ -598,9 +618,7 @@ void app.whenReady().then(async () => {
     console.log('[Init] BackupManager initialized');
 
     // Initialize IPC handlers (pass createWindow for testing support and SD callback)
-    if (!configManager) {
-      throw new Error('ConfigManager not initialized');
-    }
+    // Note: configManager is guaranteed to be initialized earlier in this function
     ipcHandlers = new IPCHandlers(
       crdtManager,
       database,
@@ -809,6 +827,13 @@ void app.whenReady().then(async () => {
               .map((sd: { id: string; path: string }) => sd.path),
           ];
           await profilePresenceManager.writePresenceToAllSDs(allSDPaths);
+        }
+      },
+      // stopWebServer callback - stop web server when feature flag is disabled
+      async (): Promise<void> => {
+        if (webServerManager?.isRunning()) {
+          await webServerManager.stop();
+          console.log('[FeatureFlags] Web server stopped');
         }
       }
     );

@@ -29,6 +29,7 @@ import { TelemetrySettings } from './TelemetrySettings';
 import { RecoverySettings } from './RecoverySettings';
 import { WebServerSettings } from './WebServerSettings';
 import { isElectron } from '../../utils/platform';
+import { useFeatureFlags } from '../../contexts/FeatureFlagsContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -68,11 +69,13 @@ export interface SettingsDialogProps {
 
 /**
  * Tab configuration for settings dialog.
- * Some tabs are only available in Electron mode.
+ * Some tabs are only available in Electron mode or require feature flags.
  */
 interface TabConfig {
   label: string;
   electronOnly: boolean;
+  /** Feature flag required for this tab (if any) */
+  featureFlag?: 'telemetry' | 'viewHistory' | 'webServer';
   component: React.ReactNode;
 }
 
@@ -84,6 +87,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const inElectron = isElectron();
+  const { isEnabled } = useFeatureFlags();
 
   // Define all tabs with their Electron-only status
   const allTabs: TabConfig[] = useMemo(
@@ -106,11 +110,13 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       {
         label: 'Telemetry',
         electronOnly: true,
+        featureFlag: 'telemetry',
         component: <TelemetrySettings />,
       },
       {
         label: 'Web Server',
         electronOnly: true,
+        featureFlag: 'webServer',
         component: <WebServerSettings />,
       },
       {
@@ -122,10 +128,17 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     [themeMode, onThemeChange]
   );
 
-  // Filter tabs based on platform
+  // Filter tabs based on platform and feature flags
   const visibleTabs = useMemo(
-    () => (inElectron ? allTabs : allTabs.filter((tab) => !tab.electronOnly)),
-    [allTabs, inElectron]
+    () =>
+      allTabs.filter((tab) => {
+        // Check platform requirement
+        if (tab.electronOnly && !inElectron) return false;
+        // Check feature flag requirement
+        if (tab.featureFlag && !isEnabled(tab.featureFlag)) return false;
+        return true;
+      }),
+    [allTabs, inElectron, isEnabled]
   );
 
   // Reset to first tab when dialog closes
