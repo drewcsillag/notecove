@@ -8,6 +8,20 @@
 import { join } from 'path';
 import * as fs from 'fs';
 import { app } from 'electron';
+
+/**
+ * Check if app.getAppPath() returns dist-electron/main (vs package root).
+ *
+ * This varies by launch method:
+ * - Dev mode (`pnpm dev`): package root
+ * - Test with `args: ['.']`: package root
+ * - Test with explicit main path: dist-electron/main
+ * - Production (asar): inside asar, treat like dist-electron/main
+ */
+function isAppPathInDistElectronMain(): boolean {
+  const appPath = app.getAppPath();
+  return appPath.endsWith('dist-electron/main') || appPath.includes('.asar');
+}
 import { WebServer, ConnectedClientInfo } from './server';
 import { AuthManager } from './auth';
 import { TLSManager, TLSCredentials, CertificateInfo } from './tls';
@@ -121,10 +135,19 @@ export class WebServerManager {
     setRouteContext({ services });
 
     // Path to browser bundle
-    // Use app.getAppPath() for reliable resolution regardless of chunking
-    const distBrowserPath = app.isPackaged
-      ? join(process.resourcesPath, 'dist-browser')
-      : join(app.getAppPath(), 'dist-browser');
+    // Resolution varies by launch method - see isAppPathInDistElectronMain()
+    let distBrowserPath: string;
+    if (app.isPackaged) {
+      distBrowserPath = join(process.resourcesPath, 'dist-browser');
+    } else if (isAppPathInDistElectronMain()) {
+      // Launched with explicit main path (e.g., E2E tests)
+      // app.getAppPath() = dist-electron/main, so go up two levels
+      distBrowserPath = join(app.getAppPath(), '..', '..', 'dist-browser');
+    } else {
+      // Dev mode or test with args: ['.']
+      // app.getAppPath() = package root
+      distBrowserPath = join(app.getAppPath(), 'dist-browser');
+    }
 
     // Determine host based on localhostOnly setting
     const host = localhostOnly ? '127.0.0.1' : '0.0.0.0';

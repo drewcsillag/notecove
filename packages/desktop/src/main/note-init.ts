@@ -5,7 +5,6 @@
 
 import { app } from 'electron';
 import { join } from 'path';
-import { is } from '@electron-toolkit/utils';
 import type { Database } from '@notecove/shared';
 import { markdownToProsemirror, prosemirrorJsonToYXmlFragment } from '@notecove/shared';
 import type { CRDTManager } from './crdt';
@@ -13,18 +12,36 @@ import * as fs from 'fs/promises';
 import * as Y from 'yjs';
 
 /**
+ * Check if app.getAppPath() returns dist-electron/main (vs package root).
+ *
+ * This varies by launch method:
+ * - Dev mode (`pnpm dev`): package root
+ * - Test with `args: ['.']`: package root
+ * - Test with explicit main path: dist-electron/main
+ * - Production (asar): inside asar, treat like dist-electron/main
+ */
+function isAppPathInDistElectronMain(): boolean {
+  const appPath = app.getAppPath();
+  return appPath.endsWith('dist-electron/main') || appPath.includes('.asar');
+}
+
+/**
  * Get the path to a bundled resource file
- * In development, resources are in the project's resources directory
+ * In development/test, resources are in the project's resources directory
  * In production, they're in the app's resources folder
  */
 function getResourcePath(filename: string): string {
-  if (is.dev) {
-    // In development, resources are in packages/desktop/resources
-    // Use app.getAppPath() for reliable resolution regardless of chunking
-    return join(app.getAppPath(), 'resources', filename);
-  } else {
-    // In production, resources are in the app's resources folder
+  if (app.isPackaged) {
+    // Production: resources are in the app's resources folder
     return join(process.resourcesPath, 'resources', filename);
+  } else if (isAppPathInDistElectronMain()) {
+    // E2E tests with explicit main path
+    // app.getAppPath() = dist-electron/main, go up two levels
+    return join(app.getAppPath(), '..', '..', 'resources', filename);
+  } else {
+    // Dev mode or test with args: ['.']
+    // app.getAppPath() = package root
+    return join(app.getAppPath(), 'resources', filename);
   }
 }
 
