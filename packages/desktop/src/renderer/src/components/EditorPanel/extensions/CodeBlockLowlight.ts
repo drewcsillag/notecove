@@ -82,6 +82,9 @@ export const NotecoveCodeBlock = CodeBlockLowlight.extend({
 
   addKeyboardShortcuts() {
     return {
+      // IMPORTANT: Inherit parent keyboard shortcuts (Enter, ArrowDown, Backspace)
+      // These enable exiting the code block at document end
+      ...this.parent?.(),
       'Mod-Shift-c': () => {
         return this.editor.commands.toggleCodeBlock();
       },

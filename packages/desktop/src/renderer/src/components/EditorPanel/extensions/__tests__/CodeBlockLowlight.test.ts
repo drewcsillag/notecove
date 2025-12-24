@@ -231,6 +231,61 @@ describe('NotecoveCodeBlock Extension', () => {
     });
   });
 
+  describe('Exit Code Block', () => {
+    it('should exit code block at document end using exitCode command', () => {
+      // Set up: code block is the only (and last) block in document
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          {
+            type: 'codeBlock',
+            attrs: { language: 'javascript' },
+            content: [{ type: 'text', text: 'const x = 1;' }],
+          },
+        ],
+      });
+
+      // Position cursor at end of code block
+      const endPos = editor.state.doc.content.size - 1;
+      editor.commands.setTextSelection(endPos);
+
+      // Verify we're in the code block
+      const $from = editor.state.selection.$from;
+      expect($from.parent.type.name).toBe('codeBlock');
+
+      // Execute exitCode command (what arrow-down and triple-enter use)
+      const result = editor.commands.exitCode();
+
+      // Should have successfully exited
+      expect(result).toBe(true);
+
+      // Document should now have 2 nodes: codeBlock and a new paragraph
+      expect(editor.state.doc.childCount).toBe(2);
+      expect(editor.state.doc.child(0).type.name).toBe('codeBlock');
+      expect(editor.state.doc.child(1).type.name).toBe('paragraph');
+
+      // Cursor should be in the new paragraph
+      const newSelection = editor.state.selection.$from;
+      expect(newSelection.parent.type.name).toBe('paragraph');
+    });
+
+    it('should have exitOnTripleEnter option enabled', () => {
+      // The extension should inherit the Enter handler from parent CodeBlock extension
+      // This option controls whether pressing Enter 3 times exits the code block
+      const extension = editor.extensionManager.extensions.find((ext) => ext.name === 'codeBlock');
+      expect(extension).toBeDefined();
+      expect(extension?.options.exitOnTripleEnter).toBe(true);
+    });
+
+    it('should have exitOnArrowDown option enabled', () => {
+      // The extension should inherit the ArrowDown handler from parent CodeBlock extension
+      // This option controls whether ArrowDown at the end exits the code block
+      const extension = editor.extensionManager.extensions.find((ext) => ext.name === 'codeBlock');
+      expect(extension).toBeDefined();
+      expect(extension?.options.exitOnArrowDown).toBe(true);
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle empty code blocks', () => {
       editor.commands.setContent({
