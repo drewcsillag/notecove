@@ -8,21 +8,37 @@ import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
 
 /**
+ * Check if app.getAppPath() returns dist-electron/main (vs package root).
+ *
+ * This varies by launch method:
+ * - Dev mode (`pnpm dev`): package root
+ * - Test with `args: ['.']`: package root
+ * - Test with explicit main path: dist-electron/main
+ * - Production (asar): inside asar, treat like dist-electron/main
+ */
+function isAppPathInDistElectronMain(): boolean {
+  const appPath = app.getAppPath();
+  return appPath.endsWith('dist-electron/main') || appPath.includes('.asar');
+}
+
+/**
  * Get the path to the preload script.
- * app.getAppPath() returns dist-electron/main, so we go up one level
- * to get to dist-electron, then into preload.
  */
 function getPreloadPath(): string {
-  return join(app.getAppPath(), '..', 'preload/index.js');
+  if (isAppPathInDistElectronMain()) {
+    return join(app.getAppPath(), '..', 'preload/index.js');
+  }
+  return join(app.getAppPath(), 'dist-electron/preload/index.js');
 }
 
 /**
  * Get the path to the renderer HTML file.
- * app.getAppPath() returns dist-electron/main, so we go up one level
- * to get to dist-electron, then into renderer.
  */
 function getRendererPath(): string {
-  return join(app.getAppPath(), '..', 'renderer/index.html');
+  if (isAppPathInDistElectronMain()) {
+    return join(app.getAppPath(), '..', 'renderer/index.html');
+  }
+  return join(app.getAppPath(), 'dist-electron/renderer/index.html');
 }
 import type { Database } from '@notecove/shared';
 import { WindowStateManager } from './window-state-manager';
