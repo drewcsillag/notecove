@@ -583,16 +583,10 @@ export class ActivitySync {
       return true; // Return true to update watermark and skip this entry
     }
 
-    // Check if note was permanently deleted before starting retry loop
-    // This prevents blocking app startup when activity log has orphaned entries
-    if (this.callbacks.checkNoteExists) {
-      const exists = await this.callbacks.checkNoteExists(noteId);
-      if (!exists) {
-        console.log(`[ActivitySync] Note ${noteId} was permanently deleted, skipping sync`);
-        // Return true to update watermark and skip this entry
-        return true;
-      }
-    }
+    // NOTE: We don't check for permanent deletion upfront anymore.
+    // A note might not exist on disk yet because the CRDT files haven't synced.
+    // Instead, we rely on the retry loop to wait for CRDT files.
+    // The retry loop will timeout after all retries if files never appear.
 
     const startTime = Date.now();
 
@@ -687,8 +681,19 @@ export class ActivitySync {
       }
     }
 
-    // Timeout - log warning but don't fail
-    // File will be retried on next ActivitySync cycle
+    // Timeout - check if note was permanently deleted (not just slow to sync)
+    // If the note was permanently deleted, we should update watermark and skip
+    if (this.callbacks.checkNoteExists) {
+      const exists = await this.callbacks.checkNoteExists(noteId);
+      if (!exists) {
+        console.log(
+          `[ActivitySync] Note ${noteId} does not exist on disk after ${delays.length} attempts, treating as permanently deleted`
+        );
+        return true; // Update watermark and skip this entry
+      }
+    }
+
+    // Log warning but don't fail - file will be retried on next ActivitySync cycle
     console.warn(
       `[ActivitySync] Timeout after ${delays.length} attempts waiting for note ${noteId} sequence ${instanceSeq}. File may sync later.`
     );

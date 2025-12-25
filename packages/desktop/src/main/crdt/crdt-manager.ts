@@ -192,7 +192,6 @@ export class CRDTManagerImpl implements CRDTManager {
       // Skip handling if this update came from reload (to avoid duplicate writes)
       // The updates from reload are already on disk, we just need to broadcast them
       if (origin === 'reload') {
-        console.log(`[CRDT Manager] Skipping disk write for reload origin on note ${noteId}`);
         // Broadcast to renderer windows
         this.broadcastUpdate(noteId, update);
         return;
@@ -202,7 +201,6 @@ export class CRDTManagerImpl implements CRDTManager {
       // The update was already written to disk by applyUpdate(), so we don't need to
       // call handleUpdate() which would write it again (double-write bug fix)
       if (origin === 'ipc') {
-        console.log(`[CRDT Manager] Skipping disk write for ipc origin on note ${noteId}`);
         // Don't broadcast here - applyUpdate() handles broadcasting after the write completes
         return;
       }
@@ -376,8 +374,11 @@ export class CRDTManagerImpl implements CRDTManager {
           const now = Date.now();
 
           // Update CRDT metadata (syncs to other machines)
-          // Use 'ipc' origin to prevent the doc.on('update') listener from double-writing
-          state.noteDoc.updateMetadata({ modified: now }, 'ipc');
+          // NOTE: We intentionally do NOT use 'ipc' origin here because we WANT
+          // this metadata update to be written to disk. The 'ipc' origin is only
+          // for incoming renderer updates (to prevent double-writes), not for
+          // updates we generate ourselves.
+          state.noteDoc.updateMetadata({ modified: now });
 
           // Update database cache
           if (this.database) {
@@ -416,9 +417,7 @@ export class CRDTManagerImpl implements CRDTManager {
       console.log(`[CRDT Manager] getVectorClock: note ${noteId} not loaded`);
       return undefined;
     }
-    const clock = state.snapshot.getVectorClock();
-    console.log(`[CRDT Manager] getVectorClock(${noteId}):`, JSON.stringify(clock));
-    return clock;
+    return state.snapshot.getVectorClock();
   }
 
   /**

@@ -45,6 +45,8 @@ export class DocumentSnapshot {
   /**
    * Create a DocumentSnapshot from encoded state and vector clock
    * Used when loading from storage or DB cache
+   * @param encodedState The Y.js state as a Uint8Array
+   * @param vectorClock The vector clock representing what's in the state
    */
   static fromStorage(encodedState: Uint8Array, vectorClock: VectorClock): DocumentSnapshot {
     const doc = new Y.Doc();

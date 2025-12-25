@@ -381,9 +381,11 @@ describe('CRDTManagerImpl - Integration', () => {
       await Promise.resolve();
       await jest.advanceTimersByTimeAsync(100);
 
-      // CRITICAL: writeNoteUpdate should be called exactly ONCE
-      // If it's called twice, the double-write bug is present
-      expect(mockStorageManager.writeNoteUpdate).toHaveBeenCalledTimes(1);
+      // writeNoteUpdate should be called TWICE:
+      // 1. The content update (from applyUpdate)
+      // 2. The metadata update (modified timestamp)
+      // Both are needed for proper cross-machine sync
+      expect(mockStorageManager.writeNoteUpdate).toHaveBeenCalledTimes(2);
     }, 10000);
   });
 
@@ -462,9 +464,12 @@ describe('CRDTManagerImpl - Integration', () => {
       // Wait for any async handlers to complete
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // CRITICAL: writeNoteUpdate should be called exactly ONCE
-      // If it's called twice, the double-write bug is still present
-      expect(realisticMockStorageManager.writeNoteUpdate).toHaveBeenCalledTimes(1);
+      // writeNoteUpdate should be called TWICE:
+      // 1. The content update (from applyUpdate)
+      // 2. The metadata update (modified timestamp, written via event handler)
+      // Both are needed for proper cross-machine sync - the metadata update must be
+      // on disk so other instances can see the modified timestamp
+      expect(realisticMockStorageManager.writeNoteUpdate).toHaveBeenCalledTimes(2);
 
       sourceDoc.destroy();
     });
@@ -589,12 +594,14 @@ describe('CRDTManagerImpl - Modified Timestamp Updates', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Verify NoteDoc.updateMetadata was called with a reasonable timestamp
-      // The second argument is 'ipc' origin to prevent double writes
+      // Note: We intentionally do NOT use 'ipc' origin here because we WANT
+      // the metadata update to be written to disk via the event handler.
+      // This is critical for cross-machine sync - the modified timestamp must
+      // be synced to other instances.
       expect(updateMetadataSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           modified: expect.any(Number),
-        }),
-        'ipc'
+        })
       );
 
       // Verify the timestamp is within expected range
