@@ -34,6 +34,16 @@ test.describe('Phase 2.6 Low Priority Settings', () => {
 
     await fs.mkdir(testStorageDir, { recursive: true });
 
+    // Enable all feature flags so Telemetry and Web Server tabs are visible
+    await fs.writeFile(
+      testConfigPath,
+      JSON.stringify(
+        { featureFlags: { telemetry: true, viewHistory: true, webServer: true } },
+        null,
+        2
+      )
+    );
+
     // Launch Electron app with test environment
     electronApp = await electron.launch({
       args: ['.'],
@@ -49,6 +59,9 @@ test.describe('Phase 2.6 Low Priority Settings', () => {
     // Wait for the main window
     window = await electronApp.firstWindow();
     await window.waitForLoadState('domcontentloaded');
+
+    // Wait for app to be fully ready (editor visible)
+    await window.waitForSelector('.ProseMirror', { timeout: 10000 });
   });
 
   test.afterEach(async () => {

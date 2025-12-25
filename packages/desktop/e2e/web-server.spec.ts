@@ -12,7 +12,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page, Browser, BrowserContext } from 'playwright';
 import { chromium } from 'playwright';
 import { join, resolve } from 'path';
-import { mkdtempSync, rmSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 
 // Check if browser bundle exists (required for web app serving)
@@ -40,6 +40,12 @@ test.beforeEach(async ({}, testInfo) => {
 
   // Create a unique temporary directory for this test's userData
   testUserDataDir = mkdtempSync(join(tmpdir(), 'notecove-webserver-e2e-'));
+
+  // Enable webServer feature flag for web server tests
+  writeFileSync(
+    join(testUserDataDir, 'config.json'),
+    JSON.stringify({ featureFlags: { webServer: true } }, null, 2)
+  );
 
   // Use a unique port based on test index to avoid conflicts
   // Base port 8765, each test gets a different port

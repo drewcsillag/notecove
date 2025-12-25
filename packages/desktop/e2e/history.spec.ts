@@ -108,6 +108,12 @@ test.describe('Note History', () => {
 
     await fs.mkdir(testStorageDir, { recursive: true });
 
+    // Enable viewHistory feature flag for history tests
+    await fs.writeFile(
+      testConfigPath,
+      JSON.stringify({ featureFlags: { viewHistory: true } }, null, 2)
+    );
+
     // Launch Electron app with test environment
     electronApp = await electron.launch({
       args: ['.'],
