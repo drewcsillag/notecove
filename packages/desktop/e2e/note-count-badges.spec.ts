@@ -124,6 +124,10 @@ test.describe('Note count badges in folder tree', () => {
   });
 
   test('should show note count badge on user folders', async () => {
+    // Click "All Notes" first to set active SD context (required for folder creation)
+    await window.locator('text=All Notes').first().click();
+    await window.waitForTimeout(500);
+
     // Create a folder
     const newFolderButton = window.locator('button[title="Create folder"]');
     await newFolderButton.click();
@@ -134,12 +138,14 @@ test.describe('Note count badges in folder tree', () => {
     const folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill('Test Folder');
     await window.keyboard.press('Enter');
-    await window.waitForTimeout(1000);
 
-    // Folder should appear with no badge initially (0 notes)
+    // Wait for dialog to close
+    await window.waitForSelector('text=Create New Folder', { state: 'hidden', timeout: 5000 });
+
+    // Wait for folder to appear in tree and be visible
     const folderNodes = getFolderTreeNodes(window);
     const testFolderNode = folderNodes.filter({ hasText: 'Test Folder' });
-    await expect(testFolderNode).toBeVisible();
+    await expect(testFolderNode).toBeVisible({ timeout: 10000 });
 
     // No badge should be visible for empty folder
     const emptyBadge = testFolderNode.locator('.MuiChip-root');

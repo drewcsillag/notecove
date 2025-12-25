@@ -237,16 +237,23 @@ test.describe('Note Info Window', () => {
   });
 
   test('Note Info window should show full folder path with SD name', async () => {
-    // Create a folder first
+    // Click "All Notes" first to set active SD context (required for folder creation)
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
+    // Create a folder
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
-    await page.waitForTimeout(500);
+    await page.waitForSelector('text=Create New Folder', { timeout: 5000 });
 
     const dialog = page.locator('div[role="dialog"]');
     const folderInput = dialog.locator('input[type="text"]');
     await folderInput.fill('Test Folder');
     await folderInput.press('Enter');
-    await page.waitForTimeout(1000);
+
+    // Wait for dialog to close and folder to appear
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden', timeout: 5000 });
+    await page.waitForSelector('text=Test Folder', { timeout: 5000 });
 
     // Click the folder to select it
     const folderItem = page.locator('text=Test Folder').first();

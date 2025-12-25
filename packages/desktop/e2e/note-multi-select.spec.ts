@@ -332,20 +332,26 @@ test.describe('Multi-Select Functionality', () => {
   });
 
   test('should move multiple notes via context menu', async () => {
-    // Create a folder first
+    // Click "All Notes" first to set active SD context (required for folder creation)
+    const allNotesFolder = window.locator('[aria-label="All Notes"]').first();
+    await allNotesFolder.click();
+    await window.waitForTimeout(500);
+
+    // Create a folder
     const createFolderButton = window.locator('button[title="Create folder"]');
     await createFolderButton.click();
-    await window.waitForTimeout(200);
+    await window.waitForSelector('text=Create New Folder', { timeout: 5000 });
 
     const folderInput = window.locator('div[role="dialog"] input[type="text"]');
     await folderInput.fill('Test Folder');
     await folderInput.press('Enter');
-    // Increased wait to ensure folder creation completes
-    await window.waitForTimeout(1000);
 
-    // Navigate to "All Notes" to ensure notes are created there, not in the new folder
+    // Wait for dialog to close and folder to appear
+    await window.waitForSelector('text=Create New Folder', { state: 'hidden', timeout: 5000 });
+    await window.waitForSelector('text=Test Folder', { timeout: 5000 });
+
+    // Navigate back to "All Notes" to ensure notes are created there, not in the new folder
     // Increased wait time to ensure folder deselection completes
-    const allNotesFolder = window.locator('[aria-label="All Notes"]').first();
     await allNotesFolder.click();
     await window.waitForTimeout(1000);
     // Verify we're on All Notes by checking the notes panel header
@@ -395,11 +401,12 @@ test.describe('Multi-Select Functionality', () => {
     // Click Move button
     const moveButton = window.locator('div[role="dialog"] button:has-text("Move")');
     await moveButton.click();
-    await window.waitForTimeout(500);
 
-    // Verify notes disappeared from "All Notes" view (3 notes - 2 moved = 1 left)
-    const currentCount = await notes.count();
-    expect(currentCount).toBe(initialCount - 2);
+    // Wait for move dialog to close
+    await window.waitForSelector('text=Move 2 Notes to Folder', { state: 'hidden', timeout: 5000 });
+
+    // Note: All Notes still shows all notes including those in folders
+    // The important verification is that notes end up in Test Folder (below)
 
     // Verify badge disappeared
     const badge = window.locator('text=/notes selected/');
