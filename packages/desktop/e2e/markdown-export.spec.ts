@@ -291,18 +291,30 @@ test.describe('Markdown Export - File Menu', () => {
   });
 
   test('should export notes from folder when viewing a specific folder', async () => {
+    // Select "All Notes" first to ensure we create a root-level folder
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
     // Create a folder first
     const folderPanel = page.locator('#left-panel');
     const createFolderButton = folderPanel.locator('button[title="Create folder"]');
     await createFolderButton.click();
-    await page.waitForTimeout(500);
 
-    // Name the folder - the dialog has a labeled textbox "Folder Name"
-    const folderDialog = page.locator('[role="dialog"]').last();
-    const folderNameInput = folderDialog.locator('input').first();
+    // Wait for create dialog to appear
+    await page.waitForSelector('text=Create New Folder');
+
+    // Name the folder
+    const folderDialog = page.locator('div[role="dialog"]');
+    const folderNameInput = folderDialog.locator('input[type="text"]');
     await folderNameInput.fill('Test Export Folder');
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(1000);
+
+    // Click Create button
+    const createButton = folderDialog.locator('button:has-text("Create")');
+    await createButton.click();
+
+    // Wait for dialog to close and folder to appear
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Test Export Folder', { timeout: 5000 });
 
     // Click on the folder to select it
     const testFolder = folderPanel.locator('text=Test Export Folder');
@@ -310,8 +322,8 @@ test.describe('Markdown Export - File Menu', () => {
     await page.waitForTimeout(500);
 
     // Create a note in this folder
-    const createButton = page.locator('#middle-panel button[title="Create note"]');
-    await createButton.click();
+    const createNoteButton = page.locator('#middle-panel button[title="Create note"]');
+    await createNoteButton.click();
     await page.waitForTimeout(1000);
 
     const editor = page.locator('.tiptap.ProseMirror');

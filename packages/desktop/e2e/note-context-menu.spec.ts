@@ -478,21 +478,35 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
+    // Select "All Notes" first to ensure we create a root-level folder
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
     // Create a folder first
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for create dialog to appear
+    await page.waitForSelector('text=Create New Folder');
 
     // Enter folder name in dialog
     const dialog = page.locator('div[role="dialog"]');
     const folderInput = dialog.locator('input[type="text"]');
     await folderInput.fill('Test Folder');
-    await folderInput.press('Enter');
-    await page.waitForTimeout(1000);
+
+    // Click Create button
+    const createButton = dialog.locator('button:has-text("Create")');
+    await createButton.click();
+
+    // Wait for dialog to close
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+
+    // Wait for folder to appear in tree
+    await page.waitForSelector('text=Test Folder', { timeout: 5000 });
 
     // Create a note
-    const createButton = page.locator('#middle-panel button[title="Create note"]');
-    await createButton.click();
+    const createNoteButton = page.locator('#middle-panel button[title="Create note"]');
+    await createNoteButton.click();
     await page.waitForTimeout(1000);
 
     // Right-click the note and select "Move to..."
@@ -540,20 +554,26 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     // Count notes in All Notes before move
     const beforeCount = await notesList.locator('li').count();
 
-    // NOW create the folder
+    // NOW create the folder - first select All Notes to ensure root-level folder
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for create dialog to appear
+    await page.waitForSelector('text=Create New Folder');
 
     // Enter folder name in dialog
     const dialog = page.locator('div[role="dialog"]');
     const folderInput = dialog.locator('input[type="text"]');
     await folderInput.fill('Work Notes');
-    await folderInput.press('Enter');
+
+    // Click Create button
+    await dialog.locator('button:has-text("Create")').click();
 
     // Wait for dialog to close
-    await dialog.waitFor({ state: 'hidden', timeout: 5000 });
-    await page.waitForTimeout(1000);
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
 
     // Wait for folder to appear in tree
     await page.waitForSelector('text=Work Notes', { timeout: 5000 });
@@ -564,8 +584,13 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     await allNotesItem.click();
     await page.waitForTimeout(1500);
 
+    // Re-capture note list references after navigation (they may have become stale)
+    const notesListAfterNav = page.locator('#middle-panel [data-testid="notes-list"]');
+    const noteToMove = notesListAfterNav.locator('li').first();
+    const countBeforeMove = await notesListAfterNav.locator('li').count();
+
     // Move note to folder
-    await firstNote.click({ button: 'right' });
+    await noteToMove.click({ button: 'right' });
     await page.waitForTimeout(500);
     await page.locator('[role="menuitem"]:has-text("Move to...")').click();
     await page.waitForTimeout(500);
@@ -583,30 +608,18 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     // Wait for move dialog to close
     await moveDialog.waitFor({ state: 'hidden', timeout: 5000 });
 
-    // Wait for the note to disappear from "All Notes"
-    await page.waitForFunction(
-      (expectedCount) => {
-        const notesList = document.querySelector('#middle-panel [data-testid="notes-list"]');
-        const count = notesList ? notesList.querySelectorAll('li').length : 0;
-        return count === expectedCount;
-      },
-      beforeCount - 1,
-      { timeout: 5000 }
-    );
+    // Note should still be visible in All Notes (All Notes shows ALL notes regardless of folder)
+    // Wait for folder tree to update after move
+    await page.waitForTimeout(500);
 
-    // Note should be removed from All Notes
-    const afterCount = await notesList.locator('li').count();
-    expect(afterCount).toBe(beforeCount - 1);
-
-    // Click on the folder to see its notes
+    // Click on the folder to verify the note is there
     await page.waitForSelector('text=Work Notes', { timeout: 5000 });
-    const folderItem = page.locator('text=Work Notes').first();
-    await folderItem.click();
+    const workNotesFolder = page.locator('text=Work Notes').first();
+    await workNotesFolder.click();
     await page.waitForTimeout(1000);
 
     // Note should appear in the folder
     const folderNotesList = page.locator('#middle-panel [data-testid="notes-list"]');
-    await page.waitForTimeout(1000); // Wait for notes list to reload
     await expect(folderNotesList.locator('li')).toHaveCount(1);
     await expect(folderNotesList).toContainText(noteTitle);
   });
@@ -616,17 +629,28 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
+    // Select "All Notes" first to ensure we create a root-level folder
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
     // Create a folder
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for create dialog to appear
+    await page.waitForSelector('text=Create New Folder');
 
     // Enter folder name in dialog
     const folderDialog = page.locator('div[role="dialog"]');
     const folderInput = folderDialog.locator('input[type="text"]');
     await folderInput.fill('Temp Folder');
-    await folderInput.press('Enter');
-    await page.waitForTimeout(1000);
+
+    // Click Create button
+    await folderDialog.locator('button:has-text("Create")').click();
+
+    // Wait for dialog to close and folder to appear
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Temp Folder', { timeout: 5000 });
 
     // Click on the folder
     const folderItem = page.locator('text=Temp Folder').first();
@@ -682,26 +706,32 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
+    // Select "All Notes" first to ensure we create root-level folders
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
     // Create two folders
     const newFolderButton = page.locator('button[title="Create folder"]');
 
     // Create Folder A
     await newFolderButton.click();
-    await page.waitForTimeout(500);
+    await page.waitForSelector('text=Create New Folder');
     let dialog = page.locator('div[role="dialog"]');
     let folderInput = dialog.locator('input[type="text"]');
     await folderInput.fill('Folder A');
-    await folderInput.press('Enter');
-    await page.waitForTimeout(1000);
+    await dialog.locator('button:has-text("Create")').click();
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Folder A', { timeout: 5000 });
 
     // Create Folder B
     await newFolderButton.click();
-    await page.waitForTimeout(500);
+    await page.waitForSelector('text=Create New Folder');
     dialog = page.locator('div[role="dialog"]');
     folderInput = dialog.locator('input[type="text"]');
     await folderInput.fill('Folder B');
-    await folderInput.press('Enter');
-    await page.waitForTimeout(1000);
+    await dialog.locator('button:has-text("Create")').click();
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Folder B', { timeout: 5000 });
 
     // Click Folder A
     const folderA = page.locator('text=Folder A').first();
@@ -756,17 +786,28 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     await page.waitForSelector('text=Folders', { timeout: 10000 });
     await page.waitForTimeout(1000);
 
+    // Select "All Notes" first to ensure we create a root-level folder
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
     // Create a folder
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for create dialog to appear
+    await page.waitForSelector('text=Create New Folder');
 
     // Enter folder name in dialog
     const dialog = page.locator('div[role="dialog"]');
     const folderInput = dialog.locator('input[type="text"]');
     await folderInput.fill('Current Folder');
-    await folderInput.press('Enter');
-    await page.waitForTimeout(1000);
+
+    // Click Create button
+    await dialog.locator('button:has-text("Create")').click();
+
+    // Wait for dialog to close and folder to appear
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await page.waitForSelector('text=Current Folder', { timeout: 5000 });
 
     // Click folder
     const folderItem = page.locator('text=Current Folder').first();
@@ -818,22 +859,26 @@ test.describe('Note Move to Folder (Phase 2.5.7.1)', () => {
     const notesList = page.locator('#middle-panel [data-testid="notes-list"]');
     const beforeCount = await notesList.locator('li').count();
 
-    // NOW create the folder
+    // NOW create the folder - first select All Notes to ensure root-level folder
+    await page.locator('text=All Notes').first().click();
+    await page.waitForTimeout(500);
+
     const plusButton = page.locator('button[title="Create folder"]');
     await plusButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for create dialog to appear
+    await page.waitForSelector('text=Create New Folder');
 
     // Enter folder name in dialog
     const dialog = page.locator('div[role="dialog"]');
     const folderInput = dialog.locator('input[type="text"]');
     await folderInput.fill('Test Folder');
-    await folderInput.press('Enter');
 
-    // Wait for dialog to close
-    await dialog.waitFor({ state: 'hidden', timeout: 5000 });
-    await page.waitForTimeout(1000);
+    // Click Create button
+    await dialog.locator('button:has-text("Create")').click();
 
-    // Wait for folder to appear in tree
+    // Wait for dialog to close and folder to appear
+    await page.waitForSelector('text=Create New Folder', { state: 'hidden' });
     await page.waitForSelector('text=Test Folder', { timeout: 5000 });
 
     // Click "All Notes" to switch back to view our note

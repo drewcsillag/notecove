@@ -223,6 +223,10 @@ test.describe('Note count badges in folder tree', () => {
   });
 
   test('should update badge count when note is moved between folders', async () => {
+    // Select "All Notes" first to ensure we create root-level folders
+    await window.locator('text=All Notes').first().click();
+    await window.waitForTimeout(500);
+
     // Create two folders
     const newFolderButton = window.locator('button[title="Create folder"]');
 
@@ -232,8 +236,9 @@ test.describe('Note count badges in folder tree', () => {
     let dialog = window.locator('div[role="dialog"]');
     let folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill('Folder A');
-    await window.keyboard.press('Enter');
-    await window.waitForTimeout(1000);
+    await dialog.locator('button:has-text("Create")').click();
+    await window.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await window.waitForSelector('text=Folder A', { timeout: 5000 });
 
     // Create Folder B
     await newFolderButton.click();
@@ -241,8 +246,9 @@ test.describe('Note count badges in folder tree', () => {
     dialog = window.locator('div[role="dialog"]');
     folderNameInput = dialog.locator('input[type="text"]');
     await folderNameInput.fill('Folder B');
-    await window.keyboard.press('Enter');
-    await window.waitForTimeout(1000);
+    await dialog.locator('button:has-text("Create")').click();
+    await window.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await window.waitForSelector('text=Folder B', { timeout: 5000 });
 
     // Select Folder A and create a note
     const folderNodes = getFolderTreeNodes(window);

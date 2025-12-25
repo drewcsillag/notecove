@@ -212,16 +212,24 @@ test.describe('Permanent Delete and Duplicate Note', () => {
   });
 
   test('should place duplicated note in the same folder as original', async () => {
+    // Select "All Notes" first to ensure we create a root-level folder
+    await window.locator('text=All Notes').first().click();
+    await window.waitForTimeout(500);
+
     // Create a folder
     await window.click('button[title="Create folder"]');
+    await window.waitForSelector('text=Create New Folder');
     const folderDialog = window.locator('div[role="dialog"]');
     await folderDialog.locator('input[type="text"]').fill('Test Folder');
     await folderDialog.locator('button:has-text("Create")').click();
-    await window.waitForTimeout(1000);
+
+    // Wait for dialog to close and folder to appear
+    await window.waitForSelector('text=Create New Folder', { state: 'hidden' });
+    await window.waitForSelector('text=Test Folder', { timeout: 5000 });
 
     // Select the folder
     await window.click('text=Test Folder');
-    await window.waitForTimeout(1000);
+    await window.waitForTimeout(500);
 
     // Create a note in the folder
     await createTestNote(window, 'Note in folder');
