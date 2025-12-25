@@ -131,6 +131,11 @@ test.describe('cross-machine sync - move conflict', () => {
     await window1.waitForSelector('.ProseMirror', { timeout: 15000 });
     await window1.waitForTimeout(1000);
 
+    // Click "All Notes" first to set active SD context (required for folder creation)
+    const allNotesFolder1 = window1.locator('[aria-label="All Notes"]').first();
+    await allNotesFolder1.click();
+    await window1.waitForTimeout(500);
+
     // Create Folder A in Instance 1
     const newFolderButton1 = window1.locator('button[title="Create folder"]');
     await newFolderButton1.click();
@@ -141,7 +146,10 @@ test.describe('cross-machine sync - move conflict', () => {
     const folderAName = `Folder A ${Date.now()}`;
     await folderNameInput1.fill(folderAName);
     await window1.keyboard.press('Enter');
-    await window1.waitForTimeout(1000);
+
+    // Wait for dialog to close and folder to appear
+    await window1.waitForSelector('text=Create New Folder', { state: 'hidden', timeout: 5000 });
+    await window1.waitForSelector(`text=${folderAName}`, { timeout: 5000 });
 
     // Verify Folder A was created
     const folderNodeA = window1
@@ -217,6 +225,11 @@ test.describe('cross-machine sync - move conflict', () => {
     await window2.waitForSelector('.ProseMirror', { timeout: 15000 });
     await window2.waitForTimeout(1000);
 
+    // Click "All Notes" first to set active SD context (required for folder creation)
+    const allNotesFolder2 = window2.locator('[aria-label="All Notes"]').first();
+    await allNotesFolder2.click();
+    await window2.waitForTimeout(500);
+
     // Verify Instance 2 sees Folder A (synced from Instance 1)
     const folderNodeASynced = window2
       .locator(`[data-testid^="folder-tree-node-"]`)
@@ -234,7 +247,10 @@ test.describe('cross-machine sync - move conflict', () => {
     const folderBName = `Folder B ${Date.now()}`;
     await folderNameInput2.fill(folderBName);
     await window2.keyboard.press('Enter');
-    await window2.waitForTimeout(1000);
+
+    // Wait for dialog to close and folder to appear
+    await window2.waitForSelector('text=Create New Folder', { state: 'hidden', timeout: 5000 });
+    await window2.waitForSelector(`text=${folderBName}`, { timeout: 5000 });
 
     // Verify Folder B was created
     const folderNodeB = window2

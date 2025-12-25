@@ -128,6 +128,11 @@ test.describe('cross-machine sync - note move', () => {
 
     console.log('[NoteMoveSync] Instance 1 ready');
 
+    // Click "All Notes" first to set active SD context (required for folder creation)
+    const allNotesFolder1 = window1.locator('[aria-label="All Notes"]').first();
+    await allNotesFolder1.click();
+    await window1.waitForTimeout(500);
+
     // === Step 1: Create a folder in Instance 1 ===
     console.log('[NoteMoveSync] Creating folder in Instance 1...');
     const newFolderButton = window1.locator('button[title="Create folder"]');
@@ -140,7 +145,10 @@ test.describe('cross-machine sync - note move', () => {
     const testFolderName = `Test Folder ${Date.now()}`;
     await folderNameInput.fill(testFolderName);
     await window1.keyboard.press('Enter');
-    await window1.waitForTimeout(1000);
+
+    // Wait for dialog to close and folder to appear
+    await window1.waitForSelector('text=Create New Folder', { state: 'hidden', timeout: 5000 });
+    await window1.waitForSelector(`text=${testFolderName}`, { timeout: 5000 });
 
     // Verify folder was created
     const folderNode1 = window1

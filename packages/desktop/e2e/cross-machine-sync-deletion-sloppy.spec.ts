@@ -202,21 +202,14 @@ test.describe('cross-machine sync - deletion and sloppy sync', () => {
 
     // The note should no longer be in the All Notes list (soft deleted)
     // It goes to Recently Deleted, so it disappears from the active list
-    const noteStillVisible = await noteToDelete1.isVisible();
-    const noteGoneFrom1 = !noteStillVisible;
-    console.log(`[DeletionSync] Note removed from Instance 1 list: ${noteGoneFrom1}`);
-    expect(noteGoneFrom1).toBe(true);
+    await expect(noteToDelete1).not.toBeVisible({ timeout: 5000 });
+    console.log('[DeletionSync] Note removed from Instance 1 list: true');
 
-    // Wait for sync to Instance 2
+    // Wait for deletion to sync to Instance 2 using retrying assertion
+    // This is more reliable than fixed waits since sync timing varies
     console.log('[DeletionSync] Waiting for deletion to sync to Instance 2...');
-    await window1.waitForTimeout(15000);
-
-    // THE KEY TEST: Is the note gone from Instance 2's list?
-    const noteGoneFrom2 = !(await noteToDelete2.isVisible());
-    console.log(`[DeletionSync] Note removed from Instance 2: ${noteGoneFrom2}`);
-
-    // This should pass - deletion should sync
-    expect(noteGoneFrom2).toBe(true);
+    await expect(noteToDelete2).not.toBeVisible({ timeout: 60000 });
+    console.log('[DeletionSync] Note removed from Instance 2: true');
 
     console.log('[DeletionSync] ✅ Deletion sync test passed!');
   });

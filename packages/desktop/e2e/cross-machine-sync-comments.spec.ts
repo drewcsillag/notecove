@@ -407,21 +407,21 @@ test.describe('cross-machine sync - comments', () => {
 
     console.log('[Comments Sync] Comment added on instance 1');
 
-    // Wait for sync to instance 2
-    await window1.waitForTimeout(8000);
+    // Wait for comment to sync to instance 2 - use retrying assertion
+    // Wait for badge to show 1 (this confirms sync happened)
+    const badge2 = window2.locator('[data-testid="view-comments-button"] .MuiBadge-badge');
+    await expect(badge2).toHaveText('1', { timeout: 30000 });
+    console.log('[Comments Sync] Instance 2 badge shows 1');
 
-    // Instance 2: Check the badge count
-    const badgeCount = await getCommentBadgeCount(window2);
-    console.log('[Comments Sync] Instance 2 badge count:', badgeCount);
+    // Open the comment sidebar
+    const viewCommentsButton = window2.locator('[data-testid="view-comments-button"]');
+    await viewCommentsButton.click();
+    await window2.waitForTimeout(500);
 
-    // Instance 2: Open sidebar and count threads
-    const sidebarThreadCount = await openCommentSidebarAndCountThreads(window2);
-    console.log('[Comments Sync] Instance 2 sidebar thread count:', sidebarThreadCount);
-
-    // CRITICAL: If badge shows 1, sidebar should also show 1 thread
-    // This is the bug - badge shows count but sidebar is empty
-    expect(sidebarThreadCount).toBe(badgeCount);
-    expect(sidebarThreadCount).toBeGreaterThan(0);
+    // Wait for the thread to appear in sidebar with retrying assertion
+    const threads = window2.locator('[data-testid="comment-thread"], .comment-thread');
+    await expect(threads).toHaveCount(1, { timeout: 10000 });
+    console.log('[Comments Sync] Instance 2 sidebar shows 1 thread');
 
     console.log('[Comments Sync] ✅ Badge and sidebar counts match');
   });
