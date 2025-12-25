@@ -9,6 +9,7 @@ Three e2e tests were failing because they didn't properly wait for folder creati
 ## Root Cause
 
 The failing tests had two issues:
+
 1. **Missing SD context**: Didn't click "All Notes" first to set `activeSdId` (required for folder creation)
 2. **Insufficient waits**: Used `waitForTimeout()` instead of proper `waitForSelector()` for dialog close/folder appearance
 3. **Wrong test logic** (note-multi-select only): Expected All Notes count to decrease after move, but All Notes shows all notes including those in folders
@@ -42,6 +43,7 @@ The failing tests had two issues:
 ## Key Learning
 
 Folder creation in NoteCove requires:
+
 1. An active SD context (set by clicking a folder like "All Notes")
 2. Proper waits for dialog lifecycle and folder appearance
 

@@ -30,7 +30,9 @@ Tests for features behind feature flags (history, web-server, settings tabs) wer
 ## Implementation Details
 
 ### For history.spec.ts
+
 Added before `electron.launch()`:
+
 ```typescript
 await fs.writeFile(
   testConfigPath,
@@ -39,7 +41,9 @@ await fs.writeFile(
 ```
 
 ### For web-server.spec.ts
+
 Added `writeFileSync` to imports and after `mkdtempSync()`:
+
 ```typescript
 writeFileSync(
   join(testUserDataDir, 'config.json'),
@@ -48,17 +52,16 @@ writeFileSync(
 ```
 
 ### For settings-low-priority.spec.ts
+
 Added before `electron.launch()`:
+
 ```typescript
 await fs.writeFile(
   testConfigPath,
-  JSON.stringify(
-    { featureFlags: { telemetry: true, viewHistory: true, webServer: true } },
-    null,
-    2
-  )
+  JSON.stringify({ featureFlags: { telemetry: true, viewHistory: true, webServer: true } }, null, 2)
 );
 ```
+
 Also added wait for `.ProseMirror` to fix flakiness.
 
 ## Additional Notes
