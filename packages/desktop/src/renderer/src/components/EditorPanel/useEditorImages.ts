@@ -111,7 +111,9 @@ export function useEditorImages(
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         if (f) {
-          console.log(`[useEditorImages] File ${i}: name="${f.name}" type="${f.type}" size=${f.size}`);
+          console.log(
+            `[useEditorImages] File ${i}: name="${f.name}" type="${f.type}" size=${f.size}`
+          );
         }
       }
 
@@ -173,7 +175,12 @@ export function useEditorImages(
 
           const data = new Uint8Array(buffer);
 
-          console.log('[useEditorImages] Saving dropped image, size:', data.length, 'type:', mimeType);
+          console.log(
+            '[useEditorImages] Saving dropped image, size:',
+            data.length,
+            'type:',
+            mimeType
+          );
 
           // Save the image via IPC (returns {imageId, filename})
           const result = await window.electronAPI.image.save(sdId, data, mimeType);

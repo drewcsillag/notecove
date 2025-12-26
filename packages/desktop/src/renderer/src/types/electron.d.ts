@@ -687,7 +687,11 @@ declare global {
 
       testing: {
         createWindow: (options?: { noteId?: string; minimal?: boolean }) => Promise<void>;
-        setNoteTimestamp: (noteId: string, timestamp: number) => Promise<void>;
+        setNoteTimestamp: (
+          noteId: string,
+          field: 'created' | 'modified' | 'deleted_at',
+          timestamp: number
+        ) => Promise<void>;
       };
 
       app: {

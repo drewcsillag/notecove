@@ -122,7 +122,7 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     const thirtyOneDaysAgo = Date.now() - 31 * 24 * 60 * 60 * 1000;
     await window.evaluate(
       async ({ noteId, timestamp }) => {
-        await window.electronAPI.testing.setNoteTimestamp(noteId, timestamp);
+        await window.electronAPI.testing.setNoteTimestamp(noteId, 'modified', timestamp);
       },
       { noteId, timestamp: thirtyOneDaysAgo }
     );
@@ -327,7 +327,7 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     const thirtyOneDaysAgo = Date.now() - 31 * 24 * 60 * 60 * 1000;
     await window.evaluate(
       async ({ noteId, timestamp }) => {
-        await window.electronAPI.testing.setNoteTimestamp(noteId, timestamp);
+        await window.electronAPI.testing.setNoteTimestamp(noteId, 'modified', timestamp);
       },
       { noteId, timestamp: thirtyOneDaysAgo }
     );

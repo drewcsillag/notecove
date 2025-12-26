@@ -5,8 +5,7 @@
  * Extracted from TipTapEditor.tsx for maintainability.
  */
 
-import type { Theme } from '@mui/material';
-import type { SxProps } from '@mui/system';
+import type { Theme, SxProps } from '@mui/material';
 import { getCodeBlockStyles } from './codeBlockTheme';
 
 /**
@@ -99,9 +98,7 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
       // Mention chip styling (user @mentions)
       '& .mention-chip': {
         backgroundColor:
-          theme.palette.mode === 'dark'
-            ? 'rgba(144, 202, 249, 0.16)'
-            : 'rgba(25, 118, 210, 0.08)',
+          theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.16)' : 'rgba(25, 118, 210, 0.08)',
         color: theme.palette.text.primary,
         padding: '2px 6px',
         borderRadius: '4px',
@@ -123,37 +120,27 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
       // Comment highlight styling
       '& .comment-highlight': {
         backgroundColor:
-          theme.palette.mode === 'dark'
-            ? 'rgba(255, 213, 79, 0.25)'
-            : 'rgba(255, 213, 79, 0.4)',
+          theme.palette.mode === 'dark' ? 'rgba(255, 213, 79, 0.25)' : 'rgba(255, 213, 79, 0.4)',
         borderBottom: `2px solid ${theme.palette.warning.main}`,
         cursor: 'pointer',
         transition: 'background-color 0.2s ease',
         '&:hover': {
           backgroundColor:
-            theme.palette.mode === 'dark'
-              ? 'rgba(255, 213, 79, 0.35)'
-              : 'rgba(255, 213, 79, 0.5)',
+            theme.palette.mode === 'dark' ? 'rgba(255, 213, 79, 0.35)' : 'rgba(255, 213, 79, 0.5)',
         },
         // Active/selected comment
         '&.comment-active': {
           backgroundColor:
-            theme.palette.mode === 'dark'
-              ? 'rgba(255, 213, 79, 0.45)'
-              : 'rgba(255, 213, 79, 0.6)',
+            theme.palette.mode === 'dark' ? 'rgba(255, 213, 79, 0.45)' : 'rgba(255, 213, 79, 0.6)',
         },
         // Overlapping comments - nested highlights get progressively darker
         '& .comment-highlight': {
           backgroundColor:
-            theme.palette.mode === 'dark'
-              ? 'rgba(255, 193, 7, 0.35)'
-              : 'rgba(255, 193, 7, 0.5)',
+            theme.palette.mode === 'dark' ? 'rgba(255, 193, 7, 0.35)' : 'rgba(255, 193, 7, 0.5)',
           // Third level overlap (rare but possible)
           '& .comment-highlight': {
             backgroundColor:
-              theme.palette.mode === 'dark'
-                ? 'rgba(255, 160, 0, 0.45)'
-                : 'rgba(255, 160, 0, 0.6)',
+              theme.palette.mode === 'dark' ? 'rgba(255, 160, 0, 0.45)' : 'rgba(255, 160, 0, 0.6)',
           },
         },
       },

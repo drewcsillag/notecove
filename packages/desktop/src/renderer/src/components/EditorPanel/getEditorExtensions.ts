@@ -56,10 +56,7 @@ export interface EditorExtensionCallbacks {
  * @param callbacks - Event callbacks for extension interactions
  * @returns Array of configured TipTap extensions
  */
-export function getEditorExtensions(
-  yDoc: Y.Doc,
-  callbacks: EditorExtensionCallbacks
-): ReturnType<typeof StarterKit.configure>[] {
+export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallbacks) {
   return [
     // Use StarterKit but exclude History and built-in lists
     // (we'll add custom list extensions that support taskItem)

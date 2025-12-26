@@ -50,7 +50,7 @@ import { TableSizePickerDialog } from './TableSizePickerDialog';
 import { SearchPanel } from './SearchPanel';
 // LinkPopover, LinkInputPopover, TextAndUrlInputPopover, tippy, detectUrlFromSelection are used by useEditorLinkPopovers
 // useWindowState and useNoteScrollPosition are used by useEditorStateRestoration
-import { sanitizeClipboardHtml } from '../../utils/clipboard-sanitizer';
+// sanitizeClipboardHtml is used by editorProps.handlePaste and useEditorContextMenu
 
 // MIME type helpers are in useEditorImages.ts
 
@@ -169,6 +169,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
   // Set up WebLink callbacks
   // This must be done before useEditor to ensure callbacks are available
+  // Note: setLinkPopoverData and handleCmdKRef are stable references (useState setter and useRef)
+  // so they don't need to be in the dependency array
   useEffect(() => {
     setWebLinkCallbacks({
       onSingleClick: (href: string, element: HTMLElement, from: number, to: number) => {
@@ -194,6 +196,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }
       },
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable refs don't need deps
   }, []);
 
   // Fetch current user profile on mount for comment authorship
@@ -643,10 +646,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     [] // Refs are stable, so empty deps is fine
   );
 
-  const noteSyncState: UseNoteSyncState = useMemo(
-    () => ({ isLoading, setIsLoading }),
-    [isLoading]
-  );
+  const noteSyncState: UseNoteSyncState = useMemo(() => ({ isLoading, setIsLoading }), [isLoading]);
 
   // Use the note sync hook for loading, updating, and syncing notes
   const noteSyncOptions = useMemo(
@@ -824,6 +824,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           );
           onTitleChange(noteId, titleText || 'Untitled', text.trim());
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- isLoadingRef.current is intentionally read at cleanup time
       } else if (noteId && isLoadingRef.current) {
         console.log(
           `[TipTapEditor] Unmount: Skipping save for note ${noteId} - still loading (preventing data corruption)`

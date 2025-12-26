@@ -71,7 +71,10 @@ export function useEditorStateRestoration(
       const windowState = await getSavedState();
       if (windowState) {
         savedStateRef.current = windowState;
-        console.log('[useEditorStateRestoration] Loaded window state for restoration:', windowState);
+        console.log(
+          '[useEditorStateRestoration] Loaded window state for restoration:',
+          windowState
+        );
         return;
       }
 
@@ -79,7 +82,10 @@ export function useEditorStateRestoration(
       const noteScrollPosition = await getSavedNoteScrollPosition(noteId);
       if (noteScrollPosition > 0) {
         savedStateRef.current = { scrollTop: noteScrollPosition, cursorPosition: 0 };
-        console.log('[useEditorStateRestoration] Loaded per-note scroll position:', noteScrollPosition);
+        console.log(
+          '[useEditorStateRestoration] Loaded per-note scroll position:',
+          noteScrollPosition
+        );
       }
     };
 

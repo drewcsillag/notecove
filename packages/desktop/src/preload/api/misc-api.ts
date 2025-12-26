@@ -219,8 +219,12 @@ export const testingApi = {
   createWindow: (options?: { noteId?: string; minimal?: boolean }): Promise<void> =>
     ipcRenderer.invoke('testing:createWindow', options) as Promise<void>,
   // Test-only: Set note timestamp (only available in NODE_ENV=test)
-  setNoteTimestamp: (noteId: string, timestamp: number): Promise<void> =>
-    ipcRenderer.invoke('test:setNoteTimestamp', noteId, timestamp) as Promise<void>,
+  setNoteTimestamp: (
+    noteId: string,
+    field: 'created' | 'modified' | 'deleted_at',
+    timestamp: number
+  ): Promise<void> =>
+    ipcRenderer.invoke('test:setNoteTimestamp', noteId, field, timestamp) as Promise<void>,
   // Test-only: Tag database queries (only available in NODE_ENV=test)
   getAllTags: (): Promise<{ id: string; name: string }[]> =>
     ipcRenderer.invoke('test:getAllTags') as Promise<{ id: string; name: string }[]>,
