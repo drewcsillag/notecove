@@ -29,7 +29,7 @@ import {
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
 import { yUndoPluginKey } from 'y-prosemirror';
-import { DOMSerializer } from '@tiptap/pm/model';
+// DOMSerializer is used by useEditorContextMenu
 import { EditorToolbar } from './EditorToolbar';
 import { type MentionNodeAttributes } from './extensions/MentionNode';
 import { DatePickerDialog } from './DatePickerDialog';
@@ -42,16 +42,14 @@ import { useNoteSync, type UseNoteSyncRefs, type UseNoteSyncState } from './useN
 import { useEditorStateRestoration } from './useEditorStateRestoration';
 import { useEditorImages } from './useEditorImages';
 import { useEditorComments, type CommentCallbacks } from './useEditorComments';
+import { useEditorContextMenu } from './useEditorContextMenu';
+import { useEditorLinkPopovers } from './useEditorLinkPopovers';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
 import { TableSizePickerDialog } from './TableSizePickerDialog';
 import { SearchPanel } from './SearchPanel';
-import { LinkPopover } from './LinkPopover';
-import { LinkInputPopover } from './LinkInputPopover';
-import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
-import tippy, { type Instance as TippyInstance } from 'tippy.js';
+// LinkPopover, LinkInputPopover, TextAndUrlInputPopover, tippy, detectUrlFromSelection are used by useEditorLinkPopovers
 // useWindowState and useNoteScrollPosition are used by useEditorStateRestoration
-import { detectUrlFromSelection } from '@notecove/shared';
 import { sanitizeClipboardHtml } from '../../utils/clipboard-sanitizer';
 
 // MIME type helpers are in useEditorImages.ts
@@ -128,30 +126,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const focusAttemptedRef = useRef(false);
   // Cache the active SD for synchronous access in transformPasted
   const activeSdIdRef = useRef<string | null>(null);
-  // Link popover state (for viewing/editing existing links)
-  const [linkPopoverData, setLinkPopoverData] = useState<{
-    href: string;
-    element: HTMLElement;
-    from: number;
-    to: number;
-  } | null>(null);
-  const linkPopoverRef = useRef<TippyInstance | null>(null);
 
-  // Link input popover state (for creating new links with selection)
-  const [linkInputPopoverData, setLinkInputPopoverData] = useState<{
-    element: HTMLElement;
-    selectionFrom: number;
-    selectionTo: number;
-    initialUrl?: string;
-  } | null>(null);
-  const linkInputPopoverRef = useRef<TippyInstance | null>(null);
-
-  // Text+URL input popover state (for creating new links without selection)
-  const [textAndUrlPopoverData, setTextAndUrlPopoverData] = useState<{
-    element: HTMLElement;
-    insertPosition: number;
-  } | null>(null);
-  const textAndUrlPopoverRef = useRef<TippyInstance | null>(null);
+  // Note: Link popover states are owned by useEditorLinkPopovers
 
   // Table size picker state
   const [tableSizePickerAnchor, setTableSizePickerAnchor] = useState<HTMLElement | null>(null);
@@ -182,18 +158,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     attrs: null,
   });
 
-  // Context menu state - includes selection bounds for clipboard operations
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    from: number;
-    to: number;
-  } | null>(null);
-
+  // Note: contextMenu state is owned by useEditorContextMenu
   // Note: overlapPopover state is owned by useEditorComments
-
-  // Ref to store the Cmd+K handler (updated when editor is available)
-  const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
+  // Note: handleCmdKRef is owned by useEditorLinkPopovers
 
   // Ref for the scrollable editor container (for scroll position tracking)
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
@@ -716,6 +683,21 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const { openCommentCount, overlapPopover, closeOverlapPopover, handleCommentButtonClick } =
     useEditorComments(noteId, editor, userProfile, commentCallbacks);
 
+  // Handle context menu (right-click)
+  const {
+    contextMenu,
+    handleContextMenu,
+    handleClose: handleContextMenuClose,
+    handleCut: handleContextMenuCut,
+    handleCopy: handleContextMenuCopy,
+    handlePaste: handleContextMenuPaste,
+    handlePasteAsPlainText: handleContextMenuPasteAsPlainText,
+  } = useEditorContextMenu(editor);
+
+  // Handle link popovers (view, create, edit links)
+  const { setLinkPopoverData, handleCmdKRef, handleLinkButtonClick } =
+    useEditorLinkPopovers(editor);
+
   // Fix: Ensure UndoManager is properly configured after React StrictMode double-mount
   // React StrictMode unmounts and remounts components, which can break the TipTap
   // Collaboration extension's UndoManager in two ways:
@@ -897,312 +879,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, [editor]);
 
-  // Manage link popover using tippy.js
-  useEffect(() => {
-    // Clean up existing popover
-    if (linkPopoverRef.current) {
-      linkPopoverRef.current.destroy();
-      linkPopoverRef.current = null;
-    }
-
-    // If no data, nothing to show
-    if (!linkPopoverData) {
-      return;
-    }
-
-    // Create a container for the React component
-    const container = document.createElement('div');
-
-    // Create the popover using tippy.js
-    const instance = tippy(linkPopoverData.element, {
-      content: container,
-      trigger: 'manual',
-      interactive: true,
-      placement: 'bottom-start',
-      appendTo: () => document.body,
-      onHide: () => {
-        setLinkPopoverData(null);
-      },
-      onClickOutside: () => {
-        instance.hide();
-      },
-    });
-
-    // Capture current values for use in callbacks
-    // (linkPopoverData is guaranteed non-null at this point, and we check editor below)
-    const { href, from, to } = linkPopoverData;
-
-    // If editor is not available, don't render edit/remove options
-    if (!editor) {
-      return;
-    }
-    const currentEditor = editor;
-
-    // Render the React component into the container
-    // Using ReactDOM.createRoot for React 18
-    void import('react-dom/client').then(({ createRoot }) => {
-      const root = createRoot(container);
-      root.render(
-        <LinkPopover
-          href={href}
-          onClose={() => {
-            instance.hide();
-            setLinkPopoverData(null);
-          }}
-          onEdit={(newHref: string) => {
-            console.log('[TipTapEditor] Editing link, new href:', newHref);
-            // Select the link range and update the href
-            currentEditor
-              .chain()
-              .focus()
-              .setTextSelection({ from, to })
-              .extendMarkRange('link')
-              .setLink({ href: newHref })
-              .run();
-          }}
-          onRemove={() => {
-            console.log('[TipTapEditor] Removing link at:', from, '-', to);
-            // Select the link range and remove the link mark
-            currentEditor
-              .chain()
-              .focus()
-              .setTextSelection({ from, to })
-              .extendMarkRange('link')
-              .unsetLink()
-              .run();
-          }}
-        />
-      );
-    });
-
-    // Show the popover
-    instance.show();
-    linkPopoverRef.current = instance;
-
-    // Cleanup on unmount
-    return () => {
-      if (linkPopoverRef.current) {
-        linkPopoverRef.current.destroy();
-        linkPopoverRef.current = null;
-      }
-    };
-  }, [linkPopoverData, editor]);
-
-  // Manage link input popover (for creating new links)
-  useEffect(() => {
-    // Clean up existing popover
-    if (linkInputPopoverRef.current) {
-      linkInputPopoverRef.current.destroy();
-      linkInputPopoverRef.current = null;
-    }
-
-    // If no data, nothing to show
-    if (!linkInputPopoverData || !editor) {
-      return;
-    }
-
-    // Create a container for the React component
-    const container = document.createElement('div');
-
-    // Capture current values
-    const { element, selectionFrom, selectionTo, initialUrl } = linkInputPopoverData;
-
-    // Create the popover using tippy.js
-    const instance = tippy(element, {
-      content: container,
-      trigger: 'manual',
-      interactive: true,
-      placement: 'bottom-start',
-      appendTo: () => document.body,
-      onHide: () => {
-        setLinkInputPopoverData(null);
-      },
-      onClickOutside: () => {
-        instance.hide();
-      },
-    });
-
-    // Render the React component into the container
-    void import('react-dom/client').then(({ createRoot }) => {
-      const root = createRoot(container);
-      root.render(
-        <LinkInputPopover
-          {...(initialUrl ? { initialUrl } : {})}
-          onSubmit={(url: string) => {
-            console.log('[TipTapEditor] Creating link with URL:', url);
-            // Select the original selection and apply link
-            editor
-              .chain()
-              .focus()
-              .setTextSelection({ from: selectionFrom, to: selectionTo })
-              .setLink({ href: url })
-              .run();
-            instance.hide();
-            setLinkInputPopoverData(null);
-          }}
-          onCancel={() => {
-            instance.hide();
-            setLinkInputPopoverData(null);
-          }}
-        />
-      );
-    });
-
-    // Show the popover
-    instance.show();
-    linkInputPopoverRef.current = instance;
-
-    // Cleanup on unmount
-    return () => {
-      if (linkInputPopoverRef.current) {
-        linkInputPopoverRef.current.destroy();
-        linkInputPopoverRef.current = null;
-      }
-    };
-  }, [linkInputPopoverData, editor]);
-
-  // Manage text+URL input popover (for creating new links without selection)
-  useEffect(() => {
-    // Clean up existing popover
-    if (textAndUrlPopoverRef.current) {
-      textAndUrlPopoverRef.current.destroy();
-      textAndUrlPopoverRef.current = null;
-    }
-
-    // If no data, nothing to show
-    if (!textAndUrlPopoverData || !editor) {
-      return;
-    }
-
-    // Create a container for the React component
-    const container = document.createElement('div');
-
-    // Capture current values
-    const { element, insertPosition } = textAndUrlPopoverData;
-
-    // Create the popover using tippy.js
-    const instance = tippy(element, {
-      content: container,
-      trigger: 'manual',
-      interactive: true,
-      placement: 'bottom-start',
-      appendTo: () => document.body,
-      onHide: () => {
-        setTextAndUrlPopoverData(null);
-      },
-      onClickOutside: () => {
-        instance.hide();
-      },
-    });
-
-    // Render the React component into the container
-    void import('react-dom/client').then(({ createRoot }) => {
-      const root = createRoot(container);
-      root.render(
-        <TextAndUrlInputPopover
-          onSubmit={(text: string, url: string) => {
-            console.log('[TipTapEditor] Creating link with text and URL:', { text, url });
-            // Insert text with link mark at the cursor position
-            editor
-              .chain()
-              .focus()
-              .insertContentAt(insertPosition, {
-                type: 'text',
-                text,
-                marks: [{ type: 'link', attrs: { href: url } }],
-              })
-              .run();
-            instance.hide();
-            setTextAndUrlPopoverData(null);
-          }}
-          onCancel={() => {
-            instance.hide();
-            setTextAndUrlPopoverData(null);
-          }}
-        />
-      );
-    });
-
-    // Show the popover
-    instance.show();
-    textAndUrlPopoverRef.current = instance;
-
-    // Cleanup on unmount
-    return () => {
-      if (textAndUrlPopoverRef.current) {
-        textAndUrlPopoverRef.current.destroy();
-        textAndUrlPopoverRef.current = null;
-      }
-    };
-  }, [textAndUrlPopoverData, editor]);
-
-  /**
-   * Handle link button click from toolbar
-   * - If cursor is in existing link: show edit popover
-   * - If text is selected: show URL input popover
-   */
-  const handleLinkButtonClick = (buttonElement: HTMLElement) => {
-    if (!editor) return;
-
-    // Check if cursor is in an existing link
-    if (editor.isActive('link')) {
-      // Get link mark attributes
-      const { href } = editor.getAttributes('link') as { href: string };
-      const { from, to } = editor.state.selection;
-
-      console.log('[TipTapEditor] Link button clicked while in link:', href);
-
-      // Show the edit popover
-      setLinkPopoverData({
-        href,
-        element: buttonElement,
-        from,
-        to,
-      });
-      return;
-    }
-
-    // Check if there's a text selection
-    const { from, to } = editor.state.selection;
-    if (from !== to) {
-      // Get selected text and check if it looks like a URL
-      const selectedText = editor.state.doc.textBetween(from, to);
-      const detectedUrl = detectUrlFromSelection(selectedText);
-
-      console.log(
-        '[TipTapEditor] Link button clicked with selection:',
-        from,
-        '-',
-        to,
-        'detected URL:',
-        detectedUrl
-      );
-
-      // Show URL input popover
-      setLinkInputPopoverData(
-        detectedUrl
-          ? {
-              element: buttonElement,
-              selectionFrom: from,
-              selectionTo: to,
-              initialUrl: detectedUrl,
-            }
-          : {
-              element: buttonElement,
-              selectionFrom: from,
-              selectionTo: to,
-            }
-      );
-      return;
-    }
-
-    // No selection and not in link - show text+URL dialog
-    console.log('[TipTapEditor] Link button clicked with no selection, showing text+URL dialog');
-    setTextAndUrlPopoverData({
-      element: buttonElement,
-      insertPosition: from,
-    });
-  };
+  // Note: Link popover effects are now managed by useEditorLinkPopovers
+  // Note: handleLinkButtonClick is now provided by useEditorLinkPopovers
 
   /**
    * Handle image button click from toolbar
@@ -1313,266 +991,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     handleMentionPopoverClose();
   };
 
-  /**
-   * Handle context menu open
-   * Shows custom context menu with Cut, Copy, Paste, and Add Comment options
-   * Captures selection bounds for clipboard operations since focus is lost when menu opens
-   */
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    // Capture selection bounds - needed because editor loses focus when menu opens
-    const { from, to } = editor?.state.selection ?? { from: 0, to: 0 };
-    setContextMenu({ x: e.clientX, y: e.clientY, from, to });
-  };
-
-  /**
-   * Serialize a selection range to HTML and plain text for clipboard operations
-   */
-  const serializeSelectionToClipboard = (
-    from: number,
-    to: number
-  ): { html: string; plainText: string } => {
-    if (!editor) return { html: '', plainText: '' };
-
-    const slice = editor.state.doc.slice(from, to);
-    const fragment = DOMSerializer.fromSchema(editor.schema).serializeFragment(slice.content);
-    const div = document.createElement('div');
-    div.appendChild(fragment);
-    const html = div.innerHTML;
-    const plainText = editor.state.doc.textBetween(from, to);
-    return { html, plainText };
-  };
-
-  /**
-   * Write content to clipboard with both HTML and plain text formats
-   */
-  const writeToClipboard = async (html: string, plainText: string): Promise<void> => {
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([plainText], { type: 'text/plain' }),
-      }),
-    ]);
-  };
-
-  /**
-   * Helper to read blob as text (for clipboard reading)
-   */
-  const readBlobAsText = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        resolve(reader.result as string);
-      };
-      reader.onerror = () => {
-        reject(new Error(reader.error?.message ?? 'Failed to read blob'));
-      };
-      reader.readAsText(blob);
-    });
-  };
-
-  /**
-   * Handle context menu Cut operation
-   */
-  const handleContextMenuCut = async () => {
-    if (!editor || !contextMenu) return;
-
-    const { from, to } = contextMenu;
-    if (from === to) {
-      // Nothing selected
-      handleContextMenuClose();
-      return;
-    }
-
-    try {
-      const { html, plainText } = serializeSelectionToClipboard(from, to);
-      await writeToClipboard(html, plainText);
-      // Focus editor, restore selection, and delete
-      editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
-      console.log('[TipTapEditor] Cut operation completed');
-    } catch (err) {
-      console.error('[TipTapEditor] Cut failed:', err);
-    }
-
-    handleContextMenuClose();
-  };
-
-  /**
-   * Handle context menu Copy operation
-   */
-  const handleContextMenuCopy = async () => {
-    if (!editor || !contextMenu) return;
-
-    const { from, to } = contextMenu;
-    if (from === to) {
-      // Nothing selected
-      handleContextMenuClose();
-      return;
-    }
-
-    try {
-      const { html, plainText } = serializeSelectionToClipboard(from, to);
-      await writeToClipboard(html, plainText);
-      console.log('[TipTapEditor] Copy operation completed');
-    } catch (err) {
-      console.error('[TipTapEditor] Copy failed:', err);
-    }
-
-    handleContextMenuClose();
-  };
-
-  /**
-   * Handle context menu Paste operation
-   */
-  const handleContextMenuPaste = async () => {
-    if (!editor || !contextMenu) return;
-
-    const { from, to } = contextMenu;
-
-    try {
-      const items = await navigator.clipboard.read();
-      let pasted = false;
-
-      for (const item of items) {
-        if (item.types.includes('text/html')) {
-          const blob = await item.getType('text/html');
-          const rawHtml = await readBlobAsText(blob);
-          // Sanitize HTML to remove <meta charset>, <style>, and other unwanted elements
-          const html = sanitizeClipboardHtml(rawHtml);
-          // Focus editor, set position (delete selection if any), and insert
-          if (from !== to) {
-            editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
-          }
-          editor.chain().focus().setTextSelection(from).insertContent(html).run();
-          pasted = true;
-          break;
-        }
-      }
-
-      if (!pasted) {
-        // Fallback to plain text
-        const text = await navigator.clipboard.readText();
-        if (from !== to) {
-          editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
-        }
-        editor.chain().focus().setTextSelection(from).insertContent(text).run();
-      }
-
-      console.log('[TipTapEditor] Paste operation completed');
-    } catch (err) {
-      console.error('[TipTapEditor] Paste failed:', err);
-      // Show toast notification for paste failures
-      // TODO: Integrate with app's toast system when available
-    }
-
-    handleContextMenuClose();
-  };
-
-  /**
-   * Handle context menu Paste Without Formatting operation
-   * Pastes clipboard content as plain text, stripping all HTML formatting
-   */
-  const handleContextMenuPasteAsPlainText = async () => {
-    if (!editor || !contextMenu) return;
-
-    const { from, to } = contextMenu;
-
-    try {
-      const text = await navigator.clipboard.readText();
-      // Focus editor, set position (delete selection if any), and insert
-      if (from !== to) {
-        editor.chain().focus().setTextSelection({ from, to }).deleteSelection().run();
-      }
-      editor.chain().focus().setTextSelection(from).insertContent(text).run();
-      console.log('[TipTapEditor] Paste without formatting completed');
-    } catch (err) {
-      console.error('[TipTapEditor] Paste without formatting failed:', err);
-    }
-
-    handleContextMenuClose();
-  };
-
-  /**
-   * Handle context menu close
-   */
-  const handleContextMenuClose = () => {
-    setContextMenu(null);
-  };
-
-  /**
-   * Handle Cmd+K keyboard shortcut
-   * Similar to handleLinkButtonClick but triggered from keyboard
-   */
-  const handleCmdK = (anchorElement: HTMLElement) => {
-    if (!editor) return;
-
-    // Check if cursor is in an existing link
-    if (editor.isActive('link')) {
-      const { href } = editor.getAttributes('link') as { href: string };
-      const { from, to } = editor.state.selection;
-
-      console.log('[TipTapEditor] Cmd+K pressed while in link:', href);
-
-      setLinkPopoverData({
-        href,
-        element: anchorElement,
-        from,
-        to,
-      });
-      return;
-    }
-
-    // Check if there's a text selection
-    const { from, to } = editor.state.selection;
-    if (from !== to) {
-      // Get selected text and check if it looks like a URL
-      const selectedText = editor.state.doc.textBetween(from, to);
-      const detectedUrl = detectUrlFromSelection(selectedText);
-
-      console.log(
-        '[TipTapEditor] Cmd+K pressed with selection:',
-        from,
-        '-',
-        to,
-        'detected URL:',
-        detectedUrl
-      );
-
-      setLinkInputPopoverData(
-        detectedUrl
-          ? {
-              element: anchorElement,
-              selectionFrom: from,
-              selectionTo: to,
-              initialUrl: detectedUrl,
-            }
-          : {
-              element: anchorElement,
-              selectionFrom: from,
-              selectionTo: to,
-            }
-      );
-      return;
-    }
-
-    // No selection and not in link - show text+URL dialog
-    console.log('[TipTapEditor] Cmd+K pressed with no selection, showing text+URL dialog');
-    setTextAndUrlPopoverData({
-      element: anchorElement,
-      insertPosition: from,
-    });
-  };
-
-  // Update handleCmdKRef when editor is available
-  useEffect(() => {
-    if (editor) {
-      handleCmdKRef.current = handleCmdK;
-    }
-    return () => {
-      handleCmdKRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleCmdK is intentionally captured via ref pattern
-  }, [editor]);
+  // Note: Context menu handlers (handleContextMenu, handleContextMenuCut, etc.)
+  // are now provided by useEditorContextMenu
+  // Note: handleCmdK and handleCmdKRef effect are now managed by useEditorLinkPopovers
 
   return (
     <Box sx={getTipTapEditorStyles(theme)}>

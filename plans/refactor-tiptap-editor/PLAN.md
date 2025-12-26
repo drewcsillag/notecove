@@ -1,6 +1,6 @@
 # TipTapEditor Refactoring Plan
 
-**Overall Progress:** `67%` (Phases 1-6 complete)
+**Overall Progress:** `89%` (Phases 1-8 complete)
 
 **Goal:** Reduce TipTapEditor.tsx from 3178 lines to ~600 lines by extracting logical groupings into separate files, each under 500 lines (max 800).
 
@@ -117,36 +117,36 @@
 
 ---
 
-## Phase 7: Extract Context Menu (~260 lines)
+## Phase 7: Extract Context Menu (~260 lines) ✅
 
-- [ ] 🟥 **Step 7: Create `useEditorContextMenu.ts`**
-  - [ ] 🟥 Create hook with signature: `useEditorContextMenu(editor)`
-  - [ ] 🟥 Move context menu state and handlers (lines 2168-2351)
-  - [ ] 🟥 Move clipboard utilities (serializeSelectionToClipboard, writeToClipboard, readBlobAsText)
-  - [ ] 🟥 Move cut/copy/paste handlers
-  - [ ] 🟥 Return: `{ contextMenu, handleContextMenu, handleClose, MenuComponent }` or render props
-  - [ ] 🟥 Update TipTapEditor.tsx to use the hook
-  - [ ] 🟥 Run `context-menu-clipboard.test.ts` specifically to verify
+- [x] 🟩 **Step 7: Create `useEditorContextMenu.ts`**
+  - [x] 🟩 Create hook with signature: `useEditorContextMenu(editor)`
+  - [x] 🟩 Move context menu state
+  - [x] 🟩 Move clipboard utilities (serializeSelectionToClipboard, writeToClipboard, readBlobAsText)
+  - [x] 🟩 Move cut/copy/paste handlers
+  - [x] 🟩 Return: `{ contextMenu, handleContextMenu, handleClose, handleCut, handleCopy, handlePaste, handlePasteAsPlainText }`
+  - [x] 🟩 Update TipTapEditor.tsx to use the hook
+  - [x] 🟩 Run `context-menu-clipboard.test.ts` specifically to verify (19 tests pass)
 
-**Expected result:** TipTapEditor.tsx: ~1693 → ~1433 lines
+**Result:** TipTapEditor.tsx: 1770 → 1592 lines (useEditorContextMenu.ts: 254 lines)
 
 ---
 
-## Phase 8: Extract Link Popovers (~305 lines)
+## Phase 8: Extract Link Popovers (~305 lines) ✅
 
-- [ ] 🟥 **Step 8: Create `useEditorLinkPopovers.ts`**
-  - [ ] 🟥 Create hook with signature: `useEditorLinkPopovers(editor)`
-  - [ ] 🟥 Move link popover state (lines 191-213)
-  - [ ] 🟥 Move link popover effects (lines 1751-1913)
-  - [ ] 🟥 Move link input popover effect (lines 1842-1913)
-  - [ ] 🟥 Move text+URL popover effect (lines 1915-1988)
-  - [ ] 🟥 Move handleLinkButtonClick (lines 1995-2056)
-  - [ ] 🟥 Move handleCmdK (lines 2357-2415)
-  - [ ] 🟥 Return state and handlers needed by component
-  - [ ] 🟥 Update TipTapEditor.tsx to use the hook
-  - [ ] 🟥 Run tests to verify no regressions
+- [x] 🟩 **Step 8: Create `useEditorLinkPopovers.tsx`**
+  - [x] 🟩 Create hook with signature: `useEditorLinkPopovers(editor)`
+  - [x] 🟩 Move link popover state (LinkPopover, LinkInputPopover, TextAndUrlInputPopover)
+  - [x] 🟩 Move three tippy.js popover effects
+  - [x] 🟩 Move handleLinkButtonClick
+  - [x] 🟩 Move handleCmdK and handleCmdKRef effect
+  - [x] 🟩 Return: `{ setLinkPopoverData, handleCmdKRef, handleLinkButtonClick }`
+  - [x] 🟩 Update TipTapEditor.tsx to use the hook
+  - [x] 🟩 Run tests to verify no regressions (423 tests pass)
 
-**Expected result:** TipTapEditor.tsx: ~1433 → ~1128 lines
+**Result:** TipTapEditor.tsx: 1592 → 1191 lines (useEditorLinkPopovers.tsx: 485 lines)
+
+**Note:** Hook uses `.tsx` extension for JSX support. Manages three types of popovers using tippy.js for positioning. WebLink callbacks in component use the hook's `setLinkPopoverData` and `handleCmdKRef`.
 
 ---
 
