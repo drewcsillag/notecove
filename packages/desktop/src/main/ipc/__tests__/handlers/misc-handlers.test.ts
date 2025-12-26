@@ -4,12 +4,19 @@
  * Tests for miscellaneous handlers (app state, config, tags, links, telemetry).
  */
 
-// Mock electron
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  type AllMocks,
+} from './test-utils';
+
+// Mock electron with handler registry
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: {
-    handle: jest.fn(),
-    removeHandler: jest.fn(),
-  },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
@@ -92,7 +99,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import { createAllMocks, castMocksToReal, resetUuidCounter, type AllMocks } from './test-utils';
 
 describe('Misc Handlers', () => {
   let handlers: IPCHandlers;
@@ -127,6 +133,7 @@ describe('Misc Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('appState:get', () => {
@@ -136,7 +143,7 @@ describe('Misc Handlers', () => {
       const value = 'testValue';
       mocks.database.getState.mockResolvedValue(value);
 
-      const result = await (handlers as any).handleGetAppState(mockEvent, key);
+      const result = await invokeHandler('appState:get', mockEvent, key);
 
       expect(result).toBe(value);
       expect(mocks.database.getState).toHaveBeenCalledWith(key);
@@ -146,7 +153,7 @@ describe('Misc Handlers', () => {
       const mockEvent = {} as any;
       mocks.database.getState.mockResolvedValue(null);
 
-      const result = await (handlers as any).handleGetAppState(mockEvent, 'nonExistent');
+      const result = await invokeHandler('appState:get', mockEvent, 'nonExistent');
 
       expect(result).toBeNull();
     });
@@ -158,7 +165,7 @@ describe('Misc Handlers', () => {
       const key = 'testKey';
       const value = 'testValue';
 
-      await (handlers as any).handleSetAppState(mockEvent, key, value);
+      await invokeHandler('appState:set', mockEvent, key, value);
 
       expect(mocks.database.setState).toHaveBeenCalledWith(key, value);
     });
@@ -169,7 +176,7 @@ describe('Misc Handlers', () => {
       const mockEvent = {} as any;
       mocks.configManager.getDatabasePath.mockResolvedValue('/test/path/notecove.db');
 
-      const result = await (handlers as any).handleGetDatabasePath(mockEvent);
+      const result = await invokeHandler('config:getDatabasePath', mockEvent);
 
       expect(result).toBe('/test/path/notecove.db');
     });
@@ -180,7 +187,7 @@ describe('Misc Handlers', () => {
       const mockEvent = {} as any;
       const newPath = '/new/path/notecove.db';
 
-      await (handlers as any).handleSetDatabasePath(mockEvent, newPath);
+      await invokeHandler('config:setDatabasePath', mockEvent, newPath);
 
       expect(mocks.configManager.setDatabasePath).toHaveBeenCalledWith(newPath);
     });
@@ -196,7 +203,7 @@ describe('Misc Handlers', () => {
 
       mocks.database.getAllTags.mockResolvedValue(tags);
 
-      const result = await (handlers as any).handleGetAllTags(mockEvent);
+      const result = await invokeHandler('tag:getAll', mockEvent);
 
       expect(result).toEqual(tags);
     });
@@ -213,7 +220,7 @@ describe('Misc Handlers', () => {
 
       mocks.database.getBacklinks.mockResolvedValue(backlinks);
 
-      const result = await (handlers as any).handleGetBacklinks(mockEvent, noteId);
+      const result = await invokeHandler('link:getBacklinks', mockEvent, noteId);
 
       expect(result).toEqual(backlinks);
       expect(mocks.database.getBacklinks).toHaveBeenCalledWith(noteId);

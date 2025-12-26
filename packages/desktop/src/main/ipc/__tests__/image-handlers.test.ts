@@ -29,6 +29,7 @@ jest.mock('electron', () => ({
   },
   net: {
     fetch: jest.fn(),
+    request: jest.fn(),
   },
 }));
 
@@ -38,10 +39,12 @@ jest.mock('fs/promises', () => ({
   writeFile: jest.fn(),
   mkdir: jest.fn(),
   rm: jest.fn(),
+  unlink: jest.fn(),
   access: jest.fn(),
   stat: jest.fn(),
   appendFile: jest.fn(),
   readdir: jest.fn(),
+  copyFile: jest.fn(),
 }));
 
 // Mock ImageStorage's saveImage to avoid crypto.randomUUID issues in tests
@@ -113,6 +116,71 @@ jest.mock('@notecove/shared', () => {
   };
 });
 
+// Helper type for event handlers
+type EventHandler = (...args: unknown[]) => void;
+type EventHandlerMap = Record<string, EventHandler[]>;
+
+/**
+ * Creates a mock for Electron's net.request that simulates the event-based API
+ */
+function createNetRequestMock(options: {
+  contentType?: string;
+  responseData?: Buffer;
+  error?: Error;
+}) {
+  return () => {
+    const handlers: EventHandlerMap = {};
+
+    return {
+      on: jest.fn((event: string, handler: EventHandler) => {
+        handlers[event] = handlers[event] ?? [];
+        handlers[event].push(handler);
+      }),
+      end: jest.fn(() => {
+        if (options.error) {
+          // Trigger error event
+          setTimeout(() => {
+            if (handlers['error']) {
+              handlers['error'].forEach((h) => {
+                h(options.error);
+              });
+            }
+          }, 0);
+          return;
+        }
+
+        const responseHandlers: EventHandlerMap = {};
+        const mockResponse = {
+          headers: options.contentType ? { 'content-type': options.contentType } : {},
+          on: jest.fn((event: string, handler: EventHandler) => {
+            responseHandlers[event] = responseHandlers[event] ?? [];
+            responseHandlers[event].push(handler);
+          }),
+        };
+
+        if (handlers['response']) {
+          handlers['response'].forEach((h) => {
+            h(mockResponse);
+          });
+        }
+
+        setTimeout(() => {
+          if (responseHandlers['data'] && options.responseData) {
+            responseHandlers['data'].forEach((h) => {
+              h(options.responseData);
+            });
+          }
+          if (responseHandlers['end']) {
+            responseHandlers['end'].forEach((h) => {
+              h();
+            });
+          }
+        }, 0);
+      }),
+    };
+  };
+}
+
 beforeEach(() => {
   mockSaveImageResult = { imageId: 'test-image-id', filename: 'test-image-id.png' };
   mockDiscoverImageResult = null;
@@ -121,7 +189,7 @@ beforeEach(() => {
 
 import { ipcMain } from 'electron';
 import * as fs from 'fs/promises';
-import { IPCHandlers } from '../handlers';
+import { IPCHandlers } from '../handlers/index';
 import type { Database, ImageCache, UUID } from '@notecove/shared';
 
 // Mock types
@@ -390,7 +458,7 @@ describe('IPCHandlers - Image Operations', () => {
       const handler = registeredHandlers.get('image:save');
 
       await expect(handler!({} as unknown, sdId, imageData, mimeType)).rejects.toThrow(
-        'Unsupported image MIME type'
+        'Unsupported image type'
       );
     });
 
@@ -635,12 +703,14 @@ describe('IPCHandlers - Image Operations', () => {
         created: Date.now(),
       });
 
-      (fs.rm as jest.Mock).mockResolvedValue(undefined);
+      // Handler uses fs.unlink, not fs.rm
+      const fsPromises = await import('fs/promises');
+      (fsPromises.unlink as jest.Mock).mockResolvedValue(undefined);
 
       const handler = registeredHandlers.get('image:delete');
       await handler!({} as unknown, sdId, imageId);
 
-      expect(fs.rm).toHaveBeenCalledWith(`/test/sd/media/${imageId}.png`, { force: true });
+      expect(fsPromises.unlink).toHaveBeenCalledWith(`/test/sd/media/${imageId}.png`);
       expect(mockDatabase.deleteImage).toHaveBeenCalledWith(imageId);
     });
 
@@ -657,8 +727,19 @@ describe('IPCHandlers - Image Operations', () => {
       expect(registeredHandlers.has('image:exists')).toBe(true);
     });
 
-    it('should return true if image exists in database', async () => {
-      mockDatabase.imageExists.mockResolvedValue(true);
+    it('should return true if image exists in database and on disk', async () => {
+      // Handler uses getImage + fs.access to verify file exists
+      mockDatabase.getImage.mockResolvedValue({
+        id: 'test-image',
+        sdId: 'sd-1',
+        filename: 'test-image.png',
+        mimeType: 'image/png',
+        width: 100,
+        height: 100,
+        size: 1000,
+        created: Date.now(),
+      });
+      (fs.access as jest.Mock).mockResolvedValue(undefined);
 
       const handler = registeredHandlers.get('image:exists');
       const result = await handler!({} as unknown, 'sd-1', 'test-image');
@@ -667,7 +748,10 @@ describe('IPCHandlers - Image Operations', () => {
     });
 
     it('should return false if image does not exist', async () => {
-      mockDatabase.imageExists.mockResolvedValue(false);
+      // Handler checks database first, then tries to discover on disk
+      mockDatabase.getImage.mockResolvedValue(null);
+      // discoverImageAcrossSDs is a context function, which uses getAllStorageDirs
+      mockDatabase.getAllStorageDirs.mockResolvedValue([]);
 
       const handler = registeredHandlers.get('image:exists');
       const result = await handler!({} as unknown, 'sd-1', 'nonexistent');
@@ -930,18 +1014,15 @@ describe('IPCHandlers - Image Operations', () => {
       const { net } = await import('electron');
       const sdId = 'sd-1';
       const url = 'https://example.com/image.png';
-      const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+      const imageData = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
 
-      // Mock net.fetch to return a successful response
-      const mockResponse = {
-        ok: true,
-        status: 200,
-        headers: {
-          get: jest.fn().mockReturnValue('image/png'),
-        },
-        arrayBuffer: jest.fn().mockResolvedValue(imageData.buffer),
-      };
-      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      // Setup net.request mock using helper
+      (net.request as jest.Mock).mockImplementation(
+        createNetRequestMock({
+          contentType: 'image/png',
+          responseData: imageData,
+        })
+      );
 
       // Mock fs operations
       (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
@@ -950,8 +1031,8 @@ describe('IPCHandlers - Image Operations', () => {
       const handler = registeredHandlers.get('image:downloadAndSave');
       const result = (await handler!({} as unknown, sdId, url)) as string;
 
-      // Verify fetch was called with the URL
-      expect(net.fetch).toHaveBeenCalledWith(url);
+      // Verify request was called with the URL
+      expect(net.request).toHaveBeenCalledWith(url);
 
       // Verify result is an imageId
       expect(typeof result).toBe('string');
@@ -970,17 +1051,15 @@ describe('IPCHandlers - Image Operations', () => {
       const { net } = await import('electron');
       const sdId = 'sd-1';
       const url = 'https://example.com/photo.jpg';
-      const imageData = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]); // JPEG magic bytes
+      const imageData = Buffer.from([0xff, 0xd8, 0xff, 0xe0]); // JPEG magic bytes
 
-      const mockResponse = {
-        ok: true,
-        status: 200,
-        headers: {
-          get: jest.fn().mockReturnValue(null), // No Content-Type header
-        },
-        arrayBuffer: jest.fn().mockResolvedValue(imageData.buffer),
-      };
-      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      // Setup net.request mock with no content-type header
+      (net.request as jest.Mock).mockImplementation(
+        createNetRequestMock({
+          // No contentType to test URL extension inference
+          responseData: imageData,
+        })
+      );
       (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
       (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
 
@@ -1026,33 +1105,32 @@ describe('IPCHandlers - Image Operations', () => {
     it('should throw on network failure', async () => {
       const { net } = await import('electron');
 
-      const mockResponse = {
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-      };
-      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      // Setup net.request mock to emit an error
+      (net.request as jest.Mock).mockImplementation(
+        createNetRequestMock({
+          error: new Error('Network error'),
+        })
+      );
 
       const handler = registeredHandlers.get('image:downloadAndSave');
 
       await expect(
         handler!({} as unknown, 'sd-1', 'https://example.com/missing.png')
-      ).rejects.toThrow('Failed to download image');
+      ).rejects.toThrow('Network error');
     });
 
     it('should throw on unsupported mime type', async () => {
       const { net } = await import('electron');
       const url = 'https://example.com/document.pdf';
+      const pdfData = Buffer.from([0x25, 0x50, 0x44, 0x46]); // PDF magic bytes
 
-      const mockResponse = {
-        ok: true,
-        status: 200,
-        headers: {
-          get: jest.fn().mockReturnValue('application/pdf'),
-        },
-        arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(4)),
-      };
-      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      // Setup net.request mock to return PDF content-type
+      (net.request as jest.Mock).mockImplementation(
+        createNetRequestMock({
+          contentType: 'application/pdf',
+          responseData: pdfData,
+        })
+      );
 
       const handler = registeredHandlers.get('image:downloadAndSave');
 
@@ -1064,7 +1142,7 @@ describe('IPCHandlers - Image Operations', () => {
       const { net } = await import('electron');
       const sdId = 'sd-1';
       const url = 'https://example.com/image.png';
-      const imageData = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+      const imageData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
       // Set consistent imageId (simulating content-addressable storage)
       mockSaveImageResult = { imageId: 'download-hash-id', filename: 'download-hash-id.png' };
@@ -1081,15 +1159,13 @@ describe('IPCHandlers - Image Operations', () => {
         created: Date.now(),
       });
 
-      const mockResponse = {
-        ok: true,
-        status: 200,
-        headers: {
-          get: jest.fn().mockReturnValue('image/png'),
-        },
-        arrayBuffer: jest.fn().mockResolvedValue(imageData.buffer),
-      };
-      (net.fetch as jest.Mock).mockResolvedValue(mockResponse);
+      // Setup net.request mock
+      (net.request as jest.Mock).mockImplementation(
+        createNetRequestMock({
+          contentType: 'image/png',
+          responseData: imageData,
+        })
+      );
       (fs.mkdir as jest.Mock).mockResolvedValue(undefined);
       (fs.writeFile as jest.Mock).mockResolvedValue(undefined);
 

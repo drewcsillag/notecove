@@ -431,6 +431,90 @@ export function createMockEvent(windowId = 1): any {
 }
 
 // =============================================================================
+// IPC Handler Registry for Testing
+// =============================================================================
+
+/**
+ * Registry that captures handlers registered via ipcMain.handle()
+ * This allows tests to invoke handlers by channel name instead of calling
+ * private methods on the IPCHandlers class.
+ */
+const handlerRegistry = new Map<string, (...args: unknown[]) => unknown>();
+
+/**
+ * Get the handler registry (for direct access if needed)
+ */
+export function getHandlerRegistry(): Map<string, (...args: unknown[]) => unknown> {
+  return handlerRegistry;
+}
+
+/**
+ * Clear all registered handlers (call in afterEach)
+ */
+export function clearHandlerRegistry(): void {
+  handlerRegistry.clear();
+}
+
+/**
+ * Invoke a registered handler by channel name
+ * @param channel The IPC channel name (e.g., 'sd:list', 'folder:create')
+ * @param args Arguments to pass to the handler (first arg is always the event)
+ * @returns The handler's return value
+ * @throws Error if handler is not registered
+ */
+export async function invokeHandler<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
+  const handler = handlerRegistry.get(channel);
+  if (!handler) {
+    throw new Error(
+      `Handler for channel "${channel}" not registered. ` +
+        `Available channels: ${Array.from(handlerRegistry.keys()).join(', ')}`
+    );
+  }
+  return (await handler(...args)) as T;
+}
+
+/**
+ * Check if a handler is registered for a channel
+ */
+export function hasHandler(channel: string): boolean {
+  return handlerRegistry.has(channel);
+}
+
+/**
+ * Get all registered channel names
+ */
+export function getRegisteredChannels(): string[] {
+  return Array.from(handlerRegistry.keys());
+}
+
+/**
+ * Create a mock ipcMain that captures handler registrations.
+ * Call this to get the mock object for jest.mock('electron', ...).
+ *
+ * Usage in test file:
+ * ```
+ * jest.mock('electron', () => ({
+ *   ipcMain: createMockIpcMain(),
+ *   BrowserWindow: { getAllWindows: jest.fn(() => []) },
+ *   app: { getPath: jest.fn(() => '/mock/path') },
+ * }));
+ * ```
+ */
+export function createMockIpcMain(): {
+  handle: jest.Mock;
+  removeHandler: jest.Mock;
+} {
+  return {
+    handle: jest.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
+      handlerRegistry.set(channel, handler);
+    }),
+    removeHandler: jest.fn((channel: string) => {
+      handlerRegistry.delete(channel);
+    }),
+  };
+}
+
+// =============================================================================
 // Reset Helpers
 // =============================================================================
 

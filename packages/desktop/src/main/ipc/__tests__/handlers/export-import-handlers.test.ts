@@ -4,8 +4,18 @@
  * NOTE: Simplified test file. More comprehensive tests in original handlers.test.ts
  */
 
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  type AllMocks,
+} from './test-utils';
+
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: { handle: jest.fn(), removeHandler: jest.fn() },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: { getAllWindows: jest.fn(() => []) },
   app: {
     getPath: jest.fn((name: string) => (name === 'userData' ? '/mock/user/data' : `/mock/${name}`)),
@@ -59,7 +69,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import { createAllMocks, castMocksToReal, resetUuidCounter, type AllMocks } from './test-utils';
 
 describe('Export/Import (Backup) Handlers', () => {
   let handlers: IPCHandlers;
@@ -83,6 +92,7 @@ describe('Export/Import (Backup) Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('backup:createManualBackup', () => {
@@ -92,8 +102,8 @@ describe('Export/Import (Backup) Handlers', () => {
         success: true,
         path: '/backup/path',
       });
-      const result = await (handlers as any).handleCreateManualBackup(mockEvent);
-      expect(result.success).toBe(true);
+      const result = await invokeHandler('backup:createManualBackup', mockEvent);
+      expect((result as { success: boolean }).success).toBe(true);
     });
   });
 
@@ -102,7 +112,7 @@ describe('Export/Import (Backup) Handlers', () => {
       const mockEvent = {} as any;
       const backups = [{ id: 'backup-1', created: Date.now() }];
       mocks.backupManager.listBackups.mockResolvedValue(backups);
-      const result = await (handlers as any).handleListBackups(mockEvent);
+      const result = await invokeHandler('backup:listBackups', mockEvent);
       expect(result).toEqual(backups);
     });
   });

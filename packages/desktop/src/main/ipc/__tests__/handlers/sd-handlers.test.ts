@@ -4,12 +4,19 @@
  * Tests for storage directory management via IPC handlers.
  */
 
-// Mock electron
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  type AllMocks,
+} from './test-utils';
+
+// Mock electron with handler registry
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: {
-    handle: jest.fn(),
-    removeHandler: jest.fn(),
-  },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
@@ -92,7 +99,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import { createAllMocks, castMocksToReal, resetUuidCounter, type AllMocks } from './test-utils';
 
 describe('SD Handlers', () => {
   let handlers: IPCHandlers;
@@ -127,6 +133,7 @@ describe('SD Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('sd:list', () => {
@@ -139,7 +146,7 @@ describe('SD Handlers', () => {
 
       mocks.database.getAllStorageDirs.mockResolvedValue(sds);
 
-      const result = await (handlers as any).handleListStorageDirs(mockEvent);
+      const result = await invokeHandler('sd:list', mockEvent);
 
       expect(mocks.database.getAllStorageDirs).toHaveBeenCalled();
       expect(result).toEqual(sds);
@@ -149,7 +156,7 @@ describe('SD Handlers', () => {
       const mockEvent = {} as any;
       mocks.database.getAllStorageDirs.mockResolvedValue([]);
 
-      const result = await (handlers as any).handleListStorageDirs(mockEvent);
+      const result = await invokeHandler('sd:list', mockEvent);
 
       expect(result).toEqual([]);
     });
@@ -171,7 +178,7 @@ describe('SD Handlers', () => {
 
       mocks.database.createStorageDir.mockResolvedValue(createdSD);
 
-      const result = await (handlers as any).handleCreateStorageDir(mockEvent, name, path);
+      const result = await invokeHandler('sd:create', mockEvent, name, path);
 
       expect(mocks.database.createStorageDir).toHaveBeenCalledWith(
         '00000001-0000-4000-8000-000000000000',
@@ -196,7 +203,7 @@ describe('SD Handlers', () => {
 
       mocks.database.createStorageDir.mockResolvedValue(createdSD);
 
-      await (handlers as any).handleCreateStorageDir(mockEvent, name, path);
+      await invokeHandler('sd:create', mockEvent, name, path);
 
       expect(mocks.database.createStorageDir).toHaveBeenCalled();
     });
@@ -207,7 +214,7 @@ describe('SD Handlers', () => {
       const mockEvent = {} as any;
       const sdId = 'sd2';
 
-      await (handlers as any).handleSetActiveStorageDir(mockEvent, sdId);
+      await invokeHandler('sd:setActive', mockEvent, sdId);
 
       expect(mocks.database.setActiveStorageDir).toHaveBeenCalledWith(sdId);
     });
@@ -227,7 +234,7 @@ describe('SD Handlers', () => {
 
       mocks.database.getActiveStorageDir.mockResolvedValue(activeSd);
 
-      const result = await (handlers as any).handleGetActiveStorageDir(mockEvent);
+      const result = await invokeHandler('sd:getActive', mockEvent);
 
       expect(mocks.database.getActiveStorageDir).toHaveBeenCalled();
       expect(result).toEqual('sd1');
@@ -237,7 +244,7 @@ describe('SD Handlers', () => {
       const mockEvent = {} as any;
       mocks.database.getActiveStorageDir.mockResolvedValue(null);
 
-      const result = await (handlers as any).handleGetActiveStorageDir(mockEvent);
+      const result = await invokeHandler('sd:getActive', mockEvent);
 
       expect(result).toBeNull();
     });
@@ -249,7 +256,7 @@ describe('SD Handlers', () => {
 
       mocks.database.deleteStorageDir.mockResolvedValue(undefined);
 
-      await (handlers as any).handleDeleteStorageDir(mockEvent, 'test-sd');
+      await invokeHandler('sd:delete', mockEvent, 'test-sd');
 
       expect(mocks.database.deleteStorageDir).toHaveBeenCalledWith('test-sd');
     });
@@ -258,6 +265,10 @@ describe('SD Handlers', () => {
       const mockEvent = {} as any;
       const onStorageDirDeleted = jest.fn().mockResolvedValue(undefined);
       const callOrder: string[] = [];
+
+      // Clean up default handlers first
+      handlers.destroy();
+      clearHandlerRegistry();
 
       // Track call order
       onStorageDirDeleted.mockImplementation(async () => {
@@ -283,7 +294,7 @@ describe('SD Handlers', () => {
         onStorageDirDeleted // onStorageDirDeleted
       );
 
-      await (handlersWithCallback as any).handleDeleteStorageDir(mockEvent, 'test-sd');
+      await invokeHandler('sd:delete', mockEvent, 'test-sd');
 
       expect(onStorageDirDeleted).toHaveBeenCalledWith('test-sd');
       expect(mocks.database.deleteStorageDir).toHaveBeenCalledWith('test-sd');
@@ -291,13 +302,14 @@ describe('SD Handlers', () => {
       expect(callOrder).toEqual(['onStorageDirDeleted', 'deleteStorageDir']);
 
       handlersWithCallback.destroy();
+      clearHandlerRegistry();
     });
   });
 
   describe('sd:getCloudStoragePaths', () => {
     it('should return cloud storage paths object', async () => {
       const mockEvent = {} as any;
-      const result = await (handlers as any).handleGetCloudStoragePaths(mockEvent);
+      const result = await invokeHandler('sd:getCloudStoragePaths', mockEvent);
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('object');

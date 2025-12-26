@@ -19,7 +19,7 @@ import {
   AppStateKey,
   type FeatureFlagConfig,
 } from '@notecove/shared';
-import { IPCHandlers } from './ipc/handlers';
+import { IPCHandlers } from './ipc';
 import type { SyncStatus, StaleSyncEntry } from './ipc/types';
 import { CRDTManagerImpl, CRDTCommentObserver, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';

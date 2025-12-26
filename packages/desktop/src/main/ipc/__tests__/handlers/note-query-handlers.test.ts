@@ -6,8 +6,19 @@
  * NOTE: Simplified test file. More comprehensive tests in original handlers.test.ts
  */
 
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  createMockNoteDoc,
+  type AllMocks,
+} from './test-utils';
+
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: { handle: jest.fn(), removeHandler: jest.fn() },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: { getAllWindows: jest.fn(() => []) },
   app: {
     getPath: jest.fn((name: string) => (name === 'userData' ? '/mock/user/data' : `/mock/${name}`)),
@@ -61,13 +72,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import {
-  createAllMocks,
-  castMocksToReal,
-  resetUuidCounter,
-  createMockNoteDoc,
-  type AllMocks,
-} from './test-utils';
 
 describe('Note Query Handlers', () => {
   let handlers: IPCHandlers;
@@ -91,6 +95,7 @@ describe('Note Query Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('note:list', () => {
@@ -100,7 +105,7 @@ describe('Note Query Handlers', () => {
       const folderId = 'folder-123';
       const notes = [{ id: 'note-1', title: 'Note 1' }];
       mocks.database.getNotesByFolder.mockResolvedValue(notes);
-      const result = await (handlers as any).handleListNotes(mockEvent, sdId, folderId);
+      const result = await invokeHandler('note:list', mockEvent, sdId, folderId);
       expect(result).toEqual(notes);
     });
   });
@@ -113,7 +118,7 @@ describe('Note Query Handlers', () => {
         { noteId: 'note-1', title: 'Test Note', snippet: 'test content', rank: 0.5 },
       ];
       mocks.database.searchNotes.mockResolvedValue(results);
-      const result = await (handlers as any).handleSearchNotes(mockEvent, query);
+      const result = await invokeHandler('note:search', mockEvent, query);
       expect(result).toEqual(results);
     });
   });
@@ -148,7 +153,15 @@ describe('Note Query Handlers', () => {
       });
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
-      const result = await (handlers as any).handleGetMetadata(mockEvent, noteId);
+      const result = await invokeHandler<{
+        createdAt: number;
+        modifiedAt: number;
+        noteId: string;
+        sdId: string;
+        title: string;
+        folderId: string;
+        deleted: boolean;
+      }>('note:getMetadata', mockEvent, noteId);
       expect(result).toMatchObject({
         noteId: noteId,
         sdId: 'test-sd',
@@ -191,7 +204,7 @@ describe('Note Query Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      const result = await (handlers as any).handleGetMetadata(mockEvent, noteId);
+      const result = await invokeHandler<{ sdId: string }>('note:getMetadata', mockEvent, noteId);
 
       expect(result.sdId).toBe(expectedSdId);
     });
@@ -202,7 +215,7 @@ describe('Note Query Handlers', () => {
       const mockEvent = {} as any;
       const folderId = 'folder-123';
       mocks.database.getNoteCountForFolder.mockResolvedValue(5);
-      const result = await (handlers as any).handleGetNoteCountForFolder(mockEvent, folderId);
+      const result = await invokeHandler('note:getCountForFolder', mockEvent, folderId);
       expect(result).toBe(5);
     });
   });

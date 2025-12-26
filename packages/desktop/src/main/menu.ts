@@ -8,7 +8,7 @@
 import { app, BrowserWindow, Menu, shell, clipboard } from 'electron';
 import { is } from '@electron-toolkit/utils';
 import { AppStateKey, type Database, type FeatureFlagConfig } from '@notecove/shared';
-import type { IPCHandlers } from './ipc/handlers';
+import type { IPCHandlers } from './ipc';
 import type { WebServerManager } from './web-server/manager';
 import type { WindowStateManager } from './window-state-manager';
 import { showProfilePicker } from './profile-picker';

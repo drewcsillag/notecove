@@ -37,7 +37,7 @@ import {
 } from '../config/manager';
 import type { Database, NoteCache, FolderCache, SearchResult } from '@notecove/shared';
 import type { CRDTManager } from '../crdt';
-import type { IPCHandlers } from '../ipc/handlers';
+import type { IPCHandlers } from '../ipc';
 import * as Y from 'yjs';
 
 const DEFAULT_PORT = 8765;

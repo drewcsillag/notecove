@@ -4,12 +4,19 @@
  * Tests for folder CRUD operations via IPC handlers.
  */
 
-// Mock electron
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  type AllMocks,
+} from './test-utils';
+
+// Mock electron with handler registry
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: {
-    handle: jest.fn(),
-    removeHandler: jest.fn(),
-  },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
@@ -93,7 +100,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 
 import { IPCHandlers } from '../../handlers';
 import type { FolderData } from '@notecove/shared';
-import { createAllMocks, castMocksToReal, resetUuidCounter, type AllMocks } from './test-utils';
 
 describe('Folder Handlers', () => {
   let handlers: IPCHandlers;
@@ -128,6 +134,7 @@ describe('Folder Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('folder:create', () => {
@@ -156,7 +163,7 @@ describe('Folder Handlers', () => {
         },
       ]);
 
-      const result = await (handlers as any).handleCreateFolder(mockEvent, sdId, null, name);
+      const result = await invokeHandler('folder:create', mockEvent, sdId, null, name);
 
       expect(result).toBeTruthy();
       expect(typeof result).toBe('string');
@@ -197,7 +204,7 @@ describe('Folder Handlers', () => {
         { id: 'existing', name: 'Existing', order: 0 } as FolderData,
       ]);
 
-      await (handlers as any).handleCreateFolder(mockEvent, sdId, parentId, name);
+      await invokeHandler('folder:create', mockEvent, sdId, parentId, name);
 
       expect(mocks.folderTree.getChildFolders).toHaveBeenCalledWith(parentId);
 
@@ -213,13 +220,13 @@ describe('Folder Handlers', () => {
       const mockEvent = {} as any;
       const sdId = 'test-sd';
 
-      await expect((handlers as any).handleCreateFolder(mockEvent, sdId, null, '')).rejects.toThrow(
+      await expect(invokeHandler('folder:create', mockEvent, sdId, null, '')).rejects.toThrow(
         'Folder name cannot be empty'
       );
 
-      await expect(
-        (handlers as any).handleCreateFolder(mockEvent, sdId, null, '   ')
-      ).rejects.toThrow('Folder name cannot be empty');
+      await expect(invokeHandler('folder:create', mockEvent, sdId, null, '   ')).rejects.toThrow(
+        'Folder name cannot be empty'
+      );
     });
 
     it('should reject duplicate folder names (case-insensitive)', async () => {
@@ -231,9 +238,9 @@ describe('Folder Handlers', () => {
         { id: 'existing', name: 'duplicate', order: 0 } as FolderData,
       ]);
 
-      await expect(
-        (handlers as any).handleCreateFolder(mockEvent, sdId, null, name)
-      ).rejects.toThrow('A folder named "Duplicate" already exists in this location');
+      await expect(invokeHandler('folder:create', mockEvent, sdId, null, name)).rejects.toThrow(
+        'A folder named "Duplicate" already exists in this location'
+      );
     });
 
     it('should trim folder names', async () => {
@@ -243,7 +250,7 @@ describe('Folder Handlers', () => {
 
       mocks.folderTree.getRootFolders.mockReturnValue([]);
 
-      await (handlers as any).handleCreateFolder(mockEvent, sdId, null, name);
+      await invokeHandler('folder:create', mockEvent, sdId, null, name);
 
       expect(mocks.folderTree.createFolder).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -262,7 +269,7 @@ describe('Folder Handlers', () => {
         { id: 'f2', name: 'Second', order: 1 } as FolderData,
       ]);
 
-      await (handlers as any).handleCreateFolder(mockEvent, sdId, null, name);
+      await invokeHandler('folder:create', mockEvent, sdId, null, name);
 
       expect(mocks.folderTree.createFolder).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -290,7 +297,7 @@ describe('Folder Handlers', () => {
       mocks.folderTree.getFolder.mockReturnValue(existingFolder);
       mocks.folderTree.getRootFolders.mockReturnValue([existingFolder]);
 
-      await (handlers as any).handleRenameFolder(mockEvent, sdId, folderId, newName);
+      await invokeHandler('folder:rename', mockEvent, sdId, folderId, newName);
 
       expect(mocks.folderTree.getFolder).toHaveBeenCalledWith(folderId);
       expect(mocks.folderTree.getRootFolders).toHaveBeenCalled();
@@ -312,9 +319,9 @@ describe('Folder Handlers', () => {
       const sdId = 'test-sd';
       const folderId = 'folder-id';
 
-      await expect(
-        (handlers as any).handleRenameFolder(mockEvent, sdId, folderId, '')
-      ).rejects.toThrow('Folder name cannot be empty');
+      await expect(invokeHandler('folder:rename', mockEvent, sdId, folderId, '')).rejects.toThrow(
+        'Folder name cannot be empty'
+      );
     });
 
     it('should reject if folder not found', async () => {
@@ -326,7 +333,7 @@ describe('Folder Handlers', () => {
       mocks.folderTree.getFolder.mockReturnValue(null);
 
       await expect(
-        (handlers as any).handleRenameFolder(mockEvent, sdId, folderId, newName)
+        invokeHandler('folder:rename', mockEvent, sdId, folderId, newName)
       ).rejects.toThrow('Folder nonexistent not found');
     });
 
@@ -356,7 +363,7 @@ describe('Folder Handlers', () => {
       mocks.folderTree.getRootFolders.mockReturnValue([folder1, folder2]);
 
       await expect(
-        (handlers as any).handleRenameFolder(mockEvent, sdId, folderId, newName)
+        invokeHandler('folder:rename', mockEvent, sdId, folderId, newName)
       ).rejects.toThrow('A folder named "Existing" already exists in this location');
     });
 
@@ -377,7 +384,7 @@ describe('Folder Handlers', () => {
       mocks.folderTree.getFolder.mockReturnValue(existingFolder);
       mocks.folderTree.getRootFolders.mockReturnValue([existingFolder]);
 
-      await (handlers as any).handleRenameFolder(mockEvent, sdId, folderId, newName);
+      await invokeHandler('folder:rename', mockEvent, sdId, folderId, newName);
 
       expect(mocks.folderTree.updateFolder).toHaveBeenCalledWith(folderId, {
         name: 'FOLDER',
@@ -402,7 +409,7 @@ describe('Folder Handlers', () => {
       mocks.folderTree.getFolder.mockReturnValue(childFolder);
       mocks.folderTree.getChildFolders.mockReturnValue([childFolder]);
 
-      await (handlers as any).handleRenameFolder(mockEvent, sdId, folderId, newName);
+      await invokeHandler('folder:rename', mockEvent, sdId, folderId, newName);
 
       expect(mocks.folderTree.getChildFolders).toHaveBeenCalledWith(parentId);
       expect(mocks.folderTree.getRootFolders).not.toHaveBeenCalled();
@@ -425,7 +432,7 @@ describe('Folder Handlers', () => {
 
       mocks.folderTree.getFolder.mockReturnValue(folder);
 
-      await (handlers as any).handleDeleteFolder(mockEvent, sdId, folderId);
+      await invokeHandler('folder:delete', mockEvent, sdId, folderId);
 
       expect(mocks.folderTree.getFolder).toHaveBeenCalledWith(folderId);
       expect(mocks.folderTree.deleteFolder).toHaveBeenCalledWith(folderId);
@@ -445,7 +452,7 @@ describe('Folder Handlers', () => {
 
       mocks.folderTree.getFolder.mockReturnValue(null);
 
-      await expect((handlers as any).handleDeleteFolder(mockEvent, sdId, folderId)).rejects.toThrow(
+      await expect(invokeHandler('folder:delete', mockEvent, sdId, folderId)).rejects.toThrow(
         'Folder nonexistent not found'
       );
     });
@@ -476,7 +483,7 @@ describe('Folder Handlers', () => {
 
       mocks.folderTree.getVisibleFolders.mockReturnValue(folders);
 
-      const result = await (handlers as any).handleListFolders(mockEvent, sdId);
+      const result = await invokeHandler('folder:list', mockEvent, sdId);
 
       expect(mocks.crdtManager.loadFolderTree).toHaveBeenCalledWith(sdId);
       expect(mocks.folderTree.getVisibleFolders).toHaveBeenCalled();
@@ -500,7 +507,7 @@ describe('Folder Handlers', () => {
 
       mocks.folderTree.getFolder.mockReturnValue(folder);
 
-      const result = await (handlers as any).handleGetFolder(mockEvent, sdId, folderId);
+      const result = await invokeHandler('folder:get', mockEvent, sdId, folderId);
 
       expect(mocks.crdtManager.loadFolderTree).toHaveBeenCalledWith(sdId);
       expect(mocks.folderTree.getFolder).toHaveBeenCalledWith(folderId);
@@ -514,7 +521,7 @@ describe('Folder Handlers', () => {
 
       mocks.folderTree.getFolder.mockReturnValue(null);
 
-      const result = await (handlers as any).handleGetFolder(mockEvent, sdId, folderId);
+      const result = await invokeHandler('folder:get', mockEvent, sdId, folderId);
 
       expect(result).toBeNull();
     });
@@ -551,7 +558,7 @@ describe('Folder Handlers', () => {
       });
       mocks.folderTree.getChildFolders.mockReturnValue([]);
 
-      await (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId);
+      await invokeHandler('folder:move', mockEvent, sdId, folderId, newParentId);
 
       expect(mocks.folderTree.getFolder).toHaveBeenCalledWith(folderId);
       expect(mocks.folderTree.getChildFolders).toHaveBeenCalledWith(newParentId);
@@ -588,7 +595,7 @@ describe('Folder Handlers', () => {
         { id: 'root-1', name: 'Root 1', order: 0 } as FolderData,
       ]);
 
-      await (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, null);
+      await invokeHandler('folder:move', mockEvent, sdId, folderId, null);
 
       expect(mocks.folderTree.getRootFolders).toHaveBeenCalled();
 
@@ -631,7 +638,7 @@ describe('Folder Handlers', () => {
         { id: 'sibling-2', name: 'Sibling 2', order: 1 } as FolderData,
       ]);
 
-      await (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId);
+      await invokeHandler('folder:move', mockEvent, sdId, folderId, newParentId);
 
       expect(mocks.folderTree.updateFolder).toHaveBeenCalledWith(folderId, {
         parentId: newParentId,
@@ -648,7 +655,7 @@ describe('Folder Handlers', () => {
       mocks.folderTree.getFolder.mockReturnValue(null);
 
       await expect(
-        (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId)
+        invokeHandler('folder:move', mockEvent, sdId, folderId, newParentId)
       ).rejects.toThrow('Folder nonexistent not found');
     });
 
@@ -683,7 +690,7 @@ describe('Folder Handlers', () => {
       });
 
       await expect(
-        (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId)
+        invokeHandler('folder:move', mockEvent, sdId, folderId, newParentId)
       ).rejects.toThrow('Cannot move folder to be its own descendant');
     });
 
@@ -728,7 +735,7 @@ describe('Folder Handlers', () => {
       });
 
       await expect(
-        (handlers as any).handleMoveFolder(mockEvent, sdId, folderId, newParentId)
+        invokeHandler('folder:move', mockEvent, sdId, folderId, newParentId)
       ).rejects.toThrow('Cannot move folder to be its own descendant');
     });
   });
@@ -740,7 +747,7 @@ describe('Folder Handlers', () => {
       const folderId = 'folder-1';
       const newOrder = 2;
 
-      await (handlers as any).handleReorderFolder(mockEvent, sdId, folderId, newOrder);
+      await invokeHandler('folder:reorder', mockEvent, sdId, folderId, newOrder);
 
       expect(mocks.crdtManager.loadFolderTree).toHaveBeenCalledWith(sdId);
       expect(mocks.folderTree.reorderFolder).toHaveBeenCalledWith(folderId, newOrder);
@@ -752,7 +759,7 @@ describe('Folder Handlers', () => {
       const mockEvent = {} as any;
       const folderId = 'folder-123';
 
-      (handlers as any).handleEmitFolderSelected(mockEvent, folderId);
+      await invokeHandler('folder:emitSelected', mockEvent, folderId);
 
       // handleEmitFolderSelected uses broadcastToAll, which is tested via window mock
       // We just verify it doesn't throw
@@ -791,7 +798,7 @@ describe('Folder Handlers', () => {
         .mockReturnValueOnce(folders1)
         .mockReturnValueOnce(folders2);
 
-      const result = await (handlers as any).handleListAllFolders(mockEvent);
+      const result = await invokeHandler('folder:listAll', mockEvent);
 
       expect(mocks.crdtManager.loadFolderTree).toHaveBeenCalledWith('sd-1');
       expect(mocks.crdtManager.loadFolderTree).toHaveBeenCalledWith('sd-2');

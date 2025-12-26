@@ -4,8 +4,18 @@
  * NOTE: Simplified test file. More comprehensive tests in original handlers.test.ts
  */
 
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  type AllMocks,
+} from './test-utils';
+
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: { handle: jest.fn(), removeHandler: jest.fn() },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: { getAllWindows: jest.fn(() => []) },
   app: {
     getPath: jest.fn((name: string) => (name === 'userData' ? '/mock/user/data' : `/mock/${name}`)),
@@ -59,7 +69,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import { createAllMocks, castMocksToReal, resetUuidCounter, type AllMocks } from './test-utils';
 
 describe('Sync Handlers', () => {
   let handlers: IPCHandlers;
@@ -83,12 +92,13 @@ describe('Sync Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('sync:getStatus', () => {
     it('should return sync status', async () => {
       const mockEvent = {} as any;
-      const result = await (handlers as any).handleGetSyncStatus(mockEvent);
+      const result = await invokeHandler('sync:getStatus', mockEvent);
       expect(result).toEqual({
         pendingCount: 0,
         perSd: [],

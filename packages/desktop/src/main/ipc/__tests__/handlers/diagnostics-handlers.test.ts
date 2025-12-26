@@ -7,12 +7,19 @@
  * handlers.test.ts file and should be migrated here over time.
  */
 
-// Mock electron
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  type AllMocks,
+} from './test-utils';
+
+// Mock electron with handler registry
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: {
-    handle: jest.fn(),
-    removeHandler: jest.fn(),
-  },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
@@ -93,7 +100,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import { createAllMocks, castMocksToReal, resetUuidCounter, type AllMocks } from './test-utils';
 
 describe('Diagnostics Handlers', () => {
   let handlers: IPCHandlers;
@@ -123,6 +129,7 @@ describe('Diagnostics Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('diagnostics:getDuplicateNotes', () => {
@@ -132,7 +139,7 @@ describe('Diagnostics Handlers', () => {
 
       mocks.diagnosticsManager.detectDuplicateNotes.mockResolvedValue(duplicates);
 
-      const result = await (handlers as any).handleGetDuplicateNotes(mockEvent);
+      const result = await invokeHandler('diagnostics:getDuplicateNotes', mockEvent);
 
       expect(result).toEqual(duplicates);
     });
@@ -145,7 +152,7 @@ describe('Diagnostics Handlers', () => {
 
       mocks.diagnosticsManager.detectOrphanedCRDTFiles.mockResolvedValue(orphaned);
 
-      const result = await (handlers as any).handleGetOrphanedCRDTFiles(mockEvent);
+      const result = await invokeHandler('diagnostics:getOrphanedCRDTFiles', mockEvent);
 
       expect(result).toEqual(orphaned);
     });

@@ -6,7 +6,25 @@
  */
 
 import { BrowserWindow } from 'electron';
-import type { HandlerDependencies, HandlerContext, WebBroadcastCallback } from './types';
+import type { Database, AppendLogManager } from '@notecove/shared';
+import type { CRDTManager } from '../../crdt';
+import type { ConfigManager } from '../../config/manager';
+import type { NoteMoveManager } from '../../note-move-manager';
+import type { DiagnosticsManager } from '../../diagnostics-manager';
+import type { BackupManager } from '../../backup-manager';
+import type {
+  HandlerContext,
+  WebBroadcastCallback,
+  CreateWindowOptions,
+  GetDeletionLoggerFn,
+  GetSyncStatusFn,
+  GetStaleSyncsFn,
+  SkipStaleEntryFn,
+  RetryStaleEntryFn,
+  ClearSkippedEntriesForNoteFn,
+  OnUserSettingsChangedFn,
+  StopWebServerFn,
+} from './types';
 import {
   isValidImageId,
   ImageStorage,
@@ -67,7 +85,9 @@ export type {
   GetStaleSyncsFn,
   SkipStaleEntryFn,
   RetryStaleEntryFn,
+  ClearSkippedEntriesForNoteFn,
   OnUserSettingsChangedFn,
+  StopWebServerFn,
   OnStorageDirCreatedFn,
   OnStorageDirDeletedFn,
   MentionUser,
@@ -86,17 +106,56 @@ export class IPCHandlers {
   private webBroadcastCallback: WebBroadcastCallback | undefined;
   private ctx: HandlerContext;
 
-  constructor(deps: HandlerDependencies) {
+  constructor(
+    crdtManager: CRDTManager,
+    database: Database,
+    configManager: ConfigManager,
+    storageManager: AppendLogManager,
+    noteMoveManager: NoteMoveManager,
+    diagnosticsManager: DiagnosticsManager,
+    backupManager: BackupManager,
+    profileId: string,
+    createWindowFn?: (options?: CreateWindowOptions) => void,
+    onStorageDirCreated?: (sdId: string, sdPath: string) => Promise<void>,
+    onStorageDirDeleted?: (sdId: string) => Promise<void>,
+    getDeletionLogger?: GetDeletionLoggerFn,
+    getSyncStatus?: GetSyncStatusFn,
+    getStaleSyncs?: GetStaleSyncsFn,
+    skipStaleEntry?: SkipStaleEntryFn,
+    retryStaleEntry?: RetryStaleEntryFn,
+    clearSkippedEntriesForNote?: ClearSkippedEntriesForNoteFn,
+    onUserSettingsChanged?: OnUserSettingsChangedFn,
+    stopWebServer?: StopWebServerFn
+  ) {
     // Initialize services that need setup
-    initializeImageServices(deps.database);
+    initializeImageServices(database);
     initializeMiscServices();
 
     // Create the handler context with runtime services
+    // Type assertion needed due to exactOptionalPropertyTypes handling of optional params
     this.ctx = {
-      ...deps,
+      crdtManager,
+      database,
+      configManager,
+      storageManager,
+      noteMoveManager,
+      diagnosticsManager,
+      backupManager,
+      profileId,
+      createWindowFn,
+      onStorageDirCreated,
+      onStorageDirDeleted,
+      getDeletionLogger,
+      getSyncStatus,
+      getStaleSyncs,
+      skipStaleEntry,
+      retryStaleEntry,
+      clearSkippedEntriesForNote,
+      onUserSettingsChanged,
+      stopWebServer,
       broadcastToAll: this.broadcastToAll.bind(this),
       discoverImageAcrossSDs: this.discoverImageAcrossSDs.bind(this),
-    };
+    } as HandlerContext;
 
     // Register all handlers
     this.registerHandlers();
@@ -215,6 +274,13 @@ export class IPCHandlers {
   }
 
   /**
+   * Broadcasts to all windows to open settings
+   */
+  openSettings(): void {
+    this.broadcastToAll('settings:open', {});
+  }
+
+  /**
    * Register all IPC handlers
    */
   private registerHandlers(): void {
@@ -236,10 +302,10 @@ export class IPCHandlers {
   }
 
   /**
-   * Unregister all IPC handlers
+   * Clean up all handlers
    * Call this when cleaning up (e.g., for tests)
    */
-  unregisterHandlers(): void {
+  destroy(): void {
     unregisterNoteHandlers();
     unregisterNoteEditHandlers();
     unregisterNoteQueryHandlers();

@@ -4,12 +4,20 @@
  * Tests for note editing operations (duplicate, togglePin, move, moveToSD, updateTitle).
  */
 
-// Mock electron
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  createMockNoteDoc,
+  type AllMocks,
+} from './test-utils';
+
+// Mock electron with handler registry
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: {
-    handle: jest.fn(),
-    removeHandler: jest.fn(),
-  },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
@@ -92,13 +100,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 });
 
 import { IPCHandlers } from '../../handlers';
-import {
-  createAllMocks,
-  castMocksToReal,
-  resetUuidCounter,
-  createMockNoteDoc,
-  type AllMocks,
-} from './test-utils';
 
 describe('Note Edit Handlers', () => {
   let handlers: IPCHandlers;
@@ -133,6 +134,7 @@ describe('Note Edit Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('note:togglePin', () => {
@@ -159,7 +161,7 @@ describe('Note Edit Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleTogglePinNote(mockEvent, noteId);
+      await invokeHandler('note:togglePin', mockEvent, noteId);
 
       expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -196,7 +198,7 @@ describe('Note Edit Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleTogglePinNote(mockEvent, noteId);
+      await invokeHandler('note:togglePin', mockEvent, noteId);
 
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -229,7 +231,7 @@ describe('Note Edit Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleMoveNote(mockEvent, noteId, newFolderId);
+      await invokeHandler('note:move', mockEvent, noteId, newFolderId);
 
       expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -264,7 +266,7 @@ describe('Note Edit Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleMoveNote(mockEvent, noteId, null);
+      await invokeHandler('note:move', mockEvent, noteId, null);
 
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -294,7 +296,7 @@ describe('Note Edit Handlers', () => {
 
       mocks.database.getNote.mockResolvedValue(mockNote);
 
-      await (handlers as any).handleUpdateTitle(mockEvent, noteId, newTitle);
+      await invokeHandler('note:updateTitle', mockEvent, noteId, newTitle);
 
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -323,7 +325,7 @@ describe('Note Edit Handlers', () => {
 
       mocks.database.getNote.mockResolvedValue(mockNote);
 
-      await (handlers as any).handleUpdateTitle(mockEvent, noteId, newTitle, contentText);
+      await invokeHandler('note:updateTitle', mockEvent, noteId, newTitle, contentText);
 
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -366,7 +368,7 @@ describe('Note Edit Handlers', () => {
       mocks.crdtManager.getDocument.mockReturnValueOnce(sourceDoc).mockReturnValueOnce(newDoc);
       mocks.crdtManager.getNoteDoc.mockReturnValueOnce(newNoteDoc);
 
-      const duplicateId = await (handlers as any).handleDuplicateNote(mockEvent, originalNoteId);
+      const duplicateId = await invokeHandler('note:duplicate', mockEvent, originalNoteId);
 
       expect(duplicateId).toBe('00000001-0000-4000-8000-000000000000');
       expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(duplicateId, 'test-sd');
@@ -488,7 +490,8 @@ describe('Note Edit Handlers', () => {
       (fsPromises.mkdir as jest.Mock).mockResolvedValue(undefined);
 
       // Call the move handler
-      await (handlers as any).handleMoveNoteToSD(
+      await invokeHandler(
+        'note:moveToSD',
         mockEvent,
         noteId,
         sourceSdId,
@@ -549,7 +552,7 @@ describe('Note Edit Handlers', () => {
 
       // Move should throw error due to image copy failure
       await expect(
-        (handlers as any).handleMoveNoteToSD(mockEvent, noteId, sourceSdId, targetSdId, null, null)
+        invokeHandler('note:moveToSD', mockEvent, noteId, sourceSdId, targetSdId, null, null)
       ).rejects.toThrow(/Failed to copy image/);
 
       // Note move should NOT have been initiated
@@ -587,14 +590,7 @@ describe('Note Edit Handlers', () => {
       });
 
       // Call the move handler
-      await (handlers as any).handleMoveNoteToSD(
-        mockEvent,
-        noteId,
-        sourceSdId,
-        targetSdId,
-        null,
-        null
-      );
+      await invokeHandler('note:moveToSD', mockEvent, noteId, sourceSdId, targetSdId, null, null);
 
       // Move should succeed
       expect(mocks.noteMoveManager.initiateMove).toHaveBeenCalled();
@@ -632,14 +628,7 @@ describe('Note Edit Handlers', () => {
       });
 
       // Call the move handler
-      await (handlers as any).handleMoveNoteToSD(
-        mockEvent,
-        noteId,
-        sourceSdId,
-        targetSdId,
-        null,
-        null
-      );
+      await invokeHandler('note:moveToSD', mockEvent, noteId, sourceSdId, targetSdId, null, null);
 
       // Move should proceed normally
       expect(mocks.noteMoveManager.initiateMove).toHaveBeenCalled();

@@ -59,6 +59,11 @@ export type ClearSkippedEntriesForNoteFn = (noteId: string, sdId: string) => voi
 export type OnUserSettingsChangedFn = (key: string, value: string) => Promise<void>;
 
 /**
+ * Callback type for stopping the web server when feature flag is disabled
+ */
+export type StopWebServerFn = () => Promise<void>;
+
+/**
  * Callback type for broadcasting to web clients via WebSocket
  */
 export type WebBroadcastCallback = (channel: string, ...args: unknown[]) => void;
@@ -126,6 +131,7 @@ export interface HandlerDependencies {
   retryStaleEntry?: RetryStaleEntryFn;
   clearSkippedEntriesForNote?: ClearSkippedEntriesForNoteFn;
   onUserSettingsChanged?: OnUserSettingsChangedFn;
+  stopWebServer?: StopWebServerFn;
 }
 
 /**

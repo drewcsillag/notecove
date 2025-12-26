@@ -4,12 +4,20 @@
  * Tests for core note operations (create, delete, restore, permanentDelete, load, unload, getState, applyUpdate).
  */
 
-// Mock electron
+import {
+  createAllMocks,
+  castMocksToReal,
+  resetUuidCounter,
+  clearHandlerRegistry,
+  invokeHandler,
+  createMockNoteDoc,
+  type AllMocks,
+} from './test-utils';
+
+// Mock electron with handler registry
+/* eslint-disable @typescript-eslint/no-require-imports */
 jest.mock('electron', () => ({
-  ipcMain: {
-    handle: jest.fn(),
-    removeHandler: jest.fn(),
-  },
+  ipcMain: require('./test-utils').createMockIpcMain(),
   BrowserWindow: {
     getAllWindows: jest.fn(() => []),
   },
@@ -93,13 +101,6 @@ jest.mock('../../../storage/node-fs-adapter', () => {
 
 import { IPCHandlers } from '../../handlers';
 import * as Y from 'yjs';
-import {
-  createAllMocks,
-  castMocksToReal,
-  resetUuidCounter,
-  createMockNoteDoc,
-  type AllMocks,
-} from './test-utils';
 
 describe('Note Core Handlers', () => {
   let handlers: IPCHandlers;
@@ -134,6 +135,7 @@ describe('Note Core Handlers', () => {
 
   afterEach(() => {
     handlers.destroy();
+    clearHandlerRegistry();
   });
 
   describe('note:create', () => {
@@ -146,7 +148,7 @@ describe('Note Core Handlers', () => {
 
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      const noteId = await (handlers as any).handleCreateNote(mockEvent, sdId, folderId);
+      const noteId = await invokeHandler('note:create', mockEvent, sdId, folderId);
 
       expect(noteId).toBeDefined();
       expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(noteId, sdId);
@@ -180,7 +182,7 @@ describe('Note Core Handlers', () => {
 
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleCreateNote(mockEvent, sdId, folderId);
+      await invokeHandler('note:create', mockEvent, sdId, folderId);
 
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -213,7 +215,7 @@ describe('Note Core Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleDeleteNote(mockEvent, noteId);
+      await invokeHandler('note:delete', mockEvent, noteId);
 
       expect(mockNoteDoc.markDeleted).toHaveBeenCalled();
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
@@ -246,7 +248,7 @@ describe('Note Core Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValueOnce(null).mockReturnValueOnce(mockNoteDoc);
 
-      await (handlers as any).handleDeleteNote(mockEvent, noteId);
+      await invokeHandler('note:delete', mockEvent, noteId);
 
       expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(noteId, sdId);
       expect(mockNoteDoc.markDeleted).toHaveBeenCalled();
@@ -256,9 +258,9 @@ describe('Note Core Handlers', () => {
       const mockEvent = {} as any;
       mocks.database.getNote.mockResolvedValue(null);
 
-      await expect(
-        (handlers as any).handleDeleteNote(mockEvent, 'non-existent-note')
-      ).rejects.toThrow('Note non-existent-note not found');
+      await expect(invokeHandler('note:delete', mockEvent, 'non-existent-note')).rejects.toThrow(
+        'Note non-existent-note not found'
+      );
     });
 
     it('should unpin a pinned note when deleting', async () => {
@@ -283,7 +285,7 @@ describe('Note Core Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleDeleteNote(mockEvent, noteId);
+      await invokeHandler('note:delete', mockEvent, noteId);
 
       // Should update CRDT metadata to unpin
       expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
@@ -325,7 +327,7 @@ describe('Note Core Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleRestoreNote(mockEvent, noteId);
+      await invokeHandler('note:restore', mockEvent, noteId);
 
       expect(mockNoteDoc.markRestored).toHaveBeenCalled();
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
@@ -358,7 +360,7 @@ describe('Note Core Handlers', () => {
 
       mocks.database.getNote.mockResolvedValue(mockNote);
 
-      await (handlers as any).handlePermanentDeleteNote(mockEvent, noteId);
+      await invokeHandler('note:permanentDelete', mockEvent, noteId);
 
       expect(mocks.crdtManager.unloadNote).toHaveBeenCalledWith(noteId);
       expect(mocks.database.deleteNote).toHaveBeenCalledWith(noteId);
@@ -402,7 +404,7 @@ describe('Note Core Handlers', () => {
         .mockResolvedValueOnce(deletedNotes[0])
         .mockResolvedValueOnce(deletedNotes[1]);
 
-      const result = await (handlers as any).handleEmptyTrash(mockEvent, sdId);
+      const result = await invokeHandler('note:emptyTrash', mockEvent, sdId);
 
       expect(result).toBe(2);
       expect(mocks.database.getDeletedNotes).toHaveBeenCalledWith(sdId);
@@ -418,7 +420,7 @@ describe('Note Core Handlers', () => {
 
       mocks.database.getDeletedNotes.mockResolvedValue([]);
 
-      const result = await (handlers as any).handleEmptyTrash(mockEvent, sdId);
+      const result = await invokeHandler('note:emptyTrash', mockEvent, sdId);
 
       expect(result).toBe(0);
       expect(mocks.database.getDeletedNotes).toHaveBeenCalledWith(sdId);
@@ -463,7 +465,7 @@ describe('Note Core Handlers', () => {
         .mockRejectedValueOnce(new Error('Failed to find note'))
         .mockResolvedValueOnce(deletedNotes[1]);
 
-      const result = await (handlers as any).handleEmptyTrash(mockEvent, sdId);
+      const result = await invokeHandler('note:emptyTrash', mockEvent, sdId);
 
       // Should still return 1 since one note succeeded
       expect(result).toBe(1);
@@ -503,7 +505,7 @@ describe('Note Core Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleLoadNote(mockEvent, noteId);
+      await invokeHandler('note:load', mockEvent, noteId);
 
       expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(noteId, sdId);
     });
@@ -514,7 +516,7 @@ describe('Note Core Handlers', () => {
       const mockEvent = {} as any;
       const noteId = 'note-123';
 
-      await (handlers as any).handleUnloadNote(mockEvent, noteId);
+      await invokeHandler('note:unload', mockEvent, noteId);
 
       expect(mocks.crdtManager.unloadNote).toHaveBeenCalledWith(noteId);
     });
@@ -528,7 +530,7 @@ describe('Note Core Handlers', () => {
 
       mocks.crdtManager.getDocument.mockReturnValue(mockDoc);
 
-      const result = await (handlers as any).handleGetState(mockEvent, noteId);
+      const result = await invokeHandler('note:getState', mockEvent, noteId);
 
       expect(result).toBeInstanceOf(Uint8Array);
     });
@@ -540,7 +542,7 @@ describe('Note Core Handlers', () => {
       const noteId = 'note-123';
       const update = new Uint8Array([1, 2, 3]);
 
-      await (handlers as any).handleApplyUpdate(mockEvent, noteId, update);
+      await invokeHandler('note:applyUpdate', mockEvent, noteId, update);
 
       expect(mocks.crdtManager.applyUpdate).toHaveBeenCalledWith(noteId, update);
     });
@@ -585,7 +587,7 @@ describe('Note Core Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleApplyUpdate(mockEvent, noteId, update);
+      await invokeHandler('note:applyUpdate', mockEvent, noteId, update);
 
       // The upsertNote should NOT be called because:
       // 1. We removed sdId from metadataChanged check
@@ -630,7 +632,7 @@ describe('Note Core Handlers', () => {
       mocks.database.getNote.mockResolvedValue(mockNote);
       mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
 
-      await (handlers as any).handleApplyUpdate(mockEvent, noteId, update);
+      await invokeHandler('note:applyUpdate', mockEvent, noteId, update);
 
       // Should update deleted status but preserve local sdId
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(

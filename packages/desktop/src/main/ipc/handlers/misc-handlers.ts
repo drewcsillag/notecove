@@ -16,7 +16,7 @@
 
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { HandlerContext } from './types';
-import type { NoteCache, AppStateKey } from '@notecove/shared';
+import { AppStateKey, type NoteCache } from '@notecove/shared';
 import { getTelemetryManager } from '../../telemetry/config';
 import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
 import {
@@ -90,6 +90,9 @@ export function registerMiscHandlers(ctx: HandlerContext): void {
   // Tools operations
   ipcMain.handle('tools:reindexNotes', handleReindexNotes(ctx));
 
+  // Theme operations (for cross-window sync)
+  ipcMain.handle('theme:set', handleSetTheme(ctx));
+
   // Test-only operations (only available in NODE_ENV=test)
   if (process.env['NODE_ENV'] === 'test') {
     ipcMain.handle('test:setNoteTimestamp', handleSetNoteTimestamp(ctx));
@@ -120,6 +123,8 @@ export function unregisterMiscHandlers(): void {
   ipcMain.removeHandler('inspector:parseFile');
 
   ipcMain.removeHandler('tools:reindexNotes');
+
+  ipcMain.removeHandler('theme:set');
 
   // Test handlers (always try to remove, safe if not registered)
   ipcMain.removeHandler('test:setNoteTimestamp');
@@ -410,6 +415,26 @@ function handleReindexNotes(ctx: HandlerContext) {
       broadcastToAll('tools:reindex-error', { error: message });
       return { success: false, error: message };
     }
+  };
+}
+
+// =============================================================================
+// Theme Handler Factories
+// =============================================================================
+
+/**
+ * Set theme and broadcast to all windows.
+ * Used by Settings dialog to ensure all windows update theme together.
+ */
+function handleSetTheme(ctx: HandlerContext) {
+  return async (_event: IpcMainInvokeEvent, theme: 'light' | 'dark'): Promise<void> => {
+    const { database, broadcastToAll } = ctx;
+
+    // Save to database
+    await database.setState(AppStateKey.ThemeMode, theme);
+
+    // Broadcast to all windows
+    broadcastToAll('theme:changed', theme);
   };
 }
 
