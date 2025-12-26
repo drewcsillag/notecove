@@ -7,14 +7,8 @@
 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import BulletList from '@tiptap/extension-bullet-list';
-import OrderedList from '@tiptap/extension-ordered-list';
-import Collaboration from '@tiptap/extension-collaboration';
-import Underline from '@tiptap/extension-underline';
-import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
 import {
   Box,
   useTheme,
@@ -37,28 +31,17 @@ import * as Y from 'yjs';
 import { yUndoPluginKey } from 'y-prosemirror';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { EditorToolbar } from './EditorToolbar';
-import { Hashtag } from './extensions/Hashtag';
-import { AtMention } from './extensions/AtMention';
-import { MentionNode, type MentionNodeAttributes } from './extensions/MentionNode';
-import { DateChip } from './extensions/DateChip';
+import { type MentionNodeAttributes } from './extensions/MentionNode';
 import { DatePickerDialog } from './DatePickerDialog';
 import { MentionPopover } from './MentionPopover';
-import { InterNoteLink, clearNoteTitleCache, prefetchNoteTitles } from './extensions/InterNoteLink';
-import { TriStateTaskItem } from './extensions/TriStateTaskItem';
-import { WebLink, setWebLinkCallbacks } from './extensions/WebLink';
-import { CommentMark } from './extensions/CommentMark';
-import { NotecoveImage } from './extensions/Image';
-import {
-  NotecoveTable,
-  NotecoveTableRow,
-  NotecoveTableHeader,
-  NotecoveTableCell,
-} from './extensions/Table';
-import { TabIndent } from './extensions/TabIndent';
-import { NotecoveListItem } from './extensions/NotecoveListItem';
-import { MoveBlock } from './extensions/MoveBlock';
-import { NotecoveCodeBlock } from './extensions/CodeBlockLowlight';
-import { getCodeBlockStyles } from './codeBlockTheme';
+// clearNoteTitleCache and prefetchNoteTitles are used by useNoteSync
+import { setWebLinkCallbacks } from './extensions/WebLink';
+import { getTipTapEditorStyles } from './tipTapEditorStyles';
+import { getEditorExtensions, type EditorExtensionCallbacks } from './getEditorExtensions';
+import { useNoteSync, type UseNoteSyncRefs, type UseNoteSyncState } from './useNoteSync';
+import { useEditorStateRestoration } from './useEditorStateRestoration';
+import { useEditorImages } from './useEditorImages';
+import { useEditorComments, type CommentCallbacks } from './useEditorComments';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
 import { TableSizePickerDialog } from './TableSizePickerDialog';
@@ -67,49 +50,11 @@ import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
-import { useWindowState } from '../../hooks/useWindowState';
-import { useNoteScrollPosition } from '../../hooks/useNoteScrollPosition';
+// useWindowState and useNoteScrollPosition are used by useEditorStateRestoration
 import { detectUrlFromSelection } from '@notecove/shared';
 import { sanitizeClipboardHtml } from '../../utils/clipboard-sanitizer';
 
-/**
- * Map of file extensions to MIME types for image files.
- * Used when file.type is empty (common when dropping files from Finder on macOS).
- */
-const EXTENSION_TO_MIME: Record<string, string> = {
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  svg: 'image/svg+xml',
-  heic: 'image/heic',
-  heif: 'image/heif',
-};
-
-/**
- * Get MIME type from filename extension.
- * Returns null if extension is not a supported image type.
- */
-function getMimeTypeFromFilename(filename: string): string | null {
-  const lastDotIndex = filename.lastIndexOf('.');
-  if (lastDotIndex === -1) return null;
-  const extension = filename.slice(lastDotIndex + 1).toLowerCase();
-  return EXTENSION_TO_MIME[extension] ?? null;
-}
-
-/**
- * Check if a file is an image, using both file.type and filename extension.
- * Returns the MIME type if it's an image, or null otherwise.
- */
-function getImageMimeType(file: File): string | null {
-  // First try the file's MIME type
-  if (file.type.startsWith('image/')) {
-    return file.type;
-  }
-  // Fall back to inferring from extension (common when dropping from Finder)
-  return getMimeTypeFromFilename(file.name);
-}
+// MIME type helpers are in useEditorImages.ts
 
 /**
  * User profile for comment authorship
@@ -161,13 +106,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 }) => {
   const theme = useTheme();
   const [yDoc] = useState(() => new Y.Doc());
-  // Show sync indicator when external updates arrive
-  const [showSyncIndicator, setShowSyncIndicator] = useState(false);
   // Track whether text is selected (for enabling comment button)
   const [hasTextSelection, setHasTextSelection] = useState(false);
-  // Track open (unresolved) comment count for badge
-  const [openCommentCount, setOpenCommentCount] = useState(0);
-  // Current user profile for comment authorship
+  // Current user profile for comment authorship (loaded via effect, passed to useEditorComments)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const syncIndicatorTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Loading state - start with loading=true to prevent title extraction before note loads
@@ -249,11 +190,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     to: number;
   } | null>(null);
 
-  // Overlapping comments popover state
-  const [overlapPopover, setOverlapPopover] = useState<{
-    anchorEl: HTMLElement;
-    threadIds: string[];
-  } | null>(null);
+  // Note: overlapPopover state is owned by useEditorComments
 
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
@@ -261,25 +198,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // Ref for the scrollable editor container (for scroll position tracking)
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Window state hook for session restoration
-  const {
-    windowId,
-    reportCurrentNote,
-    reportScrollPosition: reportWindowScrollPosition,
-    reportCursorPosition,
-    getSavedState,
-    reportFinalState,
-  } = useWindowState();
-
-  // Per-note scroll position persistence (across app restarts)
-  const {
-    getScrollPosition: getSavedNoteScrollPosition,
-    reportScrollPosition: reportNoteScrollPosition,
-  } = useNoteScrollPosition();
-
-  // Track saved state for restoration after note loads
-  const savedStateRef = useRef<{ scrollTop: number; cursorPosition: number } | null>(null);
-  const hasRestoredStateRef = useRef(false);
+  // Note: Window state and scroll position persistence are handled by useEditorStateRestoration
 
   // Set up WebLink callbacks
   // This must be done before useEditor to ensure callbacks are available
@@ -353,123 +272,70 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, []);
 
-  const editor = useEditor({
-    extensions: [
-      // Use StarterKit but exclude History and built-in lists
-      // (we'll add custom list extensions that support taskItem)
-      StarterKit.configure({
-        history: false, // Collaboration extension handles undo/redo
-        bulletList: false, // Use custom version that accepts taskItem
-        orderedList: false, // Use custom version that accepts taskItem
-        listItem: false, // Use NotecoveListItem with cursor-position-aware Tab
-        codeBlock: false, // Use NotecoveCodeBlock with syntax highlighting
-      }),
-      // Add syntax-highlighted code blocks
-      NotecoveCodeBlock,
-      // Custom BulletList that accepts both listItem and taskItem
-      BulletList.extend({
-        content: '(listItem | taskItem)+',
-      }),
-      // Custom OrderedList that accepts both listItem and taskItem
-      OrderedList.extend({
-        content: '(listItem | taskItem)+',
-      }),
-      // Custom ListItem with cursor-position-aware Tab/Shift-Tab
-      NotecoveListItem,
-      // Add Underline extension (not in StarterKit)
-      Underline,
-      // Add tri-state task item extension (list-based checkboxes)
-      TriStateTaskItem.configure({
-        nested: true, // Allow nesting for sub-tasks
-      }),
-      // Add Hashtag extension for #tag support
-      Hashtag,
-      // Add AtMention extension for @date and @mention support
-      AtMention,
-      // Add MentionNode for inline user mention chips
-      MentionNode.configure({
-        onMentionClick: (attrs: MentionNodeAttributes, element: HTMLElement) => {
-          console.log('[MentionNode] Clicked mention:', attrs);
-          setMentionPopoverState({
+  // Memoize extension callbacks to prevent recreation on every render
+  const extensionCallbacks = useMemo<EditorExtensionCallbacks>(
+    () => ({
+      onMentionClick: (attrs: MentionNodeAttributes, element: HTMLElement) => {
+        console.log('[MentionNode] Clicked mention:', attrs);
+        setMentionPopoverState({
+          open: true,
+          anchorEl: element,
+          attrs,
+        });
+      },
+      onDateClick: (date: string, from: number, to: number) => {
+        console.log('[DateChip] Clicked date:', date, 'at', from, '-', to);
+        // Find the date chip element that was clicked
+        const dateChipEl = document.querySelector<HTMLElement>(
+          `.date-chip[data-date="${date}"][data-from="${from}"]`
+        );
+        if (dateChipEl) {
+          setDatePickerState({
             open: true,
-            anchorEl: element,
-            attrs,
+            anchorEl: dateChipEl,
+            initialDate: date,
+            from,
+            to,
           });
-        },
-      }),
-      // Add DateChip extension for YYYY-MM-DD date styling
-      DateChip.configure({
-        onDateClick: (date: string, from: number, to: number) => {
-          console.log('[DateChip] Clicked date:', date, 'at', from, '-', to);
-          // Find the date chip element that was clicked
-          const dateChipEl = document.querySelector<HTMLElement>(
-            `.date-chip[data-date="${date}"][data-from="${from}"]`
-          );
-          if (dateChipEl) {
-            setDatePickerState({
-              open: true,
-              anchorEl: dateChipEl,
-              initialDate: date,
-              from,
-              to,
-            });
-          }
-        },
-      }),
-      // Add InterNoteLink extension for [[note-id]] support
-      InterNoteLink.configure({
-        onLinkClick: (linkNoteId: string) => {
-          // Single click: Navigate to note in same window
-          console.log('[InterNoteLink] Single click on note:', linkNoteId);
-          if (onNavigateToNote) {
-            onNavigateToNote(linkNoteId);
-          }
-        },
-        onLinkDoubleClick: (linkNoteId: string) => {
-          // Double click: Open note in new window (minimal layout)
-          console.log('[InterNoteLink] Double click on note:', linkNoteId);
-          void window.electronAPI.testing
-            .createWindow({
-              noteId: linkNoteId,
-              minimal: true,
-            })
-            .then(() => {
-              console.log('[InterNoteLink] New window created for note:', linkNoteId);
-            })
-            .catch((err) => {
-              console.error('[InterNoteLink] Failed to create new window:', err);
-            });
-        },
-      }),
-      // Add SearchAndReplace extension for in-note search
-      SearchAndReplace,
-      // Add WebLink extension for http/https links
-      WebLink,
-      // Add CommentMark extension for highlighting commented text
-      CommentMark.configure({
-        onCommentClick: (threadId) => {
-          onCommentClick?.(threadId);
-        },
-      }),
-      // Add NotecoveImage extension for image display
-      NotecoveImage,
-      // Add Table extensions for table support
-      NotecoveTable,
-      NotecoveTableRow,
-      NotecoveTableHeader,
-      NotecoveTableCell,
-      // Add MoveBlock extension for Alt-Up/Alt-Down to move blocks
-      MoveBlock,
-      // Collaboration extension binds TipTap to Yjs
-      // Use 'content' fragment to match NoteDoc structure
-      Collaboration.configure({
-        document: yDoc,
-        fragment: yDoc.getXmlFragment('content'),
-      }),
-      // TabIndent handles Tab key for inserting tab characters
-      // Must be last so other extensions (Table, ListItem, TaskItem) can handle Tab first
-      TabIndent,
-    ],
+        }
+      },
+      onLinkClick: (linkNoteId: string) => {
+        // Single click: Navigate to note in same window
+        console.log('[InterNoteLink] Single click on note:', linkNoteId);
+        if (onNavigateToNote) {
+          onNavigateToNote(linkNoteId);
+        }
+      },
+      onLinkDoubleClick: (linkNoteId: string) => {
+        // Double click: Open note in new window (minimal layout)
+        console.log('[InterNoteLink] Double click on note:', linkNoteId);
+        void window.electronAPI.testing
+          .createWindow({
+            noteId: linkNoteId,
+            minimal: true,
+          })
+          .then(() => {
+            console.log('[InterNoteLink] New window created for note:', linkNoteId);
+          })
+          .catch((err) => {
+            console.error('[InterNoteLink] Failed to create new window:', err);
+          });
+      },
+      onCommentClick: (threadId: string) => {
+        onCommentClick?.(threadId);
+      },
+    }),
+    [onNavigateToNote, onCommentClick]
+  );
+
+  // Get configured extensions using the callbacks
+  const extensions = useMemo(
+    () => getEditorExtensions(yDoc, extensionCallbacks),
+    [yDoc, extensionCallbacks]
+  );
+
+  const editor = useEditor({
+    extensions,
     // Don't set initial content - let Yjs/Collaboration handle it from loaded state
     // Setting content here causes onUpdate to fire before note loads
     // Disable editing while loading or if readOnly
@@ -796,6 +662,60 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     },
   });
 
+  // Create refs and state objects for useNoteSync
+  const noteSyncRefs: UseNoteSyncRefs = useMemo(
+    () => ({
+      isLoadingRef,
+      loadedNoteIdRef,
+      updateHandlerRef,
+      pendingUpdatesRef,
+      syncIndicatorTimerRef,
+      shouldFocusAfterLoadRef,
+      focusAttemptedRef,
+    }),
+    [] // Refs are stable, so empty deps is fine
+  );
+
+  const noteSyncState: UseNoteSyncState = useMemo(
+    () => ({ isLoading, setIsLoading }),
+    [isLoading]
+  );
+
+  // Use the note sync hook for loading, updating, and syncing notes
+  const noteSyncOptions = useMemo(
+    () => ({
+      isNewlyCreated,
+      readOnly,
+      ...(onNoteLoaded && { onNoteLoaded }),
+    }),
+    [isNewlyCreated, readOnly, onNoteLoaded]
+  );
+  const { showSyncIndicator } = useNoteSync(
+    noteId,
+    editor,
+    yDoc,
+    noteSyncRefs,
+    noteSyncState,
+    noteSyncOptions
+  );
+
+  // Handle scroll/cursor state restoration and persistence
+  useEditorStateRestoration(noteId, editor, isLoading, editorContainerRef);
+
+  // Handle image drag-and-drop and keyboard shortcuts
+  useEditorImages(editor, editorContainerRef);
+
+  // Handle comment interactions
+  const commentCallbacks: CommentCallbacks = useMemo(
+    () => ({
+      ...(onCommentClick && { onCommentClick }),
+      ...(onAddComment && { onAddComment }),
+    }),
+    [onCommentClick, onAddComment]
+  );
+  const { openCommentCount, overlapPopover, closeOverlapPopover, handleCommentButtonClick } =
+    useEditorComments(noteId, editor, userProfile, commentCallbacks);
+
   // Fix: Ensure UndoManager is properly configured after React StrictMode double-mount
   // React StrictMode unmounts and remounts components, which can break the TipTap
   // Collaboration extension's UndoManager in two ways:
@@ -936,734 +856,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
   }, [editor, yDoc, noteId, onTitleChange]);
 
-  // Send Yjs updates to main process for persistence and cross-window sync
-  useEffect(() => {
-    if (!editor || !noteId) return;
-
-    // Send updates to main process (but not updates from network/load)
-    const updateHandler = (update: Uint8Array, origin: unknown) => {
-      // Skip updates that we applied from external sources (origin will be set)
-      if (origin === 'remote' || origin === 'load') {
-        console.log(`[TipTapEditor] Skipping update with origin: ${origin}`);
-        return;
-      }
-
-      // Create a hash of the update to track it
-      const updateHash = Array.from(update.slice(0, 32))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-      pendingUpdatesRef.current.add(updateHash);
-
-      // Clean up old hashes after a short delay (in case update never comes back)
-      setTimeout(() => {
-        pendingUpdatesRef.current.delete(updateHash);
-      }, 5000);
-
-      console.log(
-        `[TipTapEditor] Sending update to main process for note ${noteId}, size: ${update.length} bytes, hash: ${updateHash.substring(0, 16)}...`
-      );
-      // Send update to main process for persistence and distribution to other windows
-      window.electronAPI.note.applyUpdate(noteId, update).catch((error: Error) => {
-        console.error(`Failed to apply update for note ${noteId}:`, error);
-      });
-    };
-
-    // Store reference to handler so we can temporarily disable it during loading
-    updateHandlerRef.current = updateHandler;
-
-    yDoc.on('update', updateHandler);
-
-    return () => {
-      yDoc.off('update', updateHandler);
-      updateHandlerRef.current = null;
-    };
-  }, [editor, yDoc, noteId]);
-
-  // Handle note loading/unloading with IPC
-  useEffect(() => {
-    if (!noteId || !editor) {
-      return;
-    }
-
-    let isActive = true;
-
-    // Helper to set loading state (both ref and state)
-    const setLoadingState = (loading: boolean) => {
-      isLoadingRef.current = loading;
-      setIsLoading(loading);
-    };
-
-    // Load note from main process
-    const loadNote = async () => {
-      // Skip if this note is already loaded (prevents redundant loads when
-      // unrelated state changes trigger useEffect re-runs)
-      if (loadedNoteIdRef.current === noteId) {
-        return;
-      }
-
-      try {
-        setLoadingState(true);
-        console.log(`[TipTapEditor] Loading note ${noteId}`);
-
-        // Clear the title cache and prefetch fresh titles in parallel with note loading
-        // This prevents "Loading..." flicker when links are rendered
-        clearNoteTitleCache();
-        const prefetchPromise = prefetchNoteTitles();
-
-        // Tell main process to load this note (in parallel with title prefetch)
-        await window.electronAPI.note.load(noteId);
-
-        // Wait for prefetch to complete before rendering content
-        await prefetchPromise;
-
-        // Get the current state from main process
-        const state = await window.electronAPI.note.getState(noteId);
-        console.log(`[TipTapEditor] Got state from main process, size: ${state.length} bytes`);
-
-        if (!isActive) {
-          return;
-        }
-
-        // Apply the state to our local Yjs document with 'load' origin
-        // Since this editor instance is created fresh for each note (via key prop),
-        // the yDoc is empty and we don't need to clear it first
-        Y.applyUpdate(yDoc, state, 'load');
-        console.log(`[TipTapEditor] Applied state to yDoc`);
-
-        // Check if this is a newly created note and set up initial formatting
-        // Only apply H1 formatting to notes that were just created, not existing empty notes
-        if (isNewlyCreated) {
-          console.log(`[TipTapEditor] Setting up newly created note with H1 formatting`);
-
-          // For new notes, clear any default content and set H1 format
-          editor.commands.setContent('');
-          editor.commands.setHeading({ level: 1 });
-
-          // Mark that we should focus after loading completes
-          // Using ref because isNewlyCreated will be cleared by onNoteLoaded
-          shouldFocusAfterLoadRef.current = true;
-          focusAttemptedRef.current = false; // Reset so we can attempt focus
-        }
-
-        // IMPORTANT: Clear loading flag AFTER all content manipulation to prevent
-        // spurious title updates from setContent/setHeading operations
-        setLoadingState(false);
-
-        // Mark this note as successfully loaded to prevent redundant reloads
-        loadedNoteIdRef.current = noteId;
-
-        // Enable editing now that loading is complete
-        editor.setEditable(!readOnly);
-
-        // Notify parent that note has been loaded
-        onNoteLoaded?.();
-      } catch (error) {
-        console.error(`Failed to load note ${noteId}:`, error);
-        setLoadingState(false);
-        editor.setEditable(!readOnly);
-      }
-    };
-
-    void loadNote();
-
-    // Set up listener for updates from other windows in same process
-    const handleNoteUpdate = (updatedNoteId: string, update: Uint8Array) => {
-      if (updatedNoteId !== noteId) {
-        return;
-      }
-
-      // Check if this is our own update bouncing back
-      const updateHash = Array.from(update.slice(0, 32))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-
-      if (pendingUpdatesRef.current.has(updateHash)) {
-        // This is our own update, skip it to preserve undo stack
-        console.log(
-          `[TipTapEditor] Skipping own update bounce-back, hash: ${updateHash.substring(0, 16)}...`
-        );
-        pendingUpdatesRef.current.delete(updateHash);
-        return;
-      }
-
-      // Apply update from other window to our local Y.Doc with 'remote' origin
-      // This will automatically update the editor via the Collaboration extension
-      console.log(
-        `[TipTapEditor] Applying remote update with ${update.length} bytes, hash: ${updateHash.substring(0, 16)}...`
-      );
-      Y.applyUpdate(yDoc, update, 'remote');
-    };
-
-    const cleanupNoteUpdate = window.electronAPI.note.onUpdated(handleNoteUpdate);
-
-    // Set up listener for updates from other instances (via activity sync)
-    // Note: We don't need to do anything here - the main process will broadcast
-    // note:updated events when it loads updates from disk, which handleNoteUpdate
-    // will receive and process normally.
-    const handleExternalUpdate = (data: { operation: string; noteIds: string[] }) => {
-      console.log(
-        `[TipTapEditor] onExternalUpdate received:`,
-        data.operation,
-        data.noteIds,
-        `this note: ${noteId}, included: ${data.noteIds.includes(noteId)}`
-      );
-
-      if (data.noteIds.includes(noteId)) {
-        // Just show sync indicator - updates will come via note:updated
-        if (syncIndicatorTimerRef.current) {
-          clearTimeout(syncIndicatorTimerRef.current);
-        }
-        setShowSyncIndicator(true);
-        syncIndicatorTimerRef.current = setTimeout(() => {
-          setShowSyncIndicator(false);
-        }, 2000);
-      }
-    };
-
-    const cleanupExternalUpdate = window.electronAPI.note.onExternalUpdate(handleExternalUpdate);
-
-    return () => {
-      isActive = false;
-      cleanupNoteUpdate();
-      cleanupExternalUpdate();
-      // Clean up sync indicator timer
-      if (syncIndicatorTimerRef.current) {
-        clearTimeout(syncIndicatorTimerRef.current);
-      }
-      // Tell main process we're done with this note
-      void window.electronAPI.note.unload(noteId);
-    };
-  }, [noteId, editor, yDoc, isNewlyCreated, onNoteLoaded, readOnly]);
-
-  // Focus editor after loading completes for newly created notes
-  // This is separate from the loading effect because isNewlyCreated changes
-  // during loading (cleared by onNoteLoaded), causing the loading effect to re-run.
-  // Using refs ensures we capture the "should focus" intent before it's cleared,
-  // and only attempt focus once per new note.
-  useEffect(() => {
-    if (!isLoading && editor && shouldFocusAfterLoadRef.current && !focusAttemptedRef.current) {
-      focusAttemptedRef.current = true;
-
-      // Delay focus to ensure React has finished rendering
-      // Query DOM directly since editor reference may be stale after remounts
-      setTimeout(() => {
-        const proseMirrorEl = document.querySelector<HTMLElement>('.ProseMirror');
-        proseMirrorEl?.focus();
-        shouldFocusAfterLoadRef.current = false;
-      }, 100);
-    }
-  }, [isLoading, editor]);
-
-  // Report current note to window state manager when note changes
-  useEffect(() => {
-    if (noteId && windowId) {
-      // Get sdId from metadata if available (could enhance later)
-      reportCurrentNote(noteId);
-    }
-  }, [noteId, windowId, reportCurrentNote]);
-
-  // Load saved state when note loads (for session restoration or per-note persistence)
-  useEffect(() => {
-    if (!noteId || isLoading) return;
-
-    // Only attempt restoration once per note load
-    if (hasRestoredStateRef.current) return;
-    hasRestoredStateRef.current = true;
-
-    const loadSavedState = async () => {
-      // First try window state (for session restoration within same app run)
-      const windowState = await getSavedState();
-      if (windowState) {
-        savedStateRef.current = windowState;
-        console.log('[TipTapEditor] Loaded window state for restoration:', windowState);
-        return;
-      }
-
-      // Fall back to per-note scroll position (for cross-restart persistence)
-      const noteScrollPosition = await getSavedNoteScrollPosition(noteId);
-      if (noteScrollPosition > 0) {
-        savedStateRef.current = { scrollTop: noteScrollPosition, cursorPosition: 0 };
-        console.log('[TipTapEditor] Loaded per-note scroll position:', noteScrollPosition);
-      }
-    };
-
-    void loadSavedState();
-  }, [noteId, isLoading, getSavedState, getSavedNoteScrollPosition]);
-
-  // Restore scroll and cursor position after note content is ready
-  useEffect(() => {
-    if (!editor || isLoading || !savedStateRef.current) return;
-
-    const savedState = savedStateRef.current;
-
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      // Restore scroll position
-      if (editorContainerRef.current && savedState.scrollTop > 0) {
-        console.log('[TipTapEditor] Restoring scroll position:', savedState.scrollTop);
-        editorContainerRef.current.scrollTop = savedState.scrollTop;
-      }
-
-      // Restore cursor position
-      if (savedState.cursorPosition > 0) {
-        try {
-          const docLength = editor.state.doc.content.size;
-          const safePosition = Math.min(savedState.cursorPosition, docLength - 1);
-          if (safePosition > 0) {
-            console.log('[TipTapEditor] Restoring cursor position:', safePosition);
-            editor.commands.setTextSelection(safePosition);
-          }
-        } catch (error) {
-          console.warn('[TipTapEditor] Failed to restore cursor position:', error);
-        }
-      }
-
-      // Clear saved state after restoration
-      savedStateRef.current = null;
-    }, 150); // Delay to ensure content is rendered
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [editor, isLoading]);
-
-  // Track scroll position changes
-  useEffect(() => {
-    const container = editorContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      const scrollTop = container.scrollTop;
-      // Report to window state (for session restoration)
-      reportWindowScrollPosition(scrollTop);
-      // Report to per-note storage (for cross-restart persistence)
-      if (noteId) {
-        reportNoteScrollPosition(noteId, scrollTop);
-      }
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-    };
-  }, [reportWindowScrollPosition, reportNoteScrollPosition, noteId]);
-
-  // Track cursor position changes
-  useEffect(() => {
-    if (!editor) return;
-
-    const handleSelectionUpdate = () => {
-      const { from } = editor.state.selection;
-      reportCursorPosition(from);
-    };
-
-    editor.on('selectionUpdate', handleSelectionUpdate);
-    return () => {
-      editor.off('selectionUpdate', handleSelectionUpdate);
-    };
-  }, [editor, reportCursorPosition]);
-
-  // Report final state on unmount
-  useEffect(() => {
-    const containerRef = editorContainerRef.current;
-    return () => {
-      if (containerRef && editor) {
-        const scrollTop = containerRef.scrollTop;
-        const cursorPosition = editor.state.selection.from;
-        reportFinalState(scrollTop, cursorPosition);
-      }
-    };
-  }, [editor, reportFinalState]);
-
-  // Reset restoration flag when note changes
-  useEffect(() => {
-    hasRestoredStateRef.current = false;
-    savedStateRef.current = null;
-  }, [noteId]);
-
-  // DOM-level drop handler for image files
-  // We handle drops at the document level because:
-  // 1. ProseMirror's handleDrop prop doesn't get triggered by synthetic events
-  // 2. Native file drops from Finder often land on container elements, not the editor itself
-  // We check if the drop is within the editor container and handle it accordingly.
-  // If dropped in the container but below the editor content, append to the end.
-  useEffect(() => {
-    if (!editor) return;
-
-    // Reference to the editor DOM and container
-    const editorDom = editor.view.dom;
-    const dropZone = editorContainerRef.current; // The scrollable container with the editor
-
-    const handleDocumentDrop = async (event: DragEvent) => {
-      const dataTransfer = event.dataTransfer;
-      if (!dataTransfer) return;
-
-      // Check if the drop target is within the drop zone (editor container)
-      const target = event.target as HTMLElement;
-      const isInDropZone = dropZone?.contains(target);
-      const isDirectlyOnEditor = editorDom.contains(target);
-
-      console.log(
-        '[TipTapEditor] Document drop - target:',
-        target,
-        'isInDropZone:',
-        isInDropZone,
-        'isDirectlyOnEditor:',
-        isDirectlyOnEditor
-      );
-
-      if (!isInDropZone) {
-        console.log('[TipTapEditor] Drop not in drop zone, ignoring');
-        return;
-      }
-
-      // Determine where to insert: at cursor if on editor, at end if on container
-      const insertAtEnd = !isDirectlyOnEditor;
-      console.log('[TipTapEditor] Insert at end:', insertAtEnd);
-
-      // Check both files and items (items works better in some contexts like tests)
-      const files = dataTransfer.files;
-      const items = dataTransfer.items;
-
-      // Debug logging
-      console.log('[TipTapEditor] Drop event - files:', files.length, 'items:', items.length);
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        if (f) {
-          console.log(`[TipTapEditor] File ${i}: name="${f.name}" type="${f.type}" size=${f.size}`);
-        }
-      }
-
-      // Collect files to process (with their MIME types)
-      // We use getImageMimeType which checks both file.type and filename extension,
-      // since files dropped from Finder on macOS often have empty file.type
-      const imageFiles: { file: File; mimeType: string }[] = [];
-
-      // First try files (preferred for native drops)
-      if (files.length > 0) {
-        for (const file of files) {
-          const mimeType = getImageMimeType(file);
-          if (mimeType) {
-            imageFiles.push({ file, mimeType });
-          }
-        }
-      }
-
-      // If no files found, try items (works better in synthetic events)
-      if (imageFiles.length === 0 && items.length > 0) {
-        for (const item of items) {
-          if (item.kind === 'file') {
-            const file = item.getAsFile();
-            if (file) {
-              const mimeType = getImageMimeType(file);
-              if (mimeType) {
-                imageFiles.push({ file, mimeType });
-              }
-            }
-          }
-        }
-      }
-
-      if (imageFiles.length === 0) return;
-
-      // Prevent default drop handling
-      event.preventDefault();
-      event.stopPropagation();
-
-      // Process each image file
-      for (const { file, mimeType } of imageFiles) {
-        console.log(
-          '[TipTapEditor] DOM drop handler: Image detected, type:',
-          mimeType,
-          'name:',
-          file.name
-        );
-
-        try {
-          // Read as ArrayBuffer and save via IPC
-          const buffer = await file.arrayBuffer();
-
-          // Get the active SD to save the image in
-          const sdId = await window.electronAPI.sd.getActive();
-          if (!sdId) {
-            console.error('[TipTapEditor] No active SD, cannot save dropped image');
-            return;
-          }
-
-          const data = new Uint8Array(buffer);
-
-          console.log('[TipTapEditor] Saving dropped image, size:', data.length, 'type:', mimeType);
-
-          // Save the image via IPC (returns {imageId, filename})
-          const result = await window.electronAPI.image.save(sdId, data, mimeType);
-          console.log('[TipTapEditor] Dropped image saved with ID:', result.imageId);
-
-          // Insert the image node
-          const { state, dispatch } = editor.view;
-          const imageNode = state.schema.nodes['notecoveImage'];
-          if (imageNode) {
-            const node = imageNode.create({
-              imageId: result.imageId,
-              sdId,
-            });
-
-            let tr;
-            if (insertAtEnd) {
-              // Insert at the end of the document
-              const endPos = state.doc.content.size;
-              tr = state.tr.insert(endPos, node);
-              console.log('[TipTapEditor] Inserting image at end, position:', endPos);
-            } else {
-              // Insert at current cursor position
-              tr = state.tr.replaceSelectionWith(node);
-              console.log('[TipTapEditor] Inserting image at cursor');
-            }
-            dispatch(tr);
-            console.log('[TipTapEditor] Dropped image node inserted');
-          }
-        } catch (err) {
-          console.error('[TipTapEditor] Failed to save dropped image:', err);
-        }
-      }
-    };
-
-    // Wrap the async handler
-    const wrappedDropHandler = (event: Event) => {
-      void handleDocumentDrop(event as DragEvent);
-    };
-
-    // IMPORTANT: dragover must call preventDefault() for drop to fire
-    // We handle this at document level and check if over the drop zone
-    const handleDragOver = (event: DragEvent) => {
-      // Check if the drag contains files that might be images
-      const hasFiles = event.dataTransfer?.types.includes('Files');
-      if (!hasFiles) return;
-
-      // Check if over the drop zone (editor container)
-      const target = event.target as HTMLElement;
-      const isInDropZone = dropZone?.contains(target);
-
-      if (isInDropZone) {
-        event.preventDefault();
-        // Set dropEffect to show the user they can drop here
-        if (event.dataTransfer) {
-          event.dataTransfer.dropEffect = 'copy';
-        }
-      }
-    };
-
-    // Listen at document level to catch drops that land on container elements
-    document.addEventListener('drop', wrappedDropHandler);
-    document.addEventListener('dragover', handleDragOver);
-
-    return () => {
-      document.removeEventListener('drop', wrappedDropHandler);
-      document.removeEventListener('dragover', handleDragOver);
-    };
-  }, [editor]);
-
-  // Keyboard shortcut for inserting images via file picker (Cmd+Shift+M / Ctrl+Shift+M)
-  // Note: "M" for Media - avoids conflict with Cmd+Shift+I which is Note Info
-  useEffect(() => {
-    if (!editor) return;
-
-    const handleKeyDown = async (event: KeyboardEvent) => {
-      // Check for Cmd+Shift+M (Mac) or Ctrl+Shift+M (Windows/Linux)
-      // eslint-disable-next-line @typescript-eslint/prefer-includes, @typescript-eslint/no-deprecated
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const modifier = isMac ? event.metaKey : event.ctrlKey;
-
-      if (modifier && event.shiftKey && event.key.toLowerCase() === 'm') {
-        event.preventDefault();
-        event.stopPropagation();
-
-        try {
-          // Get the active SD
-          const sdId = await window.electronAPI.sd.getActive();
-          if (!sdId) {
-            console.error('[TipTapEditor] No active SD, cannot pick images');
-            return;
-          }
-
-          // Open file picker and save selected images
-          const imageIds = await window.electronAPI.image.pickAndSave(sdId);
-
-          if (imageIds.length === 0) {
-            // User canceled or no valid images selected
-            return;
-          }
-
-          // Insert image nodes for each saved image
-          const { state, dispatch } = editor.view;
-          const imageNode = state.schema.nodes['notecoveImage'];
-          if (!imageNode) return;
-
-          let { tr } = state;
-          for (const imageId of imageIds) {
-            const node = imageNode.create({ imageId, sdId });
-            tr = tr.replaceSelectionWith(node);
-          }
-          dispatch(tr);
-
-          console.log('[TipTapEditor] Inserted', imageIds.length, 'images from file picker');
-        } catch (err) {
-          console.error('[TipTapEditor] Failed to pick and insert images:', err);
-        }
-      }
-    };
-
-    // Add listener to the editor DOM element
-    const editorDom = editor.view.dom;
-    const wrappedHandler = (event: Event) => {
-      void handleKeyDown(event as KeyboardEvent);
-    };
-    editorDom.addEventListener('keydown', wrappedHandler);
-
-    return () => {
-      editorDom.removeEventListener('keydown', wrappedHandler);
-    };
-  }, [editor]);
-
-  // Click handler for comment highlights
-  // When a comment mark is clicked, check for overlapping comments and show popover if multiple
-  useEffect(() => {
-    if (!editor || !onCommentClick) return;
-
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      const commentHighlight = target.closest('.comment-highlight');
-      if (commentHighlight) {
-        // Collect all thread IDs from this element and its ancestors
-        const threadIds: string[] = [];
-        let current: Element | null = commentHighlight;
-
-        while (current) {
-          if (current.classList.contains('comment-highlight')) {
-            const threadId = current.getAttribute('data-thread-id');
-            if (threadId && !threadIds.includes(threadId)) {
-              threadIds.push(threadId);
-            }
-          }
-          current = current.parentElement?.closest('.comment-highlight') ?? null;
-        }
-
-        if (threadIds.length === 0) {
-          return;
-        }
-
-        if (threadIds.length === 1 && threadIds[0]) {
-          // Single comment - select it directly
-          console.log('[TipTapEditor] Comment highlight clicked, threadId:', threadIds[0]);
-          onCommentClick(threadIds[0]);
-        } else if (threadIds.length > 1) {
-          // Multiple overlapping comments - show popover
-          console.log('[TipTapEditor] Overlapping comments clicked:', threadIds);
-          setOverlapPopover({
-            anchorEl: commentHighlight as HTMLElement,
-            threadIds,
-          });
-        }
-      }
-    };
-
-    const editorDom = editor.view.dom;
-    editorDom.addEventListener('click', handleClick);
-
-    return () => {
-      editorDom.removeEventListener('click', handleClick);
-    };
-  }, [editor, onCommentClick]);
-
-  // Create a comment on the current selection
-  // This function is used by both the keyboard shortcut and toolbar button
-  const handleAddCommentOnSelection = useCallback(async () => {
-    if (!editor || !noteId || !userProfile) return;
-
-    // Get current selection
-    const { from, to, empty } = editor.state.selection;
-
-    if (empty) {
-      console.log('[TipTapEditor] Cannot add comment: no selection');
-      return;
-    }
-
-    // Get selected text
-    const text = editor.state.doc.textBetween(from, to, ' ');
-    console.log('[TipTapEditor] Adding comment for selection:', { from, to, text });
-
-    try {
-      // Encode positions as simple Uint8Array for now
-      // Future enhancement: Use Yjs RelativePosition for anchors that survive text edits
-      const anchorStart = new Uint8Array(new Uint32Array([from]).buffer);
-      const anchorEnd = new Uint8Array(new Uint32Array([to]).buffer);
-
-      // Create the comment thread via IPC
-      const result = await window.electronAPI.comment.addThread(noteId, {
-        noteId,
-        anchorStart,
-        anchorEnd,
-        authorId: userProfile.profileId,
-        authorName: userProfile.username || 'Anonymous',
-        authorHandle: userProfile.handle || '@anonymous',
-        content: '', // Empty content - user will fill in via panel
-        originalText: text,
-        created: Date.now(),
-        modified: Date.now(),
-        resolved: false,
-      });
-
-      if (!result.success || !result.threadId) {
-        console.error('[TipTapEditor] Failed to create comment thread:', result.error);
-        return;
-      }
-
-      console.log('[TipTapEditor] Comment thread created:', result.threadId);
-
-      // Apply the comment mark to the selection
-      editor.chain().focus().setTextSelection({ from, to }).setCommentMark(result.threadId).run();
-
-      console.log('[TipTapEditor] Comment mark applied');
-
-      // Notify parent about the new comment (to open panel, select thread, etc.)
-      onAddComment?.({ from, to, text, threadId: result.threadId });
-    } catch (err) {
-      console.error('[TipTapEditor] Failed to create comment thread:', err);
-    }
-  }, [editor, noteId, onAddComment, userProfile]);
-
-  // Keyboard shortcut for adding comments (Cmd+Alt+M / Ctrl+Alt+M like Google Docs)
-  useEffect(() => {
-    if (!editor || !noteId) return;
-
-    const handleKeyDown = async (event: KeyboardEvent) => {
-      // Check for Cmd+Alt+M (Mac) or Ctrl+Alt+M (Windows/Linux)
-      // eslint-disable-next-line @typescript-eslint/prefer-includes, @typescript-eslint/no-deprecated
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const modifier = isMac ? event.metaKey : event.ctrlKey;
-
-      // Use event.code instead of event.key because Alt/Option modifies the character on Mac
-      if (modifier && event.altKey && event.code === 'KeyM') {
-        event.preventDefault();
-        event.stopPropagation();
-        await handleAddCommentOnSelection();
-      }
-    };
-
-    const editorDom = editor.view.dom;
-    const wrappedHandler = (event: Event) => {
-      void handleKeyDown(event as KeyboardEvent);
-    };
-    editorDom.addEventListener('keydown', wrappedHandler);
-
-    return () => {
-      editorDom.removeEventListener('keydown', wrappedHandler);
-    };
-  }, [editor, noteId, handleAddCommentOnSelection]);
-
-  // Handler for the comment toolbar button
-  const handleCommentButtonClick = () => {
-    void handleAddCommentOnSelection();
-  };
+  // Note: Yjs updates, note loading/unloading, and focus-after-load are handled by useNoteSync
+  // Note: Scroll/cursor state restoration and persistence are handled by useEditorStateRestoration
+  // Note: Image drag-and-drop and keyboard shortcuts are handled by useEditorImages
+  // Note: Comment handling is handled by useEditorComments
 
   // Keyboard shortcut for moving blocks (Alt+Up / Alt+Down)
   // This DOM-level handler is needed because on Mac, Option+Arrow keys are intercepted
@@ -1700,53 +896,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       editorDom.removeEventListener('keydown', handleMoveBlockKeyDown);
     };
   }, [editor]);
-
-  // Load and track open comment count for toolbar badge
-  useEffect(() => {
-    if (!noteId) {
-      setOpenCommentCount(0);
-      return;
-    }
-
-    // Load initial count
-    const loadCommentCount = async () => {
-      try {
-        const threads = await window.electronAPI.comment.getThreads(noteId);
-        const openCount = threads.filter((t) => !t.resolved).length;
-        setOpenCommentCount(openCount);
-      } catch (error) {
-        console.error('Failed to load comment count:', error);
-      }
-    };
-    void loadCommentCount();
-
-    // Subscribe to thread changes
-    const unsubAdded = window.electronAPI.comment.onThreadAdded((addedNoteId) => {
-      if (addedNoteId === noteId) {
-        void loadCommentCount();
-      }
-    });
-    const unsubUpdated = window.electronAPI.comment.onThreadUpdated((updatedNoteId) => {
-      if (updatedNoteId === noteId) {
-        void loadCommentCount();
-      }
-    });
-    const unsubDeleted = window.electronAPI.comment.onThreadDeleted((deletedNoteId, threadId) => {
-      if (deletedNoteId === noteId) {
-        void loadCommentCount();
-        // Remove the comment mark from the editor
-        if (editor) {
-          editor.commands.removeCommentMarkById(threadId);
-        }
-      }
-    });
-
-    return () => {
-      unsubAdded();
-      unsubUpdated();
-      unsubDeleted();
-    };
-  }, [noteId, editor]);
 
   // Manage link popover using tippy.js
   useEffect(() => {
@@ -2426,560 +1575,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   }, [editor]);
 
   return (
-    <Box
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        '& .ProseMirror': {
-          minHeight: '100%',
-          outline: 'none',
-          // Preserve tab characters and multiple spaces while still allowing text wrap
-          whiteSpace: 'pre-wrap',
-          '& h1': {
-            fontSize: '2em',
-            fontWeight: 600,
-            marginTop: 2,
-            marginBottom: 1,
-          },
-          '& h2': {
-            fontSize: '1.5em',
-            fontWeight: 600,
-            marginTop: 1.5,
-            marginBottom: 0.75,
-          },
-          '& h3': {
-            fontSize: '1.25em',
-            fontWeight: 600,
-            marginTop: 1.25,
-            marginBottom: 0.5,
-          },
-          '& p': {
-            marginBottom: 0,
-            marginTop: 0,
-          },
-          '& ul, & ol': {
-            paddingLeft: 2,
-            marginBottom: 1,
-          },
-          // Inline code (not in code blocks)
-          '& code': {
-            backgroundColor: 'action.hover',
-            padding: '2px 4px',
-            borderRadius: 0.5,
-            fontSize: '0.9em',
-          },
-          // Code block styles with syntax highlighting (One Dark/One Light theme)
-          ...getCodeBlockStyles(theme.palette.mode === 'dark'),
-          '& blockquote': {
-            borderLeft: '4px solid',
-            borderColor: 'primary.main',
-            paddingLeft: 2,
-            marginLeft: 0,
-            fontStyle: 'italic',
-            color: 'text.secondary',
-          },
-          // Hashtag styling
-          '& .hashtag': {
-            color: theme.palette.primary.main,
-            fontWeight: 500,
-            cursor: 'pointer',
-            textDecoration: 'none',
-            '&:hover': {
-              textDecoration: 'underline',
-            },
-          },
-          // Date chip styling (YYYY-MM-DD dates)
-          // Uses normal text color but with chip background
-          '& .date-chip': {
-            backgroundColor:
-              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
-            color: theme.palette.text.primary,
-            padding: '2px 6px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 500,
-            transition: 'background-color 0.15s ease',
-            '&:hover': {
-              backgroundColor:
-                theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
-            },
-          },
-          // Mention chip styling (user @mentions)
-          '& .mention-chip': {
-            backgroundColor:
-              theme.palette.mode === 'dark'
-                ? 'rgba(144, 202, 249, 0.16)'
-                : 'rgba(25, 118, 210, 0.08)',
-            color: theme.palette.text.primary,
-            padding: '2px 6px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 500,
-            whiteSpace: 'nowrap',
-            transition: 'background-color 0.15s ease',
-            '&:hover': {
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(144, 202, 249, 0.24)'
-                  : 'rgba(25, 118, 210, 0.16)',
-            },
-            // Hide the handle prefix, show only display name
-            '& .mention-handle-hidden': {
-              display: 'none',
-            },
-          },
-          // Comment highlight styling
-          '& .comment-highlight': {
-            backgroundColor:
-              theme.palette.mode === 'dark'
-                ? 'rgba(255, 213, 79, 0.25)'
-                : 'rgba(255, 213, 79, 0.4)',
-            borderBottom: `2px solid ${theme.palette.warning.main}`,
-            cursor: 'pointer',
-            transition: 'background-color 0.2s ease',
-            '&:hover': {
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(255, 213, 79, 0.35)'
-                  : 'rgba(255, 213, 79, 0.5)',
-            },
-            // Active/selected comment
-            '&.comment-active': {
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(255, 213, 79, 0.45)'
-                  : 'rgba(255, 213, 79, 0.6)',
-            },
-            // Overlapping comments - nested highlights get progressively darker
-            '& .comment-highlight': {
-              backgroundColor:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(255, 193, 7, 0.35)'
-                  : 'rgba(255, 193, 7, 0.5)',
-              // Third level overlap (rare but possible)
-              '& .comment-highlight': {
-                backgroundColor:
-                  theme.palette.mode === 'dark'
-                    ? 'rgba(255, 160, 0, 0.45)'
-                    : 'rgba(255, 160, 0, 0.6)',
-              },
-            },
-          },
-          // Inter-note link styling (complementary to tags - use secondary color)
-          '& .inter-note-link': {
-            color: theme.palette.secondary.main,
-            fontWeight: 500,
-            cursor: 'pointer',
-            textDecoration: 'none',
-            borderBottom: `1px dotted ${theme.palette.secondary.main}`,
-            '&:hover': {
-              textDecoration: 'underline',
-              borderBottomStyle: 'solid',
-            },
-          },
-          // Broken inter-note link styling (note doesn't exist or is deleted)
-          '& .inter-note-link-broken': {
-            color: theme.palette.error.main,
-            fontWeight: 500,
-            cursor: 'not-allowed',
-            textDecoration: 'line-through',
-            borderBottom: `1px dotted ${theme.palette.error.main}`,
-          },
-          // Hide the original [[note-id]] text when displaying title
-          '& .inter-note-link-hidden': {
-            display: 'none',
-          },
-          // Web link styling (external http/https links)
-          // Blue and underlined to distinguish from internal links (which are dotted)
-          '& a.web-link': {
-            color: theme.palette.info.main,
-            textDecoration: 'underline',
-            cursor: 'pointer',
-            '&:hover': {
-              color: theme.palette.info.dark,
-              textDecoration: 'underline',
-            },
-            '&:visited': {
-              color: theme.palette.info.main,
-            },
-          },
-          // NotecoveImage styling - all images are block-level and centered
-          '& figure.notecove-image': {
-            margin: '16px 0',
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
-            // Selected state
-            '&.ProseMirror-selectednode': {
-              outline: `2px solid ${theme.palette.primary.main}`,
-              outlineOffset: '4px',
-              borderRadius: '4px',
-            },
-          },
-          '& .notecove-image-container': {
-            position: 'relative',
-            display: 'inline-flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '100px',
-            minWidth: '100px',
-            backgroundColor: theme.palette.action.hover,
-            borderRadius: '4px',
-            overflow: 'hidden',
-          },
-          '& .notecove-image-element': {
-            maxWidth: '100%',
-            height: 'auto',
-            display: 'block',
-            borderRadius: '4px',
-          },
-          '& .notecove-image-loading': {
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '24px',
-            color: theme.palette.text.secondary,
-            fontSize: '0.875rem',
-          },
-          '& .notecove-image-spinner': {
-            width: '24px',
-            height: '24px',
-            animation: 'notecove-spin 1s linear infinite',
-          },
-          '& .notecove-spinner-circle': {
-            stroke: theme.palette.primary.main,
-            strokeLinecap: 'round',
-            strokeDasharray: '50 50',
-          },
-          '@keyframes notecove-spin': {
-            from: { transform: 'rotate(0deg)' },
-            to: { transform: 'rotate(360deg)' },
-          },
-          '& .notecove-image-error': {
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '24px',
-            color: theme.palette.error.main,
-            fontSize: '0.875rem',
-          },
-          '& .notecove-image-broken': {
-            width: '32px',
-            height: '32px',
-            color: theme.palette.error.main,
-          },
-          '& .notecove-image-error-id': {
-            fontSize: '0.75rem',
-            fontFamily: 'monospace',
-            color: theme.palette.text.disabled,
-            marginTop: '4px',
-          },
-          '& .notecove-image-caption': {
-            marginTop: '8px',
-            fontSize: '0.875rem',
-            color: theme.palette.text.secondary,
-            fontStyle: 'italic',
-            textAlign: 'center',
-            maxWidth: '100%',
-          },
-          // Dev-mode tooltip (only visible in development)
-          '& .notecove-image-dev-tooltip': {
-            position: 'absolute',
-            bottom: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginBottom: '8px',
-            padding: '8px 12px',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            color: '#fff',
-            fontSize: '11px',
-            fontFamily: 'monospace',
-            borderRadius: '4px',
-            whiteSpace: 'nowrap',
-            zIndex: 1000,
-            pointerEvents: 'none',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          },
-          '& .notecove-dev-tooltip-row': {
-            padding: '2px 0',
-            '& strong': {
-              color: '#8be9fd',
-              marginRight: '8px',
-            },
-          },
-          // Resize handles container - only visible when image is selected
-          '& .notecove-image-resize-handles': {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            pointerEvents: 'none',
-            opacity: 0,
-            transition: 'opacity 0.15s ease',
-          },
-          // Show resize handles when image is selected
-          '& figure.notecove-image.ProseMirror-selectednode .notecove-image-resize-handles': {
-            opacity: 1,
-          },
-          // Individual resize handle
-          '& .notecove-image-resize-handle': {
-            position: 'absolute',
-            width: '12px',
-            height: '12px',
-            backgroundColor: theme.palette.primary.main,
-            border: `2px solid ${theme.palette.background.paper}`,
-            borderRadius: '2px',
-            pointerEvents: 'auto',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            transition: 'transform 0.1s ease',
-            '&:hover': {
-              transform: 'scale(1.2)',
-            },
-          },
-          // Corner positions
-          '& .notecove-image-resize-handle--nw': {
-            top: '-6px',
-            left: '-6px',
-            cursor: 'nw-resize',
-          },
-          '& .notecove-image-resize-handle--ne': {
-            top: '-6px',
-            right: '-6px',
-            cursor: 'ne-resize',
-          },
-          '& .notecove-image-resize-handle--sw': {
-            bottom: '-6px',
-            left: '-6px',
-            cursor: 'sw-resize',
-          },
-          '& .notecove-image-resize-handle--se': {
-            bottom: '-6px',
-            right: '-6px',
-            cursor: 'se-resize',
-          },
-          // Resize dimension tooltip
-          '& .notecove-image-resize-tooltip': {
-            position: 'absolute',
-            bottom: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginBottom: '8px',
-            padding: '4px 8px',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            color: '#fff',
-            fontSize: '12px',
-            fontFamily: 'monospace',
-            borderRadius: '4px',
-            whiteSpace: 'nowrap',
-            zIndex: 1001,
-            pointerEvents: 'none',
-          },
-          // Resizing state - show cursor and prevent selection
-          '& figure.notecove-image--resizing': {
-            userSelect: 'none',
-            cursor: 'nw-resize',
-            '& *': {
-              cursor: 'inherit',
-            },
-          },
-          // Linked image indicator - subtle border and link icon
-          '& figure.notecove-image--linked': {
-            '& .notecove-image-container': {
-              position: 'relative',
-              '&::after': {
-                content: '"\\1F517"', // Link emoji
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                fontSize: '16px',
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                borderRadius: '4px',
-                padding: '2px 6px',
-                opacity: 0.8,
-                pointerEvents: 'none',
-              },
-            },
-            '& .notecove-image-element': {
-              outline: `2px solid ${theme.palette.info.main}`,
-              outlineOffset: '-2px',
-            },
-          },
-          // Table styling
-          '& table': {
-            borderCollapse: 'collapse',
-            width: '100%',
-            margin: '16px 0',
-            tableLayout: 'fixed',
-            overflow: 'hidden',
-            borderRadius: '4px',
-            border: `1px solid ${theme.palette.divider}`,
-          },
-          '& table td, & table th': {
-            border: `1px solid ${theme.palette.divider}`,
-            padding: '8px 12px',
-            textAlign: 'left',
-            verticalAlign: 'top',
-            position: 'relative',
-            minWidth: '50px',
-            boxSizing: 'border-box',
-            '& > p': {
-              margin: 0,
-            },
-          },
-          '& table th': {
-            backgroundColor:
-              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
-            fontWeight: 600,
-          },
-          '& table tr:hover': {
-            backgroundColor:
-              theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
-          },
-          // Selected cell styling
-          '& table .selectedCell': {
-            backgroundColor:
-              theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.2)' : 'rgba(25, 118, 210, 0.1)',
-          },
-          '& table .selectedCell::after': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            border: `2px solid ${theme.palette.primary.main}`,
-            pointerEvents: 'none',
-          },
-          // Column resize handle styling
-          '& .column-resize-handle': {
-            position: 'absolute',
-            right: '-2px',
-            top: 0,
-            bottom: 0,
-            width: '4px',
-            backgroundColor: theme.palette.primary.main,
-            cursor: 'col-resize',
-            zIndex: 20,
-          },
-          // Table selected state
-          '& table.ProseMirror-selectednode': {
-            outline: `2px solid ${theme.palette.primary.main}`,
-            outlineOffset: '2px',
-          },
-          // Resize cursor when dragging
-          '&.resize-cursor': {
-            cursor: 'col-resize',
-          },
-          // Search result highlighting
-          '& .search-result': {
-            backgroundColor:
-              theme.palette.mode === 'dark' ? 'rgba(255, 235, 59, 0.3)' : 'rgba(255, 235, 59, 0.5)',
-            borderRadius: '2px',
-          },
-          '& .search-result-current': {
-            backgroundColor:
-              theme.palette.mode === 'dark' ? 'rgba(255, 152, 0, 0.5)' : 'rgba(255, 152, 0, 0.7)',
-            outline: `2px solid ${theme.palette.primary.main}`,
-            outlineOffset: '1px',
-          },
-          // Task item styling (list-based checkboxes)
-          // The checkbox is positioned to the left of content
-          // Content aligns with body text (task item pulls back to cancel list indentation)
-          '& li[data-type="taskItem"]': {
-            display: 'flex',
-            alignItems: 'flex-start',
-            listStyle: 'none',
-            position: 'relative',
-            // Pull back to cancel list padding, so content aligns with body text
-            // Lists have paddingLeft: 2 (16px), so we offset by -16px
-            marginLeft: -2, // MUI spacing: -16px
-            // Add padding on left for the checkbox
-            paddingLeft: '28px', // 18px checkbox + 10px gap
-
-            // Checkbox wrapper - positioned absolutely in the padding area
-            '& .task-checkbox-wrapper': {
-              position: 'absolute',
-              left: 0,
-              top: '2px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              userSelect: 'none',
-            },
-
-            // Checkbox element
-            '& .task-checkbox': {
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '18px',
-              height: '18px',
-              border: `2px solid ${theme.palette.text.secondary}`,
-              borderRadius: '3px',
-              fontSize: '12px',
-              fontWeight: 700,
-              lineHeight: 1,
-              transition: 'all 0.15s ease',
-            },
-
-            // Task content area
-            '& .task-content': {
-              flex: 1,
-              minWidth: 0,
-            },
-
-            // Unchecked state - empty checkbox
-            '&[data-checked="unchecked"]': {
-              '& .task-checkbox': {
-                backgroundColor: 'transparent',
-              },
-              '& .task-content': {
-                textDecoration: 'none',
-                opacity: 1,
-              },
-            },
-
-            // Checked state - green checkbox with checkmark, strikethrough text
-            '&[data-checked="checked"]': {
-              '& .task-checkbox': {
-                backgroundColor: theme.palette.success.main,
-                borderColor: theme.palette.success.main,
-                color: '#ffffff',
-              },
-              '& .task-content': {
-                textDecoration: 'line-through',
-                opacity: 0.6,
-                color: theme.palette.text.secondary,
-              },
-            },
-
-            // Nope state - red checkbox with X, strikethrough text
-            '&[data-checked="nope"]': {
-              '& .task-checkbox': {
-                backgroundColor: theme.palette.error.main,
-                borderColor: theme.palette.error.main,
-                color: '#ffffff',
-              },
-              '& .task-content': {
-                textDecoration: 'line-through',
-                opacity: 0.6,
-                color: theme.palette.text.secondary,
-              },
-            },
-          },
-        },
-      }}
-    >
+    <Box sx={getTipTapEditorStyles(theme)}>
       <EditorToolbar
         editor={editor}
         onLinkButtonClick={handleLinkButtonClick}
@@ -3101,11 +1697,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           placement="bottom-start"
           style={{ zIndex: 1400 }}
         >
-          <ClickAwayListener
-            onClickAway={() => {
-              setOverlapPopover(null);
-            }}
-          >
+          <ClickAwayListener onClickAway={closeOverlapPopover}>
             <Paper elevation={8} sx={{ minWidth: 180 }}>
               <Typography
                 variant="caption"
@@ -3120,7 +1712,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                     key={threadId}
                     onClick={() => {
                       onCommentClick?.(threadId);
-                      setOverlapPopover(null);
+                      closeOverlapPopover();
                     }}
                     sx={{ py: 0.5 }}
                   >
@@ -3160,7 +1752,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           <MenuItem
             onClick={() => {
               handleContextMenuClose();
-              void handleAddCommentOnSelection();
+              handleCommentButtonClick();
             }}
             disabled={!hasTextSelection}
           >
