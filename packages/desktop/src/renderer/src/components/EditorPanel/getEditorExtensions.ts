@@ -8,7 +8,7 @@
 import StarterKit from '@tiptap/starter-kit';
 import { BulletList, OrderedList } from '@tiptap/extension-list';
 import Collaboration from '@tiptap/extension-collaboration';
-import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
+import { SearchAndReplace } from './extensions/SearchAndReplace';
 import * as Y from 'yjs';
 import { Hashtag } from './extensions/Hashtag';
 import { AtMention } from './extensions/AtMention';

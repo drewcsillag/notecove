@@ -10,7 +10,7 @@
 
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
+import { SearchAndReplace } from '../SearchAndReplace';
 import {
   Hashtag,
   getHashtagDecorationRegenerationCount,

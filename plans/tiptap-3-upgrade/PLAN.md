@@ -1,6 +1,6 @@
 # TipTap 3 Upgrade Plan
 
-**Overall Progress:** `~14%` (Phase 1 of 7 complete)
+**Overall Progress:** `~28%` (Phases 1-2 of 7 complete)
 
 **Branch:** `tiptap-3-upgrade`
 
@@ -81,31 +81,35 @@ From [QUESTIONS-1.md](./QUESTIONS-1.md), refined in [PLAN-CRITIQUE.md](./PLAN-CR
 
 ---
 
-## Phase 2: Fork SearchAndReplace Extension
+## Phase 2: Fork SearchAndReplace Extension ✅ COMPLETE
 
 **Goal:** Internalize the search-and-replace extension to remove unmaintained dependency.
 
-- [ ] 🟥 **2.1 Fork extension source**
-  - [ ] 🟥 Copy source from node_modules/@sereneinserenade/tiptap-search-and-replace
-  - [ ] 🟥 Create `extensions/SearchAndReplace.ts`
-  - [ ] 🟥 Preserve MIT license header (required for compliance)
+**Status:** Forked extension works correctly, all tests pass.
 
-- [ ] 🟥 **2.2 Fix TipTap 3 compatibility**
-  - [ ] 🟥 Check if `Range` type is still exported from @tiptap/core
-  - [ ] 🟥 If not, define inline: `type Range = { from: number; to: number }`
-  - [ ] 🟥 Update any other deprecated APIs
+**What was done:**
 
-- [ ] 🟥 **2.3 Update imports**
-  - [ ] 🟥 Update `getEditorExtensions.ts` to import from local extension
-  - [ ] 🟥 Remove `@sereneinserenade/tiptap-search-and-replace` from package.json
+- [x] ✅ **2.1 Fork extension source**
+  - Created `extensions/SearchAndReplace.ts` with full source
+  - Preserved MIT license header (required for compliance)
 
-- [ ] 🟥 **2.4 Verify SearchPanel integration**
-  - [ ] 🟥 Ensure SearchPanel.tsx still works with forked extension
-  - [ ] 🟥 Test: setSearchTerm, setCaseSensitive, storage.results, storage.resultIndex
+- [x] ✅ **2.2 Fix TipTap 3 compatibility**
+  - Defined inline `Range` interface (not exported from @tiptap/core in v3)
+  - Added `getStorage()` helper function for typed storage access
+  - Fixed TypeScript strict mode errors (undefined array access checks)
 
-- [ ] 🟥 **2.5 Update tests**
-  - [ ] 🟥 Update DecorationFlickering.test.ts if needed
-  - [ ] 🟥 Run test suite to verify
+- [x] ✅ **2.3 Update imports**
+  - Updated `getEditorExtensions.ts` to import from local extension
+  - Updated `DecorationFlickering.test.ts` to import from local extension
+  - Removed `@sereneinserenade/tiptap-search-and-replace` from package.json
+
+- [x] ✅ **2.4 Verify SearchPanel integration**
+  - SearchPanel.tsx works with forked extension (no changes needed)
+  - All search commands (setSearchTerm, setCaseSensitive, etc.) work correctly
+
+- [x] ✅ **2.5 Update tests**
+  - DecorationFlickering tests pass (11 passed, 1 skipped)
+  - TypeScript compilation passes
 
 ---
 
