@@ -381,6 +381,52 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
         view.dispatch(tr);
         return true;
       },
+
+      ArrowLeft: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a link ending at the cursor position
+        // If so, moving left would enter the link - skip over it
+        const linkRange = findLinkEndingAt(state.doc, pos);
+        if (linkRange) {
+          const tr = state.tr.setSelection(TextSelection.create(state.doc, linkRange.from));
+          view.dispatch(tr);
+          return true;
+        }
+
+        return false;
+      },
+
+      ArrowRight: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a link starting at the cursor position
+        // If so, moving right would enter the link - skip over it
+        const linkRange = findLinkStartingAt(state.doc, pos);
+        if (linkRange) {
+          const tr = state.tr.setSelection(TextSelection.create(state.doc, linkRange.to));
+          view.dispatch(tr);
+          return true;
+        }
+
+        return false;
+      },
     };
   },
 

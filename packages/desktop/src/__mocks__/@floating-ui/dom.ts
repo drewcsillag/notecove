@@ -15,6 +15,6 @@ export const flip = jest.fn().mockReturnValue({ name: 'flip' });
 export const shift = jest.fn().mockReturnValue({ name: 'shift' });
 export const offset = jest.fn().mockReturnValue({ name: 'offset' });
 
-export type VirtualElement = {
+export interface VirtualElement {
   getBoundingClientRect: () => DOMRect;
-};
+}

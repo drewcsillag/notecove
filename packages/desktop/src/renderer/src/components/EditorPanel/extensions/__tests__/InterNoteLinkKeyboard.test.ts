@@ -91,6 +91,28 @@ describe('InterNoteLink Keyboard Handling', () => {
   }
 
   /**
+   * Helper to simulate Left arrow (no modifiers)
+   */
+  function pressLeft() {
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      bubbles: true,
+    });
+    editor.view.dom.dispatchEvent(event);
+  }
+
+  /**
+   * Helper to simulate Right arrow (no modifiers)
+   */
+  function pressRight() {
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+    });
+    editor.view.dom.dispatchEvent(event);
+  }
+
+  /**
    * Helper to simulate Shift+Cmd+Left arrow (Mac: select to beginning of line)
    * Note: In jsdom, we use ctrlKey since jsdom doesn't recognize itself as Mac.
    * TipTap's `Mod` maps to Ctrl in non-Mac environments.
@@ -455,6 +477,96 @@ describe('InterNoteLink Keyboard Handling', () => {
       // Should select from start of line (including link) to cursor
       expect(sel.from).toBe(1);
       expect(sel.to).toBe(cursorPos);
+    });
+  });
+
+  describe('Arrow key navigation (skip over links)', () => {
+    it('should skip over link when pressing Left arrow after link', () => {
+      // Content: "foo[[uuid]]bar" with cursor after the link: "foo[[uuid]]|bar"
+      const linkText = `[[${TEST_UUID}]]`;
+      const cursorPos = 4 + linkText.length; // position after ]]
+      setContentAndCursor(`<p>foo${linkText}bar</p>`, cursorPos);
+
+      // Verify initial cursor position
+      expect(getSelection().from).toBe(cursorPos);
+
+      // Press Left - should skip over the link to position 4 (before [[)
+      pressLeft();
+
+      expect(getSelection().from).toBe(4); // before the link
+    });
+
+    it('should skip over link when pressing Right arrow before link', () => {
+      // Content: "foo[[uuid]]bar" with cursor before the link: "foo|[[uuid]]bar"
+      const linkText = `[[${TEST_UUID}]]`;
+      setContentAndCursor(`<p>foo${linkText}bar</p>`, 4); // before [[
+
+      // Verify initial cursor position
+      expect(getSelection().from).toBe(4);
+
+      // Press Right - should skip over the link to position after ]]
+      pressRight();
+
+      expect(getSelection().from).toBe(4 + linkText.length); // after the link
+    });
+
+    it('should not interfere when not adjacent to a link (Left)', () => {
+      setContentAndCursor('<p>foobar</p>', 4); // after "foo"
+
+      const initialPos = getSelection().from;
+
+      // Press Left - default behavior should apply (move one char left)
+      pressLeft();
+
+      // Our handler returns false, default behavior moves cursor
+      // In jsdom this may not actually move, but we verify our handler didn't interfere
+      const sel = getSelection();
+      // The position should either be 3 (if default worked) or 4 (if jsdom didn't move it)
+      expect(sel.from).toBeLessThanOrEqual(initialPos);
+    });
+
+    it('should not interfere when not adjacent to a link (Right)', () => {
+      setContentAndCursor('<p>foobar</p>', 3); // after "fo"
+
+      const initialPos = getSelection().from;
+
+      // Press Right - default behavior should apply
+      pressRight();
+
+      // Our handler returns false, allowing default behavior
+      const sel = getSelection();
+      expect(sel.from).toBeGreaterThanOrEqual(initialPos);
+    });
+
+    it('should handle consecutive links with Left arrow', () => {
+      const link1 = `[[${TEST_UUID}]]`;
+      const link2 = `[[${TEST_UUID_2}]]`;
+      // Position after link2: "[[uuid1]][[uuid2]]|bar"
+      const cursorPos = 1 + link1.length + link2.length;
+      setContentAndCursor(`<p>${link1}${link2}bar</p>`, cursorPos);
+
+      // First Left - skip over link2
+      pressLeft();
+      expect(getSelection().from).toBe(1 + link1.length); // between links
+
+      // Second Left - skip over link1
+      pressLeft();
+      expect(getSelection().from).toBe(1); // before link1
+    });
+
+    it('should handle consecutive links with Right arrow', () => {
+      const link1 = `[[${TEST_UUID}]]`;
+      const link2 = `[[${TEST_UUID_2}]]`;
+      // Position before link1: "|[[uuid1]][[uuid2]]bar"
+      setContentAndCursor(`<p>${link1}${link2}bar</p>`, 1);
+
+      // First Right - skip over link1
+      pressRight();
+      expect(getSelection().from).toBe(1 + link1.length); // between links
+
+      // Second Right - skip over link2
+      pressRight();
+      expect(getSelection().from).toBe(1 + link1.length + link2.length); // after link2
     });
   });
 });

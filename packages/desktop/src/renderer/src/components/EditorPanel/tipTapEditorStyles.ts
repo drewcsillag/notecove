@@ -165,8 +165,14 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
         borderBottom: `1px dotted ${theme.palette.error.main}`,
       },
       // Hide the original [[note-id]] text when displaying title
+      // Using font-size: 0 instead of display: none to keep the element in document flow.
+      // This prevents scroll jumping when cursor moves through the hidden text,
+      // because the browser can still calculate cursor positions correctly.
       '& .inter-note-link-hidden': {
-        display: 'none',
+        fontSize: 0,
+        letterSpacing: 0,
+        lineHeight: 0,
+        color: 'transparent',
       },
       // Web link styling (external http/https links)
       // Blue and underlined to distinguish from internal links (which are dotted)
