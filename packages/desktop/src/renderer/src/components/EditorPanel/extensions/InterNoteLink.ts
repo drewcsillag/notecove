@@ -328,6 +328,59 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
         view.dispatch(tr);
         return true;
       },
+
+      'Shift-ArrowLeft': () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // For TextSelection, $head is the moving end when extending selection
+        // When pressing Shift+Left, the head moves left
+        const headPos = selection.$head.pos;
+
+        // Check if there's a link ending at the current head position
+        const linkRange = findLinkEndingAt(state.doc, headPos);
+        if (!linkRange) {
+          return false; // Let default behavior handle it
+        }
+
+        // Calculate new selection:
+        // - anchor stays where it is (the fixed end)
+        // - head moves to the start of the link
+        const anchor = selection.$anchor.pos;
+        const newHead = linkRange.from;
+
+        // Create selection with proper anchor/head order
+        const newFrom = Math.min(anchor, newHead);
+        const newTo = Math.max(anchor, newHead);
+
+        const tr = state.tr.setSelection(TextSelection.create(state.doc, newFrom, newTo));
+        view.dispatch(tr);
+        return true;
+      },
+
+      'Mod-Shift-ArrowLeft': () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Get the anchor position (fixed end of selection)
+        const anchor = selection.$anchor.pos;
+        // Get the start of the current paragraph (where head should move to)
+        const paragraphStart = selection.$head.start();
+
+        // If already at the start of paragraph, let default behavior handle it
+        // (might need to select to previous paragraph)
+        if (selection.$head.pos === paragraphStart) {
+          return false;
+        }
+
+        // Create selection from paragraph start to anchor
+        const newFrom = Math.min(anchor, paragraphStart);
+        const newTo = Math.max(anchor, paragraphStart);
+
+        const tr = state.tr.setSelection(TextSelection.create(state.doc, newFrom, newTo));
+        view.dispatch(tr);
+        return true;
+      },
     };
   },
 

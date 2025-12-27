@@ -78,6 +78,33 @@ describe('InterNoteLink Keyboard Handling', () => {
     editor.view.dom.dispatchEvent(event);
   }
 
+  /**
+   * Helper to simulate Shift+Left arrow
+   */
+  function pressShiftLeft() {
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      shiftKey: true,
+      bubbles: true,
+    });
+    editor.view.dom.dispatchEvent(event);
+  }
+
+  /**
+   * Helper to simulate Shift+Cmd+Left arrow (Mac: select to beginning of line)
+   * Note: In jsdom, we use ctrlKey since jsdom doesn't recognize itself as Mac.
+   * TipTap's `Mod` maps to Ctrl in non-Mac environments.
+   */
+  function pressShiftCmdLeft() {
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      shiftKey: true,
+      ctrlKey: true, // Mod maps to Ctrl in jsdom (non-Mac)
+      bubbles: true,
+    });
+    editor.view.dom.dispatchEvent(event);
+  }
+
   describe('Helper function: findLinkEndingAt', () => {
     it('should find a link ending at the given position', () => {
       const linkText = `[[${TEST_UUID}]]`;
@@ -295,6 +322,139 @@ describe('InterNoteLink Keyboard Handling', () => {
       const sel = getSelection();
       expect(sel.from).toBe(1);
       expect(sel.to).toBe(1 + linkText.length);
+    });
+  });
+
+  describe('Shift+Left selection behavior', () => {
+    it('should extend selection to include entire link when cursor is after link', () => {
+      // Content: "foo [[uuid]] bar" with cursor after the link: "foo [[uuid]]|bar"
+      const linkText = `[[${TEST_UUID}]]`;
+      const cursorPos = 4 + linkText.length; // position after ]]
+      setContentAndCursor(`<p>foo${linkText}bar</p>`, cursorPos);
+
+      // Verify initial cursor position
+      expect(getSelection().empty).toBe(true);
+      expect(getSelection().from).toBe(cursorPos);
+
+      // Press Shift+Left - should select the entire link atomically
+      pressShiftLeft();
+
+      const sel = getSelection();
+      // Selection should span the entire link
+      expect(sel.from).toBe(4); // start of link
+      expect(sel.to).toBe(cursorPos); // original cursor position
+    });
+
+    it('should extend selection through link when head is at link boundary', () => {
+      // Content: "foo [[uuid]]bar" with cursor after "bar", having already selected back to link end
+      // This simulates: user at end of "bar", presses Shift+Left twice to select "ar",
+      // then the next Shift+Left should jump to include the entire link
+      const linkText = `[[${TEST_UUID}]]`;
+      const linkEnd = 4 + linkText.length;
+      // Create a backward selection: anchor at end of "bar", head at end of link
+      // This is like having selected "bar" by pressing Shift+Left three times
+      setContentAndCursor(`<p>foo${linkText}bar</p>`, linkEnd + 3); // cursor after "bar"
+      // Anchor stays at linkEnd+3 (end of "bar"), head moves to linkEnd (end of link)
+      const { state } = editor;
+      const tr = state.tr.setSelection(TextSelection.create(state.doc, linkEnd + 3, linkEnd));
+      editor.view.dispatch(tr);
+
+      // Now head is at linkEnd (end of link), pressing Shift+Left should select through the link
+      pressShiftLeft();
+
+      const sel = getSelection();
+      // Selection should now include the link (head moved to start of link)
+      expect(sel.from).toBe(4); // start of link (new head position)
+      expect(sel.to).toBe(linkEnd + 3); // end of "bar" (anchor stayed)
+    });
+
+    it('should not interfere when no link precedes cursor', () => {
+      setContentAndCursor('<p>foobar</p>', 4); // after "foo"
+
+      const initialPos = getSelection().from;
+
+      // Press Shift+Left - default behavior should apply
+      pressShiftLeft();
+
+      // In jsdom, default selection behavior may not work fully,
+      // but our handler should return false to allow it
+      // Just verify we didn't crash or incorrectly select something
+      const sel = getSelection();
+      expect(sel.to).toBe(initialPos); // selection head/anchor should be at original or moved left
+    });
+
+    it('should select only the immediately preceding link when multiple links exist', () => {
+      const link1 = `[[${TEST_UUID}]]`;
+      const link2 = `[[${TEST_UUID_2}]]`;
+      const link2End = 1 + link1.length + link2.length;
+      setContentAndCursor(`<p>${link1}${link2}bar</p>`, link2End);
+
+      pressShiftLeft();
+
+      const sel = getSelection();
+      // Should only select link2, not link1
+      expect(sel.from).toBe(1 + link1.length); // start of link2
+      expect(sel.to).toBe(link2End);
+    });
+  });
+
+  describe('Shift+Cmd+Left selection behavior (select to beginning of line)', () => {
+    it('should include entire link when selecting to beginning of line', () => {
+      // Content: "foo [[uuid]]| bar" - cursor immediately after link
+      const linkText = `[[${TEST_UUID}]]`;
+      const cursorPos = 4 + linkText.length; // after ]]
+      setContentAndCursor(`<p>foo${linkText} bar</p>`, cursorPos);
+
+      // Press Shift+Cmd+Left - should select to beginning of line, including link
+      pressShiftCmdLeft();
+
+      const sel = getSelection();
+      // Selection should start at beginning of paragraph content (pos 1)
+      expect(sel.from).toBe(1);
+      expect(sel.to).toBe(cursorPos);
+    });
+
+    it('should include link when selecting from end of line through link', () => {
+      // Content: "foo [[uuid]] bar|" - cursor at end
+      const linkText = `[[${TEST_UUID}]]`;
+      const endPos = 4 + linkText.length + 4; // "foo" + link + " bar"
+      setContentAndCursor(`<p>foo${linkText} bar</p>`, endPos);
+
+      pressShiftCmdLeft();
+
+      const sel = getSelection();
+      // Should select entire line content
+      expect(sel.from).toBe(1);
+      expect(sel.to).toBe(endPos);
+    });
+
+    it('should handle multiple links in line', () => {
+      const link1 = `[[${TEST_UUID}]]`;
+      const link2 = `[[${TEST_UUID_2}]]`;
+      // Content: "foo [[uuid1]] bar [[uuid2]]|"
+      const endPos = 4 + link1.length + 5 + link2.length; // "foo" + link1 + " bar " + link2
+      setContentAndCursor(`<p>foo${link1} bar ${link2}</p>`, endPos);
+
+      pressShiftCmdLeft();
+
+      const sel = getSelection();
+      // Should select entire line including both links
+      expect(sel.from).toBe(1);
+      expect(sel.to).toBe(endPos);
+    });
+
+    it('should handle link at start of line', () => {
+      // Content: "[[uuid]]| bar" - link at start, cursor after link
+      const linkText = `[[${TEST_UUID}]]`;
+      const cursorPos = 1 + linkText.length;
+      setContentAndCursor(`<p>${linkText} bar</p>`, cursorPos);
+
+      pressShiftCmdLeft();
+
+      const sel = getSelection();
+      // Should select from start of line (including link) to cursor
+      expect(sel.from).toBe(1);
+      expect(sel.to).toBe(cursorPos);
     });
   });
 });

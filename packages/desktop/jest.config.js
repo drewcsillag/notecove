@@ -26,6 +26,7 @@ module.exports = {
     '^lowlight$': '<rootDir>/src/__mocks__/lowlight.ts',
     '^@tiptap/extension-code-block-lowlight$':
       '<rootDir>/src/__mocks__/@tiptap/extension-code-block-lowlight.ts',
+    '^@floating-ui/dom$': '<rootDir>/src/__mocks__/@floating-ui/dom.ts',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(@minoru/react-dnd-treeview|react-dnd|dnd-core|@react-dnd|uuid)/)',
