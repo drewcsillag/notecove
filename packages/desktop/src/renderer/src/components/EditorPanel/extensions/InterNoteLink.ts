@@ -23,8 +23,7 @@ import type { SuggestionMatch } from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
 import { LinkSuggestionList, type LinkSuggestionListRef } from './LinkSuggestionList';
 import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion';
-import tippy from 'tippy.js';
-import type { Instance as TippyInstance } from 'tippy.js';
+import { createFloatingPopup, type FloatingPopup } from './utils/floating-popup';
 import { getChangedRanges, expandRanges, isFullDocumentReload } from './utils/transaction-ranges';
 
 export interface InterNoteLinkOptions {
@@ -215,7 +214,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
 
         render: () => {
           let component: ReactRenderer | undefined;
-          let popup: TippyInstance[] | undefined;
+          let popup: FloatingPopup | undefined;
 
           return {
             onStart: (props: SuggestionProps) => {
@@ -228,14 +227,9 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
                 return;
               }
 
-              popup = tippy('body', {
+              popup = createFloatingPopup({
                 getReferenceClientRect: props.clientRect as () => DOMRect,
-                appendTo: () => document.body,
-                content: component.element,
-                showOnCreate: true,
-                interactive: true,
-                trigger: 'manual',
-                placement: 'bottom-start',
+                content: component.element as HTMLElement,
               });
             },
 
@@ -246,14 +240,12 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
                 return;
               }
 
-              popup?.[0]?.setProps({
-                getReferenceClientRect: props.clientRect as () => DOMRect,
-              });
+              popup?.setReferenceClientRect(props.clientRect as () => DOMRect);
             },
 
             onKeyDown(props: { event: KeyboardEvent }) {
               if (props.event.key === 'Escape') {
-                popup?.[0]?.hide();
+                popup?.hide();
                 return true;
               }
 
@@ -263,7 +255,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
             },
 
             onExit() {
-              popup?.[0]?.destroy();
+              popup?.destroy();
               component?.destroy();
             },
           };

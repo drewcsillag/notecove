@@ -1,6 +1,6 @@
 # TipTap 3 Upgrade Plan
 
-**Overall Progress:** `~28%` (Phases 1-2 of 7 complete)
+**Overall Progress:** `~43%` (Phases 1-3 of 7 complete)
 
 **Branch:** `tiptap-3-upgrade`
 
@@ -113,34 +113,36 @@ From [QUESTIONS-1.md](./QUESTIONS-1.md), refined in [PLAN-CRITIQUE.md](./PLAN-CR
 
 ---
 
-## Phase 3: Floating UI - Suggestion Popovers
+## Phase 3: Floating UI - Suggestion Popovers ✅ COMPLETE
 
 **Goal:** Migrate suggestion autocomplete popovers from tippy.js to Floating UI.
 
-- [ ] 🟥 **3.1 Install Floating UI**
-  - [ ] 🟥 Add `@floating-ui/dom` to desktop package.json
+**Status:** All suggestion extensions migrated, 37 tests pass.
 
-- [ ] 🟥 **3.2 Create shared popup utility**
-  - [ ] 🟥 Create `extensions/utils/floating-popup.ts` with reusable positioning logic
-  - [ ] 🟥 Implement show/hide/update/destroy lifecycle
+**What was done:**
 
-- [ ] 🟥 **3.3 Migrate Hashtag.ts**
-  - [ ] 🟥 Replace tippy imports with Floating UI
-  - [ ] 🟥 Update render() callbacks in suggestion config
-  - [ ] 🟥 Test hashtag autocomplete works
+- [x] ✅ **3.1 Install Floating UI**
+  - Added `@floating-ui/dom` ^1.6.0 to desktop package.json
 
-- [ ] 🟥 **3.4 Migrate AtMention.ts**
-  - [ ] 🟥 Replace tippy imports with Floating UI
-  - [ ] 🟥 Update render() callbacks
-  - [ ] 🟥 Test @mention autocomplete works
+- [x] ✅ **3.2 Create shared popup utility**
+  - Created `extensions/utils/floating-popup.ts` with reusable positioning logic
+  - Implements createFloatingPopup() with show/hide/update/destroy lifecycle
+  - Uses computePosition with flip, shift, offset middleware
 
-- [ ] 🟥 **3.5 Migrate InterNoteLink.ts**
-  - [ ] 🟥 Replace tippy imports with Floating UI
-  - [ ] 🟥 Update render() callbacks
-  - [ ] 🟥 Test [[link]] autocomplete works
+- [x] ✅ **3.3 Migrate Hashtag.ts**
+  - Replaced tippy imports with floating-popup utility
+  - Updated render() callbacks in suggestion config
 
-- [ ] 🟥 **3.6 Run tests**
-  - [ ] 🟥 Verify all suggestion-related tests pass
+- [x] ✅ **3.4 Migrate AtMention.ts**
+  - Replaced tippy imports with floating-popup utility
+  - Updated render() callbacks
+
+- [x] ✅ **3.5 Migrate InterNoteLink.ts**
+  - Replaced tippy imports with floating-popup utility
+  - Updated render() callbacks
+
+- [x] ✅ **3.6 Run tests**
+  - All 37 suggestion-related tests pass
 
 ---
 

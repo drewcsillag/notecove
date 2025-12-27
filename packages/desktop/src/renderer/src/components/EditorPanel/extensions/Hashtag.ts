@@ -20,8 +20,7 @@ import Suggestion from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
 import { TagSuggestionList, type TagSuggestionListRef } from './TagSuggestionList';
 import type { SuggestionOptions } from '@tiptap/suggestion';
-import tippy from 'tippy.js';
-import type { Instance as TippyInstance } from 'tippy.js';
+import { createFloatingPopup, type FloatingPopup } from './utils/floating-popup';
 import { getChangedRanges, isFullDocumentReload } from './utils/transaction-ranges';
 
 export interface HashtagOptions {
@@ -62,7 +61,7 @@ export const Hashtag = Extension.create<HashtagOptions>({
         },
         render: () => {
           let component: ReactRenderer | undefined;
-          let popup: TippyInstance[] | undefined;
+          let popup: FloatingPopup | undefined;
 
           return {
             onStart: (props) => {
@@ -75,14 +74,9 @@ export const Hashtag = Extension.create<HashtagOptions>({
                 return;
               }
 
-              popup = tippy('body', {
+              popup = createFloatingPopup({
                 getReferenceClientRect: props.clientRect as () => DOMRect,
-                appendTo: () => document.body,
-                content: component.element,
-                showOnCreate: true,
-                interactive: true,
-                trigger: 'manual',
-                placement: 'bottom-start',
+                content: component.element as HTMLElement,
               });
             },
 
@@ -93,14 +87,12 @@ export const Hashtag = Extension.create<HashtagOptions>({
                 return;
               }
 
-              popup?.[0]?.setProps({
-                getReferenceClientRect: props.clientRect as () => DOMRect,
-              });
+              popup?.setReferenceClientRect(props.clientRect as () => DOMRect);
             },
 
             onKeyDown(props) {
               if (props.event.key === 'Escape') {
-                popup?.[0]?.hide();
+                popup?.hide();
                 return true;
               }
 
@@ -110,7 +102,7 @@ export const Hashtag = Extension.create<HashtagOptions>({
             },
 
             onExit() {
-              popup?.[0]?.destroy();
+              popup?.destroy();
               component?.destroy();
             },
           };
