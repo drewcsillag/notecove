@@ -30,6 +30,7 @@ import { SyncStatusPanel } from './components/SyncStatusPanel';
 import { ImportDialog } from './components/ImportDialog';
 import { AppStateKey } from '@notecove/shared';
 import { useWindowState } from './hooks/useWindowState';
+import { pickNextNote } from './utils/pickNextNote';
 
 const THEME_MODE_KEY = AppStateKey.ThemeMode as string;
 
@@ -624,13 +625,27 @@ function App(): React.ReactElement {
           try {
             const remainingSds = await window.electronAPI.sd.list();
             if (remainingSds.length > 0 && remainingSds[0]) {
-              setActiveSdId(remainingSds[0].id);
+              const newSdId = remainingSds[0].id;
+              setActiveSdId(newSdId);
+
+              // Auto-select a note from the new SD
+              const notesInNewSd = await window.electronAPI.note.list('all-notes');
+              const nextNoteId = pickNextNote(notesInNewSd);
+              if (nextNoteId) {
+                console.log('[App] Auto-selected note from new SD:', nextNoteId);
+                setSelectedNoteId(nextNoteId);
+              } else {
+                console.log('[App] No notes in new SD, clearing selection');
+                setSelectedNoteId(null);
+              }
             } else {
               setActiveSdId(undefined);
+              setSelectedNoteId(null);
             }
           } catch (error) {
             console.error('[App] Failed to fetch remaining SDs:', error);
             setActiveSdId(undefined);
+            setSelectedNoteId(null);
           }
         }
       })();
@@ -638,6 +653,96 @@ function App(): React.ReactElement {
 
     return cleanup;
   }, [selectedNoteId, activeSdId, minimalMode]);
+
+  // Use refs to track current values for deletion handler (avoids closure issues)
+  const selectedNoteIdRef = useRef(selectedNoteId);
+  const selectedFolderIdRef = useRef(selectedFolderId);
+  const activeSdIdRef = useRef(activeSdId);
+  const minimalModeRef = useRef(minimalMode);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    selectedNoteIdRef.current = selectedNoteId;
+  }, [selectedNoteId]);
+
+  useEffect(() => {
+    selectedFolderIdRef.current = selectedFolderId;
+  }, [selectedFolderId]);
+
+  useEffect(() => {
+    activeSdIdRef.current = activeSdId;
+  }, [activeSdId]);
+
+  useEffect(() => {
+    minimalModeRef.current = minimalMode;
+  }, [minimalMode]);
+
+  // Handle note deletion - auto-select next note when selected note is deleted
+  useEffect(() => {
+    const selectNextNote = async (deletedNoteId: string): Promise<void> => {
+      // If we have a different note selected (not empty, not the deleted one), no action needed
+      // This handles the case where NotesListPanel already cleared selection before the event fires
+      const currentSelection = selectedNoteIdRef.current;
+      if (currentSelection && currentSelection !== deletedNoteId) {
+        return;
+      }
+
+      // In minimal mode, close the window since the note no longer exists
+      if (minimalModeRef.current) {
+        window.close();
+        return;
+      }
+
+      try {
+        const sdId = activeSdIdRef.current;
+        if (!sdId) {
+          setSelectedNoteId(null);
+          return;
+        }
+
+        // First try to find a note in the current folder
+        const folderId = selectedFolderIdRef.current;
+        // note.list(sdId, folderId?) - pass undefined to get all notes in SD
+        const notesInFolder = await window.electronAPI.note.list(sdId, folderId);
+        const nextNoteId = pickNextNote(notesInFolder, [deletedNoteId]);
+
+        if (nextNoteId) {
+          setSelectedNoteId(nextNoteId);
+          return;
+        }
+
+        // Fall back to any note in the active SD (pass undefined to get all notes)
+        const allNotes = await window.electronAPI.note.list(sdId, undefined);
+        const fallbackNoteId = pickNextNote(allNotes, [deletedNoteId]);
+
+        if (fallbackNoteId) {
+          setSelectedNoteId(fallbackNoteId);
+          return;
+        }
+
+        // No notes available - clear selection (empty state will show)
+        setSelectedNoteId(null);
+      } catch (error) {
+        console.error('[App] Error auto-selecting next note:', error);
+        setSelectedNoteId(null);
+      }
+    };
+
+    // Listen for soft delete (move to trash)
+    const cleanupDeleted = window.electronAPI.note.onDeleted((noteId) => {
+      void selectNextNote(noteId);
+    });
+
+    // Listen for permanent delete
+    const cleanupPermanentDeleted = window.electronAPI.note.onPermanentDeleted((noteId) => {
+      void selectNextNote(noteId);
+    });
+
+    return () => {
+      cleanupDeleted();
+      cleanupPermanentDeleted();
+    };
+  }, []); // Empty deps - the handler uses refs for current values
 
   // Listen for menu commands
   useEffect(() => {

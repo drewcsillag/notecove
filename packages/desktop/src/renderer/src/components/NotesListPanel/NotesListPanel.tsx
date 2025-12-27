@@ -897,6 +897,12 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       // If multi-select is active, delete all selected notes
       const notesToDelete = selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [noteToDelete];
 
+      // Clear selection BEFORE the delete so App.tsx can auto-select when the event fires
+      // (If we clear after, it overwrites App's auto-selection)
+      if (selectedNoteId && notesToDelete.includes(selectedNoteId)) {
+        onNoteSelect('');
+      }
+
       // Delete all notes
       await Promise.all(notesToDelete.map((id) => window.electronAPI.note.delete(id)));
 
@@ -907,13 +913,8 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       // Clear multi-select
       setSelectedNoteIds(new Set());
 
-      // If we just deleted the selected note, clear selection
-      if (selectedNoteId && notesToDelete.includes(selectedNoteId)) {
-        onNoteSelect('');
-      }
-
       // Note: The notes list will be updated automatically via the onDeleted event handler
-      // which removes the note from the current view
+      // which removes the note from the current view, and App.tsx will auto-select another note
     } catch (err) {
       console.error('Failed to delete note:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete note');
@@ -1003,6 +1004,12 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       const notesToDelete =
         selectedNoteIds.size > 0 ? Array.from(selectedNoteIds) : [noteToPermanentDelete];
 
+      // Clear selection BEFORE the delete so App.tsx can auto-select when the event fires
+      // (If we clear after, it overwrites App's auto-selection)
+      if (selectedNoteId && notesToDelete.includes(selectedNoteId)) {
+        onNoteSelect('');
+      }
+
       // Delete all notes
       await Promise.all(notesToDelete.map((id) => window.electronAPI.note.permanentDelete(id)));
 
@@ -1011,12 +1018,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       // Clear multi-select
       setSelectedNoteIds(new Set());
 
-      // If we just deleted the selected note, clear selection
-      if (selectedNoteId && notesToDelete.includes(selectedNoteId)) {
-        onNoteSelect('');
-      }
-
-      // Refresh notes list
+      // Refresh notes list (App.tsx will auto-select another note via the event handler)
       if (selectedFolderId !== null) {
         await fetchNotes(selectedFolderId);
       }

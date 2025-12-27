@@ -633,6 +633,73 @@ describe('App', () => {
         expect(mockElectronAPI.sd.list).toHaveBeenCalled();
       });
     });
+
+    it('should auto-select a note from the new SD after SD deletion', async () => {
+      // Capture the sd.onUpdated callback
+      let sdUpdatedCallback: ((data: { operation: string; sdId: string }) => void) | null = null;
+      mockElectronAPI.sd.onUpdated.mockImplementation(
+        (callback: (data: { operation: string; sdId: string }) => void) => {
+          sdUpdatedCallback = callback;
+          return () => {
+            /* unsubscribe */
+          };
+        }
+      );
+
+      // Set up sd.getActive to return the SD that will be deleted
+      mockElectronAPI.sd.getActive.mockResolvedValue('sd-to-delete');
+
+      // Set up sd.list to return remaining SDs after deletion
+      mockElectronAPI.sd.list.mockResolvedValue([
+        {
+          id: 'remaining-sd',
+          name: 'Remaining SD',
+          path: '/path',
+          created: Date.now(),
+          isActive: false,
+        },
+      ]);
+
+      // Set up note.list to return notes in the new SD
+      mockElectronAPI.note.list.mockResolvedValue([
+        {
+          id: 'note-in-new-sd',
+          title: 'Note in New SD',
+          sdId: 'remaining-sd',
+          folderId: null,
+          created: 1000,
+          modified: 1000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+      ]);
+
+      render(<App />);
+
+      // Wait for component to mount and activeSdId to be set
+      await waitFor(() => {
+        expect(mockElectronAPI.sd.onUpdated).toHaveBeenCalled();
+      });
+
+      // Wait for initial load to settle
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Clear previous calls
+      mockElectronAPI.note.list.mockClear();
+
+      // Verify callback was captured
+      expect(sdUpdatedCallback).not.toBeNull();
+
+      // Simulate active SD deletion
+      sdUpdatedCallback!({ operation: 'delete', sdId: 'sd-to-delete' });
+
+      // App should query for notes in the new SD to auto-select one
+      await waitFor(() => {
+        expect(mockElectronAPI.note.list).toHaveBeenCalledWith('all-notes');
+      });
+    });
   });
 
   describe('Panel Size Persistence', () => {
@@ -713,6 +780,349 @@ describe('App', () => {
       // The app should render with default panel sizes
       const panelGroup = document.querySelector('[data-testid="panel-group"]');
       expect(panelGroup).toBeInTheDocument();
+    });
+  });
+
+  describe('Auto-select on Note Deletion', () => {
+    it('should auto-select next note even when selection was already cleared (NotesListPanel scenario)', async () => {
+      // This tests the real-world scenario where:
+      // 1. NotesListPanel deletes a note
+      // 2. NotesListPanel calls onNoteSelect('') to clear selection immediately
+      // 3. The note:deleted event fires
+      // 4. App should still auto-select another note
+
+      // Capture ALL note.onDeleted callbacks (multiple components subscribe)
+      const noteDeletedCallbacks: ((noteId: string) => void)[] = [];
+      mockElectronAPI.note.onDeleted.mockImplementation((callback: (noteId: string) => void) => {
+        noteDeletedCallbacks.push(callback);
+        return () => {
+          /* unsubscribe */
+        };
+      });
+
+      // Set up notes list - will return remaining note after deletion
+      mockElectronAPI.note.list.mockResolvedValue([
+        {
+          id: 'remaining-note',
+          title: 'Remaining Note',
+          sdId: 'test-sd',
+          folderId: null,
+          created: 2000,
+          modified: 2000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+      ]);
+
+      const { container } = render(<App />);
+
+      // Wait for component to mount
+      await waitFor(() => {
+        expect(mockElectronAPI.note.onDeleted).toHaveBeenCalled();
+      });
+
+      // Wait for initial load to settle
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Clear previous calls to track the auto-select query
+      mockElectronAPI.note.list.mockClear();
+
+      // Verify callbacks were captured
+      expect(noteDeletedCallbacks.length).toBeGreaterThan(0);
+
+      // Simulate the deletion event firing (in real app, NotesListPanel already cleared selection)
+      // The key test is that auto-select still works even when current selection is empty
+      noteDeletedCallbacks.forEach((cb) => {
+        cb('deleted-note');
+      });
+
+      // Wait for async handler
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // App should query for notes to auto-select
+      await waitFor(
+        () => {
+          expect(mockElectronAPI.note.list).toHaveBeenCalled();
+        },
+        { timeout: 2000 }
+      );
+
+      // Verify TipTapEditor is NOT showing empty state (a note should be selected)
+      await waitFor(() => {
+        const emptyState = container.querySelector('[data-testid="editor-empty-state"]');
+        expect(emptyState).not.toBeInTheDocument();
+      });
+    });
+
+    it('should auto-select next note when selected note is soft-deleted', async () => {
+      // Capture ALL note.onDeleted callbacks (multiple components subscribe)
+      const noteDeletedCallbacks: ((noteId: string) => void)[] = [];
+      mockElectronAPI.note.onDeleted.mockImplementation((callback: (noteId: string) => void) => {
+        noteDeletedCallbacks.push(callback);
+        return () => {
+          /* unsubscribe */
+        };
+      });
+
+      // Set up initial notes list with a default note
+      mockElectronAPI.note.list.mockResolvedValue([
+        {
+          id: 'default-note',
+          title: 'Default Note',
+          sdId: 'test-sd',
+          folderId: null,
+          created: 1000,
+          modified: 1000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+        {
+          id: 'other-note',
+          title: 'Other Note',
+          sdId: 'test-sd',
+          folderId: null,
+          created: 2000,
+          modified: 2000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+      ]);
+
+      render(<App />);
+
+      // Wait for component to mount and auto-select default note
+      await waitFor(() => {
+        expect(mockElectronAPI.note.onDeleted).toHaveBeenCalled();
+      });
+
+      // Wait for initial load to settle
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Clear previous calls
+      mockElectronAPI.note.list.mockClear();
+
+      // Verify callbacks were captured
+      expect(noteDeletedCallbacks.length).toBeGreaterThan(0);
+
+      // Simulate deletion of the selected note (default-note) - invoke ALL callbacks
+      noteDeletedCallbacks.forEach((cb) => {
+        cb('default-note');
+      });
+
+      // Wait a bit for the async handler to run
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // App should query for notes to pick the next one
+      await waitFor(
+        () => {
+          // The note.list call happens to find next note (called with folder ID)
+          expect(mockElectronAPI.note.list).toHaveBeenCalled();
+        },
+        { timeout: 2000 }
+      );
+    });
+
+    it('should auto-select next note when selected note is permanently deleted', async () => {
+      // Capture ALL note.onPermanentDeleted callbacks (multiple components may subscribe)
+      const notePermanentDeletedCallbacks: ((noteId: string) => void)[] = [];
+      mockElectronAPI.note.onPermanentDeleted.mockImplementation(
+        (callback: (noteId: string) => void) => {
+          notePermanentDeletedCallbacks.push(callback);
+          return () => {
+            /* unsubscribe */
+          };
+        }
+      );
+
+      // Set up initial notes list
+      mockElectronAPI.note.list.mockResolvedValue([
+        {
+          id: 'default-note',
+          title: 'Default Note',
+          sdId: 'test-sd',
+          folderId: null,
+          created: 1000,
+          modified: 1000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+        {
+          id: 'other-note',
+          title: 'Other Note',
+          sdId: 'test-sd',
+          folderId: null,
+          created: 2000,
+          modified: 2000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+      ]);
+
+      render(<App />);
+
+      // Wait for component to mount
+      await waitFor(() => {
+        expect(mockElectronAPI.note.onPermanentDeleted).toHaveBeenCalled();
+      });
+
+      // Wait for initial load to settle
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Clear previous calls
+      mockElectronAPI.note.list.mockClear();
+
+      // Verify callbacks were captured
+      expect(notePermanentDeletedCallbacks.length).toBeGreaterThan(0);
+
+      // Simulate permanent deletion of the selected note - invoke ALL callbacks
+      notePermanentDeletedCallbacks.forEach((cb) => {
+        cb('default-note');
+      });
+
+      // Wait a bit for the async handler to run
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // App should query for notes to pick the next one
+      await waitFor(() => {
+        expect(mockElectronAPI.note.list).toHaveBeenCalled();
+      });
+    });
+
+    it('should close minimal mode window when note is deleted', async () => {
+      // Mock window.close
+      const originalClose = window.close;
+      const mockClose = jest.fn();
+      window.close = mockClose;
+
+      // Set up URL with minimal=true parameter
+      const originalLocation = window.location;
+      Object.defineProperty(window, 'location', {
+        value: {
+          href: originalLocation.href,
+          origin: originalLocation.origin,
+          protocol: originalLocation.protocol,
+          host: originalLocation.host,
+          hostname: originalLocation.hostname,
+          port: originalLocation.port,
+          pathname: originalLocation.pathname,
+          hash: originalLocation.hash,
+          search: '?minimal=true&noteId=minimal-note',
+        },
+        writable: true,
+      });
+
+      // Capture ALL note.onDeleted callbacks
+      const noteDeletedCallbacks: ((noteId: string) => void)[] = [];
+      mockElectronAPI.note.onDeleted.mockImplementation((callback: (noteId: string) => void) => {
+        noteDeletedCallbacks.push(callback);
+        return () => {
+          /* unsubscribe */
+        };
+      });
+
+      // Set up initial notes list
+      mockElectronAPI.note.list.mockResolvedValue([
+        {
+          id: 'minimal-note',
+          title: 'Minimal Note',
+          sdId: 'test-sd',
+          folderId: null,
+          created: 1000,
+          modified: 1000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+      ]);
+
+      render(<App />);
+
+      // Wait for component to mount
+      await waitFor(() => {
+        expect(mockElectronAPI.note.onDeleted).toHaveBeenCalled();
+      });
+
+      // Wait for initial load to settle
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Simulate deletion of the minimal mode note - invoke ALL callbacks
+      noteDeletedCallbacks.forEach((cb) => {
+        cb('minimal-note');
+      });
+
+      // Wait a bit for the async handler to run
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Window should be closed
+      expect(mockClose).toHaveBeenCalled();
+
+      // Restore
+      window.close = originalClose;
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+      });
+    });
+
+    it('should not auto-select when deleted note is not the selected note', async () => {
+      // Capture the note.onDeleted callback
+      let noteDeletedCallback: ((noteId: string) => void) | null = null;
+      mockElectronAPI.note.onDeleted.mockImplementation((callback: (noteId: string) => void) => {
+        noteDeletedCallback = callback;
+        return () => {
+          /* unsubscribe */
+        };
+      });
+
+      // Set up initial notes list
+      mockElectronAPI.note.list.mockResolvedValue([
+        {
+          id: 'default-note',
+          title: 'Default Note',
+          sdId: 'test-sd',
+          folderId: null,
+          created: 1000,
+          modified: 1000,
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        },
+      ]);
+
+      render(<App />);
+
+      // Wait for component to mount and initial notes to load
+      await waitFor(() => {
+        expect(mockElectronAPI.note.onDeleted).toHaveBeenCalled();
+      });
+
+      // Wait longer for all initial async operations to settle
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Track call count BEFORE the deletion event
+      const callCountBefore = mockElectronAPI.note.list.mock.calls.length;
+
+      // Simulate deletion of a different note (not the selected one)
+      noteDeletedCallback!('some-other-note');
+
+      // Wait a bit for the event to be processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // App should NOT query for notes since the deleted note wasn't selected
+      // Check that no NEW calls were made
+      expect(mockElectronAPI.note.list.mock.calls.length).toBe(callCountBefore);
     });
   });
 });

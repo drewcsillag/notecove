@@ -1049,8 +1049,32 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           }}
         />
       </Fade>
+      {/* Empty state - shows when no note is selected */}
+      {!noteId && (
+        <Box
+          data-testid="editor-empty-state"
+          sx={{
+            position: 'absolute',
+            top: 48, // Below toolbar
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 1,
+            backgroundColor: theme.palette.background.default,
+            zIndex: 5,
+          }}
+        >
+          <Typography variant="h6" color="text.secondary">
+            Select a note to start editing
+          </Typography>
+        </Box>
+      )}
       {/* Loading overlay - shows spinner while note is loading */}
-      <Fade in={isLoading}>
+      <Fade in={isLoading && !!noteId}>
         <Box
           sx={{
             position: 'absolute',
