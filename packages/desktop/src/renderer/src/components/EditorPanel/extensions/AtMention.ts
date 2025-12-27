@@ -215,7 +215,7 @@ export const AtMention = Extension.create<AtMentionOptions>({
 
               popup = createFloatingPopup({
                 getReferenceClientRect: props.clientRect as () => DOMRect,
-                content: component.element as HTMLElement,
+                content: component.element,
               });
             },
 

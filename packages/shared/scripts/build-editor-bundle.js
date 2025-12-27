@@ -26,10 +26,10 @@ async function build() {
   // Create a temporary entry file that imports everything we need
   const entryContent = `
 // TipTap core and extensions
+// Note: TipTap 3 includes Underline in StarterKit, no separate import needed
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
-import Underline from '@tiptap/extension-underline';
 
 // Y.js for CRDT
 import * as Y from 'yjs';
@@ -40,7 +40,6 @@ window.TipTap = {
   Editor,
   StarterKit,
   Collaboration,
-  Underline,
 };
 
 window.Y = Y;

@@ -229,7 +229,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
 
               popup = createFloatingPopup({
                 getReferenceClientRect: props.clientRect as () => DOMRect,
-                content: component.element as HTMLElement,
+                content: component.element,
               });
             },
 

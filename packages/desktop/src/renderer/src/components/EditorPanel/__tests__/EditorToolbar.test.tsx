@@ -18,6 +18,7 @@ function createMockEditor(overrides: Partial<Editor> = {}): Editor {
     toggleUnderline: jest.fn().mockReturnThis(),
     toggleStrike: jest.fn().mockReturnThis(),
     toggleCode: jest.fn().mockReturnThis(),
+    toggleCodeBlock: jest.fn().mockReturnThis(),
     toggleHeading: jest.fn().mockReturnThis(),
     toggleBulletList: jest.fn().mockReturnThis(),
     toggleOrderedList: jest.fn().mockReturnThis(),
@@ -38,6 +39,9 @@ function createMockEditor(overrides: Partial<Editor> = {}): Editor {
       undo: jest.fn().mockReturnValue(true),
       redo: jest.fn().mockReturnValue(true),
     }),
+    // Required by useEditorState to subscribe to transactions
+    on: jest.fn(),
+    off: jest.fn(),
     ...overrides,
   } as unknown as Editor;
 }

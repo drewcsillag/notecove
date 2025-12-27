@@ -208,7 +208,7 @@ test.describe('Web Links - Click Handling', () => {
 
     // Popover should be visible (tippy creates popover in body)
     // Look for the popover with the URL text and action buttons
-    const popover = page.locator('[data-tippy-root]');
+    const popover = page.locator('.floating-popup-wrapper');
     await expect(popover).toBeVisible();
   });
 });
@@ -233,7 +233,7 @@ test.describe('Web Links - Popover Actions', () => {
     await page.waitForTimeout(300);
 
     // Popover should be visible
-    const popover = page.locator('[data-tippy-root]');
+    const popover = page.locator('.floating-popup-wrapper');
     await expect(popover).toBeVisible();
 
     // Click edit button
@@ -277,7 +277,7 @@ test.describe('Web Links - Popover Actions', () => {
     await page.waitForTimeout(300);
 
     // Popover should be visible
-    const popover = page.locator('[data-tippy-root]');
+    const popover = page.locator('.floating-popup-wrapper');
     await expect(popover).toBeVisible();
 
     // Click remove button
@@ -388,12 +388,12 @@ test.describe('Web Links - Toolbar Button', () => {
     await page.waitForTimeout(300);
 
     // URL input should appear (in a popover/dialog)
-    const urlInput = page.locator('[data-tippy-root] input[type="text"]');
+    const urlInput = page.locator('.floating-popup-wrapper input[type="text"]');
     await expect(urlInput).toBeVisible();
 
     // Enter URL and save
     await urlInput.fill('https://toolbar-test.com');
-    const saveButton = page.locator('[data-tippy-root] button[aria-label="Save link"]');
+    const saveButton = page.locator('.floating-popup-wrapper button[aria-label="Save link"]');
     await saveButton.click();
     await page.waitForTimeout(300);
 
@@ -434,7 +434,8 @@ test.describe('Web Links - Toolbar Button', () => {
     await page.waitForTimeout(300);
 
     // Edit popover should appear with the URL
-    const popover = page.locator('[data-tippy-root]');
+    // Use .floating-popup-wrapper to distinguish from MUI button tooltips
+    const popover = page.locator('.floating-popup-wrapper');
     await expect(popover).toBeVisible();
 
     // Should show the existing URL
@@ -467,12 +468,12 @@ test.describe('Web Links - Cmd+K Shortcut', () => {
     await page.waitForTimeout(300);
 
     // URL input should appear
-    const urlInput = page.locator('[data-tippy-root] input[type="text"]');
+    const urlInput = page.locator('.floating-popup-wrapper input[type="text"]');
     await expect(urlInput).toBeVisible();
 
     // Enter URL and save
     await urlInput.fill('https://cmdk-test.com');
-    const saveButton = page.locator('[data-tippy-root] button[aria-label="Save link"]');
+    const saveButton = page.locator('.floating-popup-wrapper button[aria-label="Save link"]');
     await saveButton.click();
     await page.waitForTimeout(300);
 
@@ -516,7 +517,7 @@ test.describe('Web Links - Cmd+K Shortcut', () => {
     await page.waitForTimeout(500);
 
     // Edit popover should appear with the URL
-    const popover = page.locator('[data-tippy-root]');
+    const popover = page.locator('.floating-popup-wrapper');
     await expect(popover).toBeVisible();
 
     // Should show the existing URL
@@ -540,7 +541,7 @@ test.describe('Web Links - Cmd+K Shortcut', () => {
     await page.waitForTimeout(300);
 
     // Should show dialog with both text and URL inputs
-    const dialog = page.locator('[data-tippy-root]');
+    const dialog = page.locator('.floating-popup-wrapper');
     await expect(dialog).toBeVisible();
 
     // Should have two input fields (text and URL)
@@ -908,7 +909,7 @@ test.describe('Web Links - Bare URL Sync', () => {
     await page.waitForTimeout(300);
 
     // Popover should be visible
-    const popover = page.locator('[data-tippy-root]');
+    const popover = page.locator('.floating-popup-wrapper');
     await expect(popover).toBeVisible();
 
     // Click Edit button in popover

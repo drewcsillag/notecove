@@ -60,6 +60,7 @@ export function createFloatingPopup(options: FloatingPopupOptions): FloatingPopu
   // Create a wrapper element that will be positioned
   const wrapper = document.createElement('div');
   wrapper.className = 'floating-popup-wrapper';
+  wrapper.setAttribute('role', 'tooltip'); // For accessibility and E2E test compatibility
   wrapper.style.cssText = `
     position: fixed;
     z-index: 9999;

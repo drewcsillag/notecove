@@ -76,7 +76,7 @@ export const Hashtag = Extension.create<HashtagOptions>({
 
               popup = createFloatingPopup({
                 getReferenceClientRect: props.clientRect as () => DOMRect,
-                content: component.element as HTMLElement,
+                content: component.element,
               });
             },
 

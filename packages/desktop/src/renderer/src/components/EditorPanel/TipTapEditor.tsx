@@ -310,9 +310,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     // Setting content here causes onUpdate to fire before note loads
     // Disable editing while loading or if readOnly
     editable: !readOnly && !isLoading,
-    // TipTap 3: Enable re-rendering on transactions for toolbar state updates
-    // (In Phase 5 we can optimize with useEditorState for specific state)
-    shouldRerenderOnTransaction: true,
+    // TipTap 3: EditorToolbar uses useEditorState hook for efficient selective re-rendering
+    // No need for shouldRerenderOnTransaction since toolbar state is tracked via useEditorState
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',

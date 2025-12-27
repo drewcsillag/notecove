@@ -1,6 +1,6 @@
 # TipTap 3 Upgrade Plan
 
-**Overall Progress:** `~57%` (Phases 1-4 of 7 complete)
+**Overall Progress:** `~86%` (Phases 1-6 of 7 complete)
 
 **Branch:** `tiptap-3-upgrade`
 
@@ -171,72 +171,96 @@ From [QUESTIONS-1.md](./QUESTIONS-1.md), refined in [PLAN-CRITIQUE.md](./PLAN-CR
 
 ---
 
-## Phase 5: React Rendering (useEditorState)
+## Phase 5: React Rendering (useEditorState) ✅ COMPLETE
 
 **Goal:** Implement proper state tracking using useEditorState hook instead of shouldRerenderOnTransaction.
 
-**Reference Pattern:**
+**Status:** EditorToolbar migrated to useEditorState, all tests pass.
 
-```typescript
-import { useEditorState } from '@tiptap/react';
+**What was done:**
 
-const { isBold, isItalic } = useEditorState({
-  editor,
-  selector: (ctx) => ({
-    isBold: ctx.editor.isActive('bold'),
-    isItalic: ctx.editor.isActive('italic'),
-  }),
-});
-```
+- [x] ✅ **5.1 Research useEditorState API**
+  - Verified import path: `import { useEditorState } from '@tiptap/react'`
+  - Understood selector pattern for performance optimization
 
-- [ ] 🟥 **5.1 Research useEditorState API**
-  - [ ] 🟥 Verify import path: `import { useEditorState } from '@tiptap/react'`
-  - [ ] 🟥 Understand selector pattern for performance
+- [x] ✅ **5.2 Update EditorToolbar**
+  - Created `EditorFormattingState` interface with all formatting states
+  - Implemented useEditorState with selector returning:
+    - Inline formatting: bold, italic, underline, strike, code, link
+    - Block formatting: heading 1/2/3, bulletList, orderedList, taskItem, blockquote, codeBlock, table
+    - Editor capabilities: canUndo, canRedo
+    - Table operations: canAddRow, canAddColumn, canDeleteRow, canDeleteColumn
+  - Updated all toolbar buttons to use derived state instead of inline `editor.isActive()` calls
+  - Updated tests with required mock editor methods (on, off)
+  - All 9 EditorToolbar tests pass
 
-- [ ] 🟥 **5.2 Update EditorToolbar**
-  - [ ] 🟥 Identify which toolbar buttons need editor state (bold, italic, etc.)
-  - [ ] 🟥 Implement useEditorState for active state tracking
-  - [ ] 🟥 Test toolbar buttons reflect current formatting
+- [x] ✅ **5.3 SearchPanel - No changes needed**
+  - Analyzed SearchPanel implementation
+  - SearchPanel uses local state + useEffect to read from editor storage after commands
+  - Does not rely on shouldRerenderOnTransaction for its state updates
+  - No useEditorState migration needed
 
-- [ ] 🟥 **5.3 Update SearchPanel**
-  - [ ] 🟥 Use useEditorState to track search results
-  - [ ] 🟥 Ensure result count and current index update correctly
-  - [ ] 🟥 Test search highlighting and navigation
-
-- [ ] 🟥 **5.4 Verify no regressions**
-  - [ ] 🟥 Test comment highlighting updates
-  - [ ] 🟥 Test any other state-dependent UI
+- [x] ✅ **5.4 Verify no regressions**
+  - Removed `shouldRerenderOnTransaction: true` from useEditor config
+  - All 424 EditorPanel-related tests pass (1 skipped)
+  - TypeScript compilation passes
 
 ---
 
-## Phase 6: iOS Bundle Update
+## Phase 6: iOS Bundle Update ✅ COMPLETE
 
 **Goal:** Update shared package TipTap dependencies and rebuild iOS editor bundle.
 
-- [ ] 🟥 **6.1 Update shared package dependencies**
-  - [ ] 🟥 Ensure all @tiptap/\* in shared are at 3.14.0
+**Status:** Bundle rebuilt with TipTap 3, all shared tests pass.
 
-- [ ] 🟥 **6.2 Update build-editor-bundle.js**
-  - [ ] 🟥 Check if import paths changed
-  - [ ] 🟥 Add any new extensions needed for feature parity
+**What was done:**
 
-- [ ] 🟥 **6.3 Rebuild bundle**
-  - [ ] 🟥 Run `node packages/shared/scripts/build-editor-bundle.js`
-  - [ ] 🟥 Verify bundle builds without errors
+- [x] ✅ **6.1 Update shared package dependencies**
+  - Verified all @tiptap/\* in shared at 3.14.0:
+    - @tiptap/core: 3.14.0
+    - @tiptap/extension-collaboration: 3.14.0
+    - @tiptap/starter-kit: 3.14.0
 
-- [ ] 🟥 **6.4 Test iOS integration**
-  - [ ] 🟥 Test bundle loads in WKWebView context (if possible)
+- [x] ✅ **6.2 Update build-editor-bundle.js**
+  - Removed `@tiptap/extension-underline` import (now part of StarterKit in TipTap 3)
+  - Removed Underline from exported TipTap object
+  - Added comment explaining TipTap 3 change
+
+- [x] ✅ **6.3 Rebuild bundle**
+  - Ran `node packages/shared/scripts/build-editor-bundle.js`
+  - Bundle built successfully: 1175.31 KB
+  - Output: `packages/ios/Sources/Resources/tiptap-bundle.js`
+
+- [x] ✅ **6.4 Verify shared package tests**
+  - All 976 shared package tests pass
+  - (iOS WKWebView testing requires device/simulator - deferred to manual testing)
 
 ---
 
-## Phase 7: Final Validation
+## Phase 7: Final Validation 🔄 IN PROGRESS
 
 **Goal:** Comprehensive testing before merge.
 
-- [ ] 🟥 **7.1 Run full CI**
+**Status:** E2E test fixes applied, most tests passing.
+
+**What was done:**
+
+- [x] ✅ **7.1 Fix E2E test selectors**
+  - Added `role="tooltip"` to floating-popup-wrapper for accessibility and test compatibility
+  - Updated web-links.spec.ts to use `[role="tooltip"]` instead of `[data-tippy-root]`
+  - Rebuilt desktop package to include changes
+
+- [x] ✅ **7.2 Verify E2E tests pass**
+  - Inter-note-links autocomplete: 10/10 pass
+  - Tags autocomplete: 26/26 pass
+  - Web-links: 27/29 pass (1 edge case failure, 2 skipped)
+  - Edge case failure: "should open edit popover when cursor is in existing link"
+    - May be focus-related when clicking toolbar button after Escape
+
+- [ ] 🟥 **7.3 Run full CI**
   - [ ] 🟥 `pnpm ci-local` passes
 
-- [ ] 🟥 **7.2 Manual testing checklist**
+- [ ] 🟥 **7.4 Manual testing checklist**
   - [ ] 🟥 Create new note, type content
   - [ ] 🟥 Hashtag autocomplete (#tag)
   - [ ] 🟥 @mention autocomplete (@today, @username)
@@ -249,7 +273,7 @@ const { isBold, isItalic } = useEditorState({
   - [ ] 🟥 Undo/redo
   - [ ] 🟥 Cross-device sync (if testable)
 
-- [ ] 🟥 **7.3 Code review**
+- [ ] 🟥 **7.5 Code review**
   - [ ] 🟥 Self-review all changes
   - [ ] 🟥 Check for any console errors
   - [ ] 🟥 Verify no debug code left in

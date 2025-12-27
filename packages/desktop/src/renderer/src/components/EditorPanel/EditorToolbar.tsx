@@ -2,6 +2,7 @@
  * Editor Toolbar Component
  *
  * Formatting toolbar for TipTap editor with Material-UI buttons.
+ * Uses useEditorState for efficient re-rendering on state changes.
  */
 
 import React from 'react';
@@ -36,7 +37,7 @@ import {
   AddComment,
   Comment,
 } from '@mui/icons-material';
-import type { Editor } from '@tiptap/react';
+import { type Editor, useEditorState } from '@tiptap/react';
 import { canAddRow, canAddColumn, canDeleteRow, canDeleteColumn } from './extensions/Table';
 
 // Extended chain commands interface for our custom table commands
@@ -82,6 +83,36 @@ export interface EditorToolbarProps {
   commentCount?: number;
 }
 
+/**
+ * Selector for editor formatting state.
+ * This function extracts all formatting states needed by toolbar buttons.
+ * useEditorState only re-renders when the output of this selector changes.
+ */
+interface EditorFormattingState {
+  isBold: boolean;
+  isItalic: boolean;
+  isUnderline: boolean;
+  isStrike: boolean;
+  isCode: boolean;
+  isLink: boolean;
+  isHeading1: boolean;
+  isHeading2: boolean;
+  isHeading3: boolean;
+  isBulletList: boolean;
+  isOrderedList: boolean;
+  isTaskItem: boolean;
+  isBlockquote: boolean;
+  isCodeBlock: boolean;
+  isTable: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  // Table helpers need the full editor to check state
+  canAddRow: boolean;
+  canAddColumn: boolean;
+  canDeleteRow: boolean;
+  canDeleteColumn: boolean;
+}
+
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editor,
   onLinkButtonClick,
@@ -92,9 +123,68 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   hasTextSelection = false,
   commentCount = 0,
 }) => {
-  if (!editor) {
+  // Use useEditorState to efficiently track formatting state
+  // Only re-renders when these specific values change, not on every transaction
+  const editorState = useEditorState<EditorFormattingState | null>({
+    editor,
+    selector: ({ editor: e }) => {
+      if (!e) return null;
+
+      // Check if editor state is available (for tests with mock editors)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- needed for mock editors in tests
+      const hasState = Boolean(e.state?.selection);
+
+      return {
+        isBold: e.isActive('bold'),
+        isItalic: e.isActive('italic'),
+        isUnderline: e.isActive('underline'),
+        isStrike: e.isActive('strike'),
+        isCode: e.isActive('code'),
+        isLink: e.isActive('link'),
+        isHeading1: e.isActive('heading', { level: 1 }),
+        isHeading2: e.isActive('heading', { level: 2 }),
+        isHeading3: e.isActive('heading', { level: 3 }),
+        isBulletList: e.isActive('bulletList'),
+        isOrderedList: e.isActive('orderedList'),
+        isTaskItem: e.isActive('taskItem'),
+        isBlockquote: e.isActive('blockquote'),
+        isCodeBlock: e.isActive('codeBlock'),
+        isTable: e.isActive('table'),
+        canUndo: e.can().undo(),
+        canRedo: e.can().redo(),
+        // Table operations (require full editor state)
+        canAddRow: hasState && canAddRow(e),
+        canAddColumn: hasState && canAddColumn(e),
+        canDeleteRow: hasState && canDeleteRow(e),
+        canDeleteColumn: hasState && canDeleteColumn(e),
+      };
+    },
+  });
+
+  if (!editor || !editorState) {
     return null;
   }
+
+  // Destructure for cleaner JSX
+  const {
+    isBold,
+    isItalic,
+    isUnderline,
+    isStrike,
+    isCode,
+    isLink,
+    isHeading1,
+    isHeading2,
+    isHeading3,
+    isBulletList,
+    isOrderedList,
+    isTaskItem,
+    isBlockquote,
+    isCodeBlock,
+    isTable,
+    canUndo,
+    canRedo,
+  } = editorState;
 
   /**
    * Handle link button click
@@ -140,7 +230,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          color={editor.isActive('bold') ? 'primary' : 'default'}
+          color={isBold ? 'primary' : 'default'}
         >
           <FormatBold fontSize="small" />
         </IconButton>
@@ -150,7 +240,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          color={editor.isActive('italic') ? 'primary' : 'default'}
+          color={isItalic ? 'primary' : 'default'}
         >
           <FormatItalic fontSize="small" />
         </IconButton>
@@ -160,7 +250,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleUnderline().run()}
-          color={editor.isActive('underline') ? 'primary' : 'default'}
+          color={isUnderline ? 'primary' : 'default'}
         >
           <FormatUnderlined fontSize="small" />
         </IconButton>
@@ -170,7 +260,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleStrike().run()}
-          color={editor.isActive('strike') ? 'primary' : 'default'}
+          color={isStrike ? 'primary' : 'default'}
         >
           <FormatStrikethrough fontSize="small" />
         </IconButton>
@@ -180,7 +270,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleCode().run()}
-          color={editor.isActive('code') ? 'primary' : 'default'}
+          color={isCode ? 'primary' : 'default'}
         >
           <Code fontSize="small" />
         </IconButton>
@@ -190,7 +280,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={handleLinkClick}
-          color={editor.isActive('link') ? 'primary' : 'default'}
+          color={isLink ? 'primary' : 'default'}
           aria-label="Insert link"
         >
           <Link fontSize="small" />
@@ -200,24 +290,36 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       {/* Headings */}
-      {[1, 2, 3].map((level) => (
-        <Tooltip key={level} title={`Heading ${level} (⌘⌥${level})`}>
-          <IconButton
-            size="small"
-            onClick={() =>
-              editor
-                .chain()
-                .focus()
-                .toggleHeading({ level: level as 1 | 2 | 3 })
-                .run()
-            }
-            color={editor.isActive('heading', { level }) ? 'primary' : 'default'}
-            sx={{ fontWeight: 'bold', fontSize: '0.9em' }}
-          >
-            H{level}
-          </IconButton>
-        </Tooltip>
-      ))}
+      <Tooltip title="Heading 1 (⌘⌥1)">
+        <IconButton
+          size="small"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          color={isHeading1 ? 'primary' : 'default'}
+          sx={{ fontWeight: 'bold', fontSize: '0.9em' }}
+        >
+          H1
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Heading 2 (⌘⌥2)">
+        <IconButton
+          size="small"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          color={isHeading2 ? 'primary' : 'default'}
+          sx={{ fontWeight: 'bold', fontSize: '0.9em' }}
+        >
+          H2
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Heading 3 (⌘⌥3)">
+        <IconButton
+          size="small"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          color={isHeading3 ? 'primary' : 'default'}
+          sx={{ fontWeight: 'bold', fontSize: '0.9em' }}
+        >
+          H3
+        </IconButton>
+      </Tooltip>
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
@@ -228,13 +330,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           onClick={() => {
             // If on a taskItem in a bulletList, convert to regular listItem
             // Otherwise, toggle bullet list (handles: ordered->bullet, paragraph->bullet, or toggle off)
-            if (editor.isActive('taskItem') && editor.isActive('bulletList')) {
+            if (isTaskItem && isBulletList) {
               editor.chain().focus().convertToListItem().run();
             } else {
               editor.chain().focus().toggleBulletList().run();
             }
           }}
-          color={editor.isActive('bulletList') ? 'primary' : 'default'}
+          color={isBulletList ? 'primary' : 'default'}
         >
           <FormatListBulleted fontSize="small" />
         </IconButton>
@@ -246,13 +348,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           onClick={() => {
             // If on a taskItem in an orderedList, convert to regular listItem
             // Otherwise, toggle ordered list (handles: bullet->ordered, paragraph->ordered, or toggle off)
-            if (editor.isActive('taskItem') && editor.isActive('orderedList')) {
+            if (isTaskItem && isOrderedList) {
               editor.chain().focus().convertToListItem().run();
             } else {
               editor.chain().focus().toggleOrderedList().run();
             }
           }}
-          color={editor.isActive('orderedList') ? 'primary' : 'default'}
+          color={isOrderedList ? 'primary' : 'default'}
         >
           <FormatListNumbered fontSize="small" />
         </IconButton>
@@ -262,7 +364,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleTaskItem().run()}
-          color={editor.isActive('taskItem') ? 'primary' : 'default'}
+          color={isTaskItem ? 'primary' : 'default'}
         >
           <CheckBoxOutlineBlank fontSize="small" />
         </IconButton>
@@ -275,7 +377,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          color={editor.isActive('blockquote') ? 'primary' : 'default'}
+          color={isBlockquote ? 'primary' : 'default'}
         >
           <FormatQuote fontSize="small" />
         </IconButton>
@@ -285,7 +387,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          color={editor.isActive('codeBlock') ? 'primary' : 'default'}
+          color={isCodeBlock ? 'primary' : 'default'}
           aria-label="Code block"
         >
           <DataObject fontSize="small" />
@@ -313,7 +415,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={handleTableClick}
-          color={editor.isActive('table') ? 'primary' : 'default'}
+          color={isTable ? 'primary' : 'default'}
           aria-label="Insert table"
           data-testid="table-button"
         >
@@ -361,15 +463,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       </Tooltip>
 
       {/* Table Manipulation - only shown when cursor is in a table */}
-      {editor.isActive('table') && (
+      {isTable && (
         <>
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
           <Tooltip title="Add row below (⌘↵)">
             <IconButton
               size="small"
-              onClick={() => canAddRow(editor) && editor.chain().focus().addRowAfter().run()}
-              disabled={!canAddRow(editor)}
+              onClick={() => editorState.canAddRow && editor.chain().focus().addRowAfter().run()}
+              disabled={!editorState.canAddRow}
               aria-label="Add row below"
               data-testid="table-add-row-after"
             >
@@ -386,8 +488,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Tooltip title="Add column right (⌘⇧↵)">
             <IconButton
               size="small"
-              onClick={() => canAddColumn(editor) && editor.chain().focus().addColumnAfter().run()}
-              disabled={!canAddColumn(editor)}
+              onClick={() =>
+                editorState.canAddColumn && editor.chain().focus().addColumnAfter().run()
+              }
+              disabled={!editorState.canAddColumn}
               aria-label="Add column right"
               data-testid="table-add-col-after"
             >
@@ -404,8 +508,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Tooltip title="Delete row (⌘⌫)">
             <IconButton
               size="small"
-              onClick={() => canDeleteRow(editor) && editor.chain().focus().deleteRow().run()}
-              disabled={!canDeleteRow(editor)}
+              onClick={() => editorState.canDeleteRow && editor.chain().focus().deleteRow().run()}
+              disabled={!editorState.canDeleteRow}
               aria-label="Delete row"
               data-testid="table-delete-row"
             >
@@ -422,8 +526,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Tooltip title="Delete column (⌘⇧⌫)">
             <IconButton
               size="small"
-              onClick={() => canDeleteColumn(editor) && editor.chain().focus().deleteColumn().run()}
-              disabled={!canDeleteColumn(editor)}
+              onClick={() =>
+                editorState.canDeleteColumn && editor.chain().focus().deleteColumn().run()
+              }
+              disabled={!editorState.canDeleteColumn}
               aria-label="Delete column"
               data-testid="table-delete-col"
             >
@@ -518,7 +624,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
+          disabled={!canUndo}
           aria-label="Undo"
           data-testid="undo-button"
         >
@@ -530,7 +636,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
+          disabled={!canRedo}
           aria-label="Redo"
           data-testid="redo-button"
         >

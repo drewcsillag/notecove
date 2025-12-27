@@ -136,7 +136,7 @@ describe('NotesListPanel', () => {
     expect(screen.getByText('Loading notes...')).toBeInTheDocument();
   });
 
-  it.skip('should show "No notes" when folder is empty', async () => {
+  it('should show "No notes" when folder is empty', async () => {
     // Use real timers for this test
     jest.useRealTimers();
 
@@ -147,17 +147,19 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    render(<NotesListPanel {...defaultProps} />);
+    const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     await waitFor(() => {
       expect(screen.getByText('No notes in this folder')).toBeInTheDocument();
     });
 
-    // Restore fake timers
-    jest.useFakeTimers();
+    unmount();
   });
 
-  it.skip('should display notes list when notes are available', async () => {
+  it('should display notes list when notes are available', async () => {
+    // Use real timers for this test
+    jest.useRealTimers();
+
     const mockNotes = [
       {
         id: 'note1',
@@ -190,7 +192,7 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    render(<NotesListPanel {...defaultProps} />);
+    const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     await waitFor(() => {
       expect(screen.getByText('Notes (2)')).toBeInTheDocument();
@@ -199,9 +201,11 @@ describe('NotesListPanel', () => {
     expect(screen.getByText('Test Note 1')).toBeInTheDocument();
     expect(screen.getByText('Test Note 2')).toBeInTheDocument();
     expect(screen.getByText('This is a test note preview')).toBeInTheDocument();
+
+    unmount();
   });
 
-  it.skip('should show "Untitled Note" for notes without title', async () => {
+  it('should show "Untitled Note" for notes without title', async () => {
     // Use real timers for this test
     jest.useRealTimers();
 
@@ -226,33 +230,34 @@ describe('NotesListPanel', () => {
       return Promise.resolve(null);
     });
 
-    render(<NotesListPanel {...defaultProps} />);
+    const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     await waitFor(() => {
       expect(screen.getByText('Untitled Note')).toBeInTheDocument();
     });
 
-    // Restore fake timers
-    jest.useFakeTimers();
+    unmount();
   });
 
-  it.skip('should call note.list with folder ID when folder is selected', async () => {
+  it('should call note.list with folder ID when folder is selected', async () => {
+    // Use real timers for this test
+    jest.useRealTimers();
+
     const folderId = 'folder123';
     mockElectronAPI.appState.get.mockImplementation((key: string) => {
-      if (key === 'selectedFolder') return Promise.resolve(folderId);
+      if (key === 'selectedFolderId') return Promise.resolve(folderId);
       if (key === 'searchQuery') return Promise.resolve(null);
       return Promise.resolve(null);
     });
     mockElectronAPI.note.list.mockResolvedValue([]);
 
-    render(<NotesListPanel {...defaultProps} />);
-
-    // Advance timers to trigger the polling interval
-    jest.advanceTimersByTime(1000);
+    const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId={folderId} />);
 
     await waitFor(() => {
       expect(mockElectronAPI.note.list).toHaveBeenCalledWith('default', folderId);
     });
+
+    unmount();
   });
 
   it('should call note.list without folder ID for all-notes', async () => {
