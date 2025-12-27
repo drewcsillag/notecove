@@ -28,7 +28,7 @@ import {
 } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 import * as Y from 'yjs';
-import { yUndoPluginKey } from 'y-prosemirror';
+import { yUndoPluginKey } from '@tiptap/y-tiptap';
 // DOMSerializer is used by useEditorContextMenu
 import { EditorToolbar } from './EditorToolbar';
 import { type MentionNodeAttributes } from './extensions/MentionNode';
@@ -310,6 +310,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     // Setting content here causes onUpdate to fire before note loads
     // Disable editing while loading or if readOnly
     editable: !readOnly && !isLoading,
+    // TipTap 3: Enable re-rendering on transactions for toolbar state updates
+    // (In Phase 5 we can optimize with useEditorState for specific state)
+    shouldRerenderOnTransaction: true,
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
@@ -704,6 +707,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // 1. The UndoManager may lose itself from trackedOrigins
   // 2. The UndoManager's afterTransactionHandler may be unregistered from the Y.Doc
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in some circumstances
     if (editor) {
       const undoPluginState = yUndoPluginKey.getState(editor.state);
       if (undoPluginState?.undoManager) {
@@ -715,7 +719,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         }
 
         // Fix 2: If the UndoManager's handler is not registered on Y.Doc, re-register it
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
         const umAny = um as any;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const yDocAny = yDoc as any;
@@ -763,6 +767,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     if (previousNoteId !== noteId) {
       // If we're deselecting a note (changing from a valid ID to null or different ID),
       // immediately save the current editor content
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
       if (previousNoteId && editor && onTitleChange) {
         // Don't save if the note is still loading
         if (isLoadingRef.current) {
@@ -806,6 +811,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     return () => {
       // Save current editor content before unmounting
       // IMPORTANT: Only save if note was fully loaded to prevent data corruption
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
       if (noteId && editor && onTitleChange && !isLoadingRef.current) {
         const firstLine = editor.state.doc.firstChild;
         if (firstLine) {
@@ -834,6 +840,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       if (titleUpdateTimerRef.current) {
         clearTimeout(titleUpdateTimerRef.current);
       }
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
       editor?.destroy();
       yDoc.destroy();
     };
@@ -849,6 +856,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // by the browser for paragraph navigation before TipTap's keyboard shortcuts fire.
   // Using event.code instead of event.key ensures reliable detection on Mac.
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
     if (!editor) return;
 
     const handleMoveBlockKeyDown = (event: KeyboardEvent) => {
@@ -872,7 +880,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }
     };
 
-    const editorDom = editor.view.dom;
+    // TipTap 3: editor.view throws if not mounted yet
+    let editorDom: HTMLElement;
+    try {
+      editorDom = editor.view.dom;
+    } catch {
+      return; // Editor not mounted yet
+    }
     editorDom.addEventListener('keydown', handleMoveBlockKeyDown);
 
     return () => {
@@ -888,6 +902,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
    * Opens file picker and inserts selected images
    */
   const handleImageButtonClick = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
     if (!editor) return;
 
     try {
@@ -907,7 +922,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       }
 
       // Insert image nodes for each saved image
-      const { state, dispatch } = editor.view;
+      // TipTap 3: editor.view throws if not mounted yet (shouldn't happen in click handler)
+      let state, dispatch;
+      try {
+        ({ state, dispatch } = editor.view);
+      } catch {
+        console.error('[TipTapEditor] Editor view not available');
+        return;
+      }
       const imageNode = state.schema.nodes['notecoveImage'];
       if (!imageNode) return;
 
@@ -937,6 +959,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
    * Inserts a table with the selected dimensions
    */
   const handleTableSizeSelect = (rows: number, cols: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
     if (!editor) return;
 
     console.log('[TipTapEditor] Inserting table with dimensions:', rows, 'x', cols);
@@ -948,6 +971,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
    * Replaces the date text at the stored position
    */
   const handleDateSelect = (newDate: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
     if (!editor) return;
 
     const { from, to } = datePickerState;
@@ -1052,6 +1076,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         onClick={(e) => {
           // Only handle clicks on the Box itself (empty space), not on the editor content
           // Don't allow focus while loading
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
           if (e.target === e.currentTarget && editor && !isLoading) {
             // Focus the editor and move cursor to the end
             editor.commands.focus('end');

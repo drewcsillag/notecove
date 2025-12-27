@@ -13,7 +13,7 @@ describe('CommentMark Extension', () => {
 
   beforeEach(() => {
     editor = new Editor({
-      extensions: [StarterKit.configure({ history: false }), CommentMark],
+      extensions: [StarterKit.configure({ undoRedo: false }), CommentMark],
       content: '<p>Hello World</p>',
     });
   });

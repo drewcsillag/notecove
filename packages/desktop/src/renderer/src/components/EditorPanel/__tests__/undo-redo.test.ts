@@ -9,7 +9,7 @@ import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import * as Y from 'yjs';
-import { yUndoPluginKey } from 'y-prosemirror';
+import { yUndoPluginKey } from '@tiptap/y-tiptap';
 
 describe('TipTap Undo/Redo with Yjs Collaboration', () => {
   let editor: Editor;
@@ -23,7 +23,7 @@ describe('TipTap Undo/Redo with Yjs Collaboration', () => {
     editor = new Editor({
       extensions: [
         StarterKit.configure({
-          history: false, // Disable default history - Collaboration has its own
+          undoRedo: false, // Disable default history - Collaboration has its own
         }),
         Collaboration.configure({
           document: yDoc,
@@ -56,8 +56,11 @@ describe('TipTap Undo/Redo with Yjs Collaboration', () => {
       console.log('trackedOrigins size:', um.trackedOrigins.size);
       console.log(
         'trackedOrigins:',
-        Array.from(um.trackedOrigins).map((o) =>
-          typeof o === 'object' ? (o.constructor?.name ?? 'PluginKey') : String(o)
+
+        Array.from(um.trackedOrigins as Set<unknown>).map((o) =>
+          typeof o === 'object' && o !== null
+            ? ((o as { constructor?: { name?: string } }).constructor?.name ?? 'PluginKey')
+            : String(o)
         )
       );
 
@@ -206,7 +209,7 @@ describe('UndoManager with external Y.Doc updates', () => {
     editor = new Editor({
       extensions: [
         StarterKit.configure({
-          history: false,
+          undoRedo: false,
         }),
         Collaboration.configure({
           document: yDoc,
@@ -292,7 +295,7 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     const tempDoc = new Y.Doc();
     const tempEditor = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: tempDoc,
           fragment: tempDoc.getXmlFragment('content'),
@@ -330,7 +333,7 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     const editor = new Editor({
       extensions: [
         StarterKit.configure({
-          history: false,
+          undoRedo: false,
         }),
         Collaboration.configure({
           document: yDoc,
@@ -355,8 +358,11 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     console.log('After load - trackedOrigins size:', um.trackedOrigins.size);
     console.log(
       'After load - trackedOrigins:',
-      Array.from(um.trackedOrigins).map((o) =>
-        typeof o === 'object' ? (o.constructor?.name ?? 'object') : String(o)
+
+      Array.from(um.trackedOrigins as Set<unknown>).map((o) =>
+        typeof o === 'object' && o !== null
+          ? ((o as { constructor?: { name?: string } }).constructor?.name ?? 'object')
+          : String(o)
       )
     );
     console.log('After load - undoStack:', um.undoStack.length);
@@ -365,7 +371,7 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     // The initial load should NOT add to undo stack (since origin is 'load')
     // BUT it might if the origin 'load' is not excluded from tracked origins...
     // Let's see what happens
-    const undoStackAfterLoad = um.undoStack.length;
+    const undoStackAfterLoad = um.undoStack.length as number;
     console.log('undoStack after load:', undoStackAfterLoad);
 
     // trackedOrigins should have 2 entries (ySyncPluginKey and UndoManager)
@@ -378,7 +384,7 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     console.log('After typing - canUndo:', editor.can().undo());
 
     // Should have content in undo stack now
-    expect(um.undoStack.length).toBeGreaterThan(undoStackAfterLoad);
+    expect(um.undoStack.length as number).toBeGreaterThan(undoStackAfterLoad);
     expect(editor.can().undo()).toBe(true);
 
     // Step 5: Undo should work
@@ -408,7 +414,7 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     const yDoc = new Y.Doc();
     const editor = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: yDoc,
           fragment: yDoc.getXmlFragment('content'),
@@ -482,7 +488,7 @@ describe('UndoManager with note loading flow (simulates TipTapEditor)', () => {
     const yDoc = new Y.Doc();
     const editor = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: yDoc,
           fragment: yDoc.getXmlFragment('content'),
@@ -548,7 +554,7 @@ describe('UndoManager with React StrictMode simulation', () => {
     // First mount
     const editor1 = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: yDoc,
           fragment: yDoc.getXmlFragment('content'),
@@ -563,8 +569,10 @@ describe('UndoManager with React StrictMode simulation', () => {
     console.log(
       'After 1st mount - trackedOrigins:',
 
-      Array.from(um1?.trackedOrigins ?? []).map((o) =>
-        typeof o === 'object' ? (o.constructor?.name ?? 'object') : String(o)
+      Array.from((um1?.trackedOrigins ?? new Set()) as Set<unknown>).map((o) =>
+        typeof o === 'object' && o !== null
+          ? ((o as { constructor?: { name?: string } }).constructor?.name ?? 'object')
+          : String(o)
       )
     );
 
@@ -574,7 +582,7 @@ describe('UndoManager with React StrictMode simulation', () => {
     // Second mount (with same yDoc - like React would do)
     const editor2 = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: yDoc,
           fragment: yDoc.getXmlFragment('content'),
@@ -589,8 +597,10 @@ describe('UndoManager with React StrictMode simulation', () => {
     console.log(
       'After 2nd mount - trackedOrigins:',
 
-      Array.from(um2?.trackedOrigins ?? []).map((o) =>
-        typeof o === 'object' ? (o.constructor?.name ?? 'object') : String(o)
+      Array.from((um2?.trackedOrigins ?? new Set()) as Set<unknown>).map((o) =>
+        typeof o === 'object' && o !== null
+          ? ((o as { constructor?: { name?: string } }).constructor?.name ?? 'object')
+          : String(o)
       )
     );
 
@@ -610,7 +620,7 @@ describe('UndoManager with React StrictMode simulation', () => {
     const tempDoc = new Y.Doc();
     const tempEditor = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: tempDoc,
           fragment: tempDoc.getXmlFragment('content'),
@@ -629,7 +639,7 @@ describe('UndoManager with React StrictMode simulation', () => {
     // First mount
     const editor1 = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: yDoc,
           fragment: yDoc.getXmlFragment('content'),
@@ -649,7 +659,7 @@ describe('UndoManager with React StrictMode simulation', () => {
     // Second mount (StrictMode re-mount)
     const editor2 = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         Collaboration.configure({
           document: yDoc,
           fragment: yDoc.getXmlFragment('content'),

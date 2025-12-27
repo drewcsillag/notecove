@@ -72,7 +72,13 @@ export function useEditorImages(
     if (!editor) return;
 
     // Reference to the editor DOM and container
-    const editorDom = editor.view.dom;
+    // TipTap 3: editor.view throws if not mounted yet
+    let editorDom: HTMLElement;
+    try {
+      editorDom = editor.view.dom;
+    } catch {
+      return; // Editor not mounted yet
+    }
     const dropZone = editorContainerRef.current; // The scrollable container with the editor
 
     const handleDocumentDrop = async (event: DragEvent) => {
@@ -187,7 +193,14 @@ export function useEditorImages(
           console.log('[useEditorImages] Dropped image saved with ID:', result.imageId);
 
           // Insert the image node
-          const { state, dispatch } = editor.view;
+          // TipTap 3: editor.view throws if not mounted yet (shouldn't happen in drop handler)
+          let state, dispatch;
+          try {
+            ({ state, dispatch } = editor.view);
+          } catch {
+            console.error('[useEditorImages] Editor view not available');
+            return;
+          }
           const imageNode = state.schema.nodes['notecoveImage'];
           if (imageNode) {
             const node = imageNode.create({
@@ -282,7 +295,14 @@ export function useEditorImages(
           }
 
           // Insert image nodes for each saved image
-          const { state, dispatch } = editor.view;
+          // TipTap 3: editor.view throws if not mounted yet (shouldn't happen in keydown handler)
+          let state, dispatch;
+          try {
+            ({ state, dispatch } = editor.view);
+          } catch {
+            console.error('[useEditorImages] Editor view not available');
+            return;
+          }
           const imageNode = state.schema.nodes['notecoveImage'];
           if (!imageNode) return;
 
@@ -301,7 +321,13 @@ export function useEditorImages(
     };
 
     // Add listener to the editor DOM element
-    const editorDom = editor.view.dom;
+    // TipTap 3: editor.view throws if not mounted yet
+    let editorDom: HTMLElement;
+    try {
+      editorDom = editor.view.dom;
+    } catch {
+      return; // Editor not mounted yet
+    }
     const wrappedHandler = (event: Event) => {
       void handleKeyDown(event as KeyboardEvent);
     };

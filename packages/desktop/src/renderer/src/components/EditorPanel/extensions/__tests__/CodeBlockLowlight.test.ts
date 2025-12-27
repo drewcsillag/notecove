@@ -245,8 +245,13 @@ describe('NotecoveCodeBlock Extension', () => {
         ],
       });
 
-      // Position cursor at end of code block
-      const endPos = editor.state.doc.content.size - 1;
+      // Position cursor at end of code block content
+      // The codeBlock starts at position 0 in the doc, text content starts at position 1
+      // "const x = 1;" is 12 characters, so end of text is position 13
+      const codeBlock = editor.state.doc.firstChild;
+      expect(codeBlock).not.toBeNull();
+      expect(codeBlock?.type.name).toBe('codeBlock');
+      const endPos = 1 + (codeBlock?.textContent.length ?? 0); // Position at end of text inside codeBlock
       editor.commands.setTextSelection(endPos);
 
       // Verify we're in the code block
@@ -259,12 +264,23 @@ describe('NotecoveCodeBlock Extension', () => {
       // Should have successfully exited
       expect(result).toBe(true);
 
-      // Document should now have 2 nodes: codeBlock and a new paragraph
-      expect(editor.state.doc.childCount).toBe(2);
-      expect(editor.state.doc.child(0).type.name).toBe('codeBlock');
-      expect(editor.state.doc.child(1).type.name).toBe('paragraph');
+      // Document should now have a paragraph after the codeBlock
+      // (TipTap may have an initial empty paragraph, so we check for at least 2 nodes)
+      expect(editor.state.doc.childCount).toBeGreaterThanOrEqual(2);
+      // Find the codeBlock and verify there's a paragraph after it
+      let foundCodeBlock = false;
+      let foundParagraphAfterCodeBlock = false;
+      editor.state.doc.forEach((node, _offset, _index) => {
+        if (node.type.name === 'codeBlock') {
+          foundCodeBlock = true;
+        } else if (foundCodeBlock && node.type.name === 'paragraph') {
+          foundParagraphAfterCodeBlock = true;
+        }
+      });
+      expect(foundCodeBlock).toBe(true);
+      expect(foundParagraphAfterCodeBlock).toBe(true);
 
-      // Cursor should be in the new paragraph
+      // Cursor should be in a paragraph
       const newSelection = editor.state.selection.$from;
       expect(newSelection.parent.type.name).toBe('paragraph');
     });

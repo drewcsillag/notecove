@@ -11,8 +11,7 @@
 
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import BulletList from '@tiptap/extension-bullet-list';
-import OrderedList from '@tiptap/extension-ordered-list';
+import { BulletList, OrderedList } from '@tiptap/extension-list';
 import { TriStateTaskItem } from '../TriStateTaskItem';
 import { NotecoveListItem } from '../NotecoveListItem';
 import { MoveBlock } from '../MoveBlock';

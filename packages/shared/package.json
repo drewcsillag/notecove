@@ -53,10 +53,9 @@
     "dump:activity": "npx tsx tools/dump-activity.ts"
   },
   "dependencies": {
-    "@tiptap/core": "^2.26.4",
-    "@tiptap/extension-collaboration": "^2.26.4",
-    "@tiptap/extension-underline": "^2.26.4",
-    "@tiptap/starter-kit": "^2.26.4",
+    "@tiptap/core": "3.14.0",
+    "@tiptap/extension-collaboration": "3.14.0",
+    "@tiptap/starter-kit": "3.14.0",
     "lib0": "^0.2.94",
     "markdown-it": "^14.1.0",
     "uuid": "^13.0.0",

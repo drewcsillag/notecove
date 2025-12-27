@@ -135,12 +135,18 @@ export const WebLink = Link.extend({
   name: 'link',
 
   addOptions() {
+    // TipTap 3 has stricter LinkOptions types - we spread parent defaults
+    // and override only what we need. Type assertion is needed because
+    // TypeScript can't verify the spread includes all required properties.
     return {
       // Optional chaining required here - without it, the app fails to render (blank window bug)
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       ...this.parent?.(),
       // Only allow http and https protocols
       protocols: ['http', 'https'],
+      // Default protocol for URLs without a scheme
+      defaultProtocol: 'https',
+      // Don't select whole link on click
+      enableClickSelection: false,
       // Auto-detect URLs when typing (on space/enter)
       autolink: true,
       // Only auto-link URLs that have a scheme (http:// or https://)
@@ -159,6 +165,9 @@ export const WebLink = Link.extend({
         target: '_blank',
         rel: 'noopener noreferrer',
       },
+      // TipTap 3 required options - use sensible defaults
+      validate: (url: string) => !!url,
+      isAllowedUri: () => true,
     };
   },
 

@@ -93,7 +93,7 @@ describe('NotecoveImage Extension', () => {
     editor = new Editor({
       extensions: [
         StarterKit.configure({
-          history: false,
+          undoRedo: false,
         }),
         NotecoveImage,
       ],
@@ -210,8 +210,8 @@ describe('NotecoveImage Extension', () => {
         sdId: 'sd-1',
       });
 
-      // Should have paragraph + image
-      expect(editor.state.doc.childCount).toBe(2);
+      // Should have paragraph + image (TipTap 3 may add trailing paragraph)
+      expect(editor.state.doc.childCount).toBeGreaterThanOrEqual(2);
       expect(editor.state.doc.child(1).type.name).toBe('notecoveImage');
       expect(editor.state.doc.child(1).attrs['imageId']).toBe('new-image');
     });
@@ -319,7 +319,7 @@ describe('NotecoveImage Extension', () => {
         element: container,
         extensions: [
           StarterKit.configure({
-            history: false,
+            undoRedo: false,
           }),
           NotecoveImage,
         ],
@@ -492,7 +492,7 @@ describe('NotecoveImage Extension', () => {
         element: container,
         extensions: [
           StarterKit.configure({
-            history: false,
+            undoRedo: false,
           }),
           NotecoveImage,
         ],

@@ -187,7 +187,13 @@ export function useEditorComments(
       }
     };
 
-    const editorDom = editor.view.dom;
+    // TipTap 3: editor.view throws if not mounted yet
+    let editorDom: HTMLElement;
+    try {
+      editorDom = editor.view.dom;
+    } catch {
+      return; // Editor not mounted yet
+    }
     editorDom.addEventListener('click', handleClick);
 
     return () => {
@@ -213,7 +219,13 @@ export function useEditorComments(
       }
     };
 
-    const editorDom = editor.view.dom;
+    // TipTap 3: editor.view throws if not mounted yet
+    let editorDom: HTMLElement;
+    try {
+      editorDom = editor.view.dom;
+    } catch {
+      return; // Editor not mounted yet
+    }
     const wrappedHandler = (event: Event) => {
       void handleKeyDown(event as KeyboardEvent);
     };

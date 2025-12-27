@@ -8,8 +8,7 @@
 
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import BulletList from '@tiptap/extension-bullet-list';
-import OrderedList from '@tiptap/extension-ordered-list';
+import { BulletList, OrderedList } from '@tiptap/extension-list';
 import { TriStateTaskItem } from '../TriStateTaskItem';
 import { TabIndent } from '../TabIndent';
 import { NotecoveListItem } from '../NotecoveListItem';

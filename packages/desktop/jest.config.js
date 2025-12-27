@@ -24,6 +24,8 @@ module.exports = {
     '^react-dnd-html5-backend$': '<rootDir>/src/__mocks__/react-dnd-html5-backend.tsx',
     '^uuid$': '<rootDir>/src/__mocks__/uuid.ts',
     '^lowlight$': '<rootDir>/src/__mocks__/lowlight.ts',
+    '^@tiptap/extension-code-block-lowlight$':
+      '<rootDir>/src/__mocks__/@tiptap/extension-code-block-lowlight.ts',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(@minoru/react-dnd-treeview|react-dnd|dnd-core|@react-dnd|uuid)/)',

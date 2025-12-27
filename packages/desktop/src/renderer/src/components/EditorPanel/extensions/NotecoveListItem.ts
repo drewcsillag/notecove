@@ -6,7 +6,7 @@
  * - Elsewhere in content: let TabIndent handle it (insert/remove tab character)
  */
 
-import ListItem from '@tiptap/extension-list-item';
+import { ListItem } from '@tiptap/extension-list';
 
 export const NotecoveListItem = ListItem.extend({
   addKeyboardShortcuts() {

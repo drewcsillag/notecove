@@ -6,10 +6,8 @@
  */
 
 import StarterKit from '@tiptap/starter-kit';
-import BulletList from '@tiptap/extension-bullet-list';
-import OrderedList from '@tiptap/extension-ordered-list';
+import { BulletList, OrderedList } from '@tiptap/extension-list';
 import Collaboration from '@tiptap/extension-collaboration';
-import Underline from '@tiptap/extension-underline';
 import SearchAndReplace from '@sereneinserenade/tiptap-search-and-replace';
 import * as Y from 'yjs';
 import { Hashtag } from './extensions/Hashtag';
@@ -58,14 +56,15 @@ export interface EditorExtensionCallbacks {
  */
 export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallbacks) {
   return [
-    // Use StarterKit but exclude History and built-in lists
+    // Use StarterKit but exclude UndoRedo and built-in lists
     // (we'll add custom list extensions that support taskItem)
     StarterKit.configure({
-      history: false, // Collaboration extension handles undo/redo
+      undoRedo: false, // Collaboration extension handles undo/redo
       bulletList: false, // Use custom version that accepts taskItem
       orderedList: false, // Use custom version that accepts taskItem
       listItem: false, // Use NotecoveListItem with cursor-position-aware Tab
       codeBlock: false, // Use NotecoveCodeBlock with syntax highlighting
+      link: false, // Use custom WebLink extension
     }),
     // Add syntax-highlighted code blocks
     NotecoveCodeBlock,
@@ -79,8 +78,7 @@ export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallb
     }),
     // Custom ListItem with cursor-position-aware Tab/Shift-Tab
     NotecoveListItem,
-    // Add Underline extension (not in StarterKit)
-    Underline,
+    // Note: Underline is now included in StarterKit v3
     // Add tri-state task item extension (list-based checkboxes)
     TriStateTaskItem.configure({
       nested: true, // Allow nesting for sub-tasks

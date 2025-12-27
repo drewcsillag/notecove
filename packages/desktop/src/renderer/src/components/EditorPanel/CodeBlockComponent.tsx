@@ -311,8 +311,7 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = ({ node, updateAttrib
           )}
 
           {/* Code Content - editable area */}
-          <NodeViewContent
-            as="code"
+          <code
             className={currentLanguage ? `language-${currentLanguage}` : undefined}
             style={{
               display: 'block',
@@ -322,7 +321,9 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = ({ node, updateAttrib
               padding: 0,
               flex: 1,
             }}
-          />
+          >
+            <NodeViewContent />
+          </code>
         </Box>
       </Box>
     </NodeViewWrapper>

@@ -35,6 +35,13 @@ interface SearchAndReplaceStorage {
   resultIndex: number;
 }
 
+// Helper to get searchAndReplace storage with proper typing
+// TipTap 3 has stricter Storage types, so we need this helper
+function getSearchStorage(editor: Editor): SearchAndReplaceStorage | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/dot-notation
+  return (editor.storage as any)['searchAndReplace'] as SearchAndReplaceStorage | undefined;
+}
+
 export const SearchPanel: React.FC<SearchPanelProps> = ({
   editor,
   onClose,
@@ -60,7 +67,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     editor.commands.setCaseSensitive(caseSensitive);
 
     // Get search results
-    const storage = editor.storage['searchAndReplace'] as SearchAndReplaceStorage | undefined;
+    const storage = getSearchStorage(editor);
     const results = storage?.results ?? [];
     setTotalMatches(results.length);
 
@@ -103,7 +110,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     editor.commands.nextSearchResult();
 
     // Update current match index
-    const storage = editor.storage['searchAndReplace'] as SearchAndReplaceStorage | undefined;
+    const storage = getSearchStorage(editor);
     const resultIndex = storage?.resultIndex ?? 0;
     const results = storage?.results ?? [];
     setCurrentMatch(resultIndex >= 0 && results.length > 0 ? resultIndex + 1 : 0);
@@ -117,7 +124,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     editor.commands.previousSearchResult();
 
     // Update current match index
-    const storage = editor.storage['searchAndReplace'] as SearchAndReplaceStorage | undefined;
+    const storage = getSearchStorage(editor);
     const resultIndex = storage?.resultIndex ?? 0;
     const results = storage?.results ?? [];
     setCurrentMatch(resultIndex >= 0 && results.length > 0 ? resultIndex + 1 : 0);

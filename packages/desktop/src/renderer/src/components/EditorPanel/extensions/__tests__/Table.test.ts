@@ -8,7 +8,7 @@ import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import * as Y from 'yjs';
-import { yUndoPluginKey } from 'y-prosemirror';
+import { yUndoPluginKey } from '@tiptap/y-tiptap';
 import {
   NotecoveTable,
   NotecoveTableRow,
@@ -227,7 +227,7 @@ describe('Table with Yjs Collaboration', () => {
     yDoc = new Y.Doc();
     editor = new Editor({
       extensions: [
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ undoRedo: false }),
         NotecoveTable,
         NotecoveTableRow,
         NotecoveTableHeader,
@@ -260,14 +260,16 @@ describe('Table with Yjs Collaboration', () => {
   it('should track table operations in undo stack', () => {
     const undoPluginState = yUndoPluginKey.getState(editor.state);
     const um = undoPluginState?.undoManager;
+    expect(um).toBeDefined();
+    if (!um) return;
 
     // Clear any existing undo stack
-    const initialStackLength = um?.undoStack.length ?? 0;
+    const initialStackLength = um.undoStack.length as number;
 
     editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });
 
     // Check undo stack has grown
-    expect(um?.undoStack.length).toBeGreaterThan(initialStackLength);
+    expect(um.undoStack.length as number).toBeGreaterThan(initialStackLength);
   });
 
   it('should undo table creation', () => {

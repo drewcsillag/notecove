@@ -14,7 +14,7 @@ describe('WebLink Extension', () => {
 
   beforeEach(() => {
     editor = new Editor({
-      extensions: [StarterKit.configure({ history: false }), WebLink],
+      extensions: [StarterKit.configure({ undoRedo: false, link: false }), WebLink],
       content: '<p>Hello <a href="https://example.com">link text</a> world</p>',
     });
   });
@@ -101,7 +101,7 @@ describe('WebLink Extension', () => {
       // Create a fresh editor with no initial link
       editor.destroy();
       editor = new Editor({
-        extensions: [StarterKit.configure({ history: false }), WebLink],
+        extensions: [StarterKit.configure({ undoRedo: false, link: false }), WebLink],
         content: '<p>Check this </p>',
       });
 
