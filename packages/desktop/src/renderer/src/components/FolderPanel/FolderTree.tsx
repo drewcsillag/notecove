@@ -1945,7 +1945,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
               <Button onClick={handleDeleteCancel}>Cancel</Button>
               <Button
                 onClick={() => {
-                  void handleDeleteConfirm('simple');
+                  void handleDeleteConfirm('reparent');
                 }}
                 variant="contained"
                 color="error"

@@ -25,6 +25,7 @@ export interface MockFolderTreeDoc {
   getRootFolders: jest.Mock;
   getChildFolders: jest.Mock;
   getSiblings: jest.Mock;
+  getDescendants: jest.Mock;
   createFolder: jest.Mock;
   updateFolder: jest.Mock;
   deleteFolder: jest.Mock;
@@ -167,6 +168,7 @@ export function createMockFolderTree(): MockFolderTreeDoc {
     getRootFolders: jest.fn(),
     getChildFolders: jest.fn(),
     getSiblings: jest.fn(),
+    getDescendants: jest.fn().mockReturnValue([]),
     createFolder: jest.fn(),
     updateFolder: jest.fn(),
     deleteFolder: jest.fn(),

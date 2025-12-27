@@ -456,6 +456,358 @@ describe('Folder Handlers', () => {
         'Folder nonexistent not found'
       );
     });
+
+    describe('reparent mode', () => {
+      it('should update note CRDT metadata when moving notes to parent folder', async () => {
+        const mockEvent = {} as any;
+        const sdId = 'test-sd';
+        const folderId = 'folder-to-delete';
+        const parentFolderId = 'parent-folder';
+        const noteId = 'note-1';
+
+        const folder: FolderData = {
+          id: folderId,
+          name: 'To Delete',
+          parentId: parentFolderId,
+          sdId,
+          order: 0,
+          deleted: false,
+        };
+
+        const note = {
+          id: noteId,
+          title: 'Test Note',
+          sdId,
+          folderId,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        };
+
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+          getMetadata: jest.fn().mockReturnValue({ id: noteId, folderId }),
+        };
+
+        mocks.folderTree.getFolder.mockReturnValue(folder);
+        mocks.folderTree.getChildFolders.mockReturnValue([]);
+        mocks.database.getNotesByFolder.mockResolvedValue([note]);
+        mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+        await invokeHandler('folder:delete', mockEvent, sdId, folderId, 'reparent');
+
+        // Should update note's CRDT metadata with new folderId
+        expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
+          expect.objectContaining({
+            folderId: parentFolderId,
+          })
+        );
+      });
+
+      it('should load note CRDT if not already loaded', async () => {
+        const mockEvent = {} as any;
+        const sdId = 'test-sd';
+        const folderId = 'folder-to-delete';
+        const parentFolderId = 'parent-folder';
+        const noteId = 'note-1';
+
+        const folder: FolderData = {
+          id: folderId,
+          name: 'To Delete',
+          parentId: parentFolderId,
+          sdId,
+          order: 0,
+          deleted: false,
+        };
+
+        const note = {
+          id: noteId,
+          title: 'Test Note',
+          sdId,
+          folderId,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        };
+
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+          getMetadata: jest.fn().mockReturnValue({ id: noteId, folderId }),
+        };
+
+        mocks.folderTree.getFolder.mockReturnValue(folder);
+        mocks.folderTree.getChildFolders.mockReturnValue([]);
+        mocks.database.getNotesByFolder.mockResolvedValue([note]);
+        // First call returns null (not loaded), second returns the doc
+        mocks.crdtManager.getNoteDoc.mockReturnValueOnce(null).mockReturnValueOnce(mockNoteDoc);
+
+        await invokeHandler('folder:delete', mockEvent, sdId, folderId, 'reparent');
+
+        // Should have loaded the note
+        expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(noteId, sdId);
+        // Should update metadata after loading
+        expect(mockNoteDoc.updateMetadata).toHaveBeenCalled();
+      });
+
+      it('should broadcast note:moved event for each moved note', async () => {
+        const mockEvent = {} as any;
+        const sdId = 'test-sd';
+        const folderId = 'folder-to-delete';
+        const parentFolderId = 'parent-folder';
+
+        const folder: FolderData = {
+          id: folderId,
+          name: 'To Delete',
+          parentId: parentFolderId,
+          sdId,
+          order: 0,
+          deleted: false,
+        };
+
+        const notes = [
+          {
+            id: 'note-1',
+            title: 'Note 1',
+            sdId,
+            folderId,
+            created: Date.now(),
+            modified: Date.now(),
+            deleted: false,
+            pinned: false,
+            contentPreview: '',
+            contentText: '',
+          },
+          {
+            id: 'note-2',
+            title: 'Note 2',
+            sdId,
+            folderId,
+            created: Date.now(),
+            modified: Date.now(),
+            deleted: false,
+            pinned: false,
+            contentPreview: '',
+            contentText: '',
+          },
+        ];
+
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+          getMetadata: jest.fn(),
+        };
+
+        mocks.folderTree.getFolder.mockReturnValue(folder);
+        mocks.folderTree.getChildFolders.mockReturnValue([]);
+        mocks.database.getNotesByFolder.mockResolvedValue(notes);
+        mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+        // Mock BrowserWindow to capture broadcasts
+        const { BrowserWindow } = await import('electron');
+        const mockWindow = {
+          webContents: {
+            send: jest.fn(),
+            isDestroyed: jest.fn().mockReturnValue(false),
+          },
+          isDestroyed: jest.fn().mockReturnValue(false),
+        };
+        (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
+
+        await invokeHandler('folder:delete', mockEvent, sdId, folderId, 'reparent');
+
+        // Should broadcast note:moved for each note
+        const noteMoved = mockWindow.webContents.send.mock.calls.filter(
+          (call: unknown[]) => call[0] === 'note:moved'
+        );
+        expect(noteMoved.length).toBe(2);
+        expect(noteMoved[0][1]).toEqual({
+          noteId: 'note-1',
+          oldFolderId: folderId,
+          newFolderId: parentFolderId,
+        });
+        expect(noteMoved[1][1]).toEqual({
+          noteId: 'note-2',
+          oldFolderId: folderId,
+          newFolderId: parentFolderId,
+        });
+      });
+    });
+
+    describe('cascade mode', () => {
+      it('should update note CRDT metadata for notes in all deleted folders', async () => {
+        const mockEvent = {} as any;
+        const sdId = 'test-sd';
+        const folderId = 'folder-to-delete';
+        const parentFolderId = 'parent-folder';
+        const childFolderId = 'child-folder';
+
+        const folder: FolderData = {
+          id: folderId,
+          name: 'To Delete',
+          parentId: parentFolderId,
+          sdId,
+          order: 0,
+          deleted: false,
+        };
+
+        const childFolder: FolderData = {
+          id: childFolderId,
+          name: 'Child',
+          parentId: folderId,
+          sdId,
+          order: 0,
+          deleted: false,
+        };
+
+        const noteInParent = {
+          id: 'note-in-parent',
+          title: 'Note in parent folder',
+          sdId,
+          folderId,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        };
+
+        const noteInChild = {
+          id: 'note-in-child',
+          title: 'Note in child folder',
+          sdId,
+          folderId: childFolderId,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        };
+
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+          getMetadata: jest.fn(),
+        };
+
+        mocks.folderTree.getFolder.mockImplementation((id: string) => {
+          if (id === folderId) return folder;
+          if (id === childFolderId) return childFolder;
+          return null;
+        });
+        mocks.folderTree.getDescendants.mockReturnValue([childFolder]);
+        mocks.database.getNotesByFolder.mockImplementation(async (id: string) => {
+          if (id === folderId) return [noteInParent];
+          if (id === childFolderId) return [noteInChild];
+          return [];
+        });
+        mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+        await invokeHandler('folder:delete', mockEvent, sdId, folderId, 'cascade');
+
+        // Should update CRDT metadata for both notes
+        expect(mockNoteDoc.updateMetadata).toHaveBeenCalledTimes(2);
+        expect(mockNoteDoc.updateMetadata).toHaveBeenCalledWith(
+          expect.objectContaining({
+            folderId: parentFolderId,
+          })
+        );
+      });
+
+      it('should broadcast note:moved event for all notes in deleted folders', async () => {
+        const mockEvent = {} as any;
+        const sdId = 'test-sd';
+        const folderId = 'folder-to-delete';
+        const parentFolderId = 'parent-folder';
+        const childFolderId = 'child-folder';
+
+        const folder: FolderData = {
+          id: folderId,
+          name: 'To Delete',
+          parentId: parentFolderId,
+          sdId,
+          order: 0,
+          deleted: false,
+        };
+
+        const childFolder: FolderData = {
+          id: childFolderId,
+          name: 'Child',
+          parentId: folderId,
+          sdId,
+          order: 0,
+          deleted: false,
+        };
+
+        const noteInParent = {
+          id: 'note-in-parent',
+          title: 'Note in parent folder',
+          sdId,
+          folderId,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        };
+
+        const noteInChild = {
+          id: 'note-in-child',
+          title: 'Note in child folder',
+          sdId,
+          folderId: childFolderId,
+          created: Date.now(),
+          modified: Date.now(),
+          deleted: false,
+          pinned: false,
+          contentPreview: '',
+          contentText: '',
+        };
+
+        const mockNoteDoc = {
+          updateMetadata: jest.fn(),
+          getMetadata: jest.fn(),
+        };
+
+        mocks.folderTree.getFolder.mockImplementation((id: string) => {
+          if (id === folderId) return folder;
+          if (id === childFolderId) return childFolder;
+          return null;
+        });
+        mocks.folderTree.getDescendants.mockReturnValue([childFolder]);
+        mocks.database.getNotesByFolder.mockImplementation(async (id: string) => {
+          if (id === folderId) return [noteInParent];
+          if (id === childFolderId) return [noteInChild];
+          return [];
+        });
+        mocks.crdtManager.getNoteDoc.mockReturnValue(mockNoteDoc);
+
+        // Mock BrowserWindow to capture broadcasts
+        const { BrowserWindow } = await import('electron');
+        const mockWindow = {
+          webContents: {
+            send: jest.fn(),
+            isDestroyed: jest.fn().mockReturnValue(false),
+          },
+          isDestroyed: jest.fn().mockReturnValue(false),
+        };
+        (BrowserWindow.getAllWindows as jest.Mock).mockReturnValue([mockWindow]);
+
+        await invokeHandler('folder:delete', mockEvent, sdId, folderId, 'cascade');
+
+        // Should broadcast note:moved for each note
+        const noteMoved = mockWindow.webContents.send.mock.calls.filter(
+          (call: unknown[]) => call[0] === 'note:moved'
+        );
+        expect(noteMoved.length).toBe(2);
+      });
+    });
   });
 
   describe('folder:list', () => {

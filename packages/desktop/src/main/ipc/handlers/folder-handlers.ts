@@ -7,7 +7,7 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import * as crypto from 'crypto';
 import type { HandlerContext } from './types';
-import type { FolderData } from '@notecove/shared';
+import type { FolderData, NoteCache } from '@notecove/shared';
 
 /**
  * Register all folder-related IPC handlers
@@ -245,6 +245,48 @@ function handleGetFolderChildInfo(ctx: HandlerContext) {
 }
 
 /**
+ * Helper to move a note to a new folder, updating both CRDT and database
+ */
+async function moveNoteToFolder(
+  ctx: HandlerContext,
+  note: NoteCache,
+  newFolderId: string | null
+): Promise<void> {
+  const { crdtManager, database, broadcastToAll } = ctx;
+  const oldFolderId = note.folderId;
+
+  // Update CRDT metadata
+  let noteDoc = crdtManager.getNoteDoc(note.id);
+  if (!noteDoc) {
+    await crdtManager.loadNote(note.id, note.sdId);
+    noteDoc = crdtManager.getNoteDoc(note.id);
+  }
+
+  if (noteDoc) {
+    noteDoc.updateMetadata({
+      folderId: newFolderId,
+      modified: Date.now(),
+    });
+  } else {
+    console.error(`[Folder] Failed to load NoteDoc for ${note.id}`);
+  }
+
+  // Update database
+  await database.upsertNote({
+    ...note,
+    folderId: newFolderId,
+    modified: Date.now(),
+  });
+
+  // Broadcast note:moved event
+  broadcastToAll('note:moved', {
+    noteId: note.id,
+    oldFolderId,
+    newFolderId,
+  });
+}
+
+/**
  * Delete folder with mode:
  * - 'simple': Just delete the folder (no children check - UI handles confirmation)
  * - 'cascade': Delete folder and all descendants, move all notes to parent
@@ -277,11 +319,7 @@ function handleDeleteFolder(ctx: HandlerContext) {
       for (const deletedFolderId of allFolderIds) {
         const notes = await database.getNotesByFolder(deletedFolderId);
         for (const note of notes) {
-          // Update note's folderId to parent
-          await database.upsertNote({
-            ...note,
-            folderId: parentFolderId,
-          });
+          await moveNoteToFolder(ctx, note, parentFolderId);
         }
       }
 
@@ -300,10 +338,7 @@ function handleDeleteFolder(ctx: HandlerContext) {
       // Move notes from this folder to parent
       const notes = await database.getNotesByFolder(folderId);
       for (const note of notes) {
-        await database.upsertNote({
-          ...note,
-          folderId: parentFolderId,
-        });
+        await moveNoteToFolder(ctx, note, parentFolderId);
       }
 
       // Move child folders to parent
