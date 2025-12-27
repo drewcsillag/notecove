@@ -2,7 +2,7 @@
  * FolderPanel Component Tests
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { FolderPanel } from '../FolderPanel';
 
@@ -134,5 +134,26 @@ describe('FolderPanel', () => {
 
     // Component should still render
     expect(screen.getByTestId('folder-tree')).toBeInTheDocument();
+  });
+
+  it('should focus the folder name input when create folder dialog opens', async () => {
+    mockAppStateGet.mockResolvedValue(null);
+
+    render(<FolderPanel {...defaultProps} activeSdId="test-sd" />);
+
+    // Wait for component to load
+    await waitFor(() => {
+      expect(screen.getByTestId('folder-tree')).toBeInTheDocument();
+    });
+
+    // Click the create folder button
+    const createButton = screen.getByTitle('Create folder');
+    fireEvent.click(createButton);
+
+    // Wait for dialog to open and verify the text field is focused
+    await waitFor(() => {
+      const input = screen.getByLabelText('Folder Name');
+      expect(input).toHaveFocus();
+    });
   });
 });
