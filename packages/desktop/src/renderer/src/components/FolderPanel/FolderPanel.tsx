@@ -5,7 +5,7 @@
  * Phase 2.4.1: Basic display with persistent state.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -41,6 +41,7 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
+  const folderNameInputRef = useRef<HTMLInputElement>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stateLoaded, setStateLoaded] = useState(false);
 
@@ -106,6 +107,20 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
       unsubscribe();
     };
   }, [onActiveSdChange]);
+
+  // Focus the folder name input when the create dialog opens
+  // Use setTimeout to wait for the dialog transition to complete
+  useEffect(() => {
+    if (!createDialogOpen) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      folderNameInputRef.current?.focus();
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [createDialogOpen]);
 
   const handleFolderSelect = useCallback(
     (folderId: string | null): void => {
@@ -269,7 +284,7 @@ export const FolderPanel: React.FC<FolderPanelProps> = ({
         <DialogTitle>Create New Folder</DialogTitle>
         <DialogContent>
           <TextField
-            autoFocus
+            inputRef={folderNameInputRef}
             margin="dense"
             label="Folder Name"
             type="text"

@@ -10,6 +10,7 @@ Based on my codebase exploration, **folder drag-to-subfolder already appears to 
 - E2E tests in `folder-bugs.spec.ts` verify dragging folders to different parents works
 
 The library (`@minoru/react-dnd-treeview`) distinguishes:
+
 - Drop **on** a folder → move INTO it (become child)
 - Drop **between** folders → reorder among siblings
 
