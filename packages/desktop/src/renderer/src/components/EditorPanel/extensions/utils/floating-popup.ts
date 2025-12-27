@@ -21,6 +21,8 @@ export interface FloatingPopupOptions {
   offsetDistance?: number;
   /** Placement preference (default: 'bottom-start') */
   placement?: 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
+  /** Callback when clicking outside the popup */
+  onClickOutside?: () => void;
 }
 
 export interface FloatingPopup {
@@ -52,7 +54,7 @@ export interface FloatingPopup {
  * ```
  */
 export function createFloatingPopup(options: FloatingPopupOptions): FloatingPopup {
-  const { content, offsetDistance = 8, placement = 'bottom-start' } = options;
+  const { content, offsetDistance = 8, placement = 'bottom-start', onClickOutside } = options;
   let getReferenceClientRect = options.getReferenceClientRect;
 
   // Create a wrapper element that will be positioned
@@ -91,6 +93,15 @@ export function createFloatingPopup(options: FloatingPopupOptions): FloatingPopu
 
   let isVisible = false;
 
+  // Click outside handler
+  const handleClickOutside = (event: MouseEvent): void => {
+    if (!isVisible || !onClickOutside) return;
+    const target = event.target as Node;
+    if (!wrapper.contains(target)) {
+      onClickOutside();
+    }
+  };
+
   const updatePosition = async (): Promise<void> => {
     if (!isVisible) return;
 
@@ -115,14 +126,22 @@ export function createFloatingPopup(options: FloatingPopupOptions): FloatingPopu
     wrapper.style.display = 'block';
     isVisible = true;
     void updatePosition();
+    // Add click outside listener with a small delay to avoid triggering on the click that opened the popup
+    if (onClickOutside) {
+      setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 0);
+    }
   };
 
   const hide = (): void => {
     wrapper.style.display = 'none';
     isVisible = false;
+    document.removeEventListener('mousedown', handleClickOutside);
   };
 
   const destroy = (): void => {
+    document.removeEventListener('mousedown', handleClickOutside);
     hide();
     wrapper.remove();
   };

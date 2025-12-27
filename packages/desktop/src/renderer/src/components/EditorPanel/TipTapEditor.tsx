@@ -48,7 +48,7 @@ import { ImageLightbox } from './ImageLightbox';
 import { ImageContextMenu } from './ImageContextMenu';
 import { TableSizePickerDialog } from './TableSizePickerDialog';
 import { SearchPanel } from './SearchPanel';
-// LinkPopover, LinkInputPopover, TextAndUrlInputPopover, tippy, detectUrlFromSelection are used by useEditorLinkPopovers
+// LinkPopover, LinkInputPopover, TextAndUrlInputPopover, detectUrlFromSelection are used by useEditorLinkPopovers
 // useWindowState and useNoteScrollPosition are used by useEditorStateRestoration
 // sanitizeClipboardHtml is used by editorProps.handlePaste and useEditorContextMenu
 

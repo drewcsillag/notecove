@@ -9,8 +9,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Editor } from '@tiptap/react';
-import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { detectUrlFromSelection } from '@notecove/shared';
+import { createFloatingPopup, type FloatingPopup } from './extensions/utils/floating-popup';
 import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
@@ -59,7 +59,7 @@ export interface UseEditorLinkPopoversReturn {
  * Hook to manage link-related popovers in the editor.
  *
  * Manages:
- * - LinkPopover for viewing/editing existing links (via tippy.js)
+ * - LinkPopover for viewing/editing existing links (via Floating UI)
  * - LinkInputPopover for adding URL to selected text
  * - TextAndUrlInputPopover for creating new links
  * - Keyboard shortcut (Cmd+K) via ref pattern
@@ -70,24 +70,24 @@ export interface UseEditorLinkPopoversReturn {
 export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopoversReturn {
   // Link popover state (for viewing/editing existing links)
   const [linkPopoverData, setLinkPopoverData] = useState<LinkPopoverData | null>(null);
-  const linkPopoverRef = useRef<TippyInstance | null>(null);
+  const linkPopoverRef = useRef<FloatingPopup | null>(null);
 
   // Link input popover state (for creating new links with selection)
   const [linkInputPopoverData, setLinkInputPopoverData] = useState<LinkInputPopoverData | null>(
     null
   );
-  const linkInputPopoverRef = useRef<TippyInstance | null>(null);
+  const linkInputPopoverRef = useRef<FloatingPopup | null>(null);
 
   // Text+URL input popover state (for creating new links without selection)
   const [textAndUrlPopoverData, setTextAndUrlPopoverData] = useState<TextAndUrlPopoverData | null>(
     null
   );
-  const textAndUrlPopoverRef = useRef<TippyInstance | null>(null);
+  const textAndUrlPopoverRef = useRef<FloatingPopup | null>(null);
 
   // Ref to store the Cmd+K handler (updated when editor is available)
   const handleCmdKRef = useRef<((element: HTMLElement) => void) | null>(null);
 
-  // Manage link popover using tippy.js
+  // Manage link popover using Floating UI
   useEffect(() => {
     // Clean up existing popover
     if (linkPopoverRef.current) {
@@ -103,23 +103,8 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
     // Create a container for the React component
     const container = document.createElement('div');
 
-    // Create the popover using tippy.js
-    const instance = tippy(linkPopoverData.element, {
-      content: container,
-      trigger: 'manual',
-      interactive: true,
-      placement: 'bottom-start',
-      appendTo: () => document.body,
-      onHide: () => {
-        setLinkPopoverData(null);
-      },
-      onClickOutside: () => {
-        instance.hide();
-      },
-    });
-
     // Capture current values for use in callbacks
-    const { href, from, to } = linkPopoverData;
+    const { href, from, to, element } = linkPopoverData;
 
     // If editor is not available, don't render edit/remove options
     if (!editor) {
@@ -127,16 +112,28 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
     }
     const currentEditor = editor;
 
+    // Create close handler
+    const closePopover = (): void => {
+      linkPopoverRef.current?.destroy();
+      linkPopoverRef.current = null;
+      setLinkPopoverData(null);
+    };
+
+    // Create the popover using Floating UI
+    const popup = createFloatingPopup({
+      getReferenceClientRect: () => element.getBoundingClientRect(),
+      content: container,
+      onClickOutside: closePopover,
+    });
+    linkPopoverRef.current = popup;
+
     // Render the React component into the container
     void import('react-dom/client').then(({ createRoot }) => {
       const root = createRoot(container);
       root.render(
         <LinkPopover
           href={href}
-          onClose={() => {
-            instance.hide();
-            setLinkPopoverData(null);
-          }}
+          onClose={closePopover}
           onEdit={(newHref: string) => {
             console.log('[useEditorLinkPopovers] Editing link, new href:', newHref);
             // Select the link range and update the href
@@ -162,10 +159,6 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
         />
       );
     });
-
-    // Show the popover
-    instance.show();
-    linkPopoverRef.current = instance;
 
     // Cleanup on unmount
     return () => {
@@ -195,20 +188,20 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
     // Capture current values
     const { element, selectionFrom, selectionTo, initialUrl } = linkInputPopoverData;
 
-    // Create the popover using tippy.js
-    const instance = tippy(element, {
+    // Create close handler
+    const closePopover = (): void => {
+      linkInputPopoverRef.current?.destroy();
+      linkInputPopoverRef.current = null;
+      setLinkInputPopoverData(null);
+    };
+
+    // Create the popover using Floating UI
+    const popup = createFloatingPopup({
+      getReferenceClientRect: () => element.getBoundingClientRect(),
       content: container,
-      trigger: 'manual',
-      interactive: true,
-      placement: 'bottom-start',
-      appendTo: () => document.body,
-      onHide: () => {
-        setLinkInputPopoverData(null);
-      },
-      onClickOutside: () => {
-        instance.hide();
-      },
+      onClickOutside: closePopover,
     });
+    linkInputPopoverRef.current = popup;
 
     // Render the React component into the container
     void import('react-dom/client').then(({ createRoot }) => {
@@ -225,20 +218,12 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
               .setTextSelection({ from: selectionFrom, to: selectionTo })
               .setLink({ href: url })
               .run();
-            instance.hide();
-            setLinkInputPopoverData(null);
+            closePopover();
           }}
-          onCancel={() => {
-            instance.hide();
-            setLinkInputPopoverData(null);
-          }}
+          onCancel={closePopover}
         />
       );
     });
-
-    // Show the popover
-    instance.show();
-    linkInputPopoverRef.current = instance;
 
     // Cleanup on unmount
     return () => {
@@ -268,20 +253,20 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
     // Capture current values
     const { element, insertPosition } = textAndUrlPopoverData;
 
-    // Create the popover using tippy.js
-    const instance = tippy(element, {
+    // Create close handler
+    const closePopover = (): void => {
+      textAndUrlPopoverRef.current?.destroy();
+      textAndUrlPopoverRef.current = null;
+      setTextAndUrlPopoverData(null);
+    };
+
+    // Create the popover using Floating UI
+    const popup = createFloatingPopup({
+      getReferenceClientRect: () => element.getBoundingClientRect(),
       content: container,
-      trigger: 'manual',
-      interactive: true,
-      placement: 'bottom-start',
-      appendTo: () => document.body,
-      onHide: () => {
-        setTextAndUrlPopoverData(null);
-      },
-      onClickOutside: () => {
-        instance.hide();
-      },
+      onClickOutside: closePopover,
     });
+    textAndUrlPopoverRef.current = popup;
 
     // Render the React component into the container
     void import('react-dom/client').then(({ createRoot }) => {
@@ -300,20 +285,12 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
                 marks: [{ type: 'link', attrs: { href: url } }],
               })
               .run();
-            instance.hide();
-            setTextAndUrlPopoverData(null);
+            closePopover();
           }}
-          onCancel={() => {
-            instance.hide();
-            setTextAndUrlPopoverData(null);
-          }}
+          onCancel={closePopover}
         />
       );
     });
-
-    // Show the popover
-    instance.show();
-    textAndUrlPopoverRef.current = instance;
 
     // Cleanup on unmount
     return () => {
