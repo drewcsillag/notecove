@@ -700,6 +700,7 @@ declare global {
           isDevBuild: boolean;
           profileId: string | null;
           profileName: string | null;
+          instanceId: string;
         }>;
       };
 

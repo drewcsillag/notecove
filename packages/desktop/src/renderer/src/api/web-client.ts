@@ -798,6 +798,7 @@ export const webClient: typeof window.electronAPI = {
         isDevBuild: false,
         profileId: null,
         profileName: null,
+        instanceId: 'browser-client',
       };
     },
   },

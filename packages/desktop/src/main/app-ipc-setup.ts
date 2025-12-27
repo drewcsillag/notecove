@@ -11,6 +11,7 @@ import { getProfileStorage } from './profile-picker';
 
 export interface IPCSetupDependencies {
   selectedProfileId: string | null;
+  instanceId: string;
   isPackaged: boolean;
   appVersion: string;
   appDataDir: string;
@@ -22,8 +23,15 @@ export interface IPCSetupDependencies {
  * Register basic IPC handlers for profile info, app info, clipboard, etc.
  */
 export function registerBasicIPCHandlers(deps: IPCSetupDependencies): void {
-  const { selectedProfileId, isPackaged, appVersion, appDataDir, webServerManager, createMenu } =
-    deps;
+  const {
+    selectedProfileId,
+    instanceId,
+    isPackaged,
+    appVersion,
+    appDataDir,
+    webServerManager,
+    createMenu,
+  } = deps;
 
   // Register profile debug IPC handler for DevTools inspection
   ipcMain.handle('profile:getInfo', async () => {
@@ -47,6 +55,7 @@ export function registerBasicIPCHandlers(deps: IPCSetupDependencies): void {
       isDevBuild: !isPackaged,
       profileId: selectedProfileId,
       profileName: currentProfile?.name ?? null,
+      instanceId,
     };
   });
 

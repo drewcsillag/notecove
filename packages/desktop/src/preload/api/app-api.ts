@@ -61,5 +61,6 @@ export const appApi = {
     isDevBuild: boolean;
     profileId: string | null;
     profileName: string | null;
+    instanceId: string;
   }> => ipcRenderer.invoke('app:getInfo'),
 };

@@ -6,19 +6,32 @@
  * Shows:
  * - App name and version
  * - Development build indicator (if applicable)
- * - Profile name and ID
+ * - Profile name and ID (compact format)
+ * - Instance ID (compact format)
  * - Copyright notice
  * - License information with link
  */
 
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Link, CircularProgress } from '@mui/material';
+import { normalizeUuid, isFullUuid, isCompactUuid } from '@notecove/shared';
 
 interface AppInfo {
   version: string;
   isDevBuild: boolean;
   profileId: string | null;
   profileName: string | null;
+  instanceId: string;
+}
+
+/**
+ * Convert a UUID to compact format, handling both old and new formats.
+ */
+function toCompact(id: string | null): string | null {
+  if (!id) return null;
+  if (isCompactUuid(id)) return id;
+  if (isFullUuid(id)) return normalizeUuid(id);
+  return id; // Return as-is if unknown format
 }
 
 export const AboutWindow: React.FC = () => {
@@ -96,12 +109,23 @@ export const AboutWindow: React.FC = () => {
       )}
 
       {appInfo?.profileName && (
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 1 }}>
           <Typography variant="body2" color="text.secondary">
             Profile: {appInfo.profileName}
           </Typography>
           <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>
-            {appInfo.profileId}
+            {toCompact(appInfo.profileId)}
+          </Typography>
+        </Box>
+      )}
+
+      {appInfo?.instanceId && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Instance
+          </Typography>
+          <Typography variant="caption" color="text.disabled" sx={{ fontFamily: 'monospace' }}>
+            {toCompact(appInfo.instanceId)}
           </Typography>
         </Box>
       )}

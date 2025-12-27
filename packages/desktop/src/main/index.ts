@@ -984,6 +984,7 @@ void app.whenReady().then(async () => {
     // Register basic IPC handlers
     registerBasicIPCHandlers({
       selectedProfileId,
+      instanceId,
       isPackaged: app.isPackaged,
       appVersion: app.getVersion(),
       appDataDir: app.getPath('userData'),
