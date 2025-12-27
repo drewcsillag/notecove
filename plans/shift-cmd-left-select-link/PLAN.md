@@ -40,12 +40,13 @@ When cursor is immediately after an inter-note link (e.g., `foo [[Link]]| bar`),
   - [x] 🟩 Test with existing selection that spans a link (via unit tests)
   - [x] 🟩 Run formatting, typecheck, unit tests - all pass
 
-### Phase B: Scroll Position Fix (if needed)
+### Phase B: Scroll Position Fix ✅
 
-- [ ] 🟥 **Step 6: Fix scroll position issue**
-  - [ ] 🟥 Implement fix based on Step 1 findings
-  - [ ] 🟥 Add tests if applicable
-  - [ ] 🟥 Run CI
+- [x] 🟩 **Step 6: Fix scroll position issue**
+  - [x] 🟩 Changed CSS from `display: none` to `font-size: 0` approach
+  - [x] 🟩 Added ArrowLeft/ArrowRight handlers to skip over links
+  - [x] 🟩 Added 6 tests for arrow key navigation
+  - [x] 🟩 All tests pass, merged to main
 
 ## Technical Approach
 
