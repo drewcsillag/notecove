@@ -1553,7 +1553,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
           rootId={0}
           sort={false} // Disable library sorting - we pre-sort in buildTreeNodes/buildMultiSDTreeNodes
           insertDroppableFirst={false} // Don't auto-reorder droppable nodes
-          dropTargetOffset={20} // Pixels from edge to trigger reorder vs nest (larger = easier to hit)
+          dropTargetOffset={8} // Pixels from edge to trigger reorder vs nest (must be < height/2 to allow nesting)
           onDrop={(tree, options) => void handleDrop(tree, options)}
           canDrag={canDrag}
           canDrop={canDrop}
