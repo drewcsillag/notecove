@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nc_canary=1 cd:*)",
+      "Bash(git checkout:*)",
+      "Bash(mkdir:*)",
+      "Bash(nc_canary=1 grep:*)",
+      "Bash(nc_canary=1 wc:*)",
+      "Bash(nc_canary=1 find:*)",
+      "Bash(nc_canary=1 ls:*)",
+      "Bash(nc_canary=1 pnpm add:*)",
+      "Bash(nc_canary=1 pnpm remove:*)",
+      "Bash(pnpm add:*)",
+      "Bash(nc_canary=1 pnpm test:*)",
+      "Bash(nc_canary=1 node_modules/.bin/jest:*)",
+      "Bash(nc_canary=1 pnpm typecheck:*)",
+      "Bash(nc_canary=1 pnpm build:*)",
+      "Bash(nc_canary=1 pnpm jest:*)",
+      "Bash(nc_canary=1 pnpm format:*)",
+      "Bash(nc_canary=1 pnpm lint:*)",
+      "Bash(nc_canary=1 git status:*)",
+      "Bash(nc_canary=1 git diff:*)",
+      "Bash(nc_canary=1 git log:*)"
+    ]
+  }
+}

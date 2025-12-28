@@ -12,6 +12,7 @@ import type { NoteMoveManager } from '../../note-move-manager';
 import type { DiagnosticsManager } from '../../diagnostics-manager';
 import type { BackupManager } from '../../backup-manager';
 import type { SyncStatus, StaleSyncEntry } from '../types';
+import type { OEmbedService } from '../../oembed';
 
 /**
  * Callback type for getting deletion logger by SD
@@ -158,4 +159,9 @@ export interface HandlerContext extends HandlerDependencies {
     mimeType: string;
     size: number;
   } | null>;
+
+  /**
+   * oEmbed service for link unfurling (optional - created lazily)
+   */
+  oembedService?: OEmbedService;
 }

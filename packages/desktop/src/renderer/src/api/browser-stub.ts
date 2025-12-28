@@ -341,6 +341,22 @@ export const browserApiStub: typeof window.electronAPI = {
     set: notImplemented('featureFlags.set'),
     onChange: stubEventSubscription,
   },
+
+  oembed: {
+    unfurl: notImplemented('oembed.unfurl'),
+    refresh: notImplemented('oembed.refresh'),
+    clearCache: notImplemented('oembed.clearCache'),
+    getCacheStats: notImplemented('oembed.getCacheStats'),
+    debug: {
+      listFavicons: notImplemented('oembed.debug.listFavicons'),
+      listThumbnails: notImplemented('oembed.debug.listThumbnails'),
+      listFetchCache: notImplemented('oembed.debug.listFetchCache'),
+      deleteFavicon: notImplemented('oembed.debug.deleteFavicon'),
+      deleteThumbnail: notImplemented('oembed.debug.deleteThumbnail'),
+      clearAllFavicons: notImplemented('oembed.debug.clearAllFavicons'),
+      clearAllThumbnails: notImplemented('oembed.debug.clearAllThumbnails'),
+    },
+  },
 };
 
 /**

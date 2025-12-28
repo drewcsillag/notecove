@@ -1090,6 +1090,23 @@ export const webClient: typeof window.electronAPI = {
     set: browserNotAvailable('featureFlags.set'),
     onChange: noopSubscription,
   },
+
+  // oEmbed is not available in browser mode (desktop-only feature)
+  oembed: {
+    unfurl: browserNotAvailable('oembed.unfurl'),
+    refresh: browserNotAvailable('oembed.refresh'),
+    clearCache: browserNotAvailable('oembed.clearCache'),
+    getCacheStats: browserNotAvailable('oembed.getCacheStats'),
+    debug: {
+      listFavicons: browserNotAvailable('oembed.debug.listFavicons'),
+      listThumbnails: browserNotAvailable('oembed.debug.listThumbnails'),
+      listFetchCache: browserNotAvailable('oembed.debug.listFetchCache'),
+      deleteFavicon: browserNotAvailable('oembed.debug.deleteFavicon'),
+      deleteThumbnail: browserNotAvailable('oembed.debug.deleteThumbnail'),
+      clearAllFavicons: browserNotAvailable('oembed.debug.clearAllFavicons'),
+      clearAllThumbnails: browserNotAvailable('oembed.debug.clearAllThumbnails'),
+    },
+  },
 };
 
 /**

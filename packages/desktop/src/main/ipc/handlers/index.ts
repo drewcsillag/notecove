@@ -72,6 +72,9 @@ import {
   registerFeatureFlagHandlers,
   unregisterFeatureFlagHandlers,
 } from './feature-flag-handlers';
+import { registerOEmbedHandlers, unregisterOEmbedHandlers } from './oembed-handlers';
+import { OEmbedService } from '../../oembed';
+import { OEmbedRepository } from '../../database/oembed-repository';
 
 // Re-export types for external use
 export type {
@@ -131,6 +134,10 @@ export class IPCHandlers {
     initializeImageServices(database);
     initializeMiscServices();
 
+    // Initialize oEmbed service
+    const oembedRepository = new OEmbedRepository(database.getAdapter());
+    const oembedService = new OEmbedService(oembedRepository);
+
     // Create the handler context with runtime services
     // Type assertion needed due to exactOptionalPropertyTypes handling of optional params
     this.ctx = {
@@ -155,6 +162,7 @@ export class IPCHandlers {
       stopWebServer,
       broadcastToAll: this.broadcastToAll.bind(this),
       discoverImageAcrossSDs: this.discoverImageAcrossSDs.bind(this),
+      oembedService,
     } as HandlerContext;
 
     // Register all handlers
@@ -298,6 +306,7 @@ export class IPCHandlers {
     registerHistoryHandlers(this.ctx);
     registerCommentHandlers(this.ctx);
     registerFeatureFlagHandlers(this.ctx);
+    registerOEmbedHandlers(this.ctx);
     registerMiscHandlers(this.ctx);
   }
 
@@ -320,6 +329,7 @@ export class IPCHandlers {
     unregisterHistoryHandlers();
     unregisterCommentHandlers();
     unregisterFeatureFlagHandlers();
+    unregisterOEmbedHandlers();
     unregisterMiscHandlers();
   }
 }

@@ -380,6 +380,40 @@ export interface CommentReactionCache {
 }
 
 /**
+ * Favicon cache entry
+ * Caches favicons for link chips in oEmbed unfurling
+ * @see plans/oembed-link-unfurling/PLAN-PHASE-1.md
+ */
+export interface FaviconCache {
+  domain: string; // Primary key - the domain (e.g., "youtube.com")
+  dataUrl: string; // Base64 data URL of the favicon
+  fetchedAt: number; // Timestamp when fetched
+}
+
+/**
+ * Thumbnail cache entry
+ * Caches thumbnails for oEmbed unfurl cards
+ * @see plans/oembed-link-unfurling/PLAN-PHASE-1.md
+ */
+export interface ThumbnailCache {
+  url: string; // Primary key - the original thumbnail URL
+  dataUrl: string; // Base64 data URL of the thumbnail
+  sizeBytes: number; // Size of the data URL in bytes
+  fetchedAt: number; // Timestamp when fetched
+}
+
+/**
+ * oEmbed fetch cache entry (session-level)
+ * Used for deduplicating fetches during a session
+ * @see plans/oembed-link-unfurling/PLAN-PHASE-1.md
+ */
+export interface OEmbedFetchCache {
+  url: string; // Primary key - the URL being unfurled
+  rawJson: string; // The raw oEmbed response JSON
+  fetchedAt: number; // Timestamp when fetched
+}
+
+/**
  * Database schema version
  *
  * Version history:
@@ -392,6 +426,8 @@ export interface CommentReactionCache {
  * - v7: Added instance_id column and index to profile_presence_cache for proper activity log lookups
  * - v8: Added images table for image metadata caching
  * - v9: Added comment_threads, comment_replies, comment_reactions tables for note comments
+ * - v10: (reserved)
+ * - v11: Added favicon_cache, thumbnail_cache, oembed_fetch_cache tables for oEmbed link unfurling
  *
  * Migration strategy:
  * - Cache tables (notes, folders, notes_fts): Rebuild from CRDT on version mismatch
@@ -399,7 +435,7 @@ export interface CommentReactionCache {
  * - Sync state tables: Safe to recreate (will rebuild from files)
  * - Comment tables: Cache only, safe to recreate (rebuilt from CRDT)
  */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /**
  * SQL schema definitions
@@ -793,5 +829,52 @@ export const SCHEMA_SQL = {
     );
 
     CREATE INDEX IF NOT EXISTS idx_comment_reactions_target ON comment_reactions(target_type, target_id);
+  `,
+
+  /**
+   * Favicon cache table
+   * Caches favicons for link chips in oEmbed unfurling
+   * Favicons are small and shared across all documents
+   * @see plans/oembed-link-unfurling/PLAN-PHASE-1.md
+   */
+  faviconCache: `
+    CREATE TABLE IF NOT EXISTS favicon_cache (
+      domain TEXT PRIMARY KEY,
+      data_url TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
+  `,
+
+  /**
+   * Thumbnail cache table
+   * Caches thumbnails for oEmbed unfurl cards
+   * Thumbnails can be larger, so we track size for cache management
+   * @see plans/oembed-link-unfurling/PLAN-PHASE-1.md
+   */
+  thumbnailCache: `
+    CREATE TABLE IF NOT EXISTS thumbnail_cache (
+      url TEXT PRIMARY KEY,
+      data_url TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_thumbnail_cache_fetched_at ON thumbnail_cache(fetched_at);
+  `,
+
+  /**
+   * oEmbed fetch cache table
+   * Session-level cache for deduplicating oEmbed fetches
+   * Can be cleared on app restart
+   * @see plans/oembed-link-unfurling/PLAN-PHASE-1.md
+   */
+  oembedFetchCache: `
+    CREATE TABLE IF NOT EXISTS oembed_fetch_cache (
+      url TEXT PRIMARY KEY,
+      raw_json TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_oembed_fetch_cache_fetched_at ON oembed_fetch_cache(fetched_at);
   `,
 };

@@ -193,6 +193,18 @@ import { IPCHandlers } from '../handlers/index';
 import type { Database, ImageCache, UUID } from '@notecove/shared';
 
 // Mock types
+interface MockDatabaseAdapter {
+  exec: jest.Mock;
+  get: jest.Mock;
+  all: jest.Mock;
+  run: jest.Mock;
+  initialize: jest.Mock;
+  close: jest.Mock;
+  beginTransaction: jest.Mock;
+  commit: jest.Mock;
+  rollback: jest.Mock;
+}
+
 interface MockDatabase {
   getStorageDir: jest.Mock;
   upsertImage: jest.Mock;
@@ -223,6 +235,7 @@ interface MockDatabase {
   searchNotes: jest.Mock;
   deleteNote: jest.Mock;
   deleteStorageDir: jest.Mock;
+  getAdapter: jest.Mock<MockDatabaseAdapter>;
   adapter: { exec: jest.Mock };
 }
 
@@ -332,6 +345,17 @@ describe('IPCHandlers - Image Operations', () => {
       searchNotes: jest.fn(),
       deleteNote: jest.fn(),
       deleteStorageDir: jest.fn(),
+      getAdapter: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(undefined),
+        get: jest.fn().mockResolvedValue(null),
+        all: jest.fn().mockResolvedValue([]),
+        run: jest.fn().mockResolvedValue({ changes: 0 }),
+        initialize: jest.fn().mockResolvedValue(undefined),
+        close: jest.fn().mockResolvedValue(undefined),
+        beginTransaction: jest.fn().mockResolvedValue(undefined),
+        commit: jest.fn().mockResolvedValue(undefined),
+        rollback: jest.fn().mockResolvedValue(undefined),
+      }),
       adapter: { exec: jest.fn() },
     };
 

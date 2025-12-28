@@ -50,7 +50,8 @@
     "clean": "rm -rf dist",
     "dump:log": "npx tsx tools/dump-crdtlog.ts",
     "dump:snapshot": "npx tsx tools/dump-snapshot.ts",
-    "dump:activity": "npx tsx tools/dump-activity.ts"
+    "dump:activity": "npx tsx tools/dump-activity.ts",
+    "fetch:oembed-registry": "node scripts/fetch-oembed-registry.mjs"
   },
   "dependencies": {
     "@tiptap/core": "3.14.0",

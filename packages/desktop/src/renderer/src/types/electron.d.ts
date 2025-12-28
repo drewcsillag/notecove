@@ -1261,6 +1261,113 @@ declare global {
           }) => void
         ) => () => void;
       };
+
+      /** oEmbed link unfurling operations */
+      oembed: {
+        /** Unfurl a URL - fetch oEmbed data with caching */
+        unfurl: (
+          url: string,
+          options?: {
+            maxWidth?: number;
+            maxHeight?: number;
+            skipCache?: boolean;
+            skipDiscovery?: boolean;
+          }
+        ) => Promise<{
+          success: boolean;
+          data?: {
+            type: 'photo' | 'video' | 'link' | 'rich';
+            version: '1.0';
+            title?: string;
+            author_name?: string;
+            author_url?: string;
+            provider_name?: string;
+            provider_url?: string;
+            cache_age?: number;
+            thumbnail_url?: string;
+            thumbnail_width?: number;
+            thumbnail_height?: number;
+            url?: string;
+            html?: string;
+            width?: number;
+            height?: number;
+          };
+          error?: string;
+          errorType?: string;
+          fromCache?: boolean;
+        }>;
+        /** Force refresh - fetch fresh data bypassing cache */
+        refresh: (url: string) => Promise<{
+          success: boolean;
+          data?: {
+            type: 'photo' | 'video' | 'link' | 'rich';
+            version: '1.0';
+            title?: string;
+            author_name?: string;
+            author_url?: string;
+            provider_name?: string;
+            provider_url?: string;
+            cache_age?: number;
+            thumbnail_url?: string;
+            thumbnail_width?: number;
+            thumbnail_height?: number;
+            url?: string;
+            html?: string;
+            width?: number;
+            height?: number;
+          };
+          error?: string;
+          errorType?: string;
+          fromCache?: boolean;
+        }>;
+        /** Clear cache - optionally for a specific URL or all */
+        clearCache: (url?: string) => Promise<void>;
+        /** Get cache statistics */
+        getCacheStats: () => Promise<{
+          fetchCacheCount: number;
+          faviconCount: number;
+          thumbnailCount: number;
+          thumbnailTotalSizeBytes: number;
+          providerCount: number;
+        } | null>;
+
+        /** Debug methods for cache inspection */
+        debug: {
+          /** List all cached favicons */
+          listFavicons: () => Promise<
+            {
+              domain: string;
+              dataUrl: string;
+              fetchedAt: number;
+            }[]
+          >;
+          /** List all cached thumbnails */
+          listThumbnails: () => Promise<
+            {
+              url: string;
+              dataUrl: string;
+              sizeBytes: number;
+              fetchedAt: number;
+            }[]
+          >;
+          /** List all fetch cache entries */
+          listFetchCache: () => Promise<
+            {
+              url: string;
+              rawJson: string;
+              fetchedAt: number;
+            }[]
+          >;
+          /** Delete a specific cached favicon */
+          deleteFavicon: (domain: string) => Promise<void>;
+          /** Delete a specific cached thumbnail */
+          deleteThumbnail: (url: string) => Promise<void>;
+          /** Clear all cached favicons */
+          clearAllFavicons: () => Promise<void>;
+          /** Clear all cached thumbnails */
+          clearAllThumbnails: () => Promise<void>;
+        };
+      };
     };
   }
 }

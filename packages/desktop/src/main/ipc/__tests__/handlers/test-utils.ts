@@ -98,8 +98,17 @@ export interface MockDatabase {
   deleteCommentThread?: jest.Mock;
   getCommentThreadsForNote?: jest.Mock;
   getProfilePresenceCache?: jest.Mock;
+  getAdapter: jest.Mock;
   adapter: {
     exec: jest.Mock;
+    get: jest.Mock;
+    all: jest.Mock;
+    run: jest.Mock;
+    initialize: jest.Mock;
+    close: jest.Mock;
+    beginTransaction: jest.Mock;
+    commit: jest.Mock;
+    rollback: jest.Mock;
   };
 }
 
@@ -223,6 +232,18 @@ export function createMockCRDTManager(mockFolderTree?: MockFolderTreeDoc): MockC
  * Create a mock Database
  */
 export function createMockDatabase(): MockDatabase {
+  const adapter = {
+    exec: jest.fn().mockResolvedValue(undefined),
+    get: jest.fn().mockResolvedValue(null),
+    all: jest.fn().mockResolvedValue([]),
+    run: jest.fn().mockResolvedValue({ changes: 0 }),
+    initialize: jest.fn().mockResolvedValue(undefined),
+    close: jest.fn().mockResolvedValue(undefined),
+    beginTransaction: jest.fn().mockResolvedValue(undefined),
+    commit: jest.fn().mockResolvedValue(undefined),
+    rollback: jest.fn().mockResolvedValue(undefined),
+  };
+
   return {
     upsertFolder: jest.fn().mockResolvedValue(undefined),
     upsertNote: jest.fn().mockResolvedValue(undefined),
@@ -261,9 +282,8 @@ export function createMockDatabase(): MockDatabase {
     deleteCommentThread: jest.fn().mockResolvedValue(undefined),
     getCommentThreadsForNote: jest.fn().mockResolvedValue([]),
     getProfilePresenceCache: jest.fn().mockResolvedValue([]),
-    adapter: {
-      exec: jest.fn().mockResolvedValue(undefined),
-    },
+    getAdapter: jest.fn().mockReturnValue(adapter),
+    adapter,
   };
 }
 

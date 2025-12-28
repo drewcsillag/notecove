@@ -20,13 +20,16 @@ import {
   serializeWindowStates,
   deserializeWindowStates,
   type ImageCache,
+  type FaviconCache,
+  type ThumbnailCache,
+  type OEmbedFetchCache,
 } from '../schema';
 import type { UUID } from '../../types';
 
 describe('Database Schema', () => {
   describe('SCHEMA_VERSION', () => {
     it('should be defined', () => {
-      expect(SCHEMA_VERSION).toBe(10);
+      expect(SCHEMA_VERSION).toBe(11);
     });
   });
 
@@ -51,10 +54,25 @@ describe('Database Schema', () => {
       expect(SCHEMA_SQL.sequenceState).toContain('CREATE TABLE IF NOT EXISTS sequence_state');
       // Images table
       expect(SCHEMA_SQL.images).toContain('CREATE TABLE IF NOT EXISTS images');
+      // oEmbed cache tables
+      expect(SCHEMA_SQL.faviconCache).toContain('CREATE TABLE IF NOT EXISTS favicon_cache');
+      expect(SCHEMA_SQL.thumbnailCache).toContain('CREATE TABLE IF NOT EXISTS thumbnail_cache');
+      expect(SCHEMA_SQL.oembedFetchCache).toContain(
+        'CREATE TABLE IF NOT EXISTS oembed_fetch_cache'
+      );
     });
 
     it('should create indices for images table', () => {
       expect(SCHEMA_SQL.images).toContain('CREATE INDEX IF NOT EXISTS idx_images_sd_id');
+    });
+
+    it('should create indices for oEmbed cache tables', () => {
+      expect(SCHEMA_SQL.thumbnailCache).toContain(
+        'CREATE INDEX IF NOT EXISTS idx_thumbnail_cache_fetched_at'
+      );
+      expect(SCHEMA_SQL.oembedFetchCache).toContain(
+        'CREATE INDEX IF NOT EXISTS idx_oembed_fetch_cache_fetched_at'
+      );
     });
 
     it('should create indices for notes table', () => {
@@ -380,6 +398,45 @@ describe('Database Schema', () => {
 
       expect(image.width).toBeNull();
       expect(image.height).toBeNull();
+    });
+
+    it('should accept valid FaviconCache', () => {
+      const favicon: FaviconCache = {
+        domain: 'youtube.com',
+        dataUrl: 'data:image/png;base64,iVBORw0KGgo...',
+        fetchedAt: Date.now(),
+      };
+
+      expect(favicon.domain).toBe('youtube.com');
+      expect(favicon.dataUrl).toContain('data:image/png');
+    });
+
+    it('should accept valid ThumbnailCache', () => {
+      const thumbnail: ThumbnailCache = {
+        url: 'https://img.youtube.com/vi/abc123/maxresdefault.jpg',
+        dataUrl: 'data:image/jpeg;base64,/9j/4AAQ...',
+        sizeBytes: 15000,
+        fetchedAt: Date.now(),
+      };
+
+      expect(thumbnail.url).toContain('youtube.com');
+      expect(thumbnail.sizeBytes).toBe(15000);
+    });
+
+    it('should accept valid OEmbedFetchCache', () => {
+      const cache: OEmbedFetchCache = {
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        rawJson: JSON.stringify({
+          type: 'video',
+          version: '1.0',
+          title: 'Test Video',
+          html: '<iframe></iframe>',
+        }),
+        fetchedAt: Date.now(),
+      };
+
+      expect(cache.url).toContain('youtube.com');
+      expect(JSON.parse(cache.rawJson)).toHaveProperty('type', 'video');
     });
   });
 
