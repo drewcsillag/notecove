@@ -36,8 +36,8 @@ export interface UseWindowStateReturn {
   /** Report cursor position change (debounced) */
   reportCursorPosition: (cursorPosition: number) => void;
 
-  /** Get saved state for restoration (returns null if not a restored window) */
-  getSavedState: () => Promise<SavedEditorState | null>;
+  /** Get saved state for restoration (returns null if not for this note or not a restored window) */
+  getSavedState: (noteId: string) => Promise<SavedEditorState | null>;
 
   /** Report final state immediately (for beforeunload) */
   reportFinalState: (scrollTop: number, cursorPosition: number) => void;
@@ -177,22 +177,36 @@ export function useWindowState(): UseWindowStateReturn {
   );
 
   /**
-   * Get saved state for restoration
+   * Get saved state for restoration (only if it's for the specified note)
    */
-  const getSavedState = useCallback(async (): Promise<SavedEditorState | null> => {
-    if (!windowId) return null;
+  const getSavedState = useCallback(
+    async (noteId: string): Promise<SavedEditorState | null> => {
+      if (!windowId) return null;
 
-    try {
-      const savedState = await window.electronAPI.windowState.getSavedState(windowId);
-      if (savedState?.editorState) {
-        console.log('[useWindowState] Got saved editor state:', savedState.editorState);
-        return savedState.editorState;
+      try {
+        const savedState = await window.electronAPI.windowState.getSavedState(windowId);
+        // Only return state if it's for the note we're trying to restore
+        // This prevents using stale state from a different note
+        if (savedState?.editorState && savedState.noteId === noteId) {
+          console.log(
+            '[useWindowState] Got saved editor state for note:',
+            noteId,
+            savedState.editorState
+          );
+          return savedState.editorState;
+        }
+        if (savedState?.noteId && savedState.noteId !== noteId) {
+          console.log(
+            `[useWindowState] Saved state is for different note (saved: ${savedState.noteId}, requested: ${noteId})`
+          );
+        }
+      } catch (error) {
+        console.error('[useWindowState] Error getting saved state:', error);
       }
-    } catch (error) {
-      console.error('[useWindowState] Error getting saved state:', error);
-    }
-    return null;
-  }, [windowId]);
+      return null;
+    },
+    [windowId]
+  );
 
   /**
    * Report final state immediately (for beforeunload)

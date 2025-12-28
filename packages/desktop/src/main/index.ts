@@ -56,6 +56,15 @@ import { discoverNewNotes } from './note-discovery';
 // This ensures menus show "NoteCove" instead of the package.json name "@notecove/desktop".
 app.setName('NoteCove');
 
+// Disable crash reporter dialogs in test mode to prevent blocking e2e tests
+if (process.env['NODE_ENV'] === 'test') {
+  app.commandLine.appendSwitch('disable-breakpad');
+  // Prevent crash dialogs from blocking tests
+  process.on('uncaughtException', (error) => {
+    console.error('[TEST MODE] Uncaught exception:', error);
+  });
+}
+
 let mainWindow: BrowserWindow | null = null;
 let webServerManager: WebServerManager | null = null;
 let database: Database | null = null;

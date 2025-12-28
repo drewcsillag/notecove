@@ -5,7 +5,7 @@
  * Manages saving and restoring state across note switches and app restarts.
  */
 
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useWindowState } from '../../hooks/useWindowState';
 import { useNoteScrollPosition } from '../../hooks/useNoteScrollPosition';
@@ -41,14 +41,19 @@ export function useEditorStateRestoration(
     reportFinalState,
   } = useWindowState();
 
-  // Per-note scroll position persistence (across app restarts)
+  // Per-note editor state persistence (across app restarts)
   const {
-    getScrollPosition: getSavedNoteScrollPosition,
+    getEditorState: getSavedNoteEditorState,
     reportScrollPosition: reportNoteScrollPosition,
+    reportCursorPosition: reportNoteCursorPosition,
   } = useNoteScrollPosition();
 
   // Track saved state for restoration after note loads
-  const savedStateRef = useRef<{ scrollTop: number; cursorPosition: number } | null>(null);
+  // Using state instead of ref so restoration effect re-runs when state is set
+  const [savedState, setSavedState] = useState<{
+    scrollTop: number;
+    cursorPosition: number;
+  } | null>(null);
   const hasRestoredStateRef = useRef(false);
 
   // Report current note to window state manager when note changes
@@ -68,9 +73,10 @@ export function useEditorStateRestoration(
 
     const loadSavedState = async () => {
       // First try window state (for session restoration within same app run)
-      const windowState = await getSavedState();
+      // Only use if the saved state is for THIS note (prevents using stale state from different note)
+      const windowState = await getSavedState(noteId);
       if (windowState) {
-        savedStateRef.current = windowState;
+        setSavedState(windowState);
         console.log(
           '[useEditorStateRestoration] Loaded window state for restoration:',
           windowState
@@ -78,39 +84,64 @@ export function useEditorStateRestoration(
         return;
       }
 
-      // Fall back to per-note scroll position (for cross-restart persistence)
-      const noteScrollPosition = await getSavedNoteScrollPosition(noteId);
-      if (noteScrollPosition > 0) {
-        savedStateRef.current = { scrollTop: noteScrollPosition, cursorPosition: 0 };
-        console.log(
-          '[useEditorStateRestoration] Loaded per-note scroll position:',
-          noteScrollPosition
-        );
+      // Fall back to per-note editor state (for cross-restart persistence and note switching)
+      const noteEditorState = await getSavedNoteEditorState(noteId);
+      if (noteEditorState.scrollTop > 0 || noteEditorState.cursorPosition > 0) {
+        setSavedState(noteEditorState);
+        console.log('[useEditorStateRestoration] Loaded per-note editor state:', noteEditorState);
       }
     };
 
     void loadSavedState();
-  }, [noteId, isLoading, getSavedState, getSavedNoteScrollPosition]);
+  }, [noteId, isLoading, getSavedState, getSavedNoteEditorState]);
 
   // Restore scroll and cursor position after note content is ready
   useEffect(() => {
-    if (!editor || isLoading || !savedStateRef.current) return;
+    if (!editor || isLoading || !savedState) return;
 
-    const savedState = savedStateRef.current;
+    const container = editorContainerRef.current;
+    if (!container) return;
 
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      // Restore scroll position
-      if (editorContainerRef.current && savedState.scrollTop > 0) {
-        console.log('[useEditorStateRestoration] Restoring scroll position:', savedState.scrollTop);
-        editorContainerRef.current.scrollTop = savedState.scrollTop;
+    // For long notes, content may not be fully rendered immediately.
+    // We retry scroll restoration until it succeeds or we give up.
+    const targetScrollTop = savedState.scrollTop;
+    const targetCursorPosition = savedState.cursorPosition;
+    let attempts = 0;
+    const maxAttempts = 10;
+    const retryDelay = 100; // ms between retries
+
+    const attemptRestore = () => {
+      attempts++;
+
+      // Check if we can scroll to the target position
+      const maxScrollTop = container.scrollHeight - container.clientHeight;
+      const canScrollToTarget = targetScrollTop <= maxScrollTop;
+
+      if (targetScrollTop > 0) {
+        if (canScrollToTarget || attempts >= maxAttempts) {
+          // Either we can scroll to target, or we've given up waiting
+          const actualScrollTop = Math.min(targetScrollTop, maxScrollTop);
+          console.log(
+            `[useEditorStateRestoration] Restoring scroll position: ${actualScrollTop} ` +
+              `(target: ${targetScrollTop}, max: ${maxScrollTop}, attempt: ${attempts})`
+          );
+          container.scrollTop = actualScrollTop;
+        } else {
+          // Content still loading, retry
+          console.log(
+            `[useEditorStateRestoration] Waiting for content (scrollHeight: ${container.scrollHeight}, ` +
+              `need: ${targetScrollTop + container.clientHeight}, attempt: ${attempts})`
+          );
+          timerId = setTimeout(attemptRestore, retryDelay);
+          return; // Don't clear saved state yet
+        }
       }
 
-      // Restore cursor position
-      if (savedState.cursorPosition > 0) {
+      // Restore cursor position (do this after scroll is stable)
+      if (targetCursorPosition > 0) {
         try {
           const docLength = editor.state.doc.content.size;
-          const safePosition = Math.min(savedState.cursorPosition, docLength - 1);
+          const safePosition = Math.min(targetCursorPosition, docLength - 1);
           if (safePosition > 0) {
             console.log('[useEditorStateRestoration] Restoring cursor position:', safePosition);
             editor.commands.setTextSelection(safePosition);
@@ -121,13 +152,18 @@ export function useEditorStateRestoration(
       }
 
       // Clear saved state after restoration
-      savedStateRef.current = null;
-    }, 150); // Delay to ensure content is rendered
+      setSavedState(null);
+    };
+
+    // Start with initial delay to let first render complete
+    let timerId: NodeJS.Timeout | null = setTimeout(attemptRestore, 100);
 
     return () => {
-      clearTimeout(timer);
+      if (timerId) {
+        clearTimeout(timerId);
+      }
     };
-  }, [editor, isLoading, editorContainerRef]);
+  }, [editor, isLoading, savedState, editorContainerRef]);
 
   // Track scroll position changes
   useEffect(() => {
@@ -156,14 +192,19 @@ export function useEditorStateRestoration(
 
     const handleSelectionUpdate = () => {
       const { from } = editor.state.selection;
+      // Report to window state (for session restoration)
       reportCursorPosition(from);
+      // Report to per-note storage (for cross-restart persistence)
+      if (noteId) {
+        reportNoteCursorPosition(noteId, from);
+      }
     };
 
     editor.on('selectionUpdate', handleSelectionUpdate);
     return () => {
       editor.off('selectionUpdate', handleSelectionUpdate);
     };
-  }, [editor, reportCursorPosition]);
+  }, [editor, noteId, reportCursorPosition, reportNoteCursorPosition]);
 
   // Report final state on unmount
   useEffect(() => {
@@ -180,6 +221,6 @@ export function useEditorStateRestoration(
   // Reset restoration flag when note changes
   useEffect(() => {
     hasRestoredStateRef.current = false;
-    savedStateRef.current = null;
+    setSavedState(null);
   }, [noteId]);
 }

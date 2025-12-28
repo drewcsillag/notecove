@@ -1203,6 +1203,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       </Fade>
       <Box
         ref={editorContainerRef}
+        data-testid="editor-scroll-container"
         sx={{ flex: 1, overflow: 'auto', padding: 2, cursor: isLoading ? 'wait' : 'text' }}
         onClick={(e) => {
           // Only handle clicks on the Box itself (empty space), not on the editor content
