@@ -12,6 +12,7 @@ import type { EditorView } from '@tiptap/pm/view';
 import type { EditorState } from '@tiptap/pm/state';
 import type { Node as PMNode, Mark } from '@tiptap/pm/model';
 import { getEffectiveDisplayMode, type LinkDisplayMode } from '../utils/linkContext';
+import { getCurrentLinkDisplayPreference } from '../../../contexts/LinkDisplayPreferenceContext';
 import type { WebLinkDisplayMode } from './WebLink';
 import { dispatchChipHoverEnter, dispatchChipHoverLeave } from '../useChipHoverPreview';
 
@@ -27,10 +28,14 @@ export const webLinkChipPluginKey = new PluginKey<DecorationSet>('webLinkChips')
 const faviconCache = new Map<string, string | null>();
 
 /**
- * Cache for link metadata (url -> { title, description })
- * Populated from oEmbed data
+ * Cache for link metadata (url -> { title, description, hasOEmbed })
+ * Populated from oEmbed data.
+ * hasOEmbed indicates whether the URL supports oEmbed (has title or was successfully scraped)
  */
-const linkMetadataCache = new Map<string, { title?: string; description?: string }>();
+const linkMetadataCache = new Map<
+  string,
+  { title?: string; description?: string; hasOEmbed: boolean }
+>();
 
 /**
  * Module-level reference to the current EditorView
@@ -47,6 +52,11 @@ const pendingFetches = new Set<string>();
  * Fetch oEmbed data for a URL and update the metadata cache
  */
 async function fetchLinkMetadata(url: string): Promise<void> {
+  // Skip if in secure mode (no network requests allowed)
+  if (getCurrentLinkDisplayPreference() === 'secure') {
+    return;
+  }
+
   // Skip if already fetching or cached
   if (pendingFetches.has(url) || linkMetadataCache.has(url)) {
     return;
@@ -63,11 +73,22 @@ async function fetchLinkMetadata(url: string): Promise<void> {
       window.electronAPI.oembed.getFavicon(domain),
     ]);
 
-    // Store metadata
-    const metadata: { title?: string; description?: string } = {};
-    if (oembedResult.success && oembedResult.data) {
-      if (oembedResult.data.title) {
-        metadata.title = oembedResult.data.title;
+    // Store metadata - hasOEmbed is true if we got a title
+    // Note: description is not a standard oEmbed field, but we added it to our types
+    const data = oembedResult.data;
+    const hasOEmbed = oembedResult.success && data?.title !== undefined;
+
+    const metadata: { title?: string; description?: string; hasOEmbed: boolean } = {
+      hasOEmbed,
+    };
+
+    if (oembedResult.success && data) {
+      if (data.title) {
+        metadata.title = data.title;
+      }
+      // Use provider_name as a fallback for description if available
+      if (data.provider_name) {
+        metadata.description = data.provider_name;
       }
     }
     linkMetadataCache.set(url, metadata);
@@ -83,8 +104,8 @@ async function fetchLinkMetadata(url: string): Promise<void> {
       currentEditorView.dispatch(tr);
     }
   } catch {
-    // Cache empty result to prevent retrying
-    linkMetadataCache.set(url, {});
+    // Cache result indicating no oEmbed support
+    linkMetadataCache.set(url, { hasOEmbed: false });
   } finally {
     pendingFetches.delete(url);
   }
@@ -104,9 +125,68 @@ function extractDomain(url: string): string {
 }
 
 /**
- * Create a chip DOM element for a link
+ * Create a copy button SVG element for chips
  */
-function createChipElement(href: string, _displayMode: LinkDisplayMode): HTMLElement {
+function createCopyButton(href: string): HTMLElement {
+  const button = document.createElement('button');
+  button.className = 'link-chip-copy';
+  button.setAttribute('aria-label', 'Copy URL');
+  button.setAttribute('title', 'Copy URL');
+  button.setAttribute('type', 'button');
+
+  // Copy icon SVG (content_copy icon)
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+
+  const rect1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect1.setAttribute('x', '9');
+  rect1.setAttribute('y', '9');
+  rect1.setAttribute('width', '13');
+  rect1.setAttribute('height', '13');
+  rect1.setAttribute('rx', '2');
+  rect1.setAttribute('ry', '2');
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
+
+  svg.appendChild(rect1);
+  svg.appendChild(path);
+  button.appendChild(svg);
+
+  // Handle click - copy URL
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void window.electronAPI.clipboard.writeText(href);
+
+    // Show feedback by changing button color temporarily
+    button.classList.add('link-chip-copy--copied');
+    setTimeout(() => {
+      button.classList.remove('link-chip-copy--copied');
+    }, 1500);
+  });
+
+  return button;
+}
+
+/**
+ * Create a chip DOM element for a link
+ * @param href - The URL of the link
+ * @param _displayMode - The display mode (unused but kept for API compatibility)
+ * @param linkFrom - The start position of the link in the document
+ * @param linkTo - The end position of the link in the document
+ */
+function createChipElement(
+  href: string,
+  _displayMode: LinkDisplayMode,
+  linkFrom: number,
+  linkTo: number
+): HTMLElement {
   const domain = extractDomain(href);
   const cached = linkMetadataCache.get(href);
   // Use full title if available, otherwise show the full URL
@@ -123,6 +203,8 @@ function createChipElement(href: string, _displayMode: LinkDisplayMode): HTMLEle
   const chip = document.createElement('span');
   chip.className = 'link-chip';
   chip.setAttribute('data-url', href);
+  chip.setAttribute('data-link-from', String(linkFrom));
+  chip.setAttribute('data-link-to', String(linkTo));
   chip.setAttribute('title', href);
   chip.setAttribute('role', 'link');
   chip.setAttribute('tabindex', '0');
@@ -154,14 +236,6 @@ function createChipElement(href: string, _displayMode: LinkDisplayMode): HTMLEle
     icon.appendChild(path1);
     icon.appendChild(path2);
     chip.appendChild(icon);
-
-    // TODO: Favicon fetch is disabled because Electron blocks renderer fetch to external URLs.
-    // In the future, we should route favicon fetching through IPC to the main process.
-    // For now, just show the default link icon.
-    // if (!faviconCache.has(domain)) {
-    //   faviconCache.set(domain, null);
-    //   void fetchFavicon(domain);
-    // }
   }
 
   // Add title text
@@ -169,6 +243,10 @@ function createChipElement(href: string, _displayMode: LinkDisplayMode): HTMLEle
   titleSpan.className = 'link-chip-title';
   titleSpan.textContent = displayText;
   chip.appendChild(titleSpan);
+
+  // Add copy button (visible on hover via CSS)
+  const copyButton = createCopyButton(href);
+  chip.appendChild(copyButton);
 
   // Handle click - open link in browser
   chip.addEventListener('click', (event) => {
@@ -202,6 +280,21 @@ function createChipElement(href: string, _displayMode: LinkDisplayMode): HTMLEle
 // service which runs in the main process.
 
 /**
+ * Check if a URL has oEmbed metadata available.
+ * Returns true if we know the URL supports oEmbed, false if we know it doesn't,
+ * or undefined if we haven't fetched yet (triggering a fetch).
+ */
+function checkOEmbedAvailable(url: string): boolean | undefined {
+  const cached = linkMetadataCache.get(url);
+  if (cached !== undefined) {
+    return cached.hasOEmbed;
+  }
+  // Trigger fetch and return undefined (will check again after fetch completes)
+  void fetchLinkMetadata(url);
+  return undefined;
+}
+
+/**
  * Find all links that should be displayed as chips and create decorations
  */
 function findChipDecorations(state: EditorState): DecorationSet {
@@ -227,8 +320,12 @@ function findChipDecorations(state: EditorState): DecorationSet {
     // Determine effective display mode based on context
     const effectiveMode = getEffectiveDisplayMode(state, pos, userPreference);
 
-    // Only create chip decoration if mode is 'chip'
+    // Handle chip mode
     if (effectiveMode === 'chip') {
+      // Trigger oEmbed fetch if not cached (for title/favicon)
+      // But show chip immediately regardless of oEmbed status
+      checkOEmbedAvailable(href);
+
       const nodeEnd = pos + node.nodeSize;
 
       // Add inline decoration to hide the original link text
@@ -239,13 +336,29 @@ function findChipDecorations(state: EditorState): DecorationSet {
       );
 
       // Add widget decoration to render the chip after the hidden text
+      // Pass pos and nodeEnd so the chip knows which specific link it represents
+      const chipFrom = pos;
+      const chipTo = nodeEnd;
       decorations.push(
         Decoration.widget(
           nodeEnd,
-          () => createChipElement(href, effectiveMode),
+          () => createChipElement(href, effectiveMode, chipFrom, chipTo),
           { side: 1 } // Place after the position
         )
       );
+    }
+
+    // Handle unfurl mode - hide the link text (the unfurl block is rendered separately)
+    if (effectiveMode === 'unfurl') {
+      const nodeEnd = pos + node.nodeSize;
+
+      // Add inline decoration to hide the original link text
+      decorations.push(
+        Decoration.inline(pos, nodeEnd, {
+          class: 'web-link-hidden',
+        })
+      );
+      // No widget - the OEmbedUnfurl node handles the visual representation
     }
 
     return true;
@@ -318,7 +431,16 @@ export function clearWebLinkChipCaches(): void {
  */
 export function updateLinkMetadata(
   url: string,
-  metadata: { title?: string; description?: string }
+  metadata: { title?: string; description?: string; hasOEmbed?: boolean }
 ): void {
-  linkMetadataCache.set(url, metadata);
+  const entry: { title?: string; description?: string; hasOEmbed: boolean } = {
+    hasOEmbed: metadata.hasOEmbed ?? metadata.title !== undefined,
+  };
+  if (metadata.title !== undefined) {
+    entry.title = metadata.title;
+  }
+  if (metadata.description !== undefined) {
+    entry.description = metadata.description;
+  }
+  linkMetadataCache.set(url, entry);
 }

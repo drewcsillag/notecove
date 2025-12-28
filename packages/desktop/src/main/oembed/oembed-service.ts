@@ -14,6 +14,7 @@ import {
   createRegistry,
   type OEmbedProvider,
   oembedProviders,
+  isRetryableError,
 } from '@notecove/shared';
 import { createLogger } from '../telemetry/logger';
 import type { OEmbedRepository } from '../database/oembed-repository';
@@ -42,6 +43,23 @@ const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
  * Fetch timeout - 10 seconds
  */
 const FETCH_TIMEOUT_MS = 10000;
+
+/**
+ * Maximum retry attempts
+ */
+const MAX_RETRY_ATTEMPTS = 3;
+
+/**
+ * Base delay for exponential backoff (ms)
+ */
+const RETRY_BASE_DELAY_MS = 1000;
+
+/**
+ * Sleep helper
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * oEmbed Service
@@ -74,6 +92,16 @@ export class OEmbedService {
    */
   async unfurl(url: string, options?: UnfurlOptions): Promise<OEmbedResult> {
     try {
+      // Check if we're online
+      if (!net.isOnline()) {
+        log.debug('Offline - cannot unfurl:', { url });
+        return {
+          success: false,
+          error: 'Device is offline',
+          errorType: 'OFFLINE',
+        };
+      }
+
       // Check session cache first (unless skipCache is set)
       if (!options?.skipCache) {
         const cached = await this.repository.getRecentFetch(url, SESSION_CACHE_TTL_MS);
@@ -99,7 +127,7 @@ export class OEmbedService {
           buildOptions.maxHeight = options.maxHeight;
         }
         const oembedUrl = this.registry.buildOEmbedUrl(match.endpoint, url, buildOptions);
-        const result = await this.fetchOEmbed(oembedUrl);
+        const result = await this.fetchOEmbedWithRetry(oembedUrl);
         if (result.success && result.data) {
           await this.repository.cacheFetch(url, result.data);
         }
@@ -112,7 +140,7 @@ export class OEmbedService {
         const discovered = await discoverOEmbedEndpoint(url);
         if (discovered) {
           log.debug('Discovery found endpoint:', { endpointUrl: discovered.endpointUrl });
-          const result = await this.fetchOEmbed(discovered.endpointUrl);
+          const result = await this.fetchOEmbedWithRetry(discovered.endpointUrl);
           if (result.success && result.data) {
             await this.repository.cacheFetch(url, result.data);
           }
@@ -281,6 +309,31 @@ export class OEmbedService {
   async debugClearAllThumbnails(): Promise<void> {
     log.info('Clearing all thumbnails');
     await this.repository.clearThumbnails();
+  }
+
+  /**
+   * Fetch oEmbed data with retry logic for transient errors
+   */
+  private async fetchOEmbedWithRetry(oembedUrl: string, attempt = 1): Promise<OEmbedResult> {
+    const result = await this.fetchOEmbed(oembedUrl);
+
+    // If successful or not retryable, return immediately
+    if (result.success || !isRetryableError(result.errorType)) {
+      return result;
+    }
+
+    // If we've exhausted retries, return the error
+    if (attempt >= MAX_RETRY_ATTEMPTS) {
+      log.warn('Max retries reached for oEmbed fetch:', { oembedUrl, attempts: attempt });
+      return result;
+    }
+
+    // Wait with exponential backoff before retrying
+    const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+    log.debug('Retrying oEmbed fetch:', { oembedUrl, attempt: attempt + 1, delay });
+    await sleep(delay);
+
+    return this.fetchOEmbedWithRetry(oembedUrl, attempt + 1);
   }
 
   /**

@@ -28,6 +28,7 @@ import { AppearanceSettings } from './AppearanceSettings';
 import { TelemetrySettings } from './TelemetrySettings';
 import { RecoverySettings } from './RecoverySettings';
 import { WebServerSettings } from './WebServerSettings';
+import { OEmbedSettings } from './OEmbedSettings';
 import { isElectron } from '../../utils/platform';
 import { useFeatureFlags } from '../../contexts/FeatureFlagsContext';
 
@@ -106,6 +107,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         label: 'Appearance',
         electronOnly: false,
         component: <AppearanceSettings themeMode={themeMode} onThemeChange={onThemeChange} />,
+      },
+      {
+        label: 'Link Previews',
+        electronOnly: true,
+        component: <OEmbedSettings />,
       },
       {
         label: 'Telemetry',

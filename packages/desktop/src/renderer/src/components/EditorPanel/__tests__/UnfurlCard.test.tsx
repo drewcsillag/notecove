@@ -54,11 +54,18 @@ describe('UnfurlCard', () => {
       expect(screen.getByText('Failed to load preview')).toBeInTheDocument();
     });
 
-    it('renders retry button when error and onRefresh provided', () => {
+    it('renders retry button when retryable error type and onRefresh provided', () => {
       const onRefresh = jest.fn();
-      render(<UnfurlCard url={defaultUrl} error="Error" onRefresh={onRefresh} />);
+      render(
+        <UnfurlCard
+          url={defaultUrl}
+          error="Network error"
+          errorType="NETWORK_ERROR"
+          onRefresh={onRefresh}
+        />
+      );
 
-      const refreshButton = screen.getByRole('button', { name: /retry/i });
+      const refreshButton = screen.getByRole('button', { name: /try again/i });
       expect(refreshButton).toBeInTheDocument();
 
       fireEvent.click(refreshButton);

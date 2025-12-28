@@ -8,7 +8,9 @@
  */
 
 import { Node, mergeAttributes } from '@tiptap/core';
-import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import type { Node as ProseMirrorNode, Mark } from '@tiptap/pm/model';
+import type { OEmbedErrorType } from '@notecove/shared';
+import { getCurrentLinkDisplayPreference } from '../../../contexts/LinkDisplayPreferenceContext';
 
 /**
  * OEmbedUnfurl node attributes
@@ -44,6 +46,8 @@ export interface OEmbedUnfurlAttrs {
   isLoading: boolean;
   /** Error message if fetch failed */
   error: string | null;
+  /** Error type for programmatic handling */
+  errorType: OEmbedErrorType | null;
 }
 
 /**
@@ -216,6 +220,14 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
           return { 'data-error': attributes.error };
         },
       },
+      errorType: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-error-type') as OEmbedErrorType | null,
+        renderHTML: (attributes: OEmbedUnfurlAttrs) => {
+          if (!attributes.errorType) return {};
+          return { 'data-error-type': attributes.errorType };
+        },
+      },
     };
   },
 
@@ -289,6 +301,13 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
        * Render the React component
        */
       const renderReactComponent = (attrs: OEmbedUnfurlAttrs): void => {
+        // In secure mode, hide the unfurl block completely
+        if (getCurrentLinkDisplayPreference() === 'secure') {
+          wrapper.style.display = 'none';
+          return;
+        }
+        wrapper.style.display = '';
+
         void import('react-dom/client').then(({ createRoot }) => {
           void Promise.all([
             import('../UnfurlCard'),
@@ -346,6 +365,7 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                   ...attrs,
                   isLoading: true,
                   error: null,
+                  errorType: null,
                 });
                 editor.view.dispatch(tr);
 
@@ -370,6 +390,7 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                       fetchedAt: Date.now(),
                       isLoading: false,
                       error: null,
+                      errorType: null,
                     });
                     editor.view.dispatch(updateTr);
                   } else {
@@ -377,6 +398,7 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                       ...attrs,
                       isLoading: false,
                       error: result.error ?? 'Failed to fetch preview',
+                      errorType: result.errorType ?? null,
                     });
                     editor.view.dispatch(errorTr);
                   }
@@ -396,38 +418,122 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
               // Handle convert to chip
               const handleConvertToChip = (): void => {
                 if (typeof getPos !== 'function') return;
-                const pos = getPos();
-                if (typeof pos !== 'number') return;
+                const unfurlPos = getPos();
+                if (typeof unfurlPos !== 'number') return;
 
-                // Find link marks with matching URL and set displayMode to 'chip'
-                // This prevents auto-unfurl from re-creating the block
+                // Find the link with matching URL in the paragraph before the unfurl
+                // We only want to update THIS specific link, not all links with the same URL
+                let linkFrom: number | null = null;
+                let linkTo: number | null = null;
+                let linkMark: Mark | null = null;
+
+                // Search the node before the unfurl (should be the paragraph)
+                if (unfurlPos > 0) {
+                  const beforePos = unfurlPos - 1;
+                  const $beforePos = editor.state.doc.resolve(beforePos);
+                  const parentNode = $beforePos.node($beforePos.depth);
+                  const parentStart = $beforePos.start($beforePos.depth);
+
+                  // Search within this paragraph for the link
+                  parentNode.descendants((node, offset) => {
+                    if (linkFrom !== null) return false; // Already found
+                    if (!node.isText) return true;
+
+                    const mark = node.marks.find((m) => m.type.name === 'link');
+                    if (mark && mark.attrs['href'] === attrs.url) {
+                      linkFrom = parentStart + offset;
+                      linkTo = linkFrom + node.nodeSize;
+                      linkMark = mark;
+                      return false; // Stop searching
+                    }
+                    return true;
+                  });
+                }
+
                 let tr = editor.state.tr;
 
-                editor.state.doc.descendants((node, nodePos) => {
-                  if (!node.isText) return true;
-
-                  const linkMark = node.marks.find((m) => m.type.name === 'link');
-                  if (linkMark && linkMark.attrs['href'] === attrs.url) {
-                    // Remove old mark and add new one with displayMode: 'chip'
-                    const newMark = linkMark.type.create({
-                      ...linkMark.attrs,
-                      displayMode: 'chip',
-                    });
-                    const nodeEnd = nodePos + node.nodeSize;
-                    tr = tr.removeMark(nodePos, nodeEnd, linkMark.type);
-                    tr = tr.addMark(nodePos, nodeEnd, newMark);
-                  }
-                  return true;
-                });
+                // Update only the specific link if found
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- values set in callback
+                if (linkFrom !== null && linkTo !== null && linkMark !== null) {
+                  // Cast is safe - we just checked linkMark !== null, but TypeScript
+                  // can't narrow through closure assignments
+                  const mark = linkMark as Mark;
+                  const newMark = mark.type.create({
+                    ...mark.attrs,
+                    displayMode: 'chip',
+                  });
+                  tr = tr.removeMark(linkFrom, linkTo, mark.type);
+                  tr = tr.addMark(linkFrom, linkTo, newMark);
+                }
 
                 // Delete the unfurl block
-                // Note: positions may have shifted due to mark changes, but since we're
-                // not changing content length, the pos should still be valid
-                const unfurlPos = getPos();
-                if (typeof unfurlPos === 'number') {
-                  const currentNode = editor.state.doc.nodeAt(unfurlPos);
+                const currentUnfurlPos = getPos();
+                if (typeof currentUnfurlPos === 'number') {
+                  const currentNode = editor.state.doc.nodeAt(currentUnfurlPos);
                   if (currentNode?.type.name === 'oembedUnfurl') {
-                    tr = tr.delete(unfurlPos, unfurlPos + currentNode.nodeSize);
+                    tr = tr.delete(currentUnfurlPos, currentUnfurlPos + currentNode.nodeSize);
+                  }
+                }
+
+                editor.view.dispatch(tr);
+              };
+
+              // Handle convert to plain link
+              const handleConvertToPlainLink = (): void => {
+                if (typeof getPos !== 'function') return;
+                const unfurlPos = getPos();
+                if (typeof unfurlPos !== 'number') return;
+
+                // Find the link in the paragraph BEFORE this unfurl block (not all links with same URL)
+                let linkFrom: number | null = null;
+                let linkTo: number | null = null;
+                let linkMark: Mark | null = null;
+
+                // Search the node before the unfurl (should be the paragraph containing the link)
+                if (unfurlPos > 0) {
+                  const beforePos = unfurlPos - 1;
+                  const $beforePos = editor.state.doc.resolve(beforePos);
+                  const parentNode = $beforePos.node($beforePos.depth);
+                  const parentStart = $beforePos.start($beforePos.depth);
+
+                  // Search within this paragraph for the link with matching URL
+                  parentNode.descendants((node, offset) => {
+                    if (linkFrom !== null) return false; // Already found
+                    if (!node.isText) return true;
+
+                    const mark = node.marks.find((m) => m.type.name === 'link');
+                    if (mark && mark.attrs['href'] === attrs.url) {
+                      linkFrom = parentStart + offset;
+                      linkTo = linkFrom + node.nodeSize;
+                      linkMark = mark;
+                      return false; // Stop searching
+                    }
+                    return true;
+                  });
+                }
+
+                let tr = editor.state.tr;
+
+                // Update only the specific link if found
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- values set in callback
+                if (linkFrom !== null && linkTo !== null && linkMark !== null) {
+                  // Cast is safe - we just checked linkMark !== null, but TypeScript
+                  // can't narrow through closure assignments
+                  const mark = linkMark as Mark;
+                  const newMark = mark.type.create({
+                    ...mark.attrs,
+                    displayMode: 'link',
+                  });
+                  tr = tr.removeMark(linkFrom, linkTo, mark.type);
+                  tr = tr.addMark(linkFrom, linkTo, newMark);
+                }
+
+                // Delete the unfurl block
+                const currentUnfurlPos = getPos();
+                if (typeof currentUnfurlPos === 'number') {
+                  const currentNode = editor.state.doc.nodeAt(currentUnfurlPos);
+                  if (currentNode?.type.name === 'oembedUnfurl') {
+                    tr = tr.delete(currentUnfurlPos, currentUnfurlPos + currentNode.nodeSize);
                   }
                 }
 
@@ -453,10 +559,12 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                     isStale,
                     isLoading: attrs.isLoading,
                     error: attrs.error,
+                    errorType: attrs.errorType,
                     selected: isSelected,
                     onRefresh: handleRefresh,
                     onDelete: handleDelete,
                     onConvertToChip: handleConvertToChip,
+                    onConvertToPlainLink: handleConvertToPlainLink,
                   });
                 } else if (providerEmbed.type === 'video' && providerEmbed.embedUrl) {
                   // Video embed with URL
@@ -471,6 +579,7 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                     onRefresh: handleRefresh,
                     onDelete: handleDelete,
                     onConvertToChip: handleConvertToChip,
+                    onConvertToPlainLink: handleConvertToPlainLink,
                   });
                 } else if (providerEmbed.type === 'rich' && providerEmbed.embedHtml) {
                   // Rich HTML embed - check if provider is allowed first
@@ -487,6 +596,7 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                       onRefresh: handleRefresh,
                       onDelete: handleDelete,
                       onConvertToChip: handleConvertToChip,
+                      onConvertToPlainLink: handleConvertToPlainLink,
                     });
                   } else {
                     // Disallowed provider, fallback to UnfurlCard
@@ -499,10 +609,12 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                       hasData,
                       isStale,
                       isLoading: false,
+                      errorType: null,
                       selected: isSelected,
                       onRefresh: handleRefresh,
                       onDelete: handleDelete,
                       onConvertToChip: handleConvertToChip,
+                      onConvertToPlainLink: handleConvertToPlainLink,
                     });
                   }
                 } else if (providerEmbed.type === 'video' && providerEmbed.embedHtml) {
@@ -519,6 +631,7 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                     onRefresh: handleRefresh,
                     onDelete: handleDelete,
                     onConvertToChip: handleConvertToChip,
+                    onConvertToPlainLink: handleConvertToPlainLink,
                   });
                 } else {
                   // Fallback to UnfurlCard
@@ -532,10 +645,12 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
                     isStale,
                     isLoading: attrs.isLoading,
                     error: attrs.error,
+                    errorType: attrs.errorType,
                     selected: isSelected,
                     onRefresh: handleRefresh,
                     onDelete: handleDelete,
                     onConvertToChip: handleConvertToChip,
+                    onConvertToPlainLink: handleConvertToPlainLink,
                   });
                 }
 
@@ -544,6 +659,69 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
             }
           );
         });
+      };
+
+      /**
+       * Check if an error type indicates oEmbed is definitively unavailable
+       * (not a transient error that might resolve on retry)
+       */
+      const shouldAutoConvertToPlainLink = (
+        errorType: OEmbedErrorType | null | undefined
+      ): boolean => {
+        return errorType === 'NOT_FOUND' || errorType === 'INVALID_RESPONSE';
+      };
+
+      /**
+       * Convert the unfurl to a plain link (when oEmbed is unavailable)
+       */
+      const convertToPlainLink = (unfurlPos: number, url: string): void => {
+        // Find the link in the paragraph BEFORE this unfurl block
+        let linkFrom: number | null = null;
+        let linkTo: number | null = null;
+        let linkMark: Mark | null = null;
+
+        if (unfurlPos > 0) {
+          const beforePos = unfurlPos - 1;
+          const $beforePos = editor.state.doc.resolve(beforePos);
+          const parentNode = $beforePos.node($beforePos.depth);
+          const parentStart = $beforePos.start($beforePos.depth);
+
+          parentNode.descendants((node, offset) => {
+            if (linkFrom !== null) return false;
+            if (!node.isText) return true;
+
+            const mark = node.marks.find((m) => m.type.name === 'link');
+            if (mark?.attrs['href'] === url) {
+              linkFrom = parentStart + offset;
+              linkTo = linkFrom + node.nodeSize;
+              linkMark = mark;
+              return false;
+            }
+            return true;
+          });
+        }
+
+        let tr = editor.state.tr;
+
+        // Update the link to plain link mode
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- values set in callback
+        if (linkFrom !== null && linkTo !== null && linkMark !== null) {
+          const mark = linkMark as Mark;
+          const newMark = mark.type.create({
+            ...mark.attrs,
+            displayMode: 'link',
+          });
+          tr = tr.removeMark(linkFrom, linkTo, mark.type);
+          tr = tr.addMark(linkFrom, linkTo, newMark);
+        }
+
+        // Delete the unfurl block
+        const currentNode = editor.state.doc.nodeAt(unfurlPos);
+        if (currentNode?.type.name === 'oembedUnfurl') {
+          tr = tr.delete(unfurlPos, unfurlPos + currentNode.nodeSize);
+        }
+
+        editor.view.dispatch(tr);
       };
 
       /**
@@ -576,24 +754,35 @@ export const OEmbedUnfurl = Node.create<OEmbedUnfurlOptions>({
               fetchedAt: Date.now(),
               isLoading: false,
               error: null,
+              errorType: null,
             });
             editor.view.dispatch(tr);
           } else {
-            const tr = editor.state.tr.setNodeMarkup(currentPos, undefined, {
-              ...attrs,
-              isLoading: false,
-              error: result.error ?? 'Failed to fetch preview',
-            });
-            editor.view.dispatch(tr);
+            // If oEmbed is definitively unavailable, auto-convert to plain link
+            const errorType = result.errorType as OEmbedErrorType | undefined;
+            if (shouldAutoConvertToPlainLink(errorType)) {
+              convertToPlainLink(currentPos, attrs.url);
+            } else {
+              // For retryable errors, show error state with retry option
+              const tr = editor.state.tr.setNodeMarkup(currentPos, undefined, {
+                ...attrs,
+                isLoading: false,
+                error: result.error ?? 'Failed to fetch preview',
+                errorType: result.errorType ?? null,
+              });
+              editor.view.dispatch(tr);
+            }
           }
         } catch (err) {
           const currentPos = getPos();
           if (typeof currentPos !== 'number') return;
 
+          // Network errors are retryable, so show error state
           const tr = editor.state.tr.setNodeMarkup(currentPos, undefined, {
             ...attrs,
             isLoading: false,
             error: err instanceof Error ? err.message : 'Unknown error',
+            errorType: 'NETWORK_ERROR' as OEmbedErrorType,
           });
           editor.view.dispatch(tr);
         }

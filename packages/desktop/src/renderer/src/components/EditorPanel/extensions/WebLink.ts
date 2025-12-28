@@ -14,11 +14,13 @@
  */
 
 import Link from '@tiptap/extension-link';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
+import type { EditorState } from '@tiptap/pm/state';
 import { InputRule } from '@tiptap/core';
 import type { Node as PMNode, Mark } from '@tiptap/pm/model';
-import { createWebLinkChipPlugin } from './WebLinkChipPlugin';
+import { createWebLinkChipPlugin, webLinkChipPluginKey } from './WebLinkChipPlugin';
 import { detectLinkContext, countLinksInParagraph } from '../utils/linkContext';
+import { getCurrentLinkDisplayPreference } from '../../../contexts/LinkDisplayPreferenceContext';
 
 // Debug logging enabled in development mode
 // Check for Vite's import.meta.env or fallback to process.env for Jest
@@ -129,6 +131,117 @@ export function setWebLinkCallbacks(callbacks: WebLinkOptions): void {
 }
 
 /**
+ * Type for decoration spec objects used by the chip plugin
+ */
+interface ChipDecorationSpec {
+  class?: string;
+}
+
+/**
+ * Check if a position is within a web link that's displayed as a chip.
+ * Returns the range of the link if found, or null if not in a chip.
+ */
+function isPositionInChipLink(
+  state: EditorState,
+  pos: number
+): { from: number; to: number; href: string } | null {
+  // Get the chip decorations from the plugin
+  const decoSet = webLinkChipPluginKey.getState(state);
+  if (!decoSet) return null;
+
+  // Check if there are any chip decorations at or around this position
+  // The chip consists of an inline decoration hiding the text and a widget
+  const $pos = state.doc.resolve(pos);
+  const parentStart = $pos.start();
+  const parentEnd = $pos.end();
+
+  // Look for web-link-hidden decorations in this paragraph
+  const decorations = decoSet.find(parentStart, parentEnd, (spec: ChipDecorationSpec) => {
+    return spec.class === 'web-link-hidden';
+  });
+
+  // Find if we're within any of the hidden link ranges
+  for (const deco of decorations) {
+    // Check if pos is at or just after the decoration's end
+    // (because cursor can be at the end of the hidden text)
+    if (pos > deco.from && pos <= deco.to) {
+      // Get the link mark at this position
+      const node = state.doc.nodeAt(deco.from);
+      if (node) {
+        const linkMark = node.marks.find((m: Mark) => m.type.name === 'link');
+        if (linkMark) {
+          return {
+            from: deco.from,
+            to: deco.to,
+            href: linkMark.attrs['href'] as string,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find a chip link ending at the given position (cursor is right after the chip)
+ */
+function findChipLinkEndingAt(
+  state: EditorState,
+  pos: number
+): { from: number; to: number } | null {
+  const decoSet = webLinkChipPluginKey.getState(state);
+  if (!decoSet) return null;
+
+  const $pos = state.doc.resolve(pos);
+  const parentStart = $pos.start();
+  const parentEnd = $pos.end();
+
+  // Look for web-link-hidden decorations
+  const decorations = decoSet.find(parentStart, parentEnd, (spec: ChipDecorationSpec) => {
+    return spec.class === 'web-link-hidden';
+  });
+
+  // Find if there's a decoration ending exactly at pos
+  for (const deco of decorations) {
+    if (deco.to === pos) {
+      return { from: deco.from, to: deco.to };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find a chip link starting at the given position (cursor is right before the chip)
+ */
+function findChipLinkStartingAt(
+  state: EditorState,
+  pos: number
+): { from: number; to: number } | null {
+  const decoSet = webLinkChipPluginKey.getState(state);
+  if (!decoSet) return null;
+
+  const $pos = state.doc.resolve(pos);
+  const parentStart = $pos.start();
+  const parentEnd = $pos.end();
+
+  // Look for web-link-hidden decorations
+  const decorations = decoSet.find(parentStart, parentEnd, (spec: ChipDecorationSpec) => {
+    return spec.class === 'web-link-hidden';
+  });
+
+  // Find if there's a decoration starting exactly at pos
+  for (const deco of decorations) {
+    if (deco.from === pos) {
+      return { from: deco.from, to: deco.to };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Display mode for web links
  * - 'auto': Let the system decide based on context (default)
  * - 'chip': Compact chip with favicon and domain
@@ -220,6 +333,131 @@ export const WebLink = Link.extend({
           return true; // Handled
         }
         return false; // Let other handlers process
+      },
+
+      // Arrow key navigation for chip links
+      ArrowLeft: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a chip link ending at the cursor position
+        // If so, moving left would enter the chip - skip over it
+        const linkRange = findChipLinkEndingAt(state, pos);
+        if (linkRange) {
+          const tr = state.tr.setSelection(TextSelection.create(state.doc, linkRange.from));
+          view.dispatch(tr);
+          return true;
+        }
+
+        // Also check if cursor is inside a chip (shouldn't happen, but handle it)
+        const insideChip = isPositionInChipLink(state, pos);
+        if (insideChip) {
+          const tr = state.tr.setSelection(TextSelection.create(state.doc, insideChip.from));
+          view.dispatch(tr);
+          return true;
+        }
+
+        return false;
+      },
+
+      ArrowRight: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a chip link starting at the cursor position
+        // If so, moving right would enter the chip - skip over it
+        const linkRange = findChipLinkStartingAt(state, pos);
+        if (linkRange) {
+          const tr = state.tr.setSelection(TextSelection.create(state.doc, linkRange.to));
+          view.dispatch(tr);
+          return true;
+        }
+
+        // Also check if cursor is inside a chip (shouldn't happen, but handle it)
+        const insideChip = isPositionInChipLink(state, pos);
+        if (insideChip) {
+          const tr = state.tr.setSelection(TextSelection.create(state.doc, insideChip.to));
+          view.dispatch(tr);
+          return true;
+        }
+
+        return false;
+      },
+
+      Backspace: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a chip link ending at the cursor position
+        const linkRange = findChipLinkEndingAt(state, pos);
+        if (!linkRange) {
+          return false;
+        }
+
+        // Check if the link is already selected
+        if (selection.from === linkRange.from && selection.to === linkRange.to) {
+          // Link already selected, let default behavior delete it
+          return false;
+        }
+
+        // Select the chip link
+        const tr = state.tr.setSelection(
+          TextSelection.create(state.doc, linkRange.from, linkRange.to)
+        );
+        view.dispatch(tr);
+        return true;
+      },
+
+      Delete: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+
+        // Only handle collapsed selections (cursor, no range)
+        if (!selection.empty) {
+          return false;
+        }
+
+        const pos = selection.from;
+
+        // Check if there's a chip link starting at the cursor position
+        const linkRange = findChipLinkStartingAt(state, pos);
+        if (!linkRange) {
+          return false;
+        }
+
+        // Check if the link is already selected
+        if (selection.from === linkRange.from && selection.to === linkRange.to) {
+          // Link already selected, let default behavior delete it
+          return false;
+        }
+
+        // Select the chip link
+        const tr = state.tr.setSelection(
+          TextSelection.create(state.doc, linkRange.from, linkRange.to)
+        );
+        view.dispatch(tr);
+        return true;
       },
     };
   },
@@ -401,7 +639,103 @@ export const WebLink = Link.extend({
     // Create chip decoration plugin for rendering links as chips
     const chipPlugin = createWebLinkChipPlugin();
 
+    // Plugin to bake in displayMode when links are created
+    // This ensures changing global preferences doesn't affect existing links
+    const displayModeBakeInPlugin = new Plugin({
+      key: new PluginKey('webLinkDisplayModeBakeIn'),
+
+      appendTransaction: (transactions, oldState, newState) => {
+        // Only process if document changed
+        if (!transactions.some((tr) => tr.docChanged)) {
+          return null;
+        }
+
+        const globalPreference = getCurrentLinkDisplayPreference();
+
+        // Track positions of links in old state
+        const oldLinkPositions = new Set<string>();
+        oldState.doc.descendants((node: PMNode, pos: number) => {
+          if (!node.isText) return true;
+          const linkMark = node.marks.find((m: Mark) => m.type.name === 'link');
+          if (linkMark) {
+            const href = linkMark.attrs['href'] as string;
+            oldLinkPositions.add(`${pos}:${href}`);
+          }
+          return true;
+        });
+
+        // Find new links with 'auto' displayMode and bake in the appropriate mode
+        const linksToUpdate: {
+          pos: number;
+          nodeSize: number;
+          mark: Mark;
+          newDisplayMode: string;
+        }[] = [];
+
+        newState.doc.descendants((node: PMNode, pos: number) => {
+          if (!node.isText) return true;
+
+          const linkMark = node.marks.find((m: Mark) => m.type.name === 'link');
+          if (!linkMark) return true;
+
+          const href = linkMark.attrs['href'] as string;
+          const key = `${pos}:${href}`;
+
+          // Skip if this exact link existed before
+          if (oldLinkPositions.has(key)) return true;
+
+          // Skip if displayMode is already explicitly set (not 'auto')
+          const currentDisplayMode = linkMark.attrs['displayMode'] as string | undefined;
+          if (currentDisplayMode && currentDisplayMode !== 'auto') return true;
+
+          // Determine the display mode to bake in based on global preference and context
+          let newDisplayMode: string;
+          if (globalPreference === 'secure' || globalPreference === 'none') {
+            newDisplayMode = 'link';
+          } else if (globalPreference === 'chip') {
+            newDisplayMode = 'chip';
+          } else {
+            // 'unfurl' preference - check context
+            const context = detectLinkContext(newState, pos);
+            if (context === 'paragraph') {
+              const linkCount = countLinksInParagraph(newState, pos);
+              newDisplayMode = linkCount === 1 ? 'unfurl' : 'chip';
+            } else if (context === 'code') {
+              newDisplayMode = 'link';
+            } else {
+              newDisplayMode = 'chip';
+            }
+          }
+
+          linksToUpdate.push({ pos, nodeSize: node.nodeSize, mark: linkMark, newDisplayMode });
+          return true;
+        });
+
+        // No links to update
+        if (linksToUpdate.length === 0) {
+          return null;
+        }
+
+        // Create transaction to update displayMode
+        let tr = newState.tr;
+        const linkMarkType = newState.schema.marks['link'];
+        if (!linkMarkType) return null;
+
+        // Process in reverse order to maintain positions
+        for (const { pos, nodeSize, mark, newDisplayMode } of linksToUpdate.reverse()) {
+          const newMark = linkMarkType.create({
+            ...mark.attrs,
+            displayMode: newDisplayMode,
+          });
+          tr = tr.removeMark(pos, pos + nodeSize, mark).addMark(pos, pos + nodeSize, newMark);
+        }
+
+        return tr;
+      },
+    });
+
     // Auto-unfurl plugin - inserts OEmbedUnfurl blocks when links are added in paragraphs
+    // Only active when the link's displayMode is 'unfurl'
     const autoUnfurlPlugin = new Plugin({
       key: new PluginKey('webLinkAutoUnfurl'),
 
@@ -439,16 +773,13 @@ export const WebLink = Link.extend({
           // Skip if this exact link existed before
           if (oldLinkPositions.has(key)) return true;
 
-          // Skip if displayMode is explicitly set to 'chip' (user converted from unfurl)
+          // Only unfurl if displayMode is 'unfurl' (baked in by displayModeBakeInPlugin)
           const displayMode = linkMark.attrs['displayMode'] as string | undefined;
-          if (displayMode === 'chip') return true;
+          if (displayMode !== 'unfurl') return true;
 
-          // Check context - only unfurl in paragraph with single link
+          // Check context - only unfurl in paragraph
           const context = detectLinkContext(newState, pos);
           if (context !== 'paragraph') return true;
-
-          const linkCount = countLinksInParagraph(newState, pos);
-          if (linkCount !== 1) return true;
 
           // Find the end of the paragraph
           const $pos = newState.doc.resolve(pos);
@@ -501,7 +832,7 @@ export const WebLink = Link.extend({
     });
 
     // Put our plugins BEFORE parentPlugins so they run first
-    // Order: click handler, chip decorations, auto-unfurl, then parent plugins
-    return [clickPlugin, chipPlugin, autoUnfurlPlugin, ...parentPlugins];
+    // Order: click handler, chip decorations, displayMode bake-in, auto-unfurl, then parent plugins
+    return [clickPlugin, chipPlugin, displayModeBakeInPlugin, autoUnfurlPlugin, ...parentPlugins];
   },
 });

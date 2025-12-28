@@ -5,12 +5,14 @@
  * Shows on hover over link chips.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Box, Paper, Typography, IconButton, Tooltip, Skeleton } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LinkIcon from '@mui/icons-material/Link';
 import ViewAgendaOutlinedIcon from '@mui/icons-material/ViewAgendaOutlined';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
 
 /**
  * Preview data for a link (derived from oEmbed response)
@@ -47,6 +49,8 @@ export interface LinkPreviewCardProps {
   onOpenInBrowser?: () => void;
   /** Callback to expand this chip to a full unfurl card */
   onExpandToCard?: () => void;
+  /** Callback to convert to plain link */
+  onConvertToPlainLink?: () => void;
   /** Whether expand to card option should be shown (only valid in certain contexts) */
   showExpandOption?: boolean;
 }
@@ -179,9 +183,11 @@ export const LinkPreviewCard: React.FC<LinkPreviewCardProps> = ({
   onRefresh,
   onOpenInBrowser,
   onExpandToCard,
+  onConvertToPlainLink,
   showExpandOption = false,
 }) => {
   const domain = extractDomain(url);
+  const [copied, setCopied] = useState(false);
 
   const handleOpenInBrowser = useCallback(() => {
     if (onOpenInBrowser) {
@@ -194,6 +200,14 @@ export const LinkPreviewCard: React.FC<LinkPreviewCardProps> = ({
   const handleRefresh = useCallback(() => {
     onRefresh?.();
   }, [onRefresh]);
+
+  const handleCopyUrl = useCallback(() => {
+    void window.electronAPI.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  }, [url]);
 
   return (
     <Paper
@@ -332,6 +346,20 @@ export const LinkPreviewCard: React.FC<LinkPreviewCardProps> = ({
                       </IconButton>
                     </Tooltip>
                   )}
+                  <Tooltip title={copied ? 'Copied!' : 'Copy URL'}>
+                    <IconButton
+                      size="small"
+                      onClick={handleCopyUrl}
+                      aria-label="Copy URL"
+                      sx={copied ? { color: 'success.main' } : {}}
+                    >
+                      {copied ? (
+                        <CheckIcon fontSize="small" />
+                      ) : (
+                        <ContentCopyIcon fontSize="small" />
+                      )}
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Open in browser">
                     <IconButton
                       size="small"
@@ -345,6 +373,17 @@ export const LinkPreviewCard: React.FC<LinkPreviewCardProps> = ({
                     <Tooltip title="Refresh preview">
                       <IconButton size="small" onClick={handleRefresh} aria-label="Refresh preview">
                         <RefreshIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {onConvertToPlainLink && (
+                    <Tooltip title="Convert to plain link">
+                      <IconButton
+                        size="small"
+                        onClick={onConvertToPlainLink}
+                        aria-label="Convert to plain link"
+                      >
+                        <LinkIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   )}
@@ -366,6 +405,23 @@ export const LinkPreviewCard: React.FC<LinkPreviewCardProps> = ({
                   borderColor: 'divider',
                 }}
               >
+                {showExpandOption && onExpandToCard && (
+                  <Tooltip title="Expand to card">
+                    <IconButton size="small" onClick={onExpandToCard} aria-label="Expand to card">
+                      <ViewAgendaOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title={copied ? 'Copied!' : 'Copy URL'}>
+                  <IconButton
+                    size="small"
+                    onClick={handleCopyUrl}
+                    aria-label="Copy URL"
+                    sx={copied ? { color: 'success.main' } : {}}
+                  >
+                    {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Open in browser">
                   <IconButton
                     size="small"
@@ -379,6 +435,17 @@ export const LinkPreviewCard: React.FC<LinkPreviewCardProps> = ({
                   <Tooltip title="Refresh preview">
                     <IconButton size="small" onClick={handleRefresh} aria-label="Refresh preview">
                       <RefreshIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {onConvertToPlainLink && (
+                  <Tooltip title="Convert to plain link">
+                    <IconButton
+                      size="small"
+                      onClick={onConvertToPlainLink}
+                      aria-label="Convert to plain link"
+                    >
+                      <LinkIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 )}

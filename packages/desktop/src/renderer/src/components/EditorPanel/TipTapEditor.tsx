@@ -47,7 +47,9 @@ import { useEditorLinkPopovers } from './useEditorLinkPopovers';
 import {
   useChipHoverPreview,
   CHIP_EXPAND_TO_CARD_EVENT,
+  CHIP_CONVERT_TO_PLAIN_LINK_EVENT,
   type ChipExpandToCardEventDetail,
+  type ChipConvertToPlainLinkEventDetail,
 } from './useChipHoverPreview';
 import { detectLinkContext, countLinksInParagraph } from './utils/linkContext';
 import { ImageLightbox } from './ImageLightbox';
@@ -456,6 +458,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             if (items.length > 0) {
               results.push(items.join('\n'));
             }
+          } else if (nodeType === 'oembedUnfurl') {
+            // For oEmbed unfurl blocks, return the URL (title is in the HTML format)
+            const url = node.attrs['url'] as string | undefined;
+            if (url) {
+              results.push(url);
+            }
           } else {
             // For paragraphs, headings, etc - get text content
             const text = getTextContent(node).trim();
@@ -716,39 +724,25 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       if (!editor) return;
 
       const customEvent = event as CustomEvent<ChipExpandToCardEventDetail>;
-      const { url } = customEvent.detail;
+      const { url, linkFrom, linkTo } = customEvent.detail;
 
-      // Find the link with this URL in the document
-      let linkPos: number | null = null;
-      let paragraphEnd: number | null = null;
-      let canExpand = false;
+      // Verify the link still exists at this position
+      const node = editor.state.doc.nodeAt(linkFrom);
+      if (!node?.isText) return;
 
-      editor.state.doc.descendants((node, pos) => {
-        if (linkPos !== null) return false; // Already found
-        if (!node.isText) return true;
+      const linkMark = node.marks.find((m) => m.type.name === 'link');
+      if (linkMark?.attrs['href'] !== url) return;
 
-        const linkMark = node.marks.find((m) => m.type.name === 'link');
-        if (linkMark?.attrs['href'] !== url) return true;
+      // Check context - only expand if in paragraph with single link
+      const context = detectLinkContext(editor.state, linkFrom);
+      if (context !== 'paragraph') return;
 
-        // Check context - only expand if in paragraph with single link
-        const context = detectLinkContext(editor.state, pos);
-        if (context !== 'paragraph') return true;
+      const linkCount = countLinksInParagraph(editor.state, linkFrom);
+      if (linkCount !== 1) return;
 
-        const linkCount = countLinksInParagraph(editor.state, pos);
-        if (linkCount !== 1) return true;
-
-        // Found a valid link to expand
-        linkPos = pos;
-        const $pos = editor.state.doc.resolve(pos);
-        paragraphEnd = $pos.end($pos.depth);
-        canExpand = true;
-        return false; // Stop searching
-      });
-
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- ESLint can't track mutations in synchronous callbacks
-      if (!canExpand || linkPos === null || paragraphEnd === null) {
-        return;
-      }
+      // Get paragraph end
+      const $pos = editor.state.doc.resolve(linkFrom);
+      const paragraphEnd = $pos.end($pos.depth);
 
       // Create transaction to insert unfurl block
       let tr = editor.state.tr;
@@ -760,24 +754,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           url,
           isLoading: true,
         });
-        tr = tr.insert((paragraphEnd as number) + 1, unfurlNode);
+        tr = tr.insert(paragraphEnd + 1, unfurlNode);
       }
 
-      // Update link displayMode to 'unfurl'
-      editor.state.doc.descendants((node, pos) => {
-        if (!node.isText) return true;
-        const linkMark = node.marks.find((m) => m.type.name === 'link');
-        if (linkMark?.attrs['href'] !== url) return true;
-
-        const newMark = linkMark.type.create({
-          ...linkMark.attrs,
-          displayMode: 'unfurl',
-        });
-        const nodeEnd = pos + node.nodeSize;
-        tr = tr.removeMark(pos, nodeEnd, linkMark.type);
-        tr = tr.addMark(pos, nodeEnd, newMark);
-        return true;
+      // Update ONLY this specific link's displayMode to 'unfurl'
+      const newMark = linkMark.type.create({
+        ...linkMark.attrs,
+        displayMode: 'unfurl',
       });
+      tr = tr.removeMark(linkFrom, linkTo, linkMark.type);
+      tr = tr.addMark(linkFrom, linkTo, newMark);
 
       editor.view.dispatch(tr);
     };
@@ -785,6 +771,40 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     document.addEventListener(CHIP_EXPAND_TO_CARD_EVENT, handleExpandToCard);
     return () => {
       document.removeEventListener(CHIP_EXPAND_TO_CARD_EVENT, handleExpandToCard);
+    };
+  }, [editor]);
+
+  // Handle chip convert to plain link event
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!editor) return;
+
+    const handleConvertToPlainLink = (e: Event): void => {
+      const event = e as CustomEvent<ChipConvertToPlainLinkEventDetail>;
+      const { url, linkFrom, linkTo } = event.detail;
+
+      // Verify the link still exists at this position
+      const node = editor.state.doc.nodeAt(linkFrom);
+      if (!node?.isText) return;
+
+      const linkMark = node.marks.find((m) => m.type.name === 'link');
+      if (linkMark?.attrs['href'] !== url) return;
+
+      // Update ONLY this specific link's displayMode to 'link'
+      let tr = editor.state.tr;
+      const newMark = linkMark.type.create({
+        ...linkMark.attrs,
+        displayMode: 'link',
+      });
+      tr = tr.removeMark(linkFrom, linkTo, linkMark.type);
+      tr = tr.addMark(linkFrom, linkTo, newMark);
+
+      editor.view.dispatch(tr);
+    };
+
+    document.addEventListener(CHIP_CONVERT_TO_PLAIN_LINK_EVENT, handleConvertToPlainLink);
+    return () => {
+      document.removeEventListener(CHIP_CONVERT_TO_PLAIN_LINK_EVENT, handleConvertToPlainLink);
     };
   }, [editor]);
 

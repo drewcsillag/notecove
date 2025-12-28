@@ -256,13 +256,53 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
       },
-      // Hidden web link text (when displaying as chip)
+      // Copy button for link chips - hidden by default, shown on hover
+      '& .link-chip-copy': {
+        display: 'none',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '18px',
+        height: '18px',
+        marginLeft: '4px',
+        padding: 0,
+        border: 'none',
+        borderRadius: '4px',
+        backgroundColor: 'transparent',
+        color: theme.palette.text.secondary,
+        cursor: 'pointer',
+        flexShrink: 0,
+        transition: 'color 0.15s ease, background-color 0.15s ease',
+        '& svg': {
+          width: '12px',
+          height: '12px',
+        },
+        '&:hover': {
+          backgroundColor:
+            theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+          color: theme.palette.text.primary,
+        },
+        '&:active': {
+          backgroundColor:
+            theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)',
+        },
+      },
+      // Show copy button on chip hover
+      '& .link-chip:hover .link-chip-copy': {
+        display: 'inline-flex',
+      },
+      // Copied state for copy button
+      '& .link-chip-copy--copied': {
+        color: `${theme.palette.success.main} !important`,
+      },
+      // Hidden web link text (when displaying as chip or unfurl)
       // Using font-size: 0 to keep element in document flow for cursor positioning
+      // Uses !important to override link-specific styles (a.web-link has higher specificity)
       '& .web-link-hidden': {
-        fontSize: 0,
-        letterSpacing: 0,
-        lineHeight: 0,
-        color: 'transparent',
+        fontSize: '0 !important',
+        letterSpacing: '0 !important',
+        lineHeight: '0 !important',
+        color: 'transparent !important',
+        textDecoration: 'none !important',
       },
       // OEmbedUnfurl wrapper - block-level link preview cards
       '& .oembed-unfurl-wrapper': {

@@ -8,6 +8,8 @@
  */
 
 import type { EditorState } from '@tiptap/pm/state';
+import type { LinkDisplayPreference } from '@notecove/shared';
+import { getCurrentLinkDisplayPreference } from '../../../contexts/LinkDisplayPreferenceContext';
 
 /**
  * The type of block context a link appears in
@@ -80,12 +82,35 @@ export function detectLinkContext(state: EditorState, pos: number): LinkContext 
 }
 
 /**
- * Get the default display mode based on link context
+ * Get the default display mode based on link context and global user preference
  *
  * @param context - The detected link context
+ * @param globalPreference - The user's global preference from settings
  * @returns The default display mode for that context
  */
-export function getDefaultDisplayMode(context: LinkContext): LinkDisplayMode {
+export function getDefaultDisplayMode(
+  context: LinkContext,
+  globalPreference?: LinkDisplayPreference
+): LinkDisplayMode {
+  // Get the global preference if not provided
+  const preference = globalPreference ?? getCurrentLinkDisplayPreference();
+
+  // If user wants no decoration (none or secure), always return 'link'
+  if (preference === 'none' || preference === 'secure') {
+    return 'link';
+  }
+
+  // Code blocks never get decorations
+  if (context === 'code') {
+    return 'link';
+  }
+
+  // If user wants chips only, return 'chip' for all decorated contexts
+  if (preference === 'chip') {
+    return 'chip';
+  }
+
+  // User wants unfurl - use unfurl for paragraphs, chip for structured contexts
   switch (context) {
     case 'heading':
       return 'chip';
@@ -96,10 +121,8 @@ export function getDefaultDisplayMode(context: LinkContext): LinkDisplayMode {
     case 'table':
       return 'chip';
     case 'paragraph':
-      // Use chip for now; unfurl can be added later as user preference
-      return 'chip';
-    case 'code':
-      return 'link'; // No decoration in code blocks
+      // Unfurl for standalone paragraphs
+      return 'unfurl';
     case 'other':
       return 'chip';
   }
@@ -145,23 +168,38 @@ export function countLinksInParagraph(state: EditorState, pos: number): number {
 
 /**
  * Determine the effective display mode for a link, considering:
- * 1. User preference (from displayMode attribute)
- * 2. Context (heading, list, paragraph, etc.)
- * 3. Multiple links in same paragraph (forces chip mode)
+ * 1. Global user preference from settings
+ * 2. Per-link displayMode attribute (if explicitly set)
+ * 3. Context (heading, list, paragraph, etc.)
+ * 4. Multiple links in same paragraph (forces chip mode when unfurl would be used)
  *
  * @param state - The editor state
  * @param pos - The position of the link
- * @param userPreference - The user's explicit preference ('auto', 'chip', 'unfurl', 'link')
+ * @param perLinkPreference - The per-link display mode ('auto', 'chip', 'unfurl', 'link')
  * @returns The effective display mode to use
  */
 export function getEffectiveDisplayMode(
   state: EditorState,
   pos: number,
-  userPreference: 'auto' | 'chip' | 'unfurl' | 'link' = 'auto'
+  perLinkPreference: 'auto' | 'chip' | 'unfurl' | 'link' = 'auto'
 ): LinkDisplayMode {
-  // If user explicitly chose a mode, respect it
-  if (userPreference !== 'auto') {
-    return userPreference;
+  // Get global preference
+  const globalPreference = getCurrentLinkDisplayPreference();
+
+  // If global preference is 'secure', always use plain links (overrides per-link settings)
+  if (globalPreference === 'secure') {
+    return 'link';
+  }
+
+  // If per-link preference is explicitly set (not 'auto'), respect it
+  // This ensures existing notes don't change when settings change
+  if (perLinkPreference !== 'auto') {
+    return perLinkPreference;
+  }
+
+  // If global preference is 'none', use plain links for new links with 'auto'
+  if (globalPreference === 'none') {
+    return 'link';
   }
 
   // Detect context
@@ -172,14 +210,15 @@ export function getEffectiveDisplayMode(
     return 'link';
   }
 
-  // Get default mode for this context
-  const defaultMode = getDefaultDisplayMode(context);
+  // Get default mode for this context (respects global preference)
+  const defaultMode = getDefaultDisplayMode(context, globalPreference);
 
   // If default mode would be unfurl, check for multiple links
   if (defaultMode === 'unfurl') {
     const linkCount = countLinksInParagraph(state, pos);
     if (linkCount > 1) {
       // Multiple links in paragraph: use chips instead
+      // (We're here because globalPreference is 'unfurl', so chip is a valid fallback)
       return 'chip';
     }
   }

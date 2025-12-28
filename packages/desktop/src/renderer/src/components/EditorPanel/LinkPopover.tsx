@@ -21,6 +21,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import LabelIcon from '@mui/icons-material/Label';
+import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 
 export interface LinkPopoverProps {
   /**
@@ -42,6 +44,21 @@ export interface LinkPopoverProps {
    * Callback to edit the link URL
    */
   onEdit?: (newHref: string) => void;
+
+  /**
+   * Callback to convert link to chip display mode
+   */
+  onConvertToChip?: () => void;
+
+  /**
+   * Callback to convert link to unfurl display mode
+   */
+  onConvertToUnfurl?: () => void;
+
+  /**
+   * Whether to show convert buttons (hidden in secure mode)
+   */
+  showConvertButtons?: boolean;
 }
 
 /**
@@ -53,7 +70,15 @@ export interface LinkPopoverProps {
  * - Edit: Change the link URL (inline input)
  * - Remove: Remove the link but keep the text
  */
-export const LinkPopover: React.FC<LinkPopoverProps> = ({ href, onClose, onRemove, onEdit }) => {
+export const LinkPopover: React.FC<LinkPopoverProps> = ({
+  href,
+  onClose,
+  onRemove,
+  onEdit,
+  onConvertToChip,
+  onConvertToUnfurl,
+  showConvertButtons = false,
+}) => {
   const [showCopiedSnackbar, setShowCopiedSnackbar] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(href);
@@ -129,6 +154,24 @@ export const LinkPopover: React.FC<LinkPopoverProps> = ({ href, onClose, onRemov
     onRemove?.();
     onClose();
   }, [onRemove, onClose]);
+
+  /**
+   * Handle convert to chip action
+   */
+  const handleConvertToChip = useCallback(() => {
+    console.log('[LinkPopover] Converting to chip');
+    onConvertToChip?.();
+    onClose();
+  }, [onConvertToChip, onClose]);
+
+  /**
+   * Handle convert to unfurl action
+   */
+  const handleConvertToUnfurl = useCallback(() => {
+    console.log('[LinkPopover] Converting to unfurl');
+    onConvertToUnfurl?.();
+    onClose();
+  }, [onConvertToUnfurl, onClose]);
 
   /**
    * Handle keyboard events in edit mode
@@ -223,6 +266,32 @@ export const LinkPopover: React.FC<LinkPopoverProps> = ({ href, onClose, onRemov
                 <ContentCopyIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+
+            {/* Convert to chip button (only shown when not in secure mode) */}
+            {showConvertButtons && onConvertToChip && (
+              <Tooltip title="Convert to chip">
+                <IconButton
+                  size="small"
+                  onClick={handleConvertToChip}
+                  aria-label="Convert link to chip"
+                >
+                  <LabelIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {/* Convert to unfurl button (only shown when not in secure mode) */}
+            {showConvertButtons && onConvertToUnfurl && (
+              <Tooltip title="Convert to card">
+                <IconButton
+                  size="small"
+                  onClick={handleConvertToUnfurl}
+                  aria-label="Convert link to card"
+                >
+                  <ViewAgendaIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
 
             {/* Edit button */}
             {onEdit && (

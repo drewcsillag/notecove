@@ -11,6 +11,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LabelIcon from '@mui/icons-material/Label';
+import LinkIcon from '@mui/icons-material/Link';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 /**
@@ -39,6 +40,8 @@ export interface VideoEmbedProps {
   onOpenInBrowser?: () => void;
   /** Callback to convert to chip */
   onConvertToChip?: () => void;
+  /** Callback to convert to plain link */
+  onConvertToPlainLink?: () => void;
 }
 
 /**
@@ -56,6 +59,7 @@ export const VideoEmbed: React.FC<VideoEmbedProps> = ({
   onDelete,
   onOpenInBrowser,
   onConvertToChip,
+  onConvertToPlainLink,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -159,6 +163,18 @@ export const VideoEmbed: React.FC<VideoEmbedProps> = ({
                 sx={{ color: 'white' }}
               >
                 <LabelIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {onConvertToPlainLink && (
+            <Tooltip title="Convert to plain link">
+              <IconButton
+                size="small"
+                onClick={onConvertToPlainLink}
+                aria-label="Convert to plain link"
+                sx={{ color: 'white' }}
+              >
+                <LinkIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
           )}

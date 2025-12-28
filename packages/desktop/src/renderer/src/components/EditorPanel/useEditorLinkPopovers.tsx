@@ -14,6 +14,8 @@ import { createFloatingPopup, type FloatingPopup } from './extensions/utils/floa
 import { LinkPopover } from './LinkPopover';
 import { LinkInputPopover } from './LinkInputPopover';
 import { TextAndUrlInputPopover } from './TextAndUrlInputPopover';
+import { getCurrentLinkDisplayPreference } from '../../contexts/LinkDisplayPreferenceContext';
+import { detectLinkContext, countLinksInParagraph } from './utils/linkContext';
 
 /**
  * State for the link view/edit popover (shown when clicking existing links)
@@ -127,6 +129,10 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
     });
     linkPopoverRef.current = popup;
 
+    // Check if we should show convert buttons (not in secure mode)
+    const globalPreference = getCurrentLinkDisplayPreference();
+    const showConvertButtons = globalPreference !== 'secure';
+
     // Render the React component into the container
     void import('react-dom/client').then(({ createRoot }) => {
       const root = createRoot(container);
@@ -155,6 +161,71 @@ export function useEditorLinkPopovers(editor: Editor | null): UseEditorLinkPopov
               .extendMarkRange('link')
               .unsetLink()
               .run();
+          }}
+          showConvertButtons={showConvertButtons}
+          onConvertToChip={() => {
+            console.log('[useEditorLinkPopovers] Converting to chip:', from, '-', to);
+            // Update the link mark's displayMode to 'chip'
+            // We need to use the ProseMirror API directly since TipTap's setLink
+            // doesn't know about our custom displayMode attribute
+            const { state, dispatch } = currentEditor.view;
+            const linkMarkType = state.schema.marks['link'];
+            if (!linkMarkType) return;
+
+            // Create a new mark with displayMode: 'chip'
+            const newMark = linkMarkType.create({ href, displayMode: 'chip' });
+
+            // Remove old link mark and add new one
+            let tr = state.tr;
+            tr = tr.removeMark(from, to, linkMarkType);
+            tr = tr.addMark(from, to, newMark);
+            dispatch(tr);
+            currentEditor.commands.focus();
+          }}
+          onConvertToUnfurl={() => {
+            console.log('[useEditorLinkPopovers] Converting to unfurl:', from, '-', to);
+            const { state, dispatch } = currentEditor.view;
+            const linkMarkType = state.schema.marks['link'];
+            if (!linkMarkType) return;
+
+            // Check context - only expand if in paragraph with single link
+            const context = detectLinkContext(state, from);
+            if (context !== 'paragraph') {
+              console.log('[useEditorLinkPopovers] Not in paragraph, cannot convert to unfurl');
+              return;
+            }
+
+            const linkCount = countLinksInParagraph(state, from);
+            if (linkCount !== 1) {
+              console.log(
+                '[useEditorLinkPopovers] Multiple links in paragraph, cannot convert to unfurl'
+              );
+              return;
+            }
+
+            // Get paragraph end to insert unfurl block after it
+            const $pos = state.doc.resolve(from);
+            const paragraphEnd = $pos.end($pos.depth);
+
+            let tr = state.tr;
+
+            // Insert unfurl block after paragraph
+            const unfurlType = state.schema.nodes['oembedUnfurl'];
+            if (unfurlType) {
+              const unfurlNode = unfurlType.create({
+                url: href,
+                isLoading: true,
+              });
+              tr = tr.insert(paragraphEnd + 1, unfurlNode);
+            }
+
+            // Update the link mark's displayMode to 'unfurl'
+            const newMark = linkMarkType.create({ href, displayMode: 'unfurl' });
+            tr = tr.removeMark(from, to, linkMarkType);
+            tr = tr.addMark(from, to, newMark);
+
+            dispatch(tr);
+            currentEditor.commands.focus();
           }}
         />
       );

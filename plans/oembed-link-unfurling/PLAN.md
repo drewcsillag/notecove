@@ -1,6 +1,6 @@
 # oEmbed Link Unfurling - Implementation Plan
 
-**Overall Progress:** `90%`
+**Overall Progress:** `92%`
 
 ## Summary
 
@@ -35,7 +35,8 @@ Implement oEmbed-based link unfurling in the note editor, allowing links to disp
 | 2     | Link Chips (inline, hover preview)  | ✅ Complete |
 | 3     | Full Unfurl Cards (block-level)     | ✅ Complete |
 | 4     | Video/Rich Embeds (iframe, players) | ✅ Complete |
-| 5     | Registry Updates & Polish           | 🟥 To Do    |
+| 5     | Registry Updates & Polish           | 🟡 Partial  |
+| 6     | CI Stabilization & Test Fixes       | 🟥 To Do    |
 
 ---
 
@@ -230,7 +231,7 @@ See: [PLAN-PHASE-4.md](./PLAN-PHASE-4.md)
 
 ---
 
-## Phase 5: Registry Updates & Polish
+## Phase 5: Registry Updates & Polish 🟡
 
 **Goal**: Keep registry updated and add user preferences.
 
@@ -244,28 +245,29 @@ See: [PLAN-PHASE-5.md](./PLAN-PHASE-5.md)
   - [ ] 🟥 Download and merge updates
   - [ ] 🟥 Write tests
 
-- [ ] 🟥 **5.2 User Preferences**
-  - [ ] 🟥 Add oEmbed settings to preferences
-  - [ ] 🟥 Discovery enabled/disabled toggle
-  - [ ] 🟥 Default display mode preference
+- [x] ✅ **5.2 User Preferences**
+  - [x] ✅ Add oEmbed settings to preferences (OEmbedSettings component)
+  - [x] ✅ Default display mode preference (none, chip, unfurl, secure)
+  - [x] ✅ LinkDisplayPreferenceContext for global state management
+  - [ ] 🟥 Discovery enabled/disabled toggle (deferred)
   - [ ] 🟥 Write tests
 
-- [ ] 🟥 **5.3 Cache Management**
-  - [ ] 🟥 Add "Refresh all" option in preferences
-  - [ ] 🟥 Add "Clear cache" option
-  - [ ] 🟥 Show cache stats (count, size)
-  - [ ] 🟥 Write tests
+- [x] ✅ **5.3 Cache Management**
+  - [x] ✅ Add Cache Browser dialog (CacheBrowserDialog component)
+  - [x] ✅ Browse favicons, thumbnails, fetch cache
+  - [x] ✅ Delete individual cache entries
+  - [ ] 🟥 Add "Refresh all" option
+  - [ ] 🟥 Show cache size stats
 
-- [ ] 🟥 **5.4 Error Handling Polish**
-  - [ ] 🟥 Graceful degradation when fetch fails
-  - [ ] 🟥 Retry logic with exponential backoff
-  - [ ] 🟥 User-friendly error messages
-  - [ ] 🟥 Write tests
+- [x] ✅ **5.4 Error Handling Polish**
+  - [x] ✅ Graceful degradation for NOT_FOUND and INVALID_RESPONSE (auto-convert to plain link)
+  - [x] ✅ Show error state for retryable errors (NETWORK_ERROR, TIMEOUT, OFFLINE)
+  - [x] ✅ "Show as Link" button for manual conversion
+  - [ ] 🟥 Retry logic with exponential backoff (deferred)
 
-- [ ] 🟥 **5.5 Export Behavior**
-  - [ ] 🟥 Markdown export: unfurl → `[Title](url)`
+- [x] ✅ **5.5 Export Behavior**
+  - [x] ✅ Markdown export: unfurl → `[Title](url)` (markdown-export.ts updated)
   - [ ] 🟥 Clipboard: rich format with plain fallback
-  - [ ] 🟥 Write tests
 
 - [ ] 🟥 **5.6 Offline Handling**
   - [ ] 🟥 Show "Offline" state for new links
@@ -275,6 +277,37 @@ See: [PLAN-PHASE-5.md](./PLAN-PHASE-5.md)
 - [ ] 🟥 **5.7 Documentation**
   - [ ] 🟥 Update website docs with oEmbed feature
   - [ ] 🟥 Add screenshots
+
+---
+
+## Phase 6: CI Stabilization & Test Fixes 🟥
+
+**Goal**: Fix flaky E2E tests and prevent Electron crash dialogs during testing.
+
+### Tasks
+
+- [x] ✅ **6.1 Link Display Preference in Tests**
+  - [x] ✅ Update web-links.spec.ts to set preference to 'none'
+  - [x] ✅ Update tags.spec.ts to set preference to 'none'
+  - [x] ✅ Reload page after setting preference for context sync
+
+- [ ] 🟥 **6.2 Electron Crash Dialog Prevention**
+  - [ ] 🟥 Add --disable-session-restore flag to Electron in tests
+  - [ ] 🟥 Clear session state before test runs
+  - [ ] 🟥 Investigate cause of "unexpectedly quit" dialogs
+
+- [ ] 🟥 **6.3 Flaky E2E Test Fixes**
+  - [ ] 🟥 cross-machine-sync-deletion tests (visibility issues)
+  - [ ] 🟥 cross-sd-move-sync tests (timeout issues)
+  - [ ] 🟥 folders tests (timeout issues)
+  - [ ] 🟥 history tests (restoration issues)
+  - [ ] 🟥 markdown-export tests (visibility issues)
+  - [ ] 🟥 note-switching tests (multi-window issues)
+
+- [ ] 🟥 **6.4 Test Infrastructure Improvements**
+  - [ ] 🟥 Add test stability metrics
+  - [ ] 🟥 Improve error messages for E2E failures
+  - [ ] 🟥 Add retry logic for known flaky scenarios
 
 ---
 

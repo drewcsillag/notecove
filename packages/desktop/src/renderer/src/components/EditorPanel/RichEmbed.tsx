@@ -11,6 +11,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LabelIcon from '@mui/icons-material/Label';
+import LinkIcon from '@mui/icons-material/Link';
 import { isAllowedRichProvider } from './utils/providerEmbed';
 
 /**
@@ -41,6 +42,8 @@ export interface RichEmbedProps {
   onOpenInBrowser?: () => void;
   /** Callback to convert to chip */
   onConvertToChip?: () => void;
+  /** Callback to convert to plain link */
+  onConvertToPlainLink?: () => void;
 }
 
 /**
@@ -59,6 +62,7 @@ export const RichEmbed: React.FC<RichEmbedProps> = ({
   onDelete,
   onOpenInBrowser,
   onConvertToChip,
+  onConvertToPlainLink,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,8 +103,8 @@ export const RichEmbed: React.FC<RichEmbedProps> = ({
   useEffect(() => {
     const handleMessage = (event: MessageEvent<unknown>): void => {
       const data = event.data as Record<string, unknown> | null;
-      if (data?.type === 'resize' && typeof data.height === 'number') {
-        setIframeHeight(Math.min(data.height, 800));
+      if (data?.['type'] === 'resize' && typeof data['height'] === 'number') {
+        setIframeHeight(Math.min(data['height'], 800));
       }
     };
 
@@ -232,6 +236,17 @@ export const RichEmbed: React.FC<RichEmbedProps> = ({
             <Tooltip title="Convert to chip">
               <IconButton size="small" onClick={onConvertToChip} aria-label="Convert to chip">
                 <LabelIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {onConvertToPlainLink && (
+            <Tooltip title="Convert to plain link">
+              <IconButton
+                size="small"
+                onClick={onConvertToPlainLink}
+                aria-label="Convert to plain link"
+              >
+                <LinkIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
           )}

@@ -660,6 +660,99 @@ describe('prosemirrorToMarkdown', () => {
     });
   });
 
+  describe('oembedUnfurl nodes', () => {
+    it('should convert unfurl with title to markdown link', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+              title: 'Rick Astley - Never Gonna Give You Up',
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe(
+        '[Rick Astley - Never Gonna Give You Up](https://www.youtube.com/watch?v=dQw4w9WgXcQ)'
+      );
+    });
+
+    it('should use URL as title when no title available', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://example.com/article',
+              title: null,
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[https://example.com/article](https://example.com/article)');
+    });
+
+    it('should handle empty URL', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: '',
+              title: 'Some Title',
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('');
+    });
+
+    it('should escape brackets in title', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://example.com',
+              title: 'Article [Part 1]',
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[Article \\[Part 1\\]](https://example.com)');
+    });
+
+    it('should handle unfurl with other attributes', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://github.com/anthropics/claude-code',
+              title: 'Claude Code Repository',
+              description: 'CLI for Claude',
+              providerName: 'GitHub',
+              thumbnailUrl: 'https://example.com/thumb.jpg',
+            },
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      // Only URL and title are used in markdown export
+      expect(result).toBe('[Claude Code Repository](https://github.com/anthropics/claude-code)');
+    });
+  });
+
   describe('unknown node types', () => {
     it('should extract text content from unknown nodes', () => {
       const content = {

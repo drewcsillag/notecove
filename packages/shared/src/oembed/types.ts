@@ -233,3 +233,52 @@ export interface OEmbedCacheStats {
     count: number;
   };
 }
+
+// ============================================================================
+// Error Handling Utilities
+// ============================================================================
+
+/**
+ * Check if an error type is retryable
+ */
+export function isRetryableError(errorType: OEmbedErrorType | undefined): boolean {
+  if (!errorType) return false;
+  return ['NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMITED', 'OFFLINE'].includes(errorType);
+}
+
+/**
+ * Get a user-friendly error message for an error type
+ */
+export function getOEmbedErrorMessage(errorType: OEmbedErrorType | undefined): string {
+  switch (errorType) {
+    case 'NETWORK_ERROR':
+      return 'Unable to connect. Check your internet connection.';
+    case 'TIMEOUT':
+      return 'Request timed out. The site may be slow.';
+    case 'PROVIDER_ERROR':
+      return 'The site returned an error.';
+    case 'INVALID_RESPONSE':
+      return "This site doesn't support link previews.";
+    case 'NOT_FOUND':
+      return 'Preview not available for this link.';
+    case 'RATE_LIMITED':
+      return 'Too many requests. Try again later.';
+    case 'OFFLINE':
+      return 'You are offline. Preview will load when connected.';
+    default:
+      return 'Something went wrong.';
+  }
+}
+
+// ============================================================================
+// User Preference Types
+// ============================================================================
+
+/**
+ * User preference for how links should be displayed.
+ * - 'none': Plain text links only (no chips, no unfurls), but allows conversion
+ * - 'chip': Show compact chips for links where applicable
+ * - 'unfurl': Show full preview cards when available
+ * - 'secure': Plain links only, no network requests, no conversion options
+ */
+export type LinkDisplayPreference = 'none' | 'chip' | 'unfurl' | 'secure';

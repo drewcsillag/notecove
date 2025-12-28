@@ -3,7 +3,6 @@
  *
  * Visual/theme settings:
  * - Dark mode toggle
- * - (Future: custom colors, font size, etc.)
  */
 
 import React from 'react';

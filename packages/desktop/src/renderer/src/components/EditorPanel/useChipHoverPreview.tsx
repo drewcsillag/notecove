@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createFloatingPopup, type FloatingPopup } from './extensions/utils/floating-popup';
 import { LinkPreviewCard, type LinkPreviewData } from './LinkPreviewCard';
+import { getCurrentLinkDisplayPreference } from '../../contexts/LinkDisplayPreferenceContext';
 
 /**
  * Show delay before showing the preview (ms)
@@ -26,6 +27,10 @@ const HIDE_GRACE_MS = 300;
 interface ChipHoverState {
   url: string;
   element: HTMLElement;
+  /** Start position of the link in the document */
+  linkFrom: number;
+  /** End position of the link in the document */
+  linkTo: number;
   previewData?: LinkPreviewData;
   isLoading: boolean;
   error?: string;
@@ -55,10 +60,30 @@ export const CHIP_HOVER_LEAVE_EVENT = 'chip-hover-leave';
 export const CHIP_EXPAND_TO_CARD_EVENT = 'chip-expand-to-card';
 
 /**
+ * Event name for convert chip to plain link
+ */
+export const CHIP_CONVERT_TO_PLAIN_LINK_EVENT = 'chip-convert-to-plain-link';
+
+/**
  * Event detail for expand to card event
  */
 export interface ChipExpandToCardEventDetail {
   url: string;
+  /** Start position of the link in the document */
+  linkFrom: number;
+  /** End position of the link in the document */
+  linkTo: number;
+}
+
+/**
+ * Event detail for convert to plain link event
+ */
+export interface ChipConvertToPlainLinkEventDetail {
+  url: string;
+  /** Start position of the link in the document */
+  linkFrom: number;
+  /** End position of the link in the document */
+  linkTo: number;
 }
 
 /**
@@ -128,8 +153,19 @@ export function useChipHoverPreview(): void {
   // Handle hover enter
   const handleHoverEnter = useCallback(
     (event: Event) => {
+      // Skip hover preview in secure mode (no network requests, no previews)
+      if (getCurrentLinkDisplayPreference() === 'secure') {
+        return;
+      }
+
       const customEvent = event as CustomEvent<ChipHoverEventDetail>;
       const { url, element } = customEvent.detail;
+
+      // Extract position from data attributes
+      const linkFromAttr = element.getAttribute('data-link-from');
+      const linkToAttr = element.getAttribute('data-link-to');
+      const linkFrom = linkFromAttr ? parseInt(linkFromAttr, 10) : 0;
+      const linkTo = linkToAttr ? parseInt(linkToAttr, 10) : 0;
 
       // Clear any pending hide timeout
       if (hideTimeoutRef.current) {
@@ -137,7 +173,7 @@ export function useChipHoverPreview(): void {
         hideTimeoutRef.current = null;
       }
 
-      // If already showing this URL, do nothing
+      // If already showing this URL at the same position, do nothing
       if (currentUrlRef.current === url && popupRef.current) {
         return;
       }
@@ -159,6 +195,8 @@ export function useChipHoverPreview(): void {
         setHoverState({
           url,
           element,
+          linkFrom,
+          linkTo,
           isLoading: true,
         });
 
@@ -227,7 +265,7 @@ export function useChipHoverPreview(): void {
       return;
     }
 
-    const { url, element, previewData, isLoading, error } = hoverState;
+    const { url, element, linkFrom, linkTo, previewData, isLoading, error } = hoverState;
 
     // Create a container for the React component
     const container = document.createElement('div');
@@ -274,10 +312,27 @@ export function useChipHoverPreview(): void {
     // Handle expand to card
     const handleExpandToCard = (): void => {
       // Dispatch custom event for the editor to handle
+      // Include position so only this specific link is affected
       const event = new CustomEvent<ChipExpandToCardEventDetail>(CHIP_EXPAND_TO_CARD_EVENT, {
-        detail: { url },
+        detail: { url, linkFrom, linkTo },
         bubbles: true,
       });
+      document.dispatchEvent(event);
+      // Close the popup after dispatching
+      closePopup();
+    };
+
+    // Handle convert to plain link
+    const handleConvertToPlainLink = (): void => {
+      // Dispatch custom event for the editor to handle
+      // Include position so only this specific link is affected
+      const event = new CustomEvent<ChipConvertToPlainLinkEventDetail>(
+        CHIP_CONVERT_TO_PLAIN_LINK_EVENT,
+        {
+          detail: { url, linkFrom, linkTo },
+          bubbles: true,
+        }
+      );
       document.dispatchEvent(event);
       // Close the popup after dispatching
       closePopup();
@@ -325,6 +380,7 @@ export function useChipHoverPreview(): void {
           {...(error ? { error } : {})}
           showExpandOption={true}
           onExpandToCard={handleExpandToCard}
+          onConvertToPlainLink={handleConvertToPlainLink}
           onRefresh={handleRefresh}
         />
       );

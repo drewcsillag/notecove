@@ -137,9 +137,6 @@ describe('NotesListPanel', () => {
   });
 
   it('should show "No notes" when folder is empty', async () => {
-    // Use real timers for this test
-    jest.useRealTimers();
-
     mockElectronAPI.note.list.mockResolvedValue([]);
     mockElectronAPI.appState.get.mockImplementation((key: string) => {
       if (key === 'selectedFolderId') return Promise.resolve('all-notes');
@@ -148,6 +145,9 @@ describe('NotesListPanel', () => {
     });
 
     const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
+
+    // Flush pending promises and timers to allow async operations to complete
+    await jest.runAllTimersAsync();
 
     await waitFor(() => {
       expect(screen.getByText('No notes in this folder')).toBeInTheDocument();

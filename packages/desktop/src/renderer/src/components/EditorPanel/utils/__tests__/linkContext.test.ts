@@ -15,6 +15,11 @@ import {
   getEffectiveDisplayMode,
 } from '../linkContext';
 
+// Mock the global preference to return 'chip' by default for predictable tests
+jest.mock('../../../../contexts/LinkDisplayPreferenceContext', () => ({
+  getCurrentLinkDisplayPreference: jest.fn(() => 'chip'),
+}));
+
 describe('linkContext', () => {
   let editor: Editor | undefined;
 
@@ -150,8 +155,21 @@ describe('linkContext', () => {
       expect(getDefaultDisplayMode('table')).toBe('chip');
     });
 
-    it('should return chip for paragraph', () => {
+    it('should return chip for paragraph with chip preference (mocked)', () => {
+      // With 'chip' preference mocked, paragraph should return 'chip'
       expect(getDefaultDisplayMode('paragraph')).toBe('chip');
+    });
+
+    it('should return unfurl for paragraph with explicit unfurl preference', () => {
+      expect(getDefaultDisplayMode('paragraph', 'unfurl')).toBe('unfurl');
+    });
+
+    it('should return chip for paragraph with explicit chip preference', () => {
+      expect(getDefaultDisplayMode('paragraph', 'chip')).toBe('chip');
+    });
+
+    it('should return link for paragraph with explicit none preference', () => {
+      expect(getDefaultDisplayMode('paragraph', 'none')).toBe('link');
     });
 
     it('should return link for code', () => {

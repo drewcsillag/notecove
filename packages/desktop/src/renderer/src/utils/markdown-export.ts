@@ -86,6 +86,10 @@ function convertNode(
     case 'notecoveImage':
       return convertNotecoveImage(node);
 
+    // oEmbed unfurl block
+    case 'oembedUnfurl':
+      return convertOEmbedUnfurl(node);
+
     default:
       // For unknown nodes, try to extract text content
       if (node.content) {
@@ -430,6 +434,32 @@ function convertNotecoveImage(node: JSONContent): string {
   }
 
   return imgTag;
+}
+
+/**
+ * Convert oEmbed unfurl block to markdown link
+ *
+ * Export strategy:
+ * - Use the title from oEmbed data if available
+ * - Fall back to the URL if no title
+ * - Format as markdown link: [title](url)
+ */
+function convertOEmbedUnfurl(node: JSONContent): string {
+  const attrs = node.attrs ?? {};
+  const url = (attrs['url'] as string | undefined) ?? '';
+  const title = (attrs['title'] as string | undefined) ?? null;
+
+  if (!url) {
+    return '';
+  }
+
+  // Use title if available, otherwise use the URL as display text
+  const displayText = title ?? url;
+
+  // Escape special markdown characters in the title
+  const escapedTitle = displayText.replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+
+  return `[${escapedTitle}](${url})`;
 }
 
 /**

@@ -166,6 +166,7 @@ export enum AppStateKey {
   WindowStates = 'windowStates', // Array of WindowState for session restoration
   InstanceId = 'instanceId', // Unique per-installation identifier (separate from profileId)
   SelectedFolderId = 'selectedFolderId', // Currently selected folder in main window
+  LinkDisplayPreference = 'linkDisplayPreference', // 'none' | 'chip' | 'unfurl' | 'secure'
 }
 
 /**

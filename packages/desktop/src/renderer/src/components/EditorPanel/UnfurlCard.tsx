@@ -6,12 +6,15 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Box, Typography, IconButton, Tooltip, Skeleton } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip, Skeleton, Button } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LinkIcon from '@mui/icons-material/Link';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LabelIcon from '@mui/icons-material/Label';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import { type OEmbedErrorType, getOEmbedErrorMessage, isRetryableError } from '@notecove/shared';
 
 /**
  * Props for the UnfurlCard component
@@ -35,6 +38,8 @@ export interface UnfurlCardProps {
   isLoading?: boolean;
   /** Error message if fetch failed */
   error?: string | null;
+  /** Error type for friendly messages */
+  errorType?: OEmbedErrorType | null;
   /** Whether the node is selected in the editor */
   selected?: boolean;
   /** Callback to refresh the unfurl data */
@@ -45,6 +50,8 @@ export interface UnfurlCardProps {
   onOpenInBrowser?: () => void;
   /** Callback to convert to chip (removes unfurl, keeps link as chip) */
   onConvertToChip?: () => void;
+  /** Callback to convert to plain link (removes unfurl, keeps link as plain text) */
+  onConvertToPlainLink?: () => void;
 }
 
 /**
@@ -78,30 +85,78 @@ const UnfurlSkeleton: React.FC = () => (
 /**
  * Error state for the unfurl card
  */
-const UnfurlError: React.FC<{ error: string; onRefresh?: () => void }> = ({ error, onRefresh }) => (
-  <Box
-    sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      py: 3,
-      color: 'text.secondary',
-    }}
-  >
-    <LinkIcon sx={{ fontSize: 32, mb: 1, opacity: 0.5 }} />
-    <Typography variant="body2" color="error" sx={{ mb: 1 }}>
-      {error}
-    </Typography>
-    {onRefresh && (
-      <Tooltip title="Retry">
-        <IconButton size="small" onClick={onRefresh} aria-label="Retry loading preview">
-          <RefreshIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    )}
-  </Box>
-);
+interface UnfurlErrorProps {
+  errorType?: OEmbedErrorType | null | undefined;
+  error?: string | null | undefined;
+  onRefresh?: (() => void) | undefined;
+  onConvertToPlainLink?: (() => void) | undefined;
+}
+
+const UnfurlError: React.FC<UnfurlErrorProps> = ({
+  errorType,
+  error,
+  onRefresh,
+  onConvertToPlainLink,
+}) => {
+  const friendlyMessage = getOEmbedErrorMessage(errorType ?? undefined);
+  const canRetry = isRetryableError(errorType ?? undefined);
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        py: 3,
+        px: 2,
+        color: 'text.secondary',
+        textAlign: 'center',
+      }}
+    >
+      <ErrorOutlineIcon sx={{ fontSize: 40, mb: 1.5, opacity: 0.5, color: 'warning.main' }} />
+      <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
+        Preview not available
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
+        {friendlyMessage}
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        {canRetry && onRefresh && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRefresh();
+            }}
+          >
+            Try Again
+          </Button>
+        )}
+        {onConvertToPlainLink && (
+          <Button
+            size="small"
+            variant="text"
+            onClick={(e) => {
+              e.stopPropagation();
+              onConvertToPlainLink();
+            }}
+          >
+            Show as Link
+          </Button>
+        )}
+      </Box>
+      {/* Show raw error for debugging (subtle) */}
+      {error && error !== friendlyMessage && (
+        <Typography variant="caption" color="text.disabled" sx={{ mt: 1, fontSize: 10 }}>
+          {error}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
 /**
  * UnfurlCard - Displays a rich preview card for web links
@@ -127,14 +182,17 @@ export const UnfurlCard: React.FC<UnfurlCardProps> = ({
   isStale = false,
   isLoading = false,
   error,
+  errorType,
   selected = false,
   onRefresh,
   onDelete,
   onOpenInBrowser,
   onConvertToChip,
+  onConvertToPlainLink,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [thumbnailError, setThumbnailError] = useState(false);
+  const [copied, setCopied] = useState(false);
   const domain = extractDomain(url);
 
   const handleOpenInBrowser = useCallback(() => {
@@ -144,6 +202,14 @@ export const UnfurlCard: React.FC<UnfurlCardProps> = ({
       void window.electronAPI.shell.openExternal(url);
     }
   }, [url, onOpenInBrowser]);
+
+  const handleCopyUrl = useCallback(() => {
+    void window.electronAPI.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  }, [url]);
 
   const handleThumbnailError = useCallback(() => {
     setThumbnailError(true);
@@ -210,6 +276,11 @@ export const UnfurlCard: React.FC<UnfurlCardProps> = ({
               <OpenInNewIcon sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
+          <Tooltip title={copied ? 'Copied!' : 'Copy URL'}>
+            <IconButton size="small" onClick={handleCopyUrl} aria-label="Copy URL">
+              <ContentCopyIcon sx={{ fontSize: 16, color: copied ? 'success.main' : undefined }} />
+            </IconButton>
+          </Tooltip>
           {onRefresh && (
             <Tooltip title={isStale ? 'Refresh (data may be stale)' : 'Refresh'}>
               <IconButton
@@ -229,6 +300,17 @@ export const UnfurlCard: React.FC<UnfurlCardProps> = ({
               </IconButton>
             </Tooltip>
           )}
+          {onConvertToPlainLink && (
+            <Tooltip title="Convert to plain link">
+              <IconButton
+                size="small"
+                onClick={onConvertToPlainLink}
+                aria-label="Convert to plain link"
+              >
+                <LinkIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
           {onDelete && (
             <Tooltip title="Remove preview">
               <IconButton size="small" onClick={onDelete} aria-label="Remove preview">
@@ -243,7 +325,14 @@ export const UnfurlCard: React.FC<UnfurlCardProps> = ({
       {isLoading && <UnfurlSkeleton />}
 
       {/* Error state */}
-      {!isLoading && error && <UnfurlError error={error} {...(onRefresh ? { onRefresh } : {})} />}
+      {!isLoading && error && (
+        <UnfurlError
+          error={error}
+          errorType={errorType}
+          onRefresh={onRefresh}
+          onConvertToPlainLink={onConvertToPlainLink}
+        />
+      )}
 
       {/* Content - show when not loading and no error */}
       {!isLoading && !error && (

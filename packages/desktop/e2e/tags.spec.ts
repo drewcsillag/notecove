@@ -39,6 +39,17 @@ test.beforeAll(async () => {
   page = await electronApp.firstWindow();
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1000); // Wait for app initialization
+
+  // Set link display preference to 'none' so links appear as plain links
+  // This ensures tests checking for a.web-link elements find visible links
+  await page.evaluate(async () => {
+    await window.electronAPI.appState.set('linkDisplayPreference', 'none');
+  });
+
+  // Reload the page so the preference is picked up by the React context
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1000); // Wait for app re-initialization
 });
 
 test.afterAll(async () => {
