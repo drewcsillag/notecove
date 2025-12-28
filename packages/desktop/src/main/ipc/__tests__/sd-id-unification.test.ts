@@ -63,9 +63,7 @@ describe('SD ID Unification', () => {
       expect(dotSdIdExists).toBe(false);
 
       // Verify UUID was generated
-      expect(result.uuid).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      );
+      expect(result.uuid).toMatch(/^[A-Za-z0-9_-]{22}$/);
     });
 
     it('should use existing SD_ID when present', async () => {
@@ -201,9 +199,7 @@ describe('SD ID Unification', () => {
       const result = await migrateAndGetSdId(sdPath);
 
       // Should have generated a new UUID
-      expect(result.id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      );
+      expect(result.id).toMatch(/^[A-Za-z0-9_-]{22}$/);
       expect(result.migrated).toBe(false);
       expect(result.wasGenerated).toBe(true);
 
@@ -252,9 +248,7 @@ describe('SD ID Unification', () => {
 
       // Should generate a new UUID instead of using invalid one
       expect(result.wasGenerated).toBe(true);
-      expect(result.id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      );
+      expect(result.id).toMatch(/^[A-Za-z0-9_-]{22}$/);
 
       // SD_ID should be created with the new UUID
       const sdIdContent = await fs.readFile(path.join(sdPath, 'SD_ID'), 'utf-8');

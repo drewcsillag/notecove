@@ -7,7 +7,6 @@
 
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import * as Y from 'yjs';
-import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { HandlerContext } from './types';
@@ -18,6 +17,7 @@ import {
   extractSnippet,
   resolveLinks,
   ImageStorage,
+  generateCompactId,
   SyncDirectoryStructure,
 } from '@notecove/shared';
 import { extractImageReferencesFromXmlFragment } from '../../image-cleanup-manager';
@@ -58,7 +58,7 @@ function handleDuplicateNote(ctx: HandlerContext) {
       throw new Error(`Source note ${sourceNoteId} not found`);
     }
 
-    const newNoteId = crypto.randomUUID();
+    const newNoteId = generateCompactId();
 
     let sourceDoc = crdtManager.getDocument(sourceNoteId);
     const wasSourceLoaded = sourceDoc != null;
@@ -500,7 +500,7 @@ async function moveNoteToSD_Legacy(
 ): Promise<void> {
   const { database, broadcastToAll } = ctx;
 
-  const targetNoteId: string = crypto.randomUUID();
+  const targetNoteId: string = generateCompactId();
 
   // Get SD paths for image copy
   const sourceSD = await database.getStorageDir(sourceSdId);

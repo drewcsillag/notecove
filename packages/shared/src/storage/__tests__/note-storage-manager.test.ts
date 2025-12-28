@@ -137,6 +137,7 @@ describe('NoteStorageManager', () => {
   const sdId = 'sd-123';
   const sdPath = '/storage/sd-123';
   const noteId = 'note-abc';
+  const profileId = 'profile-xyz';
   const instanceId = 'inst-xyz';
 
   describe('loadNote', () => {
@@ -150,7 +151,7 @@ describe('NoteStorageManager', () => {
         fs.directories.add(paths.logs);
         fs.directories.add(paths.snapshots);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNote(sdId, noteId, paths);
 
         expect(result.doc).toBeInstanceOf(Y.Doc);
@@ -174,7 +175,7 @@ describe('NoteStorageManager', () => {
         fs.directories.add(paths.snapshots);
         fs.files.set(`${paths.logs}/inst-abc_${timestamp}.crdtlog`, logData);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNote(sdId, noteId, paths);
 
         // Verify the content was loaded
@@ -215,7 +216,7 @@ describe('NoteStorageManager', () => {
         fs.files.set(`${paths.logs}/inst-a_${timestamp1}.crdtlog`, logData1);
         fs.files.set(`${paths.logs}/inst-b_${timestamp2}.crdtlog`, logData2);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNote(sdId, noteId, paths);
 
         // Verify merged content
@@ -261,7 +262,7 @@ describe('NoteStorageManager', () => {
         fs.files.set(`${paths.snapshots}/inst-a_1000.snapshot`, snapshotData);
         fs.files.set(`${paths.logs}/inst-b_2000.crdtlog`, logData);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNote(sdId, noteId, paths);
 
         // Verify content includes both snapshot and log updates
@@ -304,7 +305,7 @@ describe('NoteStorageManager', () => {
         fs.files.set(`${paths.snapshots}/inst-a_2000.snapshot`, snapshotData);
         fs.files.set(`${paths.logs}/inst-a_1000.crdtlog`, logData);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNote(sdId, noteId, paths);
 
         // Content should be correct (no double-application issues)
@@ -341,7 +342,7 @@ describe('NoteStorageManager', () => {
         fs.directories.add(paths.logs);
         fs.directories.add(paths.snapshots);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNoteFromCache(sdId, noteId, paths);
 
         expect(result).not.toBeNull();
@@ -358,7 +359,7 @@ describe('NoteStorageManager', () => {
         fs.directories.add(paths.logs);
         fs.directories.add(paths.snapshots);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNoteFromCache(sdId, noteId, paths);
 
         expect(result).toBeNull();
@@ -405,7 +406,7 @@ describe('NoteStorageManager', () => {
         fs.directories.add(paths.snapshots);
         fs.files.set(`${paths.logs}/inst-b_1000.crdtlog`, logData);
 
-        const manager = new NoteStorageManager(fs, db, instanceId);
+        const manager = new NoteStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadNoteFromCache(sdId, noteId, paths);
 
         expect(result).not.toBeNull();
@@ -424,7 +425,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Create an update to save
       const { update } = createYjsUpdate(noteId, 'New content');
@@ -434,7 +435,7 @@ describe('NoteStorageManager', () => {
       // Verify a log file was created
       const logFiles = await fs.listFiles(paths.logs);
       expect(logFiles.length).toBe(1);
-      expect(logFiles[0]).toMatch(new RegExp(`^${instanceId}_\\d+\\.crdtlog$`));
+      expect(logFiles[0]).toMatch(new RegExp(`^${profileId}_${instanceId}_\\d+\\.crdtlog$`));
     });
 
     it('should append multiple updates to same log file', async () => {
@@ -445,7 +446,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Save multiple updates
       const { update: update1 } = createYjsUpdate(noteId, 'First');
@@ -467,7 +468,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Create multiple updates
       const updates = Array.from({ length: 10 }, (_, i) => {
@@ -508,7 +509,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Save updates and track sequence
       const { update: update1 } = createYjsUpdate(noteId, 'First');
@@ -549,7 +550,7 @@ describe('NoteStorageManager', () => {
         updatedAt: Date.now(),
       });
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Load the note from cache - this should initialize the sequence counter
       const loadResult = await manager.loadNoteFromCache(sdId, noteId, paths);
@@ -589,7 +590,7 @@ describe('NoteStorageManager', () => {
       const logData = createLogFile(updates);
       fs.files.set(`${paths.logs}/${instanceId}_1000.crdtlog`, logData);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Load the note from files (no cache)
       const loadResult = await manager.loadNote(sdId, noteId, paths);
@@ -612,7 +613,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Create a doc to snapshot
       const doc = new Y.Doc();
@@ -645,7 +646,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Save initial snapshot
       const doc1 = new Y.Doc();
@@ -682,7 +683,7 @@ describe('NoteStorageManager', () => {
 
       fs.directories.add(paths.logs);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       const writer1 = manager.getLogWriter(noteId, paths);
       const writer2 = manager.getLogWriter(noteId, paths);
@@ -699,7 +700,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths1.logs);
       fs.directories.add(paths2.logs);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       const writer1 = manager.getLogWriter('note-1', paths1);
       const writer2 = manager.getLogWriter('note-2', paths2);
@@ -744,7 +745,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.snapshots);
       fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
       const result = await manager.loadNote(sdId, noteId, paths);
 
       // The vector clock offset should be exactly at the end of the file
@@ -778,7 +779,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.snapshots);
       fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData1);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // First load - reads first record
       const result1 = await manager.loadNote(sdId, noteId, paths);
@@ -840,7 +841,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths.snapshots);
       fs.files.set(`${paths.logs}/inst-test_1000.crdtlog`, logData);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
       const result = await manager.loadNote(sdId, noteId, paths);
 
       // Vector clock should show max sequence (3), not last read (2)
@@ -860,7 +861,7 @@ describe('NoteStorageManager', () => {
       fs.directories.add(paths1.logs);
       fs.directories.add(paths2.logs);
 
-      const manager = new NoteStorageManager(fs, db, instanceId);
+      const manager = new NoteStorageManager(fs, db, profileId, instanceId);
 
       // Create writers by saving updates
       const { update: update1 } = createYjsUpdate('note-1', 'Content 1');

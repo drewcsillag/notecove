@@ -9,6 +9,7 @@ describe('DeletionLogger', () => {
   let mockFs: jest.Mocked<FileSystemAdapter>;
   let logger: DeletionLogger;
   const deletionDir = '/test/deleted';
+  const profileId = 'test-profile';
   const instanceId = 'test-instance';
 
   beforeEach(() => {
@@ -22,7 +23,7 @@ describe('DeletionLogger', () => {
     } as jest.Mocked<FileSystemAdapter>;
 
     logger = new DeletionLogger(mockFs, deletionDir);
-    logger.setInstanceId(instanceId);
+    logger.setIds(profileId, instanceId);
   });
 
   describe('initialize', () => {
@@ -43,7 +44,7 @@ describe('DeletionLogger', () => {
       await logger.recordDeletion(noteId);
 
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        `${deletionDir}/${instanceId}.log`,
+        `${deletionDir}/${profileId}_${instanceId}.log`,
         expect.any(Uint8Array)
       );
 
@@ -86,7 +87,7 @@ describe('DeletionLogger', () => {
 
   describe('getLogPath', () => {
     it('should return correct log path', () => {
-      expect(logger.getLogPath()).toBe(`${deletionDir}/${instanceId}.log`);
+      expect(logger.getLogPath()).toBe(`${deletionDir}/${profileId}_${instanceId}.log`);
     });
   });
 

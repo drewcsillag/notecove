@@ -49,6 +49,9 @@ export class ProfileStorage {
    * - The file doesn't exist (first run)
    * - The file is corrupted (recovery)
    *
+   * Note: Existing profile IDs are NOT migrated because the profile ID
+   * is used as a directory name. New profiles get compact 22-char IDs.
+   *
    * @returns The loaded ProfilesConfig or empty config
    */
   async loadProfiles(): Promise<ProfilesConfig> {

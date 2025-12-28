@@ -119,6 +119,7 @@ export class SDWatcherManager {
     sdId: string,
     sdPath: string,
     fsAdapter: NodeFileSystemAdapter,
+    profileId: string,
     instanceId: string,
     storageManager: AppendLogManager,
     crdtManager: CRDTManager,
@@ -132,7 +133,7 @@ export class SDWatcherManager {
 
     // Create and initialize ActivityLogger for this SD
     const activityLogger = new ActivityLogger(fsAdapter, activityDir);
-    activityLogger.setInstanceId(instanceId);
+    activityLogger.setIds(profileId, instanceId);
     await activityLogger.initialize();
 
     // Register the activity logger with CRDT Manager
@@ -145,7 +146,7 @@ export class SDWatcherManager {
 
     // Create and initialize DeletionLogger for this SD
     const deletionLogger = new DeletionLogger(fsAdapter, deletionDir);
-    deletionLogger.setInstanceId(instanceId);
+    deletionLogger.setIds(profileId, instanceId);
     await deletionLogger.initialize();
     this.sdDeletionLoggers.set(sdId, deletionLogger);
 
@@ -164,6 +165,7 @@ export class SDWatcherManager {
       sdId,
       activitySyncCallbacks
     );
+    activitySync.setProfileId(profileId);
 
     // Load previously skipped stale entries from persistence
     await activitySync.loadSkippedEntries();
@@ -187,6 +189,7 @@ export class SDWatcherManager {
       deletionDir,
       deletionSyncCallbacks
     );
+    deletionSync.setProfileId(profileId);
 
     // Store the DeletionSync instance
     this.sdDeletionSyncs.set(sdId, deletionSync);

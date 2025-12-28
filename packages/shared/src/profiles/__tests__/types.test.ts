@@ -110,7 +110,7 @@ describe('Profile Types', () => {
 
       expect(profile.name).toBe('Development');
       expect(profile.isDev).toBe(true);
-      expect(profile.id).toMatch(/^[0-9a-f-]{36}$/); // UUID format
+      expect(profile.id).toMatch(/^[A-Za-z0-9_-]{22}$/); // Compact UUID format (base64url)
       expect(profile.created).toBeGreaterThanOrEqual(before);
       expect(profile.created).toBeLessThanOrEqual(after);
       expect(profile.lastUsed).toBe(profile.created);

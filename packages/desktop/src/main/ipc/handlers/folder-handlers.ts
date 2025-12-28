@@ -5,9 +5,9 @@
  */
 
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
-import * as crypto from 'crypto';
 import type { HandlerContext } from './types';
 import type { FolderData, NoteCache } from '@notecove/shared';
+import { generateCompactId } from '@notecove/shared';
 
 /**
  * Register all folder-related IPC handlers
@@ -116,7 +116,7 @@ function handleCreateFolder(ctx: HandlerContext) {
     }
 
     // Generate new folder ID
-    const folderId = crypto.randomUUID();
+    const folderId = generateCompactId();
 
     // Find alphabetical insertion position among siblings (case-insensitive)
     const sortedSiblings = [...siblings].sort((a, b) =>

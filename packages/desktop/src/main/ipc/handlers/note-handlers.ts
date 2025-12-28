@@ -13,11 +13,11 @@
 
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import * as Y from 'yjs';
-import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { HandlerContext } from './types';
 import type { UUID } from '@notecove/shared';
+import { generateCompactId } from '@notecove/shared';
 import { extractTags, extractLinks } from '@notecove/shared';
 
 /**
@@ -274,7 +274,7 @@ function handleCreateNote(ctx: HandlerContext) {
   ): Promise<string> => {
     const { crdtManager, database, broadcastToAll } = ctx;
 
-    const noteId = crypto.randomUUID();
+    const noteId = generateCompactId();
     await crdtManager.loadNote(noteId, sdId);
 
     const noteDoc = crdtManager.getNoteDoc(noteId);

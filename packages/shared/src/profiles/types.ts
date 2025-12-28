@@ -8,6 +8,8 @@
  * @see PLAN-profiles.md for full requirements
  */
 
+import { generateCompactId } from '../utils/uuid-encoding';
+
 /**
  * Represents a single profile.
  *
@@ -82,15 +84,10 @@ export function createProfile(name: string, isDev: boolean): Profile {
 }
 
 /**
- * Generate a unique profile ID
+ * Generate a unique profile ID in compact format (22-char base64url)
  */
 function generateProfileId(): string {
-  // Simple UUID v4-like generation
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return generateCompactId();
 }
 
 /**

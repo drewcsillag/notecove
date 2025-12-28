@@ -9,6 +9,8 @@ describe('ActivityLogger', () => {
   let mockFs: jest.Mocked<FileSystemAdapter>;
   let logger: ActivityLogger;
   const activityDir = '/test/activity';
+  const profileId = 'test-profile';
+  const instanceId = 'test-instance';
 
   beforeEach(() => {
     mockFs = {
@@ -21,7 +23,7 @@ describe('ActivityLogger', () => {
     } as jest.Mocked<FileSystemAdapter>;
 
     logger = new ActivityLogger(mockFs, activityDir);
-    logger.setInstanceId('test-instance');
+    logger.setIds(profileId, instanceId);
   });
 
   describe('initialize', () => {
@@ -41,7 +43,7 @@ describe('ActivityLogger', () => {
     });
 
     it('should append new line for different note', async () => {
-      mockFs.readFile.mockResolvedValue(new TextEncoder().encode('note-1|test-instance_100\n'));
+      mockFs.readFile.mockResolvedValue(new TextEncoder().encode('note-1|test-profile_100\n'));
 
       await logger.recordNoteActivity('note-2', 101);
 
@@ -50,8 +52,8 @@ describe('ActivityLogger', () => {
       const lines = text.split('\n').filter((l) => l.length > 0);
 
       expect(lines).toHaveLength(2);
-      expect(lines[0]).toBe('note-1|test-instance_100');
-      expect(lines[1]).toBe('note-2|test-instance_101');
+      expect(lines[0]).toBe('note-1|test-profile_100');
+      expect(lines[1]).toBe('note-2|test-profile_101');
     });
 
     it('should append all edits for same note (no replace optimization)', async () => {
@@ -62,7 +64,7 @@ describe('ActivityLogger', () => {
       // Get what was written
       const firstWrite = mockFs.writeFile.mock.calls[0]?.[1] ?? new Uint8Array();
       const firstText = new TextDecoder().decode(firstWrite);
-      expect(firstText).toBe('note-1|test-instance_100\n');
+      expect(firstText).toBe('note-1|test-profile_100\n');
 
       // Second edit to note-1 (consecutive) - should append (not replace)
       // This ensures other instances see ALL intermediate sequences during incremental sync
@@ -76,8 +78,8 @@ describe('ActivityLogger', () => {
 
       // Should have 2 lines (appended, not replaced)
       expect(lines).toHaveLength(2);
-      expect(lines[0]).toBe('note-1|test-instance_100');
-      expect(lines[1]).toBe('note-1|test-instance_105');
+      expect(lines[0]).toBe('note-1|test-profile_100');
+      expect(lines[1]).toBe('note-1|test-profile_105');
     });
 
     it('should use monotonically increasing sequence numbers', async () => {
@@ -87,7 +89,7 @@ describe('ActivityLogger', () => {
       await logger.recordNoteActivity('note-1', 100);
       const firstWrite = mockFs.writeFile.mock.calls[0]?.[1];
       const firstText = new TextDecoder().decode(firstWrite);
-      expect(firstText).toBe('note-1|test-instance_100\n');
+      expect(firstText).toBe('note-1|test-profile_100\n');
 
       mockFs.readFile.mockResolvedValue(firstWrite);
       await logger.recordNoteActivity('note-2', 101);
@@ -95,8 +97,8 @@ describe('ActivityLogger', () => {
       const secondText = new TextDecoder().decode(secondWrite);
       const lines = secondText.split('\n').filter((l) => l.length > 0);
 
-      expect(lines[0]).toBe('note-1|test-instance_100');
-      expect(lines[1]).toBe('note-2|test-instance_101');
+      expect(lines[0]).toBe('note-1|test-profile_100');
+      expect(lines[1]).toBe('note-2|test-profile_101');
     });
   });
 
@@ -109,7 +111,7 @@ describe('ActivityLogger', () => {
 
     it('should not write if under retention limit', async () => {
       const lines =
-        Array.from({ length: 500 }, (_, i) => `note-${i}|test-instance_${1000 + i}`).join('\n') +
+        Array.from({ length: 500 }, (_, i) => `note-${i}|test-profile_${1000 + i}`).join('\n') +
         '\n';
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode(lines));
 
@@ -122,7 +124,7 @@ describe('ActivityLogger', () => {
 
     it('should trim to retention limit if over', async () => {
       const lines =
-        Array.from({ length: 1500 }, (_, i) => `note-${i}|test-instance_${1000 + i}`).join('\n') +
+        Array.from({ length: 1500 }, (_, i) => `note-${i}|test-profile_${1000 + i}`).join('\n') +
         '\n';
       mockFs.readFile.mockResolvedValue(new TextEncoder().encode(lines));
 
@@ -134,8 +136,8 @@ describe('ActivityLogger', () => {
 
       expect(writtenLines).toHaveLength(1000);
       // Should keep the most recent 1000 lines
-      expect(writtenLines[0]).toBe('note-500|test-instance_1500');
-      expect(writtenLines[writtenLines.length - 1]).toBe('note-1499|test-instance_2499');
+      expect(writtenLines[0]).toBe('note-500|test-profile_1500');
+      expect(writtenLines[writtenLines.length - 1]).toBe('note-1499|test-profile_2499');
     });
   });
 });

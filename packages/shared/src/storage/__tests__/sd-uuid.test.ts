@@ -5,10 +5,8 @@
 import { SdUuidManager } from '../sd-uuid';
 import type { FileSystemAdapter } from '../types';
 
-// Mock uuid module
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => '550e8400-e29b-41d4-a716-446655440000'),
-}));
+// Compact UUID format: 22 base64url characters
+const COMPACT_UUID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 
 describe('SdUuidManager', () => {
   let mockFs: FileSystemAdapter;
@@ -135,9 +133,7 @@ describe('SdUuidManager', () => {
     it('should generate and write new UUID if SD_ID does not exist', async () => {
       const result = await uuidManager.initializeUuid('/test/sd');
 
-      expect(result.uuid).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      );
+      expect(result.uuid).toMatch(COMPACT_UUID_PATTERN);
       expect(result.wasGenerated).toBe(true);
       expect(result.hadRaceCondition).toBe(false);
       expect(mockFs.writeFile).toHaveBeenCalled();
@@ -182,9 +178,7 @@ describe('SdUuidManager', () => {
 
       const result = await uuidManager.initializeUuid('/test/sd');
 
-      expect(result.uuid).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      );
+      expect(result.uuid).toMatch(COMPACT_UUID_PATTERN);
       expect(result.wasGenerated).toBe(true);
       expect(attemptCount).toBe(2);
     });
@@ -224,9 +218,7 @@ describe('SdUuidManager', () => {
 
     it('should generate and return new UUID', async () => {
       const uuid = await uuidManager.ensureUuid('/test/sd');
-      expect(uuid).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      );
+      expect(uuid).toMatch(COMPACT_UUID_PATTERN);
     });
   });
 

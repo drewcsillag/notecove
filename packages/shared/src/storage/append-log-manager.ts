@@ -31,6 +31,7 @@ export interface AppendLogManagerDb extends NoteSyncStateDb, FolderSyncStateDb {
 export class AppendLogManager {
   private readonly fs: FileSystemAdapter;
   private readonly db: AppendLogManagerDb;
+  private readonly profileId: string;
   private readonly instanceId: string;
 
   private readonly registeredSDs = new Map<string, SDRegistration>();
@@ -41,10 +42,23 @@ export class AppendLogManager {
   private readonly noteVectorClocks = new Map<string, VectorClock>();
   private readonly folderVectorClocks = new Map<string, VectorClock>();
 
-  constructor(fs: FileSystemAdapter, db: AppendLogManagerDb, instanceId: string) {
+  constructor(
+    fs: FileSystemAdapter,
+    db: AppendLogManagerDb,
+    profileId: string,
+    instanceId: string
+  ) {
     this.fs = fs;
     this.db = db;
+    this.profileId = profileId;
     this.instanceId = instanceId;
+  }
+
+  /**
+   * Get the profile ID.
+   */
+  getProfileId(): string {
+    return this.profileId;
   }
 
   /**
@@ -112,7 +126,7 @@ export class AppendLogManager {
   private getNoteManager(sdId: string): NoteStorageManager {
     let manager = this.noteManagers.get(sdId);
     if (!manager) {
-      manager = new NoteStorageManager(this.fs, this.db, this.instanceId);
+      manager = new NoteStorageManager(this.fs, this.db, this.profileId, this.instanceId);
       this.noteManagers.set(sdId, manager);
     }
     return manager;
@@ -124,7 +138,7 @@ export class AppendLogManager {
   private getFolderManager(sdId: string): FolderStorageManager {
     let manager = this.folderManagers.get(sdId);
     if (!manager) {
-      manager = new FolderStorageManager(this.fs, this.db, this.instanceId);
+      manager = new FolderStorageManager(this.fs, this.db, this.profileId, this.instanceId);
       this.folderManagers.set(sdId, manager);
     }
     return manager;

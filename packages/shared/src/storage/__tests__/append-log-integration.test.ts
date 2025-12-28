@@ -130,7 +130,7 @@ describe('AppendLogManager Integration Tests', () => {
 
       // Session 1: Create and edit note
       {
-        const manager = new AppendLogManager(fs, db, 'instance-1');
+        const manager = new AppendLogManager(fs, db, 'profile-1', 'instance-1');
         manager.registerSD(sdId, sdPath);
 
         // Create initial content
@@ -154,7 +154,7 @@ describe('AppendLogManager Integration Tests', () => {
 
       // Session 2: Reopen and verify content
       {
-        const manager = new AppendLogManager(fs, db, 'instance-1');
+        const manager = new AppendLogManager(fs, db, 'profile-1', 'instance-1');
         manager.registerSD(sdId, sdPath);
 
         const result = await manager.loadNote(sdId, noteId);
@@ -178,7 +178,7 @@ describe('AppendLogManager Integration Tests', () => {
 
       // Session 1: Multiple edits
       {
-        const manager = new AppendLogManager(fs, db, 'instance-1');
+        const manager = new AppendLogManager(fs, db, 'profile-1', 'instance-1');
         manager.registerSD(sdId, sdPath);
 
         const doc = new Y.Doc();
@@ -199,7 +199,7 @@ describe('AppendLogManager Integration Tests', () => {
 
       // Session 2: Verify all edits persisted
       {
-        const manager = new AppendLogManager(fs, db, 'instance-1');
+        const manager = new AppendLogManager(fs, db, 'profile-1', 'instance-1');
         manager.registerSD(sdId, sdPath);
 
         const result = await manager.loadNote(sdId, noteId);
@@ -225,7 +225,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance A: Create note content
       {
         const dbA = createMockDb();
-        const managerA = new AppendLogManager(fs, dbA, 'instance-A');
+        const managerA = new AppendLogManager(fs, dbA, 'profile-A', 'instance-A');
         managerA.registerSD(sdId, sdPath);
 
         const doc = new Y.Doc();
@@ -239,7 +239,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance B: Load note (should see Instance A's content)
       {
         const dbB = createMockDb();
-        const managerB = new AppendLogManager(fs, dbB, 'instance-B');
+        const managerB = new AppendLogManager(fs, dbB, 'profile-B', 'instance-B');
         managerB.registerSD(sdId, sdPath);
 
         const result = await managerB.loadNote(sdId, noteId);
@@ -261,7 +261,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance A: Create folders
       {
         const dbA = createMockDb();
-        const managerA = new AppendLogManager(fs, dbA, 'instance-A');
+        const managerA = new AppendLogManager(fs, dbA, 'profile-A', 'instance-A');
         managerA.registerSD(sdId, sdPath);
 
         const doc = new Y.Doc();
@@ -286,7 +286,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance B: Load folders
       {
         const dbB = createMockDb();
-        const managerB = new AppendLogManager(fs, dbB, 'instance-B');
+        const managerB = new AppendLogManager(fs, dbB, 'profile-B', 'instance-B');
         managerB.registerSD(sdId, sdPath);
 
         const result = await managerB.loadFolderTree(sdId);
@@ -318,7 +318,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance A: Edit at beginning
       {
         const dbA = createMockDb();
-        const managerA = new AppendLogManager(fs, dbA, 'instance-A');
+        const managerA = new AppendLogManager(fs, dbA, 'profile-A', 'instance-A');
         managerA.registerSD(sdId, sdPath);
 
         const doc = new Y.Doc();
@@ -331,7 +331,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance B: Edit at end (independently, simulating concurrent edit)
       {
         const dbB = createMockDb();
-        const managerB = new AppendLogManager(fs, dbB, 'instance-B');
+        const managerB = new AppendLogManager(fs, dbB, 'profile-B', 'instance-B');
         managerB.registerSD(sdId, sdPath);
 
         // Load current state first
@@ -348,7 +348,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance C: Load and verify merged content
       {
         const dbC = createMockDb();
-        const managerC = new AppendLogManager(fs, dbC, 'instance-C');
+        const managerC = new AppendLogManager(fs, dbC, 'profile-C', 'instance-C');
         managerC.registerSD(sdId, sdPath);
 
         const result = await managerC.loadNote(sdId, noteId);
@@ -373,7 +373,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance A: Create folder-1
       {
         const dbA = createMockDb();
-        const managerA = new AppendLogManager(fs, dbA, 'instance-A');
+        const managerA = new AppendLogManager(fs, dbA, 'profile-A', 'instance-A');
         managerA.registerSD(sdId, sdPath);
 
         const doc = new Y.Doc();
@@ -390,7 +390,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance B: Load, then create folder-2
       {
         const dbB = createMockDb();
-        const managerB = new AppendLogManager(fs, dbB, 'instance-B');
+        const managerB = new AppendLogManager(fs, dbB, 'profile-B', 'instance-B');
         managerB.registerSD(sdId, sdPath);
 
         const result = await managerB.loadFolderTree(sdId);
@@ -409,7 +409,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Instance C: Load and verify both folders
       {
         const dbC = createMockDb();
-        const managerC = new AppendLogManager(fs, dbC, 'instance-C');
+        const managerC = new AppendLogManager(fs, dbC, 'profile-C', 'instance-C');
         managerC.registerSD(sdId, sdPath);
 
         const result = await managerC.loadFolderTree(sdId);
@@ -446,7 +446,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Write both updates
       {
         const dbA = createMockDb();
-        const managerA = new AppendLogManager(fs, dbA, 'instance-A');
+        const managerA = new AppendLogManager(fs, dbA, 'profile-A', 'instance-A');
         managerA.registerSD(sdId, sdPath);
         await managerA.writeNoteUpdate(sdId, noteId, updateA);
         await managerA.shutdown();
@@ -454,7 +454,7 @@ describe('AppendLogManager Integration Tests', () => {
 
       {
         const dbB = createMockDb();
-        const managerB = new AppendLogManager(fs, dbB, 'instance-B');
+        const managerB = new AppendLogManager(fs, dbB, 'profile-B', 'instance-B');
         managerB.registerSD(sdId, sdPath);
         await managerB.writeNoteUpdate(sdId, noteId, updateB);
         await managerB.shutdown();
@@ -463,7 +463,7 @@ describe('AppendLogManager Integration Tests', () => {
       // Load and verify both contents are present (Yjs will merge them)
       {
         const dbC = createMockDb();
-        const managerC = new AppendLogManager(fs, dbC, 'instance-C');
+        const managerC = new AppendLogManager(fs, dbC, 'profile-C', 'instance-C');
         managerC.registerSD(sdId, sdPath);
 
         const result = await managerC.loadNote(sdId, noteId);

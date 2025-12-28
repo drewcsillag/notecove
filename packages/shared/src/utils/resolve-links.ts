@@ -6,6 +6,7 @@
  */
 
 import { LINK_PATTERN } from './link-extractor';
+import { isFullUuid } from './uuid-encoding';
 
 /**
  * Function type for resolving a note ID to its title.
@@ -36,8 +37,9 @@ export async function resolveLinks(text: string, resolver: NoteTitleResolver): P
   const linkIds = new Set<string>();
 
   for (const match of matches) {
-    // Normalize to lowercase for consistent lookup
-    linkIds.add(match[1].toLowerCase());
+    // Only lowercase full UUIDs for consistency - compact UUIDs are case-sensitive
+    const rawId = match[1];
+    linkIds.add(isFullUuid(rawId) ? rawId.toLowerCase() : rawId);
   }
 
   if (linkIds.size === 0) {
@@ -55,7 +57,8 @@ export async function resolveLinks(text: string, resolver: NoteTitleResolver): P
 
   // Replace all links with resolved titles
   const result = text.replace(new RegExp(LINK_PATTERN.source, 'gi'), (_match, uuid: string) => {
-    const normalizedId = uuid.toLowerCase();
+    // Only lowercase full UUIDs - compact UUIDs are case-sensitive
+    const normalizedId = isFullUuid(uuid) ? uuid.toLowerCase() : uuid;
     const title = titleMap.get(normalizedId) ?? 'deleted note';
     return `[[${title}]]`;
   });

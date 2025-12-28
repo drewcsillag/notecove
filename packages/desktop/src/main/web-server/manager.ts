@@ -36,6 +36,7 @@ import {
   WebServerConfig as StoredWebServerConfig,
 } from '../config/manager';
 import type { Database, NoteCache, FolderCache, SearchResult } from '@notecove/shared';
+import { generateCompactId } from '@notecove/shared';
 import type { CRDTManager } from '../crdt';
 import type { IPCHandlers } from '../ipc';
 import * as Y from 'yjs';
@@ -467,7 +468,7 @@ export class WebServerManager {
         // Use IPC handler's createNote logic via a workaround
         // For now, we'll create a note by upserting to the cache
         // The proper way would be to expose createNote on IPCHandlers
-        const noteId = crypto.randomUUID();
+        const noteId = generateCompactId();
         const now = Date.now();
         await db.upsertNote({
           id: noteId,
@@ -547,7 +548,7 @@ export class WebServerManager {
       },
 
       folderCreate: async (sdId: string, parentId: string | null, name: string) => {
-        const folderId = crypto.randomUUID();
+        const folderId = generateCompactId();
         // Get max order for sibling folders
         const siblings = parentId
           ? await db.getChildFolders(parentId)

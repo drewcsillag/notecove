@@ -3,8 +3,8 @@
  * Handles SD_ID file operations and UUID generation with reconciliation
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import type { FileSystemAdapter } from './types';
+import { generateCompactId, isCompactUuid, isFullUuid } from '../utils/uuid-encoding';
 
 /**
  * SD_ID file format
@@ -121,8 +121,8 @@ export class SdUuidManager {
 
     for (let attempt = 0; attempt < SdUuidManager.MAX_RETRIES; attempt++) {
       try {
-        // Generate new UUID
-        const generatedUuid = uuidv4();
+        // Generate new compact UUID
+        const generatedUuid = generateCompactId();
 
         // Write to file
         await this.writeUuid(sdPath, generatedUuid);
@@ -171,11 +171,10 @@ export class SdUuidManager {
 
   /**
    * Validate UUID format
-   * Basic check for v4 UUID format
+   * Accepts both full UUID (36-char) and compact (22-char) formats
    */
   private isValidUuid(uuid: string): boolean {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
+    return isFullUuid(uuid) || isCompactUuid(uuid);
   }
 
   /**

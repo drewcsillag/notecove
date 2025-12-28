@@ -18,6 +18,8 @@ export interface LogFileInfo {
   filename: string;
   /** Full path to the file */
   path: string;
+  /** Profile ID extracted from filename (null for old format files) */
+  profileId: string | null;
   /** Instance ID extracted from filename */
   instanceId: string;
   /** Creation timestamp extracted from filename */
@@ -61,12 +63,23 @@ export class LogReader {
     for (const filename of files) {
       if (!filename.endsWith('.crdtlog')) continue;
 
-      // Parse filename: {instanceId}_{timestamp}.crdtlog
-      const match = filename.match(/^(.+)_(\d+)\.crdtlog$/);
-      if (!match) continue;
+      let profileId: string | null = null;
+      let instanceId: string;
+      let timestamp: number;
 
-      const instanceId = match[1]!;
-      const timestamp = parseInt(match[2]!, 10);
+      // Try new format first: {profileId}_{instanceId}_{timestamp}.crdtlog
+      const newMatch = filename.match(/^(.+)_(.+)_(\d+)\.crdtlog$/);
+      if (newMatch) {
+        profileId = newMatch[1]!;
+        instanceId = newMatch[2]!;
+        timestamp = parseInt(newMatch[3]!, 10);
+      } else {
+        // Try old format: {instanceId}_{timestamp}.crdtlog
+        const oldMatch = filename.match(/^(.+)_(\d+)\.crdtlog$/);
+        if (!oldMatch) continue;
+        instanceId = oldMatch[1]!;
+        timestamp = parseInt(oldMatch[2]!, 10);
+      }
 
       const path = fs.joinPath(logDir, filename);
       let size = 0;
@@ -81,6 +94,7 @@ export class LogReader {
       logFiles.push({
         filename,
         path,
+        profileId,
         instanceId,
         timestamp,
         size,

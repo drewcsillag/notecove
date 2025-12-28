@@ -18,13 +18,15 @@ import {
   ProfileLock,
   AppStateKey,
   type FeatureFlagConfig,
+  isFullUuid,
+  uuidToCompact,
+  generateCompactId,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc';
 import type { SyncStatus, StaleSyncEntry } from './ipc/types';
 import { CRDTManagerImpl, CRDTCommentObserver, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
-import { randomUUID } from 'crypto';
 import { ConfigManager } from './config/manager';
 import { initializeTelemetry } from './telemetry/config';
 import { NoteMoveManager } from './note-move-manager';
@@ -323,16 +325,24 @@ void app.whenReady().then(async () => {
     if (!instanceId) {
       const storedInstanceId: string | null = await database.getState(AppStateKey.InstanceId);
       if (storedInstanceId) {
-        instanceId = storedInstanceId;
-        console.log(`[InstanceId] Loaded existing instanceId: ${instanceId}`);
+        // Migrate old 36-char UUID format to 22-char compact format
+        if (isFullUuid(storedInstanceId)) {
+          instanceId = uuidToCompact(storedInstanceId);
+          await database.setState(AppStateKey.InstanceId, instanceId);
+          console.log(`[InstanceId] Migrated to compact: ${storedInstanceId} → ${instanceId}`);
+        } else {
+          instanceId = storedInstanceId;
+          console.log(`[InstanceId] Loaded existing instanceId: ${instanceId}`);
+        }
       } else {
-        instanceId = randomUUID();
+        instanceId = generateCompactId();
         await database.setState(AppStateKey.InstanceId, instanceId);
         console.log(`[InstanceId] Generated new instanceId: ${instanceId}`);
       }
     }
+    const profileId = selectedProfileId ?? instanceId;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-    storageManager = new AppendLogManager(fsAdapter as any, database, instanceId);
+    storageManager = new AppendLogManager(fsAdapter as any, database, profileId, instanceId);
 
     // Register the default SD
     storageManager.registerSD('default', storageDir);
@@ -456,6 +466,7 @@ void app.whenReady().then(async () => {
           sdId,
           sdPath,
           fsAdapter,
+          profileId,
           instanceId,
           storageManager,
           crdtManager,
@@ -906,6 +917,7 @@ void app.whenReady().then(async () => {
       'default',
       storageDir,
       fsAdapter,
+      profileId,
       instanceId,
       storageManager,
       crdtManager,
@@ -941,6 +953,7 @@ void app.whenReady().then(async () => {
             sd.id,
             sd.path,
             fsAdapter,
+            profileId,
             instanceId,
             storageManager,
             crdtManager,

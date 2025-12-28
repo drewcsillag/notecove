@@ -8,6 +8,15 @@ const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
+// Polyfill crypto.randomUUID for jsdom environment
+const crypto = require('crypto');
+if (!global.crypto) {
+  global.crypto = crypto;
+}
+if (!global.crypto.randomUUID) {
+  global.crypto.randomUUID = () => crypto.randomUUID();
+}
+
 // Mock i18next
 jest.mock('i18next', () => ({
   use: jest.fn().mockReturnThis(),

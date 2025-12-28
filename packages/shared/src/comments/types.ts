@@ -9,6 +9,7 @@
  */
 
 import type { UUID } from '../types';
+import { generateCompactId } from '../utils/uuid-encoding';
 
 /**
  * A comment thread anchored to a text selection in a note.
@@ -153,10 +154,10 @@ export type CreateReplyData = Omit<CommentReply, 'id'>;
 export type CreateReactionData = Omit<CommentReaction, 'id'>;
 
 /**
- * Generate a UUID for a new comment entity.
+ * Generate a compact UUID for a new comment entity.
  */
 export function generateCommentId(): UUID {
-  return crypto.randomUUID() as UUID;
+  return generateCompactId();
 }
 
 /**

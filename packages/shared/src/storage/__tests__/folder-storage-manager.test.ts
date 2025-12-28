@@ -119,6 +119,7 @@ function createFolderPaths(sdPath: string): { logs: string; snapshots: string } 
 describe('FolderStorageManager', () => {
   const sdId = 'sd-123';
   const sdPath = '/storage/sd-123';
+  const profileId = 'profile-xyz';
   const instanceId = 'inst-xyz';
 
   describe('loadFolderTree', () => {
@@ -131,7 +132,7 @@ describe('FolderStorageManager', () => {
         fs.directories.add(paths.logs);
         fs.directories.add(paths.snapshots);
 
-        const manager = new FolderStorageManager(fs, db, instanceId);
+        const manager = new FolderStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadFolderTree(sdId, paths);
 
         expect(result.doc).toBeInstanceOf(Y.Doc);
@@ -164,7 +165,7 @@ describe('FolderStorageManager', () => {
         fs.directories.add(paths.snapshots);
         fs.files.set(`${paths.logs}/inst-abc_${timestamp}.crdtlog`, logData);
 
-        const manager = new FolderStorageManager(fs, db, instanceId);
+        const manager = new FolderStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadFolderTree(sdId, paths);
 
         // Verify folder was loaded
@@ -218,7 +219,7 @@ describe('FolderStorageManager', () => {
         fs.files.set(`${paths.snapshots}/inst-a_1000.snapshot`, snapshotData);
         fs.files.set(`${paths.logs}/inst-b_2000.crdtlog`, logData);
 
-        const manager = new FolderStorageManager(fs, db, instanceId);
+        const manager = new FolderStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadFolderTree(sdId, paths);
 
         // Verify both folders were loaded
@@ -261,7 +262,7 @@ describe('FolderStorageManager', () => {
         fs.directories.add(paths.logs);
         fs.directories.add(paths.snapshots);
 
-        const manager = new FolderStorageManager(fs, db, instanceId);
+        const manager = new FolderStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadFolderTreeFromCache(sdId, paths);
 
         expect(result).not.toBeNull();
@@ -277,7 +278,7 @@ describe('FolderStorageManager', () => {
         fs.directories.add(paths.logs);
         fs.directories.add(paths.snapshots);
 
-        const manager = new FolderStorageManager(fs, db, instanceId);
+        const manager = new FolderStorageManager(fs, db, profileId, instanceId);
         const result = await manager.loadFolderTreeFromCache(sdId, paths);
 
         expect(result).toBeNull();
@@ -294,7 +295,7 @@ describe('FolderStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new FolderStorageManager(fs, db, instanceId);
+      const manager = new FolderStorageManager(fs, db, profileId, instanceId);
 
       // Create a folder update
       const doc = new Y.Doc();
@@ -310,7 +311,7 @@ describe('FolderStorageManager', () => {
       // Verify log file was created
       const logFiles = await fs.listFiles(paths.logs);
       expect(logFiles.length).toBe(1);
-      expect(logFiles[0]).toMatch(new RegExp(`^${instanceId}_\\d+\\.crdtlog$`));
+      expect(logFiles[0]).toMatch(new RegExp(`^${profileId}_${instanceId}_\\d+\\.crdtlog$`));
     });
 
     it('should increment sequence number', async () => {
@@ -321,7 +322,7 @@ describe('FolderStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new FolderStorageManager(fs, db, instanceId);
+      const manager = new FolderStorageManager(fs, db, profileId, instanceId);
 
       const doc = new Y.Doc();
       const update = Y.encodeStateAsUpdate(doc);
@@ -343,7 +344,7 @@ describe('FolderStorageManager', () => {
       fs.directories.add(paths.logs);
       fs.directories.add(paths.snapshots);
 
-      const manager = new FolderStorageManager(fs, db, instanceId);
+      const manager = new FolderStorageManager(fs, db, profileId, instanceId);
 
       // Create folder tree to snapshot
       const doc = new Y.Doc();
@@ -381,7 +382,7 @@ describe('FolderStorageManager', () => {
       fs.directories.add(paths1.logs);
       fs.directories.add(paths2.logs);
 
-      const manager = new FolderStorageManager(fs, db, instanceId);
+      const manager = new FolderStorageManager(fs, db, profileId, instanceId);
 
       // Create writers by saving updates
       const doc = new Y.Doc();

@@ -18,15 +18,26 @@ export class DeletionLogger {
     private fs: FileSystemAdapter,
     private deletionDir: string
   ) {
-    // Instance ID will be passed via setInstanceId() after construction
+    // IDs will be passed via setIds() after construction
     this.deletionLogPath = '';
   }
 
   /**
-   * Set instance ID and initialize log path
+   * Set profile and instance IDs and initialize log path
+   *
+   * New filename format: {profileId}_{instanceId}.log
+   * Old format ({instanceId}.log) is still readable for backward compatibility.
+   */
+  setIds(profileId: string, instanceId: string): void {
+    this.deletionLogPath = this.fs.joinPath(this.deletionDir, `${profileId}_${instanceId}.log`);
+  }
+
+  /**
+   * @deprecated Use setIds() instead
    */
   setInstanceId(instanceId: string): void {
-    this.deletionLogPath = this.fs.joinPath(this.deletionDir, `${instanceId}.log`);
+    // Legacy support - uses instanceId as both profile and instance
+    this.setIds(instanceId, instanceId);
   }
 
   /**

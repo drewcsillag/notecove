@@ -6,7 +6,7 @@ import { extractLinks, hasLinks, LINK_PATTERN } from '../link-extractor';
 
 describe('link-extractor', () => {
   describe('LINK_PATTERN', () => {
-    it('should match valid UUID links', () => {
+    it('should match valid full UUID links (36-char)', () => {
       const validLinks = [
         '[[550e8400-e29b-41d4-a716-446655440000]]',
         '[[AAAAAAAA-BBBB-CCCC-DDDD-123456789ABC]]', // Uppercase
@@ -19,14 +19,30 @@ describe('link-extractor', () => {
       });
     });
 
+    it('should match valid compact UUID links (22-char)', () => {
+      const validLinks = [
+        '[[VQ6EAOKbQdSnFkRmVUQAAA]]', // Standard compact
+        '[[j1wOGksuTX-MOzqR0uPzSg]]', // With hyphen
+        '[[AAAAAAAAAAAAAAAAAAAAAA]]', // All A's
+        '[[____________________AA]]', // With underscores
+      ];
+
+      validLinks.forEach((link) => {
+        const regex = new RegExp(LINK_PATTERN.source, LINK_PATTERN.flags);
+        expect(regex.test(link)).toBe(true);
+      });
+    });
+
     it('should not match invalid link formats', () => {
       const invalidLinks = [
-        '[[not-a-uuid]]', // Invalid format
-        '[[12345678-1234-1234-1234-12345678901]]', // Too short
-        '[[12345678-1234-1234-1234-1234567890123]]', // Too long
+        '[[not-a-uuid]]', // Invalid format (too short, not base64url)
+        '[[12345678-1234-1234-1234-12345678901]]', // Too short for full UUID
+        '[[12345678-1234-1234-1234-1234567890123]]', // Too long for full UUID
         '[550e8400-e29b-41d4-a716-446655440000]', // Single brackets
         '[[550e8400-e29b-41d4-a716-446655440000]', // Mismatched brackets
-        '[[550e8400e29b41d4a716446655440000]]', // Missing hyphens
+        '[[550e8400e29b41d4a716446655440000]]', // Missing hyphens, wrong length for compact
+        '[[AAAAAAAAAAAAAAAAAAAAA]]', // 21 chars (too short for compact)
+        '[[AAAAAAAAAAAAAAAAAAAAAAA]]', // 23 chars (too long for compact)
         '', // Empty
       ];
 
@@ -38,12 +54,32 @@ describe('link-extractor', () => {
   });
 
   describe('extractLinks', () => {
-    it('should extract single link from text', () => {
+    it('should extract single full UUID link from text', () => {
       const text = 'Check out this note: [[550e8400-e29b-41d4-a716-446655440000]]';
       const links = extractLinks(text);
 
       expect(links).toHaveLength(1);
       expect(links[0]).toBe('550e8400-e29b-41d4-a716-446655440000');
+    });
+
+    it('should extract single compact UUID link from text', () => {
+      const text = 'Check out this note: [[VQ6EAOKbQdSnFkRmVUQAAA]]';
+      const links = extractLinks(text);
+
+      expect(links).toHaveLength(1);
+      expect(links[0]).toBe('VQ6EAOKbQdSnFkRmVUQAAA');
+    });
+
+    it('should extract mixed full and compact UUID links', () => {
+      const text = `
+        Full UUID: [[550e8400-e29b-41d4-a716-446655440000]]
+        Compact: [[VQ6EAOKbQdSnFkRmVUQAAA]]
+      `;
+      const links = extractLinks(text);
+
+      expect(links).toHaveLength(2);
+      expect(links).toContain('550e8400-e29b-41d4-a716-446655440000');
+      expect(links).toContain('VQ6EAOKbQdSnFkRmVUQAAA');
     });
 
     it('should extract multiple links from text', () => {

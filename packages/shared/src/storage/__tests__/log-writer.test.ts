@@ -87,7 +87,7 @@ describe('LogWriter', () => {
   describe('constructor and initialization', () => {
     it('should create new log file on first append', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(Date.now(), 1, new Uint8Array([0x01]));
 
@@ -97,7 +97,7 @@ describe('LogWriter', () => {
 
     it('should create directory if it does not exist', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(Date.now(), 1, new Uint8Array([0x01]));
 
@@ -108,7 +108,7 @@ describe('LogWriter', () => {
   describe('appendRecord', () => {
     it('should append single record', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
       const timestamp = 1704067200000;
 
       await writer.appendRecord(timestamp, 1, new Uint8Array([0x01, 0x02, 0x03]));
@@ -125,7 +125,7 @@ describe('LogWriter', () => {
 
     it('should append multiple records', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(1000, 1, new Uint8Array([0xaa]));
       await writer.appendRecord(2000, 2, new Uint8Array([0xbb]));
@@ -143,7 +143,7 @@ describe('LogWriter', () => {
 
     it('should return file and offset', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       const result = await writer.appendRecord(1000, 1, new Uint8Array([0x01]));
 
@@ -155,7 +155,7 @@ describe('LogWriter', () => {
 
     it('should track offset correctly', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(1000, 1, new Uint8Array([0x01]));
       const offset1 = writer.getCurrentOffset();
@@ -168,24 +168,26 @@ describe('LogWriter', () => {
   });
 
   describe('filename generation', () => {
-    it('should include instanceId and timestamp in filename', async () => {
+    it('should include profileId, instanceId and timestamp in filename', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(Date.now(), 1, new Uint8Array([0x01]));
 
       const file = writer.getCurrentFile()!;
-      expect(file).toMatch(/inst-abc_\d+\.crdtlog$/);
+      expect(file).toMatch(/profile-abc_inst-abc_\d+\.crdtlog$/);
     });
 
     it('should handle timestamp collision by incrementing', async () => {
       const fs = createMockFs();
-      // Pre-create a file with a specific timestamp
+      // Pre-create a finalized file (with termination sentinel) with a specific timestamp
+      // The LogWriter will try to append but find it's finalized, so it needs a new file
       const existingTimestamp = 1704067200000;
-      const existingFile = `/logs/inst-abc_${existingTimestamp}.crdtlog`;
-      fs.files.set(existingFile, new Uint8Array([0x4e, 0x43, 0x4c, 0x47, 0x01]));
+      const existingFile = `/logs/profile-abc_inst-abc_${existingTimestamp}.crdtlog`;
+      // Header (5 bytes) + termination sentinel (1 byte with value 0x00)
+      fs.files.set(existingFile, new Uint8Array([0x4e, 0x43, 0x4c, 0x47, 0x01, 0x00]));
 
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       // Mock Date.now to return the same timestamp
       const originalNow = Date.now;
@@ -194,8 +196,8 @@ describe('LogWriter', () => {
         await writer.appendRecord(existingTimestamp, 1, new Uint8Array([0x01]));
 
         const file = writer.getCurrentFile()!;
-        // Should have timestamp + 1
-        expect(file).toBe(`/logs/inst-abc_${existingTimestamp + 1}.crdtlog`);
+        // Should have timestamp + 1 since existing file is finalized
+        expect(file).toBe(`/logs/profile-abc_inst-abc_${existingTimestamp + 1}.crdtlog`);
       } finally {
         Date.now = originalNow;
       }
@@ -208,7 +210,7 @@ describe('LogWriter', () => {
       let rotateCallCount = 0;
 
       // Use small rotation size for testing
-      const writer = new LogWriter('/logs', 'inst-abc', fs, {
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs, {
         rotationSizeBytes: 100, // 100 bytes for testing
         onRotate: async () => {
           rotateCallCount++;
@@ -225,7 +227,7 @@ describe('LogWriter', () => {
 
     it('should create new file after rotation', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs, {
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs, {
         rotationSizeBytes: 100,
       });
 
@@ -244,7 +246,7 @@ describe('LogWriter', () => {
 
     it('should write termination sentinel when rotating', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs, {
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs, {
         rotationSizeBytes: 100,
       });
 
@@ -264,7 +266,7 @@ describe('LogWriter', () => {
   describe('finalize', () => {
     it('should write termination sentinel', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(1000, 1, new Uint8Array([0x01]));
       await writer.finalize();
@@ -278,7 +280,7 @@ describe('LogWriter', () => {
 
     it('should prevent further writes after finalize', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(1000, 1, new Uint8Array([0x01]));
       await writer.finalize();
@@ -290,7 +292,7 @@ describe('LogWriter', () => {
 
     it('should be idempotent', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(1000, 1, new Uint8Array([0x01]));
       await writer.finalize();
@@ -309,7 +311,7 @@ describe('LogWriter', () => {
   describe('getCurrentFile and getCurrentOffset', () => {
     it('should return null before any writes', () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       expect(writer.getCurrentFile()).toBeNull();
       expect(writer.getCurrentOffset()).toBe(0);
@@ -317,7 +319,7 @@ describe('LogWriter', () => {
 
     it('should return correct values after writes', async () => {
       const fs = createMockFs();
-      const writer = new LogWriter('/logs', 'inst-abc', fs);
+      const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(1000, 1, new Uint8Array([0x01]));
 

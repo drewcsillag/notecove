@@ -9,9 +9,10 @@ import {
 
 describe('Comment Types', () => {
   describe('generateCommentId', () => {
-    it('should generate a valid UUID', () => {
+    it('should generate a valid compact UUID', () => {
       const id = generateCommentId();
-      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      // Compact UUID format: 22 base64url characters
+      expect(id).toMatch(/^[A-Za-z0-9_-]{22}$/);
     });
 
     it('should generate unique IDs', () => {

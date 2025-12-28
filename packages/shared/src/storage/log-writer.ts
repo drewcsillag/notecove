@@ -14,6 +14,7 @@ import {
   writeLogRecord,
   writeTerminationSentinel,
   LOG_HEADER_SIZE,
+  decodeVarint,
 } from './binary-format';
 import type { FileSystemAdapter } from './types';
 
@@ -36,6 +37,7 @@ export interface AppendResult {
 
 export class LogWriter {
   private readonly logDir: string;
+  private readonly profileId: string;
   private readonly instanceId: string;
   private readonly fs: FileSystemAdapter;
   private readonly rotationSize: number;
@@ -48,11 +50,13 @@ export class LogWriter {
 
   constructor(
     logDir: string,
+    profileId: string,
     instanceId: string,
     fs: FileSystemAdapter,
     options: LogWriterOptions = {}
   ) {
     this.logDir = logDir;
+    this.profileId = profileId;
     this.instanceId = instanceId;
     this.fs = fs;
     this.rotationSize = options.rotationSizeBytes ?? DEFAULT_ROTATION_SIZE;
@@ -134,7 +138,8 @@ export class LogWriter {
   }
 
   /**
-   * Initialize the writer (ensure directory exists).
+   * Initialize the writer.
+   * Tries to append to an existing file first, otherwise creates a new one.
    */
   private async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -144,21 +149,145 @@ export class LogWriter {
       await this.fs.mkdir(this.logDir);
     }
 
+    // Try to find an existing file we can append to
+    const existingFile = await this.findAppendableFile();
+    if (existingFile) {
+      this.currentFile = existingFile.path;
+      this.currentOffset = existingFile.appendOffset;
+      console.log(
+        `[LogWriter] Appending to existing file: ${this.fs.basename(existingFile.path)} at offset ${existingFile.appendOffset}`
+      );
+    }
+    // If no appendable file found, a new one will be created on first write
+
     this.initialized = true;
   }
 
   /**
+   * Find an existing file that can be appended to.
+   * Returns the most recent file for this profile+instance that hasn't been finalized.
+   */
+  private async findAppendableFile(): Promise<{ path: string; appendOffset: number } | null> {
+    const files = await this.fs.listFiles(this.logDir);
+
+    // Match both old format (instanceId_timestamp.crdtlog) and
+    // new format (profileId_instanceId_timestamp.crdtlog)
+    const matchingFiles: { filename: string; timestamp: number }[] = [];
+
+    for (const filename of files) {
+      if (!filename.endsWith('.crdtlog')) continue;
+
+      // Try new format: {profileId}_{instanceId}_{timestamp}.crdtlog
+      const newMatch = filename.match(/^(.+)_(.+)_(\d+)\.crdtlog$/);
+      if (newMatch) {
+        const [, fileProfileId, fileInstanceId, ts] = newMatch;
+        if (fileProfileId === this.profileId && fileInstanceId === this.instanceId) {
+          matchingFiles.push({ filename, timestamp: parseInt(ts!, 10) });
+          continue;
+        }
+      }
+
+      // Try old format: {instanceId}_{timestamp}.crdtlog (for backward compat)
+      const oldMatch = filename.match(/^(.+)_(\d+)\.crdtlog$/);
+      if (oldMatch) {
+        const [, fileInstanceId, ts] = oldMatch;
+        if (fileInstanceId === this.instanceId) {
+          matchingFiles.push({ filename, timestamp: parseInt(ts!, 10) });
+        }
+      }
+    }
+
+    if (matchingFiles.length === 0) return null;
+
+    // Sort by timestamp descending, check the most recent one
+    matchingFiles.sort((a, b) => b.timestamp - a.timestamp);
+
+    for (const { filename } of matchingFiles) {
+      const filePath = this.fs.joinPath(this.logDir, filename);
+      const appendOffset = await this.validateAndGetAppendOffset(filePath);
+      if (appendOffset !== null) {
+        return { path: filePath, appendOffset };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate a log file and determine where to append.
+   * Returns the append offset, or null if the file can't be appended to
+   * (e.g., it has a termination sentinel or is corrupt).
+   *
+   * Log record format:
+   * - varint: length of (timestamp + sequence + data)
+   * - 8 bytes: timestamp (big-endian)
+   * - varint: sequence number
+   * - N bytes: data
+   *
+   * Termination sentinel is length=0 (single byte: 0x00).
+   */
+  private async validateAndGetAppendOffset(filePath: string): Promise<number | null> {
+    try {
+      const content = await this.fs.readFile(filePath);
+      if (content.length < LOG_HEADER_SIZE) {
+        return null; // Too small to be valid
+      }
+
+      // Scan through the file to find the end of valid records
+      let offset = LOG_HEADER_SIZE;
+
+      while (offset < content.length) {
+        try {
+          // Read length prefix (varint)
+          const lengthResult = decodeVarint(content, offset);
+          const payloadLength = lengthResult.value;
+
+          // Check for termination sentinel (length=0)
+          if (payloadLength === 0) {
+            // File has been finalized, can't append
+            return null;
+          }
+
+          // Check if we have enough bytes for the full record
+          const recordTotalSize = lengthResult.bytesRead + payloadLength;
+          if (offset + recordTotalSize > content.length) {
+            // Incomplete record at end (crash during write) - append here
+            break;
+          }
+
+          offset += recordTotalSize;
+        } catch {
+          // Varint decode failed - file may be corrupt, stop here
+          break;
+        }
+      }
+
+      // Check if file is at rotation size
+      if (offset >= this.rotationSize) {
+        return null; // File is at rotation size, create new one
+      }
+
+      return offset;
+    } catch {
+      return null; // File can't be read
+    }
+  }
+
+  /**
    * Create a new log file with header.
+   * Uses new format: {profileId}_{instanceId}_{timestamp}.crdtlog
    */
   private async createNewFile(): Promise<void> {
     const timestamp = await this.getUniqueTimestamp();
-    const filename = `${this.instanceId}_${timestamp}.crdtlog`;
+    const filename = `${this.profileId}_${this.instanceId}_${timestamp}.crdtlog`;
     this.currentFile = this.fs.joinPath(this.logDir, filename);
 
     // Write header
     const header = writeLogHeader();
     await this.fs.writeFile(this.currentFile, header);
     this.currentOffset = LOG_HEADER_SIZE;
+
+    console.log(`[LogWriter] Created new log file: ${filename}`);
   }
 
   /**
@@ -167,10 +296,11 @@ export class LogWriter {
   private async getUniqueTimestamp(): Promise<number> {
     let timestamp = Date.now();
 
-    // Check for existing files with this instance ID
+    // Check for existing files with this profile+instance ID
     const files = await this.fs.listFiles(this.logDir);
+    const prefix = `${this.profileId}_${this.instanceId}_`;
     const ourFiles = files
-      .filter((f) => f.startsWith(`${this.instanceId}_`) && f.endsWith('.crdtlog'))
+      .filter((f) => f.startsWith(prefix) && f.endsWith('.crdtlog'))
       .map((f) => {
         const match = f.match(/_(\d+)\.crdtlog$/);
         return match ? parseInt(match[1]!, 10) : 0;

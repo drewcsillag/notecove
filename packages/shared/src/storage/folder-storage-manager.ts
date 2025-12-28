@@ -52,13 +52,15 @@ export interface FolderSyncStateDb {
 export class FolderStorageManager {
   private readonly fs: FileSystemAdapter;
   private readonly db: FolderSyncStateDb;
+  private readonly profileId: string;
   private readonly instanceId: string;
   private readonly logWriters: Map<string, LogWriter> = new Map();
   private readonly sequences: Map<string, number> = new Map();
 
-  constructor(fs: FileSystemAdapter, db: FolderSyncStateDb, instanceId: string) {
+  constructor(fs: FileSystemAdapter, db: FolderSyncStateDb, profileId: string, instanceId: string) {
     this.fs = fs;
     this.db = db;
+    this.profileId = profileId;
     this.instanceId = instanceId;
   }
 
@@ -174,7 +176,7 @@ export class FolderStorageManager {
       return existing;
     }
 
-    const writer = new LogWriter(paths.logs, this.instanceId, this.fs);
+    const writer = new LogWriter(paths.logs, this.profileId, this.instanceId, this.fs);
     this.logWriters.set(sdId, writer);
     return writer;
   }

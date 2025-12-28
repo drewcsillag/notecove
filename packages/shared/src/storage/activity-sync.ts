@@ -120,6 +120,62 @@ export interface ActivitySyncCallbacks {
   ) => Promise<void>;
 }
 
+/** Parsed activity log filename information */
+interface ParsedActivityFilename {
+  /** Full filename including .log extension */
+  filename: string;
+  /** Profile ID (null for old format files without profile) */
+  profileId: string | null;
+  /** Instance ID extracted from filename */
+  instanceId: string;
+}
+
+/**
+ * Parse activity log filename to extract profile and instance IDs.
+ *
+ * Supports both formats:
+ * - Old: `{instanceId}.log`
+ * - New: `{profileId}_{instanceId}.log`
+ *
+ * Detection logic: If the filename (without .log) contains exactly one underscore
+ * and both parts are valid ID lengths (22 chars for compact or 36 chars for full UUID),
+ * it's the new format. Otherwise it's the old format.
+ */
+function parseActivityFilename(filename: string): ParsedActivityFilename | null {
+  if (!filename.endsWith('.log')) return null;
+
+  const baseName = filename.slice(0, -4); // Remove .log
+
+  // Try to split by underscore
+  const underscoreIndex = baseName.indexOf('_');
+
+  if (underscoreIndex !== -1) {
+    const firstPart = baseName.slice(0, underscoreIndex);
+    const secondPart = baseName.slice(underscoreIndex + 1);
+
+    // Check if both parts look like valid IDs (22 or 36 chars)
+    // and that there's no underscore in the second part (which would indicate
+    // the first underscore was inside an old-format instance ID)
+    const isValidIdLength = (s: string) => s.length === 22 || s.length === 36;
+
+    if (isValidIdLength(firstPart) && isValidIdLength(secondPart) && !secondPart.includes('_')) {
+      // New format: {profileId}_{instanceId}.log
+      return {
+        filename,
+        profileId: firstPart,
+        instanceId: secondPart,
+      };
+    }
+  }
+
+  // Old format: {instanceId}.log
+  return {
+    filename,
+    profileId: null,
+    instanceId: baseName,
+  };
+}
+
 export class ActivitySync {
   // Track line count per instance's activity log file
   // This is more robust than tracking sequence numbers because:
@@ -138,6 +194,9 @@ export class ActivitySync {
   private skippedEntries = new Map<string, number>();
   private skippedEntriesLoaded = false;
 
+  // Profile ID for this instance (used for new format files)
+  private profileId: string | null = null;
+
   constructor(
     private fs: FileSystemAdapter,
     private instanceId: string,
@@ -145,6 +204,14 @@ export class ActivitySync {
     private sdId: string,
     private callbacks: ActivitySyncCallbacks
   ) {}
+
+  /**
+   * Set the profile ID for this instance.
+   * Used to identify our own log files in the new format.
+   */
+  setProfileId(profileId: string): void {
+    this.profileId = profileId;
+  }
 
   /**
    * Load previously skipped entries from persistence
@@ -321,10 +388,16 @@ export class ActivitySync {
       const files = await this.fs.listFiles(this.activityDir);
 
       for (const file of files) {
-        if (!file.endsWith('.log')) continue;
+        const parsed = parseActivityFilename(file);
+        if (!parsed) continue;
 
-        const otherInstanceId = file.replace('.log', '');
-        if (otherInstanceId === this.instanceId) continue; // Skip our own
+        // Skip our own log file - check both instance ID and profile ID
+        const isOwnFile =
+          parsed.instanceId === this.instanceId ||
+          (parsed.profileId !== null && parsed.profileId === this.profileId);
+        if (isOwnFile) continue;
+
+        const otherInstanceId = parsed.instanceId;
 
         // Record activity log processed metric
         this.callbacks.metrics?.recordActivityLogProcessed?.(otherInstanceId, this.sdId);
@@ -768,10 +841,22 @@ export class ActivitySync {
     const cleaned: Array<{ noteId: string; sequence: number }> = [];
 
     try {
-      const filePath = this.fs.joinPath(this.activityDir, `${this.instanceId}.log`);
+      // Try new format first, then fall back to old format
+      let filePath: string;
+      if (this.profileId) {
+        filePath = this.fs.joinPath(this.activityDir, `${this.profileId}_${this.instanceId}.log`);
+      } else {
+        filePath = this.fs.joinPath(this.activityDir, `${this.instanceId}.log`);
+      }
 
       // Check if our activity log exists
-      const exists = await this.fs.exists(filePath);
+      let exists = await this.fs.exists(filePath);
+      if (!exists && this.profileId) {
+        // Try old format as fallback
+        filePath = this.fs.joinPath(this.activityDir, `${this.instanceId}.log`);
+        exists = await this.fs.exists(filePath);
+      }
+
       if (!exists) {
         return cleaned;
       }

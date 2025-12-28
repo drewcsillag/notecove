@@ -86,6 +86,7 @@ function createMockFs(): FileSystemAdapter & {
 }
 
 describe('StorageMigration', () => {
+  const profileId = 'profile-migration';
   const instanceId = 'inst-migration';
 
   describe('migrateNote', () => {
@@ -114,7 +115,7 @@ describe('StorageMigration', () => {
         encoded2
       );
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const result = await migration.migrateNote(
         '/storage/sd-123/notes/note-abc/updates',
         '/storage/sd-123/notes/note-abc/logs',
@@ -141,7 +142,7 @@ describe('StorageMigration', () => {
       fs.directories.add('/storage/sd-123/notes/note-empty/updates');
       fs.directories.add('/storage/sd-123/notes/note-empty/logs');
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const result = await migration.migrateNote(
         '/storage/sd-123/notes/note-empty/updates',
         '/storage/sd-123/notes/note-empty/logs',
@@ -169,7 +170,7 @@ describe('StorageMigration', () => {
       fs.files.set('/storage/sd-123/notes/note-abc/updates/readme.txt', new Uint8Array([0x00]));
       fs.files.set('/storage/sd-123/notes/note-abc/updates/.hidden', new Uint8Array([0x00]));
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const result = await migration.migrateNote(
         '/storage/sd-123/notes/note-abc/updates',
         '/storage/sd-123/notes/note-abc/logs',
@@ -200,7 +201,7 @@ describe('StorageMigration', () => {
         encoded
       );
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const result = await migration.migrateFolders(
         '/storage/sd-123/folders/updates',
         '/storage/sd-123/folders/logs'
@@ -225,7 +226,7 @@ describe('StorageMigration', () => {
         new Uint8Array([0x01])
       );
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const needed = await migration.checkMigrationNeeded('/storage/sd-123/notes/note-abc/updates');
 
       expect(needed).toBe(true);
@@ -236,7 +237,7 @@ describe('StorageMigration', () => {
 
       fs.directories.add('/storage/sd-123/notes/note-abc/updates');
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const needed = await migration.checkMigrationNeeded('/storage/sd-123/notes/note-abc/updates');
 
       expect(needed).toBe(false);
@@ -245,7 +246,7 @@ describe('StorageMigration', () => {
     it('should return false if directory does not exist', async () => {
       const fs = createMockFs();
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const needed = await migration.checkMigrationNeeded('/storage/sd-123/notes/note-abc/updates');
 
       expect(needed).toBe(false);
@@ -260,7 +261,7 @@ describe('StorageMigration', () => {
       fs.files.set('/storage/sd-123/notes/note-abc/updates/old_1000.yjson', new Uint8Array([0x01]));
       fs.files.set('/storage/sd-123/notes/note-abc/updates/old_2000.yjson', new Uint8Array([0x02]));
 
-      const migration = new StorageMigration(fs, instanceId);
+      const migration = new StorageMigration(fs, profileId, instanceId);
       const deleted = await migration.cleanupOldFiles('/storage/sd-123/notes/note-abc/updates');
 
       expect(deleted).toBe(2);

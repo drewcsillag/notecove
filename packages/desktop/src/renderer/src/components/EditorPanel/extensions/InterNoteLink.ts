@@ -17,7 +17,7 @@ import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import type { ResolvedPos } from '@tiptap/pm/model';
-import { LINK_PATTERN } from '@notecove/shared';
+import { LINK_PATTERN, isFullUuid } from '@notecove/shared';
 import Suggestion from '@tiptap/suggestion';
 import type { SuggestionMatch } from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
@@ -605,7 +605,9 @@ function findLinksInRange(
       // Include decorations that OVERLAP with the specified range
       // This matches the behavior of DecorationSet.find() used when removing stale decorations
       if (from < rangeTo && to > rangeFrom) {
-        const noteId = (match[1] ?? '').toLowerCase();
+        // Only lowercase full UUIDs (36-char format) - compact UUIDs are case-sensitive
+        const rawId = match[1] ?? '';
+        const noteId = isFullUuid(rawId) ? rawId.toLowerCase() : rawId;
 
         // If we don't have the title cached, fetch it asynchronously
         if (!noteTitleCache.has(noteId)) {

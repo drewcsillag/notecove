@@ -10,6 +10,7 @@
  */
 
 import type { FileSystemAdapter, ProfilePresence, CachedProfilePresence } from '@notecove/shared';
+import { normalizeUuid } from '@notecove/shared';
 
 /**
  * Database operations needed by ProfilePresenceReader
@@ -53,9 +54,10 @@ export class ProfilePresenceReader {
       const presence = JSON.parse(text) as ProfilePresence;
 
       // Cache the presence data
+      // Normalize profile and instance IDs to compact format for consistent lookups
       const cachedPresence: CachedProfilePresence = {
-        profileId: presence.profileId,
-        instanceId: presence.instanceId,
+        profileId: normalizeUuid(presence.profileId),
+        instanceId: normalizeUuid(presence.instanceId),
         sdId,
         profileName: presence.profileName,
         user: presence.user,

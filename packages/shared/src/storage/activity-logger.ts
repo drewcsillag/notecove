@@ -9,22 +9,34 @@ import type { FileSystemAdapter } from './types';
 
 export class ActivityLogger {
   private activityLogPath: string;
-  private instanceId = '';
+  private profileId = '';
 
   constructor(
     private fs: FileSystemAdapter,
     private activityDir: string
   ) {
-    // Instance ID will be passed via setInstanceId() after construction
+    // IDs will be passed via setIds() after construction
     this.activityLogPath = '';
   }
 
   /**
-   * Set instance ID and initialize log path
+   * Set profile and instance IDs and initialize log path
+   *
+   * New filename format: {profileId}_{instanceId}.log
+   * Old format ({instanceId}.log) is still readable for backward compatibility.
+   */
+  setIds(profileId: string, instanceId: string): void {
+    this.profileId = profileId;
+    // instanceId is only used for the filename, not stored separately
+    this.activityLogPath = this.fs.joinPath(this.activityDir, `${profileId}_${instanceId}.log`);
+  }
+
+  /**
+   * @deprecated Use setIds() instead
    */
   setInstanceId(instanceId: string): void {
-    this.instanceId = instanceId;
-    this.activityLogPath = this.fs.joinPath(this.activityDir, `${instanceId}.log`);
+    // Legacy support - uses instanceId as both profile and instance
+    this.setIds(instanceId, instanceId);
   }
 
   /**
@@ -40,14 +52,18 @@ export class ActivityLogger {
    * Always appends a new line for each update to ensure other instances
    * see all intermediate sequence numbers during incremental sync.
    *
-   * Format: noteId|instanceId_sequenceNumber
-   * This allows other instances to poll for the specific update file.
+   * New format: noteId|profileId_sequenceNumber
+   * Old format: noteId|instanceId_sequenceNumber (still readable)
+   *
+   * The profileId uniquely identifies the source of the update. The instanceId
+   * is now stored in the filename ({profileId}_{instanceId}.log) rather than
+   * in each line.
    *
    * Note: The compact() function prevents unbounded growth by keeping
    * only the last 1000 entries.
    */
   async recordNoteActivity(noteId: string, sequenceNumber: number): Promise<void> {
-    const line = `${noteId}|${this.instanceId}_${sequenceNumber}`;
+    const line = `${noteId}|${this.profileId}_${sequenceNumber}`;
 
     // Always append - don't use replaceLastLine optimization
     // This ensures other instances see ALL intermediate sequences, which is

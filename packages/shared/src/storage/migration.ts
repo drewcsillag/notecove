@@ -25,10 +25,12 @@ interface UpdateFileInfo {
 
 export class StorageMigration {
   private readonly fs: FileSystemAdapter;
+  private readonly profileId: string;
   private readonly instanceId: string;
 
-  constructor(fs: FileSystemAdapter, instanceId: string) {
+  constructor(fs: FileSystemAdapter, profileId: string, instanceId: string) {
     this.fs = fs;
+    this.profileId = profileId;
     this.instanceId = instanceId;
   }
 
@@ -133,7 +135,7 @@ export class StorageMigration {
 
       // Write to new format
       if (updateInfos.length > 0) {
-        const writer = new LogWriter(logsDir, this.instanceId, this.fs);
+        const writer = new LogWriter(logsDir, this.profileId, this.instanceId, this.fs);
 
         let sequence = 1;
         for (const info of updateInfos) {

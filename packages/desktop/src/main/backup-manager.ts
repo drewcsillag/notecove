@@ -1,7 +1,8 @@
 import type { Database } from '@notecove/shared';
+import { generateCompactId } from '@notecove/shared';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
 
 export interface BackupMetadata {
   backupId: string;
@@ -462,7 +463,7 @@ export class BackupManager {
 
     // Create SD_ID file (restore original UUID or generate new one)
     const sdIdPath = path.join(targetPath, 'SD_ID');
-    const sdUuid = registerAsNew ? crypto.randomUUID() : backup.sdUuid;
+    const sdUuid = registerAsNew ? generateCompactId() : backup.sdUuid;
     fs.writeFileSync(sdIdPath, sdUuid);
 
     // Determine the SD name (add suffix if registering as new to avoid name conflicts)
@@ -626,7 +627,7 @@ export class BackupManager {
 
     // Create SD_ID file (restore original UUID or generate new one)
     const sdIdPath = path.join(targetPath, 'SD_ID');
-    const sdUuid = registerAsNew ? crypto.randomUUID() : backup.sdUuid;
+    const sdUuid = registerAsNew ? generateCompactId() : backup.sdUuid;
     fs.writeFileSync(sdIdPath, sdUuid);
 
     // Determine the SD name (add suffix if registering as new to avoid name conflicts)

@@ -540,9 +540,20 @@ export function getUuidCounter(): number {
 }
 
 /**
- * Increment and return a deterministic UUID
+ * Increment and return a deterministic UUID (full 36-char format)
  */
 export function nextUuid(): string {
   uuidCounter++;
   return `${uuidCounter.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
+}
+
+/**
+ * Increment and return a deterministic compact ID (22-char base64url format)
+ * Uses a predictable pattern for testing
+ */
+export function nextCompactId(): string {
+  uuidCounter++;
+  // Pad with 'A' to get 22 chars, prefix with counter
+  const base = uuidCounter.toString(36).toUpperCase();
+  return base.padStart(22, 'A');
 }

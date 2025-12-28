@@ -167,41 +167,47 @@ describe('SD Handlers', () => {
       const mockEvent = {} as any;
       const name = 'Work';
       const path = '/path/to/work';
-      const createdSD = {
-        id: '00000001-0000-4000-8000-000000000000',
-        name,
-        path,
-        created: Date.now(),
-        isActive: false,
-        uuid: 'target-uuid-5678',
-      };
 
-      mocks.database.createStorageDir.mockResolvedValue(createdSD);
+      // Capture the ID that was generated
+      let capturedId = '';
+      mocks.database.createStorageDir.mockImplementation(async (id: string) => {
+        capturedId = id;
+        return {
+          id,
+          name,
+          path,
+          created: Date.now(),
+          isActive: false,
+          uuid: 'target-uuid-5678',
+        };
+      });
 
       const result = await invokeHandler('sd:create', mockEvent, name, path);
 
+      // Verify createStorageDir was called with a compact UUID (22 chars)
       expect(mocks.database.createStorageDir).toHaveBeenCalledWith(
-        '00000001-0000-4000-8000-000000000000',
+        expect.stringMatching(/^[A-Za-z0-9_-]{22}$/),
         name,
         path
       );
-      expect(result).toEqual('00000001-0000-4000-8000-000000000000');
+      // Result should match the generated ID
+      expect(result).toBe(capturedId);
+      expect(result).toMatch(/^[A-Za-z0-9_-]{22}$/);
     });
 
     it('should create first SD as active', async () => {
       const mockEvent = {} as any;
       const name = 'Work';
       const path = '/path/to/work';
-      const createdSD = {
-        id: '00000001-0000-4000-8000-000000000000',
+
+      mocks.database.createStorageDir.mockImplementation(async (id: string) => ({
+        id,
         name,
         path,
         created: Date.now(),
         isActive: true,
         uuid: 'source-uuid-1234',
-      };
-
-      mocks.database.createStorageDir.mockResolvedValue(createdSD);
+      }));
 
       await invokeHandler('sd:create', mockEvent, name, path);
 

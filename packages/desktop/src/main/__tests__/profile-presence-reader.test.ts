@@ -92,9 +92,17 @@ describe('ProfilePresenceReader', () => {
   const testSdId = 'test-sd-id';
   const testSdPath = '/test/sd';
 
+  // Use valid UUID formats for testing
+  // Full 36-char UUID format (for testing backward compatibility)
+  const testProfileIdFull = '550e8400-e29b-41d4-a716-446655440000';
+  const testInstanceIdFull = '660e8400-e29b-41d4-a716-446655440001';
+  // Compact 22-char format (what normalizeUuid returns)
+  const testProfileIdCompact = 'VQ6EAOKbQdSnFkRmVUQAAA';
+  const testInstanceIdCompact = 'Zg6EAOKbQdSnFkRmVUQAAQ';
+
   const validPresence: ProfilePresence = {
-    profileId: 'profile-123',
-    instanceId: 'instance-123',
+    profileId: testProfileIdFull,
+    instanceId: testInstanceIdFull,
     profileName: 'Test Profile',
     user: '@testuser',
     username: 'Test User',
@@ -112,24 +120,25 @@ describe('ProfilePresenceReader', () => {
 
   describe('Step 5.1: presence info cached in local DB', () => {
     it('should read presence file and cache it in the database', async () => {
-      // Set up a valid presence file
-      const presenceFilePath = '/test/sd/profiles/profile-123.json';
+      // Set up a valid presence file (filename uses full UUID from disk)
+      const presenceFilePath = `/test/sd/profiles/${testProfileIdFull}.json`;
       mockFs.files.set(presenceFilePath, JSON.stringify(validPresence));
       mockFs.existingPaths.add('/test/sd/profiles');
 
       // Read and cache
-      const result = await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      const result = await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
-      // Should return the presence
+      // Should return the presence with normalized (compact) profileId
       expect(result).toBeDefined();
-      expect(result?.profileId).toBe('profile-123');
+      expect(result?.profileId).toBe(testProfileIdCompact);
       expect(result?.profileName).toBe('Test Profile');
       expect(result?.user).toBe('@testuser');
 
-      // Should have cached to database
+      // Should have cached to database with compact IDs
       expect(mockDb.upsertProfilePresenceCache).toHaveBeenCalledWith(
         expect.objectContaining({
-          profileId: 'profile-123',
+          profileId: testProfileIdCompact,
+          instanceId: testInstanceIdCompact,
           sdId: testSdId,
           profileName: 'Test Profile',
           user: '@testuser',
@@ -142,24 +151,30 @@ describe('ProfilePresenceReader', () => {
     });
 
     it('should read all presence files from an SD and cache them', async () => {
+      // Use additional valid UUIDs for multi-profile test
+      const profile1Full = '770e8400-e29b-41d4-a716-446655440002';
+      const profile1Compact = 'dw6EAOKbQdSnFkRmVUQAAg';
+      const profile2Full = '880e8400-e29b-41d4-a716-446655440003';
+      const profile2Compact = 'iA6EAOKbQdSnFkRmVUQAAw';
+
       // Set up multiple presence files
       mockFs.existingPaths.add('/test/sd/profiles');
       mockFs.files.set(
-        '/test/sd/profiles/profile-1.json',
-        JSON.stringify({ ...validPresence, profileId: 'profile-1', profileName: 'Profile 1' })
+        `/test/sd/profiles/${profile1Full}.json`,
+        JSON.stringify({ ...validPresence, profileId: profile1Full, profileName: 'Profile 1' })
       );
       mockFs.files.set(
-        '/test/sd/profiles/profile-2.json',
-        JSON.stringify({ ...validPresence, profileId: 'profile-2', profileName: 'Profile 2' })
+        `/test/sd/profiles/${profile2Full}.json`,
+        JSON.stringify({ ...validPresence, profileId: profile2Full, profileName: 'Profile 2' })
       );
 
       // Read all presence files
       const results = await reader.readAllPresenceFiles(testSdPath, testSdId);
 
-      // Should return both presences
+      // Should return both presences with normalized (compact) IDs
       expect(results).toHaveLength(2);
-      expect(results.map((p) => p.profileId)).toContain('profile-1');
-      expect(results.map((p) => p.profileId)).toContain('profile-2');
+      expect(results.map((p) => p.profileId)).toContain(profile1Compact);
+      expect(results.map((p) => p.profileId)).toContain(profile2Compact);
 
       // Should have cached both to database
       expect(mockDb.upsertProfilePresenceCache).toHaveBeenCalledTimes(2);
@@ -177,13 +192,13 @@ describe('ProfilePresenceReader', () => {
   describe('Step 5.2: partial/corrupt JSON uses cached value', () => {
     it('should fall back to cached value when JSON is corrupt', async () => {
       // Set up corrupt presence file
-      const presenceFilePath = '/test/sd/profiles/profile-123.json';
+      const presenceFilePath = `/test/sd/profiles/${testProfileIdFull}.json`;
       mockFs.files.set(presenceFilePath, '{ invalid json that is not parseable');
       mockFs.existingPaths.add('/test/sd/profiles');
 
-      // Set up cached value in database
+      // Set up cached value in database (uses compact ID as key)
       const cachedPresence: CachedProfilePresence = {
-        profileId: 'profile-123',
+        profileId: testProfileIdFull, // Cache lookup uses the ID passed to readAndCachePresence
         instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile',
@@ -195,10 +210,10 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now() - 86400000, // 1 day ago
         cachedAt: Date.now() - 3600000,
       };
-      mockDb.cache.set('profile-123:test-sd-id', cachedPresence);
+      mockDb.cache.set(`${testProfileIdFull}:test-sd-id`, cachedPresence);
 
       // Read should fall back to cache
-      const result = await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      const result = await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
       expect(result).toBeDefined();
       expect(result?.profileName).toBe('Cached Profile');
@@ -207,13 +222,16 @@ describe('ProfilePresenceReader', () => {
 
     it('should fall back to cached value when file is truncated', async () => {
       // Set up truncated presence file (partial JSON)
-      const presenceFilePath = '/test/sd/profiles/profile-123.json';
-      mockFs.files.set(presenceFilePath, '{"profileId":"profile-123","profileName":"Trunc');
+      const presenceFilePath = `/test/sd/profiles/${testProfileIdFull}.json`;
+      mockFs.files.set(
+        presenceFilePath,
+        `{"profileId":"${testProfileIdFull}","profileName":"Trunc`
+      );
       mockFs.existingPaths.add('/test/sd/profiles');
 
       // Set up cached value
       const cachedPresence: CachedProfilePresence = {
-        profileId: 'profile-123',
+        profileId: testProfileIdFull,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile',
@@ -225,10 +243,10 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now() - 86400000,
         cachedAt: Date.now() - 3600000,
       };
-      mockDb.cache.set('profile-123:test-sd-id', cachedPresence);
+      mockDb.cache.set(`${testProfileIdFull}:test-sd-id`, cachedPresence);
 
       // Read should fall back to cache
-      const result = await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      const result = await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
       expect(result).toBeDefined();
       expect(result?.profileName).toBe('Cached Profile');
@@ -240,7 +258,7 @@ describe('ProfilePresenceReader', () => {
 
       // Set up cached value
       const cachedPresence: CachedProfilePresence = {
-        profileId: 'profile-123',
+        profileId: testProfileIdFull,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile',
@@ -252,10 +270,10 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now() - 86400000,
         cachedAt: Date.now() - 3600000,
       };
-      mockDb.cache.set('profile-123:test-sd-id', cachedPresence);
+      mockDb.cache.set(`${testProfileIdFull}:test-sd-id`, cachedPresence);
 
       // Read should fall back to cache
-      const result = await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      const result = await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
       expect(result).toBeDefined();
       expect(result?.profileName).toBe('Cached Profile');
@@ -263,12 +281,12 @@ describe('ProfilePresenceReader', () => {
 
     it('should return null when file is corrupt and no cache exists', async () => {
       // Set up corrupt presence file
-      const presenceFilePath = '/test/sd/profiles/profile-123.json';
+      const presenceFilePath = `/test/sd/profiles/${testProfileIdFull}.json`;
       mockFs.files.set(presenceFilePath, '{ corrupt json }');
       mockFs.existingPaths.add('/test/sd/profiles');
       // No cached value
 
-      const result = await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      const result = await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
       expect(result).toBeNull();
     });
@@ -277,24 +295,29 @@ describe('ProfilePresenceReader', () => {
       mockFs.existingPaths.add('/test/sd/profiles');
       // No file, no cache
 
-      const result = await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      const result = await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
       expect(result).toBeNull();
     });
 
     it('should skip corrupt files when reading all presence files', async () => {
+      // Use additional valid UUIDs
+      const profile1Full = '770e8400-e29b-41d4-a716-446655440002';
+      const profile1Compact = 'dw6EAOKbQdSnFkRmVUQAAg';
+      const profile2Full = '880e8400-e29b-41d4-a716-446655440003';
+
       mockFs.existingPaths.add('/test/sd/profiles');
 
       // One valid, one corrupt
       mockFs.files.set(
-        '/test/sd/profiles/profile-1.json',
-        JSON.stringify({ ...validPresence, profileId: 'profile-1' })
+        `/test/sd/profiles/${profile1Full}.json`,
+        JSON.stringify({ ...validPresence, profileId: profile1Full })
       );
-      mockFs.files.set('/test/sd/profiles/profile-2.json', '{ corrupt }');
+      mockFs.files.set(`/test/sd/profiles/${profile2Full}.json`, '{ corrupt }');
 
       // Set up cached value for corrupt file
       const cachedPresence: CachedProfilePresence = {
-        profileId: 'profile-2',
+        profileId: profile2Full,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile 2',
@@ -306,14 +329,16 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now(),
         cachedAt: Date.now(),
       };
-      mockDb.cache.set('profile-2:test-sd-id', cachedPresence);
+      mockDb.cache.set(`${profile2Full}:test-sd-id`, cachedPresence);
 
       const results = await reader.readAllPresenceFiles(testSdPath, testSdId);
 
-      // Should have 2 results: one from file, one from cache
+      // Should have 2 results: one from file (normalized), one from cache
       expect(results).toHaveLength(2);
-      expect(results.find((p) => p.profileId === 'profile-1')?.profileName).toBe('Test Profile');
-      expect(results.find((p) => p.profileId === 'profile-2')?.profileName).toBe(
+      expect(results.find((p) => p.profileId === profile1Compact)?.profileName).toBe(
+        'Test Profile'
+      );
+      expect(results.find((p) => p.profileId === profile2Full)?.profileName).toBe(
         'Cached Profile 2'
       );
     });
@@ -322,13 +347,13 @@ describe('ProfilePresenceReader', () => {
   describe('getPresence (with cache fallback)', () => {
     it('should prefer fresh file data over cached data', async () => {
       // Set up presence file
-      const presenceFilePath = '/test/sd/profiles/profile-123.json';
+      const presenceFilePath = `/test/sd/profiles/${testProfileIdFull}.json`;
       mockFs.files.set(presenceFilePath, JSON.stringify(validPresence));
       mockFs.existingPaths.add('/test/sd/profiles');
 
       // Set up older cached value
       const cachedPresence: CachedProfilePresence = {
-        profileId: 'profile-123',
+        profileId: testProfileIdFull,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Old Cached Name',
@@ -340,9 +365,9 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now() - 86400000,
         cachedAt: Date.now() - 3600000,
       };
-      mockDb.cache.set('profile-123:test-sd-id', cachedPresence);
+      mockDb.cache.set(`${testProfileIdFull}:test-sd-id`, cachedPresence);
 
-      const result = await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      const result = await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
       // Should return fresh file data, not cached
       expect(result?.profileName).toBe('Test Profile');
@@ -351,16 +376,16 @@ describe('ProfilePresenceReader', () => {
 
     it('should update cache when reading fresh file data', async () => {
       // Set up presence file
-      const presenceFilePath = '/test/sd/profiles/profile-123.json';
+      const presenceFilePath = `/test/sd/profiles/${testProfileIdFull}.json`;
       mockFs.files.set(presenceFilePath, JSON.stringify(validPresence));
       mockFs.existingPaths.add('/test/sd/profiles');
 
-      await reader.readAndCachePresence(testSdPath, testSdId, 'profile-123');
+      await reader.readAndCachePresence(testSdPath, testSdId, testProfileIdFull);
 
-      // Cache should have been updated
+      // Cache should have been updated with compact IDs
       expect(mockDb.upsertProfilePresenceCache).toHaveBeenCalledWith(
         expect.objectContaining({
-          profileId: 'profile-123',
+          profileId: testProfileIdCompact,
           profileName: 'Test Profile',
         })
       );
@@ -369,9 +394,13 @@ describe('ProfilePresenceReader', () => {
 
   describe('getCachedPresenceForSd', () => {
     it('should return all cached presences for an SD', async () => {
+      // Use valid UUIDs
+      const profile1Compact = 'dw6EAOKbQdSnFkRmVUQAAg';
+      const profile2Compact = 'iA6EAOKbQdSnFkRmVUQAAw';
+
       // Set up cached values
       const cached1: CachedProfilePresence = {
-        profileId: 'profile-1',
+        profileId: profile1Compact,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Profile 1',
@@ -384,7 +413,7 @@ describe('ProfilePresenceReader', () => {
         cachedAt: Date.now(),
       };
       const cached2: CachedProfilePresence = {
-        profileId: 'profile-2',
+        profileId: profile2Compact,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Profile 2',
@@ -396,8 +425,8 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now(),
         cachedAt: Date.now(),
       };
-      mockDb.cache.set('profile-1:test-sd-id', cached1);
-      mockDb.cache.set('profile-2:test-sd-id', cached2);
+      mockDb.cache.set(`${profile1Compact}:test-sd-id`, cached1);
+      mockDb.cache.set(`${profile2Compact}:test-sd-id`, cached2);
 
       const results = await reader.getCachedPresenceForSd(testSdId);
 
@@ -409,7 +438,7 @@ describe('ProfilePresenceReader', () => {
   describe('getCachedPresence', () => {
     it('should return cached presence for specific profile', async () => {
       const cachedPresence: CachedProfilePresence = {
-        profileId: 'profile-123',
+        profileId: testProfileIdCompact,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Test Profile',
@@ -421,17 +450,19 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now(),
         cachedAt: Date.now(),
       };
-      mockDb.cache.set('profile-123:test-sd-id', cachedPresence);
+      mockDb.cache.set(`${testProfileIdCompact}:test-sd-id`, cachedPresence);
 
-      const result = await reader.getCachedPresence('profile-123', testSdId);
+      const result = await reader.getCachedPresence(testProfileIdCompact, testSdId);
 
       expect(result).toBeDefined();
       expect(result?.profileName).toBe('Test Profile');
-      expect(mockDb.getProfilePresenceCache).toHaveBeenCalledWith('profile-123', testSdId);
+      expect(mockDb.getProfilePresenceCache).toHaveBeenCalledWith(testProfileIdCompact, testSdId);
     });
 
     it('should return null when no cached presence exists', async () => {
-      const result = await reader.getCachedPresence('non-existent', testSdId);
+      // Use a valid but non-existent compact UUID
+      const nonExistentId = 'AAAAAAAAAAAAAAAAAAAAAA';
+      const result = await reader.getCachedPresence(nonExistentId, testSdId);
 
       expect(result).toBeNull();
     });
@@ -439,6 +470,9 @@ describe('ProfilePresenceReader', () => {
 
   describe('readAllPresenceFiles error handling', () => {
     it('should fall back to cached presences when listFiles throws', async () => {
+      // Use valid compact UUID
+      const profile1Compact = 'dw6EAOKbQdSnFkRmVUQAAg';
+
       // Set up profiles directory to exist
       mockFs.existingPaths.add('/test/sd/profiles');
 
@@ -447,7 +481,7 @@ describe('ProfilePresenceReader', () => {
 
       // Set up cached values
       const cachedPresence: CachedProfilePresence = {
-        profileId: 'profile-1',
+        profileId: profile1Compact,
         instanceId: null,
         sdId: testSdId,
         profileName: 'Cached Profile',
@@ -459,7 +493,7 @@ describe('ProfilePresenceReader', () => {
         lastUpdated: Date.now(),
         cachedAt: Date.now(),
       };
-      mockDb.cache.set('profile-1:test-sd-id', cachedPresence);
+      mockDb.cache.set(`${profile1Compact}:test-sd-id`, cachedPresence);
 
       // Suppress console.error for this test
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();

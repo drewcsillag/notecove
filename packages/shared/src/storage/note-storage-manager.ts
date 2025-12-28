@@ -51,15 +51,17 @@ export interface NoteSyncStateDb {
 export class NoteStorageManager {
   private readonly fs: FileSystemAdapter;
   private readonly db: NoteSyncStateDb;
+  private readonly profileId: string;
   private readonly instanceId: string;
   private readonly logWriters: Map<string, LogWriter> = new Map();
   private readonly sequences: Map<string, number> = new Map();
   // Write queues to serialize writes per note and prevent out-of-order records
   private readonly writeQueues: Map<string, Promise<SaveUpdateResult>> = new Map();
 
-  constructor(fs: FileSystemAdapter, db: NoteSyncStateDb, instanceId: string) {
+  constructor(fs: FileSystemAdapter, db: NoteSyncStateDb, profileId: string, instanceId: string) {
     this.fs = fs;
     this.db = db;
+    this.profileId = profileId;
     this.instanceId = instanceId;
   }
 
@@ -218,7 +220,7 @@ export class NoteStorageManager {
       return existing;
     }
 
-    const writer = new LogWriter(paths.logs, this.instanceId, this.fs);
+    const writer = new LogWriter(paths.logs, this.profileId, this.instanceId, this.fs);
     this.logWriters.set(noteId, writer);
     return writer;
   }

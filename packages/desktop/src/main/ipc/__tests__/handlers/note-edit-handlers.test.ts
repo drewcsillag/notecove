@@ -370,7 +370,8 @@ describe('Note Edit Handlers', () => {
 
       const duplicateId = await invokeHandler('note:duplicate', mockEvent, originalNoteId);
 
-      expect(duplicateId).toBe('00000001-0000-4000-8000-000000000000');
+      // Check that a valid compact UUID was generated (22 chars, base64url)
+      expect(duplicateId).toMatch(/^[A-Za-z0-9_-]{22}$/);
       expect(mocks.crdtManager.loadNote).toHaveBeenCalledWith(duplicateId, 'test-sd');
       expect(mocks.database.upsertNote).toHaveBeenCalledWith(
         expect.objectContaining({

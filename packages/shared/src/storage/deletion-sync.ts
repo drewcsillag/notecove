@@ -9,6 +9,54 @@
 
 import type { FileSystemAdapter } from './types';
 
+/** Parsed deletion log filename information */
+interface ParsedDeletionFilename {
+  /** Full filename including .log extension */
+  filename: string;
+  /** Profile ID (null for old format files without profile) */
+  profileId: string | null;
+  /** Instance ID extracted from filename */
+  instanceId: string;
+}
+
+/**
+ * Parse deletion log filename to extract profile and instance IDs.
+ *
+ * Supports both formats:
+ * - Old: `{instanceId}.log`
+ * - New: `{profileId}_{instanceId}.log`
+ */
+function parseDeletionFilename(filename: string): ParsedDeletionFilename | null {
+  if (!filename.endsWith('.log')) return null;
+
+  const baseName = filename.slice(0, -4); // Remove .log
+  const underscoreIndex = baseName.indexOf('_');
+
+  if (underscoreIndex !== -1) {
+    const firstPart = baseName.slice(0, underscoreIndex);
+    const secondPart = baseName.slice(underscoreIndex + 1);
+
+    // Check if both parts look like valid IDs (22 or 36 chars)
+    const isValidIdLength = (s: string) => s.length === 22 || s.length === 36;
+
+    if (isValidIdLength(firstPart) && isValidIdLength(secondPart) && !secondPart.includes('_')) {
+      // New format: {profileId}_{instanceId}.log
+      return {
+        filename,
+        profileId: firstPart,
+        instanceId: secondPart,
+      };
+    }
+  }
+
+  // Old format: {instanceId}.log
+  return {
+    filename,
+    profileId: null,
+    instanceId: baseName,
+  };
+}
+
 export interface DeletionSyncCallbacks {
   /**
    * Permanently delete a note from the local database and CRDT manager.
@@ -28,12 +76,23 @@ export class DeletionSync {
   // Key: instanceId, Value: set of noteIds already processed from that instance
   private processedDeletions = new Map<string, Set<string>>();
 
+  // Profile ID for this instance (used for new format files)
+  private profileId: string | null = null;
+
   constructor(
     private fs: FileSystemAdapter,
     private instanceId: string,
     private deletionDir: string,
     private callbacks: DeletionSyncCallbacks
   ) {}
+
+  /**
+   * Set the profile ID for this instance.
+   * Used to identify our own log files in the new format.
+   */
+  setProfileId(profileId: string): void {
+    this.profileId = profileId;
+  }
 
   /**
    * Sync deletions from other instances' deletion logs
@@ -47,10 +106,16 @@ export class DeletionSync {
       const files = await this.fs.listFiles(this.deletionDir);
 
       for (const file of files) {
-        if (!file.endsWith('.log')) continue;
+        const parsed = parseDeletionFilename(file);
+        if (!parsed) continue;
 
-        const otherInstanceId = file.replace('.log', '');
-        if (otherInstanceId === this.instanceId) continue; // Skip our own
+        // Skip our own log file - check both instance ID and profile ID
+        const isOwnFile =
+          parsed.instanceId === this.instanceId ||
+          (parsed.profileId !== null && parsed.profileId === this.profileId);
+        if (isOwnFile) continue;
+
+        const otherInstanceId = parsed.instanceId;
 
         const filePath = this.fs.joinPath(this.deletionDir, file);
 

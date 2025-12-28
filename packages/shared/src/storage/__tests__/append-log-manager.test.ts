@@ -115,6 +115,7 @@ function createMockDb() {
 }
 
 describe('AppendLogManager', () => {
+  const profileId = 'profile-local';
   const instanceId = 'inst-local';
 
   describe('registerSD', () => {
@@ -122,7 +123,7 @@ describe('AppendLogManager', () => {
       const fs = createMockFs();
       const db = createMockDb();
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       expect(manager.hasSD('sd-123')).toBe(true);
@@ -132,7 +133,7 @@ describe('AppendLogManager', () => {
       const fs = createMockFs();
       const db = createMockDb();
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
       manager.unregisterSD('sd-123');
 
@@ -148,7 +149,7 @@ describe('AppendLogManager', () => {
       // Create required directories
       fs.directories.add('/storage/sd-123/notes/note-abc/logs');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       const doc = new Y.Doc();
@@ -170,7 +171,7 @@ describe('AppendLogManager', () => {
 
       fs.directories.add('/storage/sd-123/notes/note-abc/logs');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       const update = new Uint8Array([0x01, 0x02]);
@@ -193,7 +194,7 @@ describe('AppendLogManager', () => {
       fs.directories.add('/storage/sd-123/notes/note-abc/logs');
       fs.directories.add('/storage/sd-123/notes/note-abc/snapshots');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       // Write an update
@@ -216,7 +217,7 @@ describe('AppendLogManager', () => {
       fs.directories.add('/storage/sd-123/notes/note-new/logs');
       fs.directories.add('/storage/sd-123/notes/note-new/snapshots');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       const result = await manager.loadNote('sd-123', 'note-new');
@@ -233,7 +234,7 @@ describe('AppendLogManager', () => {
 
       fs.directories.add('/storage/sd-123/folders/logs');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       const doc = new Y.Doc();
@@ -258,7 +259,7 @@ describe('AppendLogManager', () => {
       fs.directories.add('/storage/sd-123/folders/logs');
       fs.directories.add('/storage/sd-123/folders/snapshots');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       // Write a folder update
@@ -287,7 +288,7 @@ describe('AppendLogManager', () => {
       fs.directories.add('/storage/sd-123/notes/note-abc/logs');
       fs.directories.add('/storage/sd-123/notes/note-abc/snapshots');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       const doc = new Y.Doc();
@@ -309,7 +310,7 @@ describe('AppendLogManager', () => {
 
       fs.directories.add('/storage/sd-123/notes/note-abc/logs');
 
-      const manager = new AppendLogManager(fs, db, instanceId);
+      const manager = new AppendLogManager(fs, db, profileId, instanceId);
       manager.registerSD('sd-123', '/storage/sd-123');
 
       // Write some updates
