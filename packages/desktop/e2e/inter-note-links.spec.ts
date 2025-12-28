@@ -10,6 +10,9 @@ import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
 
+// Tests share an Electron instance via beforeAll, so they must run serially
+test.describe.configure({ mode: 'serial' });
+
 let electronApp: ElectronApplication;
 let page: Page;
 let testUserDataDir: string;
@@ -50,6 +53,20 @@ test.afterAll(async () => {
   } catch (err) {
     console.error('[E2E Links] Failed to clean up test userData directory:', err);
   }
+});
+
+// Clean up all notes before each test to ensure test isolation
+test.beforeEach(async () => {
+  await page.evaluate(async () => {
+    const sds = await window.electronAPI.sd.list();
+    for (const sd of sds) {
+      const notes = await window.electronAPI.note.list(sd.id);
+      for (const note of notes) {
+        await window.electronAPI.note.delete(note.id);
+      }
+    }
+  });
+  await page.waitForTimeout(300); // Allow UI to update
 });
 
 test.describe('Inter-Note Links - Basic Rendering', () => {
@@ -152,21 +169,28 @@ test.describe('Inter-Note Links - Autocomplete', () => {
     await page.waitForTimeout(500);
 
     editor = page.locator('.ProseMirror');
-    await editor.click();
-    await page.keyboard.type('[[');
-    await page.waitForTimeout(1000); // Give autocomplete time to appear
+    // Click on paragraph to avoid heading interpretation
+    const paragraph = editor.locator('p').first();
+    await paragraph.click();
+    await page.waitForTimeout(300);
 
-    // The autocomplete popup should appear
-    const autocompletePopup = page.locator('[role="tooltip"]');
-    await expect(autocompletePopup).toBeVisible({ timeout: 3000 });
+    // Type prefix to avoid heading, then [[Auto to trigger autocomplete
+    await page.keyboard.type('Test ');
+    await page.waitForTimeout(200);
+    // Type [[ and query character by character
+    for (const char of '[[Auto') {
+      await page.keyboard.type(char);
+      await page.waitForTimeout(100);
+    }
+    await page.waitForTimeout(2000); // Give autocomplete time to appear
 
-    // Verify that the target note appears in suggestions
+    // Verify that the target note appears in autocomplete suggestions
     const targetNoteItem = page
       .locator('[role="tooltip"]')
       .getByText('Autocomplete Target Note', { exact: false })
       .first();
 
-    await expect(targetNoteItem).toBeVisible({ timeout: 3000 });
+    await expect(targetNoteItem).toBeVisible({ timeout: 5000 });
   });
 
   test('should filter autocomplete suggestions based on query', async () => {
@@ -192,13 +216,18 @@ test.describe('Inter-Note Links - Autocomplete', () => {
     await page.waitForTimeout(500);
 
     editor = page.locator('.ProseMirror');
-    await editor.click();
-    await page.keyboard.type('[[Pro');
-    await page.waitForTimeout(1500); // Give autocomplete time to query
+    const paragraph = editor.locator('p').first();
+    await paragraph.click();
+    await page.waitForTimeout(300);
 
-    // The autocomplete popup should appear
-    const autocompletePopup = page.locator('[role="tooltip"]');
-    await expect(autocompletePopup).toBeVisible({ timeout: 3000 });
+    // Type prefix then [[ with query character by character
+    await page.keyboard.type('Test ');
+    await page.waitForTimeout(200);
+    for (const char of '[[Pro') {
+      await page.keyboard.type(char);
+      await page.waitForTimeout(100);
+    }
+    await page.waitForTimeout(2000); // Give autocomplete time to query
 
     // Both 'Programming Guide' and 'Project Notes' should be suggested
     const programmingItem = page
@@ -211,8 +240,8 @@ test.describe('Inter-Note Links - Autocomplete', () => {
       .getByText('Project Notes', { exact: false })
       .first();
 
-    await expect(programmingItem).toBeVisible({ timeout: 3000 });
-    await expect(projectItem).toBeVisible({ timeout: 3000 });
+    await expect(programmingItem).toBeVisible({ timeout: 5000 });
+    await expect(projectItem).toBeVisible({ timeout: 5000 });
   });
 
   test('should insert link when autocomplete suggestion is selected', async () => {
@@ -237,19 +266,25 @@ test.describe('Inter-Note Links - Autocomplete', () => {
     await page.waitForTimeout(500);
 
     editor = page.locator('.ProseMirror');
-    await editor.click();
-    await page.keyboard.type('[[Inser');
-    await page.waitForTimeout(1500);
+    const paragraph = editor.locator('p').first();
+    await paragraph.click();
+    await page.waitForTimeout(300);
 
-    // Wait for autocomplete
-    const autocompletePopup = page.locator('[role="tooltip"]');
-    await expect(autocompletePopup).toBeVisible({ timeout: 3000 });
+    // Type prefix then [[ with query character by character
+    await page.keyboard.type('Test ');
+    await page.waitForTimeout(200);
+    for (const char of '[[Inser') {
+      await page.keyboard.type(char);
+      await page.waitForTimeout(100);
+    }
+    await page.waitForTimeout(2000);
 
+    // Wait for autocomplete suggestion
     const insertMeItem = page
       .locator('[role="tooltip"]')
       .getByText('Insert Me Note', { exact: false })
       .first();
-    await expect(insertMeItem).toBeVisible({ timeout: 3000 });
+    await expect(insertMeItem).toBeVisible({ timeout: 5000 });
 
     // Press Enter to select
     await page.keyboard.press('Enter');
@@ -279,20 +314,32 @@ test.describe('Inter-Note Links - Autocomplete', () => {
     await page.waitForTimeout(500);
 
     editor = page.locator('.ProseMirror');
-    await editor.click();
-    await page.keyboard.type('[[');
-    await page.waitForTimeout(1000);
+    const paragraph = editor.locator('p').first();
+    await paragraph.click();
+    await page.waitForTimeout(300);
 
-    // Wait for autocomplete to appear
-    const autocompletePopup = page.locator('[role="tooltip"]');
-    await expect(autocompletePopup).toBeVisible({ timeout: 3000 });
+    // Type prefix then [[ with query character by character
+    await page.keyboard.type('Test ');
+    await page.waitForTimeout(200);
+    for (const char of '[[Escape') {
+      await page.keyboard.type(char);
+      await page.waitForTimeout(100);
+    }
+    await page.waitForTimeout(2000);
+
+    // Wait for autocomplete suggestion to appear
+    const escapeTestItem = page
+      .locator('[role="tooltip"]')
+      .getByText('Escape Test Note', { exact: false })
+      .first();
+    await expect(escapeTestItem).toBeVisible({ timeout: 5000 });
 
     // Press Escape to close
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    // Autocomplete popup should be hidden
-    await expect(autocompletePopup).not.toBeVisible();
+    // Autocomplete suggestion should be hidden
+    await expect(escapeTestItem).not.toBeVisible();
   });
 });
 

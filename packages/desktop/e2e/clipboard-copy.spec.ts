@@ -65,29 +65,36 @@ test.afterEach(async () => {
 
 test.describe('Clipboard Copy', () => {
   test('copying paragraphs should preserve blank lines between them', async () => {
-    // Wait for editor to be ready
-    await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-    const editor = page.locator('.ProseMirror');
-    await editor.click();
+    // Create a new note to ensure editor is ready
+    await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
 
-    // Clear any existing content and type multiple paragraphs
-    await page.keyboard.press('Meta+a');
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(300);
+
+    // Clear any existing content with triple-click to select all in editor, then delete
+    await editor.click({ clickCount: 3 });
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(300);
 
     // Type first paragraph
     await page.keyboard.type('First paragraph');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     // Type second paragraph
     await page.keyboard.type('Second paragraph');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     // Type third paragraph
     await page.keyboard.type('Third paragraph');
 
     await page.waitForTimeout(500);
 
-    // Select all and copy
+    // Select all content in editor and copy
+    // Use Cmd+A only when editor has focus - re-focus first
+    await editor.focus();
+    await page.waitForTimeout(100);
     await page.keyboard.press('Meta+a');
     await page.waitForTimeout(200);
     await page.keyboard.press('Meta+c');
@@ -106,32 +113,39 @@ test.describe('Clipboard Copy', () => {
   });
 
   test('copying bullet list items should use single newlines between them', async () => {
-    // Wait for editor to be ready
-    await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-    const editor = page.locator('.ProseMirror');
-    await editor.click();
+    // Create a new note to ensure editor is ready
+    await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
 
-    // Clear any existing content
-    await page.keyboard.press('Meta+a');
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(300);
+
+    // Clear any existing content with triple-click
+    await editor.click({ clickCount: 3 });
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(300);
 
     // Type a header first
     await page.keyboard.type('My List');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
 
     // Create a bullet list using toolbar or markdown syntax
     // Type dash-space to start a bullet list
     await page.keyboard.type('- First item');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     await page.keyboard.type('Second item');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     await page.keyboard.type('Third item');
 
     await page.waitForTimeout(500);
 
-    // Select all and copy
+    // Select all and copy - ensure editor has focus
+    await editor.focus();
+    await page.waitForTimeout(100);
     await page.keyboard.press('Meta+a');
     await page.waitForTimeout(200);
     await page.keyboard.press('Meta+c');
@@ -150,14 +164,16 @@ test.describe('Clipboard Copy', () => {
   });
 
   test('copying mixed content (header + list) should have correct spacing', async () => {
-    // Wait for editor to be ready
-    await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-    const editor = page.locator('.ProseMirror');
-    await editor.click();
+    // Create a new note to ensure editor is ready
+    await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
 
-    // Clear any existing content
-    await page.keyboard.press('Meta+a');
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(300);
+
+    // Clear any existing content with triple-click
+    await editor.click({ clickCount: 3 });
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(300);
 
@@ -165,15 +181,20 @@ test.describe('Clipboard Copy', () => {
     // A header followed by bullet list items
     await page.keyboard.type('Your responsibilities:');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     await page.keyboard.type('- Analyze and understand the existing codebase thoroughly.');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     await page.keyboard.type('Determine exactly how this feature integrates.');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     await page.keyboard.type('Clearly identify anything unclear or ambiguous.');
 
     await page.waitForTimeout(500);
 
-    // Select all and copy
+    // Select all and copy - ensure editor has focus
+    await editor.focus();
+    await page.waitForTimeout(100);
     await page.keyboard.press('Meta+a');
     await page.waitForTimeout(200);
     await page.keyboard.press('Meta+c');
@@ -260,22 +281,26 @@ test.describe('Clipboard Copy', () => {
   });
 
   test('copying just bullet list should use single newlines', async () => {
-    // Wait for editor to be ready
-    await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-    const editor = page.locator('.ProseMirror');
-    await editor.click();
+    // Create a new note to ensure editor is ready
+    await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
 
-    // Clear any existing content
-    await page.keyboard.press('Meta+a');
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.waitForTimeout(300);
+
+    // Clear any existing content with triple-click
+    await editor.click({ clickCount: 3 });
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(300);
 
     // Create just a bullet list (no preceding paragraph)
     await page.keyboard.type('- First item');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     await page.keyboard.type('Second item');
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(100);
     await page.keyboard.type('Third item');
 
     await page.waitForTimeout(500);
@@ -284,7 +309,9 @@ test.describe('Clipboard Copy', () => {
     const editorContent = await editor.textContent();
     console.log('[E2E] Editor content before copy:', JSON.stringify(editorContent));
 
-    // Select all and copy
+    // Select all and copy - ensure editor has focus
+    await editor.focus();
+    await page.waitForTimeout(100);
     await page.keyboard.press('Meta+a');
     await page.waitForTimeout(200);
     await page.keyboard.press('Meta+c');

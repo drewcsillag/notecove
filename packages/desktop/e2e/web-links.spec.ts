@@ -14,6 +14,9 @@ let electronApp: ElectronApplication;
 let page: Page;
 let testUserDataDir: string;
 
+// Tests share an Electron instance via beforeAll, so they must run serially
+test.describe.configure({ mode: 'serial' });
+
 test.beforeAll(async () => {
   // Create unique temp directory for this test
   testUserDataDir = path.join(
@@ -51,6 +54,20 @@ test.afterAll(async () => {
   } catch (err) {
     console.error('[E2E WebLinks] Failed to clean up test userData directory:', err);
   }
+});
+
+// Clean up all notes before each test to ensure test isolation
+test.beforeEach(async () => {
+  await page.evaluate(async () => {
+    const sds = await window.electronAPI.sd.list();
+    for (const sd of sds) {
+      const notes = await window.electronAPI.note.list(sd.id);
+      for (const note of notes) {
+        await window.electronAPI.note.delete(note.id);
+      }
+    }
+  });
+  await page.waitForTimeout(300); // Allow UI to update
 });
 
 test.describe('Web Links - Auto-detection', () => {
@@ -387,13 +404,20 @@ test.describe('Web Links - Toolbar Button', () => {
     await linkButton.click();
     await page.waitForTimeout(300);
 
-    // URL input should appear (in a popover/dialog)
-    const urlInput = page.locator('.floating-popup-wrapper input[type="text"]');
+    // Popup should appear with both text and URL inputs
+    const popup = page.locator('.floating-popup-wrapper');
+    await expect(popup).toBeVisible();
+
+    // Fill both text and URL inputs
+    const textInput = popup.getByPlaceholder(/text/i);
+    const urlInput = popup.getByPlaceholder(/URL/);
+    await expect(textInput).toBeVisible();
     await expect(urlInput).toBeVisible();
 
-    // Enter URL and save
+    // Enter text (the selected text should be used) and URL
+    await textInput.fill('Click here');
     await urlInput.fill('https://toolbar-test.com');
-    const saveButton = page.locator('.floating-popup-wrapper button[aria-label="Save link"]');
+    const saveButton = popup.locator('button[aria-label="Save link"]');
     await saveButton.click();
     await page.waitForTimeout(300);
 
@@ -463,17 +487,26 @@ test.describe('Web Links - Cmd+K Shortcut', () => {
     }
     await page.waitForTimeout(200);
 
-    // Press Cmd+K
+    // Press Cmd+K - ensure editor has focus first
+    await editor.focus();
+    await page.waitForTimeout(100);
     await page.keyboard.press('Meta+k');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
-    // URL input should appear
-    const urlInput = page.locator('.floating-popup-wrapper input[type="text"]');
+    // Popup should appear with both text and URL inputs
+    const popup = page.locator('.floating-popup-wrapper');
+    await expect(popup).toBeVisible({ timeout: 5000 });
+
+    // Fill both text and URL inputs
+    const textInput = popup.getByPlaceholder(/text/i);
+    const urlInput = popup.getByPlaceholder(/URL/);
+    await expect(textInput).toBeVisible();
     await expect(urlInput).toBeVisible();
 
-    // Enter URL and save
+    // Enter text and URL
+    await textInput.fill('Link this');
     await urlInput.fill('https://cmdk-test.com');
-    const saveButton = page.locator('.floating-popup-wrapper button[aria-label="Save link"]');
+    const saveButton = popup.locator('button[aria-label="Save link"]');
     await saveButton.click();
     await page.waitForTimeout(300);
 
@@ -500,25 +533,21 @@ test.describe('Web Links - Cmd+K Shortcut', () => {
     const linkElement = page.locator('.ProseMirror a.web-link');
     await expect(linkElement).toBeVisible();
 
-    // Position cursor inside the link using keyboard navigation
-    // (clicking on the link element triggers the popover handler which prevents cursor positioning)
-    // Go to start of line, then move right to enter the link
-    await page.keyboard.press('Home');
-    await page.waitForTimeout(100);
-
-    // Move right past "Check out " (10 chars) to enter the link
-    for (let i = 0; i < 12; i++) {
-      await page.keyboard.press('ArrowRight');
-    }
+    // Click inside the link to position cursor there
+    await linkElement.click();
     await page.waitForTimeout(200);
 
-    // Press Cmd+K while cursor is in the link - should show edit popover
+    // Close any popover that opened from the click
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+
+    // Press Cmd+K while cursor is in the link
     await page.keyboard.press('Meta+k');
     await page.waitForTimeout(500);
 
     // Edit popover should appear with the URL
     const popover = page.locator('.floating-popup-wrapper');
-    await expect(popover).toBeVisible();
+    await expect(popover).toBeVisible({ timeout: 5000 });
 
     // Should show the existing URL
     await expect(popover).toContainText('https://existing-cmdk.com');
@@ -536,13 +565,15 @@ test.describe('Web Links - Cmd+K Shortcut', () => {
     await page.keyboard.type('Some text here ');
     await page.waitForTimeout(300);
 
-    // Press Cmd+K with no selection
+    // Press Cmd+K with no selection - ensure editor has focus first
+    await editor.focus();
+    await page.waitForTimeout(100);
     await page.keyboard.press('Meta+k');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
     // Should show dialog with both text and URL inputs
     const dialog = page.locator('.floating-popup-wrapper');
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible({ timeout: 5000 });
 
     // Should have two input fields (text and URL)
     const textInput = dialog.locator('input[placeholder*="text"], input[placeholder*="Text"]');
