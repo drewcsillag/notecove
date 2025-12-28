@@ -60,6 +60,13 @@ function App(): React.ReactElement {
   const [showTagPanel, setShowTagPanel] = useState(true);
   // Track newly created notes (to apply initial formatting)
   const [newlyCreatedNoteId, setNewlyCreatedNoteId] = useState<string | null>(null);
+  // App info for window title (dev prefix, profile suffix)
+  const [appTitleInfo, setAppTitleInfo] = useState<{
+    devPrefix: string;
+    profileSuffix: string;
+  } | null>(null);
+  // Selected note title for window titlebar
+  const [selectedNoteTitle, setSelectedNoteTitle] = useState<string | null>(null);
   // SD initialization progress
   const [sdInitProgress, setSDInitProgress] = useState<{
     open: boolean;
@@ -206,25 +213,70 @@ function App(): React.ReactElement {
     }
   }, []);
 
-  // Set document title based on app info (dev build indicator + profile name)
+  // Load app info for window title on mount
   useEffect(() => {
-    const setWindowTitle = async (): Promise<void> => {
+    const loadAppInfo = async (): Promise<void> => {
       try {
         const appInfo = await window.electronAPI.app.getInfo();
-        const devPrefix = appInfo.isDevBuild ? '[DEV] ' : '';
-        const profileSuffix = appInfo.profileName ? ` - ${appInfo.profileName}` : '';
-        document.title = `${devPrefix}NoteCove${profileSuffix}`;
+        setAppTitleInfo({
+          devPrefix: appInfo.isDevBuild ? '[DEV] ' : '',
+          profileSuffix: appInfo.profileName ? ` - ${appInfo.profileName}` : '',
+        });
       } catch (error: unknown) {
         console.error(
           '[App] Failed to get app info for title:',
           error instanceof Error ? error.message : String(error)
         );
-        // Fallback title
-        document.title = 'NoteCove';
+        // Use empty values as fallback
+        setAppTitleInfo({ devPrefix: '', profileSuffix: '' });
       }
     };
-    void setWindowTitle();
+    void loadAppInfo();
   }, []);
+
+  // Update document title when app info or selected note title changes
+  useEffect(() => {
+    if (!appTitleInfo) return;
+
+    const { devPrefix, profileSuffix } = appTitleInfo;
+    if (selectedNoteTitle) {
+      // Format: [DEV] NoteCove - Note Title - ProfileName
+      document.title = `${devPrefix}NoteCove - ${selectedNoteTitle}${profileSuffix}`;
+    } else {
+      // No note selected: [DEV] NoteCove - ProfileName
+      document.title = `${devPrefix}NoteCove${profileSuffix}`;
+    }
+  }, [appTitleInfo, selectedNoteTitle]);
+
+  // Fetch note title when selected note changes
+  useEffect(() => {
+    if (!selectedNoteId) {
+      setSelectedNoteTitle(null);
+      return;
+    }
+
+    const fetchNoteTitle = async (): Promise<void> => {
+      try {
+        const metadata = await window.electronAPI.note.getMetadata(selectedNoteId);
+        setSelectedNoteTitle(metadata.title || 'Untitled');
+      } catch (error: unknown) {
+        console.error('[App] Failed to fetch note title:', error);
+        setSelectedNoteTitle(null);
+      }
+    };
+    void fetchNoteTitle();
+  }, [selectedNoteId]);
+
+  // Listen for note title updates to keep titlebar in sync
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.note.onTitleUpdated((data) => {
+      if (data.noteId === selectedNoteId) {
+        setSelectedNoteTitle(data.title || 'Untitled');
+      }
+    });
+
+    return unsubscribe;
+  }, [selectedNoteId]);
 
   // Debug: Log when activeSdId changes
   useEffect(() => {

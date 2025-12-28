@@ -218,6 +218,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       sx={{
         display: 'flex',
         flexWrap: 'wrap',
+        justifyContent: 'center',
         gap: 0.5,
         padding: 1,
         borderBottom: 1,

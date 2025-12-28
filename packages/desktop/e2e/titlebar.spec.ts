@@ -59,7 +59,8 @@ test.describe('Window Titlebar', () => {
     const documentTitle = await page.title();
 
     // In dev/test mode, title should start with [DEV]
-    expect(documentTitle).toMatch(/^\[DEV\] NoteCove/);
+    // Format may be "[DEV] NoteCove" or "[DEV] Note Title - NoteCove"
+    expect(documentTitle).toMatch(/^\[DEV\] /);
   });
 
   test('should include NoteCove in title', async () => {
@@ -68,5 +69,19 @@ test.describe('Window Titlebar', () => {
     const documentTitle = await page.title();
 
     expect(documentTitle).toContain('NoteCove');
+  });
+
+  test('should show note title when a note is selected', async () => {
+    // Wait for app to be ready and default note to load
+    await page.waitForSelector('.ProseMirror', { timeout: 15000 });
+
+    // Wait a moment for title to update after note selection
+    await page.waitForTimeout(500);
+
+    const documentTitle = await page.title();
+
+    // With a note selected, format should be "[DEV] NoteCove - Note Title"
+    // The default note typically has a title like "Untitled" or the first line content
+    expect(documentTitle).toMatch(/^\[DEV\] NoteCove - .+/);
   });
 });

@@ -9,6 +9,13 @@ import type { Theme, SxProps } from '@mui/material';
 import { getCodeBlockStyles } from './codeBlockTheme';
 
 /**
+ * Maximum width for editor content, similar to Google Docs / Dropbox Paper.
+ * Content will be centered when the container is wider than this value.
+ * Exported so EditorToolbar can use the same constraint.
+ */
+export const EDITOR_MAX_WIDTH = 750;
+
+/**
  * Returns the complete sx styles for the TipTapEditor outer Box container.
  * Includes all ProseMirror styling for the editor content.
  *
@@ -26,6 +33,10 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
       outline: 'none',
       // Preserve tab characters and multiple spaces while still allowing text wrap
       whiteSpace: 'pre-wrap',
+      // Max-width constraint for comfortable reading (like Google Docs / Dropbox Paper)
+      maxWidth: EDITOR_MAX_WIDTH,
+      marginLeft: 'auto',
+      marginRight: 'auto',
       '& h1': {
         fontSize: '2em',
         fontWeight: 600,
