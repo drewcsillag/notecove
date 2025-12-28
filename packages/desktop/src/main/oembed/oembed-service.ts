@@ -18,6 +18,8 @@ import {
 import { createLogger } from '../telemetry/logger';
 import type { OEmbedRepository } from '../database/oembed-repository';
 import { discoverOEmbedEndpoint } from './oembed-discovery';
+import { FaviconService } from './favicon-service';
+import { scrapeMetadata } from './metadata-scraper';
 
 const log = createLogger('oEmbed:Service');
 
@@ -48,9 +50,11 @@ const FETCH_TIMEOUT_MS = 10000;
  */
 export class OEmbedService {
   private registry: OEmbedRegistry;
+  private faviconService: FaviconService;
 
   constructor(private readonly repository: OEmbedRepository) {
     this.registry = createRegistry(oembedProviders as OEmbedProvider[]);
+    this.faviconService = new FaviconService(repository);
     log.info(`Initialized with ${this.registry.providerCount} providers`);
   }
 
@@ -116,11 +120,35 @@ export class OEmbedService {
         }
       }
 
-      // No oEmbed available
-      log.debug('No oEmbed endpoint found for:', { url });
+      // Fall back to metadata scraping (Open Graph, Twitter cards, etc.)
+      log.debug('No oEmbed endpoint found, trying metadata scraping for:', { url });
+      const scraped = await scrapeMetadata(url);
+      if (scraped && (scraped.title || scraped.description || scraped.image)) {
+        log.debug('Metadata scraping succeeded:', { url, title: scraped.title });
+        // Convert scraped metadata to oEmbed-like response
+        // Build response with only defined properties
+        const response: OEmbedResponse = {
+          type: 'link',
+          version: '1.0',
+          ...(scraped.title ? { title: scraped.title } : {}),
+          ...(scraped.description ? { description: scraped.description } : {}),
+          ...(scraped.image ? { thumbnail_url: scraped.image } : {}),
+          ...(scraped.siteName ? { provider_name: scraped.siteName } : {}),
+          ...(scraped.url ? { provider_url: scraped.url } : {}),
+        };
+        await this.repository.cacheFetch(url, response);
+        return {
+          success: true,
+          data: response,
+          fromCache: false,
+        };
+      }
+
+      // No metadata available
+      log.debug('No metadata found for:', { url });
       return {
         success: false,
-        error: 'No oEmbed endpoint found',
+        error: 'No metadata found',
         errorType: 'NOT_FOUND',
       };
     } catch (error) {
@@ -177,6 +205,19 @@ export class OEmbedService {
       ...dbStats,
       providerCount: this.registry.providerCount,
     };
+  }
+
+  /**
+   * Get a favicon for a domain
+   *
+   * Fetches from cache or network and returns as a base64 data URL.
+   * Uses Google's favicon API with fallback to direct site favicon.
+   *
+   * @param domain The domain to get the favicon for (e.g., "youtube.com")
+   * @returns The base64 data URL or null if not found
+   */
+  async getFavicon(domain: string): Promise<string | null> {
+    return this.faviconService.getFavicon(domain);
   }
 
   // ==========================================================================
@@ -316,14 +357,20 @@ export class OEmbedService {
             try {
               const parsed = JSON.parse(data) as Record<string, unknown>;
 
-              // Validate required fields
-              if (typeof parsed['type'] !== 'string' || typeof parsed['version'] !== 'string') {
+              // Validate required fields - only 'type' is truly required
+              // Many providers (like Reddit) don't include 'version'
+              if (typeof parsed['type'] !== 'string') {
                 resolve({
                   success: false,
-                  error: 'Invalid oEmbed response: missing required fields',
+                  error: 'Invalid oEmbed response: missing type field',
                   errorType: 'INVALID_RESPONSE',
                 });
                 return;
+              }
+
+              // Default version if not provided (spec says 1.0)
+              if (typeof parsed['version'] !== 'string') {
+                parsed['version'] = '1.0';
               }
 
               log.debug('Successfully fetched oEmbed:', { oembedType: parsed['type'] });

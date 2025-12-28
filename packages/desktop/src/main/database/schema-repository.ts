@@ -149,6 +149,11 @@ export class SchemaRepository {
       await this.migrateToVersion10();
     }
 
+    // Migration v10 -> v11: Add oEmbed tables (favicon_cache, thumbnail_cache, oembed_fetch_cache)
+    if (fromVersion < 11) {
+      await this.migrateToVersion11();
+    }
+
     // Add future migrations here following the pattern:
     // if (fromVersion < N) { await this.migrateToVersionN(); }
   }
@@ -235,5 +240,30 @@ export class SchemaRepository {
     // Snippets are regenerated when notes are edited
     await this.recordVersion(10, 'Schema version bump for snippet extraction fix');
     console.log('[Database] Migration to v10 complete');
+  }
+
+  /**
+   * Migration to version 11:
+   * - Add favicon_cache, thumbnail_cache, oembed_fetch_cache tables for oEmbed link unfurling
+   */
+  private async migrateToVersion11(): Promise<void> {
+    console.log('[Database] Migrating to v11: Adding oEmbed tables');
+
+    // Create the oEmbed cache tables (CREATE TABLE IF NOT EXISTS is safe)
+    await this.adapter.exec(SCHEMA_SQL.faviconCache);
+    console.log('[Database] Created/verified favicon_cache table');
+
+    await this.adapter.exec(SCHEMA_SQL.thumbnailCache);
+    console.log('[Database] Created/verified thumbnail_cache table');
+
+    await this.adapter.exec(SCHEMA_SQL.oembedFetchCache);
+    console.log('[Database] Created/verified oembed_fetch_cache table');
+
+    // Record the migration
+    await this.recordVersion(
+      11,
+      'Added oEmbed tables (favicon_cache, thumbnail_cache, oembed_fetch_cache)'
+    );
+    console.log('[Database] Migration to v11 complete');
   }
 }

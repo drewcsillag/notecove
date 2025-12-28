@@ -55,6 +55,7 @@ export function registerOEmbedHandlers(ctx: HandlerContext): void {
   ipcMain.handle('oembed:refresh', handleRefresh(ctx));
   ipcMain.handle('oembed:clearCache', handleClearCache(ctx));
   ipcMain.handle('oembed:getCacheStats', handleGetCacheStats(ctx));
+  ipcMain.handle('oembed:getFavicon', handleGetFavicon(ctx));
 
   // Debug handlers
   ipcMain.handle('oembed:debug:listFavicons', handleDebugListFavicons(ctx));
@@ -74,6 +75,7 @@ export function unregisterOEmbedHandlers(): void {
   ipcMain.removeHandler('oembed:refresh');
   ipcMain.removeHandler('oembed:clearCache');
   ipcMain.removeHandler('oembed:getCacheStats');
+  ipcMain.removeHandler('oembed:getFavicon');
 
   // Debug handlers
   ipcMain.removeHandler('oembed:debug:listFavicons');
@@ -162,6 +164,21 @@ function handleGetCacheStats(ctx: HandlerContext) {
     }
 
     return oembedService.getCacheStats();
+  };
+}
+
+/**
+ * Get a favicon for a domain
+ */
+function handleGetFavicon(ctx: HandlerContext) {
+  return async (_event: IpcMainInvokeEvent, domain: string): Promise<string | null> => {
+    const { oembedService } = ctx;
+
+    if (!oembedService) {
+      return null;
+    }
+
+    return oembedService.getFavicon(domain);
   };
 }
 

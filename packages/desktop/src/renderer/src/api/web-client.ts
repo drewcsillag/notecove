@@ -1097,6 +1097,7 @@ export const webClient: typeof window.electronAPI = {
     refresh: browserNotAvailable('oembed.refresh'),
     clearCache: browserNotAvailable('oembed.clearCache'),
     getCacheStats: browserNotAvailable('oembed.getCacheStats'),
+    getFavicon: browserNotAvailable('oembed.getFavicon'),
     debug: {
       listFavicons: browserNotAvailable('oembed.debug.listFavicons'),
       listThumbnails: browserNotAvailable('oembed.debug.listThumbnails'),

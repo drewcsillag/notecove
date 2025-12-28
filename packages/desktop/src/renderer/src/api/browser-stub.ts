@@ -347,6 +347,7 @@ export const browserApiStub: typeof window.electronAPI = {
     refresh: notImplemented('oembed.refresh'),
     clearCache: notImplemented('oembed.clearCache'),
     getCacheStats: notImplemented('oembed.getCacheStats'),
+    getFavicon: notImplemented('oembed.getFavicon'),
     debug: {
       listFavicons: notImplemented('oembed.debug.listFavicons'),
       listThumbnails: notImplemented('oembed.debug.listThumbnails'),

@@ -16,6 +16,9 @@
 import Link from '@tiptap/extension-link';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { InputRule } from '@tiptap/core';
+import type { Node as PMNode, Mark } from '@tiptap/pm/model';
+import { createWebLinkChipPlugin } from './WebLinkChipPlugin';
+import { detectLinkContext, countLinksInParagraph } from '../utils/linkContext';
 
 // Debug logging enabled in development mode
 // Check for Vite's import.meta.env or fallback to process.env for Jest
@@ -126,6 +129,15 @@ export function setWebLinkCallbacks(callbacks: WebLinkOptions): void {
 }
 
 /**
+ * Display mode for web links
+ * - 'auto': Let the system decide based on context (default)
+ * - 'chip': Compact chip with favicon and domain
+ * - 'unfurl': Full preview card with title, description, thumbnail
+ * - 'link': Plain text link (no decoration)
+ */
+export type WebLinkDisplayMode = 'auto' | 'chip' | 'unfurl' | 'link';
+
+/**
  * WebLink extension for handling external web links
  *
  * Extends the base TipTap Link extension with custom click handling
@@ -133,6 +145,27 @@ export function setWebLinkCallbacks(callbacks: WebLinkOptions): void {
  */
 export const WebLink = Link.extend({
   name: 'link',
+
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      /**
+       * Display mode for this link
+       * Determines how the link should be rendered (chip, unfurl, or plain link)
+       */
+      displayMode: {
+        default: 'auto' as WebLinkDisplayMode,
+        parseHTML: (element: HTMLElement) =>
+          (element.getAttribute('data-display-mode') as WebLinkDisplayMode | null) ?? 'auto',
+        renderHTML: (attributes: { displayMode?: WebLinkDisplayMode }) => {
+          if (!attributes.displayMode || attributes.displayMode === 'auto') {
+            return {};
+          }
+          return { 'data-display-mode': attributes.displayMode };
+        },
+      },
+    };
+  },
 
   addOptions() {
     // TipTap 3 has stricter LinkOptions types - we spread parent defaults
@@ -365,7 +398,110 @@ export const WebLink = Link.extend({
 
     debugLog('Extension initialized with protocols:', this.options.protocols);
 
-    // Put our click plugin BEFORE parentPlugins so it runs first
-    return [clickPlugin, ...parentPlugins];
+    // Create chip decoration plugin for rendering links as chips
+    const chipPlugin = createWebLinkChipPlugin();
+
+    // Auto-unfurl plugin - inserts OEmbedUnfurl blocks when links are added in paragraphs
+    const autoUnfurlPlugin = new Plugin({
+      key: new PluginKey('webLinkAutoUnfurl'),
+
+      appendTransaction: (transactions, oldState, newState) => {
+        // Only process if document changed
+        if (!transactions.some((tr) => tr.docChanged)) {
+          return null;
+        }
+
+        // Find new links added in this transaction
+        const newLinks: { url: string; pos: number; paragraphEnd: number }[] = [];
+
+        // Track positions of links in old state
+        const oldLinkPositions = new Set<string>();
+        oldState.doc.descendants((node: PMNode, pos: number) => {
+          if (!node.isText) return true;
+          const linkMark = node.marks.find((m: Mark) => m.type.name === 'link');
+          if (linkMark) {
+            const href = linkMark.attrs['href'] as string;
+            oldLinkPositions.add(`${pos}:${href}`);
+          }
+          return true;
+        });
+
+        // Find links in new state that weren't in old state
+        newState.doc.descendants((node: PMNode, pos: number) => {
+          if (!node.isText) return true;
+
+          const linkMark = node.marks.find((m: Mark) => m.type.name === 'link');
+          if (!linkMark) return true;
+
+          const href = linkMark.attrs['href'] as string;
+          const key = `${pos}:${href}`;
+
+          // Skip if this exact link existed before
+          if (oldLinkPositions.has(key)) return true;
+
+          // Skip if displayMode is explicitly set to 'chip' (user converted from unfurl)
+          const displayMode = linkMark.attrs['displayMode'] as string | undefined;
+          if (displayMode === 'chip') return true;
+
+          // Check context - only unfurl in paragraph with single link
+          const context = detectLinkContext(newState, pos);
+          if (context !== 'paragraph') return true;
+
+          const linkCount = countLinksInParagraph(newState, pos);
+          if (linkCount !== 1) return true;
+
+          // Find the end of the paragraph
+          const $pos = newState.doc.resolve(pos);
+          const paragraphEnd = $pos.end($pos.depth);
+
+          // Check if unfurl already exists after this paragraph
+          const nextPos = paragraphEnd + 1;
+          if (nextPos < newState.doc.content.size) {
+            const nextNode = newState.doc.nodeAt(nextPos);
+            if (nextNode?.type.name === 'oembedUnfurl') {
+              return true; // Already has unfurl
+            }
+          }
+
+          newLinks.push({ url: href, pos, paragraphEnd });
+          return true;
+        });
+
+        // No new single-link paragraphs found
+        if (newLinks.length === 0) {
+          return null;
+        }
+
+        // Create transaction to insert unfurl blocks
+        let tr = newState.tr;
+
+        // Process in reverse order to maintain positions
+        for (const link of newLinks.reverse()) {
+          debugLog(`Auto-inserting unfurl for: ${link.url}`);
+
+          // Get the OEmbedUnfurl node type
+          const unfurlType = newState.schema.nodes['oembedUnfurl'];
+          if (!unfurlType) {
+            debugLog('OEmbedUnfurl node type not found in schema');
+            continue;
+          }
+
+          // Create the unfurl node
+          const unfurlNode = unfurlType.create({
+            url: link.url,
+            isLoading: true,
+          });
+
+          // Insert after the paragraph (paragraphEnd + 1 is after the closing tag)
+          tr = tr.insert(link.paragraphEnd + 1, unfurlNode);
+        }
+
+        return tr;
+      },
+    });
+
+    // Put our plugins BEFORE parentPlugins so they run first
+    // Order: click handler, chip decorations, auto-unfurl, then parent plugins
+    return [clickPlugin, chipPlugin, autoUnfurlPlugin, ...parentPlugins];
   },
 });

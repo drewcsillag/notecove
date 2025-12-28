@@ -19,6 +19,7 @@ import { TriStateTaskItem } from './extensions/TriStateTaskItem';
 import { WebLink } from './extensions/WebLink';
 import { CommentMark } from './extensions/CommentMark';
 import { NotecoveImage } from './extensions/Image';
+import { OEmbedUnfurl } from './extensions/OEmbedUnfurl';
 import {
   NotecoveTable,
   NotecoveTableRow,
@@ -110,6 +111,8 @@ export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallb
     }),
     // Add NotecoveImage extension for image display
     NotecoveImage,
+    // Add OEmbedUnfurl extension for link preview cards
+    OEmbedUnfurl,
     // Add Table extensions for table support
     NotecoveTable,
     NotecoveTableRow,

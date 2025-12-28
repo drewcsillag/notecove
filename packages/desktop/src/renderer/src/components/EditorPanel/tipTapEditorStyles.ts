@@ -199,6 +199,83 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
           color: theme.palette.info.main,
         },
       },
+      // Link chip styling (compact pill for links in headings, lists, etc.)
+      '& .link-chip': {
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '2px 8px',
+        borderRadius: '12px',
+        backgroundColor:
+          theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+        fontSize: '0.9em',
+        cursor: 'pointer',
+        textDecoration: 'none',
+        color: theme.palette.text.primary,
+        transition: 'background-color 0.15s ease',
+        verticalAlign: 'middle',
+        '&:hover': {
+          backgroundColor:
+            theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
+        },
+        '&:focus': {
+          outline: `2px solid ${theme.palette.primary.main}`,
+          outlineOffset: '1px',
+        },
+      },
+      '& .link-chip--loading': {
+        opacity: 0.7,
+      },
+      '& .link-chip-favicon': {
+        width: '14px',
+        height: '14px',
+        marginRight: '4px',
+        borderRadius: '2px',
+        flexShrink: 0,
+      },
+      '& .link-chip-icon': {
+        width: '14px',
+        height: '14px',
+        marginRight: '4px',
+        flexShrink: 0,
+        color: theme.palette.text.secondary,
+      },
+      '& .link-chip-spinner': {
+        animation: 'link-chip-spin 1s linear infinite',
+      },
+      '@keyframes link-chip-spin': {
+        from: { transform: 'rotate(0deg)' },
+        to: { transform: 'rotate(360deg)' },
+      },
+      '& .link-chip-spinner-circle': {
+        stroke: theme.palette.primary.main,
+      },
+      '& .link-chip-title': {
+        // Allow full title display, only truncate on very long content
+        maxWidth: '600px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      },
+      // Hidden web link text (when displaying as chip)
+      // Using font-size: 0 to keep element in document flow for cursor positioning
+      '& .web-link-hidden': {
+        fontSize: 0,
+        letterSpacing: 0,
+        lineHeight: 0,
+        color: 'transparent',
+      },
+      // OEmbedUnfurl wrapper - block-level link preview cards
+      '& .oembed-unfurl-wrapper': {
+        margin: '8px 0',
+        // Selected state
+        '&.ProseMirror-selectednode .oembed-unfurl-container > div': {
+          borderColor: theme.palette.primary.main,
+          boxShadow: `0 0 0 2px ${theme.palette.primary.main}25`,
+        },
+      },
+      '& .oembed-unfurl-container': {
+        width: '100%',
+      },
       // NotecoveImage styling - all images are block-level and centered
       '& figure.notecove-image': {
         margin: '16px 0',

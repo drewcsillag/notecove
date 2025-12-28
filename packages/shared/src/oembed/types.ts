@@ -19,6 +19,8 @@ export interface OEmbedResponseBase {
   type: OEmbedType;
   /** A text title describing the resource */
   title?: string;
+  /** A description of the resource (non-standard but commonly used) */
+  description?: string;
   /** The name of the author/owner of the resource */
   author_name?: string;
   /** A URL for the author/owner of the resource */

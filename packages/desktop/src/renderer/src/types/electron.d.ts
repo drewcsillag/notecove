@@ -1330,6 +1330,8 @@ declare global {
           thumbnailTotalSizeBytes: number;
           providerCount: number;
         } | null>;
+        /** Get favicon for a domain (returns data URL) */
+        getFavicon: (domain: string) => Promise<string | null>;
 
         /** Debug methods for cache inspection */
         debug: {

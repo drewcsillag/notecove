@@ -7,6 +7,7 @@
 
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import type { Mark } from '@tiptap/pm/model';
 import { WebLink } from '../WebLink';
 
 describe('WebLink Extension', () => {
@@ -112,6 +113,125 @@ describe('WebLink Extension', () => {
       // First, let's verify the extension is configured with linkOnPaste: true
       const linkExtension = editor.extensionManager.extensions.find((ext) => ext.name === 'link');
       expect(linkExtension?.options.linkOnPaste).toBe(true);
+    });
+  });
+
+  describe('displayMode attribute', () => {
+    it('should have displayMode attribute with default value of auto', () => {
+      const linkMarkType = editor.schema.marks['link'];
+      expect(linkMarkType?.spec.attrs).toBeDefined();
+      expect(linkMarkType?.spec.attrs?.['displayMode']).toBeDefined();
+      expect(linkMarkType?.spec.attrs?.['displayMode']?.default).toBe('auto');
+    });
+
+    it('should parse displayMode from HTML data-display-mode attribute', () => {
+      editor.destroy();
+      editor = new Editor({
+        extensions: [StarterKit.configure({ undoRedo: false, link: false }), WebLink],
+        content:
+          '<p>Check <a href="https://example.com" data-display-mode="chip">this link</a></p>',
+      });
+
+      // Find the link mark
+      const doc = editor.state.doc;
+      let linkMark: Mark | undefined;
+
+      doc.descendants((node) => {
+        const mark = node.marks.find((m) => m.type.name === 'link');
+        if (mark) {
+          linkMark = mark;
+          return false;
+        }
+        return true;
+      });
+
+      expect(linkMark).toBeDefined();
+      expect(linkMark?.attrs['displayMode']).toBe('chip');
+    });
+
+    it('should parse displayMode unfurl from HTML', () => {
+      editor.destroy();
+      editor = new Editor({
+        extensions: [StarterKit.configure({ undoRedo: false, link: false }), WebLink],
+        content:
+          '<p>Check <a href="https://example.com" data-display-mode="unfurl">this link</a></p>',
+      });
+
+      const doc = editor.state.doc;
+      let linkMark: Mark | undefined;
+
+      doc.descendants((node) => {
+        const mark = node.marks.find((m) => m.type.name === 'link');
+        if (mark) {
+          linkMark = mark;
+          return false;
+        }
+        return true;
+      });
+
+      expect(linkMark?.attrs['displayMode']).toBe('unfurl');
+    });
+
+    it('should parse displayMode link from HTML', () => {
+      editor.destroy();
+      editor = new Editor({
+        extensions: [StarterKit.configure({ undoRedo: false, link: false }), WebLink],
+        content:
+          '<p>Check <a href="https://example.com" data-display-mode="link">this link</a></p>',
+      });
+
+      const doc = editor.state.doc;
+      let linkMark: Mark | undefined;
+
+      doc.descendants((node) => {
+        const mark = node.marks.find((m) => m.type.name === 'link');
+        if (mark) {
+          linkMark = mark;
+          return false;
+        }
+        return true;
+      });
+
+      expect(linkMark?.attrs['displayMode']).toBe('link');
+    });
+
+    it('should default to auto when no displayMode attribute present', () => {
+      // The original editor already has a link without data-display-mode
+      const doc = editor.state.doc;
+      let linkMark: Mark | undefined;
+
+      doc.descendants((node) => {
+        const mark = node.marks.find((m) => m.type.name === 'link');
+        if (mark) {
+          linkMark = mark;
+          return false;
+        }
+        return true;
+      });
+
+      expect(linkMark?.attrs['displayMode']).toBe('auto');
+    });
+
+    it('should render displayMode chip to HTML with data-display-mode', () => {
+      editor.destroy();
+      editor = new Editor({
+        extensions: [StarterKit.configure({ undoRedo: false, link: false }), WebLink],
+        content: '<p>Test</p>',
+      });
+
+      // Insert text and apply link with displayMode
+      editor.commands.insertContent('link text');
+      editor.commands.setTextSelection({ from: 1, to: 10 });
+      editor.commands.setMark('link', { href: 'https://example.com', displayMode: 'chip' });
+
+      const html = editor.getHTML();
+      expect(html).toContain('data-display-mode="chip"');
+    });
+
+    it('should NOT render data-display-mode for auto mode', () => {
+      // The original editor has auto mode (no displayMode attribute)
+      const html = editor.getHTML();
+      expect(html).not.toContain('data-display-mode');
     });
   });
 });

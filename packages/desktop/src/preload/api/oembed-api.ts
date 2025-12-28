@@ -71,6 +71,18 @@ export const oembedApi = {
   getCacheStats: (): Promise<OEmbedCacheStats | null> =>
     ipcRenderer.invoke('oembed:getCacheStats') as Promise<OEmbedCacheStats | null>,
 
+  /**
+   * Get a favicon for a domain
+   *
+   * Fetches from cache or network and returns as a base64 data URL.
+   * Uses Google's favicon API with fallback to direct site favicon.
+   *
+   * @param domain The domain to get the favicon for (e.g., "youtube.com")
+   * @returns The base64 data URL or null if not found
+   */
+  getFavicon: (domain: string): Promise<string | null> =>
+    ipcRenderer.invoke('oembed:getFavicon', domain) as Promise<string | null>,
+
   // Debug methods
   debug: {
     /**
