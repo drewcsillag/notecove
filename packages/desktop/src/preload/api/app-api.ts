@@ -45,6 +45,13 @@ export const clipboardApi = {
   writeText: (text: string): Promise<void> =>
     ipcRenderer.invoke('clipboard:writeText', text) as Promise<void>,
   readText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText') as Promise<string>,
+  /**
+   * Write rich format to clipboard (HTML + plain text fallback)
+   * This allows pasting as formatted content in rich text editors
+   * while falling back to plain text in plain text contexts.
+   */
+  writeRich: (html: string, text: string): Promise<void> =>
+    ipcRenderer.invoke('clipboard:writeRich', html, text) as Promise<void>,
 };
 
 export const profileApi = {

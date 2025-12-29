@@ -39,6 +39,7 @@ export default defineConfig({
           items: [
             { text: 'Overview', link: '/features/' },
             { text: 'Rich Text Editing', link: '/features/rich-text-editing' },
+            { text: 'Link Unfurling', link: '/features/link-unfurling' },
             { text: 'Folders & Organization', link: '/features/folders-organization' },
             { text: 'Offline-First Sync', link: '/features/offline-sync' },
             { text: 'Search', link: '/features/search' },

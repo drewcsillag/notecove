@@ -204,12 +204,17 @@ export const UnfurlCard: React.FC<UnfurlCardProps> = ({
   }, [url, onOpenInBrowser]);
 
   const handleCopyUrl = useCallback(() => {
-    void window.electronAPI.clipboard.writeText(url);
+    // Copy as rich format with plain text fallback
+    // Rich format: HTML link with title for pasting in rich text editors
+    // Plain format: Just the URL for plain text contexts
+    const linkTitle = title ?? url;
+    const html = `<a href="${url}">${linkTitle}</a>`;
+    void window.electronAPI.clipboard.writeRich(html, url);
     setCopied(true);
     setTimeout(() => {
       setCopied(false);
     }, 2000);
-  }, [url]);
+  }, [url, title]);
 
   const handleThumbnailError = useCallback(() => {
     setThumbnailError(true);

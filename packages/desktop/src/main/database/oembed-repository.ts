@@ -253,4 +253,87 @@ export class OEmbedRepository {
       thumbnailTotalSizeBytes: thumbnails.totalSizeBytes,
     };
   }
+
+  // ============================================
+  // Registry Metadata (via app_state table)
+  // ============================================
+
+  private static readonly REGISTRY_HASH_KEY = 'oembed_registry_hash';
+  private static readonly REGISTRY_LAST_CHECK_KEY = 'oembed_registry_last_check';
+  private static readonly REGISTRY_PROVIDER_COUNT_KEY = 'oembed_registry_provider_count';
+
+  /**
+   * Get the stored registry hash
+   */
+  async getRegistryHash(): Promise<string | null> {
+    const row = await this.adapter.get<{ value: string }>(
+      'SELECT value FROM app_state WHERE key = ?',
+      [OEmbedRepository.REGISTRY_HASH_KEY]
+    );
+    return row?.value ?? null;
+  }
+
+  /**
+   * Get the last registry check timestamp
+   */
+  async getRegistryLastCheck(): Promise<number | null> {
+    const row = await this.adapter.get<{ value: string }>(
+      'SELECT value FROM app_state WHERE key = ?',
+      [OEmbedRepository.REGISTRY_LAST_CHECK_KEY]
+    );
+    if (!row) return null;
+    const parsed = parseInt(row.value, 10);
+    return isNaN(parsed) ? null : parsed;
+  }
+
+  /**
+   * Get the stored provider count from last update
+   */
+  async getRegistryProviderCount(): Promise<number | null> {
+    const row = await this.adapter.get<{ value: string }>(
+      'SELECT value FROM app_state WHERE key = ?',
+      [OEmbedRepository.REGISTRY_PROVIDER_COUNT_KEY]
+    );
+    if (!row) return null;
+    const parsed = parseInt(row.value, 10);
+    return isNaN(parsed) ? null : parsed;
+  }
+
+  /**
+   * Store registry metadata after an update check
+   */
+  async setRegistryMetadata(hash: string, providerCount: number): Promise<void> {
+    const now = Date.now();
+    await this.adapter.exec(
+      `INSERT INTO app_state (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [OEmbedRepository.REGISTRY_HASH_KEY, hash]
+    );
+    await this.adapter.exec(
+      `INSERT INTO app_state (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [OEmbedRepository.REGISTRY_LAST_CHECK_KEY, String(now)]
+    );
+    await this.adapter.exec(
+      `INSERT INTO app_state (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [OEmbedRepository.REGISTRY_PROVIDER_COUNT_KEY, String(providerCount)]
+    );
+  }
+
+  /**
+   * Get all registry metadata
+   */
+  async getRegistryMetadata(): Promise<{
+    hash: string | null;
+    lastCheck: number | null;
+    providerCount: number | null;
+  }> {
+    const [hash, lastCheck, providerCount] = await Promise.all([
+      this.getRegistryHash(),
+      this.getRegistryLastCheck(),
+      this.getRegistryProviderCount(),
+    ]);
+    return { hash, lastCheck, providerCount };
+  }
 }

@@ -21,6 +21,7 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Switch,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -28,6 +29,7 @@ import StorageIcon from '@mui/icons-material/Storage';
 import type { LinkDisplayPreference } from '@notecove/shared';
 import { useLinkDisplayPreference } from '../../contexts/LinkDisplayPreferenceContext';
 import { CacheBrowserDialog } from './CacheBrowserDialog';
+import { isElectron } from '../../utils/platform';
 
 /**
  * Cache stats from the oEmbed service
@@ -59,9 +61,43 @@ export const OEmbedSettings: React.FC = () => {
   const [clearingFavicons, setClearingFavicons] = useState(false);
   const [clearingFetchCache, setClearingFetchCache] = useState(false);
   const [cacheBrowserOpen, setCacheBrowserOpen] = useState(false);
+  const [discoveryEnabled, setDiscoveryEnabled] = useState(true);
+  const [discoveryLoading, setDiscoveryLoading] = useState(true);
 
   const handleLinkDisplayChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     void setPreference(event.target.value as LinkDisplayPreference);
+  };
+
+  // Load discovery preference
+  useEffect(() => {
+    const loadDiscoveryPref = async (): Promise<void> => {
+      if (!isElectron()) {
+        setDiscoveryLoading(false);
+        return;
+      }
+      try {
+        const stored = await window.electronAPI.appState.get('oembedDiscoveryEnabled');
+        // Default to true if not set
+        setDiscoveryEnabled(stored !== 'false');
+      } catch (err) {
+        console.error('Failed to load discovery preference:', err);
+      } finally {
+        setDiscoveryLoading(false);
+      }
+    };
+    void loadDiscoveryPref();
+  }, []);
+
+  const handleDiscoveryChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const enabled = event.target.checked;
+    setDiscoveryEnabled(enabled);
+    if (isElectron()) {
+      try {
+        await window.electronAPI.appState.set('oembedDiscoveryEnabled', enabled ? 'true' : 'false');
+      } catch (err) {
+        console.error('Failed to save discovery preference:', err);
+      }
+    }
   };
 
   const loadStats = useCallback(async () => {
@@ -197,6 +233,36 @@ export const OEmbedSettings: React.FC = () => {
         Note: This setting affects newly added links. Existing links will retain their current
         display style.
       </Typography>
+
+      <Divider sx={{ my: 2 }} />
+
+      {/* Discovery Setting */}
+      <Typography variant="subtitle1" mb={1}>
+        oEmbed Discovery
+      </Typography>
+
+      <Box display="flex" alignItems="flex-start" mb={2}>
+        <Switch
+          checked={discoveryEnabled}
+          onChange={(e) => void handleDiscoveryChange(e)}
+          disabled={discoveryLoading || preference === 'secure'}
+          size="small"
+        />
+        <Box ml={1}>
+          <Typography variant="body2">Enable automatic discovery</Typography>
+          <Typography variant="caption" color="text.secondary">
+            When enabled, NoteCove will attempt to find preview data from websites not in the
+            built-in registry by fetching and parsing the page HTML. Disable this for increased
+            privacy.
+          </Typography>
+        </Box>
+      </Box>
+
+      {preference === 'secure' && (
+        <Typography variant="caption" color="warning.main" display="block" mb={2}>
+          Discovery is automatically disabled when &quot;Plain links (secure)&quot; is selected.
+        </Typography>
+      )}
 
       <Divider sx={{ my: 2 }} />
 

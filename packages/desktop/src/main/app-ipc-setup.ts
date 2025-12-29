@@ -73,6 +73,14 @@ export function registerBasicIPCHandlers(deps: IPCSetupDependencies): void {
     return clipboard.readText();
   });
 
+  // Rich clipboard format (HTML + plain text fallback)
+  ipcMain.handle('clipboard:writeRich', (_event, html: string, text: string) => {
+    clipboard.write({
+      html,
+      text,
+    });
+  });
+
   // Register web server IPC handlers
   ipcMain.handle('webServer:start', async (_event, port?: number) => {
     if (!webServerManager) {

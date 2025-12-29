@@ -831,6 +831,27 @@ export const webClient: typeof window.electronAPI = {
     readText: async () => {
       return navigator.clipboard.readText();
     },
+    writeRich: async (html: string, text: string) => {
+      // Use Clipboard API with multiple formats if available
+      // Fall back to plain text if ClipboardItem is not supported
+      try {
+        if (typeof ClipboardItem !== 'undefined') {
+          const htmlBlob = new Blob([html], { type: 'text/html' });
+          const textBlob = new Blob([text], { type: 'text/plain' });
+          const item = new ClipboardItem({
+            'text/html': htmlBlob,
+            'text/plain': textBlob,
+          });
+          await navigator.clipboard.write([item]);
+        } else {
+          // Fallback: just write plain text
+          await navigator.clipboard.writeText(text);
+        }
+      } catch {
+        // Fallback: just write plain text
+        await navigator.clipboard.writeText(text);
+      }
+    },
   },
 
   // Window state is not applicable in web client (no multi-window support)

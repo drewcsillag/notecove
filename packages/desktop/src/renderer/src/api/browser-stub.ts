@@ -252,6 +252,7 @@ export const browserApiStub: typeof window.electronAPI = {
   clipboard: {
     writeText: notImplemented('clipboard.writeText'),
     readText: notImplemented('clipboard.readText'),
+    writeRich: notImplemented('clipboard.writeRich'),
   },
 
   windowState: {

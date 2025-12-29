@@ -20,6 +20,27 @@ export interface OEmbedCacheStats {
 }
 
 /**
+ * Registry update status returned to renderer
+ */
+export interface OEmbedRegistryStatus {
+  lastCheck: number | null;
+  storedHash: string | null;
+  storedProviderCount: number | null;
+  currentProviderCount: number;
+  needsCheck: boolean;
+}
+
+/**
+ * Result of a registry update check
+ */
+export interface OEmbedRegistryUpdateResult {
+  result: 'UPDATED' | 'NO_CHANGE' | 'OFFLINE' | 'ERROR' | 'SKIPPED';
+  newProviders?: number;
+  totalProviders?: number;
+  error?: string;
+}
+
+/**
  * Cached favicon entry for debug UI
  */
 export interface CachedFavicon {
@@ -57,6 +78,10 @@ export function registerOEmbedHandlers(ctx: HandlerContext): void {
   ipcMain.handle('oembed:getCacheStats', handleGetCacheStats(ctx));
   ipcMain.handle('oembed:getFavicon', handleGetFavicon(ctx));
 
+  // Registry update handlers
+  ipcMain.handle('oembed:getRegistryStatus', handleGetRegistryStatus(ctx));
+  ipcMain.handle('oembed:checkRegistryUpdate', handleCheckRegistryUpdate(ctx));
+
   // Debug handlers
   ipcMain.handle('oembed:debug:listFavicons', handleDebugListFavicons(ctx));
   ipcMain.handle('oembed:debug:listThumbnails', handleDebugListThumbnails(ctx));
@@ -76,6 +101,10 @@ export function unregisterOEmbedHandlers(): void {
   ipcMain.removeHandler('oembed:clearCache');
   ipcMain.removeHandler('oembed:getCacheStats');
   ipcMain.removeHandler('oembed:getFavicon');
+
+  // Registry update handlers
+  ipcMain.removeHandler('oembed:getRegistryStatus');
+  ipcMain.removeHandler('oembed:checkRegistryUpdate');
 
   // Debug handlers
   ipcMain.removeHandler('oembed:debug:listFavicons');
@@ -100,7 +129,7 @@ function handleUnfurl(ctx: HandlerContext) {
     url: string,
     options?: UnfurlOptions
   ): Promise<OEmbedResult> => {
-    const { oembedService } = ctx;
+    const { oembedService, database } = ctx;
 
     if (!oembedService) {
       return {
@@ -110,7 +139,21 @@ function handleUnfurl(ctx: HandlerContext) {
       };
     }
 
-    return oembedService.unfurl(url, options);
+    // Check discovery preference from app state
+    let effectiveOptions = options;
+    if (!options?.skipDiscovery) {
+      try {
+        const discoveryPref = await database.getState('oembedDiscoveryEnabled');
+        // If explicitly set to 'false', skip discovery
+        if (discoveryPref === 'false') {
+          effectiveOptions = { ...options, skipDiscovery: true };
+        }
+      } catch {
+        // Ignore errors, proceed with default
+      }
+    }
+
+    return oembedService.unfurl(url, effectiveOptions);
   };
 }
 
@@ -119,7 +162,7 @@ function handleUnfurl(ctx: HandlerContext) {
  */
 function handleRefresh(ctx: HandlerContext) {
   return async (_event: IpcMainInvokeEvent, url: string): Promise<OEmbedResult> => {
-    const { oembedService } = ctx;
+    const { oembedService, database } = ctx;
 
     if (!oembedService) {
       return {
@@ -129,7 +172,18 @@ function handleRefresh(ctx: HandlerContext) {
       };
     }
 
-    return oembedService.refresh(url);
+    // Check discovery preference from app state
+    let skipDiscovery = false;
+    try {
+      const discoveryPref = await database.getState('oembedDiscoveryEnabled');
+      if (discoveryPref === 'false') {
+        skipDiscovery = true;
+      }
+    } catch {
+      // Ignore errors, proceed with default
+    }
+
+    return oembedService.unfurl(url, { skipCache: true, skipDiscovery });
   };
 }
 
@@ -179,6 +233,46 @@ function handleGetFavicon(ctx: HandlerContext) {
     }
 
     return oembedService.getFavicon(domain);
+  };
+}
+
+// =============================================================================
+// Registry Update Handler Factories
+// =============================================================================
+
+/**
+ * Get registry update status
+ */
+function handleGetRegistryStatus(ctx: HandlerContext) {
+  return async (_event: IpcMainInvokeEvent): Promise<OEmbedRegistryStatus | null> => {
+    const { oembedService } = ctx;
+
+    if (!oembedService) {
+      return null;
+    }
+
+    return oembedService.getRegistryUpdateStatus();
+  };
+}
+
+/**
+ * Check for registry updates
+ */
+function handleCheckRegistryUpdate(ctx: HandlerContext) {
+  return async (
+    _event: IpcMainInvokeEvent,
+    force?: boolean
+  ): Promise<OEmbedRegistryUpdateResult> => {
+    const { oembedService } = ctx;
+
+    if (!oembedService) {
+      return {
+        result: 'ERROR',
+        error: 'oEmbed service not available',
+      };
+    }
+
+    return oembedService.checkForRegistryUpdate(force ?? false);
   };
 }
 

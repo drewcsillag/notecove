@@ -711,6 +711,8 @@ declare global {
       clipboard: {
         writeText: (text: string) => Promise<void>;
         readText: () => Promise<string>;
+        /** Write rich format (HTML + plain text fallback) */
+        writeRich: (html: string, text: string) => Promise<void>;
       };
 
       windowState: {

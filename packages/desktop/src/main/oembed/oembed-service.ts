@@ -6,6 +6,7 @@
  * to HTML discovery for unknown URLs.
  */
 
+import { createHash } from 'crypto';
 import { net } from 'electron';
 import {
   type OEmbedResponse,
@@ -23,6 +24,16 @@ import { FaviconService } from './favicon-service';
 import { scrapeMetadata } from './metadata-scraper';
 
 const log = createLogger('oEmbed:Service');
+
+/**
+ * URL for fetching the oEmbed provider registry
+ */
+const OEMBED_REGISTRY_URL = 'https://oembed.com/providers.json';
+
+/**
+ * How often to check for registry updates (1 week in ms)
+ */
+const REGISTRY_CHECK_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Options for unfurling a URL
@@ -309,6 +320,249 @@ export class OEmbedService {
   async debugClearAllThumbnails(): Promise<void> {
     log.info('Clearing all thumbnails');
     await this.repository.clearThumbnails();
+  }
+
+  // ==========================================================================
+  // Registry Update Methods
+  // ==========================================================================
+
+  /**
+   * Result of a registry update check
+   */
+  public static readonly RegistryUpdateResult = {
+    UPDATED: 'UPDATED',
+    NO_CHANGE: 'NO_CHANGE',
+    OFFLINE: 'OFFLINE',
+    ERROR: 'ERROR',
+    SKIPPED: 'SKIPPED',
+  } as const;
+
+  /**
+   * Check if the registry should be updated (based on last check time)
+   */
+  async shouldCheckForRegistryUpdate(): Promise<boolean> {
+    const lastCheck = await this.repository.getRegistryLastCheck();
+    if (lastCheck === null) {
+      // Never checked before, should check
+      return true;
+    }
+    const timeSinceLastCheck = Date.now() - lastCheck;
+    return timeSinceLastCheck >= REGISTRY_CHECK_INTERVAL_MS;
+  }
+
+  /**
+   * Get registry update status
+   */
+  async getRegistryUpdateStatus(): Promise<{
+    lastCheck: number | null;
+    storedHash: string | null;
+    storedProviderCount: number | null;
+    currentProviderCount: number;
+    needsCheck: boolean;
+  }> {
+    const metadata = await this.repository.getRegistryMetadata();
+    const needsCheck = await this.shouldCheckForRegistryUpdate();
+    return {
+      lastCheck: metadata.lastCheck,
+      storedHash: metadata.hash,
+      storedProviderCount: metadata.providerCount,
+      currentProviderCount: this.registry.providerCount,
+      needsCheck,
+    };
+  }
+
+  /**
+   * Check for registry updates and merge new providers
+   *
+   * @param force If true, check even if within the check interval
+   * @returns The result of the update check
+   */
+  async checkForRegistryUpdate(force = false): Promise<{
+    result: (typeof OEmbedService.RegistryUpdateResult)[keyof typeof OEmbedService.RegistryUpdateResult];
+    newProviders?: number;
+    totalProviders?: number;
+    error?: string;
+  }> {
+    // Check if we should actually check
+    if (!force) {
+      const shouldCheck = await this.shouldCheckForRegistryUpdate();
+      if (!shouldCheck) {
+        log.debug('Skipping registry update check - within check interval');
+        return { result: OEmbedService.RegistryUpdateResult.SKIPPED };
+      }
+    }
+
+    // Check if online
+    if (!net.isOnline()) {
+      log.debug('Offline - cannot check for registry updates');
+      return { result: OEmbedService.RegistryUpdateResult.OFFLINE };
+    }
+
+    log.info('Checking for oEmbed registry updates...');
+
+    try {
+      // Fetch the remote registry
+      const remoteProviders = await this.fetchRemoteRegistry();
+      if (!remoteProviders) {
+        return {
+          result: OEmbedService.RegistryUpdateResult.ERROR,
+          error: 'Failed to fetch remote registry',
+        };
+      }
+
+      // Calculate hash of remote registry
+      const remoteHash = this.calculateRegistryHash(remoteProviders);
+      const storedHash = await this.repository.getRegistryHash();
+
+      // Check if there are changes
+      if (storedHash === remoteHash) {
+        log.info('Registry is up to date');
+        // Update the last check time even if no changes
+        await this.repository.setRegistryMetadata(remoteHash, remoteProviders.length);
+        return { result: OEmbedService.RegistryUpdateResult.NO_CHANGE };
+      }
+
+      // Merge new providers into the registry
+      const newCount = this.mergeProviders(remoteProviders);
+
+      log.info(`Registry updated: ${newCount} new providers, ${this.registry.providerCount} total`);
+
+      // Save metadata
+      await this.repository.setRegistryMetadata(remoteHash, this.registry.providerCount);
+
+      return {
+        result: OEmbedService.RegistryUpdateResult.UPDATED,
+        newProviders: newCount,
+        totalProviders: this.registry.providerCount,
+      };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      log.error('Registry update check failed', err);
+      return {
+        result: OEmbedService.RegistryUpdateResult.ERROR,
+        error: err.message,
+      };
+    }
+  }
+
+  /**
+   * Fetch the remote oEmbed provider registry
+   */
+  private async fetchRemoteRegistry(): Promise<OEmbedProvider[] | null> {
+    return new Promise((resolve) => {
+      log.debug(`Fetching remote registry from ${OEMBED_REGISTRY_URL}`);
+
+      const request = net.request({
+        url: OEMBED_REGISTRY_URL,
+        method: 'GET',
+      });
+
+      let data = '';
+      let resolved = false;
+
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          request.abort();
+          log.error('Registry fetch timeout');
+          resolve(null);
+        }
+      }, FETCH_TIMEOUT_MS);
+
+      request.on('response', (response) => {
+        if (response.statusCode !== 200) {
+          clearTimeout(timeout);
+          resolved = true;
+          log.error(`Registry fetch failed: HTTP ${response.statusCode}`);
+          resolve(null);
+          return;
+        }
+
+        response.on('data', (chunk: Buffer) => {
+          data += chunk.toString();
+        });
+
+        response.on('end', () => {
+          if (!resolved) {
+            clearTimeout(timeout);
+            resolved = true;
+
+            try {
+              const providers = JSON.parse(data) as unknown;
+              if (!Array.isArray(providers)) {
+                log.error('Invalid registry format: not an array');
+                resolve(null);
+                return;
+              }
+              log.debug(`Fetched ${providers.length} providers from remote registry`);
+              resolve(providers as OEmbedProvider[]);
+            } catch {
+              log.error('Failed to parse registry JSON');
+              resolve(null);
+            }
+          }
+        });
+
+        response.on('error', (error) => {
+          if (!resolved) {
+            clearTimeout(timeout);
+            resolved = true;
+            log.error(`Registry fetch error: ${error.message}`);
+            resolve(null);
+          }
+        });
+      });
+
+      request.on('error', (error) => {
+        if (!resolved) {
+          clearTimeout(timeout);
+          resolved = true;
+          log.error(`Registry request error: ${error.message}`);
+          resolve(null);
+        }
+      });
+
+      request.end();
+    });
+  }
+
+  /**
+   * Calculate a hash of the provider registry for change detection
+   */
+  private calculateRegistryHash(providers: OEmbedProvider[]): string {
+    // Sort providers by name for consistent hashing
+    const sorted = [...providers].sort((a, b) => a.provider_name.localeCompare(b.provider_name));
+    const json = JSON.stringify(sorted);
+    return createHash('sha256').update(json).digest('hex');
+  }
+
+  /**
+   * Merge remote providers into the current registry
+   * Only adds new providers, doesn't remove or update existing ones
+   *
+   * @returns The number of new providers added
+   */
+  private mergeProviders(remoteProviders: OEmbedProvider[]): number {
+    const currentProviders = this.registry.getProviders();
+    const currentNames = new Set(currentProviders.map((p) => p.provider_name.toLowerCase()));
+
+    const newProviders: OEmbedProvider[] = [];
+    for (const provider of remoteProviders) {
+      if (!currentNames.has(provider.provider_name.toLowerCase())) {
+        newProviders.push(provider);
+      }
+    }
+
+    if (newProviders.length > 0) {
+      // Create a new registry with all providers
+      const allProviders = [...currentProviders, ...newProviders];
+      this.registry = createRegistry(allProviders);
+      log.debug(`Added ${newProviders.length} new providers`, {
+        providers: newProviders.map((p) => p.provider_name).join(', '),
+      });
+    }
+
+    return newProviders.length;
   }
 
   /**

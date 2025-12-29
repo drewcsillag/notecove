@@ -38,6 +38,17 @@ Express yourself with powerful formatting tools:
 
 [Learn more about rich text editing →](/features/rich-text-editing)
 
+### 🔗 Link Unfurling
+
+Paste URLs and see rich previews instantly:
+
+- **300+ providers** including YouTube, Twitter, GitHub, and more
+- Automatic thumbnail, title, and description extraction
+- Interactive preview cards with copy and refresh actions
+- Smart caching for fast performance
+
+[Learn more about link unfurling →](/features/link-unfurling)
+
 ### 📁 Smart Organization
 
 Organize notes your way:
@@ -156,6 +167,7 @@ Native mobile experience:
 | Cross-Platform   | ✅       | macOS/iOS only | ✅     | ✅       |
 | No Cloud Servers | ✅       | ❌             | ❌     | ✅       |
 | Rich Text        | ✅       | ✅             | ✅     | Markdown |
+| Link Unfurling   | ✅       | ❌             | ✅     | Plugin   |
 | Open Source      | ✅       | ❌             | ❌     | ❌       |
 | File-Based Sync  | ✅       | ❌             | ❌     | ✅       |
 

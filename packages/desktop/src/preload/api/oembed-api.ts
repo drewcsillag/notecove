@@ -46,6 +46,27 @@ export interface CachedFetch {
   fetchedAt: number;
 }
 
+/**
+ * Registry update status
+ */
+export interface OEmbedRegistryStatus {
+  lastCheck: number | null;
+  storedHash: string | null;
+  storedProviderCount: number | null;
+  currentProviderCount: number;
+  needsCheck: boolean;
+}
+
+/**
+ * Result of a registry update check
+ */
+export interface OEmbedRegistryUpdateResult {
+  result: 'UPDATED' | 'NO_CHANGE' | 'OFFLINE' | 'ERROR' | 'SKIPPED';
+  newProviders?: number;
+  totalProviders?: number;
+  error?: string;
+}
+
 export const oembedApi = {
   /**
    * Unfurl a URL - fetch oEmbed data with caching
@@ -82,6 +103,23 @@ export const oembedApi = {
    */
   getFavicon: (domain: string): Promise<string | null> =>
     ipcRenderer.invoke('oembed:getFavicon', domain) as Promise<string | null>,
+
+  // Registry update methods
+
+  /**
+   * Get registry update status
+   */
+  getRegistryStatus: (): Promise<OEmbedRegistryStatus | null> =>
+    ipcRenderer.invoke('oembed:getRegistryStatus') as Promise<OEmbedRegistryStatus | null>,
+
+  /**
+   * Check for registry updates
+   *
+   * @param force If true, check even if within the check interval (1 week)
+   * @returns The result of the update check
+   */
+  checkRegistryUpdate: (force?: boolean): Promise<OEmbedRegistryUpdateResult> =>
+    ipcRenderer.invoke('oembed:checkRegistryUpdate', force) as Promise<OEmbedRegistryUpdateResult>,
 
   // Debug methods
   debug: {

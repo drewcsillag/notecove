@@ -292,4 +292,132 @@ describe('OEmbedRepository', () => {
       });
     });
   });
+
+  describe('Registry Metadata', () => {
+    const testHash = 'abc123def456';
+    const testProviderCount = 350;
+    const testLastCheck = 1700000000000;
+
+    describe('getRegistryHash', () => {
+      it('should return stored hash', async () => {
+        adapter.get.mockResolvedValue({ value: testHash });
+
+        const result = await repository.getRegistryHash();
+
+        expect(result).toBe(testHash);
+        expect(adapter.get).toHaveBeenCalledWith('SELECT value FROM app_state WHERE key = ?', [
+          'oembed_registry_hash',
+        ]);
+      });
+
+      it('should return null if no hash stored', async () => {
+        adapter.get.mockResolvedValue(null);
+
+        const result = await repository.getRegistryHash();
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('getRegistryLastCheck', () => {
+      it('should return stored timestamp', async () => {
+        adapter.get.mockResolvedValue({ value: String(testLastCheck) });
+
+        const result = await repository.getRegistryLastCheck();
+
+        expect(result).toBe(testLastCheck);
+        expect(adapter.get).toHaveBeenCalledWith('SELECT value FROM app_state WHERE key = ?', [
+          'oembed_registry_last_check',
+        ]);
+      });
+
+      it('should return null if no timestamp stored', async () => {
+        adapter.get.mockResolvedValue(null);
+
+        const result = await repository.getRegistryLastCheck();
+
+        expect(result).toBeNull();
+      });
+
+      it('should return null for invalid timestamp', async () => {
+        adapter.get.mockResolvedValue({ value: 'not-a-number' });
+
+        const result = await repository.getRegistryLastCheck();
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('getRegistryProviderCount', () => {
+      it('should return stored count', async () => {
+        adapter.get.mockResolvedValue({ value: String(testProviderCount) });
+
+        const result = await repository.getRegistryProviderCount();
+
+        expect(result).toBe(testProviderCount);
+      });
+
+      it('should return null if no count stored', async () => {
+        adapter.get.mockResolvedValue(null);
+
+        const result = await repository.getRegistryProviderCount();
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('setRegistryMetadata', () => {
+      it('should store hash, timestamp, and provider count', async () => {
+        adapter.exec.mockResolvedValue(undefined);
+
+        await repository.setRegistryMetadata(testHash, testProviderCount);
+
+        expect(adapter.exec).toHaveBeenCalledTimes(3);
+        expect(adapter.exec).toHaveBeenNthCalledWith(
+          1,
+          expect.stringContaining('INSERT INTO app_state'),
+          ['oembed_registry_hash', testHash]
+        );
+        expect(adapter.exec).toHaveBeenNthCalledWith(
+          2,
+          expect.stringContaining('INSERT INTO app_state'),
+          ['oembed_registry_last_check', expect.any(String)]
+        );
+        expect(adapter.exec).toHaveBeenNthCalledWith(
+          3,
+          expect.stringContaining('INSERT INTO app_state'),
+          ['oembed_registry_provider_count', String(testProviderCount)]
+        );
+      });
+    });
+
+    describe('getRegistryMetadata', () => {
+      it('should return all metadata', async () => {
+        adapter.get
+          .mockResolvedValueOnce({ value: testHash })
+          .mockResolvedValueOnce({ value: String(testLastCheck) })
+          .mockResolvedValueOnce({ value: String(testProviderCount) });
+
+        const result = await repository.getRegistryMetadata();
+
+        expect(result).toEqual({
+          hash: testHash,
+          lastCheck: testLastCheck,
+          providerCount: testProviderCount,
+        });
+      });
+
+      it('should handle missing metadata', async () => {
+        adapter.get.mockResolvedValue(null);
+
+        const result = await repository.getRegistryMetadata();
+
+        expect(result).toEqual({
+          hash: null,
+          lastCheck: null,
+          providerCount: null,
+        });
+      });
+    });
+  });
 });
