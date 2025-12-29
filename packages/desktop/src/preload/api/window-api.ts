@@ -150,6 +150,15 @@ export const menuApi = {
       ipcRenderer.removeListener('menu:toggle-tags-panel', listener);
     };
   },
+  onToggleNotesListPanel: (callback: () => void): (() => void) => {
+    const listener = (): void => {
+      callback();
+    };
+    ipcRenderer.on('menu:toggle-notes-list-panel', listener);
+    return () => {
+      ipcRenderer.removeListener('menu:toggle-notes-list-panel', listener);
+    };
+  },
   onCreateSnapshot: (callback: () => void): (() => void) => {
     const listener = (): void => {
       callback();

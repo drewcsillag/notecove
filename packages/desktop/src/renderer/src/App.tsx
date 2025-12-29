@@ -9,6 +9,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { createAppTheme } from './theme';
 import './i18n';
 import { ThreePanelLayout } from './components/Layout/ThreePanelLayout';
+import { BottomStatusbar } from './components/Layout/BottomStatusbar';
 import { LeftSidebar } from './components/LeftSidebar/LeftSidebar';
 import { NotesListPanel } from './components/NotesListPanel/NotesListPanel';
 import { NoteDragLayer } from './components/NotesListPanel/NoteDragLayer';
@@ -62,6 +63,16 @@ function App(): React.ReactElement {
   const [tagFilters, setTagFilters] = useState<Record<string, 'include' | 'exclude'>>({});
   const [showFolderPanel, setShowFolderPanel] = useState(true);
   const [showTagPanel, setShowTagPanel] = useState(true);
+  // Track which panels were visible before collapsing (for restore on expand)
+  const [lastVisibleLeftPanels, setLastVisibleLeftPanels] = useState<{
+    folder: boolean;
+    tags: boolean;
+  }>({ folder: true, tags: true });
+  // Notes list panel visibility
+  const [showNotesListPanel, setShowNotesListPanel] = useState(true);
+  // Track if user has seen the first-collapse tooltips (for onboarding)
+  const [hasSeenLeftPaneTooltip, setHasSeenLeftPaneTooltip] = useState(false);
+  const [hasSeenMiddlePaneTooltip, setHasSeenMiddlePaneTooltip] = useState(false);
   // Track newly created notes (to apply initial formatting)
   const [newlyCreatedNoteId, setNewlyCreatedNoteId] = useState<string | null>(null);
   // App info for window title (dev prefix, profile suffix)
@@ -408,13 +419,25 @@ function App(): React.ReactElement {
         }
 
         // Fall back to global appState for windows without windowId or no per-window state
-        const [panelSizesResult, leftSidebarResult, showFolderResult, showTagResult] =
-          await Promise.all([
-            window.electronAPI.appState.get(AppStateKey.PanelSizes),
-            window.electronAPI.appState.get(AppStateKey.LeftSidebarPanelSizes),
-            window.electronAPI.appState.get(AppStateKey.ShowFolderPanel),
-            window.electronAPI.appState.get(AppStateKey.ShowTagPanel),
-          ]);
+        const [
+          panelSizesResult,
+          leftSidebarResult,
+          showFolderResult,
+          showTagResult,
+          showNotesListResult,
+          lastVisibleLeftPanelsResult,
+          hasSeenLeftPaneTooltipResult,
+          hasSeenMiddlePaneTooltipResult,
+        ] = await Promise.all([
+          window.electronAPI.appState.get(AppStateKey.PanelSizes),
+          window.electronAPI.appState.get(AppStateKey.LeftSidebarPanelSizes),
+          window.electronAPI.appState.get(AppStateKey.ShowFolderPanel),
+          window.electronAPI.appState.get(AppStateKey.ShowTagPanel),
+          window.electronAPI.appState.get(AppStateKey.ShowNotesListPanel),
+          window.electronAPI.appState.get(AppStateKey.LastVisibleLeftPanels),
+          window.electronAPI.appState.get(AppStateKey.HasSeenLeftPaneTooltip),
+          window.electronAPI.appState.get(AppStateKey.HasSeenMiddlePaneTooltip),
+        ]);
 
         if (panelSizesResult) {
           const sizes = JSON.parse(panelSizesResult) as number[];
@@ -429,6 +452,26 @@ function App(): React.ReactElement {
         }
         if (showTagResult !== null) {
           setShowTagPanel(showTagResult === 'true');
+        }
+        if (showNotesListResult !== null) {
+          setShowNotesListPanel(showNotesListResult === 'true');
+        }
+        if (lastVisibleLeftPanelsResult) {
+          try {
+            const parsed = JSON.parse(lastVisibleLeftPanelsResult) as {
+              folder: boolean;
+              tags: boolean;
+            };
+            setLastVisibleLeftPanels(parsed);
+          } catch {
+            // Ignore invalid JSON
+          }
+        }
+        if (hasSeenLeftPaneTooltipResult !== null) {
+          setHasSeenLeftPaneTooltip(hasSeenLeftPaneTooltipResult === 'true');
+        }
+        if (hasSeenMiddlePaneTooltipResult !== null) {
+          setHasSeenMiddlePaneTooltip(hasSeenMiddlePaneTooltipResult === 'true');
         }
       } catch (error: unknown) {
         console.error(
@@ -564,6 +607,45 @@ function App(): React.ReactElement {
       void window.electronAPI.appState.set(AppStateKey.ShowTagPanel, String(showTagPanel));
     }
   }, [showTagPanel, panelSizesLoaded, windowId]);
+
+  // Save notes list panel visibility
+  useEffect(() => {
+    if (!panelSizesLoaded) return;
+
+    void window.electronAPI.appState.set(
+      AppStateKey.ShowNotesListPanel,
+      String(showNotesListPanel)
+    );
+  }, [showNotesListPanel, panelSizesLoaded]);
+
+  // Save last visible left panels state
+  useEffect(() => {
+    if (!panelSizesLoaded) return;
+
+    void window.electronAPI.appState.set(
+      AppStateKey.LastVisibleLeftPanels,
+      JSON.stringify(lastVisibleLeftPanels)
+    );
+  }, [lastVisibleLeftPanels, panelSizesLoaded]);
+
+  // Save tooltip seen states
+  useEffect(() => {
+    if (!panelSizesLoaded) return;
+
+    void window.electronAPI.appState.set(
+      AppStateKey.HasSeenLeftPaneTooltip,
+      String(hasSeenLeftPaneTooltip)
+    );
+  }, [hasSeenLeftPaneTooltip, panelSizesLoaded]);
+
+  useEffect(() => {
+    if (!panelSizesLoaded) return;
+
+    void window.electronAPI.appState.set(
+      AppStateKey.HasSeenMiddlePaneTooltip,
+      String(hasSeenMiddlePaneTooltip)
+    );
+  }, [hasSeenMiddlePaneTooltip, panelSizesLoaded]);
 
   // Auto-select default note on first load
   useEffect(() => {
@@ -839,14 +921,31 @@ function App(): React.ReactElement {
       setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'));
     });
 
-    // Toggle Folder Panel
+    // Toggle Folder Panel - track visible state before hiding
     const cleanupToggleFolderPanel = window.electronAPI.menu.onToggleFolderPanel(() => {
-      setShowFolderPanel((prev) => !prev);
+      setShowFolderPanel((prev) => {
+        // Update last visible state when hiding (before the toggle)
+        if (prev) {
+          setLastVisibleLeftPanels((last) => ({ ...last, folder: true }));
+        }
+        return !prev;
+      });
     });
 
-    // Toggle Tags Panel
+    // Toggle Tags Panel - track visible state before hiding
     const cleanupToggleTagsPanel = window.electronAPI.menu.onToggleTagsPanel(() => {
-      setShowTagPanel((prev) => !prev);
+      setShowTagPanel((prev) => {
+        // Update last visible state when hiding (before the toggle)
+        if (prev) {
+          setLastVisibleLeftPanels((last) => ({ ...last, tags: true }));
+        }
+        return !prev;
+      });
+    });
+
+    // Toggle Notes List Panel
+    const cleanupToggleNotesListPanel = window.electronAPI.menu.onToggleNotesListPanel(() => {
+      setShowNotesListPanel((prev) => !prev);
     });
 
     // Create Snapshot
@@ -977,6 +1076,7 @@ function App(): React.ReactElement {
       cleanupToggleDarkMode();
       cleanupToggleFolderPanel();
       cleanupToggleTagsPanel();
+      cleanupToggleNotesListPanel();
       cleanupCreateSnapshot();
       cleanupNoteInfo();
       cleanupViewHistory();
@@ -1010,6 +1110,12 @@ function App(): React.ReactElement {
       );
     }
   };
+
+  // Derived state: left pane is collapsed when both folder and tag panels are hidden
+  const leftPaneCollapsed = !showFolderPanel && !showTagPanel;
+
+  // Derived state: middle pane is collapsed when notes list panel is hidden
+  const middlePaneCollapsed = !showNotesListPanel;
 
   // Tag filter handlers - cycle through: neutral -> include -> exclude -> neutral
   const handleTagSelect = (tagId: string): void => {
@@ -1221,67 +1327,81 @@ function App(): React.ReactElement {
         <FeatureFlagsProvider>
           <DndProvider backend={HTML5Backend}>
             <NoteDragLayer />
-            <div data-testid="app-root" data-active-sd-id={activeSdId}>
-              <ThreePanelLayout
-                leftPanel={
-                  <LeftSidebar
-                    onOpenSettings={() => {
-                      setSettingsOpen(true);
-                    }}
-                    activeSdId={activeSdId}
-                    onActiveSdChange={setActiveSdId}
-                    selectedFolderId={selectedFolderId}
-                    onFolderSelect={setSelectedFolderId}
-                    tagFilters={tagFilters}
-                    onTagSelect={handleTagSelect}
-                    onClearTagFilters={handleClearTagFilters}
-                    showFolderPanel={showFolderPanel}
-                    showTagPanel={showTagPanel}
-                    {...(leftSidebarSizes ? { initialSizes: leftSidebarSizes } : {})}
-                    onLayoutChange={handleLeftSidebarLayoutChange}
-                  />
-                }
-                middlePanel={
-                  <NotesListPanel
-                    selectedNoteId={selectedNoteId}
-                    onNoteSelect={setSelectedNoteId}
-                    onNoteCreated={setNewlyCreatedNoteId}
-                    activeSdId={activeSdId}
-                    selectedFolderId={selectedFolderId}
-                    tagFilters={tagFilters}
-                    exportTrigger={exportTrigger}
-                    onExportComplete={() => {
-                      setExportTrigger(null);
-                    }}
-                  />
-                }
-                rightPanel={
-                  <EditorPanel
-                    selectedNoteId={selectedNoteId}
-                    isNewlyCreated={selectedNoteId === newlyCreatedNoteId}
-                    onNoteLoaded={handleNoteLoaded}
-                    showHistoryPanel={historyPanelOpen}
-                    onHistoryPanelClose={() => {
-                      setHistoryPanelOpen(false);
-                    }}
-                    showSearchPanel={searchPanelOpen}
-                    onSearchPanelClose={() => {
-                      setSearchPanelOpen(false);
-                    }}
-                    showCommentPanel={commentPanelOpen}
-                    onCommentPanelClose={() => {
-                      setCommentPanelOpen(false);
-                    }}
-                    onCommentAdded={() => {
-                      setCommentPanelOpen(true);
-                    }}
-                    onNavigateToNote={setSelectedNoteId}
-                  />
-                }
-                onLayoutChange={handleLayoutChange}
-                initialSizes={initialPanelSizes}
-              />
-            </div>
+            <Box
+              data-testid="app-root"
+              data-active-sd-id={activeSdId}
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100vh',
+                overflow: 'hidden',
+              }}
+            >
+              <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                <ThreePanelLayout
+                  leftPanel={
+                    <LeftSidebar
+                      onOpenSettings={() => {
+                        setSettingsOpen(true);
+                      }}
+                      activeSdId={activeSdId}
+                      onActiveSdChange={setActiveSdId}
+                      selectedFolderId={selectedFolderId}
+                      onFolderSelect={setSelectedFolderId}
+                      tagFilters={tagFilters}
+                      onTagSelect={handleTagSelect}
+                      onClearTagFilters={handleClearTagFilters}
+                      showFolderPanel={showFolderPanel}
+                      showTagPanel={showTagPanel}
+                      {...(leftSidebarSizes ? { initialSizes: leftSidebarSizes } : {})}
+                      onLayoutChange={handleLeftSidebarLayoutChange}
+                    />
+                  }
+                  middlePanel={
+                    <NotesListPanel
+                      selectedNoteId={selectedNoteId}
+                      onNoteSelect={setSelectedNoteId}
+                      onNoteCreated={setNewlyCreatedNoteId}
+                      activeSdId={activeSdId}
+                      selectedFolderId={selectedFolderId}
+                      tagFilters={tagFilters}
+                      exportTrigger={exportTrigger}
+                      onExportComplete={() => {
+                        setExportTrigger(null);
+                      }}
+                    />
+                  }
+                  rightPanel={
+                    <EditorPanel
+                      selectedNoteId={selectedNoteId}
+                      isNewlyCreated={selectedNoteId === newlyCreatedNoteId}
+                      onNoteLoaded={handleNoteLoaded}
+                      showHistoryPanel={historyPanelOpen}
+                      onHistoryPanelClose={() => {
+                        setHistoryPanelOpen(false);
+                      }}
+                      showSearchPanel={searchPanelOpen}
+                      onSearchPanelClose={() => {
+                        setSearchPanelOpen(false);
+                      }}
+                      showCommentPanel={commentPanelOpen}
+                      onCommentPanelClose={() => {
+                        setCommentPanelOpen(false);
+                      }}
+                      onCommentAdded={() => {
+                        setCommentPanelOpen(true);
+                      }}
+                      onNavigateToNote={setSelectedNoteId}
+                    />
+                  }
+                  onLayoutChange={handleLayoutChange}
+                  initialSizes={initialPanelSizes}
+                  leftPaneCollapsed={leftPaneCollapsed}
+                  middlePaneCollapsed={middlePaneCollapsed}
+                />
+              </Box>
+              <BottomStatusbar />
+            </Box>
             {settingsOpen && (
               <SettingsDialog
                 open={settingsOpen}

@@ -187,6 +187,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onToggleDarkMode: stubEventSubscription,
     onToggleFolderPanel: stubEventSubscription,
     onToggleTagsPanel: stubEventSubscription,
+    onToggleNotesListPanel: stubEventSubscription,
     onCreateSnapshot: stubEventSubscription,
     onViewHistory: stubEventSubscription,
     onNoteInfo: stubEventSubscription,

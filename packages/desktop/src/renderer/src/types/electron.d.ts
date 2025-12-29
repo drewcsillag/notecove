@@ -575,6 +575,7 @@ declare global {
         onToggleDarkMode: (callback: () => void) => () => void;
         onToggleFolderPanel: (callback: () => void) => () => void;
         onToggleTagsPanel: (callback: () => void) => () => void;
+        onToggleNotesListPanel: (callback: () => void) => () => void;
         onCreateSnapshot: (callback: () => void) => () => void;
         onViewHistory: (callback: () => void) => () => void;
         onNoteInfo: (callback: () => void) => () => void;

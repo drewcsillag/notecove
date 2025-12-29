@@ -749,6 +749,7 @@ export const webClient: typeof window.electronAPI = {
     onToggleDarkMode: noopSubscription,
     onToggleFolderPanel: noopSubscription,
     onToggleTagsPanel: noopSubscription,
+    onToggleNotesListPanel: noopSubscription,
     onCreateSnapshot: noopSubscription,
     onViewHistory: noopSubscription,
     onNoteInfo: noopSubscription,

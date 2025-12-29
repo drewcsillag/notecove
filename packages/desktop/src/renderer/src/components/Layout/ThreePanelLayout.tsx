@@ -5,10 +5,18 @@
  * - Left: Folder/Tags navigation (25% default)
  * - Middle: Notes list (25% default)
  * - Right: Note editor (50% default)
+ *
+ * Panels can be collapsed via keyboard shortcuts. Collapsed panels
+ * can be expanded by dragging the resize handle.
  */
 
-import React from 'react';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import React, { useRef, useEffect } from 'react';
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelHandle,
+} from 'react-resizable-panels';
 import { Box, useTheme } from '@mui/material';
 
 interface ThreePanelLayoutProps {
@@ -17,6 +25,10 @@ interface ThreePanelLayoutProps {
   rightPanel: React.ReactNode;
   onLayoutChange?: (sizes: number[]) => void;
   initialSizes?: number[] | undefined;
+  /** Whether the left pane should be collapsed */
+  leftPaneCollapsed?: boolean;
+  /** Whether the middle pane should be collapsed */
+  middlePaneCollapsed?: boolean;
 }
 
 export const ThreePanelLayout: React.FC<ThreePanelLayoutProps> = ({
@@ -25,14 +37,42 @@ export const ThreePanelLayout: React.FC<ThreePanelLayoutProps> = ({
   rightPanel,
   onLayoutChange,
   initialSizes,
+  leftPaneCollapsed = false,
+  middlePaneCollapsed = false,
 }) => {
   const theme = useTheme();
+  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+  const middlePanelRef = useRef<ImperativePanelHandle>(null);
 
   const handleLayoutChange = (sizes: number[]): void => {
     if (onLayoutChange) {
       onLayoutChange(sizes);
     }
   };
+
+  // Handle left pane collapse/expand
+  useEffect(() => {
+    const panel = leftPanelRef.current;
+    if (!panel) return;
+
+    if (leftPaneCollapsed) {
+      panel.collapse();
+    } else {
+      panel.expand();
+    }
+  }, [leftPaneCollapsed]);
+
+  // Handle middle pane collapse/expand
+  useEffect(() => {
+    const panel = middlePanelRef.current;
+    if (!panel) return;
+
+    if (middlePaneCollapsed) {
+      panel.collapse();
+    } else {
+      panel.expand();
+    }
+  }, [middlePaneCollapsed]);
 
   // Default sizes: [25, 25, 50]
   const leftSize = initialSizes?.[0] ?? 25;
@@ -43,7 +83,7 @@ export const ThreePanelLayout: React.FC<ThreePanelLayoutProps> = ({
     <Box
       sx={{
         width: '100%',
-        height: '100vh',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -52,12 +92,14 @@ export const ThreePanelLayout: React.FC<ThreePanelLayoutProps> = ({
       <PanelGroup direction="horizontal" onLayout={handleLayoutChange}>
         {/* Left Panel - Folder/Tags Navigation */}
         <Panel
+          ref={leftPanelRef}
           id="left-panel"
           order={1}
           defaultSize={leftSize}
-          minSize={15}
+          minSize={0}
           maxSize={40}
           collapsible={true}
+          collapsedSize={0}
         >
           <Box
             sx={{
@@ -91,12 +133,14 @@ export const ThreePanelLayout: React.FC<ThreePanelLayoutProps> = ({
 
         {/* Middle Panel - Notes List */}
         <Panel
+          ref={middlePanelRef}
           id="middle-panel"
           order={2}
           defaultSize={middleSize}
-          minSize={15}
+          minSize={0}
           maxSize={50}
           collapsible={true}
+          collapsedSize={0}
         >
           <Box
             sx={{

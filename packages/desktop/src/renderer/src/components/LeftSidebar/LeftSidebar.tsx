@@ -9,7 +9,6 @@ import { Box, useTheme } from '@mui/material';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { FolderPanel } from '../FolderPanel/FolderPanel';
 import { TagPanel } from '../TagPanel/TagPanel';
-import { SyncStatusIndicator } from '../SyncStatusIndicator';
 
 export interface LeftSidebarProps {
   onOpenSettings?: () => void;
@@ -69,7 +68,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         <Box sx={{ flex: 1, overflow: 'auto' }}>
           <FolderPanel {...folderPanelProps} />
         </Box>
-        <SyncStatusIndicator />
       </Box>
     );
   }
@@ -85,19 +83,13 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             onClearFilters={onClearTagFilters}
           />
         </Box>
-        <SyncStatusIndicator />
       </Box>
     );
   }
 
-  // If both panels are hidden, show a minimal sidebar
+  // If both panels are hidden, show an empty sidebar
   if (!showFolderPanel && !showTagPanel) {
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Box sx={{ flex: 1 }} />
-        <SyncStatusIndicator />
-      </Box>
-    );
+    return <Box sx={{ height: '100%' }} />;
   }
 
   // Default sizes: 60% folder, 40% tags
@@ -112,48 +104,45 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   // Both panels are shown - render resizable layout
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ flex: 1, minHeight: 0 }} data-testid="left-sidebar-panel-group">
-        <PanelGroup direction="vertical" onLayout={handleLayoutChange}>
-          {/* Folder Panel */}
-          <Panel defaultSize={folderSize} minSize={20} data-testid="panel">
-            <Box sx={{ height: '100%', overflow: 'auto' }}>
-              <FolderPanel {...folderPanelProps} />
-            </Box>
-          </Panel>
+    <Box sx={{ height: '100%' }} data-testid="left-sidebar-panel-group">
+      <PanelGroup direction="vertical" onLayout={handleLayoutChange}>
+        {/* Folder Panel */}
+        <Panel defaultSize={folderSize} minSize={20} data-testid="panel">
+          <Box sx={{ height: '100%', overflow: 'auto' }}>
+            <FolderPanel {...folderPanelProps} />
+          </Box>
+        </Panel>
 
-          {/* Resize Handle */}
-          <PanelResizeHandle
-            data-testid="resize-handle"
-            style={{
-              height: '4px',
-              backgroundColor: theme.palette.divider,
-              cursor: 'row-resize',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              const target = e.currentTarget as unknown as HTMLElement;
-              target.style.backgroundColor = theme.palette.primary.main;
-            }}
-            onMouseLeave={(e) => {
-              const target = e.currentTarget as unknown as HTMLElement;
-              target.style.backgroundColor = theme.palette.divider;
-            }}
-          />
+        {/* Resize Handle */}
+        <PanelResizeHandle
+          data-testid="resize-handle"
+          style={{
+            height: '4px',
+            backgroundColor: theme.palette.divider,
+            cursor: 'row-resize',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            const target = e.currentTarget as unknown as HTMLElement;
+            target.style.backgroundColor = theme.palette.primary.main;
+          }}
+          onMouseLeave={(e) => {
+            const target = e.currentTarget as unknown as HTMLElement;
+            target.style.backgroundColor = theme.palette.divider;
+          }}
+        />
 
-          {/* Tag Panel */}
-          <Panel defaultSize={tagsSize} minSize={20}>
-            <Box sx={{ height: '100%', overflow: 'auto' }}>
-              <TagPanel
-                tagFilters={tagFilters}
-                onTagSelect={onTagSelect}
-                onClearFilters={onClearTagFilters}
-              />
-            </Box>
-          </Panel>
-        </PanelGroup>
-      </Box>
-      <SyncStatusIndicator />
+        {/* Tag Panel */}
+        <Panel defaultSize={tagsSize} minSize={20}>
+          <Box sx={{ height: '100%', overflow: 'auto' }}>
+            <TagPanel
+              tagFilters={tagFilters}
+              onTagSelect={onTagSelect}
+              onClearFilters={onClearTagFilters}
+            />
+          </Box>
+        </Panel>
+      </PanelGroup>
     </Box>
   );
 };

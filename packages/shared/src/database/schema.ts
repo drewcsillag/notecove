@@ -154,6 +154,10 @@ export enum AppStateKey {
   LeftSidebarPanelSizes = 'leftSidebarPanelSizes', // Array of left sidebar sizes: [folder%, tags%]
   ShowFolderPanel = 'showFolderPanel', // Whether the folder panel is visible
   ShowTagPanel = 'showTagPanel', // Whether the tag panel is visible
+  ShowNotesListPanel = 'showNotesListPanel', // Whether the notes list panel is visible
+  LastVisibleLeftPanels = 'lastVisibleLeftPanels', // JSON: {folder: boolean, tags: boolean}
+  HasSeenLeftPaneTooltip = 'hasSeenLeftPaneTooltip', // Whether user has seen the left pane collapse tooltip
+  HasSeenMiddlePaneTooltip = 'hasSeenMiddlePaneTooltip', // Whether user has seen the middle pane collapse tooltip
   NoteScrollPositions = 'noteScrollPositions', // JSON object of noteId -> scrollTop
   FolderCollapseState = 'folderCollapseState',
   TagFilters = 'tagFilters',

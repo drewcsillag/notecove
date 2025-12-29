@@ -67,4 +67,55 @@ describe('ThreePanelLayout', () => {
     // Should render without errors with default sizes [25, 25, 50]
     expect(container).toBeTruthy();
   });
+
+  it('should render with leftPaneCollapsed prop', () => {
+    const { container } = render(
+      <ThreePanelLayout
+        leftPanel={<div>Left</div>}
+        middlePanel={<div>Middle</div>}
+        rightPanel={<div>Right</div>}
+        leftPaneCollapsed={true}
+      />
+    );
+
+    // Should render without errors when left pane is collapsed
+    expect(container).toBeTruthy();
+    // Middle panel should still be visible
+    expect(container.textContent).toContain('Middle');
+    expect(container.textContent).toContain('Right');
+  });
+
+  it('should render with middlePaneCollapsed prop', () => {
+    const { container } = render(
+      <ThreePanelLayout
+        leftPanel={<div>Left</div>}
+        middlePanel={<div>Middle</div>}
+        rightPanel={<div>Right</div>}
+        middlePaneCollapsed={true}
+      />
+    );
+
+    // Should render without errors when middle pane is collapsed
+    expect(container).toBeTruthy();
+    // Left and right panels should still be visible
+    expect(container.textContent).toContain('Left');
+    expect(container.textContent).toContain('Right');
+  });
+
+  it('should render with both panes collapsed', () => {
+    const { container } = render(
+      <ThreePanelLayout
+        leftPanel={<div>Left</div>}
+        middlePanel={<div>Middle</div>}
+        rightPanel={<div>Right</div>}
+        leftPaneCollapsed={true}
+        middlePaneCollapsed={true}
+      />
+    );
+
+    // Should render without errors when both panes are collapsed
+    expect(container).toBeTruthy();
+    // Right panel should still be visible
+    expect(container.textContent).toContain('Right');
+  });
 });

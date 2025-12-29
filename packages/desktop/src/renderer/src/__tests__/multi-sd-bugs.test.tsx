@@ -105,6 +105,7 @@ const mockElectronAPI = {
     onToggleDarkMode: jest.fn(() => () => {}),
     onToggleFolderPanel: jest.fn(() => () => {}),
     onToggleTagsPanel: jest.fn(() => () => {}),
+    onToggleNotesListPanel: jest.fn(() => () => {}),
     onCreateSnapshot: jest.fn(() => () => {}),
     onNoteInfo: jest.fn(() => () => {}),
     onViewHistory: jest.fn(() => () => {}),

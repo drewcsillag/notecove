@@ -27,10 +27,6 @@ jest.mock('../../TagPanel/TagPanel', () => ({
   ),
 }));
 
-jest.mock('../../SyncStatusIndicator', () => ({
-  SyncStatusIndicator: () => <div data-testid="sync-status">Sync Status</div>,
-}));
-
 const theme = createTheme();
 
 const defaultProps = {
@@ -69,12 +65,6 @@ describe('LeftSidebar', () => {
 
       expect(screen.getByTestId('left-sidebar-panel-group')).toBeInTheDocument();
       expect(screen.getByTestId('resize-handle')).toBeInTheDocument();
-    });
-
-    it('should render SyncStatusIndicator', () => {
-      renderLeftSidebar({ showTagPanel: true });
-
-      expect(screen.getByTestId('sync-status')).toBeInTheDocument();
     });
 
     it('should pass tagFilters to TagPanel', () => {
@@ -125,12 +115,6 @@ describe('LeftSidebar', () => {
       expect(screen.queryByTestId('left-sidebar-panel-group')).not.toBeInTheDocument();
       expect(screen.queryByTestId('resize-handle')).not.toBeInTheDocument();
     });
-
-    it('should still render SyncStatusIndicator', () => {
-      renderLeftSidebar({ showFolderPanel: true, showTagPanel: false });
-
-      expect(screen.getByTestId('sync-status')).toBeInTheDocument();
-    });
   });
 
   describe('with folder panel hidden', () => {
@@ -147,12 +131,6 @@ describe('LeftSidebar', () => {
       expect(screen.queryByTestId('left-sidebar-panel-group')).not.toBeInTheDocument();
       expect(screen.queryByTestId('resize-handle')).not.toBeInTheDocument();
     });
-
-    it('should still render SyncStatusIndicator', () => {
-      renderLeftSidebar({ showFolderPanel: false, showTagPanel: true });
-
-      expect(screen.getByTestId('sync-status')).toBeInTheDocument();
-    });
   });
 
   describe('with both panels hidden', () => {
@@ -163,10 +141,11 @@ describe('LeftSidebar', () => {
       expect(screen.queryByTestId('tag-panel')).not.toBeInTheDocument();
     });
 
-    it('should still render SyncStatusIndicator', () => {
-      renderLeftSidebar({ showFolderPanel: false, showTagPanel: false });
+    it('should render an empty container', () => {
+      const { container } = renderLeftSidebar({ showFolderPanel: false, showTagPanel: false });
 
-      expect(screen.getByTestId('sync-status')).toBeInTheDocument();
+      // Should just be a minimal Box element
+      expect(container.firstChild).toBeTruthy();
     });
   });
 

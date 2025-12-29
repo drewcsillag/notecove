@@ -303,6 +303,15 @@ export function createMenu(deps: MenuDependencies): void {
             }
           },
         },
+        {
+          label: 'Toggle Notes List',
+          accelerator: 'CmdOrCtrl+Shift+0',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('menu:toggle-notes-list-panel');
+            }
+          },
+        },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
