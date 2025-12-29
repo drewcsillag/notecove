@@ -23,7 +23,7 @@ import {
   generateCompactId,
 } from '@notecove/shared';
 import { IPCHandlers } from './ipc';
-import type { SyncStatus, StaleSyncEntry } from './ipc/types';
+import type { SyncStatus } from './ipc/types';
 import { CRDTManagerImpl, CRDTCommentObserver, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
@@ -477,7 +477,7 @@ void app.whenReady().then(async () => {
     );
 
     // Initialize ProfilePresenceReader for reading and caching presence files from SDs
-    // This populates the cache that getStaleSyncs uses to show meaningful device names
+    // This is used to show meaningful device names for sync operations
     profilePresenceReader = new ProfilePresenceReader(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       fsAdapter as any,
@@ -782,139 +782,6 @@ void app.whenReady().then(async () => {
           perSd,
           isSyncing: totalPending > 0,
         };
-      },
-      // getStaleSyncs callback - returns stale sync entries for UI display
-      async (): Promise<StaleSyncEntry[]> => {
-        const result: StaleSyncEntry[] = [];
-
-        // Database may not be initialized yet
-        if (!database) {
-          return result;
-        }
-
-        /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
-        for (const [sdId, activitySync] of (
-          sdWatcherManager?.getActivitySyncs() ?? new Map()
-        ).entries()) {
-          const staleEntries = activitySync.getStaleEntries();
-
-          // Get SD name for display
-          const sd = await database.getStorageDir(sdId);
-          const sdName = sd?.name ?? sdId;
-
-          for (const entry of staleEntries) {
-            // Look up note title from database
-            const noteCache = await database.getNote(entry.noteId);
-
-            // Look up source profile from presence cache
-            // First try by instanceId (new method), then fall back to profileId (for backwards compatibility)
-            let profilePresence = await database.getProfilePresenceCacheByInstanceId(
-              entry.sourceInstanceId,
-              sdId
-            );
-            // Fall back to lookup by profileId for older presence files without instanceId
-            // (In current design, instanceId === profileId for most cases)
-            profilePresence ??= await database.getProfilePresenceCache(
-              entry.sourceInstanceId,
-              sdId
-            );
-
-            const sourceProfile = profilePresence
-              ? {
-                  profileId: profilePresence.profileId,
-                  profileName: profilePresence.profileName ?? 'Unknown',
-                  hostname: profilePresence.hostname ?? 'Unknown Device',
-                  lastSeen: profilePresence.lastUpdated ?? profilePresence.cachedAt,
-                }
-              : undefined;
-
-            // Build the entry, only including optional fields if they have values
-            const staleSyncEntry: StaleSyncEntry = {
-              sdId,
-              sdName,
-              noteId: entry.noteId,
-              sourceInstanceId: entry.sourceInstanceId,
-              expectedSequence: entry.expectedSequence,
-              highestSequenceForNote: entry.highestSequenceForNote,
-              gap: entry.gap,
-              detectedAt: entry.detectedAt,
-            };
-            /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
-
-            // Add optional fields only if they have values
-            if (noteCache?.title) {
-              staleSyncEntry.noteTitle = noteCache.title;
-            }
-            if (sourceProfile) {
-              staleSyncEntry.sourceProfile = sourceProfile;
-            }
-
-            result.push(staleSyncEntry);
-          }
-        }
-
-        return result;
-      },
-      // skipStaleEntry callback - skip a stale entry (accept data loss)
-      (
-        sdId: string,
-        noteId: string,
-        sourceInstanceId: string
-      ): Promise<{ success: boolean; error?: string }> => {
-        const activitySync = sdWatcherManager?.getActivitySyncs().get(sdId);
-        if (!activitySync) {
-          return Promise.resolve({
-            success: false,
-            error: `Storage directory ${sdId} not found`,
-          });
-        }
-
-        try {
-          void activitySync.removeStaleEntry(noteId, sourceInstanceId);
-          // TODO: Update watermark to skip past missing sequences
-          console.log(
-            `[Stale Sync] Skipped stale entry: sdId=${sdId}, noteId=${noteId}, sourceInstanceId=${sourceInstanceId}`
-          );
-          return Promise.resolve({ success: true });
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          return Promise.resolve({ success: false, error: errorMessage });
-        }
-      },
-      // retryStaleEntry callback - retry syncing a stale entry
-      async (
-        sdId: string,
-        noteId: string,
-        sourceInstanceId: string
-      ): Promise<{ success: boolean; error?: string }> => {
-        const activitySync = sdWatcherManager?.getActivitySyncs().get(sdId);
-        if (!activitySync) {
-          return { success: false, error: `Storage directory ${sdId} not found` };
-        }
-
-        try {
-          // Remove from stale entries so it can be retried
-          void activitySync.removeStaleEntry(noteId, sourceInstanceId);
-          // Force a sync cycle
-          await activitySync.syncFromOtherInstances();
-          console.log(
-            `[Stale Sync] Retried stale entry: sdId=${sdId}, noteId=${noteId}, sourceInstanceId=${sourceInstanceId}`
-          );
-          return { success: true };
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          return { success: false, error: errorMessage };
-        }
-      },
-      // clearSkippedEntriesForNote callback - called when user reloads from CRDT logs
-      (noteId: string, sdId: string): void => {
-        const activitySync = sdWatcherManager?.getActivitySyncs().get(sdId);
-        if (activitySync) {
-          activitySync.clearSkippedEntriesForNote(noteId);
-          console.log(
-            `[Activity Sync] Cleared skipped entries for note ${noteId} in SD ${sdId} (user reloaded from CRDT logs)`
-          );
-        }
       },
       // onUserSettingsChanged callback - update profile presence when user settings change
       async (key: string, _value: string): Promise<void> => {

@@ -167,9 +167,6 @@ export class SDWatcherManager {
     );
     activitySync.setProfileId(profileId);
 
-    // Load previously skipped stale entries from persistence
-    await activitySync.loadSkippedEntries();
-
     // Clean up orphaned activity logs on startup
     await activitySync.cleanupOrphanedLogs();
 

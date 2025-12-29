@@ -4,7 +4,12 @@
  * Defines the communication protocol between main and renderer processes.
  */
 
-import type { NoteCache, StorageDir, PollingGroupStoredSettings, PollingGroupStatus } from '@notecove/shared';
+import type {
+  NoteCache,
+  StorageDir,
+  PollingGroupStoredSettings,
+  PollingGroupStatus,
+} from '@notecove/shared';
 
 /**
  * Commands (renderer → main)
@@ -36,23 +41,15 @@ export interface IPCCommands {
 
   // Sync status operations
   'sync:getStatus': () => Promise<SyncStatus>;
-  'sync:getStaleSyncs': () => Promise<StaleSyncEntry[]>;
-  'sync:skipStaleEntry': (
-    sdId: string,
-    noteId: string,
-    sourceInstanceId: string
-  ) => Promise<{ success: boolean; error?: string }>;
-  'sync:retryStaleEntry': (
-    sdId: string,
-    noteId: string,
-    sourceInstanceId: string
-  ) => Promise<{ success: boolean; error?: string }>;
 
   // Polling group settings operations
   'polling:getSettings': () => Promise<PollingGroupStoredSettings>;
   'polling:setSettings': (settings: Partial<PollingGroupStoredSettings>) => Promise<void>;
   'polling:getSettingsForSd': (sdId: string) => Promise<PollingGroupStoredSettings>;
-  'polling:setSettingsForSd': (sdId: string, settings: Partial<PollingGroupStoredSettings>) => Promise<void>;
+  'polling:setSettingsForSd': (
+    sdId: string,
+    settings: Partial<PollingGroupStoredSettings>
+  ) => Promise<void>;
   'polling:getGroupStatus': () => Promise<PollingGroupStatus | null>;
 }
 
@@ -70,7 +67,6 @@ export interface IPCEvents {
   // Sync events
   'sync:progress': (sdId: string, progress: SyncProgress) => void;
   'sync:status-changed': (status: SyncStatus) => void;
-  'sync:stale-entries-changed': (entries: StaleSyncEntry[]) => void;
 }
 
 /**
@@ -111,35 +107,4 @@ export interface SyncStatus {
   }[];
   /** Whether any sync is in progress */
   isSyncing: boolean;
-}
-
-/**
- * Stale sync entry information for UI display
- */
-export interface StaleSyncEntry {
-  /** Storage directory ID */
-  sdId: string;
-  /** Storage directory name */
-  sdName: string;
-  /** Note ID affected by the stale entry */
-  noteId: string;
-  /** Note title (if available) */
-  noteTitle?: string;
-  /** Instance ID that created the stale entry */
-  sourceInstanceId: string;
-  /** Expected sequence number that will never arrive */
-  expectedSequence: number;
-  /** Highest sequence for THIS note from that instance (not global) */
-  highestSequenceForNote: number;
-  /** Sequence gap */
-  gap: number;
-  /** When the stale entry was detected */
-  detectedAt: number;
-  /** Profile info for the source instance (if available from presence files) */
-  sourceProfile?: {
-    profileId: string;
-    profileName: string;
-    hostname: string;
-    lastSeen: number;
-  };
 }

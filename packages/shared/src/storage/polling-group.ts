@@ -99,7 +99,9 @@ export interface PollingGroupStoredSettings {
 /**
  * Convert stored settings (minutes/seconds) to runtime settings (milliseconds)
  */
-export function storedToRuntimeSettings(stored: PollingGroupStoredSettings): Partial<PollingGroupSettings> {
+export function storedToRuntimeSettings(
+  stored: PollingGroupStoredSettings
+): Partial<PollingGroupSettings> {
   const result: Partial<PollingGroupSettings> = {};
 
   if (stored.pollRatePerMinute !== undefined) {

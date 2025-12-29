@@ -57,7 +57,6 @@ export interface MockCRDTManager {
   createDocument: jest.Mock;
   getNoteDoc: jest.Mock;
   getDocument: jest.Mock;
-  getStaleSyncs?: jest.Mock;
 }
 
 export interface MockDatabase {

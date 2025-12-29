@@ -339,41 +339,6 @@ export function createActivitySyncCallbacks(
         });
       },
     },
-
-    // Persistence callbacks for skipped stale entries
-    getSkippedStaleEntries: async (): Promise<string[]> => {
-      const stateKey = `skippedStaleEntries:${sdId}`;
-      const stored = await database.getState(stateKey);
-      if (!stored) return [];
-      try {
-        return JSON.parse(stored) as string[];
-      } catch {
-        return [];
-      }
-    },
-    onSkipStaleEntry: async (
-      noteId: string,
-      sourceInstanceId: string,
-      skipSequence: number
-    ): Promise<void> => {
-      const stateKey = `skippedStaleEntries:${sdId}`;
-      const stored = await database.getState(stateKey);
-      let entries: string[] = [];
-      if (stored) {
-        try {
-          entries = JSON.parse(stored) as string[];
-        } catch {
-          entries = [];
-        }
-      }
-      // Include sequence in the key so we can skip up to this sequence but not future ones
-      const key = `${noteId}:${sourceInstanceId}:${skipSequence}`;
-      // Also remove any legacy entries (without sequence) for this note+instance
-      const legacyKey = `${noteId}:${sourceInstanceId}`;
-      entries = entries.filter((e) => e !== legacyKey && !e.startsWith(`${legacyKey}:`));
-      entries.push(key);
-      await database.setState(stateKey, JSON.stringify(entries));
-    },
   };
 }
 

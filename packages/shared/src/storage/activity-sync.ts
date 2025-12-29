@@ -18,17 +18,10 @@ import type { FileSystemAdapter } from './types';
 export const STALE_SEQUENCE_GAP_THRESHOLD = 50;
 
 /**
- * Information about a stale sync entry
+ * Default max delay for fast path polling before handing off to polling group.
+ * Once cumulative delay would exceed this, hand off instead of continuing to poll.
  */
-export interface StaleEntry {
-  noteId: string;
-  sourceInstanceId: string;
-  expectedSequence: number;
-  /** Highest sequence seen for THIS note from THIS instance (not global) */
-  highestSequenceForNote: number;
-  gap: number;
-  detectedAt: number;
-}
+export const DEFAULT_FAST_PATH_MAX_DELAY_MS = 60000; // 60 seconds
 
 /**
  * Metrics callback interface for sync telemetry
@@ -101,23 +94,26 @@ export interface ActivitySyncCallbacks {
   metrics?: SyncMetricsCallbacks;
 
   /**
-   * Get list of previously skipped stale entries (loaded from persistence)
-   * Returns array of "noteId:sourceInstanceId" strings
+   * Hand off a note to the polling group when fast path times out.
+   * Called when the fast path exponential backoff would exceed the configured max delay.
+   * The polling group will continue polling for the CRDT files persistently.
+   *
+   * @param noteId - The note ID to hand off
+   * @param sdId - The storage directory ID
+   * @param expectedSequences - Map of instanceId -> expected sequence number
    */
-  getSkippedStaleEntries?: () => Promise<string[]>;
+  onHandoffToPollingGroup?: (
+    noteId: string,
+    sdId: string,
+    expectedSequences: Map<string, number>
+  ) => void;
 
   /**
-   * Persist a skipped stale entry
-   * Called when user clicks "Skip" on a stale entry
-   * @param noteId The note ID
-   * @param sourceInstanceId The source instance ID
-   * @param skipSequence The highest sequence to skip (entries at or below this are stale)
+   * Maximum delay (in ms) for fast path polling before handing off to polling group.
+   * Default is 60000ms (60 seconds).
+   * After this cumulative delay, instead of timing out, hand off to polling group.
    */
-  onSkipStaleEntry?: (
-    noteId: string,
-    sourceInstanceId: string,
-    skipSequence: number
-  ) => Promise<void>;
+  fastPathMaxDelayMs?: number;
 }
 
 /** Parsed activity log filename information */
@@ -186,13 +182,9 @@ export class ActivitySync {
   private pendingSyncs = new Map<string, Promise<void>>(); // noteId -> pending sync promise
   private highestPendingSequence = new Map<string, { instanceSeq: string; sequence: number }>(); // noteId -> highest sequence
 
-  // Stale entries tracking for UI display
-  private staleEntries: StaleEntry[] = [];
-
-  // Skipped stale entries (persisted) - maps "noteId:sourceInstanceId" to max skipped sequence
-  // This allows new activity with higher sequences to sync while skipping stale entries
-  private skippedEntries = new Map<string, number>();
-  private skippedEntriesLoaded = false;
+  // Track expected sequences per note for polling group handoff
+  // Maps noteId -> Map<instanceId, expectedSequence>
+  private pendingSequences = new Map<string, Map<string, number>>();
 
   // Profile ID for this instance (used for new format files)
   private profileId: string | null = null;
@@ -211,61 +203,6 @@ export class ActivitySync {
    */
   setProfileId(profileId: string): void {
     this.profileId = profileId;
-  }
-
-  /**
-   * Load previously skipped entries from persistence
-   * Should be called once during initialization
-   *
-   * Entry format: "noteId:sourceInstanceId" (legacy) or "noteId:sourceInstanceId:sequence"
-   */
-  async loadSkippedEntries(): Promise<void> {
-    if (this.skippedEntriesLoaded) return;
-
-    if (this.callbacks.getSkippedStaleEntries) {
-      try {
-        const entries = await this.callbacks.getSkippedStaleEntries();
-        for (const entry of entries) {
-          // Parse entry - format is "noteId:sourceInstanceId" or "noteId:sourceInstanceId:sequence"
-          const parts = entry.split(':');
-          if (parts.length >= 2) {
-            const noteId = parts[0];
-            const sourceInstanceId = parts[1];
-            // Legacy entries (without sequence) should not block anything - use -1
-            // If the stale entry is still relevant, it will reappear and user can skip again
-            const sequence = parts.length >= 3 ? parseInt(parts[2] ?? '0', 10) : -1;
-            const key = `${noteId}:${sourceInstanceId}`;
-            // Keep the highest skipped sequence for this key
-            const existing = this.skippedEntries.get(key);
-            if (existing === undefined || sequence > existing) {
-              this.skippedEntries.set(key, sequence);
-            }
-          }
-        }
-        console.log(`[ActivitySync] Loaded ${this.skippedEntries.size} skipped stale entries`);
-      } catch (error) {
-        console.error('[ActivitySync] Failed to load skipped entries:', error);
-      }
-    }
-    this.skippedEntriesLoaded = true;
-  }
-
-  /**
-   * Check if a stale entry has been skipped
-   * Only returns true if the sequence is at or below the skipped sequence
-   */
-  private isSkipped(noteId: string, sourceInstanceId: string, sequence?: number): boolean {
-    const key = `${noteId}:${sourceInstanceId}`;
-    const skippedSequence = this.skippedEntries.get(key);
-    if (skippedSequence === undefined) {
-      return false;
-    }
-    // If no sequence provided, check if any skip exists (legacy behavior for stale detection)
-    if (sequence === undefined) {
-      return true;
-    }
-    // Only skip if the current sequence is at or below the skipped sequence
-    return sequence <= skippedSequence;
   }
 
   /**
@@ -296,83 +233,6 @@ export class ActivitySync {
    */
   getPendingNoteIds(): string[] {
     return Array.from(this.pendingSyncs.keys());
-  }
-
-  /**
-   * Get list of stale entries detected during sync
-   * Used by the UI to show which entries are stuck
-   */
-  getStaleEntries(): StaleEntry[] {
-    return [...this.staleEntries];
-  }
-
-  /**
-   * Clear stale entries (e.g., after user acknowledges them)
-   */
-  clearStaleEntries(): void {
-    this.staleEntries = [];
-  }
-
-  /**
-   * Clear stale entries for a specific note.
-   * Called automatically on successful sync to remove false positives.
-   */
-  clearStaleEntriesForNote(noteId: string): void {
-    const before = this.staleEntries.length;
-    this.staleEntries = this.staleEntries.filter((e) => e.noteId !== noteId);
-    const removed = before - this.staleEntries.length;
-    if (removed > 0) {
-      console.log(
-        `[ActivitySync] Cleared ${removed} stale entries for note ${noteId} (sync succeeded)`
-      );
-    }
-  }
-
-  /**
-   * Clear skipped entries for a specific note
-   * Called when user manually reloads from CRDT logs - they've resolved the issue
-   * so we should allow future syncs from all instances for this note
-   */
-  clearSkippedEntriesForNote(noteId: string): void {
-    // Find and remove all entries for this note
-    const keysToRemove: string[] = [];
-    for (const key of this.skippedEntries.keys()) {
-      if (key.startsWith(`${noteId}:`)) {
-        keysToRemove.push(key);
-      }
-    }
-    for (const key of keysToRemove) {
-      this.skippedEntries.delete(key);
-      console.log(`[ActivitySync] Cleared skipped entry for ${key} (note reloaded manually)`);
-    }
-    // Also clear any stale entries for this note
-    this.staleEntries = this.staleEntries.filter((e) => e.noteId !== noteId);
-  }
-
-  /**
-   * Remove a specific stale entry (e.g., after user skips it)
-   */
-  async removeStaleEntry(noteId: string, sourceInstanceId: string): Promise<void> {
-    // Find the stale entry to get its sequence info
-    const staleEntry = this.staleEntries.find(
-      (e) => e.noteId === noteId && e.sourceInstanceId === sourceInstanceId
-    );
-    // Use the highest sequence for this note - entries below this are stale
-    const skipSequence = staleEntry?.highestSequenceForNote ?? Infinity;
-
-    // Remove from in-memory list
-    this.staleEntries = this.staleEntries.filter(
-      (e) => !(e.noteId === noteId && e.sourceInstanceId === sourceInstanceId)
-    );
-
-    // Add to skipped map with sequence (prevents re-detection for this and lower sequences)
-    const key = `${noteId}:${sourceInstanceId}`;
-    this.skippedEntries.set(key, skipSequence);
-
-    // Persist the skip with sequence info
-    if (this.callbacks.onSkipStaleEntry) {
-      await this.callbacks.onSkipStaleEntry(noteId, sourceInstanceId, skipSequence);
-    }
   }
 
   /**
@@ -439,24 +299,6 @@ export class ActivitySync {
             continue;
           }
 
-          // FIRST PASS: Find the highest sequence per-note from this instance
-          // This is needed to detect stale entries (entries with sequence far behind the highest
-          // for that SAME note). Sequences are per-note-per-instance, not global per-instance.
-          const highestSeqPerNote = new Map<string, number>();
-          for (const line of lines) {
-            const parts = line.split('|');
-            if (parts.length < 2) continue;
-            const noteId = parts[0];
-            const instanceSeq = parts[1];
-            if (!noteId || !instanceSeq) continue;
-            const seqParts = instanceSeq.split('_');
-            const seq = parseInt(seqParts[1] ?? '0');
-            const currentHighest = highestSeqPerNote.get(noteId) ?? 0;
-            if (seq > currentHighest) {
-              highestSeqPerNote.set(noteId, seq);
-            }
-          }
-
           // Process only NEW lines (those beyond what we've already seen)
           // This correctly handles interleaved entries from different notes
           const newLines = lines.slice(lastSeenCount);
@@ -471,54 +313,6 @@ export class ActivitySync {
 
             const seqParts = instanceSeq.split('_');
             const sequence = parseInt(seqParts[1] ?? '0');
-
-            // STALE DETECTION: Check if this entry is too far behind the highest sequence
-            // for THIS SPECIFIC NOTE from this instance (not global across all notes)
-            const highestSeqForNote = highestSeqPerNote.get(noteId) ?? sequence;
-            const gap = highestSeqForNote - sequence;
-            if (gap > STALE_SEQUENCE_GAP_THRESHOLD) {
-              // Check if this entry was previously skipped by the user
-              if (this.isSkipped(noteId, otherInstanceId)) {
-                // User already skipped this - don't show it again
-                continue;
-              }
-
-              // NEW: Before marking as stale, check if CRDT log already has the highest sequence.
-              // If it does, we already have all the data - this is a false positive (e.g., first
-              // time reading an activity log with long history). Skip silently.
-              if (this.callbacks.checkCRDTLogExists) {
-                const hasLatestData = await this.callbacks.checkCRDTLogExists(
-                  noteId,
-                  otherInstanceId,
-                  highestSeqForNote
-                );
-                if (hasLatestData) {
-                  // Not stale - we already have all the data, skip silently
-                  continue;
-                }
-              }
-
-              console.warn(
-                `[ActivitySync] Stale entry detected: note ${noteId} at seq ${sequence}, highest for this note from ${otherInstanceId} is ${highestSeqForNote} (gap=${gap})`
-              );
-              // Track this stale entry for UI display
-              // Avoid duplicates
-              const existingStale = this.staleEntries.find(
-                (e) => e.noteId === noteId && e.sourceInstanceId === otherInstanceId
-              );
-              if (!existingStale) {
-                this.staleEntries.push({
-                  noteId,
-                  sourceInstanceId: otherInstanceId,
-                  expectedSequence: sequence,
-                  highestSequenceForNote: highestSeqForNote,
-                  gap,
-                  detectedAt: Date.now(),
-                });
-              }
-              // Skip syncing this stale entry - it will never arrive
-              continue;
-            }
 
             affectedNotes.add(noteId);
 
@@ -634,27 +428,36 @@ export class ActivitySync {
    * @returns true if sync succeeded, false if it failed/timed out
    */
   private async pollAndReload(instanceSeq: string, noteId: string): Promise<boolean> {
-    // Exponential backoff delays (ms)
-    // Extended delays to handle slow cloud sync (e.g., iCloud, Dropbox, Google Drive, OneDrive)
-    const delays = [100, 200, 500, 1000, 2000, 3000, 5000, 7000, 10000, 15000];
+    // Exponential backoff delays (ms) for fast path polling
+    // Optimized for fast local filesystems and quick cloud syncs
+    const baseDelays = [100, 200, 500, 1000, 2000, 3000, 5000, 7000, 10000, 15000, 20000, 30000];
+
+    // Get max delay from callbacks (default 60 seconds)
+    const maxDelayMs = this.callbacks.fastPathMaxDelayMs ?? DEFAULT_FAST_PATH_MAX_DELAY_MS;
+
+    // Calculate which delays to use based on max delay
+    // Stop when cumulative delay would exceed max
+    let cumulativeDelay = 0;
+    const delays: number[] = [];
+    for (const delay of baseDelays) {
+      if (cumulativeDelay + delay > maxDelayMs) {
+        break;
+      }
+      delays.push(delay);
+      cumulativeDelay += delay;
+    }
 
     // Parse instance ID and sequence from instanceSeq (format: "{instanceId}_{sequence}")
     const seqParts = instanceSeq.split('_');
     const expectedSequence = parseInt(seqParts[seqParts.length - 1] ?? '0');
     const sourceInstanceId = seqParts.length > 1 ? seqParts.slice(0, -1).join('_') : instanceSeq;
 
-    console.log(
-      `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}, sourceInstance: ${sourceInstanceId}, expectedSeq: ${expectedSequence}`
-    );
+    // Track expected sequence for potential handoff to polling group
+    this.trackPendingSequence(noteId, sourceInstanceId, expectedSequence);
 
-    // Check if this entry was skipped by the user (stale sync they chose to ignore)
-    // Pass the sequence so we only skip if this sequence is at or below the skipped sequence
-    if (this.isSkipped(noteId, sourceInstanceId, expectedSequence)) {
-      console.log(
-        `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} at seq ${expectedSequence} was skipped by user, aborting sync`
-      );
-      return true; // Return true to update watermark and skip this entry
-    }
+    console.log(
+      `[ActivitySync] Starting pollAndReload for note ${noteId}, sequence ${instanceSeq}, sourceInstance: ${sourceInstanceId}, expectedSeq: ${expectedSequence}, maxAttempts: ${delays.length}`
+    );
 
     // NOTE: We don't check for permanent deletion upfront anymore.
     // A note might not exist on disk yet because the CRDT files haven't synced.
@@ -664,13 +467,6 @@ export class ActivitySync {
     const startTime = Date.now();
 
     for (let attempt = 0; attempt < delays.length; attempt++) {
-      // Check if skipped between retry attempts (user may have skipped during polling)
-      if (this.isSkipped(noteId, sourceInstanceId, expectedSequence)) {
-        console.log(
-          `[ActivitySync] Entry for note ${noteId} from ${sourceInstanceId} at seq ${expectedSequence} was skipped during retry, aborting sync`
-        );
-        return true;
-      }
       const delay = delays[attempt] ?? 0;
       console.log(
         `[ActivitySync] Attempt ${attempt + 1}/${delays.length} for note ${noteId}, sequence ${instanceSeq}`
@@ -704,10 +500,8 @@ export class ActivitySync {
           `[ActivitySync] SUCCESS on attempt ${attempt + 1} for note ${noteId}, sequence ${instanceSeq}`
         );
 
-        // Defense-in-depth: Clear any stale entries for this note on successful sync.
-        // This handles edge cases where stale detection had a false positive that wasn't
-        // caught by the checkCRDTLogExists check (e.g., callback not provided).
-        this.clearStaleEntriesForNote(noteId);
+        // Clear pending sequence tracking for this instance (sync succeeded)
+        this.clearPendingSequence(noteId, sourceInstanceId);
 
         // Record success metrics
         const latencyMs = Date.now() - startTime;
@@ -762,11 +556,30 @@ export class ActivitySync {
         console.log(
           `[ActivitySync] Note ${noteId} does not exist on disk after ${delays.length} attempts, treating as permanently deleted`
         );
+        this.clearPendingSequences(noteId);
         return true; // Update watermark and skip this entry
       }
     }
 
-    // Log warning but don't fail - file will be retried on next ActivitySync cycle
+    // Fast path timed out - hand off to polling group for persistent polling
+    if (this.callbacks.onHandoffToPollingGroup) {
+      const pendingSeqs = this.pendingSequences.get(noteId);
+      if (pendingSeqs && pendingSeqs.size > 0) {
+        console.log(
+          `[ActivitySync] Fast path timeout for note ${noteId}, handing off to polling group with ${pendingSeqs.size} pending sequences`
+        );
+        this.callbacks.onHandoffToPollingGroup(noteId, this.sdId, new Map(pendingSeqs));
+        // Don't clear pending sequences - polling group will track them
+
+        // Record timeout metrics (handoff is a type of timeout)
+        this.callbacks.metrics?.recordSyncTimeout?.(delays.length, noteId, this.sdId);
+
+        // Return true so watermark advances - polling group will handle the sync
+        return true;
+      }
+    }
+
+    // No polling group handoff available - log warning
     console.warn(
       `[ActivitySync] Timeout after ${delays.length} attempts waiting for note ${noteId} sequence ${instanceSeq}. File may sync later.`
     );
@@ -782,6 +595,42 @@ export class ActivitySync {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Track a pending sequence for potential handoff to polling group
+   */
+  private trackPendingSequence(noteId: string, instanceId: string, sequence: number): void {
+    let noteSeqs = this.pendingSequences.get(noteId);
+    if (!noteSeqs) {
+      noteSeqs = new Map();
+      this.pendingSequences.set(noteId, noteSeqs);
+    }
+    // Only update if this sequence is higher than what we're tracking
+    const currentSeq = noteSeqs.get(instanceId) ?? 0;
+    if (sequence > currentSeq) {
+      noteSeqs.set(instanceId, sequence);
+    }
+  }
+
+  /**
+   * Clear a specific pending sequence for a note (e.g., on successful sync)
+   */
+  private clearPendingSequence(noteId: string, instanceId: string): void {
+    const noteSeqs = this.pendingSequences.get(noteId);
+    if (noteSeqs) {
+      noteSeqs.delete(instanceId);
+      if (noteSeqs.size === 0) {
+        this.pendingSequences.delete(noteId);
+      }
+    }
+  }
+
+  /**
+   * Clear all pending sequences for a note (e.g., on permanent deletion)
+   */
+  private clearPendingSequences(noteId: string): void {
+    this.pendingSequences.delete(noteId);
   }
 
   /**

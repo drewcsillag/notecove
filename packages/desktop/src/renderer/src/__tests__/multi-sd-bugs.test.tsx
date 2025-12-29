@@ -87,10 +87,6 @@ const mockElectronAPI = {
       isSyncing: false,
     }),
     onStatusChanged: jest.fn(() => () => {}),
-    getStaleSyncs: jest.fn().mockResolvedValue([]),
-    onStaleEntriesChanged: jest.fn(() => () => {}),
-    skipStaleEntry: jest.fn().mockResolvedValue({ success: true }),
-    retryStaleEntry: jest.fn().mockResolvedValue({ success: true }),
     exportDiagnostics: jest.fn().mockResolvedValue({ success: true }),
   },
   appState: {

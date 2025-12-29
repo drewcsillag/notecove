@@ -10,8 +10,12 @@ import { ipcMain, dialog, BrowserWindow, type IpcMainInvokeEvent } from 'electro
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import type { HandlerContext } from './types';
-import type { SyncStatus, StaleSyncEntry } from '../types';
-import { AppStateKey, type PollingGroupStoredSettings, type PollingGroupStatus } from '@notecove/shared';
+import type { SyncStatus } from '../types';
+import {
+  AppStateKey,
+  type PollingGroupStoredSettings,
+  type PollingGroupStatus,
+} from '@notecove/shared';
 
 /**
  * Register all sync-related IPC handlers
@@ -23,9 +27,6 @@ export function registerSyncHandlers(ctx: HandlerContext): void {
 
   // Sync status operations
   ipcMain.handle('sync:getStatus', handleGetSyncStatus(ctx));
-  ipcMain.handle('sync:getStaleSyncs', handleGetStaleSyncs(ctx));
-  ipcMain.handle('sync:skipStaleEntry', handleSkipStaleEntry(ctx));
-  ipcMain.handle('sync:retryStaleEntry', handleRetryStaleEntry(ctx));
   ipcMain.handle('sync:exportDiagnostics', handleExportSyncDiagnostics(ctx));
 
   // Polling group settings operations
@@ -43,9 +44,6 @@ export function unregisterSyncHandlers(): void {
   ipcMain.removeHandler('appState:get');
   ipcMain.removeHandler('appState:set');
   ipcMain.removeHandler('sync:getStatus');
-  ipcMain.removeHandler('sync:getStaleSyncs');
-  ipcMain.removeHandler('sync:skipStaleEntry');
-  ipcMain.removeHandler('sync:retryStaleEntry');
   ipcMain.removeHandler('sync:exportDiagnostics');
   ipcMain.removeHandler('polling:getSettings');
   ipcMain.removeHandler('polling:setSettings');
@@ -104,48 +102,11 @@ function handleGetSyncStatus(ctx: HandlerContext) {
   };
 }
 
-function handleGetStaleSyncs(ctx: HandlerContext) {
-  return async (): Promise<StaleSyncEntry[]> => {
-    if (!ctx.getStaleSyncs) {
-      return [];
-    }
-    return ctx.getStaleSyncs();
-  };
-}
-
-function handleSkipStaleEntry(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    noteId: string,
-    sourceInstanceId: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    if (!ctx.skipStaleEntry) {
-      return { success: false, error: 'Skip stale entry not available' };
-    }
-    return ctx.skipStaleEntry(sdId, noteId, sourceInstanceId);
-  };
-}
-
-function handleRetryStaleEntry(ctx: HandlerContext) {
-  return async (
-    _event: IpcMainInvokeEvent,
-    sdId: string,
-    noteId: string,
-    sourceInstanceId: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    if (!ctx.retryStaleEntry) {
-      return { success: false, error: 'Retry stale entry not available' };
-    }
-    return ctx.retryStaleEntry(sdId, noteId, sourceInstanceId);
-  };
-}
-
 function handleExportSyncDiagnostics(ctx: HandlerContext) {
   return async (
     _event: IpcMainInvokeEvent
   ): Promise<{ success: boolean; filePath?: string; error?: string }> => {
-    const { database, getStaleSyncs } = ctx;
+    const { database } = ctx;
 
     try {
       // Show save dialog
@@ -174,14 +135,12 @@ function handleExportSyncDiagnostics(ctx: HandlerContext) {
         appVersion: string;
         platform: string;
         osVersion: string;
-        staleEntries: StaleSyncEntry[];
         storageDirs: { id: string; name: string; path: string }[];
       } = {
         exportedAt: new Date().toISOString(),
         appVersion: app.getVersion(),
         platform: os.platform(),
         osVersion: os.release(),
-        staleEntries: getStaleSyncs ? await getStaleSyncs() : [],
         storageDirs: (await database.getAllStorageDirs()).map((sd) => ({
           id: sd.id,
           name: sd.name,
@@ -262,7 +221,10 @@ function handleSetPollingSettings(ctx: HandlerContext) {
       await database.setState(AppStateKey.PollingHitMultiplier, String(settings.hitRateMultiplier));
     }
     if (settings.maxBurstPerSecond !== undefined) {
-      await database.setState(AppStateKey.PollingMaxBurstPerSecond, String(settings.maxBurstPerSecond));
+      await database.setState(
+        AppStateKey.PollingMaxBurstPerSecond,
+        String(settings.maxBurstPerSecond)
+      );
     }
     if (settings.normalPriorityReserve !== undefined) {
       await database.setState(
@@ -271,7 +233,10 @@ function handleSetPollingSettings(ctx: HandlerContext) {
       );
     }
     if (settings.recentEditWindowMinutes !== undefined) {
-      await database.setState(AppStateKey.RecentEditWindowMinutes, String(settings.recentEditWindowMinutes));
+      await database.setState(
+        AppStateKey.RecentEditWindowMinutes,
+        String(settings.recentEditWindowMinutes)
+      );
     }
     if (settings.fullRepollIntervalMinutes !== undefined) {
       await database.setState(
@@ -280,7 +245,10 @@ function handleSetPollingSettings(ctx: HandlerContext) {
       );
     }
     if (settings.fastPathMaxDelaySeconds !== undefined) {
-      await database.setState(AppStateKey.FastPathMaxDelaySeconds, String(settings.fastPathMaxDelaySeconds));
+      await database.setState(
+        AppStateKey.FastPathMaxDelaySeconds,
+        String(settings.fastPathMaxDelaySeconds)
+      );
     }
   };
 }

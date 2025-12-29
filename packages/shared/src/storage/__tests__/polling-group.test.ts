@@ -659,7 +659,9 @@ describe('Polling Group Settings Helpers', () => {
       expect(result.pollRatePerMinute).toBe(60);
       expect(result.hitRateMultiplier).toBe(0.5);
       expect(result.maxBurstPerSecond).toBe(20);
-      expect(result.normalPriorityReserve).toBe(DEFAULT_POLLING_GROUP_SETTINGS.normalPriorityReserve);
+      expect(result.normalPriorityReserve).toBe(
+        DEFAULT_POLLING_GROUP_SETTINGS.normalPriorityReserve
+      );
     });
 
     it('should work with undefined override', () => {

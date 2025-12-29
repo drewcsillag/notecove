@@ -186,12 +186,6 @@ describe('Web Client', () => {
 
         expect(status).toEqual({ pendingCount: 0, perSd: [], isSyncing: false });
       });
-
-      it('should return empty stale syncs', async () => {
-        const staleSyncs = await webClient.sync.getStaleSyncs();
-
-        expect(staleSyncs).toEqual([]);
-      });
     });
 
     describe('note.getDeletedNoteCount', () => {
@@ -324,16 +318,6 @@ describe('Web Client', () => {
     });
 
     describe('sync stub methods', () => {
-      it('should return empty result for skipStaleEntry', async () => {
-        const result = await webClient.sync.skipStaleEntry('sd-1', 'note-1', 'instance-1');
-        expect(result).toEqual({ success: true });
-      });
-
-      it('should return empty result for retryStaleEntry', async () => {
-        const result = await webClient.sync.retryStaleEntry('sd-1', 'note-1', 'instance-1');
-        expect(result).toEqual({ success: true });
-      });
-
       it('should return not supported for exportDiagnostics', async () => {
         const result = await webClient.sync.exportDiagnostics();
         expect(result).toEqual({ success: false, error: 'Not supported in web mode' });

@@ -119,13 +119,9 @@ export const browserApiStub: typeof window.electronAPI = {
   sync: {
     openWindow: notImplemented('sync.openWindow'),
     getStatus: notImplemented('sync.getStatus'),
-    getStaleSyncs: notImplemented('sync.getStaleSyncs'),
-    skipStaleEntry: notImplemented('sync.skipStaleEntry'),
-    retryStaleEntry: notImplemented('sync.retryStaleEntry'),
     exportDiagnostics: notImplemented('sync.exportDiagnostics'),
     onProgress: stubEventSubscription,
     onStatusChanged: stubEventSubscription,
-    onStaleEntriesChanged: stubEventSubscription,
   },
 
   appState: {

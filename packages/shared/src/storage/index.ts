@@ -8,9 +8,9 @@ export { SyncDirectoryStructure } from './sd-structure';
 export { ActivityLogger } from './activity-logger';
 export {
   ActivitySync,
+  DEFAULT_FAST_PATH_MAX_DELAY_MS,
   type ActivitySyncCallbacks,
   type SyncMetricsCallbacks,
-  type StaleEntry,
 } from './activity-sync';
 export { DeletionLogger } from './deletion-logger';
 export { DeletionSync, type DeletionSyncCallbacks } from './deletion-sync';

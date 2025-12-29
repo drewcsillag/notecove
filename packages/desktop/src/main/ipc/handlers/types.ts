@@ -6,12 +6,17 @@
 
 import type { BrowserWindow } from 'electron';
 import type { CRDTManager } from '../../crdt';
-import type { Database, AppendLogManager, DeletionLogger, PollingGroupStatus } from '@notecove/shared';
+import type {
+  Database,
+  AppendLogManager,
+  DeletionLogger,
+  PollingGroupStatus,
+} from '@notecove/shared';
 import type { ConfigManager } from '../../config/manager';
 import type { NoteMoveManager } from '../../note-move-manager';
 import type { DiagnosticsManager } from '../../diagnostics-manager';
 import type { BackupManager } from '../../backup-manager';
-import type { SyncStatus, StaleSyncEntry } from '../types';
+import type { SyncStatus } from '../types';
 import type { OEmbedService } from '../../oembed';
 
 /**
@@ -23,35 +28,6 @@ export type GetDeletionLoggerFn = (sdId: string) => DeletionLogger | undefined;
  * Callback type for getting sync status
  */
 export type GetSyncStatusFn = () => SyncStatus;
-
-/**
- * Callback type for getting stale sync entries
- */
-export type GetStaleSyncsFn = () => Promise<StaleSyncEntry[]>;
-
-/**
- * Callback type for skipping a stale sync entry
- */
-export type SkipStaleEntryFn = (
-  sdId: string,
-  noteId: string,
-  sourceInstanceId: string
-) => Promise<{ success: boolean; error?: string }>;
-
-/**
- * Callback type for retrying a stale sync entry
- */
-export type RetryStaleEntryFn = (
-  sdId: string,
-  noteId: string,
-  sourceInstanceId: string
-) => Promise<{ success: boolean; error?: string }>;
-
-/**
- * Callback type for clearing skipped entries for a note
- * Called when user manually reloads from CRDT logs
- */
-export type ClearSkippedEntriesForNoteFn = (noteId: string, sdId: string) => void;
 
 /**
  * Callback type for user settings changes
@@ -132,10 +108,6 @@ export interface HandlerDependencies {
   onStorageDirDeleted?: OnStorageDirDeletedFn;
   getDeletionLogger?: GetDeletionLoggerFn;
   getSyncStatus?: GetSyncStatusFn;
-  getStaleSyncs?: GetStaleSyncsFn;
-  skipStaleEntry?: SkipStaleEntryFn;
-  retryStaleEntry?: RetryStaleEntryFn;
-  clearSkippedEntriesForNote?: ClearSkippedEntriesForNoteFn;
   onUserSettingsChanged?: OnUserSettingsChangedFn;
   stopWebServer?: StopWebServerFn;
   getPollingGroupStatus?: GetPollingGroupStatusFn;
