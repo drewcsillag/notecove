@@ -66,6 +66,82 @@ export interface PollingGroupSettings {
 }
 
 /**
+ * Default settings values
+ */
+export const DEFAULT_POLLING_GROUP_SETTINGS: PollingGroupSettings = {
+  pollRatePerMinute: 120,
+  hitRateMultiplier: 0.25,
+  maxBurstPerSecond: 10,
+  normalPriorityReserve: 0.2,
+  recentEditWindowMs: 5 * 60 * 1000, // 5 minutes
+  fullRepollIntervalMs: 30 * 60 * 1000, // 30 minutes
+  fastPathMaxDelayMs: 60 * 1000, // 60 seconds
+};
+
+/**
+ * Per-SD settings overrides (all fields optional)
+ */
+export type PollingGroupSettingsOverride = Partial<PollingGroupSettings>;
+
+/**
+ * Settings stored in app state (uses minutes/seconds instead of ms for readability)
+ */
+export interface PollingGroupStoredSettings {
+  pollRatePerMinute?: number;
+  hitRateMultiplier?: number;
+  maxBurstPerSecond?: number;
+  normalPriorityReserve?: number;
+  recentEditWindowMinutes?: number;
+  fullRepollIntervalMinutes?: number;
+  fastPathMaxDelaySeconds?: number;
+}
+
+/**
+ * Convert stored settings (minutes/seconds) to runtime settings (milliseconds)
+ */
+export function storedToRuntimeSettings(stored: PollingGroupStoredSettings): Partial<PollingGroupSettings> {
+  const result: Partial<PollingGroupSettings> = {};
+
+  if (stored.pollRatePerMinute !== undefined) {
+    result.pollRatePerMinute = stored.pollRatePerMinute;
+  }
+  if (stored.hitRateMultiplier !== undefined) {
+    result.hitRateMultiplier = stored.hitRateMultiplier;
+  }
+  if (stored.maxBurstPerSecond !== undefined) {
+    result.maxBurstPerSecond = stored.maxBurstPerSecond;
+  }
+  if (stored.normalPriorityReserve !== undefined) {
+    result.normalPriorityReserve = stored.normalPriorityReserve;
+  }
+  if (stored.recentEditWindowMinutes !== undefined) {
+    result.recentEditWindowMs = stored.recentEditWindowMinutes * 60 * 1000;
+  }
+  if (stored.fullRepollIntervalMinutes !== undefined) {
+    result.fullRepollIntervalMs = stored.fullRepollIntervalMinutes * 60 * 1000;
+  }
+  if (stored.fastPathMaxDelaySeconds !== undefined) {
+    result.fastPathMaxDelayMs = stored.fastPathMaxDelaySeconds * 1000;
+  }
+
+  return result;
+}
+
+/**
+ * Merge settings with defaults, applying overrides
+ */
+export function mergePollingSettings(
+  base: Partial<PollingGroupSettings>,
+  override?: Partial<PollingGroupSettings>
+): PollingGroupSettings {
+  return {
+    ...DEFAULT_POLLING_GROUP_SETTINGS,
+    ...base,
+    ...override,
+  };
+}
+
+/**
  * Input for adding an entry (subset of full entry)
  */
 export interface PollingGroupAddInput {

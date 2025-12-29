@@ -1,6 +1,6 @@
 # Polling Group Refactor - Implementation Plan
 
-**Overall Progress:** `10%`
+**Overall Progress:** `20%`
 
 ## Summary
 
@@ -198,10 +198,10 @@ Based on [PLAN-CRITIQUE.md](./PLAN-CRITIQUE.md), execute phases in this order fo
     - Schedule next repoll based on settings
   - [ ] 🟥 3.3 Integrate with startup sequence
 
-### Phase 4: Settings Infrastructure 🟥
+### Phase 4: Settings Infrastructure 🟩
 
-- [ ] 🟥 **Step 4: Add settings storage**
-  - [ ] 🟥 4.1 Add AppStateKeys for polling settings
+- [x] 🟩 **Step 4: Add settings storage**
+  - [x] 🟩 4.1 Add AppStateKeys for polling settings
     - `pollingRatePerMinute` (global, default 120)
     - `pollingHitMultiplier` (global, default 0.25)
     - `pollingMaxBurstPerSecond` (global, default 10)
@@ -210,8 +210,13 @@ Based on [PLAN-CRITIQUE.md](./PLAN-CRITIQUE.md), execute phases in this order fo
     - `fullRepollIntervalMinutes` (global, default 30, 0 = disabled)
     - `fastPathMaxDelaySeconds` (global, default 60)
     - `pollingSettings:{sdId}` (per-SD overrides, JSON object)
-  - [ ] 🟥 4.2 Add IPC handlers for settings (get/set)
-  - [ ] 🟥 4.3 Load settings on startup and pass to PollingGroup
+  - [x] 🟩 4.2 Add IPC handlers for settings (get/set)
+    - `polling:getSettings` - get global settings
+    - `polling:setSettings` - set global settings
+    - `polling:getSettingsForSd` - get per-SD overrides
+    - `polling:setSettingsForSd` - set per-SD overrides
+    - `polling:getGroupStatus` - get polling group status
+  - [ ] 🟨 4.3 Load settings on startup and pass to PollingGroup (deferred to Phase 2 integration)
 
 ### Phase 5: Open Notes / Notes List Integration 🟥
 

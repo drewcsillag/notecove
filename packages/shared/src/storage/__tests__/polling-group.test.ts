@@ -9,6 +9,10 @@ import {
   PollingGroupEntry,
   PollingGroupSettings,
   PollingGroupReason,
+  DEFAULT_POLLING_GROUP_SETTINGS,
+  storedToRuntimeSettings,
+  mergePollingSettings,
+  PollingGroupStoredSettings,
 } from '../polling-group';
 
 describe('PollingGroup', () => {
@@ -549,6 +553,119 @@ describe('PollingGroup', () => {
       pollingGroup.removeWindow('window-1');
 
       expect(pollingGroup.getStatus().entries[0].priority).toBe('normal');
+    });
+  });
+});
+
+describe('Polling Group Settings Helpers', () => {
+  describe('DEFAULT_POLLING_GROUP_SETTINGS', () => {
+    it('should have correct default values', () => {
+      expect(DEFAULT_POLLING_GROUP_SETTINGS.pollRatePerMinute).toBe(120);
+      expect(DEFAULT_POLLING_GROUP_SETTINGS.hitRateMultiplier).toBe(0.25);
+      expect(DEFAULT_POLLING_GROUP_SETTINGS.maxBurstPerSecond).toBe(10);
+      expect(DEFAULT_POLLING_GROUP_SETTINGS.normalPriorityReserve).toBe(0.2);
+      expect(DEFAULT_POLLING_GROUP_SETTINGS.recentEditWindowMs).toBe(5 * 60 * 1000);
+      expect(DEFAULT_POLLING_GROUP_SETTINGS.fullRepollIntervalMs).toBe(30 * 60 * 1000);
+      expect(DEFAULT_POLLING_GROUP_SETTINGS.fastPathMaxDelayMs).toBe(60 * 1000);
+    });
+  });
+
+  describe('storedToRuntimeSettings', () => {
+    it('should convert empty stored settings to empty partial', () => {
+      const stored: PollingGroupStoredSettings = {};
+      const result = storedToRuntimeSettings(stored);
+      expect(result).toEqual({});
+    });
+
+    it('should pass through rate-based settings directly', () => {
+      const stored: PollingGroupStoredSettings = {
+        pollRatePerMinute: 60,
+        hitRateMultiplier: 0.5,
+        maxBurstPerSecond: 5,
+        normalPriorityReserve: 0.3,
+      };
+      const result = storedToRuntimeSettings(stored);
+      expect(result.pollRatePerMinute).toBe(60);
+      expect(result.hitRateMultiplier).toBe(0.5);
+      expect(result.maxBurstPerSecond).toBe(5);
+      expect(result.normalPriorityReserve).toBe(0.3);
+    });
+
+    it('should convert minutes to milliseconds', () => {
+      const stored: PollingGroupStoredSettings = {
+        recentEditWindowMinutes: 10,
+        fullRepollIntervalMinutes: 60,
+      };
+      const result = storedToRuntimeSettings(stored);
+      expect(result.recentEditWindowMs).toBe(10 * 60 * 1000);
+      expect(result.fullRepollIntervalMs).toBe(60 * 60 * 1000);
+    });
+
+    it('should convert seconds to milliseconds', () => {
+      const stored: PollingGroupStoredSettings = {
+        fastPathMaxDelaySeconds: 30,
+      };
+      const result = storedToRuntimeSettings(stored);
+      expect(result.fastPathMaxDelayMs).toBe(30 * 1000);
+    });
+
+    it('should handle all settings together', () => {
+      const stored: PollingGroupStoredSettings = {
+        pollRatePerMinute: 200,
+        hitRateMultiplier: 0.1,
+        maxBurstPerSecond: 15,
+        normalPriorityReserve: 0.15,
+        recentEditWindowMinutes: 3,
+        fullRepollIntervalMinutes: 45,
+        fastPathMaxDelaySeconds: 90,
+      };
+      const result = storedToRuntimeSettings(stored);
+      expect(result).toEqual({
+        pollRatePerMinute: 200,
+        hitRateMultiplier: 0.1,
+        maxBurstPerSecond: 15,
+        normalPriorityReserve: 0.15,
+        recentEditWindowMs: 3 * 60 * 1000,
+        fullRepollIntervalMs: 45 * 60 * 1000,
+        fastPathMaxDelayMs: 90 * 1000,
+      });
+    });
+  });
+
+  describe('mergePollingSettings', () => {
+    it('should return defaults when no overrides provided', () => {
+      const result = mergePollingSettings({});
+      expect(result).toEqual(DEFAULT_POLLING_GROUP_SETTINGS);
+    });
+
+    it('should apply base settings over defaults', () => {
+      const base = { pollRatePerMinute: 60 };
+      const result = mergePollingSettings(base);
+      expect(result.pollRatePerMinute).toBe(60);
+      expect(result.hitRateMultiplier).toBe(DEFAULT_POLLING_GROUP_SETTINGS.hitRateMultiplier);
+    });
+
+    it('should apply override over base', () => {
+      const base = { pollRatePerMinute: 60 };
+      const override = { pollRatePerMinute: 30 };
+      const result = mergePollingSettings(base, override);
+      expect(result.pollRatePerMinute).toBe(30);
+    });
+
+    it('should merge base and override independently', () => {
+      const base = { pollRatePerMinute: 60, hitRateMultiplier: 0.5 };
+      const override = { maxBurstPerSecond: 20 };
+      const result = mergePollingSettings(base, override);
+      expect(result.pollRatePerMinute).toBe(60);
+      expect(result.hitRateMultiplier).toBe(0.5);
+      expect(result.maxBurstPerSecond).toBe(20);
+      expect(result.normalPriorityReserve).toBe(DEFAULT_POLLING_GROUP_SETTINGS.normalPriorityReserve);
+    });
+
+    it('should work with undefined override', () => {
+      const base = { pollRatePerMinute: 60 };
+      const result = mergePollingSettings(base, undefined);
+      expect(result.pollRatePerMinute).toBe(60);
     });
   });
 });

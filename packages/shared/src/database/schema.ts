@@ -171,6 +171,16 @@ export enum AppStateKey {
   InstanceId = 'instanceId', // Unique per-installation identifier (separate from profileId)
   SelectedFolderId = 'selectedFolderId', // Currently selected folder in main window
   LinkDisplayPreference = 'linkDisplayPreference', // 'none' | 'chip' | 'unfurl' | 'secure'
+
+  // Polling group settings (Tier 2 sync polling)
+  PollingRatePerMinute = 'pollingRatePerMinute', // Base polling rate (default 120)
+  PollingHitMultiplier = 'pollingHitMultiplier', // Hit acceleration (default 0.25)
+  PollingMaxBurstPerSecond = 'pollingMaxBurstPerSecond', // Max burst rate (default 10)
+  PollingNormalPriorityReserve = 'pollingNormalPriorityReserve', // Normal priority reserve (default 0.2)
+  RecentEditWindowMinutes = 'recentEditWindowMinutes', // Recent edit window (default 5)
+  FullRepollIntervalMinutes = 'fullRepollIntervalMinutes', // Full repoll interval (default 30, 0=disabled)
+  FastPathMaxDelaySeconds = 'fastPathMaxDelaySeconds', // Fast path handoff threshold (default 60)
+  // Per-SD overrides stored as: pollingSettings:{sdId} -> JSON object of partial settings
 }
 
 /**

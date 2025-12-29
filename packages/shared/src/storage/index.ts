@@ -59,8 +59,13 @@ export { StorageMigration, type StorageMigrationResult } from './migration';
 export { DocumentSnapshot } from './document-snapshot';
 export {
   PollingGroup,
+  DEFAULT_POLLING_GROUP_SETTINGS,
+  storedToRuntimeSettings,
+  mergePollingSettings,
   type PollingGroupEntry,
   type PollingGroupSettings,
+  type PollingGroupSettingsOverride,
+  type PollingGroupStoredSettings,
   type PollingGroupAddInput,
   type PollingGroupStatus,
   type PollingGroupReason,

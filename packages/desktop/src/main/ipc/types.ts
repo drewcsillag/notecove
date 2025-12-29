@@ -4,7 +4,7 @@
  * Defines the communication protocol between main and renderer processes.
  */
 
-import type { NoteCache, StorageDir } from '@notecove/shared';
+import type { NoteCache, StorageDir, PollingGroupStoredSettings, PollingGroupStatus } from '@notecove/shared';
 
 /**
  * Commands (renderer → main)
@@ -47,6 +47,13 @@ export interface IPCCommands {
     noteId: string,
     sourceInstanceId: string
   ) => Promise<{ success: boolean; error?: string }>;
+
+  // Polling group settings operations
+  'polling:getSettings': () => Promise<PollingGroupStoredSettings>;
+  'polling:setSettings': (settings: Partial<PollingGroupStoredSettings>) => Promise<void>;
+  'polling:getSettingsForSd': (sdId: string) => Promise<PollingGroupStoredSettings>;
+  'polling:setSettingsForSd': (sdId: string, settings: Partial<PollingGroupStoredSettings>) => Promise<void>;
+  'polling:getGroupStatus': () => Promise<PollingGroupStatus | null>;
 }
 
 /**

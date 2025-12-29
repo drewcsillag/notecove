@@ -6,7 +6,7 @@
 
 import type { BrowserWindow } from 'electron';
 import type { CRDTManager } from '../../crdt';
-import type { Database, AppendLogManager, DeletionLogger } from '@notecove/shared';
+import type { Database, AppendLogManager, DeletionLogger, PollingGroupStatus } from '@notecove/shared';
 import type { ConfigManager } from '../../config/manager';
 import type { NoteMoveManager } from '../../note-move-manager';
 import type { DiagnosticsManager } from '../../diagnostics-manager';
@@ -68,6 +68,11 @@ export type StopWebServerFn = () => Promise<void>;
  * Callback type for broadcasting to web clients via WebSocket
  */
 export type WebBroadcastCallback = (channel: string, ...args: unknown[]) => void;
+
+/**
+ * Callback type for getting polling group status
+ */
+export type GetPollingGroupStatusFn = () => PollingGroupStatus | null;
 
 /**
  * User info for @-mentions autocomplete
@@ -133,6 +138,7 @@ export interface HandlerDependencies {
   clearSkippedEntriesForNote?: ClearSkippedEntriesForNoteFn;
   onUserSettingsChanged?: OnUserSettingsChangedFn;
   stopWebServer?: StopWebServerFn;
+  getPollingGroupStatus?: GetPollingGroupStatusFn;
 }
 
 /**
