@@ -57,3 +57,12 @@ export { LogSync, type LogSyncCallbacks, type SyncResult } from './log-sync';
 export { AppendLogManager, type LoadResult, type AppendLogManagerDb } from './append-log-manager';
 export { StorageMigration, type StorageMigrationResult } from './migration';
 export { DocumentSnapshot } from './document-snapshot';
+export {
+  PollingGroup,
+  type PollingGroupEntry,
+  type PollingGroupSettings,
+  type PollingGroupAddInput,
+  type PollingGroupStatus,
+  type PollingGroupReason,
+  type PollingPriority,
+} from './polling-group';
