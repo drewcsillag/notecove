@@ -37,7 +37,7 @@ export const ReactionDisplay: React.FC<ReactionDisplayProps> = ({
   // Current user profile for reaction authorship
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  // Fetch current user profile on mount
+  // Fetch current user profile on mount and subscribe to changes
   useEffect(() => {
     window.electronAPI.user
       .getCurrentProfile()
@@ -53,6 +53,13 @@ export const ReactionDisplay: React.FC<ReactionDisplayProps> = ({
           handle: '@anonymous',
         });
       });
+
+    // Subscribe to profile changes
+    const unsubscribe = window.electronAPI.user.onProfileChanged((profile) => {
+      setUserProfile(profile);
+    });
+
+    return unsubscribe;
   }, []);
 
   // Filter reactions for this specific target

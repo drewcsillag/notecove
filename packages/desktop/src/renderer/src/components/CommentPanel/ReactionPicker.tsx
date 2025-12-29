@@ -33,7 +33,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({
 }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  // Fetch user profile on mount
+  // Fetch user profile on mount and subscribe to changes
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -44,6 +44,13 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({
       }
     };
     void fetchProfile();
+
+    // Subscribe to profile changes
+    const unsubscribe = window.electronAPI.user.onProfileChanged((profile) => {
+      setUserProfile(profile);
+    });
+
+    return unsubscribe;
   }, []);
 
   const handleAddReaction = async (emoji: string) => {

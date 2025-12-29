@@ -1219,6 +1219,15 @@ declare global {
           username: string;
           handle: string;
         }>;
+
+        /**
+         * Listen for profile changes broadcast from main process.
+         * Called when username or handle is changed in settings.
+         * @returns Unsubscribe function
+         */
+        onProfileChanged: (
+          callback: (profile: { profileId: string; username: string; handle: string }) => void
+        ) => () => void;
       };
 
       /** Theme operations for dark mode sync across windows */

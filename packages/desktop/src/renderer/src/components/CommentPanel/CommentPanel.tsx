@@ -112,7 +112,7 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
   // Current user profile for comment authorship
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  // Fetch current user profile on mount
+  // Fetch current user profile on mount and subscribe to changes
   useEffect(() => {
     window.electronAPI.user
       .getCurrentProfile()
@@ -128,6 +128,13 @@ export const CommentPanel: React.FC<CommentPanelProps> = ({
           handle: '@anonymous',
         });
       });
+
+    // Subscribe to profile changes (when user updates settings)
+    const unsubscribe = window.electronAPI.user.onProfileChanged((profile) => {
+      setUserProfile(profile);
+    });
+
+    return unsubscribe;
   }, []);
 
   // Load threads from the note

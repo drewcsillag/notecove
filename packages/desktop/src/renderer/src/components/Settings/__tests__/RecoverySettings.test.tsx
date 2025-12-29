@@ -24,6 +24,9 @@ const mockElectronAPI = {
       username: 'Test User',
       handle: '@testuser',
     }),
+    onProfileChanged: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
 };
 

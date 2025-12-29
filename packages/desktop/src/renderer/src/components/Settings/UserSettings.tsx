@@ -10,9 +10,25 @@ import React, { useEffect, useState } from 'react';
 import { Box, TextField, Typography, Button, Alert } from '@mui/material';
 import { AppStateKey } from '@notecove/shared';
 
+// Validate handle: alphanumeric and underscore only, max 20 chars
+const HANDLE_REGEX = /^[a-zA-Z0-9_]*$/;
+const MAX_HANDLE_LENGTH = 20;
+
+function validateHandle(value: string): string | null {
+  if (value === '') return null; // Empty is allowed (optional field)
+  if (value.length > MAX_HANDLE_LENGTH) {
+    return 'Handle must be 20 characters or less';
+  }
+  if (!HANDLE_REGEX.test(value)) {
+    return 'Invalid handle: use only letters, numbers, and underscores';
+  }
+  return null;
+}
+
 export const UserSettings: React.FC = () => {
   const [username, setUsername] = useState('');
   const [handle, setHandle] = useState('');
+  const [handleError, setHandleError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -23,12 +39,9 @@ export const UserSettings: React.FC = () => {
         const savedUsername = await window.electronAPI.appState.get(AppStateKey.Username);
         const savedHandle = await window.electronAPI.appState.get(AppStateKey.UserHandle);
 
-        // Use saved values or defaults
-        const defaultUsername = savedUsername ?? 'User';
-        const defaultHandle = savedHandle ?? 'user';
-
-        setUsername(defaultUsername);
-        setHandle(defaultHandle);
+        // Use saved values or empty string (placeholder will show when empty)
+        setUsername(savedUsername ?? '');
+        setHandle(savedHandle ?? '');
       } catch (error) {
         console.error('Failed to load user settings:', error);
       } finally {
@@ -75,6 +88,7 @@ export const UserSettings: React.FC = () => {
         fullWidth
         variant="outlined"
         value={username}
+        placeholder="Your name"
         onChange={(e) => {
           setUsername(e.target.value);
         }}
@@ -88,10 +102,14 @@ export const UserSettings: React.FC = () => {
         fullWidth
         variant="outlined"
         value={handle}
+        placeholder="yourhandle"
+        error={!!handleError}
         onChange={(e) => {
-          setHandle(e.target.value);
+          const newValue = e.target.value;
+          setHandle(newValue);
+          setHandleError(validateHandle(newValue));
         }}
-        helperText="Used for @mentions in notes (e.g., @username)"
+        helperText={handleError ?? 'Used for @mentions in notes (e.g., @username)'}
         InputProps={{
           startAdornment: '@',
         }}
@@ -99,7 +117,11 @@ export const UserSettings: React.FC = () => {
       />
 
       <Box display="flex" justifyContent="flex-end">
-        <Button variant="contained" onClick={() => void handleSave()} disabled={loading}>
+        <Button
+          variant="contained"
+          onClick={() => void handleSave()}
+          disabled={loading || !!handleError}
+        >
           Save Changes
         </Button>
       </Box>

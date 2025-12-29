@@ -421,19 +421,33 @@ export const mentionApi = {
     >,
 };
 
+/** User profile data */
+export interface UserProfile {
+  profileId: string;
+  username: string;
+  handle: string;
+}
+
 export const userApi = {
   /**
    * Get the current user's profile information
    * @returns Current user's profileId, username, and handle
    */
-  getCurrentProfile: (): Promise<{
-    profileId: string;
-    username: string;
-    handle: string;
-  }> =>
-    ipcRenderer.invoke('user:getCurrentProfile') as Promise<{
-      profileId: string;
-      username: string;
-      handle: string;
-    }>,
+  getCurrentProfile: (): Promise<UserProfile> =>
+    ipcRenderer.invoke('user:getCurrentProfile') as Promise<UserProfile>,
+
+  /**
+   * Listen for profile changes broadcast from main process.
+   * Called when username or handle is changed in settings.
+   * @returns Unsubscribe function
+   */
+  onProfileChanged: (callback: (profile: UserProfile) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, profile: UserProfile): void => {
+      callback(profile);
+    };
+    ipcRenderer.on('user:profileChanged', listener);
+    return () => {
+      ipcRenderer.removeListener('user:profileChanged', listener);
+    };
+  },
 };

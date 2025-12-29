@@ -207,7 +207,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- stable refs don't need deps
   }, []);
 
-  // Fetch current user profile on mount for comment authorship
+  // Fetch current user profile on mount for comment authorship and subscribe to changes
   useEffect(() => {
     window.electronAPI.user
       .getCurrentProfile()
@@ -223,6 +223,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           handle: '@anonymous',
         });
       });
+
+    // Subscribe to profile changes (when user updates settings)
+    const unsubscribe = window.electronAPI.user.onProfileChanged((profile) => {
+      console.log('[TipTapEditor] User profile changed:', profile);
+      setUserProfile(profile);
+    });
+
+    return unsubscribe;
   }, []);
 
   // Listen for date picker requests from AtMention extension (@date keyword)

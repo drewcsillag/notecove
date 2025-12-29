@@ -55,6 +55,9 @@ Object.defineProperty(window, 'electronAPI', {
         username: 'Test User',
         handle: '@testuser',
       }),
+      onProfileChanged: jest.fn(() => () => {
+        /* unsubscribe */
+      }),
     },
   },
 });

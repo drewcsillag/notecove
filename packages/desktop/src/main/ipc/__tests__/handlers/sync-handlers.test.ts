@@ -106,4 +106,54 @@ describe('Sync Handlers', () => {
       });
     });
   });
+
+  describe('appState:set', () => {
+    it('should save username to database and fetch profile for broadcast', async () => {
+      const mockEvent = {} as any;
+
+      // Set up database mock to return current values
+      mocks.database.getState.mockImplementation(async (key: string) => {
+        if (key === 'username') return 'NewUser';
+        if (key === 'userHandle') return 'newhandle';
+        return null;
+      });
+
+      await invokeHandler('appState:set', mockEvent, 'username', 'NewUser');
+
+      // Verify database was called to set value
+      expect(mocks.database.setState).toHaveBeenCalledWith('username', 'NewUser');
+
+      // Verify database was queried for broadcast data
+      // (broadcastToAll is called internally, verified by implementation)
+      expect(mocks.database.getState).toHaveBeenCalledWith('username');
+      expect(mocks.database.getState).toHaveBeenCalledWith('userHandle');
+    });
+
+    it('should save userHandle to database and fetch profile for broadcast', async () => {
+      const mockEvent = {} as any;
+
+      mocks.database.getState.mockImplementation(async (key: string) => {
+        if (key === 'username') return 'TestUser';
+        if (key === 'userHandle') return 'newhandle';
+        return null;
+      });
+
+      await invokeHandler('appState:set', mockEvent, 'userHandle', 'newhandle');
+
+      expect(mocks.database.setState).toHaveBeenCalledWith('userHandle', 'newhandle');
+      expect(mocks.database.getState).toHaveBeenCalledWith('username');
+      expect(mocks.database.getState).toHaveBeenCalledWith('userHandle');
+    });
+
+    it('should not fetch profile for non-user settings', async () => {
+      const mockEvent = {} as any;
+
+      await invokeHandler('appState:set', mockEvent, 'someOtherKey', 'value');
+
+      expect(mocks.database.setState).toHaveBeenCalledWith('someOtherKey', 'value');
+      // Should not query for username/handle since it's not a user setting
+      expect(mocks.database.getState).not.toHaveBeenCalledWith('username');
+      expect(mocks.database.getState).not.toHaveBeenCalledWith('userHandle');
+    });
+  });
 });

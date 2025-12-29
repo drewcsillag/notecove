@@ -1098,6 +1098,7 @@ export const webClient: typeof window.electronAPI = {
 
   user: {
     getCurrentProfile: browserNotAvailable('user.getCurrentProfile'),
+    onProfileChanged: noopSubscription,
   },
 
   theme: {

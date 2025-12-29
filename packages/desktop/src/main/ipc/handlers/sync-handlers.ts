@@ -53,13 +53,23 @@ function handleGetAppState(ctx: HandlerContext) {
 
 function handleSetAppState(ctx: HandlerContext) {
   return async (_event: IpcMainInvokeEvent, key: string, value: string): Promise<void> => {
-    const { database, onUserSettingsChanged } = ctx;
+    const { database, onUserSettingsChanged, broadcastToAll, profileId } = ctx;
 
     await database.setState(key, value);
 
-    // Notify if user settings changed (for profile presence updates)
-    if (onUserSettingsChanged && (key === 'username' || key === 'userHandle')) {
-      await onUserSettingsChanged(key, value);
+    // Notify if user settings changed (for profile presence updates and UI reactivity)
+    if (key === 'username' || key === 'userHandle') {
+      // Update profile presence files on disk
+      if (onUserSettingsChanged) {
+        await onUserSettingsChanged(key, value);
+      }
+
+      // Broadcast to all renderer windows so they can update their UI
+      // Fetch the current profile to send complete data
+      const username = (await database.getState('username')) ?? '';
+      const handle = (await database.getState('userHandle')) ?? '';
+      console.log('[User Settings] Broadcasting profile change');
+      broadcastToAll('user:profileChanged', { profileId, username, handle });
     }
   };
 }

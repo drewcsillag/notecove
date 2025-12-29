@@ -61,6 +61,9 @@ const mockElectronAPI = {
       username: 'Test User',
       handle: '@testuser',
     }),
+    onProfileChanged: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   sd: {
     onUpdated: jest.fn().mockReturnValue(() => {}),
