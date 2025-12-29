@@ -440,6 +440,208 @@ describe('image import helpers', () => {
   });
 });
 
+describe('link display mode attributes', () => {
+  describe('basic displayMode parsing', () => {
+    it('should parse {.link} attribute on links', () => {
+      const markdown = 'Visit [Example](https://example.com){.link} now.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      // Link should have displayMode: 'link'
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      expect(linkNode).toBeDefined();
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://example.com',
+        displayMode: 'link',
+      });
+
+      // The {.link} text should be removed
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).not.toContain('{.link}');
+      expect(allText).toBe('Visit Example now.');
+    });
+
+    it('should parse {.chip} attribute on links', () => {
+      const markdown = 'Check out [GitHub](https://github.com){.chip} for code.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://github.com',
+        displayMode: 'chip',
+      });
+
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toBe('Check out GitHub for code.');
+    });
+
+    it('should parse {.unfurl} attribute on links', () => {
+      const markdown = 'Watch [Video](https://youtube.com/watch?v=abc){.unfurl} here.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://youtube.com/watch?v=abc',
+        displayMode: 'unfurl',
+      });
+
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toBe('Watch Video here.');
+    });
+
+    it('should not add displayMode for links without attribute', () => {
+      const markdown = 'Visit [Example](https://example.com) now.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+      // Should only have href, no displayMode
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://example.com',
+      });
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should ignore invalid display mode attributes', () => {
+      const markdown = 'Visit [Example](https://example.com){.invalid} now.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+      // Should not have displayMode
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://example.com',
+      });
+
+      // The {.invalid} should remain as text
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toContain('{.invalid}');
+    });
+
+    it('should handle whitespace before attribute', () => {
+      const markdown = 'Visit [Example](https://example.com) {.chip} now.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://example.com',
+        displayMode: 'chip',
+      });
+
+      // Both the space and {.chip} should be removed
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toBe('Visit Example now.');
+    });
+
+    it('should handle multiple links with different attributes', () => {
+      const markdown =
+        'See [Link A](https://a.com){.link} and [Link B](https://b.com){.chip} and [Link C](https://c.com){.unfurl}.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const linkNodes = content.filter((n) => n.marks?.some((m) => m.type === 'link'));
+
+      expect(linkNodes).toHaveLength(3);
+
+      const linkA = linkNodes[0].marks!.find((m) => m.type === 'link');
+      expect(linkA!.attrs).toEqual({ href: 'https://a.com', displayMode: 'link' });
+
+      const linkB = linkNodes[1].marks!.find((m) => m.type === 'link');
+      expect(linkB!.attrs).toEqual({ href: 'https://b.com', displayMode: 'chip' });
+
+      const linkC = linkNodes[2].marks!.find((m) => m.type === 'link');
+      expect(linkC!.attrs).toEqual({ href: 'https://c.com', displayMode: 'unfurl' });
+
+      // All attribute text should be removed
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toBe('See Link A and Link B and Link C.');
+    });
+
+    it('should handle link at end of paragraph with attribute', () => {
+      const markdown = 'Visit [Example](https://example.com){.chip}';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://example.com',
+        displayMode: 'chip',
+      });
+
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toBe('Visit Example');
+    });
+
+    it('should not match {.chip} without preceding link', () => {
+      const markdown = 'Some text {.chip} here.';
+      const result = markdownToProsemirror(markdown);
+
+      const content = result.content![0].content!;
+      const allText = content.map((n) => n.text || '').join('');
+      // Should remain as-is since there's no preceding link
+      expect(allText).toBe('Some text {.chip} here.');
+    });
+  });
+
+  describe('oEmbedUnfurl block creation', () => {
+    it('should create oEmbedUnfurl block after paragraph with unfurl link', () => {
+      const markdown = '[Video](https://youtube.com/watch?v=abc){.unfurl}';
+      const result = markdownToProsemirror(markdown);
+
+      // Should have paragraph followed by oembedUnfurl block
+      expect(result.content).toHaveLength(2);
+      expect(result.content![0].type).toBe('paragraph');
+      expect(result.content![1].type).toBe('oembedUnfurl');
+      expect(result.content![1].attrs).toMatchObject({
+        url: 'https://youtube.com/watch?v=abc',
+        isLoading: true,
+      });
+    });
+
+    it('should not create unfurl block for unfurl link in list', () => {
+      const markdown = '- [Video](https://youtube.com/watch?v=abc){.unfurl}';
+      const result = markdownToProsemirror(markdown);
+
+      // Should only have the list, no oembedUnfurl block
+      expect(result.content).toHaveLength(1);
+      expect(result.content![0].type).toBe('bulletList');
+    });
+
+    it('should not create unfurl block for chip links', () => {
+      const markdown = '[Link](https://example.com){.chip}';
+      const result = markdownToProsemirror(markdown);
+
+      // Should only have paragraph, no oembedUnfurl block
+      expect(result.content).toHaveLength(1);
+      expect(result.content![0].type).toBe('paragraph');
+    });
+
+    it('should create multiple unfurl blocks for multiple unfurl links', () => {
+      const markdown =
+        '[Video 1](https://youtube.com/1){.unfurl}\n\n[Video 2](https://youtube.com/2){.unfurl}';
+      const result = markdownToProsemirror(markdown);
+
+      // Should have: paragraph, unfurl, paragraph, unfurl
+      expect(result.content).toHaveLength(4);
+      expect(result.content![0].type).toBe('paragraph');
+      expect(result.content![1].type).toBe('oembedUnfurl');
+      expect(result.content![2].type).toBe('paragraph');
+      expect(result.content![3].type).toBe('oembedUnfurl');
+    });
+  });
+});
+
 describe('inter-note link helpers', () => {
   describe('extractLinkReferences', () => {
     it('should extract links to .md files', () => {

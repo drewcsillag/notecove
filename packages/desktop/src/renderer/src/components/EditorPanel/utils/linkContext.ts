@@ -194,6 +194,14 @@ export function getEffectiveDisplayMode(
   // If per-link preference is explicitly set (not 'auto'), respect it
   // This ensures existing notes don't change when settings change
   if (perLinkPreference !== 'auto') {
+    // Special case: unfurl only works in paragraphs
+    // Fall back to chip for other contexts (lists, headings, etc.)
+    if (perLinkPreference === 'unfurl') {
+      const context = detectLinkContext(state, pos);
+      if (context !== 'paragraph') {
+        return 'chip';
+      }
+    }
     return perLinkPreference;
   }
 

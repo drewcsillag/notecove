@@ -235,12 +235,20 @@ describe('linkContext', () => {
       expect(mode).toBe('chip');
     });
 
-    it('should respect explicit unfurl preference', () => {
-      editor = createEditor('<h1><a href="https://example.com">link</a></h1>');
+    it('should respect explicit unfurl preference in paragraph', () => {
+      editor = createEditor('<p><a href="https://example.com">link</a></p>');
 
-      // Even in a heading (which defaults to chip), explicit unfurl should win
+      // Unfurl in paragraph should work
       const mode = getEffectiveDisplayMode(editor.state, 1, 'unfurl');
       expect(mode).toBe('unfurl');
+    });
+
+    it('should fall back to chip for explicit unfurl in non-paragraph context', () => {
+      editor = createEditor('<h1><a href="https://example.com">link</a></h1>');
+
+      // Unfurl in heading should fall back to chip (unfurls only work in paragraphs)
+      const mode = getEffectiveDisplayMode(editor.state, 1, 'unfurl');
+      expect(mode).toBe('chip');
     });
 
     it('should respect explicit link preference', () => {

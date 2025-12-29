@@ -27,10 +27,15 @@ export function markdownToProsemirror(markdown: string): ProseMirrorNode {
   }
 
   const tokens = md.parse(markdown, {});
-  return {
+  const doc: ProseMirrorNode = {
     type: 'doc',
     content: convertTokens(tokens),
   };
+
+  // Post-process: create oEmbedUnfurl blocks for unfurl links in paragraphs
+  insertUnfurlBlocks(doc);
+
+  return doc;
 }
 
 /**
@@ -456,6 +461,202 @@ function convertHtmlBlock(token: Token): ProseMirrorNode | null {
 }
 
 /**
+ * Valid display modes for links
+ */
+const VALID_DISPLAY_MODES = ['link', 'chip', 'unfurl'] as const;
+type LinkDisplayMode = (typeof VALID_DISPLAY_MODES)[number];
+
+/**
+ * Insert oEmbedUnfurl blocks after paragraphs containing unfurl links
+ *
+ * When a link has displayMode: 'unfurl', the editor expects an oEmbedUnfurl
+ * block node after the paragraph to display the rich preview. This function
+ * scans the document for such links and inserts the blocks.
+ *
+ * Only processes top-level paragraphs (not paragraphs in lists, blockquotes, etc.)
+ * because unfurls only work in standalone paragraphs.
+ *
+ * @param doc The ProseMirror JSON document (modified in place)
+ */
+function insertUnfurlBlocks(doc: ProseMirrorNode): void {
+  if (!doc.content) return;
+
+  const newContent: ProseMirrorNode[] = [];
+
+  for (const block of doc.content) {
+    newContent.push(block);
+
+    // Only process paragraphs at the top level
+    if (block.type === 'paragraph' && block.content) {
+      // Find unfurl links in this paragraph
+      const unfurlUrls: string[] = [];
+
+      for (const node of block.content) {
+        if (node.type === 'text' && node.marks) {
+          const linkMark = node.marks.find((m) => m.type === 'link');
+          if (linkMark?.attrs) {
+            const attrs = linkMark.attrs as { href?: string; displayMode?: string };
+            if (attrs.displayMode === 'unfurl' && attrs.href) {
+              unfurlUrls.push(attrs.href);
+            }
+          }
+        }
+      }
+
+      // Create oEmbedUnfurl blocks for each unfurl link
+      for (const url of unfurlUrls) {
+        newContent.push({
+          type: 'oembedUnfurl',
+          attrs: {
+            url,
+            oembedType: null,
+            title: null,
+            description: null,
+            thumbnailUrl: null,
+            providerName: null,
+            providerUrl: null,
+            authorName: null,
+            html: null,
+            width: null,
+            height: null,
+            fetchedAt: null,
+            isLoading: true,
+            error: null,
+            errorType: null,
+          },
+        });
+      }
+    }
+  }
+
+  doc.content = newContent;
+}
+
+/**
+ * Regex to match display mode attributes at the start of text
+ * Captures optional leading whitespace and the display mode
+ * Examples: "{.link}", " {.chip}", "  {.unfurl}"
+ */
+const DISPLAY_MODE_REGEX = /^(\s*)\{\.(\w+)\}/;
+
+/**
+ * Process link display mode attributes in inline content
+ *
+ * Looks for patterns like `{.link}`, `{.chip}`, `{.unfurl}` after links
+ * and moves the display mode to the preceding link mark's attrs.
+ *
+ * @param nodes Array of inline ProseMirror nodes
+ * @returns Processed array with display modes applied to links
+ */
+function processLinkDisplayModeAttributes(nodes: ProseMirrorNode[]): ProseMirrorNode[] {
+  if (nodes.length === 0) return nodes;
+
+  const result: ProseMirrorNode[] = [];
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+
+    // Check if this is a text node that might contain a display mode attribute
+    if (node.type === 'text' && node.text) {
+      const match = DISPLAY_MODE_REGEX.exec(node.text);
+
+      if (match) {
+        const [fullMatch, whitespace, mode] = match;
+
+        // Check if this is a valid display mode
+        if (VALID_DISPLAY_MODES.includes(mode as LinkDisplayMode)) {
+          // Look for a preceding node with a link mark
+          const prevNode = result[result.length - 1];
+
+          if (prevNode?.marks?.some((m) => m.type === 'link')) {
+            // Found a link - update its displayMode
+            const updatedMarks = prevNode.marks.map((m) => {
+              if (m.type === 'link') {
+                return {
+                  ...m,
+                  attrs: {
+                    ...m.attrs,
+                    displayMode: mode,
+                  },
+                };
+              }
+              return m;
+            });
+
+            // Update the previous node in result
+            result[result.length - 1] = {
+              ...prevNode,
+              marks: updatedMarks,
+            };
+
+            // Remove the attribute from this text node
+            const remainingText = node.text.slice(fullMatch.length);
+
+            // If there's remaining text, add it as a new node
+            if (remainingText) {
+              result.push(createTextNode(remainingText, node.marks ? [...node.marks] : []));
+            }
+
+            // Also need to handle if whitespace was consumed from end of previous node
+            // But since the whitespace is in THIS node, we've already handled it
+            continue;
+          } else if (
+            prevNode?.type === 'text' &&
+            prevNode.text &&
+            whitespace === '' &&
+            result.length >= 2
+          ) {
+            // The whitespace might be at the end of the previous text node
+            // Check if there's a link node before that
+            const prevPrevNode = result[result.length - 2];
+
+            if (
+              prevPrevNode?.marks?.some((m) => m.type === 'link') &&
+              prevNode.text.match(/^\s+$/)
+            ) {
+              // Previous node is whitespace, and before that is a link
+              // We know marks exists from the check above
+              const updatedMarks = prevPrevNode.marks.map((m) => {
+                if (m.type === 'link') {
+                  return {
+                    ...m,
+                    attrs: {
+                      ...m.attrs,
+                      displayMode: mode,
+                    },
+                  };
+                }
+                return m;
+              });
+
+              result[result.length - 2] = {
+                ...prevPrevNode,
+                marks: updatedMarks,
+              };
+
+              // Remove the whitespace node
+              result.pop();
+
+              // Remove the attribute from this text node
+              const remainingText = node.text.slice(fullMatch.length);
+              if (remainingText) {
+                result.push(createTextNode(remainingText, node.marks ? [...node.marks] : []));
+              }
+              continue;
+            }
+          }
+        }
+        // Invalid mode or no preceding link - fall through to add node as-is
+      }
+    }
+
+    result.push(node);
+  }
+
+  return result;
+}
+
+/**
  * Convert inline tokens to text nodes with marks
  */
 function convertInlineTokens(tokens: Token[]): ProseMirrorNode[] {
@@ -542,7 +743,8 @@ function convertInlineTokens(tokens: Token[]): ProseMirrorNode[] {
     }
   }
 
-  return result;
+  // Process link display mode attributes (e.g., {.link}, {.chip}, {.unfurl})
+  return processLinkDisplayModeAttributes(result);
 }
 
 /**

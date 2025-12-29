@@ -44,6 +44,17 @@ console.log(greeting);
 > "The best way to predict the future is to create it."
 > — Peter Drucker
 
+### Link Previews
+
+NoteCove can display links in different ways:
+
+- [Plain link](https://github.com/drewcsillag/notecove){.link} — Simple clickable text
+- [The Onion](https://theonion.com/heroic-dog-saves-family-of-5-from-herb-roasted-chicken/){.chip} — Compact chip with favicon
+
+Rich preview with thumbnail:
+
+[YouTube Video](https://www.youtube.com/watch?v=qXD9HnrNrvk){.unfurl}
+
 ---
 
 Happy note-taking!

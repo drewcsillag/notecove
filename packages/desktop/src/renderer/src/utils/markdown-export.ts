@@ -273,6 +273,23 @@ function convertTextNode(node: JSONContent, noteTitleLookup: NoteTitleLookup): s
 }
 
 /**
+ * Get the display mode suffix for markdown export
+ * Only adds suffix for explicitly set modes (not 'auto' or undefined)
+ */
+function getDisplayModeSuffix(displayMode: string | undefined): string {
+  if (!displayMode || displayMode === 'auto') {
+    return '';
+  }
+
+  // Only export valid display modes
+  if (displayMode === 'link' || displayMode === 'chip' || displayMode === 'unfurl') {
+    return `{.${displayMode}}`;
+  }
+
+  return '';
+}
+
+/**
  * Apply a mark to text
  */
 function applyMark(text: string, mark: { type: string; attrs?: Record<string, unknown> }): string {
@@ -295,7 +312,13 @@ function applyMark(text: string, mark: { type: string; attrs?: Record<string, un
 
     case 'link': {
       const href = mark.attrs?.['href'] as string;
-      return href ? `[${text}](${href})` : text;
+      if (!href) return text;
+
+      // Get displayMode if explicitly set (not 'auto')
+      const displayMode = mark.attrs?.['displayMode'] as string | undefined;
+      const suffix = getDisplayModeSuffix(displayMode);
+
+      return `[${text}](${href})${suffix}`;
     }
 
     default:
@@ -442,7 +465,7 @@ function convertNotecoveImage(node: JSONContent): string {
  * Export strategy:
  * - Use the title from oEmbed data if available
  * - Fall back to the URL if no title
- * - Format as markdown link: [title](url)
+ * - Format as markdown link with unfurl attribute: [title](url){.unfurl}
  */
 function convertOEmbedUnfurl(node: JSONContent): string {
   const attrs = node.attrs ?? {};
@@ -459,7 +482,8 @@ function convertOEmbedUnfurl(node: JSONContent): string {
   // Escape special markdown characters in the title
   const escapedTitle = displayText.replace(/\[/g, '\\[').replace(/\]/g, '\\]');
 
-  return `[${escapedTitle}](${url})`;
+  // Always add {.unfurl} suffix since this was an unfurl block
+  return `[${escapedTitle}](${url}){.unfurl}`;
 }
 
 /**

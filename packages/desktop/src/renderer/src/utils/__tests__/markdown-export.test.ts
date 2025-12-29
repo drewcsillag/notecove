@@ -661,7 +661,7 @@ describe('prosemirrorToMarkdown', () => {
   });
 
   describe('oembedUnfurl nodes', () => {
-    it('should convert unfurl with title to markdown link', () => {
+    it('should convert unfurl with title to markdown link with {.unfurl} suffix', () => {
       const content = {
         type: 'doc',
         content: [
@@ -676,7 +676,7 @@ describe('prosemirrorToMarkdown', () => {
       };
       const result = prosemirrorToMarkdown(content, noopLookup);
       expect(result).toBe(
-        '[Rick Astley - Never Gonna Give You Up](https://www.youtube.com/watch?v=dQw4w9WgXcQ)'
+        '[Rick Astley - Never Gonna Give You Up](https://www.youtube.com/watch?v=dQw4w9WgXcQ){.unfurl}'
       );
     });
 
@@ -694,7 +694,7 @@ describe('prosemirrorToMarkdown', () => {
         ],
       };
       const result = prosemirrorToMarkdown(content, noopLookup);
-      expect(result).toBe('[https://example.com/article](https://example.com/article)');
+      expect(result).toBe('[https://example.com/article](https://example.com/article){.unfurl}');
     });
 
     it('should handle empty URL', () => {
@@ -728,7 +728,7 @@ describe('prosemirrorToMarkdown', () => {
         ],
       };
       const result = prosemirrorToMarkdown(content, noopLookup);
-      expect(result).toBe('[Article \\[Part 1\\]](https://example.com)');
+      expect(result).toBe('[Article \\[Part 1\\]](https://example.com){.unfurl}');
     });
 
     it('should handle unfurl with other attributes', () => {
@@ -748,8 +748,179 @@ describe('prosemirrorToMarkdown', () => {
         ],
       };
       const result = prosemirrorToMarkdown(content, noopLookup);
-      // Only URL and title are used in markdown export
-      expect(result).toBe('[Claude Code Repository](https://github.com/anthropics/claude-code)');
+      // Only URL and title are used in markdown export, plus {.unfurl} suffix
+      expect(result).toBe(
+        '[Claude Code Repository](https://github.com/anthropics/claude-code){.unfurl}'
+      );
+    });
+  });
+
+  describe('link display mode export', () => {
+    it('should export link with displayMode: link as {.link}', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Click here',
+                marks: [
+                  { type: 'link', attrs: { href: 'https://example.com', displayMode: 'link' } },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[Click here](https://example.com){.link}');
+    });
+
+    it('should export link with displayMode: chip as {.chip}', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'GitHub',
+                marks: [
+                  { type: 'link', attrs: { href: 'https://github.com', displayMode: 'chip' } },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[GitHub](https://github.com){.chip}');
+    });
+
+    it('should export link with displayMode: unfurl as {.unfurl}', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Video',
+                marks: [
+                  {
+                    type: 'link',
+                    attrs: { href: 'https://youtube.com/watch?v=abc', displayMode: 'unfurl' },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[Video](https://youtube.com/watch?v=abc){.unfurl}');
+    });
+
+    it('should not add suffix for links without displayMode', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Click here',
+                marks: [{ type: 'link', attrs: { href: 'https://example.com' } }],
+              },
+            ],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[Click here](https://example.com)');
+    });
+
+    it('should not add suffix for links with displayMode: auto', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Click here',
+                marks: [
+                  { type: 'link', attrs: { href: 'https://example.com', displayMode: 'auto' } },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[Click here](https://example.com)');
+    });
+
+    it('should not add suffix for invalid displayMode values', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Click here',
+                marks: [
+                  { type: 'link', attrs: { href: 'https://example.com', displayMode: 'invalid' } },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe('[Click here](https://example.com)');
+    });
+
+    it('should handle multiple links with different displayModes', () => {
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Link A',
+                marks: [{ type: 'link', attrs: { href: 'https://a.com', displayMode: 'link' } }],
+              },
+              { type: 'text', text: ' and ' },
+              {
+                type: 'text',
+                text: 'Link B',
+                marks: [{ type: 'link', attrs: { href: 'https://b.com', displayMode: 'chip' } }],
+              },
+              { type: 'text', text: ' and ' },
+              {
+                type: 'text',
+                text: 'Link C',
+                marks: [{ type: 'link', attrs: { href: 'https://c.com' } }],
+              },
+            ],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      expect(result).toBe(
+        '[Link A](https://a.com){.link} and [Link B](https://b.com){.chip} and [Link C](https://c.com)'
+      );
     });
   });
 
