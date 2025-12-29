@@ -210,205 +210,216 @@ export function ProfilePicker(): React.ReactElement {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Select Profile</h1>
+      {/* Fixed Header */}
+      <div style={styles.header}>
+        <h1 style={styles.title}>Select Profile</h1>
+        {isDevBuild && <div style={styles.devBanner}>Development Build</div>}
+        <p style={styles.subtitle}>Choose a profile to launch NoteCove with:</p>
+      </div>
 
-      {isDevBuild && <div style={styles.devBanner}>Development Build</div>}
-
-      <p style={styles.subtitle}>Choose a profile to launch NoteCove with:</p>
-
-      {/* Delete confirmation dialog */}
-      {deletingProfileId && (
-        <div style={styles.confirmDialog}>
-          <p style={styles.confirmText}>
-            Are you sure you want to delete this profile? The profile data will remain on disk.
-          </p>
-          <div style={styles.confirmButtons}>
-            <button
-              style={styles.buttonSecondary}
-              onClick={() => {
-                setDeletingProfileId(null);
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              style={styles.buttonDanger}
-              onClick={() => void handleDeleteProfile(deletingProfileId)}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Profile list */}
-      <div style={styles.profileList}>
-        {profiles.length === 0 ? (
-          <div style={styles.emptyState}>No profiles yet. Create one to get started.</div>
-        ) : (
-          profiles.map((profile) => (
-            <div
-              key={profile.id}
-              data-testid={`profile-item-${profile.id}`}
-              style={{
-                ...styles.profileItem,
-                ...(selectedId === profile.id ? styles.profileItemSelected : {}),
-              }}
-              onClick={() => {
-                setSelectedId(profile.id);
-              }}
-              onDoubleClick={() => void handleSelect()}
-            >
-              {renamingProfileId === profile.id ? (
-                <div style={styles.renameForm}>
-                  <input
-                    type="text"
-                    value={renameValue}
-                    onChange={(e) => {
-                      setRenameValue(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void handleRenameProfile();
-                      if (e.key === 'Escape') {
+      {/* Scrollable Middle */}
+      <div style={styles.scrollableMiddle}>
+        {/* Profile list */}
+        <div style={styles.profileList}>
+          {profiles.length === 0 ? (
+            <div style={styles.emptyState}>No profiles yet. Create one to get started.</div>
+          ) : (
+            profiles.map((profile) => (
+              <div
+                key={profile.id}
+                data-testid={`profile-item-${profile.id}`}
+                style={{
+                  ...styles.profileItem,
+                  ...(selectedId === profile.id ? styles.profileItemSelected : {}),
+                }}
+                onClick={() => {
+                  setSelectedId(profile.id);
+                }}
+                onDoubleClick={() => void handleSelect()}
+              >
+                {renamingProfileId === profile.id ? (
+                  <div style={styles.renameForm}>
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => {
+                        setRenameValue(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleRenameProfile();
+                        if (e.key === 'Escape') {
+                          setRenamingProfileId(null);
+                          setRenameValue('');
+                        }
+                      }}
+                      style={styles.renameInput}
+                      autoFocus
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    />
+                    <button
+                      style={styles.iconButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleRenameProfile();
+                      }}
+                      title="Save"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      style={styles.iconButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setRenamingProfileId(null);
                         setRenameValue('');
-                      }
-                    }}
-                    style={styles.renameInput}
-                    autoFocus
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                  />
-                  <button
-                    style={styles.iconButton}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleRenameProfile();
-                    }}
-                    title="Save"
-                  >
-                    ✓
-                  </button>
-                  <button
-                    style={styles.iconButton}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRenamingProfileId(null);
-                      setRenameValue('');
-                    }}
-                    title="Cancel"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div style={styles.profileInfo}>
-                    <div style={styles.profileName}>
-                      {profile.name}
-                      {profile.isDev && <span style={styles.devBadge}>DEV</span>}
+                      }}
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={styles.profileInfo}>
+                      <div style={styles.profileName}>
+                        {profile.name}
+                        {profile.isDev && <span style={styles.devBadge}>DEV</span>}
+                      </div>
+                      <div style={styles.profileMeta}>
+                        Last used: {formatDate(profile.lastUsed)}
+                      </div>
                     </div>
-                    <div style={styles.profileMeta}>Last used: {formatDate(profile.lastUsed)}</div>
-                  </div>
-                  <div style={styles.profileActions}>
-                    <button
-                      style={styles.iconButton}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startRename(profile);
-                      }}
-                      title="Rename"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      style={styles.iconButton}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingProfileId(profile.id);
-                      }}
-                      title="Delete"
-                    >
-                      🗑
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ))
-        )}
+                    <div style={styles.profileActions}>
+                      <button
+                        style={styles.iconButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startRename(profile);
+                        }}
+                        title="Rename"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        style={styles.iconButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingProfileId(profile.id);
+                        }}
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
-      {/* Create profile form */}
-      {creatingProfile ? (
-        <div style={styles.createForm}>
-          <input
-            type="text"
-            placeholder="Profile name..."
-            value={newProfileName}
-            onChange={(e) => {
-              setNewProfileName(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleCreateProfile();
-              if (e.key === 'Escape') setCreatingProfile(false);
-            }}
-            style={styles.input}
-            autoFocus
-          />
-          <div style={styles.createFormButtons}>
-            <button
-              style={styles.buttonSecondary}
-              onClick={() => {
-                setCreatingProfile(false);
+      {/* Fixed Footer */}
+      <div style={styles.footer}>
+        {/* Create profile form */}
+        {creatingProfile ? (
+          <div style={styles.createForm}>
+            <input
+              type="text"
+              placeholder="Profile name..."
+              value={newProfileName}
+              onChange={(e) => {
+                setNewProfileName(e.target.value);
               }}
-            >
-              Cancel
-            </button>
-            <button
-              style={styles.button}
-              onClick={() => void handleCreateProfile()}
-              disabled={!newProfileName.trim()}
-            >
-              Create
-            </button>
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleCreateProfile();
+                if (e.key === 'Escape') setCreatingProfile(false);
+              }}
+              style={styles.input}
+              autoFocus
+            />
+            <div style={styles.createFormButtons}>
+              <button
+                style={styles.buttonSecondary}
+                onClick={() => {
+                  setCreatingProfile(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.button}
+                onClick={() => void handleCreateProfile()}
+                disabled={!newProfileName.trim()}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            style={styles.buttonSecondary}
+            onClick={() => {
+              setCreatingProfile(true);
+            }}
+          >
+            + New Profile
+          </button>
+        )}
+
+        {/* Don't ask again checkbox (production only) */}
+        {!isDevBuild && profiles.length > 0 && (
+          <label style={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={skipPicker}
+              onChange={(e) => {
+                setSkipPicker(e.target.checked);
+              }}
+            />
+            <span>Don&apos;t ask again (use this profile automatically)</span>
+          </label>
+        )}
+
+        {/* Action buttons */}
+        <div style={styles.actions}>
+          <button style={styles.buttonSecondary} onClick={() => void handleCancel()}>
+            Cancel
+          </button>
+          <button style={styles.button} onClick={() => void handleSelect()} disabled={!selectedId}>
+            Launch
+          </button>
+        </div>
+      </div>
+
+      {/* Delete confirmation overlay */}
+      {deletingProfileId && (
+        <div style={styles.overlay}>
+          <div style={styles.confirmDialog}>
+            <p style={styles.confirmText}>
+              Are you sure you want to delete this profile? The profile data will remain on disk.
+            </p>
+            <div style={styles.confirmButtons}>
+              <button
+                style={styles.buttonSecondary}
+                onClick={() => {
+                  setDeletingProfileId(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.buttonDanger}
+                onClick={() => void handleDeleteProfile(deletingProfileId)}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
-      ) : (
-        <button
-          style={styles.buttonSecondary}
-          onClick={() => {
-            setCreatingProfile(true);
-          }}
-        >
-          + New Profile
-        </button>
       )}
-
-      {/* Don't ask again checkbox (production only) */}
-      {!isDevBuild && profiles.length > 0 && (
-        <label style={styles.checkbox}>
-          <input
-            type="checkbox"
-            checked={skipPicker}
-            onChange={(e) => {
-              setSkipPicker(e.target.checked);
-            }}
-          />
-          <span>Don&apos;t ask again (use this profile automatically)</span>
-        </label>
-      )}
-
-      {/* Action buttons */}
-      <div style={styles.actions}>
-        <button style={styles.buttonSecondary} onClick={() => void handleCancel()}>
-          Cancel
-        </button>
-        <button style={styles.button} onClick={() => void handleSelect()} disabled={!selectedId}>
-          Launch
-        </button>
-      </div>
     </div>
   );
 }
@@ -422,7 +433,41 @@ const stylesData = {
     margin: '0 auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    height: '100vh',
+    boxSizing: 'border-box', // Include padding in height calculation
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '8px',
+  },
+  header: {
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  scrollableMiddle: {
+    flex: 1,
+    overflowY: 'auto',
+    minHeight: 0, // Required for flex child to scroll
+    marginBottom: '16px',
+  },
+  footer: {
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
   },
   title: {
     fontSize: '20px',
@@ -448,9 +493,7 @@ const stylesData = {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
-    maxHeight: '200px',
-    overflowY: 'auto',
-    border: '1px solid #e5e5e5',
+    border: '2px solid #ccc',
     borderRadius: '8px',
     padding: '8px',
   },
@@ -579,9 +622,11 @@ const stylesData = {
   },
   confirmDialog: {
     backgroundColor: '#fff3cd',
-    padding: '12px',
-    borderRadius: '6px',
+    padding: '16px',
+    borderRadius: '8px',
     border: '1px solid #ffc107',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+    maxWidth: '320px',
   },
   confirmText: {
     margin: '0 0 12px 0',

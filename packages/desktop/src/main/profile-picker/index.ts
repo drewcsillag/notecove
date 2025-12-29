@@ -251,7 +251,7 @@ export async function showProfilePicker(
     // Create the picker window
     pickerWindow = new BrowserWindow({
       width: 480,
-      height: 400,
+      height: 475,
       resizable: false,
       minimizable: false,
       maximizable: false,
