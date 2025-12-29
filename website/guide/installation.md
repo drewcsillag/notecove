@@ -22,7 +22,15 @@ cd notecove
 pnpm install
 ```
 
-3. **Run the desktop app in development mode**
+3. **Rebuild native Electron modules**
+
+```bash
+pnpm --filter @notecove/desktop rebuild:electron
+```
+
+This rebuilds native Node.js modules (like `better-sqlite3`) for Electron's version of Node.js.
+
+4. **Run the desktop app in development mode**
 
 ```bash
 pnpm dev
@@ -39,7 +47,7 @@ pnpm --filter @notecove/desktop dev
 
 :::
 
-4. **Or build everything first (optional)**
+5. **Or build everything first (optional)**
 
 If you prefer to build explicitly before running dev:
 

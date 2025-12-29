@@ -7,10 +7,11 @@ Master NoteCove with these keyboard shortcuts.
 | Action       | macOS         | Windows/Linux  |
 | ------------ | ------------- | -------------- |
 | New note     | `Cmd+N`       | `Ctrl+N`       |
-| New window   | `Cmd+Shift+N` | `Ctrl+Shift+N` |
+| New folder   | `Cmd+Shift+N` | `Ctrl+Shift+N` |
+| New window   | `Cmd+Shift+W` | `Ctrl+Shift+W` |
 | Close window | `Cmd+W`       | `Ctrl+W`       |
+| Settings     | `Cmd+,`       | `Ctrl+,`       |
 | Quit         | `Cmd+Q`       | `Ctrl+Q`       |
-| Preferences  | `Cmd+,`       | `Ctrl+,`       |
 
 ## Editing
 
@@ -59,48 +60,40 @@ Master NoteCove with these keyboard shortcuts.
 
 | Action        | macOS         | Windows/Linux  |
 | ------------- | ------------- | -------------- |
-| Find in note  | `Cmd+F`       | `Ctrl+F`       |
+| Global search | `Cmd+F`       | `Ctrl+F`       |
+| Find in note  | `Cmd+Shift+F` | `Ctrl+Shift+F` |
 | Find next     | `Cmd+G`       | `Ctrl+G`       |
 | Find previous | `Cmd+Shift+G` | `Ctrl+Shift+G` |
-| Global search | `Cmd+Shift+F` | `Ctrl+Shift+F` |
-
-## Navigation
-
-| Action         | macOS         | Windows/Linux  |
-| -------------- | ------------- | -------------- |
-| Next note      | `Cmd+]`       | `Ctrl+]`       |
-| Previous note  | `Cmd+[`       | `Ctrl+[`       |
-| Toggle sidebar | `Cmd+\`       | `Ctrl+\`       |
-| Focus sidebar  | `Cmd+Shift+S` | `Ctrl+Shift+S` |
-| Focus editor   | `Cmd+Shift+E` | `Ctrl+Shift+E` |
-
-## Organization
-
-| Action         | macOS         | Windows/Linux  |
-| -------------- | ------------- | -------------- |
-| New folder     | `Cmd+Shift+F` | `Ctrl+Shift+F` |
-| Rename         | `F2`          | `F2`           |
-| Delete         | `Delete`      | `Delete`       |
-| Move to folder | `Cmd+Shift+M` | `Ctrl+Shift+M` |
 
 ## View
 
-| Action             | macOS        | Windows/Linux  |
-| ------------------ | ------------ | -------------- |
-| View history       | `Cmd+Alt+H`  | `Ctrl+Alt+H`   |
-| Zoom in            | `Cmd++`      | `Ctrl++`       |
-| Zoom out           | `Cmd+-`      | `Ctrl+-`       |
-| Reset zoom         | `Cmd+0`      | `Ctrl+0`       |
-| Toggle full screen | `Cmd+Ctrl+F` | `F11`          |
-| Toggle dev tools   | `Cmd+Alt+I`  | `Ctrl+Shift+I` |
+| Action              | macOS         | Windows/Linux  |
+| ------------------- | ------------- | -------------- |
+| Toggle dark mode    | `Cmd+Shift+D` | `Ctrl+Shift+D` |
+| Toggle folder panel | `Cmd+Shift+1` | `Ctrl+Shift+1` |
+| Toggle tags panel   | `Cmd+Shift+2` | `Ctrl+Shift+2` |
+| Toggle notes list   | `Cmd+Shift+0` | `Ctrl+Shift+0` |
+| Zoom in             | `Cmd++`       | `Ctrl++`       |
+| Zoom out            | `Cmd+-`       | `Ctrl+-`       |
+| Reset zoom          | `Cmd+0`       | `Ctrl+0`       |
+| Toggle full screen  | `Cmd+Ctrl+F`  | `F11`          |
+| Toggle dev tools    | `Cmd+Alt+I`   | `Ctrl+Shift+I` |
+
+## Import & Export
+
+| Action                | macOS         | Windows/Linux  |
+| --------------------- | ------------- | -------------- |
+| Import markdown       | `Cmd+Shift+I` | `Ctrl+Shift+I` |
+| Export selected notes | `Cmd+Shift+E` | `Ctrl+Shift+E` |
+
+## Organization
+
+| Action | macOS    | Windows/Linux |
+| ------ | -------- | ------------- |
+| Rename | `F2`     | `F2`          |
+| Delete | `Delete` | `Delete`      |
 
 ## Tips
-
-### Custom Shortcuts
-
-(Coming soon)
-
-Customize shortcuts in Preferences → Keyboard Shortcuts.
 
 ### Markdown Shortcuts
 

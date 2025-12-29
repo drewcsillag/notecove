@@ -8,7 +8,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
-      { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Getting Started', link: '/guide/getting-started' },
       { text: 'Features', link: '/features/' },
       { text: 'Architecture', link: '/architecture/' },
       { text: 'Technical Docs', link: '/technical_documents/' },
@@ -40,6 +40,7 @@ export default defineConfig({
             { text: 'Overview', link: '/features/' },
             { text: 'Rich Text Editing', link: '/features/rich-text-editing' },
             { text: 'Link Unfurling', link: '/features/link-unfurling' },
+            { text: 'Comments & Collaboration', link: '/features/collaboration' },
             { text: 'Folders & Organization', link: '/features/folders-organization' },
             { text: 'Offline-First Sync', link: '/features/offline-sync' },
             { text: 'Search', link: '/features/search' },
