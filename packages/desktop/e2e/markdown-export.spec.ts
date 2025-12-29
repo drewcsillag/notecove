@@ -101,18 +101,26 @@ test.describe('Markdown Export - Context Menu', () => {
     await createButton.click();
     await page.waitForTimeout(1000);
 
-    // Add content to the note
+    // Add content to the note - use unique identifier to avoid conflicts
+    const uniqueTitle = `Test Export Note ${Date.now()}`;
     const editor = page.locator('.tiptap.ProseMirror');
     await editor.click();
-    await editor.type('Test Export Note');
+    await editor.type(uniqueTitle);
     await editor.press('Enter');
     await editor.type('This is the content of my test note.');
-    await page.waitForTimeout(1500); // Wait for title extraction
 
-    // Right-click and export
+    // Wait for title to appear in notes list (confirms content was saved)
     const notesList = page.locator('#middle-panel [data-testid="notes-list"]');
-    const firstNote = notesList.locator('li').first();
-    await firstNote.click({ button: 'right' });
+    await expect(notesList.locator(`li:has-text("${uniqueTitle}")`)).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Wait extra time for CRDT to fully sync to disk
+    await page.waitForTimeout(3000);
+
+    // Right-click the specific note and export
+    const targetNote = notesList.locator(`li:has-text("${uniqueTitle}")`);
+    await targetNote.click({ button: 'right' });
     await page.waitForTimeout(500);
 
     const exportOption = page.locator('[role="menuitem"]:has-text("Export to Markdown")');
@@ -126,8 +134,14 @@ test.describe('Markdown Export - Context Menu', () => {
     console.log('[E2E Export] Files created:', files);
     expect(files.length).toBeGreaterThanOrEqual(1);
 
+    // Find the specific file we exported by timestamp in title
+    const testExportFile = files.find((f) => f.includes('Test Export Note'));
+    console.log('[E2E Export] Looking for Test Export Note file, found:', testExportFile);
+    expect(testExportFile).toBeDefined();
+
     // Verify content
-    const content = readFileSync(join(exportDir, files[0]), 'utf-8');
+    const content = readFileSync(join(exportDir, testExportFile!), 'utf-8');
+    console.log('[E2E Export] File content:', content);
     expect(content).toContain('Test Export Note');
     expect(content).toContain('This is the content of my test note.');
   });
@@ -186,31 +200,41 @@ test.describe('Markdown Export - Context Menu', () => {
     // Create first note
     const createButton = page.locator('#middle-panel button[title="Create note"]');
     await createButton.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     let editor = page.locator('.tiptap.ProseMirror');
     await editor.click();
     await editor.type('First Export Note');
-    await page.waitForTimeout(1000);
+
+    // Wait for first note title to appear in list
+    const notesList = page.locator('[data-testid="notes-list"]');
+    await expect(notesList.locator('li:has-text("First Export Note")')).toBeVisible({
+      timeout: 10000,
+    });
+    await page.waitForTimeout(3000); // Give CRDT extra time to sync to disk
 
     // Create second note
     await createButton.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     editor = page.locator('.tiptap.ProseMirror');
     await editor.click();
     await editor.type('Second Export Note');
-    await page.waitForTimeout(1000);
+
+    // Wait for second note title to appear in list
+    await expect(notesList.locator('li:has-text("Second Export Note")')).toBeVisible({
+      timeout: 10000,
+    });
+    await page.waitForTimeout(3000); // Give CRDT extra time to sync to disk
 
     // Multi-select both notes
-    const notesList = page.locator('[data-testid="notes-list"]');
     const notes = notesList.locator('.MuiListItemButton-root');
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 
     await notes.nth(0).click({ modifiers: [modifier] });
-    await page.waitForTimeout(300);
-    await notes.nth(1).click({ modifiers: [modifier] });
     await page.waitForTimeout(500);
+    await notes.nth(1).click({ modifiers: [modifier] });
+    await page.waitForTimeout(1000);
 
     // Right-click and export
     await notes.first().click({ button: 'right' });
@@ -220,17 +244,36 @@ test.describe('Markdown Export - Context Menu', () => {
     await exportOption.click();
 
     // Wait for export to complete
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(4000);
 
     // Verify files were created
     const files = readdirSync(exportDir).filter((f) => f.endsWith('.md'));
     console.log('[E2E Export] Files created:', files);
+
+    // Log content of each file for debugging
+    files.forEach((f) => {
+      const content = readFileSync(join(exportDir, f), 'utf-8');
+      console.log(`[E2E Export] File "${f}" content:`, content.substring(0, 200));
+    });
+
     expect(files.length).toBeGreaterThanOrEqual(2);
 
-    // Verify both notes were exported
-    const allContent = files.map((f) => readFileSync(join(exportDir, f), 'utf-8')).join('\n');
-    expect(allContent).toContain('First Export Note');
-    expect(allContent).toContain('Second Export Note');
+    // Verify both notes were exported - check each file individually
+    const firstExportFile = files.find((f) => f.includes('First Export Note'));
+    const secondExportFile = files.find((f) => f.includes('Second Export Note'));
+
+    console.log('[E2E Export] First export file:', firstExportFile);
+    console.log('[E2E Export] Second export file:', secondExportFile);
+
+    expect(firstExportFile).toBeDefined();
+    expect(secondExportFile).toBeDefined();
+
+    // Verify content
+    const firstContent = readFileSync(join(exportDir, firstExportFile!), 'utf-8');
+    const secondContent = readFileSync(join(exportDir, secondExportFile!), 'utf-8');
+
+    expect(firstContent).toContain('First Export Note');
+    expect(secondContent).toContain('Second Export Note');
   });
 });
 

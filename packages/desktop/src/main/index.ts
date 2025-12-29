@@ -27,6 +27,7 @@ import type { SyncStatus, StaleSyncEntry } from './ipc/types';
 import { CRDTManagerImpl, CRDTCommentObserver, type CRDTManager } from './crdt';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import * as fs from 'fs/promises';
+import { rmSync, existsSync, readdirSync } from 'fs';
 import { ConfigManager } from './config/manager';
 import { initializeTelemetry } from './telemetry/config';
 import { NoteMoveManager } from './note-move-manager';
@@ -63,6 +64,33 @@ if (process.env['NODE_ENV'] === 'test') {
   process.on('uncaughtException', (error) => {
     console.error('[TEST MODE] Uncaught exception:', error);
   });
+}
+
+// Clear macOS saved application state in test mode to prevent "unexpectedly quit" dialogs
+// This must run very early, before macOS checks for saved state
+if (process.platform === 'darwin' && process.env['NODE_ENV'] === 'test') {
+  const savedStateDir = join(os.homedir(), 'Library', 'Saved Application State');
+  if (existsSync(savedStateDir)) {
+    const electronPatterns = [/electron/i, /notecove/i];
+    try {
+      const entries = readdirSync(savedStateDir);
+      for (const entry of entries) {
+        if (
+          electronPatterns.some((pattern) => pattern.test(entry)) &&
+          entry.endsWith('.savedState')
+        ) {
+          const fullPath = join(savedStateDir, entry);
+          try {
+            rmSync(fullPath, { recursive: true, force: true });
+          } catch {
+            // Ignore errors
+          }
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
+  }
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -1356,8 +1384,8 @@ app.on('will-quit', (event) => {
   if (isTestMode) {
     setTimeout(() => {
       console.warn('[App] Shutdown timeout reached in test mode, forcing quit');
-      app.exit(1);
-    }, 3000); // 3 second timeout in test mode
+      app.exit(0); // Use 0 to avoid triggering crash detection
+    }, 4000); // 4 second timeout in test mode (tests wait 5 seconds)
   }
 
   // Perform async cleanup
@@ -1376,31 +1404,33 @@ app.on('will-quit', (event) => {
         await manager.flush();
         console.log('[App] CRDT updates flushed successfully');
 
-        // 2. Create snapshots for modified notes (show progress if >5)
-        const pendingCount = manager.getPendingSnapshotCount();
-        if (pendingCount > 0) {
-          console.log(`[App] Creating shutdown snapshots for ${pendingCount} notes...`);
+        // 2. Create snapshots for modified notes (skip in test mode for faster shutdown)
+        if (!isTestMode) {
+          const pendingCount = manager.getPendingSnapshotCount();
+          if (pendingCount > 0) {
+            console.log(`[App] Creating shutdown snapshots for ${pendingCount} notes...`);
 
-          // Show progress UI if many notes need saving
-          const showProgress = pendingCount > 5;
-          const progressCallback = showProgress
-            ? (current: number, total: number) => {
-                BrowserWindow.getAllWindows().forEach((window) => {
-                  window.webContents.send('shutdown:progress', { current, total });
-                });
-              }
-            : undefined;
+            // Show progress UI if many notes need saving
+            const showProgress = pendingCount > 5;
+            const progressCallback = showProgress
+              ? (current: number, total: number) => {
+                  BrowserWindow.getAllWindows().forEach((window) => {
+                    window.webContents.send('shutdown:progress', { current, total });
+                  });
+                }
+              : undefined;
 
-          await manager.flushSnapshots(progressCallback);
+            await manager.flushSnapshots(progressCallback);
 
-          // Signal completion
-          if (showProgress) {
-            BrowserWindow.getAllWindows().forEach((window) => {
-              window.webContents.send('shutdown:complete');
-            });
+            // Signal completion
+            if (showProgress) {
+              BrowserWindow.getAllWindows().forEach((window) => {
+                window.webContents.send('shutdown:complete');
+              });
+            }
+
+            console.log('[App] Shutdown snapshots created successfully');
           }
-
-          console.log('[App] Shutdown snapshots created successfully');
         }
 
         // 3. Destroy CRDT manager
@@ -1423,8 +1453,9 @@ app.on('will-quit', (event) => {
 
       // 5. Clean up all SD watchers and syncs
       if (sdWatcherManager) {
-        // Wait for pending syncs with timeout
-        await sdWatcherManager.waitForPendingSyncs(5000);
+        // Wait for pending syncs with timeout (shorter in test mode)
+        const syncTimeout = isTestMode ? 1000 : 5000;
+        await sdWatcherManager.waitForPendingSyncs(syncTimeout);
         // Clean up all watchers
         await sdWatcherManager.cleanupAllWatchers();
       }

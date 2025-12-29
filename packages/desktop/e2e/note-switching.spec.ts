@@ -290,11 +290,13 @@ test.describe('Note Switching - Multi-Window', () => {
 
     // Click the note in window 2 to load it
     const noteButton2 = window2.locator('text=Multi-Window Test Content').first();
+    await expect(noteButton2).toBeVisible({ timeout: 10000 });
     await noteButton2.click();
-    await window2.waitForTimeout(1000);
+    await window2.waitForTimeout(2000); // Wait for note to fully load
 
-    // Verify content is visible in window 2
+    // Verify content is visible in window 2 using retrying assertion
     const editor2 = window2.locator('.ProseMirror');
+    await expect(editor2).toContainText('Multi-Window Test Content', { timeout: 10000 });
     let content2 = await editor2.textContent();
     expect(content2).toContain('Multi-Window Test Content');
 
