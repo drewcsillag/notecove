@@ -71,18 +71,19 @@ pnpm --filter @notecove/desktop dev
 ### What's Working
 
 ✅ Multi-window real-time sync
-✅ Note persistence across restarts
 ✅ CRDT synchronization with Yjs
 ✅ Rich text editing with TipTap
-✅ Folder management
-✅ SQLite caching with FTS5 search
+✅ Images, tables, and code blocks
+✅ Folder and tag organization
+✅ Inter-note links
+✅ Threaded comments
+✅ Full-text search (FTS5)
+✅ Import/export markdown
+✅ Dark mode
 
 ### Coming Soon
 
-🔄 Cross-instance sync improvements
-📋 Note list panel with search
-📋 Tags and inter-note links
-📋 iOS app implementation
+📱 iOS app implementation
 
 ## License
 

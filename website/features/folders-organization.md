@@ -9,7 +9,7 @@ NoteCove provides flexible tools to organize your notes exactly the way you want
 Create folders to organize related notes:
 
 1. **Right-click in sidebar** → "New Folder"
-2. **Or use keyboard shortcut**: `Cmd+Shift+F` / `Ctrl+Shift+F`
+2. **Or use keyboard shortcut**: `Cmd+Shift+N` / `Ctrl+Shift+N`
 3. Name your folder
 4. Press Enter
 
@@ -98,165 +98,95 @@ Each note displays:
 - **Preview**: First few lines of content
 - **Modified date**: When last edited
 - **Folder**: Current location
-- **Tags**: Associated tags (coming soon)
-
-### Sorting Notes
-
-Sort notes within each folder:
-
-- **Modified date**: Most recently edited first (default)
-- **Created date**: Newest first
-- **Title**: Alphabetical
-- **Manual**: Drag to reorder (coming soon)
+- **Tags**: Associated tags
 
 ## Tags
 
-(Coming soon)
-
-Tags provide flexible cross-cutting organization:
+Tags provide flexible cross-cutting organization, letting you categorize notes independent of their folder location.
 
 ### Adding Tags
 
-1. Click tag icon in note toolbar
-2. Type tag name
-3. Press Enter to add
-4. Add multiple tags per note
+Add tags directly in your note content using hashtag syntax:
 
-### Tag Hierarchy
+- Type `#` followed by the tag name (e.g., `#project`, `#important`)
+- Tags are automatically recognized and highlighted
+- Add multiple tags anywhere in your note
 
-Create hierarchical tags:
+### Tag Panel
 
-- `work/projects/projectA`
-- `personal/health/fitness`
+View and filter by tags in the Tag Panel:
 
-### Tag Filtering
+- Shows all tags used across your notes
+- Click a tag to filter notes
+- Toggle between include/exclude filtering modes
 
-Filter notes by tags:
+### Tag Filtering Modes
 
-- Click tag in sidebar to filter
-- Multiple tag selection (AND/OR)
-- Combine with folder filters
+**Include Mode:**
 
-### Smart Tags
+- Shows notes that contain the selected tags
+- Select multiple tags to narrow results
 
-(Coming soon)
+**Exclude Mode:**
 
-Auto-tag notes based on rules:
-
-- Content keywords
-- Creation date
-- Folder location
-- Custom rules
+- Hides notes that contain the selected tags
+- Useful for filtering out specific categories
 
 ## Search & Filtering
 
-### Quick Filter
+NoteCove provides powerful search capabilities:
 
-Filter notes in current folder:
-
-- Type in search box
-- Filters by title and content preview
-- Updates in real-time
-
-### Advanced Search
-
-(Coming soon)
-
-Full-text search with filters:
-
-- Search across all folders
-- Filter by folder, tag, date
-- Regex support
-- Saved searches
+- **Global Search** (`Cmd+F` / `Ctrl+F`): Search across all notes
+- **Filter by Tags**: Use the Tag Panel to filter notes
+- **Filter by Folder**: Select a folder to narrow results
 
 [Learn more about search →](/features/search)
 
 ## Inter-Note Links
 
-(Coming soon)
-
-Connect related notes with wiki-style links:
+Connect related notes with wiki-style links to build your personal knowledge graph.
 
 ### Creating Links
 
 Use `[[Note Title]]` syntax:
 
-- Type `[[`
-- Autocomplete shows matching notes
-- Select note to insert link
-- Link to specific headings: `[[Note Title#Heading]]`
+- Type `[[` to start a link
+- Autocomplete shows matching notes as you type
+- Select a note to insert the link
+- The link appears as a clickable chip in the editor
 
 ### Following Links
 
-- Click link to navigate to linked note
+- Click a link to navigate to the linked note
 - `Cmd+Click` / `Ctrl+Click` to open in new window
-- Hover to preview linked note
+- Links are validated - broken links are highlighted
 
 ### Backlinks
 
-See which notes link to current note:
+(Coming soon)
+
+See which notes link to the current note:
 
 - Backlinks panel shows all incoming links
 - Navigate backwards through your knowledge graph
 - Find related content automatically
 
-### Graph View
+## Pinned Notes
 
-(Coming soon)
+Keep important notes at the top of your note list for quick access.
 
-Visualize note connections:
+### Pinning Notes
 
-- Interactive graph of linked notes
-- Color-coded by folder/tag
-- Zoom and pan to explore
-- Click nodes to open notes
+- Right-click a note and select "Pin"
+- Pinned notes appear at the top of the notes list
+- Pin multiple notes - they stay grouped together
+- Unpin anytime by right-clicking and selecting "Unpin"
 
-## Favorites & Pinning
+### Use Cases
 
-(Coming soon)
-
-Quick access to important notes:
-
-### Favorites
-
-- Star notes to add to favorites
-- Favorites appear at top of sidebar
-- Keyboard shortcut for quick access
-
-### Pinned Notes
-
-- Pin notes to keep them at top of folder
-- Multiple notes can be pinned
-- Drag to reorder pinned notes
-
-## Workspaces
-
-(Coming soon)
-
-Different contexts for different workflows:
-
-### Creating Workspaces
-
-- Save current sidebar, open notes, and layout
-- Switch between workspaces instantly
-- Perfect for different projects or contexts
-
-### Examples
-
-- **Work**: Work folders, project notes, meeting notes
-- **Personal**: Journal, ideas, reading notes
-- **Research**: Reference materials, research notes, citations
-
-## Archiving
-
-(Coming soon)
-
-Remove clutter without deleting:
-
-- Archive old notes and folders
-- Archived items hidden from main view
-- Full-text search includes archived notes
-- Unarchive anytime
+- **Active projects**: Keep current work at top
+- **Reference notes**: Quick access to frequently used information
+- **Daily notes**: Pin today's journal entry
 
 ## Best Practices
 

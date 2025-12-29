@@ -90,14 +90,45 @@ When a note with the same title already exists in the target folder:
 - **Missing images**: If a referenced image can't be found, the import continues with a placeholder
 - **Invalid markdown**: NoteCove handles malformed markdown gracefully - it won't crash
 
-## Export (Coming Soon)
+## Export to Markdown
 
-Future versions will support exporting notes to:
+Export your notes to markdown files, preserving folder structure and images.
 
-- Markdown files
-- HTML
-- PDF
-- Portable archive format
+### How to Export
+
+1. Open NoteCove
+2. Select **File > Export...** (or press `Cmd/Ctrl+Shift+E`)
+3. Choose what to export:
+   - **Single note**: Export the currently selected note
+   - **Folder**: Export all notes in a folder
+   - **All notes**: Export your entire library
+4. Select a destination folder
+5. Click **Export** and wait for completion
+
+### What Gets Exported
+
+**Notes**
+
+- Full markdown content with all formatting
+- Headings, lists, code blocks, tables preserved
+- File names match note titles
+
+**Folder Structure**
+
+- Folder hierarchy is recreated in the export destination
+- Empty folders are not exported
+
+**Images**
+
+- All embedded images are copied to the export folder
+- Image references are updated to relative paths
+- Original quality preserved
+
+### Export Tips
+
+- **Backup**: Use export to create markdown backups of your notes
+- **Sharing**: Export individual notes to share as markdown files
+- **Migration**: Export all notes to migrate to another application
 
 ## Migrating from Other Apps
 

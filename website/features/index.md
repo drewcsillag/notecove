@@ -31,10 +31,10 @@ Edit the same note on multiple devices simultaneously:
 Express yourself with powerful formatting tools:
 
 - **TipTap editor** with extensive formatting options
-- Headings, lists, code blocks, tables
+- Headings, lists, code blocks, and tables
 - Markdown shortcuts for fast typing
 - Syntax highlighting for code
-- Image support (coming soon)
+- Full image support with drag-and-drop
 
 [Learn more about rich text editing →](/features/rich-text-editing)
 
@@ -49,13 +49,45 @@ Paste URLs and see rich previews instantly:
 
 [Learn more about link unfurling →](/features/link-unfurling)
 
+### 🖼️ Images
+
+Add images to your notes with ease:
+
+- **Drag and drop**: Drop images directly into the editor
+- **Paste from clipboard**: Paste screenshots and copied images
+- **Thumbnails**: Automatic thumbnail generation for fast loading
+- **Lightbox**: Click to view full-size images
+- **Text wrapping**: Wrap text around images
+
+### 📊 Tables
+
+Create structured data in your notes:
+
+- **Easy creation**: Insert tables from the toolbar
+- **Headers**: Toggle header rows for clarity
+- **Keyboard navigation**: Tab through cells efficiently
+- **Column resizing**: Drag to adjust column widths
+- **Cell alignment**: Left, center, or right align content
+- **Markdown export**: Tables export cleanly to markdown
+
+### 💬 Comments
+
+Add threaded discussions to your notes:
+
+- **Google Docs-style**: Select text and add comments
+- **Threaded replies**: Have conversations in context
+- **Emoji reactions**: Quick feedback with reactions
+- **Mentions**: Tag notes and concepts
+
+[Learn more about comments →](/features/collaboration)
+
 ### 📁 Smart Organization
 
 Organize notes your way:
 
 - **Folders**: Hierarchical organization with drag-and-drop
-- **Tags**: Flexible cross-cutting categorization (coming soon)
-- **Inter-note links**: Connect related notes (coming soon)
+- **Tags**: Flexible cross-cutting categorization with filtering
+- **Inter-note links**: Connect related notes with wiki-style links
 - **Full-text search**: Find anything instantly with SQLite FTS5
 
 [Learn more about organization →](/features/folders-organization)
@@ -109,6 +141,14 @@ Monitor sync activity and debug issues:
 - Diagnose sync problems
 - Export logs for support
 
+### 🌙 Dark Mode
+
+Comfortable viewing in any lighting:
+
+- Toggle between light and dark themes
+- Syncs across all open windows
+- Respects system preferences
+
 ### 📥 Import Markdown
 
 Bring your notes from other apps:
@@ -123,15 +163,6 @@ Bring your notes from other apps:
 
 ## Coming Soon
 
-### Tags
-
-Flexible tagging system:
-
-- Multiple tags per note
-- Tag hierarchy
-- Tag filtering and search
-- Tag-based organization
-
 ### Templates
 
 Reusable note templates:
@@ -141,19 +172,11 @@ Reusable note templates:
 - Variable substitution
 - Template library
 
-### Export
-
-Export your notes to:
-
-- Markdown files
-- HTML
-- PDF
-
 ### Mobile Apps
 
 Native mobile experience:
 
-- iOS app with SwiftUI
+- iOS app with SwiftUI (coming soon)
 - Android app (planned)
 - Full offline support
 - Touch-optimized interface
@@ -167,6 +190,9 @@ Native mobile experience:
 | Cross-Platform   | ✅       | macOS/iOS only | ✅     | ✅       |
 | No Cloud Servers | ✅       | ❌             | ❌     | ✅       |
 | Rich Text        | ✅       | ✅             | ✅     | Markdown |
+| Tables           | ✅       | ✅             | ✅     | Plugin   |
+| Images           | ✅       | ✅             | ✅     | ✅       |
+| Comments         | ✅       | ❌             | ✅     | ❌       |
 | Link Unfurling   | ✅       | ❌             | ✅     | Plugin   |
 | Open Source      | ✅       | ❌             | ❌     | ❌       |
 | File-Based Sync  | ✅       | ❌             | ❌     | ✅       |

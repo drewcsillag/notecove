@@ -74,29 +74,38 @@ Add hashtags to notes for flexible organization:
 
 **Resizable Panel**: Drag the divider between the Folder Panel and Tag Panel to adjust their size.
 
+### Inter-note Links
+
+Connect related notes using wiki-style links:
+
+- Type `[[` to start a link
+- Autocomplete shows matching notes as you type
+- Select a note to insert the link
+- Click a link to navigate to that note
+- Double-click to open in a new window
+
 ## Search
-
-### Quick Search
-
-Press `Cmd+F` / `Ctrl+F` to search within the current note.
 
 ### Global Search
 
-(Coming soon)
-
-Press `Cmd+Shift+F` / `Ctrl+Shift+F` to search across all notes:
+Press `Cmd+F` / `Ctrl+F` to search across all notes:
 
 - Full-text search powered by SQLite FTS5
 - Search in note titles, content, and tags
-- Filter by folder or date range
+- Instant results as you type
+
+### Find in Note
+
+Press `Cmd+Shift+F` / `Ctrl+Shift+F` to search within the current note.
 
 ## Sync
 
 ### Setting Up Sync
 
-1. **Choose a sync folder**: File → Preferences → Sync
-2. **Select cloud storage**: Choose a folder in your Dropbox, Google Drive, or iCloud Drive
-3. **Enable sync**: Toggle "Enable Sync"
+1. **Open Settings**: Press `Cmd+,` (macOS) or `Ctrl+,` (Windows/Linux)
+2. **Go to Storage Directories tab**
+3. **Add a storage directory**: Choose a folder in your Dropbox, Google Drive, or iCloud Drive
+4. Your notes will sync automatically through your cloud storage
 
 ### Sync Status
 
@@ -118,7 +127,7 @@ NoteCove uses CRDTs to merge changes from multiple devices:
 
 Open multiple windows to view different notes side-by-side:
 
-- File → New Window (`Cmd+Shift+N` / `Ctrl+Shift+N`)
+- File → New Window (`Cmd+Shift+W` / `Ctrl+Shift+W`)
 
 ### Auto-Save
 

@@ -19,9 +19,8 @@ NoteCove uses a file-based synchronization model:
 
 1. Install Dropbox desktop app
 2. Ensure Dropbox is syncing
-3. In NoteCove: File → Preferences → Sync
-4. Choose a folder inside your Dropbox folder
-5. Enable sync
+3. In NoteCove: Open Settings (`Cmd+,` / `Ctrl+,`) → Storage Directories
+4. Click "Add Storage Directory" and choose a folder inside your Dropbox folder
 
 **Recommended folder**: `~/Dropbox/Apps/NoteCove/`
 
@@ -31,9 +30,8 @@ NoteCove uses a file-based synchronization model:
 
 1. Install Google Drive desktop app (Drive File Stream or Backup and Sync)
 2. Ensure Google Drive is syncing
-3. In NoteCove: File → Preferences → Sync
-4. Choose a folder inside your Google Drive folder
-5. Enable sync
+3. In NoteCove: Open Settings (`Cmd+,` / `Ctrl+,`) → Storage Directories
+4. Click "Add Storage Directory" and choose a folder inside your Google Drive folder
 
 **Recommended folder**: `~/Google Drive/NoteCove/`
 
@@ -42,9 +40,8 @@ NoteCove uses a file-based synchronization model:
 **Setup:**
 
 1. Enable iCloud Drive in System Preferences
-2. In NoteCove: File → Preferences → Sync
-3. Choose a folder inside `~/Library/Mobile Documents/com~apple~CloudDocs/`
-4. Enable sync
+2. In NoteCove: Open Settings (`Cmd+,` / `Ctrl+,`) → Storage Directories
+3. Click "Add Storage Directory" and choose a folder inside `~/Library/Mobile Documents/com~apple~CloudDocs/`
 
 **Recommended folder**: `~/Library/Mobile Documents/com~apple~CloudDocs/NoteCove/`
 
@@ -69,9 +66,8 @@ sync-folder/
 1. Install NoteCove on the second device
 2. Install the same cloud storage app (Dropbox, Google Drive, etc.)
 3. Wait for the sync folder to sync from your first device
-4. In NoteCove: File → Preferences → Sync
-5. Choose the same sync folder as your first device
-6. Enable sync
+4. In NoteCove: Open Settings (`Cmd+,` / `Ctrl+,`) → Storage Directories
+5. Click "Add Storage Directory" and choose the same sync folder as your first device
 
 NoteCove will automatically detect existing sync data and download all notes.
 
@@ -109,7 +105,7 @@ When you edit a note on multiple devices:
 1. Cloud storage app is running and syncing
 2. Sync folder has read/write permissions
 3. Internet connection is active
-4. View activity log: Help → View Activity Log
+4. Check Tools → Advanced → Sync Status for diagnostics
 
 ### Duplicate Notes
 
@@ -117,7 +113,7 @@ If you see duplicate notes:
 
 1. This shouldn't happen with CRDTs, but if it does:
 2. Check that all devices are using the same sync folder
-3. Verify sync data UUIDs match in Preferences
+3. Verify all devices point to the same storage directory in Settings
 
 ### Slow Sync
 
@@ -125,16 +121,15 @@ If you see duplicate notes:
 
 - Ensure cloud storage app isn't rate-limited
 - Check network bandwidth
-- Reduce sync frequency in Preferences (if needed)
+- Check your cloud storage isn't paused or quota-limited
 
-### Reset Sync
+### Reload Note from CRDT Logs
 
-**Warning: This will re-download all notes from sync folder**
+If a note isn't syncing correctly, you can reload it from the CRDT logs:
 
-1. File → Preferences → Sync
-2. Click "Reset Sync State"
-3. Confirm the reset
-4. NoteCove will rebuild local state from sync data
+1. Select the problematic note
+2. Go to Tools → Advanced → Reload Note From CRDT Logs
+3. NoteCove will rebuild the note state from the sync data
 
 ## Advanced Configuration
 
