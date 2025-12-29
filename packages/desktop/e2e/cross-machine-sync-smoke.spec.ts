@@ -102,12 +102,24 @@ test.describe('cross-machine sync - smoke test', () => {
   test.afterEach(async () => {
     console.log('[Smoke Test] Cleaning up...');
 
-    if (instance1) {
-      await instance1.close();
-    }
-    if (instance2) {
-      await instance2.close();
-    }
+    // Close instances with timeout to prevent hanging
+    const closeWithTimeout = async (
+      instance: ElectronApplication | undefined,
+      name: string
+    ): Promise<void> => {
+      if (!instance) return;
+      try {
+        await Promise.race([
+          instance.close(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Close timeout')), 5000)),
+        ]);
+      } catch (err) {
+        console.error(`[Smoke Test] Error closing ${name}:`, err);
+      }
+    };
+
+    await closeWithTimeout(instance1, 'instance1');
+    await closeWithTimeout(instance2, 'instance2');
 
     // Clean up temporary directories
     try {

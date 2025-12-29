@@ -27,9 +27,11 @@ async function launchAppWithProfilePicker(args: string[] = []): Promise<void> {
   electronApp = await electron.launch({
     args: [mainPath, `--user-data-dir=${testUserDataDir}`, ...args],
     // Note: NOT setting NODE_ENV=test so profile picker shows
+    // But we do set E2E_FAST_SHUTDOWN for faster cleanup
     env: {
       ...process.env,
       NODE_ENV: undefined, // Explicitly unset
+      E2E_FAST_SHUTDOWN: '1', // Enable fast shutdown for E2E tests
     },
     timeout: 60000,
   });

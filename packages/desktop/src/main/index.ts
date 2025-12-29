@@ -1380,7 +1380,9 @@ app.on('will-quit', (event) => {
   console.log('[App] Starting graceful shutdown...');
 
   // In test mode, add a timeout to force quit if cleanup hangs
-  const isTestMode = process.env['NODE_ENV'] === 'test';
+  // E2E_FAST_SHUTDOWN allows fast shutdown even when NODE_ENV !== 'test'
+  // (e.g., profile-picker tests that need to show the picker UI)
+  const isTestMode = process.env['NODE_ENV'] === 'test' || process.env['E2E_FAST_SHUTDOWN'] === '1';
   if (isTestMode) {
     setTimeout(() => {
       console.warn('[App] Shutdown timeout reached in test mode, forcing quit');

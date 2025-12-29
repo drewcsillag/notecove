@@ -54,9 +54,23 @@ test.describe('cross-machine sync - file sync simulator', () => {
       await simulator.stop();
     }
 
-    if (instance1) {
-      await instance1.close();
-    }
+    // Close instances with timeout to prevent hanging
+    const closeWithTimeout = async (
+      instance: ElectronApplication | undefined,
+      name: string
+    ): Promise<void> => {
+      if (!instance) return;
+      try {
+        await Promise.race([
+          instance.close(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Close timeout')), 5000)),
+        ]);
+      } catch (err) {
+        console.error(`[File Sync Simulator] Error closing ${name}:`, err);
+      }
+    };
+
+    await closeWithTimeout(instance1, 'instance1');
 
     // Clean up temporary directories
     try {
