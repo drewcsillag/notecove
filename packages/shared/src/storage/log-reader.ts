@@ -130,7 +130,7 @@ export class LogReader {
       // Validate header
       const header = readLogHeader(buffer);
       if (!header.valid) {
-        throw new Error(`Invalid log file: ${header.error}`);
+        throw new Error(`Invalid log file '${filePath}': ${header.error}`);
       }
       offset = LOG_HEADER_SIZE;
     }

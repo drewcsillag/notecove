@@ -236,7 +236,7 @@ describe('LogReader', () => {
       expect(records.length).toBe(0);
     });
 
-    it('should throw for invalid magic number', async () => {
+    it('should throw for invalid magic number with filepath in error message', async () => {
       const fs = createMockFs();
       fs.files.set('/logs/bad.crdtlog', new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x01]));
 
@@ -244,7 +244,7 @@ describe('LogReader', () => {
         for await (const record of LogReader.readRecords('/logs/bad.crdtlog', fs)) {
           void record; // consume
         }
-      }).rejects.toThrow(/magic/i);
+      }).rejects.toThrow(/\/logs\/bad\.crdtlog.*magic/i);
     });
 
     it('should include offset in each record', async () => {
