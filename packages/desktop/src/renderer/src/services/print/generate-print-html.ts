@@ -68,6 +68,30 @@ function renderNode(node: JSONContent): string {
       return renderHeading(node);
     case 'text':
       return renderText(node);
+    case 'bulletList':
+      return renderBulletList(node);
+    case 'orderedList':
+      return renderOrderedList(node);
+    case 'listItem':
+      return renderListItem(node);
+    case 'blockquote':
+      return renderBlockquote(node);
+    case 'taskList':
+      return renderTaskList(node);
+    case 'taskItem':
+      return renderTaskItem(node);
+    case 'codeBlock':
+      return renderCodeBlock(node);
+    case 'image':
+      return renderImage(node);
+    case 'table':
+      return renderTable(node);
+    case 'tableRow':
+      return renderTableRow(node);
+    case 'tableCell':
+      return renderTableCell(node);
+    case 'tableHeader':
+      return renderTableHeader(node);
     default:
       // For now, just render children if any
       if (node.content) {
@@ -95,10 +119,173 @@ function renderHeading(node: JSONContent): string {
 }
 
 /**
+ * Render a bullet list node
+ */
+function renderBulletList(node: JSONContent): string {
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  return `<ul>${content}</ul>`;
+}
+
+/**
+ * Render an ordered list node
+ */
+function renderOrderedList(node: JSONContent): string {
+  const start = (node.attrs?.['start'] as number | undefined) ?? 1;
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  if (start !== 1) {
+    return `<ol start="${start}">${content}</ol>`;
+  }
+  return `<ol>${content}</ol>`;
+}
+
+/**
+ * Render a list item node
+ */
+function renderListItem(node: JSONContent): string {
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  return `<li>${content}</li>`;
+}
+
+/**
+ * Render a blockquote node
+ */
+function renderBlockquote(node: JSONContent): string {
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  return `<blockquote>${content}</blockquote>`;
+}
+
+/**
+ * Render a task list node
+ */
+function renderTaskList(node: JSONContent): string {
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  return `<ul class="task-list">${content}</ul>`;
+}
+
+/**
+ * Render a task item node with checkbox symbol
+ * ☐ = unchecked, ☑ = checked, ☒ = cancelled
+ */
+function renderTaskItem(node: JSONContent): string {
+  const checked = node.attrs?.['checked'] as boolean | 'cancelled' | undefined;
+  let symbol: string;
+
+  if (checked === 'cancelled') {
+    symbol = '☒';
+  } else if (checked === true) {
+    symbol = '☑';
+  } else {
+    symbol = '☐';
+  }
+
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  return `<li class="task-item"><span class="task-checkbox">${symbol}</span>${content}</li>`;
+}
+
+/**
+ * Render a code block node
+ */
+function renderCodeBlock(node: JSONContent): string {
+  const language = node.attrs?.['language'] as string | undefined;
+  // Code blocks contain text nodes directly, extract and escape the text
+  const codeText = node.content
+    ? node.content.map((child) => escapeHtml(child.text ?? '')).join('')
+    : '';
+
+  const languageClass = language ? ` class="language-${language}"` : '';
+  return `<pre><code${languageClass}>${codeText}</code></pre>`;
+}
+
+/**
+ * Render an image node
+ */
+function renderImage(node: JSONContent): string {
+  const src = escapeHtml((node.attrs?.['src'] as string | undefined) ?? '');
+  const alt = node.attrs?.['alt'] as string | undefined;
+  const title = node.attrs?.['title'] as string | undefined;
+  const width = node.attrs?.['width'] as number | undefined;
+  const height = node.attrs?.['height'] as number | undefined;
+
+  let attrs = `src="${src}"`;
+
+  if (alt !== undefined) {
+    attrs += ` alt="${escapeHtml(alt)}"`;
+  }
+  if (title !== undefined) {
+    attrs += ` title="${escapeHtml(title)}"`;
+  }
+  if (width !== undefined) {
+    attrs += ` width="${width}"`;
+  }
+  if (height !== undefined) {
+    attrs += ` height="${height}"`;
+  }
+
+  return `<img ${attrs} style="max-width: 100%;" />`;
+}
+
+/**
+ * Render a table node
+ */
+function renderTable(node: JSONContent): string {
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  return `<table class="print-table">${content}</table>`;
+}
+
+/**
+ * Render a table row node
+ */
+function renderTableRow(node: JSONContent): string {
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+  return `<tr>${content}</tr>`;
+}
+
+/**
+ * Render a table cell node
+ */
+function renderTableCell(node: JSONContent): string {
+  const colspan = node.attrs?.['colspan'] as number | undefined;
+  const rowspan = node.attrs?.['rowspan'] as number | undefined;
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+
+  let attrs = '';
+  if (colspan !== undefined && colspan > 1) {
+    attrs += ` colspan="${colspan}"`;
+  }
+  if (rowspan !== undefined && rowspan > 1) {
+    attrs += ` rowspan="${rowspan}"`;
+  }
+
+  return `<td${attrs}>${content}</td>`;
+}
+
+/**
+ * Render a table header node
+ */
+function renderTableHeader(node: JSONContent): string {
+  const colspan = node.attrs?.['colspan'] as number | undefined;
+  const rowspan = node.attrs?.['rowspan'] as number | undefined;
+  const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
+
+  let attrs = '';
+  if (colspan !== undefined && colspan > 1) {
+    attrs += ` colspan="${colspan}"`;
+  }
+  if (rowspan !== undefined && rowspan > 1) {
+    attrs += ` rowspan="${rowspan}"`;
+  }
+
+  return `<th${attrs}>${content}</th>`;
+}
+
+/**
  * Render a text node with marks
  */
 function renderText(node: JSONContent): string {
   let text = escapeHtml(node.text ?? '');
+
+  // Highlight hashtags in text
+  text = highlightHashtags(text);
 
   // Apply marks in reverse order so inner marks come first
   if (node.marks && node.marks.length > 0) {
@@ -111,6 +298,21 @@ function renderText(node: JSONContent): string {
   }
 
   return text;
+}
+
+/**
+ * Hashtag pattern: # followed by a letter, then letters/numbers/underscores
+ * Must match HASHTAG_PATTERN from @notecove/shared
+ */
+const PRINT_HASHTAG_PATTERN = /#[a-zA-Z][a-zA-Z0-9_]*/g;
+
+/**
+ * Highlight hashtags in text with styled spans
+ */
+function highlightHashtags(text: string): string {
+  return text.replace(PRINT_HASHTAG_PATTERN, (match) => {
+    return `<span class="hashtag">${match}</span>`;
+  });
 }
 
 /**

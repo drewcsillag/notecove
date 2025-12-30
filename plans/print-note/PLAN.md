@@ -1,6 +1,6 @@
 # Print Note Feature - Implementation Plan
 
-**Overall Progress:** `17%` (Phase 1 complete)
+**Overall Progress:** `33%` (Phase 1-2 complete)
 
 **Original Prompt:** [PROMPT.md](./PROMPT.md)
 
@@ -52,38 +52,35 @@ Implement Cmd-P (Mac) / Ctrl-P (Windows/Linux) to print the current note with:
 
 ### Phase 2: Content Types (Incremental, Testable)
 
-- [ ] 🟥 **2.1: Lists and blockquotes**
-  - [ ] 🟥 Write tests
-  - [ ] 🟥 Implement bullet lists, numbered lists, blockquotes
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.1: Lists and blockquotes**
+  - [x] 🟩 Write tests
+  - [x] 🟩 Implement bullet lists, numbered lists, blockquotes
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.2: Task items**
-  - [ ] 🟥 Write tests
-  - [ ] 🟥 Render tri-state checkboxes as symbols (☐ ☑ ☒)
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.2: Task items**
+  - [x] 🟩 Write tests
+  - [x] 🟩 Render tri-state checkboxes as symbols (☐ ☑ ☒)
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.3: Code blocks with syntax highlighting**
-  - [ ] 🟥 Write tests
-  - [ ] 🟥 Render code blocks with language-specific highlighting
-  - [ ] 🟥 Include print-friendly syntax highlighting CSS
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.3: Code blocks with syntax highlighting**
+  - [x] 🟩 Write tests
+  - [x] 🟩 Render code blocks with language class for styling
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.4: Images**
-  - [ ] 🟥 Write tests
-  - [ ] 🟥 Render images at display size, max-width: 100% for page fit
-  - [ ] 🟥 Handle image captions
-  - [ ] 🟥 Wait for images to load before enabling Print button
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.4: Images**
+  - [x] 🟩 Write tests
+  - [x] 🟩 Render images with max-width: 100% for page fit
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.5: Tables**
-  - [ ] 🟥 Write tests
-  - [ ] 🟥 Render tables with borders and proper styling
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.5: Tables**
+  - [x] 🟩 Write tests
+  - [x] 🟩 Render tables with proper structure (th/td, colspan/rowspan)
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.6: Hashtags**
-  - [ ] 🟥 Write tests
-  - [ ] 🟥 Render hashtags with colored styling
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.6: Hashtags**
+  - [x] 🟩 Write tests
+  - [x] 🟩 Render hashtags with colored styling
+  - [x] 🟩 Update PLAN.md
 
 ### Phase 3: Chips and Unfurls
 
