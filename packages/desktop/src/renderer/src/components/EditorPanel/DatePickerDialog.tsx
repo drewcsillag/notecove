@@ -6,7 +6,7 @@
  * - User selects @date from the autocomplete menu
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Popover, Box, Button, Stack } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -44,7 +44,10 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = ({
   });
 
   const handleDateChange = (newDate: Dayjs | null): void => {
-    setSelectedDate(newDate);
+    if (newDate) {
+      onSelect(newDate.format('YYYY-MM-DD'));
+      onClose();
+    }
   };
 
   const handleConfirm = (): void => {
@@ -73,6 +76,62 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = ({
     onClose();
   };
 
+  // Ref to the container for focus management
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Focus the selected day when dialog opens for keyboard navigation
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    // Small delay to ensure the calendar is rendered
+    const timeoutId = setTimeout(() => {
+      const selectedDay = containerRef.current?.querySelector(
+        '.MuiPickersDay-root.Mui-selected'
+      ) as HTMLElement | null;
+      if (selectedDay) {
+        selectedDay.focus();
+      }
+    }, 50);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [open]);
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = (event: React.KeyboardEvent): void => {
+    const key = event.key.toLowerCase();
+
+    // T = Today
+    if (key === 't') {
+      event.preventDefault();
+      event.stopPropagation();
+      const today = dayjs();
+      onSelect(today.format('YYYY-MM-DD'));
+      onClose();
+      return;
+    }
+
+    // M = toMorrow
+    if (key === 'm') {
+      event.preventDefault();
+      event.stopPropagation();
+      const tomorrow = dayjs().add(1, 'day');
+      onSelect(tomorrow.format('YYYY-MM-DD'));
+      onClose();
+      return;
+    }
+
+    // Let MUI handle Enter/Space natively - it will trigger onChange
+    // which we handle in handleDateChange
+
+    // Escape = close without selecting
+    if (event.key === 'Escape') {
+      onClose();
+      return;
+    }
+  };
+
   return (
     <Popover
       open={open}
@@ -89,11 +148,12 @@ export const DatePickerDialog: React.FC<DatePickerDialogProps> = ({
       slotProps={{
         paper: {
           sx: { mt: 1 },
+          onKeyDown: handleKeyDown,
         },
       }}
     >
       <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <Box sx={{ p: 1 }}>
+        <Box ref={containerRef} sx={{ p: 1 }}>
           {/* Quick date buttons */}
           <Stack direction="row" spacing={1} sx={{ mb: 1, px: 1 }}>
             <Button size="small" variant="outlined" onClick={handleToday}>

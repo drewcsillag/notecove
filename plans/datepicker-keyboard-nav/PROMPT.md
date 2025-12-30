@@ -1,0 +1,1 @@
+in the datepicker that pops up when typing `@date` it should be possible to move the selected date via cursor keys. For example, when @calpicker.png shows, the current date is 30 and it would be good to be able to, without using the mouse, select a different date.
