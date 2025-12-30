@@ -34,6 +34,9 @@ export class CRDTManagerImpl implements CRDTManager {
   private static readonly MAX_SYNC_EVENTS_PER_NOTE = 100;
   // Callback for live sync event notifications
   private syncEventCallback?: (event: SyncEvent) => void;
+  // Operation queues for serializing applyUpdate() calls per note
+  // This prevents race conditions where concurrent IPC calls could cause sequence violations
+  private applyUpdateQueues = new Map<string, Promise<void>>();
 
   constructor(
     private storageManager: AppendLogManager,
@@ -288,6 +291,45 @@ export class CRDTManagerImpl implements CRDTManager {
 
     console.log(`[CRDT Manager] Applying update to note ${noteId}, size: ${update.length} bytes`);
 
+    // Chain this operation after any pending operations for this note.
+    // This ensures concurrent applyUpdate calls are serialized, preventing
+    // sequence violations when writes complete out of order.
+    const previousOp = this.applyUpdateQueues.get(noteId) ?? Promise.resolve();
+
+    // Create the current operation that chains onto the previous one.
+    // Use .then() to ensure previous errors don't break the chain.
+    const currentOp = previousOp.then(
+      () => this.executeApplyUpdate(noteId, state, update, options),
+      () => this.executeApplyUpdate(noteId, state, update, options)
+    );
+
+    // Store the "sanitized" version that always resolves (for chaining subsequent operations)
+    const sanitizedOp = currentOp.catch(() => {
+      // Swallow error for the chain - the actual error is propagated to the caller
+    });
+    this.applyUpdateQueues.set(noteId, sanitizedOp);
+
+    // Clean up queue entry after completion to prevent memory leak
+    void sanitizedOp.finally(() => {
+      if (this.applyUpdateQueues.get(noteId) === sanitizedOp) {
+        this.applyUpdateQueues.delete(noteId);
+      }
+    });
+
+    // Return the actual operation promise (can reject) so callers get errors
+    return currentOp;
+  }
+
+  /**
+   * Execute the actual applyUpdate logic.
+   * This is separated from applyUpdate() to enable operation queuing.
+   */
+  private async executeApplyUpdate(
+    noteId: string,
+    state: DocumentState,
+    update: Uint8Array,
+    options?: { skipTimestampUpdate?: boolean }
+  ): Promise<void> {
     // Capture content before update for comparison (to detect actual content changes)
     const contentBefore = state.noteDoc.getContentText();
 

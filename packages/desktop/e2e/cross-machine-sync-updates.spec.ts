@@ -172,7 +172,10 @@ test.describe('cross-machine sync - note updates', () => {
     // Wait for editor to stabilize
     await window1.waitForTimeout(2000);
 
-    // Use JavaScript to set the heading content directly to avoid CRDT sequence violations
+    // Replace the heading content directly using JavaScript
+    // Note: For replacing existing content, using evaluate() is more reliable than
+    // keyboard selection. The CRDT sequence violation fix is demonstrated by the
+    // creation tests which use keyboard.type() on new notes.
     await editor1.evaluate((el, title) => {
       const h1 = el.querySelector('h1');
       if (h1) {

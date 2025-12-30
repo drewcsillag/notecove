@@ -508,6 +508,167 @@ describe('CRDTManagerImpl - Integration', () => {
   });
 });
 
+describe('CRDTManagerImpl - Concurrent applyUpdate Race Condition', () => {
+  // This test suite verifies the fix for the CRDT sequence violation bug.
+  //
+  // Bug: During rapid typing, concurrent IPC calls to applyUpdate() cause
+  // sequence violations because the snapshot.applyUpdate() calls happen
+  // when each async write completes, not in the order they started.
+  //
+  // Example: Three concurrent applyUpdate calls:
+  // 1. Call #1 awaits writeNoteUpdate → gets seq=1
+  // 2. Call #2 awaits writeNoteUpdate → gets seq=2
+  // 3. Call #3 awaits writeNoteUpdate → gets seq=3
+  //
+  // If the async continuations resolve out of order (e.g., seq=2 before seq=1),
+  // the snapshot.applyUpdate(seq=2) is called when expecting seq=1 → VIOLATION!
+  //
+  // Fix: Add an operation queue to CRDTManager.applyUpdate() that serializes
+  // the entire operation (write + snapshot update) per note.
+
+  let manager: CRDTManagerImpl;
+  let mockStorageManager: jest.Mocked<AppendLogManager>;
+  let mockDatabase: jest.Mocked<Database>;
+
+  // Import the real DocumentSnapshot to get actual sequence validation
+  const RealStorage: typeof import('@shared/storage') = jest.requireActual('@shared/storage');
+  const { DocumentSnapshot } = RealStorage;
+
+  beforeEach(() => {
+    jest.useRealTimers(); // Need real timers for async operations
+
+    mockStorageManager = {
+      getInstanceId: jest.fn().mockReturnValue('test-instance'),
+      getSDPath: jest.fn((sdId: string) => `/mock/storage/${sdId}`),
+      loadNote: jest.fn(),
+      writeNoteUpdate: jest.fn(),
+      loadFolderTree: jest.fn().mockResolvedValue({
+        doc: new Y.Doc(),
+      }),
+      writeFolderUpdate: jest.fn().mockResolvedValue(undefined),
+      saveNoteSnapshot: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AppendLogManager>;
+
+    mockDatabase = {
+      getNote: jest.fn().mockResolvedValue({
+        id: 'test-note',
+        sdId: 'test-sd',
+        title: 'Test Note',
+        modified: 1000,
+      }),
+      upsertNote: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<Database>;
+
+    manager = new CRDTManagerImpl(mockStorageManager, mockDatabase);
+  });
+
+  afterEach(() => {
+    manager.destroy();
+  });
+
+  it('should serialize concurrent applyUpdate calls to prevent sequence violations', async () => {
+    // Create a real DocumentSnapshot to get actual sequence validation
+    const realSnapshot = DocumentSnapshot.createEmpty();
+    const sharedDoc = realSnapshot.getDoc();
+
+    // Set up loadNote to return our controlled snapshot
+    mockStorageManager.loadNote.mockResolvedValue({
+      doc: sharedDoc,
+      vectorClock: {},
+    });
+
+    // Manually set up the internal state with our real snapshot
+    // We need to access the manager's internal state, which requires some workaround
+    await manager.loadNote('test-note', 'test-sd');
+
+    // Get the loaded state and replace its snapshot with our real one
+    // This is a bit hacky but necessary to test with real sequence validation
+    const state = (
+      manager as unknown as { documents: Map<string, { snapshot: typeof realSnapshot }> }
+    ).documents.get('test-note');
+    if (state) {
+      state.snapshot = realSnapshot;
+    }
+
+    // Create three updates with different content
+    const sourceDoc1 = new Y.Doc();
+    sourceDoc1.getText('test').insert(0, 'A');
+    const update1 = Y.encodeStateAsUpdate(sourceDoc1);
+
+    const sourceDoc2 = new Y.Doc();
+    Y.applyUpdate(sourceDoc2, update1); // Apply previous state first
+    sourceDoc2.getText('test').insert(1, 'B');
+    const update2 = Y.encodeStateAsUpdate(sourceDoc2);
+
+    const sourceDoc3 = new Y.Doc();
+    Y.applyUpdate(sourceDoc3, update2); // Apply previous state first
+    sourceDoc3.getText('test').insert(2, 'C');
+    const update3 = Y.encodeStateAsUpdate(sourceDoc3);
+
+    // Set up writeNoteUpdate to return promises we can control
+    // Each call will create a new promise that we can resolve later
+    type ResolverType = (value: { sequence: number; offset: number; file: string }) => void;
+    const resolvers: ResolverType[] = [];
+    let callCount = 0;
+
+    mockStorageManager.writeNoteUpdate.mockImplementation(() => {
+      callCount++;
+      const myCallNumber = callCount;
+      return new Promise((resolve) => {
+        resolvers.push((value) => {
+          console.log(`[Test] Resolving write #${myCallNumber} with sequence ${value.sequence}`);
+          resolve(value);
+        });
+      });
+    });
+
+    // Start three concurrent applyUpdate calls (simulating rapid typing via IPC)
+    // skipTimestampUpdate to avoid metadata updates interfering with the test
+    const promise1 = manager.applyUpdate('test-note', update1, { skipTimestampUpdate: true });
+    const promise2 = manager.applyUpdate('test-note', update2, { skipTimestampUpdate: true });
+    const promise3 = manager.applyUpdate('test-note', update3, { skipTimestampUpdate: true });
+
+    // With the fix: Operations are serialized, so only #1 has called writeNoteUpdate.
+    // We need to resolve them in the order they reach writeNoteUpdate (which is now sequential).
+    //
+    // This test verifies that the queue correctly serializes the operations.
+    // Before the fix, all three would have started concurrently and we could
+    // resolve them out of order, causing sequence violations.
+
+    // Wait for first operation to reach writeNoteUpdate
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(resolvers.length).toBe(1); // Only first operation has started
+    console.log('[Test] Resolving write #1 with sequence 1');
+    resolvers[0]!({ sequence: 1, offset: 0, file: 'test1.log' });
+
+    // Wait for second operation to start and reach writeNoteUpdate
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(resolvers.length).toBe(2); // Second operation has now started
+    console.log('[Test] Resolving write #2 with sequence 2');
+    resolvers[1]!({ sequence: 2, offset: 100, file: 'test2.log' });
+
+    // Wait for third operation to start and reach writeNoteUpdate
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(resolvers.length).toBe(3); // Third operation has now started
+    console.log('[Test] Resolving write #3 with sequence 3');
+    resolvers[2]!({ sequence: 3, offset: 200, file: 'test3.log' });
+
+    // All three should complete without errors because the queue ensures
+    // operations are processed in order
+    await expect(Promise.all([promise1, promise2, promise3])).resolves.not.toThrow();
+
+    // Verify all updates were applied in the correct order
+    const vectorClock = realSnapshot.getVectorClock();
+    expect(vectorClock['test-instance']?.sequence).toBe(3);
+
+    // Clean up
+    sourceDoc1.destroy();
+    sourceDoc2.destroy();
+    sourceDoc3.destroy();
+    realSnapshot.destroy();
+  });
+});
+
 describe('CRDTManagerImpl - Modified Timestamp Updates', () => {
   // Tests for the feature: "When a note is edited, its modified timestamp should update"
   // This test suite verifies that applyUpdate updates the modified timestamp in:
