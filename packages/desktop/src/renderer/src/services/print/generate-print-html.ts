@@ -83,6 +83,7 @@ function renderNode(node: JSONContent): string {
     case 'codeBlock':
       return renderCodeBlock(node);
     case 'image':
+    case 'notecoveImage':
       return renderImage(node);
     case 'table':
       return renderTable(node);
@@ -163,23 +164,37 @@ function renderTaskList(node: JSONContent): string {
 }
 
 /**
- * Render a task item node with checkbox symbol
- * ☐ = unchecked, ☑ = checked, ☒ = cancelled
+ * Render a task item node with styled checkbox
+ * Uses CSS classes to match editor appearance:
+ * - unchecked: empty checkbox
+ * - checked: green checkbox with checkmark
+ * - nope: red checkbox with X
+ *
+ * Note: The editor uses string values 'unchecked', 'checked', 'nope'
+ * for the checked attribute (from TriStateTaskItem extension).
  */
 function renderTaskItem(node: JSONContent): string {
-  const checked = node.attrs?.['checked'] as boolean | 'cancelled' | undefined;
-  let symbol: string;
+  const checked = node.attrs?.['checked'] as string | boolean | undefined;
 
-  if (checked === 'cancelled') {
-    symbol = '☒';
-  } else if (checked === true) {
-    symbol = '☑';
+  // Determine state class and checkbox content
+  // Handle both string states ('unchecked', 'checked', 'nope') and legacy boolean
+  let stateClass: string;
+  let checkboxContent: string;
+
+  if (checked === 'nope' || checked === 'cancelled') {
+    stateClass = 'task-item--nope';
+    checkboxContent = '✕';
+  } else if (checked === 'checked' || checked === true) {
+    stateClass = 'task-item--checked';
+    checkboxContent = '✓';
   } else {
-    symbol = '☐';
+    // 'unchecked', false, or undefined
+    stateClass = 'task-item--unchecked';
+    checkboxContent = '';
   }
 
   const content = node.content ? node.content.map((child) => renderNode(child)).join('') : '';
-  return `<li class="task-item"><span class="task-checkbox">${symbol}</span>${content}</li>`;
+  return `<li class="task-item ${stateClass}"><span class="task-checkbox">${checkboxContent}</span><span class="task-content">${content}</span></li>`;
 }
 
 /**
@@ -198,30 +213,43 @@ function renderCodeBlock(node: JSONContent): string {
 
 /**
  * Render an image node
+ * Images can have either src (URL) or imageId/sdId (local storage reference)
  */
 function renderImage(node: JSONContent): string {
-  const src = escapeHtml((node.attrs?.['src'] as string | undefined) ?? '');
+  const src = node.attrs?.['src'] as string | undefined;
+  const imageId = node.attrs?.['imageId'] as string | undefined;
+  const sdId = node.attrs?.['sdId'] as string | undefined;
   const alt = node.attrs?.['alt'] as string | undefined;
   const title = node.attrs?.['title'] as string | undefined;
   const width = node.attrs?.['width'] as number | undefined;
   const height = node.attrs?.['height'] as number | undefined;
 
-  let attrs = `src="${src}"`;
+  // Build attributes
+  const attrParts: string[] = [];
+
+  // For local images, use data attributes that will be resolved later
+  if (imageId && sdId) {
+    attrParts.push(`data-image-id="${escapeHtml(imageId)}"`);
+    attrParts.push(`data-sd-id="${escapeHtml(sdId)}"`);
+    attrParts.push(`src=""`); // Will be filled by image resolver
+  } else if (src) {
+    attrParts.push(`src="${escapeHtml(src)}"`);
+  }
 
   if (alt !== undefined) {
-    attrs += ` alt="${escapeHtml(alt)}"`;
+    attrParts.push(`alt="${escapeHtml(alt)}"`);
   }
   if (title !== undefined) {
-    attrs += ` title="${escapeHtml(title)}"`;
+    attrParts.push(`title="${escapeHtml(title)}"`);
   }
   if (width !== undefined) {
-    attrs += ` width="${width}"`;
+    attrParts.push(`width="${width}"`);
   }
   if (height !== undefined) {
-    attrs += ` height="${height}"`;
+    attrParts.push(`height="${height}"`);
   }
 
-  return `<img ${attrs} style="max-width: 100%;" />`;
+  return `<img ${attrParts.join(' ')} style="max-width: 100%;" />`;
 }
 
 /**

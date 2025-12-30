@@ -778,6 +778,30 @@ describe('generatePrintHtml', () => {
       expect(html).not.toContain('<tags>');
       expect(html).toContain('&lt;tags&gt;');
     });
+
+    it('should render notecoveImage with imageId and sdId', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'notecoveImage',
+            attrs: {
+              imageId: 'img-123',
+              sdId: 'sd-456',
+              alt: 'Test image',
+            },
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('<img');
+      expect(html).toContain('data-image-id="img-123"');
+      expect(html).toContain('data-sd-id="sd-456"');
+      expect(html).toContain('src=""');
+      expect(html).toContain('alt="Test image"');
+    });
   });
 
   describe('code blocks', () => {
@@ -854,7 +878,7 @@ describe('generatePrintHtml', () => {
   });
 
   describe('task lists', () => {
-    it('should render unchecked task item with ☐ symbol', () => {
+    it('should render unchecked task item with empty checkbox', () => {
       const content: JSONContent = {
         type: 'doc',
         content: [
@@ -863,7 +887,7 @@ describe('generatePrintHtml', () => {
             content: [
               {
                 type: 'taskItem',
-                attrs: { checked: false },
+                attrs: { checked: 'unchecked' },
                 content: [
                   {
                     type: 'paragraph',
@@ -878,11 +902,12 @@ describe('generatePrintHtml', () => {
 
       const html = generatePrintHtml(content, [], defaultOptions);
 
-      expect(html).toContain('☐');
+      expect(html).toContain('task-item--unchecked');
+      expect(html).toContain('task-checkbox');
       expect(html).toContain('Todo item');
     });
 
-    it('should render checked task item with ☑ symbol', () => {
+    it('should render checked task item with checkmark', () => {
       const content: JSONContent = {
         type: 'doc',
         content: [
@@ -891,7 +916,7 @@ describe('generatePrintHtml', () => {
             content: [
               {
                 type: 'taskItem',
-                attrs: { checked: true },
+                attrs: { checked: 'checked' },
                 content: [
                   {
                     type: 'paragraph',
@@ -906,11 +931,12 @@ describe('generatePrintHtml', () => {
 
       const html = generatePrintHtml(content, [], defaultOptions);
 
-      expect(html).toContain('☑');
+      expect(html).toContain('task-item--checked');
+      expect(html).toContain('✓');
       expect(html).toContain('Done item');
     });
 
-    it('should render cancelled task item with ☒ symbol', () => {
+    it('should render nope task item with X', () => {
       const content: JSONContent = {
         type: 'doc',
         content: [
@@ -919,11 +945,11 @@ describe('generatePrintHtml', () => {
             content: [
               {
                 type: 'taskItem',
-                attrs: { checked: 'cancelled' },
+                attrs: { checked: 'nope' },
                 content: [
                   {
                     type: 'paragraph',
-                    content: [{ type: 'text', text: 'Cancelled item' }],
+                    content: [{ type: 'text', text: 'Nope item' }],
                   },
                 ],
               },
@@ -934,8 +960,9 @@ describe('generatePrintHtml', () => {
 
       const html = generatePrintHtml(content, [], defaultOptions);
 
-      expect(html).toContain('☒');
-      expect(html).toContain('Cancelled item');
+      expect(html).toContain('task-item--nope');
+      expect(html).toContain('✕');
+      expect(html).toContain('Nope item');
     });
 
     it('should render multiple task items', () => {
@@ -947,7 +974,7 @@ describe('generatePrintHtml', () => {
             content: [
               {
                 type: 'taskItem',
-                attrs: { checked: false },
+                attrs: { checked: 'unchecked' },
                 content: [
                   {
                     type: 'paragraph',
@@ -957,7 +984,7 @@ describe('generatePrintHtml', () => {
               },
               {
                 type: 'taskItem',
-                attrs: { checked: true },
+                attrs: { checked: 'checked' },
                 content: [
                   {
                     type: 'paragraph',
@@ -967,7 +994,7 @@ describe('generatePrintHtml', () => {
               },
               {
                 type: 'taskItem',
-                attrs: { checked: 'cancelled' },
+                attrs: { checked: 'nope' },
                 content: [
                   {
                     type: 'paragraph',
@@ -982,9 +1009,9 @@ describe('generatePrintHtml', () => {
 
       const html = generatePrintHtml(content, [], defaultOptions);
 
-      expect(html).toContain('☐');
-      expect(html).toContain('☑');
-      expect(html).toContain('☒');
+      expect(html).toContain('task-item--unchecked');
+      expect(html).toContain('task-item--checked');
+      expect(html).toContain('task-item--nope');
       expect(html).toContain('First');
       expect(html).toContain('Second');
       expect(html).toContain('Third');

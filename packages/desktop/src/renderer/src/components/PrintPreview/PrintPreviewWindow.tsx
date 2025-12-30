@@ -55,6 +55,8 @@ const printStyles = `
   .print-content p {
     margin: 0.5em 0;
   }
+
+  /* Inline code */
   .print-content code {
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
     background: #f5f5f5;
@@ -62,16 +64,149 @@ const printStyles = `
     border-radius: 3px;
     font-size: 10pt;
   }
+
+  /* Code blocks */
   .print-content pre {
     background: #f5f5f5;
     padding: 1em;
     border-radius: 4px;
     overflow-x: auto;
     font-size: 10pt;
+    border: 1px solid #e0e0e0;
   }
   .print-content pre code {
     background: none;
     padding: 0;
+  }
+
+  /* Task lists */
+  .print-content ul.task-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.5em 0;
+  }
+  .print-content li.task-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 0.25em 0;
+  }
+  .print-content li.task-item .task-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    border: 2px solid #666;
+    border-radius: 3px;
+    margin-right: 8px;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .print-content li.task-item .task-content {
+    flex: 1;
+  }
+  .print-content li.task-item .task-content p {
+    margin: 0;
+    display: inline;
+  }
+  /* Unchecked - empty box */
+  .print-content li.task-item.task-item--unchecked .task-checkbox {
+    background-color: transparent;
+  }
+  /* Checked - green with checkmark */
+  .print-content li.task-item.task-item--checked .task-checkbox {
+    background-color: #4caf50;
+    border-color: #4caf50;
+    color: #ffffff;
+  }
+  .print-content li.task-item.task-item--checked .task-content {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: #666;
+  }
+  /* Cancelled/Nope - red with X */
+  .print-content li.task-item.task-item--nope .task-checkbox {
+    background-color: #f44336;
+    border-color: #f44336;
+    color: #ffffff;
+  }
+  .print-content li.task-item.task-item--nope .task-content {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: #666;
+  }
+
+  /* Tables */
+  .print-content table.print-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+  }
+  .print-content table.print-table th,
+  .print-content table.print-table td {
+    border: 1px solid #333;
+    padding: 0.5em;
+    text-align: left;
+  }
+  .print-content table.print-table th {
+    background-color: #f0f0f0;
+    font-weight: 600;
+  }
+  .print-content table.print-table th p,
+  .print-content table.print-table td p {
+    margin: 0;
+  }
+
+  /* Hashtags */
+  .print-content .hashtag {
+    color: #1976d2;
+    font-weight: 500;
+  }
+
+  /* Images */
+  .print-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1em 0;
+  }
+
+  /* Blockquotes */
+  .print-content blockquote {
+    margin: 1em 0;
+    padding-left: 1em;
+    border-left: 3px solid #ccc;
+    color: #555;
+  }
+
+  /* Lists */
+  .print-content ul, .print-content ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+  }
+  .print-content li {
+    margin: 0.25em 0;
+  }
+
+  /* Print-specific page break rules */
+  @media print {
+    .print-content h1, .print-content h2, .print-content h3,
+    .print-content h4, .print-content h5, .print-content h6 {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    .print-content pre, .print-content blockquote,
+    .print-content table, .print-content img {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .print-content p {
+      orphans: 3;
+      widows: 3;
+    }
   }
 `;
 
@@ -113,9 +248,40 @@ export function PrintPreviewWindow({ noteId }: PrintPreviewWindowProps): React.R
         const comments: never[] = [];
 
         // Generate print HTML
-        const html = generatePrintHtml(content, comments, {
+        let html = generatePrintHtml(content, comments, {
           includeResolvedComments,
         });
+
+        // Resolve local images (those with data-image-id and data-sd-id attributes)
+        // Find all images that need resolution and collect their IDs
+        const imageRegex = /data-image-id="([^"]+)"\s+data-sd-id="([^"]+)"\s+src=""/g;
+        const imagesToResolve: { imageId: string; sdId: string }[] = [];
+        let imageMatch;
+        while ((imageMatch = imageRegex.exec(html)) !== null) {
+          const imageId = imageMatch[1];
+          const sdId = imageMatch[2];
+          if (imageId && sdId) {
+            imagesToResolve.push({ imageId, sdId });
+          }
+        }
+
+        // Resolve each image and replace in HTML
+        for (const { imageId, sdId } of imagesToResolve) {
+          try {
+            const dataUrl = await window.electronAPI.image.getDataUrl(sdId, imageId);
+            if (dataUrl) {
+              // Replace the empty src with the data URL
+              html = html.replace(
+                `data-image-id="${imageId}" data-sd-id="${sdId}" src=""`,
+                `data-image-id="${imageId}" data-sd-id="${sdId}" src="${dataUrl}"`
+              );
+            } else {
+              console.warn('[PrintPreview] Image not found:', imageId);
+            }
+          } catch (imgErr) {
+            console.warn('[PrintPreview] Failed to load image:', imageId, imgErr);
+          }
+        }
 
         setPrintHtml(html);
         setLoading(false);
@@ -225,15 +391,16 @@ export function PrintPreviewWindow({ noteId }: PrintPreviewWindowProps): React.R
             className="print-content"
             sx={{
               width: '8.5in',
-              minHeight: '11in',
               bgcolor: 'background.paper',
               boxShadow: 3,
               p: 4,
+              mb: 3, // Add margin at bottom so shadow extends past content
+              // Content auto-sizes, page breaks handled by browser during printing
               '@media print': {
                 width: '100%',
-                minHeight: 'auto',
                 boxShadow: 'none',
                 p: 0,
+                mb: 0,
               },
             }}
             dangerouslySetInnerHTML={{ __html: printHtml }}

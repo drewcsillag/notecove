@@ -267,6 +267,18 @@ export class WindowStateManager {
   }
 
   /**
+   * Window types that should NOT be persisted across sessions.
+   * These are transient windows that should not be restored on app restart.
+   */
+  private static readonly TRANSIENT_WINDOW_TYPES = new Set([
+    'printPreview',
+    'about',
+    'noteInfo',
+    'sdPicker',
+    'storageInspector',
+  ]);
+
+  /**
    * Get current state of all tracked windows
    */
   getCurrentState(): WindowState[] {
@@ -275,6 +287,11 @@ export class WindowStateManager {
     for (const tracked of this.windows.values()) {
       // Skip destroyed windows
       if (tracked.window.isDestroyed()) {
+        continue;
+      }
+
+      // Skip transient window types that shouldn't be persisted
+      if (WindowStateManager.TRANSIENT_WINDOW_TYPES.has(tracked.type)) {
         continue;
       }
 
