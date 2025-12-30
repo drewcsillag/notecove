@@ -5,6 +5,12 @@
  */
 
 import type { JSONContent } from '@tiptap/core';
+import { LINK_PATTERN } from '@notecove/shared';
+
+/**
+ * Date pattern for YYYY-MM-DD dates (matches DateChip.ts)
+ */
+const DATE_PATTERN = /\b(\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b/g;
 
 /**
  * Comment thread with full details (placeholder for Phase 4)
@@ -93,6 +99,8 @@ function renderNode(node: JSONContent): string {
       return renderTableCell(node);
     case 'tableHeader':
       return renderTableHeader(node);
+    case 'oembedUnfurl':
+      return renderOEmbedUnfurl(node);
     default:
       // For now, just render children if any
       if (node.content) {
@@ -307,13 +315,81 @@ function renderTableHeader(node: JSONContent): string {
 }
 
 /**
+ * Render an oEmbed unfurl node as a card
+ */
+function renderOEmbedUnfurl(node: JSONContent): string {
+  const url = node.attrs?.['url'] as string | undefined;
+  const title = node.attrs?.['title'] as string | undefined;
+  const description = node.attrs?.['description'] as string | undefined;
+  const thumbnailUrl = node.attrs?.['thumbnailUrl'] as string | undefined;
+  const providerName = node.attrs?.['providerName'] as string | undefined;
+  const isLoading = node.attrs?.['isLoading'] as boolean | undefined;
+  const error = node.attrs?.['error'] as string | undefined;
+
+  // Don't render if loading or error
+  if (isLoading || error || !url) {
+    if (url) {
+      // Show as plain link if can't render unfurl
+      return `<p><a href="${escapeHtml(url)}" class="print-link">${escapeHtml(url)}</a></p>`;
+    }
+    return '';
+  }
+
+  // Build unfurl card HTML
+  const parts: string[] = [];
+  parts.push('<div class="unfurl-card">');
+
+  // Thumbnail (if available)
+  if (thumbnailUrl) {
+    parts.push(`<div class="unfurl-thumbnail"><img src="${escapeHtml(thumbnailUrl)}" alt="" /></div>`);
+  }
+
+  parts.push('<div class="unfurl-content">');
+
+  // Title
+  if (title) {
+    parts.push(`<div class="unfurl-title">${escapeHtml(title)}</div>`);
+  }
+
+  // Description
+  if (description) {
+    parts.push(`<div class="unfurl-description">${escapeHtml(description)}</div>`);
+  }
+
+  // Provider and URL
+  parts.push('<div class="unfurl-meta">');
+  if (providerName) {
+    parts.push(`<span class="unfurl-provider">${escapeHtml(providerName)}</span>`);
+  }
+  parts.push(`<span class="unfurl-url">${escapeHtml(url)}</span>`);
+  parts.push('</div>');
+
+  parts.push('</div>'); // unfurl-content
+  parts.push('</div>'); // unfurl-card
+
+  return parts.join('');
+}
+
+/**
  * Render a text node with marks
  */
 function renderText(node: JSONContent): string {
   let text = escapeHtml(node.text ?? '');
 
-  // Highlight hashtags in text
-  text = highlightHashtags(text);
+  // Check if text has a link mark - if so, skip pattern highlighting
+  // (links handle their own content rendering)
+  const hasLinkMark = node.marks?.some((m) => m.type === 'link');
+
+  if (!hasLinkMark) {
+    // Highlight inter-note links [[uuid]] with placeholder titles
+    text = highlightInterNoteLinks(text);
+
+    // Highlight dates YYYY-MM-DD
+    text = highlightDates(text);
+
+    // Highlight hashtags in text
+    text = highlightHashtags(text);
+  }
 
   // Apply marks in reverse order so inner marks come first
   if (node.marks && node.marks.length > 0) {
@@ -326,6 +402,54 @@ function renderText(node: JSONContent): string {
   }
 
   return text;
+}
+
+/**
+ * Highlight inter-note links [[uuid]] with styled chip
+ * Note: In print preview, we show the UUID since we don't have async title lookup.
+ * The PrintPreviewWindow can resolve titles if needed.
+ */
+function highlightInterNoteLinks(text: string): string {
+  // Create a new RegExp instance to avoid global state issues
+  const regex = new RegExp(LINK_PATTERN.source, LINK_PATTERN.flags);
+  return text.replace(regex, (_match, uuid: string) => {
+    // For print, show as a styled chip with the UUID (or title if resolved)
+    // The data-note-id attribute allows post-processing to resolve titles
+    return `<span class="inter-note-link" data-note-id="${escapeHtml(uuid)}">[[${escapeHtml(uuid)}]]</span>`;
+  });
+}
+
+/**
+ * Highlight dates YYYY-MM-DD with styled chip
+ */
+function highlightDates(text: string): string {
+  // Create a new RegExp instance to avoid global state issues
+  const regex = new RegExp(DATE_PATTERN.source, DATE_PATTERN.flags);
+  return text.replace(regex, (_match, date: string) => {
+    // Format the date for display
+    const formatted = formatDateForPrint(date);
+    return `<span class="date-chip" data-date="${escapeHtml(date)}">${escapeHtml(formatted)}</span>`;
+  });
+}
+
+/**
+ * Format a YYYY-MM-DD date for print display
+ */
+function formatDateForPrint(dateStr: string): string {
+  try {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (year === undefined || month === undefined || day === undefined) {
+      return dateStr;
+    }
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 /**
@@ -358,8 +482,41 @@ function applyMark(text: string, mark: { type: string; attrs?: Record<string, un
       return `<code>${text}</code>`;
     case 'underline':
       return `<u>${text}</u>`;
+    case 'link':
+      return renderLinkMark(text, mark.attrs);
     default:
       return text;
+  }
+}
+
+/**
+ * Render a link mark
+ * Handles different display modes: chip, unfurl, link (plain)
+ */
+function renderLinkMark(text: string, attrs?: Record<string, unknown>): string {
+  const href = attrs?.['href'] as string | undefined;
+  const displayMode = (attrs?.['displayMode'] as string | undefined) ?? 'auto';
+
+  if (!href) {
+    return text;
+  }
+
+  // Extract domain for chip display
+  let domain = '';
+  try {
+    const url = new URL(href);
+    domain = url.hostname.replace(/^www\./, '');
+  } catch {
+    domain = href;
+  }
+
+  // Render based on display mode
+  if (displayMode === 'chip' || displayMode === 'auto') {
+    // Chip mode: show as styled chip with domain
+    return `<span class="link-chip"><span class="link-chip-icon">🔗</span><span class="link-chip-text">${escapeHtml(text)}</span><span class="link-chip-domain">${escapeHtml(domain)}</span></span>`;
+  } else {
+    // Link mode: render as plain hyperlink
+    return `<a href="${escapeHtml(href)}" class="print-link">${text}</a>`;
   }
 }
 

@@ -1017,4 +1017,254 @@ describe('generatePrintHtml', () => {
       expect(html).toContain('Third');
     });
   });
+
+  describe('link chips (Phase 3)', () => {
+    it('should render link mark as chip by default', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Click here',
+                marks: [{ type: 'link', attrs: { href: 'https://example.com/page' } }],
+              },
+            ],
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('link-chip');
+      expect(html).toContain('Click here');
+      expect(html).toContain('example.com');
+    });
+
+    it('should render link mark with chip displayMode', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'My Link',
+                marks: [
+                  { type: 'link', attrs: { href: 'https://github.com/test', displayMode: 'chip' } },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('link-chip');
+      expect(html).toContain('My Link');
+      expect(html).toContain('github.com');
+    });
+
+    it('should render link mark with link displayMode as plain link', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Plain Link',
+                marks: [
+                  { type: 'link', attrs: { href: 'https://example.com', displayMode: 'link' } },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('print-link');
+      expect(html).toContain('href="https://example.com"');
+      expect(html).toContain('Plain Link');
+    });
+  });
+
+  describe('inter-note links (Phase 3)', () => {
+    it('should render inter-note link pattern [[uuid]]', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'See [[a1b2c3d4-e5f6-7890-abcd-ef1234567890]]' }],
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('inter-note-link');
+      expect(html).toContain('data-note-id="a1b2c3d4-e5f6-7890-abcd-ef1234567890"');
+    });
+
+    it('should handle multiple inter-note links', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: '[[11111111-1111-1111-1111-111111111111]] and [[22222222-2222-2222-2222-222222222222]]',
+              },
+            ],
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect((html.match(/inter-note-link/g) ?? []).length).toBe(2);
+      expect(html).toContain('11111111-1111-1111-1111-111111111111');
+      expect(html).toContain('22222222-2222-2222-2222-222222222222');
+    });
+  });
+
+  describe('date chips (Phase 3)', () => {
+    it('should render date pattern YYYY-MM-DD as chip', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Due on 2024-12-25' }],
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('date-chip');
+      expect(html).toContain('data-date="2024-12-25"');
+      expect(html).toContain('Dec 25, 2024');
+    });
+
+    it('should handle multiple dates', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'From 2024-01-01 to 2024-12-31' }],
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect((html.match(/date-chip/g) ?? []).length).toBe(2);
+      expect(html).toContain('Jan 1, 2024');
+      expect(html).toContain('Dec 31, 2024');
+    });
+  });
+
+  describe('oEmbed unfurls (Phase 3)', () => {
+    it('should render oEmbed unfurl card with title and description', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://example.com/article',
+              title: 'Example Article',
+              description: 'This is an example article description',
+              providerName: 'Example',
+            },
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('unfurl-card');
+      expect(html).toContain('Example Article');
+      expect(html).toContain('This is an example article description');
+      expect(html).toContain('Example');
+      expect(html).toContain('https://example.com/article');
+    });
+
+    it('should render oEmbed unfurl with thumbnail', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://youtube.com/watch?v=123',
+              title: 'Video Title',
+              thumbnailUrl: 'https://i.ytimg.com/vi/123/hqdefault.jpg',
+              providerName: 'YouTube',
+            },
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('unfurl-card');
+      expect(html).toContain('unfurl-thumbnail');
+      expect(html).toContain('https://i.ytimg.com/vi/123/hqdefault.jpg');
+      expect(html).toContain('Video Title');
+    });
+
+    it('should render loading unfurl as plain link', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://example.com',
+              isLoading: true,
+            },
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('print-link');
+      expect(html).toContain('href="https://example.com"');
+      expect(html).not.toContain('unfurl-card');
+    });
+
+    it('should render error unfurl as plain link', () => {
+      const content: JSONContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'oembedUnfurl',
+            attrs: {
+              url: 'https://example.com',
+              error: 'Failed to fetch',
+            },
+          },
+        ],
+      };
+
+      const html = generatePrintHtml(content, [], defaultOptions);
+
+      expect(html).toContain('print-link');
+      expect(html).not.toContain('unfurl-card');
+    });
+  });
 });

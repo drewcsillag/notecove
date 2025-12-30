@@ -191,6 +191,116 @@ const printStyles = `
     margin: 0.25em 0;
   }
 
+  /* Link chips */
+  .print-content .link-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.9em;
+    color: #1565c0;
+    text-decoration: none;
+  }
+  .print-content .link-chip-icon {
+    font-size: 0.8em;
+  }
+  .print-content .link-chip-text {
+    font-weight: 500;
+  }
+  .print-content .link-chip-domain {
+    color: #666;
+    font-size: 0.85em;
+  }
+  .print-content .print-link {
+    color: #1565c0;
+    text-decoration: underline;
+  }
+
+  /* Inter-note link chips */
+  .print-content .inter-note-link {
+    display: inline;
+    background-color: #fff3e0;
+    border: 1px solid #ffcc80;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.9em;
+    color: #e65100;
+    font-weight: 500;
+  }
+
+  /* Date chips */
+  .print-content .date-chip {
+    display: inline;
+    background-color: #f3e5f5;
+    border: 1px solid #ce93d8;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.9em;
+    color: #7b1fa2;
+    font-weight: 500;
+  }
+
+  /* oEmbed unfurl cards */
+  .print-content .unfurl-card {
+    display: flex;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 1em 0;
+    background-color: #fafafa;
+    max-width: 600px;
+  }
+  .print-content .unfurl-thumbnail {
+    flex-shrink: 0;
+    width: 120px;
+    min-height: 80px;
+    background-color: #eee;
+  }
+  .print-content .unfurl-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    margin: 0;
+  }
+  .print-content .unfurl-content {
+    flex: 1;
+    padding: 12px;
+    min-width: 0;
+  }
+  .print-content .unfurl-title {
+    font-weight: 600;
+    font-size: 1em;
+    color: #333;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .print-content .unfurl-description {
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .print-content .unfurl-meta {
+    font-size: 0.75em;
+    color: #888;
+  }
+  .print-content .unfurl-provider {
+    font-weight: 500;
+    margin-right: 8px;
+  }
+  .print-content .unfurl-url {
+    color: #999;
+    word-break: break-all;
+  }
+
   /* Print-specific page break rules */
   @media print {
     .print-content h1, .print-content h2, .print-content h3,
