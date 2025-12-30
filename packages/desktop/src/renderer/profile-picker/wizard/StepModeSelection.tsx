@@ -81,6 +81,7 @@ export function StepModeSelection({
         {modeOptions.map((option) => (
           <div
             key={option.mode}
+            data-testid={`mode-card-${option.mode}`}
             onClick={() => {
               handleModeSelect(option.mode);
             }}

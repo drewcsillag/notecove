@@ -33,6 +33,7 @@ async function launchAppWithProfilePicker(): Promise<void> {
       ...process.env,
       NODE_ENV: undefined, // Explicitly unset so profile picker shows
       E2E_FAST_SHUTDOWN: '1',
+      E2E_WIZARD_TEST: '1', // Skip auto-creation of Development profile
     },
     timeout: 60000,
   });
@@ -96,7 +97,9 @@ async function fillProfileName(name: string): Promise<void> {
  */
 async function selectMode(mode: 'Local' | 'Cloud' | 'Paranoid' | 'Custom'): Promise<void> {
   await pickerPage.waitForSelector('text=Choose Profile Mode', { timeout: 5000 });
-  await pickerPage.locator(`text=${mode}`).first().click();
+  // Click on the mode card using data-testid for reliable selection
+  const modeId = mode.toLowerCase();
+  await pickerPage.locator(`[data-testid="mode-card-${modeId}"]`).click();
   await pickerPage.locator('button:has-text("Next")').click();
 }
 
@@ -255,8 +258,8 @@ test.describe('Onboarding Wizard', () => {
     await launchAppWithProfilePicker();
     await openWizard();
 
-    // Click Cancel
-    await pickerPage.locator('button:has-text("Cancel")').click();
+    // Click Cancel (use form locator to target wizard's Cancel button, not profile picker's)
+    await pickerPage.locator('form button:has-text("Cancel")').click();
 
     // Should be back at profile picker
     await expect(pickerPage.locator('text=Select Profile')).toBeVisible();
@@ -316,8 +319,8 @@ test.describe('Onboarding Wizard - Cloud Mode', () => {
     // Check if Cloud option is available (it depends on system having cloud storage)
     await pickerPage.waitForSelector('text=Choose Profile Mode', { timeout: 5000 });
 
-    // The Cloud card should exist
-    const cloudCard = pickerPage.locator('text=Cloud');
+    // The Cloud card should exist (use exact match to avoid matching description text)
+    const cloudCard = pickerPage.getByText('Cloud', { exact: true });
     await expect(cloudCard).toBeVisible();
 
     // Note: Whether it's enabled depends on whether cloud storage is detected

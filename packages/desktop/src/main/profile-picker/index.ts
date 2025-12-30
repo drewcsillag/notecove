@@ -371,7 +371,8 @@ export async function showProfilePicker(
   }
 
   // Auto-create Development profile if in dev mode and no profiles exist
-  if (options.isDevBuild && config.profiles.length === 0) {
+  // Skip this in E2E wizard tests so they can test the full wizard flow
+  if (options.isDevBuild && config.profiles.length === 0 && !process.env['E2E_WIZARD_TEST']) {
     const devProfile: Profile = {
       id: generateProfileId(),
       name: 'Development',

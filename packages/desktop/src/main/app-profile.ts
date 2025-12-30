@@ -32,14 +32,57 @@ export async function selectProfile(
   cliArgs: CliArgs,
   isTestMode: boolean
 ): Promise<ProfileSelectionResult | null> {
-  if (isTestMode) {
-    console.log('[Profile] Test mode - skipping profile picker');
-    return null;
-  }
-
   const appDataDir = app.getPath('userData');
   const isDevBuild = !app.isPackaged;
   const profileStorage = getProfileStorage(appDataDir);
+
+  // In test mode, handle CLI profile lookup but skip UI dialogs
+  if (isTestMode) {
+    console.log('[Profile] Test mode - checking for CLI profile...');
+
+    // Handle --profile=<name> in test mode (e.g., paranoid mode E2E tests)
+    if (cliArgs.profileName) {
+      const config = await profileStorage.loadProfiles();
+      const profile = config.profiles.find((p) => p.name === cliArgs.profileName);
+
+      if (profile) {
+        console.log(
+          `[Profile] Test mode: Using profile "${profile.name}" (${profile.id}, mode: ${getProfileMode(profile)})`
+        );
+
+        // Return the profile without UI dialogs or locks
+        // In test mode we don't need locking since tests manage their own isolation
+        const fsAdapter = new NodeFileSystemAdapter();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+        const dummyLock = new ProfileLock(fsAdapter as any);
+
+        const result: ProfileSelectionResult = {
+          profileId: profile.id,
+          profileName: profile.name,
+          profileMode: getProfileMode(profile),
+          profileLock: dummyLock,
+        };
+
+        // Only include initialization data if present
+        if (profile.initialStoragePath) {
+          result.initialStoragePath = profile.initialStoragePath;
+        }
+        if (profile.initialUsername) {
+          result.initialUsername = profile.initialUsername;
+        }
+        if (profile.initialHandle) {
+          result.initialHandle = profile.initialHandle;
+        }
+
+        return result;
+      } else {
+        console.warn(`[Profile] Test mode: Profile "${cliArgs.profileName}" not found`);
+      }
+    }
+
+    console.log('[Profile] Test mode - skipping profile picker');
+    return null;
+  }
 
   let selectedProfileId: string | null = null;
 

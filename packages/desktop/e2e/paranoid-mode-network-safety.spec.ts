@@ -261,8 +261,8 @@ test.describe('Paranoid Mode - Settings Restrictions', () => {
     // Wait for settings dialog
     await page.waitForSelector('text=Settings', { timeout: 5000 });
 
-    // Navigate to Storage Directories tab (should be first tab, so should be visible)
-    await page.locator('text=Storage Directories').click();
+    // Navigate to Storage Directories tab (use exact match to avoid matching descriptions)
+    await page.getByRole('tab', { name: 'Storage Directories' }).click();
     await page.waitForTimeout(300);
 
     // "Quick Add from Cloud Storage" section should NOT be visible for paranoid mode
