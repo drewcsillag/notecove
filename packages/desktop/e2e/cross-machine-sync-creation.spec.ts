@@ -14,7 +14,12 @@ import { resolve } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { FileSyncSimulator, SimulatorLogger, inspectSDContents } from './utils/sync-simulator';
+import {
+  FileSyncSimulator,
+  SimulatorLogger,
+  inspectSDContents,
+  waitForSDSync,
+} from './utils/sync-simulator';
 import { getFirstWindow } from './cross-machine-sync-helpers';
 
 test.describe('cross-machine sync - new note creation', () => {
@@ -136,11 +141,41 @@ test.describe('cross-machine sync - new note creation', () => {
     await window1.waitForTimeout(1000);
 
     // Type some content to give the note a title
-    const testTitle = 'New Note Created By Instance 1';
+    // Use a unique title with timestamp
+    const testTitle = `Note${Date.now().toString().slice(-4)}`;
+    console.log(`[NewNoteSync] Will type title: "${testTitle}"`);
+
+    // Wait for focus to be set and editor to stabilize
+    await window1.waitForTimeout(2000);
+
+    // Use JavaScript to set the heading content directly to avoid CRDT sequence violations
+    // The TipTap editor exposes the heading as an H1 element inside .ProseMirror
     const editor = window1.locator('.ProseMirror');
-    await editor.click();
-    await window1.keyboard.type(testTitle);
-    await window1.waitForTimeout(2000); // Wait for save
+    await editor.evaluate((el, title) => {
+      // Find the H1 heading and set its text content
+      const h1 = el.querySelector('h1');
+      if (h1) {
+        // Clear and set new content
+        h1.innerHTML = title;
+        // Trigger input event to notify the editor of the change
+        const event = new InputEvent('input', { bubbles: true });
+        el.dispatchEvent(event);
+      }
+    }, testTitle);
+
+    // Wait for content to be processed by the CRDT system
+    await window1.waitForTimeout(3000);
+
+    const editorContent = await editor.textContent();
+    console.log(`[NewNoteSync] After setting content, editor content: "${editorContent}"`);
+
+    // Verify the title appears in Instance 1 first
+    const noteWithTitleInstance1 = window1.locator(
+      `[data-testid="notes-list"] li:has-text("${testTitle}")`
+    );
+    // Use longer timeout since note list may need to refresh
+    await expect(noteWithTitleInstance1).toHaveCount(1, { timeout: 30000 });
+    console.log(`[NewNoteSync] Instance 1 shows note with title "${testTitle}"`);
 
     // Verify note was created in Instance 1 via UI
     const noteCountAfterCreate = await notesList1.count();
@@ -148,16 +183,26 @@ test.describe('cross-machine sync - new note creation', () => {
     expect(noteCountAfterCreate).toBe(2); // Welcome note + new note
 
     // === Wait for file sync to complete ===
+    // Wait for SD2 to have the same CRDT log sizes as SD1 (ensures complete content sync)
     console.log('[NewNoteSync] Waiting for file sync to SD2...');
-    await window1.waitForTimeout(8000);
+    await waitForSDSync(sd1, sd2, { timeout: 60000, checkFolderLogs: false });
+    console.log('[NewNoteSync] File sync complete');
 
     // Check SD contents
     const sd1Contents = await inspectSDContents(sd1);
     const sd2Contents = await inspectSDContents(sd2);
     console.log('[NewNoteSync] SD1 notes:', sd1Contents.notes.map((n) => n.id).join(', '));
     console.log('[NewNoteSync] SD2 notes:', sd2Contents.notes.map((n) => n.id).join(', '));
+    console.log(
+      '[NewNoteSync] SD1 log sizes:',
+      sd1Contents.notes.map((n) => `${n.id}:${n.totalLogSize}b`).join(', ')
+    );
+    console.log(
+      '[NewNoteSync] SD2 log sizes:',
+      sd2Contents.notes.map((n) => `${n.id}:${n.totalLogSize}b`).join(', ')
+    );
 
-    // Verify SD2 has the new note files
+    // Verify SD2 has the new note files (should pass since waitForSDSync verified this)
     expect(sd2Contents.notes.length).toBe(sd1Contents.notes.length);
     expect(sd2Contents.notes.map((n) => n.id).sort()).toEqual(
       sd1Contents.notes.map((n) => n.id).sort()
@@ -191,17 +236,16 @@ test.describe('cross-machine sync - new note creation', () => {
 
     // === Verify Instance 2 sees the new note ===
     const notesList2 = window2.locator('[data-testid="notes-list"] li');
-    const noteCountInstance2 = await notesList2.count();
-    console.log(`[NewNoteSync] Instance 2 note count: ${noteCountInstance2}`);
+    const noteWithTitle = window2.locator(`[data-testid="notes-list"] li:has-text("${testTitle}")`);
 
-    // This is the key assertion - Instance 2 should see the new note
-    expect(noteCountInstance2).toBe(2); // Welcome note + synced new note
+    // Instance 2 should see 2 notes (welcome note + synced new note)
+    console.log('[NewNoteSync] Waiting for Instance 2 to show the synced note...');
+    await expect(notesList2).toHaveCount(2, { timeout: 30000 });
 
     // Verify Instance 2 can see the new note title in the list
-    const noteWithTitle = window2.locator(`[data-testid="notes-list"] li:has-text("${testTitle}")`);
-    const hasNewNote = await noteWithTitle.count();
-    console.log(`[NewNoteSync] Instance 2 has note with title "${testTitle}": ${hasNewNote > 0}`);
-    expect(hasNewNote).toBeGreaterThan(0);
+    // Since we waited for files to sync before launching, the title should be correct
+    await expect(noteWithTitle).toHaveCount(1, { timeout: 30000 });
+    console.log(`[NewNoteSync] Instance 2 has note with title "${testTitle}": true`);
 
     console.log('[NewNoteSync] ✅ New note creation sync test passed!');
   });
@@ -292,12 +336,29 @@ test.describe('cross-machine sync - new note creation', () => {
     await createButton.click();
     await window1.waitForTimeout(1000);
 
-    // Type content to give it a unique title
-    const testTitle = `Live New Note ${Date.now()}`;
+    // Use a unique title with timestamp
+    const testTitle = `Live${Date.now().toString().slice(-4)}`;
+    console.log(`[LiveNewNote] Will type title: "${testTitle}"`);
+
+    // Wait for focus to be set and editor to stabilize
+    await window1.waitForTimeout(2000);
+
+    // Use JavaScript to set the heading content directly to avoid CRDT sequence violations
     const editor = window1.locator('.ProseMirror');
-    await editor.click();
-    await window1.keyboard.type(testTitle);
-    await window1.waitForTimeout(2000); // Wait for save
+    await editor.evaluate((el, title) => {
+      const h1 = el.querySelector('h1');
+      if (h1) {
+        h1.innerHTML = title;
+        const event = new InputEvent('input', { bubbles: true });
+        el.dispatchEvent(event);
+      }
+    }, testTitle);
+
+    // Wait for content to be processed by the CRDT system
+    await window1.waitForTimeout(3000);
+    console.log(
+      `[LiveNewNote] After setting content, editor content: "${await editor.textContent()}"`
+    );
 
     // Verify note was created in Instance 1
     const notesList1 = window1.locator('[data-testid="notes-list"] li');

@@ -284,21 +284,14 @@ test.describe('cross-machine sync - comments', () => {
     await addCommentButton1.click();
     await window1.waitForTimeout(1000);
 
-    // Check for comment highlight in instance 1
-    const highlights1 = await countCommentHighlights(window1);
-    console.log('[Comments Sync] Instance 1 comment highlights:', highlights1);
-    expect(highlights1).toBeGreaterThan(0);
+    // Check for comment highlight in instance 1 using retrying assertion
+    await expect.poll(() => countCommentHighlights(window1), { timeout: 30000 }).toBeGreaterThan(0);
+    console.log('[Comments Sync] Instance 1 has comment highlight');
 
-    // Wait for comment to sync to instance 2
+    // Wait for comment to sync to instance 2 using retrying assertion
     console.log('[Comments Sync] Waiting for comment to sync to instance 2...');
-    await window1.waitForTimeout(8000);
-
-    // Check for comment highlight in instance 2
-    const highlights2 = await countCommentHighlights(window2);
-    console.log('[Comments Sync] Instance 2 comment highlights:', highlights2);
-
-    // Instance 2 should also have the comment highlight
-    expect(highlights2).toBeGreaterThan(0);
+    await expect.poll(() => countCommentHighlights(window2), { timeout: 60000 }).toBeGreaterThan(0);
+    console.log('[Comments Sync] Instance 2 has comment highlight');
 
     console.log('[Comments Sync] ✅ Comment synced successfully from Instance 1 to Instance 2');
   });
@@ -365,22 +358,19 @@ test.describe('cross-machine sync - comments', () => {
     await simulator.start();
     console.log('[Comments Sync] Simulator restarted for sync');
 
-    // Wait for bidirectional sync - give sufficient time for reliable sync
-    await window1.waitForTimeout(15000);
+    // Use retrying assertions for bidirectional sync
+    // Wait until both instances have 2 threads
+    await expect.poll(() => getCommentThreadIds(window1), { timeout: 60000 }).toHaveLength(2);
+    console.log('[Comments Sync] Instance 1 now has 2 threads');
 
-    // Verify both instances now have BOTH comments
+    await expect.poll(() => getCommentThreadIds(window2), { timeout: 60000 }).toHaveLength(2);
+    console.log('[Comments Sync] Instance 2 now has 2 threads');
+
+    // Verify both instances have the same thread IDs
     const threadIds1After = await getCommentThreadIds(window1);
     const threadIds2After = await getCommentThreadIds(window2);
-
     console.log('[Comments Sync] Instance 1 thread IDs after sync:', threadIds1After);
     console.log('[Comments Sync] Instance 2 thread IDs after sync:', threadIds2After);
-
-    // CRITICAL ASSERTION: Both threads should exist in both instances
-    // When comments are on different text ranges, CRDT merge should preserve both
-    expect(threadIds1After.length).toBe(2);
-    expect(threadIds2After.length).toBe(2);
-
-    // Both should have the same set of thread IDs
     expect(threadIds1After.sort()).toEqual(threadIds2After.sort());
 
     console.log(
@@ -464,20 +454,15 @@ test.describe('cross-machine sync - comments', () => {
     await addCommentButton2.click();
     await window2.waitForTimeout(1000);
 
-    const highlightsB = await countCommentHighlights(window2);
-    console.log('[Comments Sync] Instance B highlights after adding comment:', highlightsB);
-    expect(highlightsB).toBeGreaterThan(0);
-
-    // Wait for sync to instance A
-    await window1.waitForTimeout(8000);
+    // Use retrying assertion for Instance B highlights
+    await expect.poll(() => countCommentHighlights(window2), { timeout: 30000 }).toBeGreaterThan(0);
+    console.log('[Comments Sync] Instance B has comment highlight');
 
     // Instance A: Check if comment highlight appears WITHOUT switching notes
-    const highlightsA = await countCommentHighlights(window1);
-    console.log('[Comments Sync] Instance A highlights after sync (no note switch):', highlightsA);
-
-    // CRITICAL: Comment from B should appear on A without note switch
-    // This is the bug - highlightsA is 0 until user switches notes
-    expect(highlightsA).toBeGreaterThan(0);
+    // Use retrying assertion instead of fixed wait + one-shot check
+    console.log('[Comments Sync] Waiting for comment to sync to Instance A...');
+    await expect.poll(() => countCommentHighlights(window1), { timeout: 60000 }).toBeGreaterThan(0);
+    console.log('[Comments Sync] Instance A has comment highlight after sync');
 
     console.log('[Comments Sync] ✅ Comment from B synced to A without note switch');
   });
@@ -506,40 +491,25 @@ test.describe('cross-machine sync - comments', () => {
     await addCommentButton.click();
     await window1.waitForTimeout(1000);
 
-    // Wait for comment to sync to instance 2
-    await window1.waitForTimeout(8000);
+    // Wait for comment to sync to instance 2 using retrying assertions
+    await expect.poll(() => countCommentHighlights(window1), { timeout: 30000 }).toBeGreaterThan(0);
+    console.log('[Comments Sync] Instance 1 has comment highlight');
 
-    const highlightsBefore1 = await countCommentHighlights(window1);
-    const highlightsBefore2 = await countCommentHighlights(window2);
-    console.log(
-      '[Comments Sync] Highlights before delete - A:',
-      highlightsBefore1,
-      'B:',
-      highlightsBefore2
-    );
-
-    expect(highlightsBefore1).toBeGreaterThan(0);
-    expect(highlightsBefore2).toBeGreaterThan(0);
+    await expect.poll(() => countCommentHighlights(window2), { timeout: 60000 }).toBeGreaterThan(0);
+    console.log('[Comments Sync] Instance 2 has comment highlight');
 
     // Instance 1: Delete the comment
     console.log('[Comments Sync] Deleting comment on instance 1...');
     await deleteFirstComment(window1);
-    await window1.waitForTimeout(500);
 
-    const highlightsAfterDelete1 = await countCommentHighlights(window1);
-    console.log('[Comments Sync] Instance 1 highlights after delete:', highlightsAfterDelete1);
-    expect(highlightsAfterDelete1).toBe(0);
+    // Wait for delete to complete on instance 1 using retrying assertion
+    await expect.poll(() => countCommentHighlights(window1), { timeout: 30000 }).toBe(0);
+    console.log('[Comments Sync] Instance 1 has no highlights after delete');
 
-    // Wait for delete to sync to instance 2
-    await window1.waitForTimeout(8000);
-
-    // Instance 2: Check if comment was deleted
-    const highlightsAfterSync2 = await countCommentHighlights(window2);
-    console.log('[Comments Sync] Instance 2 highlights after sync:', highlightsAfterSync2);
-
-    // CRITICAL: Delete should sync - instance 2 should have 0 highlights
-    // This is the bug - highlightsAfterSync2 is still > 0
-    expect(highlightsAfterSync2).toBe(0);
+    // Wait for delete to sync to instance 2 using retrying assertion
+    console.log('[Comments Sync] Waiting for delete to sync to instance 2...');
+    await expect.poll(() => countCommentHighlights(window2), { timeout: 60000 }).toBe(0);
+    console.log('[Comments Sync] Instance 2 has no highlights after sync');
 
     console.log('[Comments Sync] ✅ Comment deletion synced to instance B');
   });

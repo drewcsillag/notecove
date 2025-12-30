@@ -219,6 +219,133 @@ export function formatSDContents(contents: SDContents): string {
 }
 
 /**
+ * Options for waitForSDSync
+ */
+export interface WaitForSDSyncOptions {
+  /** Timeout in milliseconds (default: 60000) */
+  timeout?: number;
+  /** Poll interval in milliseconds (default: 500) */
+  pollInterval?: number;
+  /** Whether to check folder log sizes (default: true) */
+  checkFolderLogs?: boolean;
+  /** Logger for progress messages (optional) */
+  logger?: SimulatorLogger;
+}
+
+/**
+ * Wait for SD directories to have matching CRDT log sizes and folder log sizes.
+ *
+ * This function polls both SD directories and waits until:
+ * 1. Both have the same note IDs
+ * 2. Each note has matching totalLogSize between SD1 and SD2
+ * 3. (Optionally) Folder log sizes match
+ *
+ * Use this to wait for FileSyncSimulator to complete syncing before making assertions.
+ *
+ * @param sd1Path - Path to the first SD directory (source)
+ * @param sd2Path - Path to the second SD directory (destination)
+ * @param options - Configuration options
+ * @returns Promise that resolves when sync is complete, or rejects on timeout
+ */
+export async function waitForSDSync(
+  sd1Path: string,
+  sd2Path: string,
+  options: WaitForSDSyncOptions = {}
+): Promise<void> {
+  const { timeout = 60000, pollInterval = 500, checkFolderLogs = true, logger } = options;
+
+  const startTime = Date.now();
+  let lastLogTime = 0;
+  const logInterval = 5000; // Log progress every 5 seconds
+
+  const log = (message: string) => {
+    if (logger) {
+      logger.log(message);
+    } else {
+      console.log(`[waitForSDSync] ${message}`);
+    }
+  };
+
+  log(`Waiting for SD sync (timeout: ${timeout}ms, checkFolderLogs: ${checkFolderLogs})`);
+
+  while (Date.now() - startTime < timeout) {
+    const sd1Contents = await inspectSDContents(sd1Path);
+    const sd2Contents = await inspectSDContents(sd2Path);
+
+    // Check if note IDs match
+    const sd1NoteIds = sd1Contents.notes.map((n) => n.id).sort();
+    const sd2NoteIds = sd2Contents.notes.map((n) => n.id).sort();
+
+    const noteIdsMatch = JSON.stringify(sd1NoteIds) === JSON.stringify(sd2NoteIds);
+
+    // Check if all note log sizes match
+    let allLogSizesMatch = true;
+    const logSizeMismatches: string[] = [];
+
+    if (noteIdsMatch) {
+      for (const sd1Note of sd1Contents.notes) {
+        const sd2Note = sd2Contents.notes.find((n) => n.id === sd1Note.id);
+        if (!sd2Note || sd2Note.totalLogSize !== sd1Note.totalLogSize) {
+          allLogSizesMatch = false;
+          const sd2Size = sd2Note?.totalLogSize ?? 0;
+          logSizeMismatches.push(`${sd1Note.id}: ${sd2Size}/${sd1Note.totalLogSize}`);
+        }
+      }
+    }
+
+    // Check folder log sizes if enabled
+    let folderLogsMatch = true;
+    if (checkFolderLogs) {
+      const sd1FolderSizes = await getFolderLogSizes(sd1Path);
+      const sd2FolderSizes = await getFolderLogSizes(sd2Path);
+
+      // Check all SD1 folder logs exist in SD2 with same size
+      for (const [file, size] of sd1FolderSizes) {
+        const sd2Size = sd2FolderSizes.get(file);
+        if (sd2Size !== size) {
+          folderLogsMatch = false;
+          break;
+        }
+      }
+    }
+
+    // Log progress periodically
+    const now = Date.now();
+    if (now - lastLogTime >= logInterval) {
+      const elapsed = Math.round((now - startTime) / 1000);
+      log(
+        `Progress after ${elapsed}s: noteIds=${noteIdsMatch}, logSizes=${allLogSizesMatch}, folderLogs=${folderLogsMatch}`
+      );
+      if (logSizeMismatches.length > 0) {
+        log(`  Log size mismatches: ${logSizeMismatches.join(', ')}`);
+      }
+      lastLogTime = now;
+    }
+
+    // Check if sync is complete
+    if (noteIdsMatch && allLogSizesMatch && folderLogsMatch) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      log(`Sync complete after ${elapsed}s`);
+      return;
+    }
+
+    // Wait before next poll
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+  }
+
+  // Timeout - get final state for error message
+  const sd1Contents = await inspectSDContents(sd1Path);
+  const sd2Contents = await inspectSDContents(sd2Path);
+
+  const details = [
+    `SD1 notes: ${sd1Contents.notes.map((n) => `${n.id}(${n.totalLogSize}b)`).join(', ')}`,
+    `SD2 notes: ${sd2Contents.notes.map((n) => `${n.id}(${n.totalLogSize}b)`).join(', ')}`,
+  ];
+
+  throw new Error(`waitForSDSync timed out after ${timeout}ms. ${details.join('; ')}`);
+}
+
+/**
  * CRDT log record information
  */
 export interface CRDTLogRecord {

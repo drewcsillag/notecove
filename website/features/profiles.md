@@ -99,11 +99,11 @@ When NoteCove launches, you can:
 
 After creation, you can modify some profile settings:
 
-| Setting | Local | Cloud | Paranoid | Custom |
-|---------|-------|-------|----------|--------|
-| Add storage directories | Yes | Yes | No | Yes |
-| Link preview mode | Yes | Yes | No (locked to secure) | Yes |
-| Display name/handle | Yes | Yes | No | Yes |
+| Setting                 | Local | Cloud | Paranoid              | Custom |
+| ----------------------- | ----- | ----- | --------------------- | ------ |
+| Add storage directories | Yes   | Yes   | No                    | Yes    |
+| Link preview mode       | Yes   | Yes   | No (locked to secure) | Yes    |
+| Display name/handle     | Yes   | Yes   | No                    | Yes    |
 
 ## Privacy Considerations
 
@@ -143,6 +143,7 @@ Profile configuration is stored in:
 ```
 
 This includes:
+
 - Profile ID and name
 - Mode setting
 - Creation timestamp

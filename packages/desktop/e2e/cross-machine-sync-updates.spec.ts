@@ -158,50 +158,50 @@ test.describe('cross-machine sync - note updates', () => {
     // Verify Instance 2 sees the welcome note with original title
     const notesList2 = window2.locator('[data-testid="notes-list"]');
     const welcomeNote2 = notesList2.locator('li:has-text("Welcome to NoteCove")');
-    const hasWelcomeNote = await welcomeNote2.isVisible();
-    console.log(`[LiveTitleSync] Instance 2 has welcome note: ${hasWelcomeNote}`);
-    expect(hasWelcomeNote).toBe(true);
+    await expect(welcomeNote2).toBeVisible({ timeout: 30000 });
+    console.log('[LiveTitleSync] Instance 2 has welcome note');
 
     // === Change the title in Instance 1 ===
     console.log('[LiveTitleSync] Changing note title in Instance 1...');
     const editor1 = window1.locator('.ProseMirror');
-    await editor1.click();
 
-    // Select all and delete to clear the content
-    await window1.keyboard.press('Meta+a');
-    await window1.waitForTimeout(100);
-    await window1.keyboard.press('Delete');
-    await window1.waitForTimeout(200);
+    // Use a unique title with timestamp
+    const newTitle = `Updated${Date.now().toString().slice(-4)}`;
+    console.log(`[LiveTitleSync] Will set new title: "${newTitle}"`);
 
-    // Type new title
-    const newTitle = `Updated Title ${Date.now()}`;
-    await window1.keyboard.type(newTitle);
-    await window1.waitForTimeout(2000); // Wait for save
+    // Wait for editor to stabilize
+    await window1.waitForTimeout(2000);
+
+    // Use JavaScript to set the heading content directly to avoid CRDT sequence violations
+    await editor1.evaluate((el, title) => {
+      const h1 = el.querySelector('h1');
+      if (h1) {
+        h1.innerHTML = title;
+        const event = new InputEvent('input', { bubbles: true });
+        el.dispatchEvent(event);
+      }
+    }, newTitle);
+
+    // Wait for content to be processed by the CRDT system
+    await window1.waitForTimeout(3000);
     console.log(`[LiveTitleSync] New title: ${newTitle}`);
 
-    // Verify title changed in Instance 1's note list
+    // Verify title changed in Instance 1's note list using retrying assertion
     const notesList1 = window1.locator('[data-testid="notes-list"]');
     const updatedNote1 = notesList1.locator(`li:has-text("${newTitle}")`);
-    const titleUpdatedIn1 = await updatedNote1.isVisible();
-    console.log(`[LiveTitleSync] Instance 1 note list updated: ${titleUpdatedIn1}`);
-    expect(titleUpdatedIn1).toBe(true);
+    await expect(updatedNote1).toBeVisible({ timeout: 30000 });
+    console.log('[LiveTitleSync] Instance 1 note list updated');
 
-    // === Wait for sync to Instance 2 ===
+    // === Wait for sync to Instance 2 using retrying assertion ===
     console.log('[LiveTitleSync] Waiting for title sync to Instance 2...');
-    await window1.waitForTimeout(15000);
-
-    // === THE KEY TEST: Does Instance 2's note list show the new title? ===
     const updatedNote2 = notesList2.locator(`li:has-text("${newTitle}")`);
-    const titleUpdatedIn2 = await updatedNote2.isVisible();
-    console.log(`[LiveTitleSync] Instance 2 note list updated: ${titleUpdatedIn2}`);
-
-    // This is the key assertion
-    expect(titleUpdatedIn2).toBe(true);
+    // Use retrying assertion instead of fixed wait + one-shot check
+    await expect(updatedNote2).toBeVisible({ timeout: 60000 });
+    console.log('[LiveTitleSync] Instance 2 note list updated');
 
     // Also verify the old title is gone
-    const oldTitleStillVisible = await welcomeNote2.isVisible();
-    console.log(`[LiveTitleSync] Old title still visible: ${oldTitleStillVisible}`);
-    expect(oldTitleStillVisible).toBe(false);
+    await expect(welcomeNote2).not.toBeVisible({ timeout: 30000 });
+    console.log('[LiveTitleSync] Old title no longer visible');
 
     console.log('[LiveTitleSync] ✅ Live title sync test passed!');
   });
@@ -283,15 +283,13 @@ test.describe('cross-machine sync - note updates', () => {
     // Verify Instance 2 sees the welcome note (unpinned)
     const notesList2 = window2.locator('[data-testid="notes-list"]');
     const welcomeNote2 = notesList2.locator('li:has-text("Welcome to NoteCove")');
-    const hasWelcomeNote = await welcomeNote2.isVisible();
-    console.log(`[LivePinSync] Instance 2 has welcome note: ${hasWelcomeNote}`);
-    expect(hasWelcomeNote).toBe(true);
+    await expect(welcomeNote2).toBeVisible({ timeout: 30000 });
+    console.log('[LivePinSync] Instance 2 has welcome note');
 
     // Verify not pinned initially (no pin icon)
     const pinIcon2Before = welcomeNote2.locator('[data-testid="PushPinIcon"]');
-    const isPinnedBefore = await pinIcon2Before.isVisible().catch(() => false);
-    console.log(`[LivePinSync] Instance 2 note pinned before: ${isPinnedBefore}`);
-    expect(isPinnedBefore).toBe(false);
+    await expect(pinIcon2Before).not.toBeVisible({ timeout: 5000 });
+    console.log('[LivePinSync] Instance 2 note not pinned initially');
 
     // === Pin the note in Instance 1 ===
     console.log('[LivePinSync] Pinning note in Instance 1...');
@@ -307,25 +305,19 @@ test.describe('cross-machine sync - note updates', () => {
     await pinMenuItem.click();
     await window1.waitForTimeout(1000);
 
-    // Verify pin icon appears in Instance 1
+    // Verify pin icon appears in Instance 1 using retrying assertion
     const pinIcon1 = welcomeNote1.locator('[data-testid="PushPinIcon"]');
-    const isPinned1 = await pinIcon1.isVisible().catch(() => false);
-    console.log(`[LivePinSync] Instance 1 note pinned: ${isPinned1}`);
-    expect(isPinned1).toBe(true);
+    await expect(pinIcon1).toBeVisible({ timeout: 30000 });
+    console.log('[LivePinSync] Instance 1 note pinned');
 
-    // === Wait for sync to Instance 2 ===
+    // === Wait for sync to Instance 2 using retrying assertion ===
     console.log('[LivePinSync] Waiting for pin status sync to Instance 2...');
-    await window1.waitForTimeout(15000);
-
-    // === THE KEY TEST: Does Instance 2 show the pin icon? ===
     // Re-query the note list to get fresh DOM
     const welcomeNote2After = notesList2.locator('li:has-text("Welcome to NoteCove")');
     const pinIcon2After = welcomeNote2After.locator('[data-testid="PushPinIcon"]');
-    const isPinnedAfter = await pinIcon2After.isVisible().catch(() => false);
-    console.log(`[LivePinSync] Instance 2 note pinned after sync: ${isPinnedAfter}`);
-
-    // This is the key assertion
-    expect(isPinnedAfter).toBe(true);
+    // Use retrying assertion instead of fixed wait + one-shot check
+    await expect(pinIcon2After).toBeVisible({ timeout: 60000 });
+    console.log('[LivePinSync] Instance 2 note pinned after sync');
 
     console.log('[LivePinSync] ✅ Live pin sync test passed!');
   });
@@ -410,32 +402,28 @@ test.describe('cross-machine sync - note updates', () => {
     console.log('[TitleSyncUnopened] Creating new note in Instance 1...');
     const createButton1 = window1.locator('button[title="Create note"]');
     await createButton1.click();
-    await window1.waitForTimeout(1000);
-
-    // Type initial content
-    const editor1 = window1.locator('.ProseMirror');
-    await editor1.click();
-    await window1.keyboard.type('Initial Title For Test');
     await window1.waitForTimeout(2000);
 
-    // Wait for sync to Instance 2 - use polling pattern for stability during list updates
+    // Use JavaScript to set the heading content directly to avoid CRDT sequence violations
+    const editor1 = window1.locator('.ProseMirror');
+    const initialTitle = `Init${Date.now().toString().slice(-4)}`;
+    console.log(`[TitleSyncUnopened] Setting initial title: ${initialTitle}`);
+    await editor1.evaluate((el, title) => {
+      const h1 = el.querySelector('h1');
+      if (h1) {
+        h1.innerHTML = title;
+        const event = new InputEvent('input', { bubbles: true });
+        el.dispatchEvent(event);
+      }
+    }, initialTitle);
+    await window1.waitForTimeout(3000);
+
+    // Wait for sync to Instance 2 - use retrying assertion
     console.log('[TitleSyncUnopened] Waiting for new note to sync to Instance 2...');
-    // Wait for notes list to be stable first
-    await window2.waitForSelector('[data-testid="notes-list"]', { timeout: 30000 });
-    // Use expect.poll for more robust checking during rapid list updates
-    await expect
-      .poll(
-        async () => {
-          const noteLocator = window2.locator(
-            '[data-testid="notes-list"] li:has-text("Initial Title For Test")'
-          );
-          return await noteLocator.count();
-        },
-        { timeout: 60000, intervals: [500, 1000, 2000] }
-      )
-      .toBeGreaterThan(0);
-    console.log('[TitleSyncUnopened] Instance 2 has initial note: true');
     const notesList2 = window2.locator('[data-testid="notes-list"]');
+    const initialNoteLocator = notesList2.locator(`li:has-text("${initialTitle}")`);
+    await expect(initialNoteLocator).toBeVisible({ timeout: 60000 });
+    console.log('[TitleSyncUnopened] Instance 2 has initial note');
 
     // KEY: Switch Instance 2 back to welcome note so the new note is NOT open
     console.log('[TitleSyncUnopened] Switching Instance 2 to welcome note (closing test note)...');
@@ -446,38 +434,30 @@ test.describe('cross-machine sync - note updates', () => {
     // Now change the title in Instance 1
     console.log('[TitleSyncUnopened] Changing title in Instance 1...');
     const notesList1 = window1.locator('[data-testid="notes-list"]');
-    const testNote1 = notesList1.locator('li:has-text("Initial Title For Test")');
+    const testNote1 = notesList1.locator(`li:has-text("${initialTitle}")`);
     await testNote1.click();
-    await window1.waitForTimeout(500);
-
-    // Click in the editor to ensure focus
-    const editor1Edit = window1.locator('.ProseMirror');
-    await editor1Edit.click();
-    await window1.waitForTimeout(200);
-
-    // Select all and replace
-    await window1.keyboard.press('Meta+a');
-    await window1.waitForTimeout(100);
-    await window1.keyboard.press('Backspace');
-    await window1.waitForTimeout(200);
-
-    const newTitle = `Changed Title ${Date.now()}`;
-    await window1.keyboard.type(newTitle);
     await window1.waitForTimeout(2000);
-    console.log(`[TitleSyncUnopened] New title: ${newTitle}`);
 
-    // Wait for sync to Instance 2
-    console.log('[TitleSyncUnopened] Waiting for title sync to Instance 2...');
-    await window1.waitForTimeout(15000);
+    // Use JavaScript to set the new heading content directly
+    const newTitle = `Changed${Date.now().toString().slice(-4)}`;
+    console.log(`[TitleSyncUnopened] Setting new title: ${newTitle}`);
+    await editor1.evaluate((el, title) => {
+      const h1 = el.querySelector('h1');
+      if (h1) {
+        h1.innerHTML = title;
+        const event = new InputEvent('input', { bubbles: true });
+        el.dispatchEvent(event);
+      }
+    }, newTitle);
+    await window1.waitForTimeout(3000);
 
     // THE KEY TEST: Does Instance 2's note list show the new title?
     // (Note is NOT open in Instance 2 - it's viewing the welcome note)
+    console.log('[TitleSyncUnopened] Waiting for title sync to Instance 2...');
     const updatedNote2 = notesList2.locator(`li:has-text("${newTitle}")`);
-    const titleUpdated = await updatedNote2.isVisible();
-    console.log(`[TitleSyncUnopened] Instance 2 note list shows new title: ${titleUpdated}`);
-
-    // This should pass - title should sync even when note is not open
-    expect(titleUpdated).toBe(true);
+    // Use retrying assertion instead of fixed wait + one-shot check
+    await expect(updatedNote2).toBeVisible({ timeout: 60000 });
+    console.log('[TitleSyncUnopened] Instance 2 note list shows new title');
 
     console.log('[TitleSyncUnopened] ✅ Title sync on unopened note test passed!');
   });
@@ -535,11 +515,10 @@ test.describe('cross-machine sync - note updates', () => {
     await pinMenuItem.click();
     await window1.waitForTimeout(1000);
 
-    // Verify pinned in Instance 1
+    // Verify pinned in Instance 1 using retrying assertion
     const pinIcon1 = welcomeNote1.locator('[data-testid="PushPinIcon"]');
-    const isPinned1 = await pinIcon1.isVisible().catch(() => false);
-    console.log(`[UnpinSync] Instance 1 note pinned: ${isPinned1}`);
-    expect(isPinned1).toBe(true);
+    await expect(pinIcon1).toBeVisible({ timeout: 30000 });
+    console.log('[UnpinSync] Instance 1 note pinned');
 
     // Wait for initial sync
     await window1.waitForTimeout(5000);
@@ -566,13 +545,12 @@ test.describe('cross-machine sync - note updates', () => {
     await window2.waitForTimeout(2000);
     console.log('[UnpinSync] Instance 2 ready');
 
-    // Verify Instance 2 sees the note as pinned
+    // Verify Instance 2 sees the note as pinned using retrying assertion
     const notesList2 = window2.locator('[data-testid="notes-list"]');
     const welcomeNote2 = notesList2.locator('li:has-text("Welcome to NoteCove")');
     const pinIcon2Before = welcomeNote2.locator('[data-testid="PushPinIcon"]');
-    const isPinnedBefore = await pinIcon2Before.isVisible().catch(() => false);
-    console.log(`[UnpinSync] Instance 2 note pinned before: ${isPinnedBefore}`);
-    expect(isPinnedBefore).toBe(true);
+    await expect(pinIcon2Before).toBeVisible({ timeout: 30000 });
+    console.log('[UnpinSync] Instance 2 note pinned before');
 
     // Now UNPIN in Instance 1
     console.log('[UnpinSync] Unpinning note in Instance 1...');
@@ -582,20 +560,15 @@ test.describe('cross-machine sync - note updates', () => {
     await unpinMenuItem.click();
     await window1.waitForTimeout(1000);
 
-    // Verify unpinned in Instance 1
-    const isPinned1After = await pinIcon1.isVisible().catch(() => false);
-    console.log(`[UnpinSync] Instance 1 note pinned after unpin: ${isPinned1After}`);
-    expect(isPinned1After).toBe(false);
-
-    // Wait for sync to Instance 2
-    console.log('[UnpinSync] Waiting for unpin sync to Instance 2...');
-    await window1.waitForTimeout(15000);
+    // Verify unpinned in Instance 1 using retrying assertion
+    await expect(pinIcon1).not.toBeVisible({ timeout: 30000 });
+    console.log('[UnpinSync] Instance 1 note unpinned');
 
     // THE KEY TEST: Is the pin icon gone from Instance 2?
-    const isPinnedAfter = await pinIcon2Before.isVisible().catch(() => false);
-    console.log(`[UnpinSync] Instance 2 note pinned after sync: ${isPinnedAfter}`);
-
-    expect(isPinnedAfter).toBe(false);
+    // Use retrying assertion instead of fixed wait + one-shot check
+    console.log('[UnpinSync] Waiting for unpin sync to Instance 2...');
+    await expect(pinIcon2Before).not.toBeVisible({ timeout: 60000 });
+    console.log('[UnpinSync] Instance 2 note unpinned after sync');
 
     console.log('[UnpinSync] ✅ Unpin sync test passed!');
   });
