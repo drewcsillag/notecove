@@ -157,13 +157,14 @@ Now implement precisely as planned, in full.
 
 When updating website documentation, remember that features are **platform-specific**:
 
-| Platform | Status      | Feature List Location                           |
-| -------- | ----------- | ----------------------------------------------- |
-| Desktop  | Active      | `website/features/` (current)                   |
-| iOS      | Coming Soon | `website/features/ios/` (create when needed)    |
-| Android  | Planned     | `website/features/android/` (create when needed)|
+| Platform | Status      | Feature List Location                            |
+| -------- | ----------- | ------------------------------------------------ |
+| Desktop  | Active      | `website/features/` (current)                    |
+| iOS      | Coming Soon | `website/features/ios/` (create when needed)     |
+| Android  | Planned     | `website/features/android/` (create when needed) |
 
 **Important:** When documenting a feature:
+
 - Clearly indicate which platform(s) it applies to
 - Don't assume a desktop feature will be available on mobile (or vice versa)
 - Update the appropriate platform-specific feature list(s)

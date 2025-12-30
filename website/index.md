@@ -80,6 +80,7 @@ pnpm --filter @notecove/desktop dev
 ✅ Full-text search (FTS5)
 ✅ Import/export markdown
 ✅ Dark mode
+✅ Profiles with privacy modes (Local, Cloud, Paranoid, Custom)
 
 ### Coming Soon
 

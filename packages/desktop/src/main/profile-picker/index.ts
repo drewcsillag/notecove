@@ -6,10 +6,12 @@
  * and returns the selected profile ID.
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { join } from 'path';
+import * as fs from 'fs/promises';
+import * as os from 'os';
 import { is } from '@electron-toolkit/utils';
-import { ProfileStorage, type Profile } from '@notecove/shared';
+import { ProfileStorage, type Profile, type ProfileMode, getProfileMode } from '@notecove/shared';
 import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
 
 /**
@@ -54,6 +56,8 @@ function getProfilePickerRendererPath(): string {
 export interface ProfilePickerResult {
   /** Selected profile ID, or null if cancelled */
   profileId: string | null;
+  /** Profile mode, or null if cancelled */
+  mode: ProfileMode | null;
   /** Whether to skip picker in future (production only) */
   skipPicker: boolean;
 }
@@ -69,6 +73,47 @@ export interface ProfilePickerOptions {
 let pickerWindow: BrowserWindow | null = null;
 let profileStorage: ProfileStorage | null = null;
 let resolveSelection: ((result: ProfilePickerResult) => void) | null = null;
+
+/**
+ * Get detected cloud storage paths
+ * Returns only paths that actually exist on the system
+ */
+async function getCloudStoragePaths(): Promise<Record<string, string>> {
+  const homeDir = os.homedir();
+  const platform = os.platform();
+  const candidatePaths: Record<string, string> = {};
+
+  if (platform === 'darwin') {
+    candidatePaths['iCloud Drive'] = join(homeDir, 'Library/Mobile Documents/com~apple~CloudDocs');
+    candidatePaths['Dropbox'] = join(homeDir, 'Dropbox');
+    candidatePaths['Google Drive'] = join(homeDir, 'Google Drive');
+    candidatePaths['OneDrive'] = join(homeDir, 'OneDrive');
+  } else if (platform === 'win32') {
+    candidatePaths['iCloud Drive'] = join(homeDir, 'iCloudDrive');
+    candidatePaths['Dropbox'] = join(homeDir, 'Dropbox');
+    candidatePaths['Google Drive'] = join(homeDir, 'Google Drive');
+    candidatePaths['OneDrive'] = join(homeDir, 'OneDrive');
+  } else {
+    // Linux
+    candidatePaths['Dropbox'] = join(homeDir, 'Dropbox');
+    candidatePaths['Google Drive'] = join(homeDir, 'Google Drive');
+  }
+
+  // Check which paths actually exist
+  const existingPaths: Record<string, string> = {};
+  for (const [name, dirPath] of Object.entries(candidatePaths)) {
+    try {
+      const stats = await fs.stat(dirPath);
+      if (stats.isDirectory()) {
+        existingPaths[name] = dirPath;
+      }
+    } catch {
+      // Directory doesn't exist, skip it
+    }
+  }
+
+  return existingPaths;
+}
 
 /**
  * Initialize profile storage
@@ -118,9 +163,12 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
         await storage.saveProfiles(config);
       }
 
+      // Get the profile mode (defaults to 'local' for profiles without mode)
+      const mode = profile ? getProfileMode(profile) : 'local';
+
       // Resolve the promise with the selection
       if (resolveSelection) {
-        resolveSelection({ profileId, skipPicker });
+        resolveSelection({ profileId, mode, skipPicker });
         resolveSelection = null;
       }
 
@@ -134,7 +182,7 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
   // Cancel selection (close window without selecting)
   ipcMain.handle('profile-picker:cancel', () => {
     if (resolveSelection) {
-      resolveSelection({ profileId: null, skipPicker: false });
+      resolveSelection({ profileId: null, mode: null, skipPicker: false });
       resolveSelection = null;
     }
 
@@ -177,6 +225,93 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
       await storage.renameProfile(profileId, newName);
     }
   );
+
+  // Create profile with full wizard configuration
+  ipcMain.handle(
+    'profile-picker:createProfileWithConfig',
+    async (
+      _event,
+      config: {
+        name: string;
+        mode: ProfileMode;
+        storagePath?: string;
+        username?: string;
+        handle?: string;
+      }
+    ) => {
+      const currentConfig = await storage.loadProfiles();
+
+      // Create profile with mode and initialization data
+      const newProfile: Profile = {
+        id: generateProfileId(),
+        name: config.name,
+        isDev: options.isDevBuild,
+        mode: config.mode,
+        created: Date.now(),
+        lastUsed: Date.now(),
+      };
+
+      // Store initialization data for first-launch setup
+      // These will be consumed by the main app when the profile is first used
+      if (config.storagePath) {
+        newProfile.initialStoragePath = config.storagePath;
+      }
+      if (config.username) {
+        newProfile.initialUsername = config.username;
+      }
+      if (config.handle) {
+        newProfile.initialHandle = config.handle;
+      }
+
+      currentConfig.profiles.push(newProfile);
+      await storage.saveProfiles(currentConfig);
+
+      // Ensure profile data directory exists
+      await storage.ensureProfileDataDir(newProfile.id);
+
+      return newProfile;
+    }
+  );
+
+  // Get cloud storage paths
+  ipcMain.handle('profile-picker:getCloudStoragePaths', async () => {
+    return await getCloudStoragePaths();
+  });
+
+  // Get default storage path
+  ipcMain.handle('profile-picker:getDefaultStoragePath', () => {
+    const homeDir = os.homedir();
+    return join(homeDir, 'Documents', 'NoteCove');
+  });
+
+  // Select storage path via directory picker
+  ipcMain.handle(
+    'profile-picker:selectStoragePath',
+    async (event: IpcMainInvokeEvent, defaultPath?: string) => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window) {
+        return null;
+      }
+
+      const dialogOptions: Electron.OpenDialogOptions = {
+        properties: ['openDirectory', 'createDirectory'],
+        title: 'Select Storage Directory Location',
+        buttonLabel: 'Select Folder',
+      };
+
+      if (defaultPath) {
+        dialogOptions.defaultPath = defaultPath;
+      }
+
+      const result = await dialog.showOpenDialog(window, dialogOptions);
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+
+      return result.filePaths[0] ?? null;
+    }
+  );
 }
 
 /**
@@ -187,8 +322,12 @@ function unregisterIPCHandlers(): void {
   ipcMain.removeHandler('profile-picker:selectProfile');
   ipcMain.removeHandler('profile-picker:cancel');
   ipcMain.removeHandler('profile-picker:createProfile');
+  ipcMain.removeHandler('profile-picker:createProfileWithConfig');
   ipcMain.removeHandler('profile-picker:deleteProfile');
   ipcMain.removeHandler('profile-picker:renameProfile');
+  ipcMain.removeHandler('profile-picker:getCloudStoragePaths');
+  ipcMain.removeHandler('profile-picker:getDefaultStoragePath');
+  ipcMain.removeHandler('profile-picker:selectStoragePath');
 }
 
 /**
@@ -223,7 +362,11 @@ export async function showProfilePicker(
       // Update lastUsed and return
       defaultProfile.lastUsed = Date.now();
       await storage.saveProfiles(config);
-      return { profileId: config.defaultProfileId, skipPicker: true };
+      return {
+        profileId: config.defaultProfileId,
+        mode: getProfileMode(defaultProfile),
+        skipPicker: true,
+      };
     }
   }
 
@@ -233,6 +376,7 @@ export async function showProfilePicker(
       id: generateProfileId(),
       name: 'Development',
       isDev: true,
+      mode: 'local', // Auto-created dev profiles default to local mode
       created: Date.now(),
       lastUsed: Date.now(),
     };
@@ -279,7 +423,7 @@ export async function showProfilePicker(
 
       // If window was closed without selection, resolve with null
       if (resolveSelection) {
-        resolveSelection({ profileId: null, skipPicker: false });
+        resolveSelection({ profileId: null, mode: null, skipPicker: false });
         resolveSelection = null;
       }
     });

@@ -38,6 +38,7 @@ export default defineConfig({
           text: 'Features',
           items: [
             { text: 'Overview', link: '/features/' },
+            { text: 'Profiles & Privacy', link: '/features/profiles' },
             { text: 'Rich Text Editing', link: '/features/rich-text-editing' },
             { text: 'Link Unfurling', link: '/features/link-unfurling' },
             { text: 'Comments & Collaboration', link: '/features/collaboration' },

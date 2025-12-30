@@ -38,6 +38,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloudIcon from '@mui/icons-material/Cloud';
 import EditIcon from '@mui/icons-material/Edit';
+import { useProfileMode } from '../../contexts/ProfileModeContext';
 
 interface StorageDirectory {
   id: string;
@@ -57,6 +58,7 @@ export const StorageDirectorySettings: React.FC = () => {
   const [newSdName, setNewSdName] = useState('');
   const [newSdPath, setNewSdPath] = useState('');
   const [cloudPaths, setCloudPaths] = useState<Record<string, string>>({});
+  const { mode: profileMode } = useProfileMode();
 
   // Context menu state for SD items
   const [contextMenu, setContextMenu] = useState<{
@@ -289,8 +291,8 @@ export const StorageDirectorySettings: React.FC = () => {
         collection of notes and folders.
       </Typography>
 
-      {/* Cloud Storage Quick Add */}
-      {Object.keys(cloudPaths).length > 0 && (
+      {/* Cloud Storage Quick Add - hidden in paranoid mode */}
+      {Object.keys(cloudPaths).length > 0 && profileMode !== 'paranoid' && (
         <Box mb={3}>
           <Typography variant="subtitle2" color="text.secondary" mb={1}>
             Quick Add from Cloud Storage:

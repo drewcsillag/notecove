@@ -12,6 +12,7 @@ export {
   resolveImportLinkMarkers,
   type ImageReference,
   type LinkReference,
+  type MarkdownToProsemirrorOptions,
 } from './markdown-to-prosemirror';
 export {
   prosemirrorJsonToYXmlFragment,

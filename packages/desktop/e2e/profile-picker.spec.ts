@@ -107,25 +107,40 @@ test.describe('Profile Picker', () => {
     // Wait for profile picker
     await pickerPage.waitForSelector('text=Select Profile', { timeout: 15000 });
 
-    // Click "New Profile" button
+    // Click "New Profile" button - this opens the wizard
     const newProfileButton = await pickerPage.locator('button:has-text("+ New Profile")');
     await newProfileButton.click();
 
-    // Fill in profile name
-    const nameInput = await pickerPage.locator('input[placeholder*="Profile name"]').first();
+    // Step 1: Fill in profile name
+    await pickerPage.waitForSelector('text=Create New Profile', { timeout: 5000 });
+    const nameInput = await pickerPage.locator('#profileName');
     await nameInput.fill('Test Profile');
+    await pickerPage.locator('button:has-text("Next")').click();
 
-    // Click create button
-    const createButton = await pickerPage.locator('button:has-text("Create")');
-    await createButton.click();
+    // Step 2: Select Local mode
+    await pickerPage.waitForSelector('text=Choose Profile Mode', { timeout: 5000 });
+    await pickerPage.locator('text=Local').first().click();
+    await pickerPage.locator('button:has-text("Next")').click();
 
-    // Wait a moment for the profile to be created
-    await pickerPage.waitForTimeout(500);
+    // Step 3: Storage config - just click Next (local uses default path)
+    await pickerPage.waitForSelector('text=Local Storage', { timeout: 5000 });
+    await pickerPage.locator('button:has-text("Next")').click();
+
+    // Step 4: User settings - skip (just click Next)
+    await pickerPage.waitForSelector('text=Your Identity', { timeout: 5000 });
+    await pickerPage.locator('button:has-text("Next")').click();
+
+    // Step 5: Confirmation - click Create Profile
+    await pickerPage.waitForSelector('text=Review & Create', { timeout: 5000 });
+    await pickerPage.locator('button:has-text("Create Profile")').click();
+
+    // Wait for wizard to close and profile to be created
+    await pickerPage.waitForSelector('text=Select Profile', { timeout: 10000 });
 
     // Verify the new profile appears in the list
     const newProfile = await pickerPage.locator('text=Test Profile').first();
     await expect(newProfile).toBeVisible({ timeout: 5000 });
-  }, 60000);
+  }, 90000);
 
   test('should select profile and open main app', async () => {
     await launchAppWithProfilePicker();

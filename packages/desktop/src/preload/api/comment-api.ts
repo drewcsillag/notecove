@@ -3,6 +3,7 @@
  */
 
 import { ipcRenderer } from 'electron';
+import type { ProfileMode } from '@notecove/shared';
 
 export const commentApi = {
   /**
@@ -435,6 +436,13 @@ export const userApi = {
    */
   getCurrentProfile: (): Promise<UserProfile> =>
     ipcRenderer.invoke('user:getCurrentProfile') as Promise<UserProfile>,
+
+  /**
+   * Get the current profile's mode (local, cloud, paranoid, custom)
+   * @returns The profile mode
+   */
+  getProfileMode: (): Promise<ProfileMode> =>
+    ipcRenderer.invoke('user:getProfileMode') as Promise<ProfileMode>,
 
   /**
    * Listen for profile changes broadcast from main process.

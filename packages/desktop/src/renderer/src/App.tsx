@@ -21,6 +21,7 @@ import {
   LinkDisplayPreferenceProvider,
   LinkDisplayPreferenceSync,
 } from './contexts/LinkDisplayPreferenceContext';
+import { ProfileModeProvider } from './contexts/ProfileModeContext';
 import { SDInitProgressDialog } from './components/SDInitProgress/SDInitProgressDialog';
 import { ShutdownProgressDialog } from './components/ShutdownProgress/ShutdownProgressDialog';
 import { ReindexProgressDialog } from './components/ReindexProgress/ReindexProgressDialog';
@@ -1324,146 +1325,148 @@ function App(): React.ReactElement {
       <CssBaseline />
       <LinkDisplayPreferenceProvider>
         <LinkDisplayPreferenceSync />
-        <FeatureFlagsProvider>
-          <DndProvider backend={HTML5Backend}>
-            <NoteDragLayer />
-            <Box
-              data-testid="app-root"
-              data-active-sd-id={activeSdId}
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100vh',
-                overflow: 'hidden',
-              }}
-            >
-              <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                <ThreePanelLayout
-                  leftPanel={
-                    <LeftSidebar
-                      onOpenSettings={() => {
-                        setSettingsOpen(true);
-                      }}
-                      activeSdId={activeSdId}
-                      onActiveSdChange={setActiveSdId}
-                      selectedFolderId={selectedFolderId}
-                      onFolderSelect={setSelectedFolderId}
-                      tagFilters={tagFilters}
-                      onTagSelect={handleTagSelect}
-                      onClearTagFilters={handleClearTagFilters}
-                      showFolderPanel={showFolderPanel}
-                      showTagPanel={showTagPanel}
-                      {...(leftSidebarSizes ? { initialSizes: leftSidebarSizes } : {})}
-                      onLayoutChange={handleLeftSidebarLayoutChange}
-                    />
-                  }
-                  middlePanel={
-                    <NotesListPanel
-                      selectedNoteId={selectedNoteId}
-                      onNoteSelect={setSelectedNoteId}
-                      onNoteCreated={setNewlyCreatedNoteId}
-                      activeSdId={activeSdId}
-                      selectedFolderId={selectedFolderId}
-                      tagFilters={tagFilters}
-                      exportTrigger={exportTrigger}
-                      onExportComplete={() => {
-                        setExportTrigger(null);
-                      }}
-                    />
-                  }
-                  rightPanel={
-                    <EditorPanel
-                      selectedNoteId={selectedNoteId}
-                      isNewlyCreated={selectedNoteId === newlyCreatedNoteId}
-                      onNoteLoaded={handleNoteLoaded}
-                      showHistoryPanel={historyPanelOpen}
-                      onHistoryPanelClose={() => {
-                        setHistoryPanelOpen(false);
-                      }}
-                      showSearchPanel={searchPanelOpen}
-                      onSearchPanelClose={() => {
-                        setSearchPanelOpen(false);
-                      }}
-                      showCommentPanel={commentPanelOpen}
-                      onCommentPanelClose={() => {
-                        setCommentPanelOpen(false);
-                      }}
-                      onCommentAdded={() => {
-                        setCommentPanelOpen(true);
-                      }}
-                      onNavigateToNote={setSelectedNoteId}
-                    />
-                  }
-                  onLayoutChange={handleLayoutChange}
-                  initialSizes={initialPanelSizes}
-                  leftPaneCollapsed={leftPaneCollapsed}
-                  middlePaneCollapsed={middlePaneCollapsed}
-                />
+        <ProfileModeProvider>
+          <FeatureFlagsProvider>
+            <DndProvider backend={HTML5Backend}>
+              <NoteDragLayer />
+              <Box
+                data-testid="app-root"
+                data-active-sd-id={activeSdId}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100vh',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                  <ThreePanelLayout
+                    leftPanel={
+                      <LeftSidebar
+                        onOpenSettings={() => {
+                          setSettingsOpen(true);
+                        }}
+                        activeSdId={activeSdId}
+                        onActiveSdChange={setActiveSdId}
+                        selectedFolderId={selectedFolderId}
+                        onFolderSelect={setSelectedFolderId}
+                        tagFilters={tagFilters}
+                        onTagSelect={handleTagSelect}
+                        onClearTagFilters={handleClearTagFilters}
+                        showFolderPanel={showFolderPanel}
+                        showTagPanel={showTagPanel}
+                        {...(leftSidebarSizes ? { initialSizes: leftSidebarSizes } : {})}
+                        onLayoutChange={handleLeftSidebarLayoutChange}
+                      />
+                    }
+                    middlePanel={
+                      <NotesListPanel
+                        selectedNoteId={selectedNoteId}
+                        onNoteSelect={setSelectedNoteId}
+                        onNoteCreated={setNewlyCreatedNoteId}
+                        activeSdId={activeSdId}
+                        selectedFolderId={selectedFolderId}
+                        tagFilters={tagFilters}
+                        exportTrigger={exportTrigger}
+                        onExportComplete={() => {
+                          setExportTrigger(null);
+                        }}
+                      />
+                    }
+                    rightPanel={
+                      <EditorPanel
+                        selectedNoteId={selectedNoteId}
+                        isNewlyCreated={selectedNoteId === newlyCreatedNoteId}
+                        onNoteLoaded={handleNoteLoaded}
+                        showHistoryPanel={historyPanelOpen}
+                        onHistoryPanelClose={() => {
+                          setHistoryPanelOpen(false);
+                        }}
+                        showSearchPanel={searchPanelOpen}
+                        onSearchPanelClose={() => {
+                          setSearchPanelOpen(false);
+                        }}
+                        showCommentPanel={commentPanelOpen}
+                        onCommentPanelClose={() => {
+                          setCommentPanelOpen(false);
+                        }}
+                        onCommentAdded={() => {
+                          setCommentPanelOpen(true);
+                        }}
+                        onNavigateToNote={setSelectedNoteId}
+                      />
+                    }
+                    onLayoutChange={handleLayoutChange}
+                    initialSizes={initialPanelSizes}
+                    leftPaneCollapsed={leftPaneCollapsed}
+                    middlePaneCollapsed={middlePaneCollapsed}
+                  />
+                </Box>
+                <BottomStatusbar />
               </Box>
-              <BottomStatusbar />
-            </Box>
-            {settingsOpen && (
-              <SettingsDialog
-                open={settingsOpen}
+              {settingsOpen && (
+                <SettingsDialog
+                  open={settingsOpen}
+                  onClose={() => {
+                    setSettingsOpen(false);
+                  }}
+                  themeMode={themeMode}
+                  onThemeChange={setThemeMode}
+                />
+              )}
+              {featureFlagsOpen && (
+                <FeatureFlagsDialog
+                  open={featureFlagsOpen}
+                  onClose={() => {
+                    setFeatureFlagsOpen(false);
+                  }}
+                />
+              )}
+              <ImportDialog
+                open={importDialogOpen}
                 onClose={() => {
-                  setSettingsOpen(false);
+                  setImportDialogOpen(false);
                 }}
-                themeMode={themeMode}
-                onThemeChange={setThemeMode}
-              />
-            )}
-            {featureFlagsOpen && (
-              <FeatureFlagsDialog
-                open={featureFlagsOpen}
-                onClose={() => {
-                  setFeatureFlagsOpen(false);
+                onImportComplete={(result) => {
+                  console.log('[App] Import complete:', result);
+                  // Navigate to the imported content
+                  if (result.folderIds.length > 0) {
+                    // Navigate to the first created folder (usually the container)
+                    const folderId = result.folderIds[0];
+                    if (folderId) {
+                      void window.electronAPI.appState.set('selectedFolderId', folderId);
+                    }
+                  }
+                  if (result.noteIds.length > 0) {
+                    // Select the first imported note
+                    const noteId = result.noteIds[0];
+                    if (noteId) {
+                      setSelectedNoteId(noteId);
+                    }
+                  }
                 }}
               />
-            )}
-            <ImportDialog
-              open={importDialogOpen}
-              onClose={() => {
-                setImportDialogOpen(false);
-              }}
-              onImportComplete={(result) => {
-                console.log('[App] Import complete:', result);
-                // Navigate to the imported content
-                if (result.folderIds.length > 0) {
-                  // Navigate to the first created folder (usually the container)
-                  const folderId = result.folderIds[0];
-                  if (folderId) {
-                    void window.electronAPI.appState.set('selectedFolderId', folderId);
-                  }
-                }
-                if (result.noteIds.length > 0) {
-                  // Select the first imported note
-                  const noteId = result.noteIds[0];
-                  if (noteId) {
-                    setSelectedNoteId(noteId);
-                  }
-                }
-              }}
-            />
-            <SDInitProgressDialog
-              open={sdInitProgress.open}
-              step={sdInitProgress.step}
-              total={sdInitProgress.total}
-              message={sdInitProgress.message}
-              {...(sdInitProgress.error ? { error: sdInitProgress.error } : {})}
-            />
-            <ShutdownProgressDialog
-              open={shutdownProgress.open}
-              current={shutdownProgress.current}
-              total={shutdownProgress.total}
-            />
-            <ReindexProgressDialog
-              open={reindexProgress.open}
-              current={reindexProgress.current}
-              total={reindexProgress.total}
-              {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
-            />
-          </DndProvider>
-        </FeatureFlagsProvider>
+              <SDInitProgressDialog
+                open={sdInitProgress.open}
+                step={sdInitProgress.step}
+                total={sdInitProgress.total}
+                message={sdInitProgress.message}
+                {...(sdInitProgress.error ? { error: sdInitProgress.error } : {})}
+              />
+              <ShutdownProgressDialog
+                open={shutdownProgress.open}
+                current={shutdownProgress.current}
+                total={shutdownProgress.total}
+              />
+              <ReindexProgressDialog
+                open={reindexProgress.open}
+                current={reindexProgress.current}
+                total={reindexProgress.total}
+                {...(reindexProgress.error ? { error: reindexProgress.error } : {})}
+              />
+            </DndProvider>
+          </FeatureFlagsProvider>
+        </ProfileModeProvider>
       </LinkDisplayPreferenceProvider>
     </ThemeProvider>
   );

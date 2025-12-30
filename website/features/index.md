@@ -111,6 +111,17 @@ Your data, your rules:
 - Sync via your own cloud storage (Dropbox, Google Drive, iCloud)
 - Open source (Apache 2.0 license)
 
+### 👤 Profiles & Privacy Modes
+
+Separate note collections with different privacy levels:
+
+- **Multiple profiles**: Work, personal, research - each with its own notes
+- **Privacy modes**: Choose Local, Cloud, Paranoid, or Custom
+- **Paranoid mode**: Maximum privacy with all network features disabled
+- **Cloud mode**: Start with synced storage from day one
+
+[Learn more about profiles →](/features/profiles)
+
 ## Advanced Features
 
 ### Multi-Window Support
@@ -194,6 +205,7 @@ Native mobile experience:
 | Images           | ✅       | ✅             | ✅     | ✅       |
 | Comments         | ✅       | ❌             | ✅     | ❌       |
 | Link Unfurling   | ✅       | ❌             | ✅     | Plugin   |
+| Privacy Modes    | ✅       | ❌             | ❌     | ❌       |
 | Open Source      | ✅       | ❌             | ❌     | ❌       |
 | File-Based Sync  | ✅       | ❌             | ❌     | ✅       |
 

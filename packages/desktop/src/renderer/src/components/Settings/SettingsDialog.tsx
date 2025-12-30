@@ -31,6 +31,7 @@ import { WebServerSettings } from './WebServerSettings';
 import { OEmbedSettings } from './OEmbedSettings';
 import { isElectron } from '../../utils/platform';
 import { useFeatureFlags } from '../../contexts/FeatureFlagsContext';
+import { useProfileMode } from '../../contexts/ProfileModeContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -77,6 +78,8 @@ interface TabConfig {
   electronOnly: boolean;
   /** Feature flag required for this tab (if any) */
   featureFlag?: 'telemetry' | 'viewHistory' | 'webServer';
+  /** Hide this tab in paranoid profile mode */
+  hideInParanoidMode?: boolean;
   component: React.ReactNode;
 }
 
@@ -89,6 +92,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [tabValue, setTabValue] = useState(0);
   const inElectron = isElectron();
   const { isEnabled } = useFeatureFlags();
+  const { mode: profileMode } = useProfileMode();
 
   // Define all tabs with their Electron-only status
   const allTabs: TabConfig[] = useMemo(
@@ -111,6 +115,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       {
         label: 'Link Previews',
         electronOnly: true,
+        hideInParanoidMode: true, // Not editable in paranoid mode
         component: <OEmbedSettings />,
       },
       {
@@ -134,7 +139,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     [themeMode, onThemeChange]
   );
 
-  // Filter tabs based on platform and feature flags
+  // Filter tabs based on platform, feature flags, and profile mode
   const visibleTabs = useMemo(
     () =>
       allTabs.filter((tab) => {
@@ -142,9 +147,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         if (tab.electronOnly && !inElectron) return false;
         // Check feature flag requirement
         if (tab.featureFlag && !isEnabled(tab.featureFlag)) return false;
+        // Check paranoid mode restriction
+        if (tab.hideInParanoidMode && profileMode === 'paranoid') return false;
         return true;
       }),
-    [allTabs, inElectron, isEnabled]
+    [allTabs, inElectron, isEnabled, profileMode]
   );
 
   // Reset to first tab when dialog closes

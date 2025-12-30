@@ -172,6 +172,19 @@ describe('linkContext', () => {
       expect(getDefaultDisplayMode('paragraph', 'none')).toBe('link');
     });
 
+    it('should return link for paragraph with explicit secure preference', () => {
+      expect(getDefaultDisplayMode('paragraph', 'secure')).toBe('link');
+    });
+
+    it('should return link for heading with explicit secure preference', () => {
+      // Secure mode overrides ALL contexts to plain links
+      expect(getDefaultDisplayMode('heading', 'secure')).toBe('link');
+    });
+
+    it('should return link for list with explicit secure preference', () => {
+      expect(getDefaultDisplayMode('list', 'secure')).toBe('link');
+    });
+
     it('should return link for code', () => {
       expect(getDefaultDisplayMode('code')).toBe('link');
     });
@@ -318,6 +331,55 @@ describe('linkContext', () => {
       // Position inside code block
       const mode = getEffectiveDisplayMode(editor.state, 1, 'auto');
       expect(mode).toBe('link');
+    });
+
+    describe('with secure mode', () => {
+      // We need to override the mock for these tests
+      const mockGetCurrentLinkDisplayPreference = jest.requireMock(
+        '../../../../contexts/LinkDisplayPreferenceContext'
+      ).getCurrentLinkDisplayPreference as jest.Mock;
+
+      beforeEach(() => {
+        mockGetCurrentLinkDisplayPreference.mockReturnValue('secure');
+      });
+
+      afterEach(() => {
+        mockGetCurrentLinkDisplayPreference.mockReturnValue('chip');
+      });
+
+      it('should override explicit chip preference to link in secure mode', () => {
+        editor = createEditor('<p>Text with <a href="https://example.com">link</a></p>');
+
+        // Even with explicit 'chip' preference, secure mode forces 'link'
+        const mode = getEffectiveDisplayMode(editor.state, 1, 'chip');
+        expect(mode).toBe('link');
+      });
+
+      it('should override explicit unfurl preference to link in secure mode', () => {
+        editor = createEditor('<p><a href="https://example.com">link</a></p>');
+
+        // Even with explicit 'unfurl' preference, secure mode forces 'link'
+        const mode = getEffectiveDisplayMode(editor.state, 1, 'unfurl');
+        expect(mode).toBe('link');
+      });
+
+      it('should use link for auto mode in secure mode', () => {
+        editor = createEditor('<h1>Heading with <a href="https://example.com">link</a></h1>');
+
+        const doc = editor.state.doc;
+        let linkPos = 0;
+        doc.descendants((node, pos) => {
+          if (node.marks.some((m) => m.type.name === 'link')) {
+            linkPos = pos;
+            return false;
+          }
+          return true;
+        });
+
+        // With secure mode, even in heading context, should return link
+        const mode = getEffectiveDisplayMode(editor.state, linkPos, 'auto');
+        expect(mode).toBe('link');
+      });
     });
   });
 });

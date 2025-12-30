@@ -6,7 +6,7 @@
  */
 
 import { app, dialog } from 'electron';
-import { ProfileLock } from '@notecove/shared';
+import { ProfileLock, type ProfileMode, getProfileMode } from '@notecove/shared';
 import { NodeFileSystemAdapter } from './storage/node-fs-adapter';
 import { showProfilePicker, getProfileStorage } from './profile-picker';
 import type { CliArgs } from './cli/cli-parser';
@@ -14,7 +14,15 @@ import type { CliArgs } from './cli/cli-parser';
 export interface ProfileSelectionResult {
   profileId: string;
   profileName: string | null;
+  /** Profile mode for determining privacy/feature settings */
+  profileMode: ProfileMode;
   profileLock: ProfileLock;
+  /** Initial storage path from wizard (undefined if not set or already applied) */
+  initialStoragePath?: string;
+  /** Initial username from wizard (undefined if not set or already applied) */
+  initialUsername?: string;
+  /** Initial handle from wizard (undefined if not set or already applied) */
+  initialHandle?: string;
 }
 
 /**
@@ -212,10 +220,11 @@ export async function selectProfile(
     console.log(`[Profile] Selected profile: ${selectedProfileId}`);
   }
 
-  // Get profile name and acquire lock
+  // Get profile name and mode, and acquire lock
   const config = await profileStorage.loadProfiles();
   const profile = config.profiles.find((p) => p.id === selectedProfileId);
   const selectedProfileName = profile?.name ?? null;
+  const selectedProfileMode = profile ? getProfileMode(profile) : 'local';
 
   // Acquire profile lock to ensure single-instance per profile
   const fsAdapter = new NodeFileSystemAdapter();
@@ -237,11 +246,28 @@ export async function selectProfile(
     return null;
   }
 
-  console.log(`[Profile] Acquired lock for profile: ${selectedProfileId}`);
+  console.log(
+    `[Profile] Acquired lock for profile: ${selectedProfileId} (mode: ${selectedProfileMode})`
+  );
 
-  return {
+  // Build result with initialization data from wizard (if present)
+  const result: ProfileSelectionResult = {
     profileId: selectedProfileId,
     profileName: selectedProfileName,
+    profileMode: selectedProfileMode,
     profileLock,
   };
+
+  // Include initialization data if present
+  if (profile?.initialStoragePath) {
+    result.initialStoragePath = profile.initialStoragePath;
+  }
+  if (profile?.initialUsername) {
+    result.initialUsername = profile.initialUsername;
+  }
+  if (profile?.initialHandle) {
+    result.initialHandle = profile.initialHandle;
+  }
+
+  return result;
 }

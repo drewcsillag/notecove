@@ -52,6 +52,7 @@ import {
 } from './window-manager';
 import { ensureDefaultNote } from './note-init';
 import { discoverNewNotes } from './note-discovery';
+import { getSelectedProfileMode, setSelectedProfileMode } from './profile-state';
 
 // Set the app name early, before any Electron APIs that depend on it are called.
 // This ensures menus show "NoteCove" instead of the package.json name "@notecove/desktop".
@@ -99,6 +100,7 @@ let database: Database | null = null;
 let configManager: ConfigManager | null = null;
 let selectedProfileId: string | null = null;
 let selectedProfileName: string | null = null;
+
 let ipcHandlers: IPCHandlers | null = null;
 let compactionInterval: NodeJS.Timeout | null = null;
 let storageManager: AppendLogManager | null = null;
@@ -298,11 +300,21 @@ void app.whenReady().then(async () => {
       !!process.env['TEST_DB_PATH'] ||
       process.env['NODE_ENV'] === 'test';
 
+    // Track initialization data from wizard
+    let initialStoragePath: string | undefined;
+    let initialUsername: string | undefined;
+    let initialHandle: string | undefined;
+
     const profileResult = await selectProfile(cliArgs, isTestMode);
     if (profileResult) {
       selectedProfileId = profileResult.profileId;
       selectedProfileName = profileResult.profileName;
+      setSelectedProfileMode(profileResult.profileMode);
       profileLock = profileResult.profileLock;
+      // Capture initialization data from wizard
+      initialStoragePath = profileResult.initialStoragePath;
+      initialUsername = profileResult.initialUsername;
+      initialHandle = profileResult.initialHandle;
     }
 
     // Initialize database (with profile ID if selected)
@@ -328,6 +340,37 @@ void app.whenReady().then(async () => {
       console.log('[TEST MODE] Database ready, initializing CRDT manager...');
     }
 
+    // Apply wizard initialization settings (if this is a new profile from wizard)
+    if (initialUsername || initialHandle || getSelectedProfileMode() === 'paranoid') {
+      console.log('[Init] Applying wizard initialization settings...');
+
+      // Apply username if set
+      if (initialUsername) {
+        await database.setState(AppStateKey.Username, initialUsername);
+        console.log(`[Init] Set username: ${initialUsername}`);
+      }
+
+      // Apply handle if set
+      if (initialHandle) {
+        await database.setState(AppStateKey.UserHandle, initialHandle);
+        console.log(`[Init] Set handle: ${initialHandle}`);
+      }
+
+      // For paranoid mode, set link display preference to 'secure'
+      if (getSelectedProfileMode() === 'paranoid') {
+        await database.setState(AppStateKey.LinkDisplayPreference, 'secure');
+        console.log('[Init] Set link display preference to secure (paranoid mode)');
+      }
+
+      // Clear initialization data from profile so it's not re-applied
+      if (selectedProfileId) {
+        const appDataDir = app.getPath('userData');
+        const profileStorage = getProfileStorage(appDataDir);
+        await profileStorage.clearInitializationData(selectedProfileId);
+        console.log('[Init] Cleared initialization data from profile');
+      }
+    }
+
     // Initialize file system adapter
     const fsAdapter = new NodeFileSystemAdapter();
 
@@ -337,14 +380,25 @@ void app.whenReady().then(async () => {
     const isDevBuild = !app.isPackaged;
     const currentSDType: SDType = isDevBuild ? 'dev' : 'prod';
 
-    // Determine storage directory (profile-specific to prevent cross-profile pollution)
-    // Each profile gets its own default storage at profiles/<profileId>/storage
-    // Test mode or no profile falls back to shared 'storage' for backwards compatibility
-    const storageDir =
-      process.env['TEST_STORAGE_DIR'] ??
-      (selectedProfileId
-        ? join(app.getPath('userData'), 'profiles', selectedProfileId, 'storage')
-        : join(app.getPath('userData'), 'storage'));
+    // Determine storage directory:
+    // 1. TEST_STORAGE_DIR env var (for testing)
+    // 2. initialStoragePath from wizard (for new profiles created with wizard)
+    // 3. Profile-specific default at profiles/<profileId>/storage
+    // 4. Shared 'storage' for backwards compatibility (no profile selected)
+    let storageDir: string;
+    if (process.env['TEST_STORAGE_DIR']) {
+      storageDir = process.env['TEST_STORAGE_DIR'];
+    } else if (initialStoragePath) {
+      // Wizard-specified path - use as-is
+      storageDir = initialStoragePath;
+      console.log(`[Storage] Using wizard-specified storage path: ${storageDir}`);
+    } else if (selectedProfileId) {
+      // Default profile-specific path
+      storageDir = join(app.getPath('userData'), 'profiles', selectedProfileId, 'storage');
+    } else {
+      // Fallback for backwards compatibility
+      storageDir = join(app.getPath('userData'), 'storage');
+    }
 
     // Initialize default SD structure
     await initializeDefaultSD(
@@ -938,7 +992,8 @@ void app.whenReady().then(async () => {
       crdtManager,
       storageDir,
       instanceId,
-      (name: 'documents' | 'userData') => app.getPath(name)
+      (name: 'documents' | 'userData') => app.getPath(name),
+      getSelectedProfileMode()
     );
 
     // Collect initial sync functions to run in background after window creation

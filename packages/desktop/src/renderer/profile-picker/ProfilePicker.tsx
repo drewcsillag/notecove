@@ -7,11 +7,15 @@
 
 import React, { useState, useEffect } from 'react';
 
+import type { ProfileMode } from '@notecove/shared';
+import { WizardContainer } from './wizard';
+
 /** Profile type from preload */
 interface Profile {
   id: string;
   name: string;
   isDev: boolean;
+  mode?: ProfileMode;
   created: number;
   lastUsed: number;
 }
@@ -24,14 +28,27 @@ interface ProfilesData {
   isDevBuild: boolean;
 }
 
+/** Wizard configuration for creating a profile */
+interface WizardConfig {
+  name: string;
+  mode: ProfileMode;
+  storagePath?: string;
+  username?: string;
+  handle?: string;
+}
+
 /** Profile picker API interface */
 interface ProfilePickerAPI {
   getProfiles: () => Promise<ProfilesData>;
   selectProfile: (profileId: string, skipPicker: boolean) => Promise<void>;
   cancel: () => Promise<void>;
   createProfile: (name: string) => Promise<Profile>;
+  createProfileWithConfig: (config: WizardConfig) => Promise<Profile>;
   deleteProfile: (profileId: string) => Promise<void>;
   renameProfile: (profileId: string, newName: string) => Promise<void>;
+  getCloudStoragePaths: () => Promise<Record<string, string>>;
+  getDefaultStoragePath: () => Promise<string>;
+  selectStoragePath: (defaultPath?: string) => Promise<string | null>;
 }
 
 /** Declare the preload API type */
@@ -48,8 +65,7 @@ export function ProfilePicker(): React.ReactElement {
   const [skipPicker, setSkipPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [creatingProfile, setCreatingProfile] = useState(false);
-  const [newProfileName, setNewProfileName] = useState('');
+  const [showWizard, setShowWizard] = useState(false);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const [renamingProfileId, setRenamingProfileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -118,19 +134,16 @@ export function ProfilePicker(): React.ReactElement {
     }
   };
 
-  // Handle creating a new profile
-  const handleCreateProfile = async (): Promise<void> => {
-    if (!newProfileName.trim() || !window.profilePickerAPI) return;
+  // Handle wizard completion - profile was created via wizard
+  const handleWizardComplete = (newProfile: Profile): void => {
+    setProfiles((prev) => [...prev, newProfile]);
+    setSelectedId(newProfile.id);
+    setShowWizard(false);
+  };
 
-    try {
-      const newProfile = await window.profilePickerAPI.createProfile(newProfileName.trim());
-      setProfiles((prev) => [...prev, newProfile]);
-      setSelectedId(newProfile.id);
-      setNewProfileName('');
-      setCreatingProfile(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create profile');
-    }
+  // Handle wizard cancellation
+  const handleWizardCancel = (): void => {
+    setShowWizard(false);
   };
 
   // Handle deleting a profile
@@ -323,51 +336,15 @@ export function ProfilePicker(): React.ReactElement {
 
       {/* Fixed Footer */}
       <div style={styles.footer}>
-        {/* Create profile form */}
-        {creatingProfile ? (
-          <div style={styles.createForm}>
-            <input
-              type="text"
-              placeholder="Profile name..."
-              value={newProfileName}
-              onChange={(e) => {
-                setNewProfileName(e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleCreateProfile();
-                if (e.key === 'Escape') setCreatingProfile(false);
-              }}
-              style={styles.input}
-              autoFocus
-            />
-            <div style={styles.createFormButtons}>
-              <button
-                style={styles.buttonSecondary}
-                onClick={() => {
-                  setCreatingProfile(false);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                style={styles.button}
-                onClick={() => void handleCreateProfile()}
-                disabled={!newProfileName.trim()}
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            style={styles.buttonSecondary}
-            onClick={() => {
-              setCreatingProfile(true);
-            }}
-          >
-            + New Profile
-          </button>
-        )}
+        {/* New Profile button - shows wizard */}
+        <button
+          style={styles.buttonSecondary}
+          onClick={() => {
+            setShowWizard(true);
+          }}
+        >
+          + New Profile
+        </button>
 
         {/* Don't ask again checkbox (production only) */}
         {!isDevBuild && profiles.length > 0 && (
@@ -417,6 +394,15 @@ export function ProfilePicker(): React.ReactElement {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wizard overlay */}
+      {showWizard && (
+        <div style={styles.wizardOverlay}>
+          <div style={styles.wizardContainer}>
+            <WizardContainer onComplete={handleWizardComplete} onCancel={handleWizardCancel} />
           </div>
         </div>
       )}
@@ -660,6 +646,24 @@ const stylesData = {
     border: '1px solid #0066cc',
     borderRadius: '4px',
     outline: 'none',
+  },
+  wizardOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'white',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '24px',
+    boxSizing: 'border-box',
+  },
+  wizardContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
   },
 } as const satisfies Record<string, React.CSSProperties>;
 

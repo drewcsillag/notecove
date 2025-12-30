@@ -330,6 +330,7 @@ export const browserApiStub: typeof window.electronAPI = {
 
   user: {
     getCurrentProfile: notImplemented('user.getCurrentProfile'),
+    getProfileMode: () => Promise.resolve('local' as const),
     onProfileChanged: stubEventSubscription,
   },
 

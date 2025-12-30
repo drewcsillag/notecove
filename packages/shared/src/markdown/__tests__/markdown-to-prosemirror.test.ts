@@ -814,3 +814,133 @@ describe('inter-note link helpers', () => {
     });
   });
 });
+
+describe('secure mode', () => {
+  describe('display mode stripping', () => {
+    it('should strip {.chip} display mode in secure mode', () => {
+      const markdown = 'Check out [GitHub](https://github.com){.chip} for code.';
+      const result = markdownToProsemirror(markdown, { secureMode: true });
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+
+      // Should only have href, NO displayMode
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://github.com',
+      });
+
+      // The {.chip} text should still be removed
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toBe('Check out GitHub for code.');
+    });
+
+    it('should strip {.unfurl} display mode in secure mode', () => {
+      const markdown = 'Watch [Video](https://youtube.com/watch?v=abc){.unfurl} here.';
+      const result = markdownToProsemirror(markdown, { secureMode: true });
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+
+      // Should only have href, NO displayMode
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://youtube.com/watch?v=abc',
+      });
+
+      // The {.unfurl} text should still be removed
+      const allText = content.map((n) => n.text || '').join('');
+      expect(allText).toBe('Watch Video here.');
+    });
+
+    it('should preserve {.link} display mode in secure mode', () => {
+      const markdown = 'Visit [Example](https://example.com){.link} now.';
+      const result = markdownToProsemirror(markdown, { secureMode: true });
+
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+
+      // {.link} is allowed in secure mode since it's already plain
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://example.com',
+        displayMode: 'link',
+      });
+    });
+
+    it('should strip display modes for multiple links in secure mode', () => {
+      const markdown =
+        'See [Link A](https://a.com){.link} and [Link B](https://b.com){.chip} and [Link C](https://c.com){.unfurl}.';
+      const result = markdownToProsemirror(markdown, { secureMode: true });
+
+      const content = result.content![0].content!;
+      const linkNodes = content.filter((n) => n.marks?.some((m) => m.type === 'link'));
+
+      expect(linkNodes).toHaveLength(3);
+
+      // Link A: {.link} is allowed
+      const linkA = linkNodes[0].marks!.find((m) => m.type === 'link');
+      expect(linkA!.attrs).toEqual({ href: 'https://a.com', displayMode: 'link' });
+
+      // Link B: {.chip} stripped
+      const linkB = linkNodes[1].marks!.find((m) => m.type === 'link');
+      expect(linkB!.attrs).toEqual({ href: 'https://b.com' });
+
+      // Link C: {.unfurl} stripped
+      const linkC = linkNodes[2].marks!.find((m) => m.type === 'link');
+      expect(linkC!.attrs).toEqual({ href: 'https://c.com' });
+    });
+  });
+
+  describe('oEmbedUnfurl block prevention', () => {
+    it('should NOT create oEmbedUnfurl block in secure mode', () => {
+      const markdown = '[Video](https://youtube.com/watch?v=abc){.unfurl}';
+      const result = markdownToProsemirror(markdown, { secureMode: true });
+
+      // Should only have paragraph, NO oembedUnfurl block
+      expect(result.content).toHaveLength(1);
+      expect(result.content![0].type).toBe('paragraph');
+    });
+
+    it('should NOT create multiple oEmbedUnfurl blocks in secure mode', () => {
+      const markdown =
+        '[Video 1](https://youtube.com/1){.unfurl}\n\n[Video 2](https://youtube.com/2){.unfurl}';
+      const result = markdownToProsemirror(markdown, { secureMode: true });
+
+      // Should only have two paragraphs, NO oembedUnfurl blocks
+      expect(result.content).toHaveLength(2);
+      expect(result.content![0].type).toBe('paragraph');
+      expect(result.content![1].type).toBe('paragraph');
+    });
+  });
+
+  describe('normal mode comparison', () => {
+    it('should create oEmbedUnfurl block in normal mode', () => {
+      const markdown = '[Video](https://youtube.com/watch?v=abc){.unfurl}';
+
+      // Normal mode (no options)
+      const normalResult = markdownToProsemirror(markdown);
+      expect(normalResult.content).toHaveLength(2);
+      expect(normalResult.content![1].type).toBe('oembedUnfurl');
+
+      // Explicit secureMode: false
+      const explicitNormalResult = markdownToProsemirror(markdown, { secureMode: false });
+      expect(explicitNormalResult.content).toHaveLength(2);
+      expect(explicitNormalResult.content![1].type).toBe('oembedUnfurl');
+    });
+
+    it('should apply chip display mode in normal mode', () => {
+      const markdown = 'Check out [GitHub](https://github.com){.chip}';
+
+      const result = markdownToProsemirror(markdown);
+      const content = result.content![0].content!;
+      const linkNode = content.find((n) => n.marks?.some((m) => m.type === 'link'));
+      const linkMark = linkNode!.marks!.find((m) => m.type === 'link');
+
+      expect(linkMark!.attrs).toEqual({
+        href: 'https://github.com',
+        displayMode: 'chip',
+      });
+    });
+  });
+});

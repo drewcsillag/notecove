@@ -16,7 +16,7 @@
 
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { HandlerContext } from './types';
-import { AppStateKey, type NoteCache } from '@notecove/shared';
+import { AppStateKey, type NoteCache, type ProfileMode } from '@notecove/shared';
 import { getTelemetryManager } from '../../telemetry/config';
 import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
 import {
@@ -26,6 +26,7 @@ import {
   type ParsedFileResult,
   type InspectorFileType,
 } from '../../storage-inspector';
+import { getSelectedProfileMode } from '../../profile-state';
 
 // Re-export AppStateKey for use in the handlers
 const AppStateKeys = {
@@ -77,6 +78,7 @@ export function registerMiscHandlers(ctx: HandlerContext): void {
 
   // User operations
   ipcMain.handle('user:getCurrentProfile', handleGetCurrentProfile(ctx));
+  ipcMain.handle('user:getProfileMode', handleGetProfileMode());
 
   // Telemetry operations
   ipcMain.handle('telemetry:getSettings', handleGetTelemetrySettings(ctx));
@@ -114,6 +116,7 @@ export function unregisterMiscHandlers(): void {
   ipcMain.removeHandler('mention:getUsers');
 
   ipcMain.removeHandler('user:getCurrentProfile');
+  ipcMain.removeHandler('user:getProfileMode');
 
   ipcMain.removeHandler('telemetry:getSettings');
   ipcMain.removeHandler('telemetry:updateSettings');
@@ -296,6 +299,12 @@ function handleGetCurrentProfile(ctx: HandlerContext) {
       username,
       handle,
     };
+  };
+}
+
+function handleGetProfileMode() {
+  return (_event: IpcMainInvokeEvent): ProfileMode => {
+    return getSelectedProfileMode();
   };
 }
 

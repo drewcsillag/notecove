@@ -9,7 +9,7 @@
  */
 
 import type { FileSystemAdapter } from '../storage/types';
-import type { Profile, ProfilesConfig } from './types';
+import type { Profile, ProfileMode, ProfilesConfig } from './types';
 import { createEmptyProfilesConfig, createProfile } from './types';
 
 /** Filename for the profiles configuration */
@@ -143,17 +143,18 @@ export class ProfileStorage {
   }
 
   /**
-   * Create a new profile with the given name and dev status.
+   * Create a new profile with the given name, dev status, and optional mode.
    *
    * Creates the profile entry in profiles.json and the profile's data directory.
    *
    * @param name - Display name for the profile
    * @param isDev - Whether this is a development profile
+   * @param mode - Profile mode (defaults to 'local' if not specified)
    * @returns The newly created Profile
    */
-  async createProfile(name: string, isDev: boolean): Promise<Profile> {
+  async createProfile(name: string, isDev: boolean, mode?: ProfileMode): Promise<Profile> {
     // Create the profile object using the helper from types.ts
-    const profile = createProfile(name, isDev);
+    const profile = createProfile(name, isDev, mode);
 
     // Load existing config and add the new profile
     const config = await this.loadProfiles();
@@ -265,5 +266,32 @@ export class ProfileStorage {
     config.skipPicker = false;
     await this.saveProfiles(config);
     console.log('[ProfileStorage] Cleared skipPicker preference');
+  }
+
+  /**
+   * Clear initialization data from a profile.
+   *
+   * This removes the initialStoragePath, initialUsername, and initialHandle
+   * fields that were set by the wizard. Called after these settings have
+   * been applied on first launch to prevent re-application.
+   *
+   * @param profileId - The ID of the profile to update
+   */
+  async clearInitializationData(profileId: string): Promise<void> {
+    const config = await this.loadProfiles();
+
+    const profile = config.profiles.find((p) => p.id === profileId);
+    if (!profile) {
+      // Silently ignore if profile doesn't exist
+      return;
+    }
+
+    // Remove initialization fields
+    delete profile.initialStoragePath;
+    delete profile.initialUsername;
+    delete profile.initialHandle;
+
+    await this.saveProfiles(config);
+    console.log(`[ProfileStorage] Cleared initialization data for profile: ${profileId}`);
   }
 }

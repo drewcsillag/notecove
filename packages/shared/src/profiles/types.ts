@@ -11,6 +11,18 @@
 import { generateCompactId } from '../utils/uuid-encoding';
 
 /**
+ * Profile mode determines storage location, privacy settings, and available features.
+ *
+ * - 'local': Storage at ~/Documents/NoteCove, user info asked, all features available
+ * - 'cloud': Storage in cloud provider folder, user info asked, all features available
+ * - 'paranoid': Local storage, no user info, secure link mode, no cloud quick-add
+ * - 'custom': User-specified storage path, user info asked, all features available
+ *
+ * Existing profiles without a mode field are treated as 'local' (full permissions).
+ */
+export type ProfileMode = 'local' | 'cloud' | 'paranoid' | 'custom';
+
+/**
  * Represents a single profile.
  *
  * A profile is an isolated environment with its own database.
@@ -27,11 +39,38 @@ export interface Profile {
   /** Whether this profile is for development use only */
   isDev: boolean;
 
+  /**
+   * Profile mode determining storage, privacy, and feature availability.
+   * Optional for backwards compatibility - profiles without mode are treated as 'local'.
+   */
+  mode?: ProfileMode;
+
   /** Timestamp when the profile was created (ms since epoch) */
   created: number;
 
   /** Timestamp when the profile was last used (ms since epoch) */
   lastUsed: number;
+
+  // =========================================================================
+  // Initialization fields - set by wizard, consumed on first launch
+  // These are cleared after the settings are applied.
+  // =========================================================================
+
+  /**
+   * Initial storage directory path to set up on first launch.
+   * The main app will create an SD at this path when the profile is first used.
+   */
+  initialStoragePath?: string;
+
+  /**
+   * Initial username setting to apply on first launch.
+   */
+  initialUsername?: string;
+
+  /**
+   * Initial handle setting to apply on first launch.
+   */
+  initialHandle?: string;
 }
 
 /**
@@ -70,14 +109,19 @@ export function createEmptyProfilesConfig(): ProfilesConfig {
 }
 
 /**
- * Create a new profile with the given name and dev status
+ * Create a new profile with the given name, dev status, and optional mode
+ *
+ * @param name Display name for the profile
+ * @param isDev Whether this is a development-only profile
+ * @param mode Profile mode (defaults to 'local' if not specified)
  */
-export function createProfile(name: string, isDev: boolean): Profile {
+export function createProfile(name: string, isDev: boolean, mode?: ProfileMode): Profile {
   const now = Date.now();
   return {
     id: generateProfileId(),
     name,
     isDev,
+    mode: mode ?? 'local',
     created: now,
     lastUsed: now,
   };
@@ -88,6 +132,35 @@ export function createProfile(name: string, isDev: boolean): Profile {
  */
 function generateProfileId(): string {
   return generateCompactId();
+}
+
+/**
+ * Get the effective mode for a profile.
+ * Returns 'local' for profiles without a mode field (backwards compatibility).
+ */
+export function getProfileMode(profile: Profile): ProfileMode {
+  return profile.mode ?? 'local';
+}
+
+/**
+ * Check if a profile mode allows cloud storage quick-add in settings
+ */
+export function modeAllowsCloudQuickAdd(mode: ProfileMode): boolean {
+  return mode !== 'paranoid';
+}
+
+/**
+ * Check if a profile mode allows changing link preview settings
+ */
+export function modeAllowsLinkPreviewChanges(mode: ProfileMode): boolean {
+  return mode !== 'paranoid';
+}
+
+/**
+ * Check if a profile mode asks for user info during onboarding
+ */
+export function modeAsksForUserInfo(mode: ProfileMode): boolean {
+  return mode !== 'paranoid';
 }
 
 /**

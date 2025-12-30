@@ -5,7 +5,7 @@
 
 import { app } from 'electron';
 import { join } from 'path';
-import type { Database } from '@notecove/shared';
+import type { Database, ProfileMode } from '@notecove/shared';
 import { markdownToProsemirror, prosemirrorJsonToYXmlFragment } from '@notecove/shared';
 import type { CRDTManager } from './crdt';
 import * as fs from 'fs/promises';
@@ -51,14 +51,20 @@ function getResourcePath(filename: string): string {
 /**
  * Read and parse the welcome.md file, populating the Y.XmlFragment with content
  * @param fragment The Y.XmlFragment to populate
+ * @param secureMode When true, strip link display modes and prevent unfurls (for paranoid profiles)
  */
-export async function populateWelcomeContent(fragment: Y.XmlFragment): Promise<void> {
+export async function populateWelcomeContent(
+  fragment: Y.XmlFragment,
+  secureMode = false
+): Promise<void> {
   try {
     const welcomePath = getResourcePath('welcome.md');
     const markdown = await fs.readFile(welcomePath, 'utf-8');
-    const prosemirrorJson = markdownToProsemirror(markdown);
+    const prosemirrorJson = markdownToProsemirror(markdown, { secureMode });
     prosemirrorJsonToYXmlFragment(prosemirrorJson, fragment);
-    console.log('[ensureDefaultNote] Loaded welcome content from welcome.md');
+    console.log(
+      `[ensureDefaultNote] Loaded welcome content from welcome.md (secureMode: ${secureMode})`
+    );
   } catch (error) {
     // Fallback to hardcoded content if welcome.md can't be read
     console.warn('[ensureDefaultNote] Failed to load welcome.md, using fallback:', error);
@@ -132,14 +138,18 @@ async function getOtherInstanceCRDTLogs(logsPath: string, instanceId: string): P
  * @param defaultStoragePath Path to use for the default storage directory (e.g., from TEST_STORAGE_DIR in tests)
  * @param instanceId Our instance ID (to avoid checking our own activity logs)
  * @param getPath Function to get app path (for Documents folder)
+ * @param profileMode Profile mode for determining privacy settings (paranoid mode uses secure import)
  */
 export async function ensureDefaultNote(
   db: Database,
   crdtMgr: CRDTManager,
   defaultStoragePath: string | undefined,
   instanceId: string | undefined,
-  getPath: (name: 'documents' | 'userData') => string
+  getPath: (name: 'documents' | 'userData') => string,
+  profileMode: ProfileMode = 'local'
 ): Promise<void> {
+  // Use secure mode for paranoid profiles to prevent unfurl/chip nodes
+  const secureMode = profileMode === 'paranoid';
   const DEFAULT_NOTE_ID = 'default-note';
 
   // Ensure default SD exists
@@ -218,7 +228,7 @@ export async function ensureDefaultNote(
       if (content.length === 0) {
         // No content, add the welcome message
         console.log('[ensureDefaultNote] Default note is empty, adding content');
-        await populateWelcomeContent(content);
+        await populateWelcomeContent(content, secureMode);
       }
 
       // Sync CRDT metadata to database (handles folder moves from other instances)
@@ -353,13 +363,13 @@ export async function ensureDefaultNote(
               '[ensureDefaultNote] Timeout waiting for content from other instances, creating welcome content'
             );
             // Create welcome content since nothing arrived
-            await populateWelcomeContent(finalContent);
+            await populateWelcomeContent(finalContent, secureMode);
           }
         }
       } else {
         // No other instances, create welcome content immediately
         console.log('[ensureDefaultNote] CRDT is empty, adding welcome content');
-        await populateWelcomeContent(content);
+        await populateWelcomeContent(content, secureMode);
       }
     } else {
       console.log(

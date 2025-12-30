@@ -87,6 +87,56 @@ describe('ProfileStorage', () => {
 
       expect(config.profiles).toEqual([]);
     });
+
+    it('should load profiles with mode field', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Paranoid Profile',
+            isDev: false,
+            mode: 'paranoid',
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: 'p1',
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const config = await storage.loadProfiles();
+
+      expect(config.profiles[0]?.mode).toBe('paranoid');
+    });
+
+    it('should load legacy profiles without mode field (backwards compatibility)', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: 'legacy',
+            name: 'Legacy Profile',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: 'legacy',
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const config = await storage.loadProfiles();
+
+      // Legacy profile should have undefined mode (getProfileMode() handles default)
+      expect(config.profiles[0]?.mode).toBeUndefined();
+    });
   });
 
   describe('saveProfiles', () => {
@@ -183,6 +233,42 @@ describe('ProfileStorage', () => {
 
       expect(profile.name).toBe('Dev Profile');
       expect(profile.isDev).toBe(true);
+    });
+
+    it('should default mode to local when not specified', async () => {
+      const mockFs = createMockFs();
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const profile = await storage.createProfile('Default Mode', false);
+
+      expect(profile.mode).toBe('local');
+    });
+
+    it('should accept explicit mode parameter', async () => {
+      const mockFs = createMockFs();
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const paranoidProfile = await storage.createProfile('Paranoid', false, 'paranoid');
+      const cloudProfile = await storage.createProfile('Cloud', false, 'cloud');
+      const customProfile = await storage.createProfile('Custom', false, 'custom');
+
+      expect(paranoidProfile.mode).toBe('paranoid');
+      expect(cloudProfile.mode).toBe('cloud');
+      expect(customProfile.mode).toBe('custom');
+    });
+
+    it('should save profile with mode to profiles.json', async () => {
+      const mockFs = createMockFs();
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+
+      const profile = await storage.createProfile('Paranoid Profile', false, 'paranoid');
+
+      // Verify the saved data contains the mode
+      const writeCall = (mockFs.writeFile as jest.Mock).mock.calls[0] as [string, Uint8Array];
+      const writtenData = writeCall[1];
+      const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
+      const savedProfile = parsed.profiles.find((p) => p.id === profile.id);
+      expect(savedProfile?.mode).toBe('paranoid');
     });
 
     it('should add profile to existing profiles', async () => {

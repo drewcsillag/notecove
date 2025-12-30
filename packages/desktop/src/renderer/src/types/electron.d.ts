@@ -1221,6 +1221,12 @@ declare global {
         }>;
 
         /**
+         * Get the current profile's mode.
+         * Used to determine privacy settings and available features.
+         */
+        getProfileMode: () => Promise<'local' | 'cloud' | 'paranoid' | 'custom'>;
+
+        /**
          * Listen for profile changes broadcast from main process.
          * Called when username or handle is changed in settings.
          * @returns Unsubscribe function

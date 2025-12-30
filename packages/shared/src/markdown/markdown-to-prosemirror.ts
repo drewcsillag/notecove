@@ -19,12 +19,35 @@ const md = new MarkdownIt({
 }).enable(['strikethrough', 'table']);
 
 /**
- * Convert markdown string to ProseMirror JSON document
+ * Options for markdown to ProseMirror conversion
  */
-export function markdownToProsemirror(markdown: string): ProseMirrorNode {
+export interface MarkdownToProsemirrorOptions {
+  /**
+   * When true, strips all chip/unfurl display mode attributes and forces links to plain display.
+   * Used for paranoid mode profiles to prevent network requests from previews.
+   */
+  secureMode?: boolean;
+}
+
+// Module-level flag for secure mode (set by markdownToProsemirror, read by processLinkDisplayModeAttributes)
+let currentSecureMode = false;
+
+/**
+ * Convert markdown string to ProseMirror JSON document
+ *
+ * @param markdown The markdown string to convert
+ * @param options Conversion options
+ */
+export function markdownToProsemirror(
+  markdown: string,
+  options?: MarkdownToProsemirrorOptions
+): ProseMirrorNode {
   if (!markdown || markdown.trim() === '') {
     return { type: 'doc', content: [] };
   }
+
+  // Set secure mode flag for inline processing
+  currentSecureMode = options?.secureMode ?? false;
 
   const tokens = md.parse(markdown, {});
   const doc: ProseMirrorNode = {
@@ -33,7 +56,13 @@ export function markdownToProsemirror(markdown: string): ProseMirrorNode {
   };
 
   // Post-process: create oEmbedUnfurl blocks for unfurl links in paragraphs
-  insertUnfurlBlocks(doc);
+  // Skip in secure mode to prevent creating nodes that would try to fetch data
+  if (!currentSecureMode) {
+    insertUnfurlBlocks(doc);
+  }
+
+  // Reset secure mode flag
+  currentSecureMode = false;
 
   return doc;
 }
@@ -545,6 +574,8 @@ const DISPLAY_MODE_REGEX = /^(\s*)\{\.(\w+)\}/;
  * Looks for patterns like `{.link}`, `{.chip}`, `{.unfurl}` after links
  * and moves the display mode to the preceding link mark's attrs.
  *
+ * In secure mode, chip and unfurl modes are stripped (links stay as plain links).
+ *
  * @param nodes Array of inline ProseMirror nodes
  * @returns Processed array with display modes applied to links
  */
@@ -565,29 +596,36 @@ function processLinkDisplayModeAttributes(nodes: ProseMirrorNode[]): ProseMirror
 
         // Check if this is a valid display mode
         if (VALID_DISPLAY_MODES.includes(mode as LinkDisplayMode)) {
+          // In secure mode, strip chip and unfurl modes (don't apply them to links)
+          // This prevents network requests for previews/favicons
+          const shouldApplyMode = !currentSecureMode || mode === 'link';
+
           // Look for a preceding node with a link mark
           const prevNode = result[result.length - 1];
 
           if (prevNode?.marks?.some((m) => m.type === 'link')) {
-            // Found a link - update its displayMode
-            const updatedMarks = prevNode.marks.map((m) => {
-              if (m.type === 'link') {
-                return {
-                  ...m,
-                  attrs: {
-                    ...m.attrs,
-                    displayMode: mode,
-                  },
-                };
-              }
-              return m;
-            });
+            // Found a link - update its displayMode (unless secure mode strips it)
+            if (shouldApplyMode) {
+              const updatedMarks = prevNode.marks.map((m) => {
+                if (m.type === 'link') {
+                  return {
+                    ...m,
+                    attrs: {
+                      ...m.attrs,
+                      displayMode: mode,
+                    },
+                  };
+                }
+                return m;
+              });
 
-            // Update the previous node in result
-            result[result.length - 1] = {
-              ...prevNode,
-              marks: updatedMarks,
-            };
+              // Update the previous node in result
+              result[result.length - 1] = {
+                ...prevNode,
+                marks: updatedMarks,
+              };
+            }
+            // In secure mode, we still remove the attribute but don't apply the mode
 
             // Remove the attribute from this text node
             const remainingText = node.text.slice(fullMatch.length);
@@ -616,23 +654,26 @@ function processLinkDisplayModeAttributes(nodes: ProseMirrorNode[]): ProseMirror
             ) {
               // Previous node is whitespace, and before that is a link
               // We know marks exists from the check above
-              const updatedMarks = prevPrevNode.marks.map((m) => {
-                if (m.type === 'link') {
-                  return {
-                    ...m,
-                    attrs: {
-                      ...m.attrs,
-                      displayMode: mode,
-                    },
-                  };
-                }
-                return m;
-              });
+              if (shouldApplyMode) {
+                const updatedMarks = prevPrevNode.marks.map((m) => {
+                  if (m.type === 'link') {
+                    return {
+                      ...m,
+                      attrs: {
+                        ...m.attrs,
+                        displayMode: mode,
+                      },
+                    };
+                  }
+                  return m;
+                });
 
-              result[result.length - 2] = {
-                ...prevPrevNode,
-                marks: updatedMarks,
-              };
+                result[result.length - 2] = {
+                  ...prevPrevNode,
+                  marks: updatedMarks,
+                };
+              }
+              // In secure mode, we still strip the attribute but don't apply the mode
 
               // Remove the whitespace node
               result.pop();
