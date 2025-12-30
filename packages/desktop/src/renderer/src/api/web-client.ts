@@ -768,6 +768,7 @@ export const webClient: typeof window.electronAPI = {
     onReindexNotes: noopSubscription,
     onStorageInspector: noopSubscription,
     onFeatureFlags: noopSubscription,
+    onPrint: noopSubscription,
   },
 
   tools: {
@@ -901,6 +902,11 @@ export const webClient: typeof window.electronAPI = {
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     openStorageInspector: async () => {
+      // Not supported in web client - no separate windows
+      return { success: false, error: 'Not supported in web client' };
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    openPrintPreview: async () => {
       // Not supported in web client - no separate windows
       return { success: false, error: 'Not supported in web client' };
     },

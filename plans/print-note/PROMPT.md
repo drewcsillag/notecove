@@ -1,0 +1,1 @@
+I want to be able to press Cmd-P (or Ctrl-P on non-mac) to be able to print a note. I'd want comments to be included in the printout (probably at the end) where the selected text for the comment would be highlighted with a superscript number that links to the comment at the end. I'd like any chips and unfurls to be rendered as they would normally appear on screen.

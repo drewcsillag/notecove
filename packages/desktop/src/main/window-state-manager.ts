@@ -32,7 +32,15 @@ export interface NoteReference {
 interface TrackedWindow {
   windowId: string;
   window: BrowserWindow;
-  type: 'main' | 'minimal' | 'syncStatus' | 'noteInfo' | 'storageInspector' | 'sdPicker' | 'about';
+  type:
+    | 'main'
+    | 'minimal'
+    | 'syncStatus'
+    | 'noteInfo'
+    | 'storageInspector'
+    | 'sdPicker'
+    | 'about'
+    | 'printPreview';
   noteId?: string | undefined;
   sdId?: string | undefined;
   editorState?: EditorState | undefined;
@@ -82,7 +90,8 @@ export class WindowStateManager {
       | 'noteInfo'
       | 'storageInspector'
       | 'sdPicker'
-      | 'about',
+      | 'about'
+      | 'printPreview',
     noteId?: string,
     sdId?: string,
     savedWindowId?: string

@@ -581,6 +581,7 @@ declare global {
         onReindexNotes: (callback: () => void) => () => void;
         onStorageInspector: (callback: () => void) => () => void;
         onFeatureFlags: (callback: () => void) => () => void;
+        onPrint: (callback: () => void) => () => void;
       };
 
       tools: {
@@ -818,6 +819,11 @@ declare global {
           sdPath: string,
           sdName: string
         ) => Promise<{ success: boolean; error?: string }>;
+        /**
+         * Open a Print Preview window for the specified note.
+         * Creates a new window that displays a print-ready view of the note.
+         */
+        openPrintPreview: (noteId: string) => Promise<{ success: boolean; error?: string }>;
       };
 
       // Storage inspector operations

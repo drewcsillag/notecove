@@ -73,6 +73,7 @@ export interface CreateWindowOptions {
   minimal?: boolean;
   noteInfo?: boolean;
   storageInspector?: boolean;
+  printPreview?: boolean;
   targetNoteId?: string;
   noteTitle?: string;
   parentWindow?: BrowserWindow;

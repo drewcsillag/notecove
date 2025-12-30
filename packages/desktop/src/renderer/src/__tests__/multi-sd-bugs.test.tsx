@@ -112,6 +112,7 @@ const mockElectronAPI = {
     onStorageInspector: jest.fn(() => () => {}),
     onImportMarkdown: jest.fn(() => () => {}),
     onFeatureFlags: jest.fn(() => () => {}),
+    onPrint: jest.fn(() => () => {}),
   },
   featureFlags: {
     get: jest.fn().mockResolvedValue(false),

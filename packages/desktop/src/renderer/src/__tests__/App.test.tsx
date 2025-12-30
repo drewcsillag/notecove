@@ -145,6 +145,9 @@ const mockElectronAPI = {
     onFeatureFlags: jest.fn(() => () => {
       /* unsubscribe */
     }),
+    onPrint: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   featureFlags: {
     get: jest.fn().mockResolvedValue(false),

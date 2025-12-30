@@ -202,6 +202,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onReindexNotes: stubEventSubscription,
     onStorageInspector: stubEventSubscription,
     onFeatureFlags: stubEventSubscription,
+    onPrint: stubEventSubscription,
   },
 
   tools: {
@@ -280,6 +281,7 @@ export const browserApiStub: typeof window.electronAPI = {
   window: {
     openNoteInfo: notImplemented('window.openNoteInfo'),
     openStorageInspector: notImplemented('window.openStorageInspector'),
+    openPrintPreview: notImplemented('window.openPrintPreview'),
   },
 
   image: {

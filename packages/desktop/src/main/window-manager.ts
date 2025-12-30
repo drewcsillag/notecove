@@ -56,6 +56,7 @@ export interface CreateWindowOptions {
   storageInspector?: boolean;
   sdPicker?: boolean;
   about?: boolean;
+  printPreview?: boolean;
   targetNoteId?: string;
   noteTitle?: string;
   parentWindow?: BrowserWindow;
@@ -116,20 +117,24 @@ export function createWindow(
       ? 1200
       : options?.sdPicker
         ? 500
-        : options?.syncStatus || options?.noteInfo
+        : options?.printPreview
           ? 900
-          : options?.minimal
-            ? 800
-            : 1200;
+          : options?.syncStatus || options?.noteInfo
+            ? 900
+            : options?.minimal
+              ? 800
+              : 1200;
   const defaultHeight = options?.about
     ? 350
     : options?.storageInspector
       ? 800
       : options?.sdPicker
         ? 400
-        : options?.syncStatus || options?.noteInfo
-          ? 600
-          : 800;
+        : options?.printPreview
+          ? 700
+          : options?.syncStatus || options?.noteInfo
+            ? 600
+            : 800;
 
   // Determine window title
   const windowTitle = options?.about
@@ -138,9 +143,11 @@ export function createWindow(
       ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}`
       : options?.sdPicker
         ? 'Select Storage Directory'
-        : options?.noteInfo && options.noteTitle
-          ? `Note Info - ${options.noteTitle}`
-          : getWindowTitle(context.isPackaged, context.selectedProfileName);
+        : options?.printPreview
+          ? 'Print Preview'
+          : options?.noteInfo && options.noteTitle
+            ? `Note Info - ${options.noteTitle}`
+            : getWindowTitle(context.isPackaged, context.selectedProfileName);
 
   // Create the browser window with saved bounds or defaults
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -186,7 +193,8 @@ export function createWindow(
     | 'noteInfo'
     | 'storageInspector'
     | 'sdPicker'
-    | 'about' = options?.about
+    | 'about'
+    | 'printPreview' = options?.about
     ? 'about'
     : options?.syncStatus
       ? 'syncStatus'
@@ -196,9 +204,11 @@ export function createWindow(
           ? 'storageInspector'
           : options?.sdPicker
             ? 'sdPicker'
-            : options?.minimal
-              ? 'minimal'
-              : 'main';
+            : options?.printPreview
+              ? 'printPreview'
+              : options?.minimal
+                ? 'minimal'
+                : 'main';
 
   // Register window with state manager (if available)
   let windowId: string | undefined;
@@ -259,6 +269,9 @@ export function createWindow(
   }
   if (options?.about) {
     params.set('about', 'true');
+  }
+  if (options?.printPreview) {
+    params.set('printPreview', 'true');
   }
   if (options?.targetNoteId) {
     params.set('targetNoteId', options.targetNoteId);

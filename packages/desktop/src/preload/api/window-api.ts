@@ -94,6 +94,15 @@ export const windowApi = {
       success: boolean;
       error?: string;
     }>,
+  /**
+   * Open a Print Preview window for the specified note.
+   * Creates a new window that displays a print-ready view of the note.
+   */
+  openPrintPreview: (noteId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('window:openPrintPreview', noteId) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
 };
 
 export const menuApi = {
@@ -257,6 +266,15 @@ export const menuApi = {
     ipcRenderer.on('menu:featureFlags', listener);
     return () => {
       ipcRenderer.removeListener('menu:featureFlags', listener);
+    };
+  },
+  onPrint: (callback: () => void): (() => void) => {
+    const listener = (): void => {
+      callback();
+    };
+    ipcRenderer.on('menu:print', listener);
+    return () => {
+      ipcRenderer.removeListener('menu:print', listener);
     };
   },
 };

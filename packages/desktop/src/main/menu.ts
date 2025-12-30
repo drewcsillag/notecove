@@ -44,6 +44,7 @@ export interface MenuDependencies {
     storageInspector?: boolean;
     sdPicker?: boolean;
     about?: boolean;
+    printPreview?: boolean;
     targetNoteId?: string;
     noteTitle?: string;
     parentWindow?: BrowserWindow;
@@ -167,6 +168,19 @@ export function createMenu(deps: MenuDependencies): void {
               focusedWindow.webContents.send('menu:import-markdown');
             } else if (mainWindow) {
               mainWindow.webContents.send('menu:import-markdown');
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Print...',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:print');
+            } else if (mainWindow) {
+              mainWindow.webContents.send('menu:print');
             }
           },
         },

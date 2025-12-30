@@ -33,6 +33,7 @@ import {
 } from './components/StorageInspector';
 import { AboutWindow } from './components/AboutWindow';
 import { SyncStatusPanel } from './components/SyncStatusPanel';
+import { PrintPreviewWindow } from './components/PrintPreview';
 import { ImportDialog } from './components/ImportDialog';
 import { AppStateKey } from '@notecove/shared';
 import { useWindowState } from './hooks/useWindowState';
@@ -120,6 +121,9 @@ function App(): React.ReactElement {
   const [sdPickerMode, setSdPickerMode] = useState(false);
   // About window mode (dedicated window for app information)
   const [aboutMode, setAboutMode] = useState(false);
+  // Print preview window mode (dedicated window for print preview)
+  const [printPreviewMode, setPrintPreviewMode] = useState(false);
+  const [printPreviewNoteId, setPrintPreviewNoteId] = useState<string | null>(null);
   // Export trigger from menu (null | 'selected' | 'all')
   const [exportTrigger, setExportTrigger] = useState<'selected' | 'all' | null>(null);
   // Import dialog open state
@@ -157,6 +161,7 @@ function App(): React.ReactElement {
 
       let sdPickerParam = searchParams.get('sdPicker');
       let aboutParam = searchParams.get('about');
+      let printPreviewParam = searchParams.get('printPreview');
 
       // If not in search, try hash (for file:// protocol)
       if (
@@ -167,6 +172,7 @@ function App(): React.ReactElement {
         !storageInspectorParam &&
         !sdPickerParam &&
         !aboutParam &&
+        !printPreviewParam &&
         window.location.hash
       ) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -181,6 +187,7 @@ function App(): React.ReactElement {
         sdNameParam = hashParams.get('sdName');
         sdPickerParam = hashParams.get('sdPicker');
         aboutParam = hashParams.get('about');
+        printPreviewParam = hashParams.get('printPreview');
       }
 
       if (noteIdParam) {
@@ -220,6 +227,12 @@ function App(): React.ReactElement {
       if (aboutParam === 'true') {
         console.log('[App] Enabling about mode from URL parameter');
         setAboutMode(true);
+      }
+
+      if (printPreviewParam === 'true' && noteIdParam) {
+        console.log('[App] Enabling print preview mode from URL parameter, noteId:', noteIdParam);
+        setPrintPreviewMode(true);
+        setPrintPreviewNoteId(noteIdParam);
       }
     } catch (error: unknown) {
       console.error(
@@ -1059,6 +1072,19 @@ function App(): React.ReactElement {
       setFeatureFlagsOpen(true);
     });
 
+    // Print
+    const cleanupPrint = window.electronAPI.menu.onPrint(() => {
+      if (selectedNoteId) {
+        void window.electronAPI.window.openPrintPreview(selectedNoteId).then((result) => {
+          if (!result.success) {
+            console.error('[Menu] Failed to open print preview:', result.error);
+          }
+        });
+      } else {
+        console.log('[Menu] Print: No note selected');
+      }
+    });
+
     // Subscribe to feature flag changes - close history panel if viewHistory is disabled
     const cleanupFlagChanges = window.electronAPI.featureFlags.onChange(({ flag, enabled }) => {
       if (flag === 'viewHistory' && !enabled) {
@@ -1087,6 +1113,7 @@ function App(): React.ReactElement {
       cleanupReloadFromCRDTLogs();
       cleanupReindexNotes();
       cleanupFeatureFlags();
+      cleanupPrint();
       cleanupFlagChanges();
     };
   }, [selectedNoteId]);
@@ -1253,6 +1280,16 @@ function App(): React.ReactElement {
         >
           <AboutWindow />
         </Box>
+      </ThemeProvider>
+    );
+  }
+
+  // Render print preview window (standalone window for print preview)
+  if (printPreviewMode && printPreviewNoteId) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <PrintPreviewWindow noteId={printPreviewNoteId} />
       </ThemeProvider>
     );
   }

@@ -18,6 +18,7 @@ export function registerWindowHandlers(ctx: HandlerContext): void {
     ipcMain.handle('testing:createWindow', handleCreateWindow(ctx));
     ipcMain.handle('window:openNoteInfo', handleOpenNoteInfoWindow(ctx));
     ipcMain.handle('window:openStorageInspector', handleOpenStorageInspectorWindow(ctx));
+    ipcMain.handle('window:openPrintPreview', handleOpenPrintPreviewWindow(ctx));
   }
 }
 
@@ -28,6 +29,7 @@ export function unregisterWindowHandlers(): void {
   ipcMain.removeHandler('testing:createWindow');
   ipcMain.removeHandler('window:openNoteInfo');
   ipcMain.removeHandler('window:openStorageInspector');
+  ipcMain.removeHandler('window:openPrintPreview');
 }
 
 // =============================================================================
@@ -100,6 +102,38 @@ function handleOpenStorageInspectorWindow(ctx: HandlerContext) {
         sdId,
         sdPath,
         sdName,
+      });
+    }
+
+    return { success: true };
+  };
+}
+
+function handleOpenPrintPreviewWindow(ctx: HandlerContext) {
+  return async (
+    event: IpcMainInvokeEvent,
+    noteId: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const { database, createWindowFn } = ctx;
+
+    // Validate note exists
+    const note = await database.getNote(noteId);
+    if (!note) {
+      return { success: false, error: 'Note not found' };
+    }
+
+    // Get the window that sent this IPC message
+    const parentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!parentWindow) {
+      return { success: false, error: 'Could not determine parent window' };
+    }
+
+    // Create the Print Preview window
+    if (createWindowFn) {
+      createWindowFn({
+        printPreview: true,
+        noteId: noteId,
+        parentWindow: parentWindow,
       });
     }
 
