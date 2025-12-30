@@ -86,6 +86,12 @@ Master NoteCove with these keyboard shortcuts.
 | Import markdown       | `Cmd+Shift+I` | `Ctrl+Shift+I` |
 | Export selected notes | `Cmd+Shift+E` | `Ctrl+Shift+E` |
 
+## Print
+
+| Action     | macOS   | Windows/Linux |
+| ---------- | ------- | ------------- |
+| Print note | `Cmd+P` | `Ctrl+P`      |
+
 ## Organization
 
 | Action | macOS    | Windows/Linux |

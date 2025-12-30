@@ -1267,4 +1267,538 @@ describe('generatePrintHtml', () => {
       expect(html).not.toContain('unfurl-card');
     });
   });
+
+  describe('comments (Phase 4)', () => {
+    describe('comment highlights with superscripts (4.1/4.2)', () => {
+      it('should render text with comment mark as highlighted with superscript', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'This is ' },
+                {
+                  type: 'text',
+                  text: 'commented text',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-1' } }],
+                },
+                { type: 'text', text: ' in a paragraph.' },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'thread-1',
+            content: 'This is my comment',
+            originalText: 'commented text',
+            authorName: 'Test User',
+            authorHandle: 'testuser',
+            created: Date.now(),
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        expect(html).toContain('comment-highlight');
+        expect(html).toContain('commented text');
+        expect(html).toContain('<sup');
+        expect(html).toContain('1</sup>');
+      });
+
+      it('should assign sequential superscript numbers to different threads', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'First comment',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-1' } }],
+                },
+                { type: 'text', text: ' and ' },
+                {
+                  type: 'text',
+                  text: 'second comment',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-2' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'thread-1',
+            content: 'Comment 1',
+            originalText: 'First comment',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+          {
+            id: 'thread-2',
+            content: 'Comment 2',
+            originalText: 'second comment',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        // Both superscripts should be present
+        expect(html).toContain('1</sup>');
+        expect(html).toContain('2</sup>');
+        // Verify order in document
+        const superscript1Pos = html.indexOf('1</sup>');
+        const superscript2Pos = html.indexOf('2</sup>');
+        expect(superscript1Pos).toBeLessThan(superscript2Pos);
+      });
+
+      it('should use same superscript number for same threadId appearing multiple times', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'First occurrence',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-1' } }],
+                },
+              ],
+            },
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Second occurrence same thread',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-1' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'thread-1',
+            content: 'Comment 1',
+            originalText: 'First occurrence',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        // Should have two superscript 1s, no superscript 2
+        expect((html.match(/>1<\/sup>/g) ?? []).length).toBe(2);
+        expect(html).not.toContain('2</sup>');
+      });
+
+      it('should handle overlapping comments with multiple superscripts', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'overlapping text',
+                  marks: [
+                    { type: 'commentMark', attrs: { threadId: 'thread-1' } },
+                    { type: 'commentMark', attrs: { threadId: 'thread-2' } },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'thread-1',
+            content: 'Comment 1',
+            originalText: 'overlapping text',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+          {
+            id: 'thread-2',
+            content: 'Comment 2',
+            originalText: 'overlapping text',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        // Should have both superscripts (1 and 2) for the overlapping text
+        expect(html).toContain('1</sup>');
+        expect(html).toContain('2</sup>');
+        // Both should be near the same text
+        expect(html).toContain('comment-highlight');
+      });
+
+      it('should not render superscript for comment mark with no matching thread', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'orphan comment',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'orphan-thread' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        // No comments provided
+        const html = generatePrintHtml(content, [], defaultOptions);
+
+        // Should still have highlight (mark is there) but no superscript reference
+        expect(html).toContain('orphan comment');
+        expect(html).not.toContain('<sup');
+      });
+    });
+
+    describe('comment endnotes section (4.3)', () => {
+      it('should generate endnotes section with comment content', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'commented text',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-1' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'thread-1',
+            content: 'This is the comment content',
+            originalText: 'commented text',
+            authorName: 'John Doe',
+            authorHandle: 'johndoe',
+            created: 1704067200000, // 2024-01-01 00:00:00 UTC
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        // Check for endnotes section
+        expect(html).toContain('comment-endnotes');
+        expect(html).toContain('1.');
+        expect(html).toContain('This is the comment content');
+        expect(html).toContain('John Doe');
+      });
+
+      it('should show original quoted text in endnotes', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'the original text',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-1' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'thread-1',
+            content: 'My comment',
+            originalText: 'the original text',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        expect(html).toContain('comment-endnotes');
+        expect(html).toContain('"the original text"'); // Quoted
+      });
+
+      it('should include replies in endnotes', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'commented',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-1' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'thread-1',
+            content: 'Original comment',
+            originalText: 'commented',
+            authorName: 'Alice',
+            authorHandle: 'alice',
+            created: Date.now(),
+            replies: [
+              {
+                id: 'reply-1',
+                threadId: 'thread-1',
+                content: 'This is a reply',
+                authorName: 'Bob',
+                authorHandle: 'bob',
+                created: Date.now() + 1000,
+              },
+            ],
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        expect(html).toContain('Original comment');
+        expect(html).toContain('This is a reply');
+        expect(html).toContain('Alice');
+        expect(html).toContain('Bob');
+      });
+
+      it('should not show endnotes section when no comments', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'No comments here' }],
+            },
+          ],
+        };
+
+        const html = generatePrintHtml(content, [], defaultOptions);
+
+        expect(html).not.toContain('comment-endnotes');
+      });
+
+      it('should order endnotes by first appearance in document', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'first',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-b' } }],
+                },
+                { type: 'text', text: ' and ' },
+                {
+                  type: 'text',
+                  text: 'second',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'thread-a' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        // Note: comments array order doesn't matter - document order does
+        const comments = [
+          {
+            id: 'thread-a',
+            content: 'Comment A',
+            originalText: 'second',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+          {
+            id: 'thread-b',
+            content: 'Comment B',
+            originalText: 'first',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, defaultOptions);
+
+        // thread-b appears first in document, so it should be #1
+        const endnotesHtml = html.substring(html.indexOf('comment-endnotes'));
+        const commentBPos = endnotesHtml.indexOf('Comment B');
+        const commentAPos = endnotesHtml.indexOf('Comment A');
+        expect(commentBPos).toBeLessThan(commentAPos);
+      });
+    });
+
+    describe('resolved comments toggle (4.4)', () => {
+      it('should exclude resolved comments by default', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'resolved comment',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'resolved-thread' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'resolved-thread',
+            content: 'This was resolved',
+            originalText: 'resolved comment',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+            resolved: true,
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, { includeResolvedComments: false });
+
+        // Should not have superscript or endnotes for resolved comment
+        expect(html).not.toContain('<sup');
+        expect(html).not.toContain('comment-endnotes');
+      });
+
+      it('should include resolved comments when option is true', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'resolved comment',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'resolved-thread' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'resolved-thread',
+            content: 'This was resolved',
+            originalText: 'resolved comment',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+            resolved: true,
+          },
+        ];
+
+        const html = generatePrintHtml(content, comments, { includeResolvedComments: true });
+
+        // Should have superscript and endnotes
+        expect(html).toContain('<sup');
+        expect(html).toContain('comment-endnotes');
+        expect(html).toContain('This was resolved');
+      });
+
+      it('should mix resolved and unresolved comments correctly', () => {
+        const content: JSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'open',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'open-thread' } }],
+                },
+                { type: 'text', text: ' and ' },
+                {
+                  type: 'text',
+                  text: 'resolved',
+                  marks: [{ type: 'commentMark', attrs: { threadId: 'resolved-thread' } }],
+                },
+              ],
+            },
+          ],
+        };
+
+        const comments = [
+          {
+            id: 'open-thread',
+            content: 'Open comment',
+            originalText: 'open',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+            resolved: false,
+          },
+          {
+            id: 'resolved-thread',
+            content: 'Resolved comment',
+            originalText: 'resolved',
+            authorName: 'User',
+            authorHandle: 'user',
+            created: Date.now(),
+            resolved: true,
+          },
+        ];
+
+        // Without resolved
+        const htmlWithoutResolved = generatePrintHtml(content, comments, {
+          includeResolvedComments: false,
+        });
+        expect(htmlWithoutResolved).toContain('Open comment');
+        expect(htmlWithoutResolved).not.toContain('Resolved comment');
+
+        // With resolved
+        const htmlWithResolved = generatePrintHtml(content, comments, {
+          includeResolvedComments: true,
+        });
+        expect(htmlWithResolved).toContain('Open comment');
+        expect(htmlWithResolved).toContain('Resolved comment');
+      });
+    });
+  });
 });

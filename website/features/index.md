@@ -172,6 +172,17 @@ Bring your notes from other apps:
 
 [Learn more about importing →](/features/import-export)
 
+### 🖨️ Print
+
+Print your notes with full formatting:
+
+- **Print preview**: See exactly what you'll get before printing
+- **Full content support**: Formatting, code blocks, images, tables
+- **Comments as endnotes**: Threaded comments appear as numbered endnotes
+- **Smart styling**: Light mode, proportional fonts, intelligent page breaks
+
+[Learn more about printing →](/features/import-export#print)
+
 ## Coming Soon
 
 ### Templates

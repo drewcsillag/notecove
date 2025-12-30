@@ -79,6 +79,43 @@ const printStyles = `
     padding: 0;
   }
 
+  /* Syntax highlighting (highlight.js/lowlight tokens) */
+  .print-content .hljs-comment,
+  .print-content .hljs-quote { color: #6a737d; font-style: italic; }
+  .print-content .hljs-keyword,
+  .print-content .hljs-selector-tag,
+  .print-content .hljs-addition { color: #d73a49; }
+  .print-content .hljs-number,
+  .print-content .hljs-string,
+  .print-content .hljs-meta .hljs-meta-string,
+  .print-content .hljs-literal,
+  .print-content .hljs-doctag,
+  .print-content .hljs-regexp { color: #032f62; }
+  .print-content .hljs-title,
+  .print-content .hljs-section,
+  .print-content .hljs-name,
+  .print-content .hljs-selector-id,
+  .print-content .hljs-selector-class { color: #6f42c1; }
+  .print-content .hljs-attribute,
+  .print-content .hljs-attr,
+  .print-content .hljs-variable,
+  .print-content .hljs-template-variable,
+  .print-content .hljs-class .hljs-title,
+  .print-content .hljs-type { color: #005cc5; }
+  .print-content .hljs-symbol,
+  .print-content .hljs-bullet,
+  .print-content .hljs-subst,
+  .print-content .hljs-meta,
+  .print-content .hljs-meta .hljs-keyword,
+  .print-content .hljs-selector-attr,
+  .print-content .hljs-selector-pseudo,
+  .print-content .hljs-link { color: #e36209; }
+  .print-content .hljs-built_in,
+  .print-content .hljs-deletion { color: #22863a; }
+  .print-content .hljs-formula { background: #f0fff4; }
+  .print-content .hljs-emphasis { font-style: italic; }
+  .print-content .hljs-strong { font-weight: bold; }
+
   /* Task lists */
   .print-content ul.task-list {
     list-style: none;
@@ -301,6 +338,76 @@ const printStyles = `
     word-break: break-all;
   }
 
+  /* Comment highlights and superscripts */
+  .print-content .comment-highlight {
+    background-color: #fff59d;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  .print-content .comment-ref {
+    color: #1976d2;
+    font-weight: 600;
+    font-size: 0.75em;
+    margin-left: 1px;
+  }
+
+  /* Comment endnotes section */
+  .print-content .comment-endnotes {
+    margin-top: 2em;
+    padding-top: 1em;
+  }
+  .print-content .endnotes-separator {
+    border: none;
+    border-top: 1px solid #ccc;
+    margin-bottom: 1em;
+  }
+  .print-content .endnotes-title {
+    font-size: 14pt;
+    font-weight: 600;
+    margin: 0 0 1em 0;
+    color: #333;
+  }
+  .print-content .endnote-item {
+    margin-bottom: 1.5em;
+  }
+  .print-content .endnote-header {
+    font-size: 0.95em;
+    color: #555;
+    margin-bottom: 0.5em;
+  }
+  .print-content .endnote-header strong {
+    color: #1976d2;
+    font-size: 1.1em;
+  }
+  .print-content .endnote-content {
+    margin-left: 1em;
+    margin-bottom: 0.5em;
+  }
+  .print-content .endnote-author {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 0.25em;
+  }
+  .print-content .endnote-timestamp {
+    font-weight: 400;
+    color: #888;
+    font-size: 0.85em;
+    margin-left: 0.5em;
+  }
+  .print-content .endnote-text {
+    color: #333;
+    line-height: 1.4;
+  }
+  .print-content .endnote-replies {
+    margin-left: 2em;
+    margin-top: 0.5em;
+    padding-left: 1em;
+    border-left: 2px solid #e0e0e0;
+  }
+  .print-content .endnote-reply {
+    margin-bottom: 0.75em;
+  }
+
   /* Print-specific page break rules */
   @media print {
     .print-content h1, .print-content h2, .print-content h3,
@@ -312,6 +419,10 @@ const printStyles = `
     .print-content table, .print-content img {
       page-break-inside: avoid;
       break-inside: avoid;
+    }
+    .print-content img {
+      max-height: 8in;
+      object-fit: contain;
     }
     .print-content p {
       orphans: 3;
@@ -354,8 +465,30 @@ export function PrintPreviewWindow({ noteId }: PrintPreviewWindowProps): React.R
 
         const content = note.content as JSONContent;
 
-        // TODO: Fetch comments for endnotes (Phase 4)
-        const comments: never[] = [];
+        // Fetch comments for endnotes
+        const threads = await window.electronAPI.comment.getThreads(noteId);
+        const comments = await Promise.all(
+          threads.map(async (thread) => {
+            const replies = await window.electronAPI.comment.getReplies(noteId, thread.id);
+            return {
+              id: thread.id,
+              content: thread.content,
+              originalText: thread.originalText,
+              authorName: thread.authorName,
+              authorHandle: thread.authorHandle,
+              created: thread.created,
+              resolved: thread.resolved,
+              replies: replies.map((reply) => ({
+                id: reply.id,
+                threadId: reply.threadId,
+                content: reply.content,
+                authorName: reply.authorName,
+                authorHandle: reply.authorHandle,
+                created: reply.created,
+              })),
+            };
+          })
+        );
 
         // Generate print HTML
         let html = generatePrintHtml(content, comments, {
@@ -481,6 +614,7 @@ export function PrintPreviewWindow({ noteId }: PrintPreviewWindowProps): React.R
           overflow: 'auto',
           display: 'flex',
           justifyContent: 'center',
+          alignItems: 'flex-start',
           py: 3,
           '@media print': {
             overflow: 'visible',
@@ -501,6 +635,7 @@ export function PrintPreviewWindow({ noteId }: PrintPreviewWindowProps): React.R
             className="print-content"
             sx={{
               width: '8.5in',
+              height: 'fit-content',
               bgcolor: 'background.paper',
               boxShadow: 3,
               p: 4,
@@ -508,6 +643,7 @@ export function PrintPreviewWindow({ noteId }: PrintPreviewWindowProps): React.R
               // Content auto-sizes, page breaks handled by browser during printing
               '@media print': {
                 width: '100%',
+                height: 'auto',
                 boxShadow: 'none',
                 p: 0,
                 mb: 0,

@@ -501,10 +501,17 @@ function xmlTextToJson(
       if (delta.attributes && Object.keys(delta.attributes).length > 0) {
         textNode.marks = [];
         for (const [key, value] of Object.entries(delta.attributes)) {
+          // Handle stackable marks like commentMark which use unique suffixes
+          // e.g., "commentMark--abc123" -> "commentMark"
+          const markType = key.includes('--') ? (key.split('--')[0] ?? key) : key;
+
           if (value === true) {
-            textNode.marks.push({ type: key });
+            textNode.marks.push({ type: markType });
           } else if (typeof value === 'object' && value !== null) {
-            textNode.marks.push({ type: key, attrs: value as Record<string, unknown> });
+            textNode.marks.push({ type: markType, attrs: value as Record<string, unknown> });
+          } else if (value !== false && value !== null && value !== undefined) {
+            // Handle other truthy values (like strings) as marks with the value as an attribute
+            textNode.marks.push({ type: markType, attrs: { value } });
           }
         }
       }
