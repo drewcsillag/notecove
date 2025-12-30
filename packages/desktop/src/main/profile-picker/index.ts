@@ -412,7 +412,9 @@ export async function showProfilePicker(
     });
 
     pickerWindow.on('ready-to-show', () => {
-      if (pickerWindow) {
+      // Don't show window in test/headless mode (E2E tests)
+      const isHeadless = process.env['NODE_ENV'] === 'test' || process.env['E2E_HEADLESS'] === '1';
+      if (pickerWindow && !isHeadless) {
         pickerWindow.show();
         pickerWindow.focus();
       }

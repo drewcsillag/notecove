@@ -94,6 +94,7 @@ test.describe('Backup and Restore', () => {
       env: {
         ...process.env,
         NODE_ENV: 'test',
+        E2E_HEADLESS: '1', // Don't show windows during E2E tests
         TEST_DB_PATH: testDbPath,
         TEST_STORAGE_DIR: testStorageDir,
         TEST_CONFIG_PATH: testConfigPath,

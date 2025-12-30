@@ -28,10 +28,12 @@ async function launchAppWithProfilePicker(args: string[] = []): Promise<void> {
     args: [mainPath, `--user-data-dir=${testUserDataDir}`, ...args],
     // Note: NOT setting NODE_ENV=test so profile picker shows
     // But we do set E2E_FAST_SHUTDOWN for faster cleanup
+    // E2E_HEADLESS=1 hides windows without skipping profile picker logic
     env: {
       ...process.env,
       NODE_ENV: undefined, // Explicitly unset
       E2E_FAST_SHUTDOWN: '1', // Enable fast shutdown for E2E tests
+      E2E_HEADLESS: '1', // Don't show windows during E2E tests
     },
     timeout: 60000,
   });
@@ -206,6 +208,7 @@ test.describe('Profile Picker', () => {
       env: {
         ...process.env,
         NODE_ENV: undefined,
+        E2E_HEADLESS: '1', // Don't show windows during E2E tests
       },
       timeout: 60000,
     });
@@ -235,6 +238,7 @@ test.describe('Profile Picker', () => {
       env: {
         ...process.env,
         NODE_ENV: undefined,
+        E2E_HEADLESS: '1', // Don't show windows during E2E tests
       },
       timeout: 60000,
     });

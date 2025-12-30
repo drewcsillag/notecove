@@ -98,6 +98,7 @@ export const test = base.extend<TestFixtures>({
       env: {
         ...process.env,
         NODE_ENV: 'test',
+        E2E_HEADLESS: '1', // Don't show windows during E2E tests
       },
       timeout: 60000,
     });

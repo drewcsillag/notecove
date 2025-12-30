@@ -223,8 +223,9 @@ export function createWindow(
   }
 
   newWindow.on('ready-to-show', () => {
-    // Don't show window in test mode (headless E2E tests)
-    if (process.env['NODE_ENV'] !== 'test') {
+    // Don't show window in test/headless mode (E2E tests)
+    const isHeadless = process.env['NODE_ENV'] === 'test' || process.env['E2E_HEADLESS'] === '1';
+    if (!isHeadless) {
       // Apply maximized/fullscreen state before showing
       if (options?.isMaximized) {
         newWindow.maximize();
