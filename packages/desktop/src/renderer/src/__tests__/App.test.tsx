@@ -260,6 +260,7 @@ const mockElectronAPI = {
     reportEditorState: jest.fn().mockResolvedValue(undefined),
     reportPanelLayout: jest.fn().mockResolvedValue(undefined),
     getSavedState: jest.fn().mockResolvedValue(null),
+    reportVisibleNotes: jest.fn().mockResolvedValue(undefined),
   },
 };
 

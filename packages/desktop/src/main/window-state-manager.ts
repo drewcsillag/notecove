@@ -22,6 +22,12 @@ import { randomUUID } from 'crypto';
 /** Debounce delay for window position/size changes (milliseconds) */
 const BOUNDS_DEBOUNCE_MS = 500;
 
+/** Note reference with ID and SD */
+export interface NoteReference {
+  noteId: string;
+  sdId: string;
+}
+
 /** Internal tracking data for a window */
 interface TrackedWindow {
   windowId: string;
@@ -31,6 +37,7 @@ interface TrackedWindow {
   sdId?: string | undefined;
   editorState?: EditorState | undefined;
   panelLayout?: PanelLayoutState | undefined;
+  visibleNotes?: NoteReference[] | undefined;
   debounceTimer?: NodeJS.Timeout | undefined;
   moveHandler: () => void;
   resizeHandler: () => void;
@@ -177,6 +184,77 @@ export class WindowStateManager {
   getPanelLayout(windowId: string): PanelLayoutState | undefined {
     const tracked = this.windows.get(windowId);
     return tracked?.panelLayout;
+  }
+
+  /**
+   * Update visible notes for a window (notes shown in the notes list)
+   */
+  updateVisibleNotes(windowId: string, notes: NoteReference[]): void {
+    const tracked = this.windows.get(windowId);
+    if (tracked) {
+      tracked.visibleNotes = notes;
+    }
+  }
+
+  /**
+   * Get all currently open notes across all windows (deduplicated)
+   */
+  getAllOpenNotes(): NoteReference[] {
+    const noteMap = new Map<string, NoteReference>();
+
+    for (const tracked of this.windows.values()) {
+      if (tracked.noteId && tracked.sdId) {
+        const key = `${tracked.noteId}:${tracked.sdId}`;
+        if (!noteMap.has(key)) {
+          noteMap.set(key, { noteId: tracked.noteId, sdId: tracked.sdId });
+        }
+      }
+    }
+
+    return Array.from(noteMap.values());
+  }
+
+  /**
+   * Get all visible notes across all windows (deduplicated)
+   */
+  getAllVisibleNotes(): NoteReference[] {
+    const noteMap = new Map<string, NoteReference>();
+
+    for (const tracked of this.windows.values()) {
+      if (tracked.visibleNotes) {
+        for (const note of tracked.visibleNotes) {
+          const key = `${note.noteId}:${note.sdId}`;
+          if (!noteMap.has(key)) {
+            noteMap.set(key, note);
+          }
+        }
+      }
+    }
+
+    return Array.from(noteMap.values());
+  }
+
+  /**
+   * Get all high-priority notes (union of open notes and visible notes, deduplicated)
+   */
+  getHighPriorityNotes(): NoteReference[] {
+    const noteMap = new Map<string, NoteReference>();
+
+    // Add open notes
+    for (const note of this.getAllOpenNotes()) {
+      const key = `${note.noteId}:${note.sdId}`;
+      noteMap.set(key, note);
+    }
+
+    // Add visible notes
+    for (const note of this.getAllVisibleNotes()) {
+      const key = `${note.noteId}:${note.sdId}`;
+      if (!noteMap.has(key)) {
+        noteMap.set(key, note);
+      }
+    }
+
+    return Array.from(noteMap.values());
   }
 
   /**

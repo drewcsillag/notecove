@@ -46,6 +46,23 @@ export interface PollingGroupEntry {
 }
 
 /**
+ * Serializable entry for IPC transport (Maps/Sets converted to plain objects/arrays)
+ */
+export interface PollingGroupEntrySerialized {
+  noteId: string;
+  sdId: string;
+  /** Expected sequences as object {instanceId: sequence} */
+  expectedSequences: Record<string, number>;
+  /** Instance IDs that have caught up */
+  caughtUpSequences: string[];
+  addedAt: number;
+  lastPolledAt: number;
+  reason: PollingGroupReason;
+  priority: PollingPriority;
+  hasBeenPolled: boolean;
+}
+
+/**
  * Settings for the polling group
  */
 export interface PollingGroupSettings {
@@ -154,16 +171,18 @@ export interface PollingGroupAddInput {
 }
 
 /**
- * Status returned by getStatus()
+ * Status returned by getStatus() - uses serializable entries for IPC transport
  */
 export interface PollingGroupStatus {
   totalEntries: number;
   highPriorityCount: number;
   normalPriorityCount: number;
-  entries: PollingGroupEntry[];
+  entries: PollingGroupEntrySerialized[];
   currentRatePerMinute: number;
   recentHits: number;
   recentMisses: number;
+  /** Time until next full repoll in ms, or null if disabled */
+  nextFullRepollIn: number | null;
 }
 
 /**
@@ -220,6 +239,13 @@ export class PollingGroup {
    */
   updateSettings(settings: Partial<PollingGroupSettings>): void {
     this.settings = { ...this.settings, ...settings };
+  }
+
+  /**
+   * Get current settings
+   */
+  getSettings(): Readonly<PollingGroupSettings> {
+    return this.settings;
   }
 
   /**
@@ -688,9 +714,9 @@ export class PollingGroup {
   }
 
   /**
-   * Get status for UI display
+   * Get status for UI display (with serializable entries for IPC transport)
    */
-  getStatus(): PollingGroupStatus {
+  getStatus(nextFullRepollIn: number | null = null): PollingGroupStatus {
     const entries = Array.from(this.entries.values());
     const highPriorityCount = entries.filter((e) => e.priority === 'high').length;
     const normalPriorityCount = entries.filter((e) => e.priority === 'normal').length;
@@ -709,14 +735,28 @@ export class PollingGroup {
       effectivePolls += poll.wasHit ? this.settings.hitRateMultiplier : 1;
     }
 
+    // Convert entries to serializable form
+    const serializedEntries: PollingGroupEntrySerialized[] = entries.map((entry) => ({
+      noteId: entry.noteId,
+      sdId: entry.sdId,
+      expectedSequences: Object.fromEntries(entry.expectedSequences),
+      caughtUpSequences: entry.caughtUpSequences ? Array.from(entry.caughtUpSequences) : [],
+      addedAt: entry.addedAt,
+      lastPolledAt: entry.lastPolledAt,
+      reason: entry.reason,
+      priority: entry.priority,
+      hasBeenPolled: entry.hasBeenPolled,
+    }));
+
     return {
       totalEntries: entries.length,
       highPriorityCount,
       normalPriorityCount,
-      entries,
+      entries: serializedEntries,
       currentRatePerMinute: effectivePolls,
       recentHits,
       recentMisses,
+      nextFullRepollIn,
     };
   }
 

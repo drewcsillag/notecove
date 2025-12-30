@@ -4,6 +4,20 @@
 
 import { ipcRenderer } from 'electron';
 import type { SyncProgress, SyncStatus } from '../../main/ipc/types';
+import type { PollingGroupStoredSettings, PollingGroupStatus } from '@notecove/shared';
+
+export const pollingApi = {
+  getSettings: (): Promise<PollingGroupStoredSettings> =>
+    ipcRenderer.invoke('polling:getSettings') as Promise<PollingGroupStoredSettings>,
+  setSettings: (settings: Partial<PollingGroupStoredSettings>): Promise<void> =>
+    ipcRenderer.invoke('polling:setSettings', settings) as Promise<void>,
+  getSettingsForSd: (sdId: string): Promise<PollingGroupStoredSettings> =>
+    ipcRenderer.invoke('polling:getSettingsForSd', sdId) as Promise<PollingGroupStoredSettings>,
+  setSettingsForSd: (sdId: string, settings: Partial<PollingGroupStoredSettings>): Promise<void> =>
+    ipcRenderer.invoke('polling:setSettingsForSd', sdId, settings) as Promise<void>,
+  getGroupStatus: (): Promise<PollingGroupStatus | null> =>
+    ipcRenderer.invoke('polling:getGroupStatus') as Promise<PollingGroupStatus | null>,
+};
 
 export const syncApi = {
   openWindow: (): Promise<void> => ipcRenderer.invoke('sync:openWindow') as Promise<void>,

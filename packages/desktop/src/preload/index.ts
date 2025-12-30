@@ -11,7 +11,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { noteApi, historyApi, tagApi, linkApi } from './api/note-api';
 import { folderApi } from './api/folder-api';
 import { sdApi } from './api/sd-api';
-import { syncApi, recoveryApi } from './api/sync-api';
+import { syncApi, recoveryApi, pollingApi } from './api/sync-api';
 import {
   appStateApi,
   configApi,
@@ -61,6 +61,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Sync operations
   sync: syncApi,
+
+  // Polling group operations
+  polling: pollingApi,
 
   // App state operations
   appState: appStateApi,

@@ -662,6 +662,18 @@ export const webClient: typeof window.electronAPI = {
     onStatusChanged: noopSubscription,
   },
 
+  polling: {
+    getSettings: () => Promise.resolve({}),
+    setSettings: async () => {
+      // No-op in web mode
+    },
+    getSettingsForSd: () => Promise.resolve({}),
+    setSettingsForSd: async () => {
+      // No-op in web mode
+    },
+    getGroupStatus: () => Promise.resolve(null),
+  },
+
   appState: {
     get: async (key: string) => {
       await Promise.resolve();
@@ -785,6 +797,15 @@ export const webClient: typeof window.electronAPI = {
   testing: {
     createWindow: browserNotAvailable('testing.createWindow'),
     setNoteTimestamp: browserNotAvailable('testing.setNoteTimestamp'),
+    getAllTags: browserNotAvailable('testing.getAllTags'),
+    getTagsForNote: browserNotAvailable('testing.getTagsForNote'),
+    getNoteById: browserNotAvailable('testing.getNoteById'),
+    onFileWatcherEvent: noopSubscription,
+    onGracePeriodEnded: noopSubscription,
+    onActivitySyncComplete: noopSubscription,
+    onActivityWatcherDebug: noopSubscription,
+    onInitialSyncComplete: noopSubscription,
+    onAllInitialSyncsComplete: noopSubscription,
   },
 
   app: {
@@ -866,6 +887,9 @@ export const webClient: typeof window.electronAPI = {
     getSavedState: async () => {
       // No saved state in web client
       return null;
+    },
+    reportVisibleNotes: async () => {
+      // No-op in web client - no sync polling
     },
   },
 

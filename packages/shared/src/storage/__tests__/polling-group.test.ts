@@ -63,8 +63,8 @@ describe('PollingGroup', () => {
 
       const status = pollingGroup.getStatus();
       expect(status.totalEntries).toBe(1);
-      // Should have merged/updated the expected sequences
-      expect(status.entries[0].expectedSequences.get('instance-a')).toBe(150);
+      // Should have merged/updated the expected sequences (serialized as Record)
+      expect(status.entries[0].expectedSequences['instance-a']).toBe(150);
     });
 
     it('should allow same note in different SDs', () => {

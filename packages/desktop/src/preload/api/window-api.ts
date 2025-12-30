@@ -59,6 +59,16 @@ export const windowStateApi = {
       editorState?: { scrollTop: number; cursorPosition: number };
       panelLayout?: PanelLayout;
     } | null>,
+
+  /**
+   * Report the notes currently visible in the notes list.
+   * Called when the notes list changes (filtering, scrolling, new notes loaded).
+   */
+  reportVisibleNotes: (
+    windowId: string,
+    notes: { noteId: string; sdId: string }[]
+  ): Promise<void> =>
+    ipcRenderer.invoke('windowState:reportVisibleNotes', windowId, notes) as Promise<void>,
 };
 
 export const windowApi = {

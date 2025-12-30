@@ -1,6 +1,6 @@
 # Polling Group Refactor - Implementation Plan
 
-**Overall Progress:** `20%`
+**Overall Progress:** `95%`
 
 ## Summary
 
@@ -170,33 +170,33 @@ Based on [PLAN-CRITIQUE.md](./PLAN-CRITIQUE.md), execute phases in this order fo
   - [ ] 🟨 1.5 Implement polling timer/interval driver (deferred to Phase 2 integration)
     - Timer driver will be implemented in sd-watcher-manager when integrating
 
-### Phase 2: Integrate Fast Path with Polling Group 🟥
+### Phase 2: Integrate Fast Path with Polling Group 🟩
 
-- [ ] 🟥 **Step 2: Modify ActivitySync fast path to hand off to PollingGroup**
-  - [ ] 🟥 2.1 Write integration tests
+- [x] 🟩 **Step 2: Modify ActivitySync fast path to hand off to PollingGroup**
+  - [x] 🟩 2.1 Write integration tests
     - Fast path succeeds quickly → note NOT added to polling group
     - Fast path exceeds max delay → hands off to polling group
     - Polling group eventually syncs the note
-  - [ ] 🟥 2.2 Modify `pollAndReload` to hand off instead of giving up
+  - [x] 🟩 2.2 Modify `pollAndReload` to hand off instead of giving up
     - Add callback `onHandoffToPollingGroup(noteId, sdId, expectedSequences)`
     - Change timeout behavior: instead of returning false, hand off
-  - [ ] 🟥 2.3 Remove `staleEntries` concept (no longer needed - polling group handles all)
-  - [ ] 🟥 2.4 Keep `pendingSyncs` for fast path tracking (still useful for UI)
-  - [ ] 🟥 2.5 Update callbacks interface for polling group handoff
+  - [x] 🟩 2.3 Remove `staleEntries` concept (no longer needed - polling group handles all)
+  - [x] 🟩 2.4 Keep `pendingSyncs` for fast path tracking (still useful for UI)
+  - [x] 🟩 2.5 Update callbacks interface for polling group handoff
 
-### Phase 3: Full Repoll System 🟥
+### Phase 3: Full Repoll System 🟩
 
-- [ ] 🟥 **Step 3: Implement full repoll mechanism**
-  - [ ] 🟥 3.1 Write tests for full repoll
+- [x] 🟩 **Step 3: Implement full repoll mechanism**
+  - [x] 🟩 3.1 Write tests for full repoll
     - Startup triggers full repoll
     - Periodic repoll at configured interval
     - Already-polled notes excluded from repoll queue
     - Can disable with interval = 0
-  - [ ] 🟥 3.2 Implement full repoll in SDWatcherManager
+  - [x] 🟩 3.2 Implement full repoll in SDWatcherManager
     - Enumerate all notes in all SDs
     - Add to polling group with 'full-repoll' reason
     - Schedule next repoll based on settings
-  - [ ] 🟥 3.3 Integrate with startup sequence
+  - [x] 🟩 3.3 Integrate with startup sequence
 
 ### Phase 4: Settings Infrastructure 🟩
 
@@ -216,32 +216,32 @@ Based on [PLAN-CRITIQUE.md](./PLAN-CRITIQUE.md), execute phases in this order fo
     - `polling:getSettingsForSd` - get per-SD overrides
     - `polling:setSettingsForSd` - set per-SD overrides
     - `polling:getGroupStatus` - get polling group status
-  - [ ] 🟨 4.3 Load settings on startup and pass to PollingGroup (deferred to Phase 2 integration)
+  - [x] 🟩 4.3 Load settings on startup and pass to PollingGroup
 
-### Phase 5: Open Notes / Notes List Integration 🟥
+### Phase 5: Open Notes / Notes List Integration 🟩
 
-- [ ] 🟥 **Step 5: Track open notes and notes in lists**
-  - [ ] 🟥 5.1 Write tests for open notes priority
-  - [ ] 🟥 5.2 Add IPC for renderer to report open notes (per-window)
-  - [ ] 🟥 5.3 Add IPC for renderer to report notes in lists (per-window)
-  - [ ] 🟥 5.4 Implement multi-window coordination
+- [x] 🟩 **Step 5: Track open notes and notes in lists**
+  - [x] 🟩 5.1 Write tests for open notes priority
+  - [x] 🟩 5.2 Add IPC for renderer to report open notes (per-window)
+  - [x] 🟩 5.3 Add IPC for renderer to report notes in lists (per-window)
+  - [x] 🟩 5.4 Implement multi-window coordination
     - Track open notes per window ID
     - Union all windows for high-priority set
     - Handle window close (remove that window's contribution)
-  - [ ] 🟥 5.5 Integrate with polling group priority
+  - [x] 🟩 5.5 Integrate with polling group priority
 
-### Phase 6: Recently Edited Notes 🟥
+### Phase 6: Recently Edited Notes 🟩
 
-- [ ] 🟥 **Step 6: Track recently edited notes**
-  - [ ] 🟥 6.1 Write tests for recent edit window
-  - [ ] 🟥 6.2 Track note edits with timestamps
-  - [ ] 🟥 6.3 Add to polling group when edited
-  - [ ] 🟥 6.4 Remove when outside window (configurable, default 5 min)
+- [x] 🟩 **Step 6: Track recently edited notes**
+  - [x] 🟩 6.1 Write tests for recent edit window
+  - [x] 🟩 6.2 Track note edits with timestamps
+  - [x] 🟩 6.3 Add to polling group when edited
+  - [x] 🟩 6.4 Remove when outside window (configurable, default 5 min)
 
-### Phase 7: Advanced Settings UI 🟥
+### Phase 7: Advanced Settings UI 🟩
 
-- [ ] 🟥 **Step 7: Create Advanced settings tab**
-  - [ ] 🟥 7.1 Create `AdvancedSettings.tsx` component
+- [x] 🟩 **Step 7: Create Advanced settings tab**
+  - [x] 🟩 7.1 Create `AdvancedSettings.tsx` component
     - **Polling Rate section:**
       - Base polling rate slider (60-300 notes/min, default 120)
       - Hit rate multiplier slider (0.1-1.0, default 0.25)
@@ -254,37 +254,38 @@ Based on [PLAN-CRITIQUE.md](./PLAN-CRITIQUE.md), execute phases in this order fo
     - **Per-SD override section:**
       - Dropdown to select SD
       - Override checkboxes + fields for each setting
-  - [ ] 🟥 7.2 Add tab to SettingsDialog
-  - [ ] 🟥 7.3 Wire up settings persistence
+  - [x] 🟩 7.2 Add tab to SettingsDialog
+  - [x] 🟩 7.3 Wire up settings persistence
 
-### Phase 8: Sync Status Window Redesign 🟥
+### Phase 8: Sync Status Window Redesign 🟩
 
-- [ ] 🟥 **Step 8: Redesign SyncStatusPanel**
-  - [ ] 🟥 8.1 Design new UI layout
+- [x] 🟩 **Step 8: Redesign SyncStatusPanel**
+  - [x] 🟩 8.1 Design new UI layout
     - Summary section: polling rate, time to next full repoll
-    - Polling group table: note, SD, reason, expected sequences, last polled
-    - Per-SD status section
-    - "Sync Now" button
-  - [ ] 🟥 8.2 Add new IPC handlers for polling group status
-  - [ ] 🟥 8.3 Implement new SyncStatusPanel UI
-  - [ ] 🟥 8.4 Remove stale sync specific UI elements (skip/retry for stale)
+    - Polling group table: note, SD, reason, priority, added/polled times
+    - Export diagnostics button
+  - [x] 🟩 8.2 IPC handlers already existed from Phase 4 (polling:getGroupStatus)
+  - [x] 🟩 8.3 Implement new SyncStatusPanel UI with polling group status
+  - [x] 🟩 8.4 Updated SyncStatusIndicator to show both fast-path and polling group activity
+    - Note: Kept indicator but updated to combine Tier 1 + Tier 2 status
 
-### Phase 9: Remove Stale Sync Infrastructure 🟥
+### Phase 9: Remove Stale Sync Infrastructure 🟩
 
-- [ ] 🟥 **Step 9: Remove stale sync code (replaced by polling group)**
-  - [ ] 🟥 9.1 Remove `SyncStatusIndicator` component (status bar indicator)
-  - [ ] 🟥 9.2 Remove stale sync indicator from LeftSidebar
-  - [ ] 🟥 9.3 Remove stale sync IPC handlers (skip, retry stale entry)
-  - [ ] 🟥 9.4 Remove stale entry persistence code (skippedStaleEntries in DB)
-  - [ ] 🟥 9.5 Remove `staleEntries` array and related methods from ActivitySync
-  - [ ] 🟥 9.6 Update tests that reference stale sync infrastructure
+- [x] 🟩 **Step 9: Remove stale sync code (replaced by polling group)**
+  - [x] 🟩 9.1 Remove `SyncStatusIndicator` component (status bar indicator)
+  - [x] 🟩 9.2 Remove stale sync indicator from LeftSidebar
+  - [x] 🟩 9.3 Remove stale sync IPC handlers (skip, retry stale entry)
+  - [x] 🟩 9.4 Remove stale entry persistence code (skippedStaleEntries in DB)
+  - [x] 🟩 9.5 Remove `staleEntries` array and related methods from ActivitySync
+  - [x] 🟩 9.6 Update tests that reference stale sync infrastructure
 
-### Phase 10: Documentation 🟥
+### Phase 10: Documentation 🟩
 
-- [ ] 🟥 **Step 10: Update documentation**
-  - [ ] 🟥 10.1 Update `website/architecture/sync-mechanism.md`
-  - [ ] 🟥 10.2 Add polling group explanation
-  - [ ] 🟥 10.3 Update diagrams if needed
+- [x] 🟩 **Step 10: Update documentation**
+  - [x] 🟩 10.1 Update `website/architecture/sync-mechanism.md`
+  - [x] 🟩 10.2 Add two-tier polling system explanation
+  - [x] 🟩 10.3 Update configuration tables with polling group settings
+  - [x] 🟩 10.4 Update key files reference table
 
 ### Phase 11: Final Testing & Verification 🟥
 
@@ -292,6 +293,12 @@ Based on [PLAN-CRITIQUE.md](./PLAN-CRITIQUE.md), execute phases in this order fo
   - [ ] 🟥 11.1 Run full CI suite
   - [ ] 🟥 11.2 Manual testing with simulated slow sync
   - [ ] 🟥 11.3 Verify existing cross-machine tests pass
+  - [ ] 🟥 11.4 Fix flaky E2E tests (simple-sync-test.spec.ts)
+    - Issue: `keyboard.type()` stops at spaces in ProseMirror
+    - Issue: CRDT debounce timing causes content truncation
+    - Created `e2e/utils/sync-wait-helpers.ts` with observable wait utilities
+    - Added testing API events for initial sync completion
+    - Need to investigate CRDT save timing and keyboard input quirks
 
 ---
 

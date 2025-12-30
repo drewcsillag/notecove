@@ -22,6 +22,12 @@ export interface SavedEditorState {
   cursorPosition: number;
 }
 
+/** Note reference for visible notes reporting */
+export interface VisibleNoteReference {
+  noteId: string;
+  sdId: string;
+}
+
 /** Hook return type */
 export interface UseWindowStateReturn {
   /** The window ID from URL params (null if not available) */
@@ -41,6 +47,9 @@ export interface UseWindowStateReturn {
 
   /** Report final state immediately (for beforeunload) */
   reportFinalState: (scrollTop: number, cursorPosition: number) => void;
+
+  /** Report visible notes in the notes list (for polling group prioritization) */
+  reportVisibleNotes: (notes: VisibleNoteReference[]) => void;
 }
 
 /**
@@ -235,6 +244,18 @@ export function useWindowState(): UseWindowStateReturn {
     [windowId]
   );
 
+  /**
+   * Report visible notes in the notes list (for polling group prioritization)
+   */
+  const reportVisibleNotes = useCallback(
+    (notes: VisibleNoteReference[]) => {
+      if (!windowId) return;
+
+      void window.electronAPI.windowState.reportVisibleNotes(windowId, notes);
+    },
+    [windowId]
+  );
+
   return {
     windowId,
     reportCurrentNote,
@@ -242,5 +263,6 @@ export function useWindowState(): UseWindowStateReturn {
     reportCursorPosition,
     getSavedState,
     reportFinalState,
+    reportVisibleNotes,
   };
 }

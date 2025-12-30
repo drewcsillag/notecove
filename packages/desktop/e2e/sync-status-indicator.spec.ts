@@ -83,8 +83,12 @@ test.describe('Sync Status Indicator', () => {
 
     console.log('[E2E SyncStatus] Initial status:', JSON.stringify(status));
 
-    // When no syncs are pending, indicator should not be visible
-    if (!status.isSyncing) {
+    // Also check polling group status
+    const pollingStatus = await page.evaluate(() => window.electronAPI.polling.getGroupStatus());
+    console.log('[E2E SyncStatus] Polling group status:', JSON.stringify(pollingStatus));
+
+    // When no syncs are pending AND polling group is empty, indicator should not be visible
+    if (!status.isSyncing && (!pollingStatus || pollingStatus.totalEntries === 0)) {
       const indicator = page.locator('[data-testid="sync-status-indicator"]');
       await expect(indicator).not.toBeVisible();
     }
@@ -101,11 +105,18 @@ test.describe('Sync Status Indicator', () => {
     const status = await page.evaluate(() => window.electronAPI.sync.getStatus());
     console.log('[E2E SyncStatus] Status after load:', JSON.stringify(status));
 
-    // The indicator should not be visible when no syncs are pending
+    // Also check polling group status (two-tier system)
+    const pollingStatus = await page.evaluate(() => window.electronAPI.polling.getGroupStatus());
+    console.log('[E2E SyncStatus] Polling status after load:', JSON.stringify(pollingStatus));
+
+    // The indicator should not be visible when no syncs are pending AND polling group is empty
     const indicator = page.locator('[data-testid="sync-status-indicator"]');
 
-    // If syncing is false, indicator should be hidden
-    if (!status.isSyncing) {
+    // With two-tier system, indicator shows when either:
+    // 1. Tier 1 (fast-path) syncs are active (isSyncing = true)
+    // 2. Tier 2 (polling group) has entries
+    // So indicator is hidden only when both are false/empty
+    if (!status.isSyncing && (!pollingStatus || pollingStatus.totalEntries === 0)) {
       await expect(indicator).not.toBeVisible();
     }
   });

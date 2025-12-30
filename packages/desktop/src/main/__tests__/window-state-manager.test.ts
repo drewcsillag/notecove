@@ -701,4 +701,215 @@ describe('WindowStateManager', () => {
       expect(result.bounds.height).toBe(600);
     });
   });
+
+  describe('getAllOpenNotes', () => {
+    it('should return empty array when no windows registered', () => {
+      const openNotes = manager.getAllOpenNotes();
+      expect(openNotes).toEqual([]);
+    });
+
+    it('should return open notes from all windows', () => {
+      const win1 = createMockWindow({ id: 1 });
+      const win2 = createMockWindow({ id: 2 });
+
+      manager.registerWindow(win1, 'main', 'note-1', 'sd-1');
+      manager.registerWindow(win2, 'minimal', 'note-2', 'sd-1');
+
+      const openNotes = manager.getAllOpenNotes();
+      expect(openNotes).toHaveLength(2);
+      expect(openNotes).toContainEqual({ noteId: 'note-1', sdId: 'sd-1' });
+      expect(openNotes).toContainEqual({ noteId: 'note-2', sdId: 'sd-1' });
+    });
+
+    it('should not include windows without noteId', () => {
+      const win1 = createMockWindow({ id: 1 });
+      const win2 = createMockWindow({ id: 2 });
+
+      manager.registerWindow(win1, 'main', 'note-1', 'sd-1');
+      manager.registerWindow(win2, 'syncStatus'); // No noteId
+
+      const openNotes = manager.getAllOpenNotes();
+      expect(openNotes).toHaveLength(1);
+      expect(openNotes[0]).toEqual({ noteId: 'note-1', sdId: 'sd-1' });
+    });
+
+    it('should deduplicate when same note is open in multiple windows', () => {
+      const win1 = createMockWindow({ id: 1 });
+      const win2 = createMockWindow({ id: 2 });
+
+      manager.registerWindow(win1, 'main', 'note-1', 'sd-1');
+      manager.registerWindow(win2, 'minimal', 'note-1', 'sd-1'); // Same note
+
+      const openNotes = manager.getAllOpenNotes();
+      expect(openNotes).toHaveLength(1);
+      expect(openNotes[0]).toEqual({ noteId: 'note-1', sdId: 'sd-1' });
+    });
+
+    it('should reflect updates when noteId changes', () => {
+      const win = createMockWindow({ id: 1 });
+      const windowId = manager.registerWindow(win, 'main', 'note-1', 'sd-1');
+
+      let openNotes = manager.getAllOpenNotes();
+      expect(openNotes).toContainEqual({ noteId: 'note-1', sdId: 'sd-1' });
+
+      manager.updateNoteId(windowId, 'note-2', 'sd-2');
+
+      openNotes = manager.getAllOpenNotes();
+      expect(openNotes).toHaveLength(1);
+      expect(openNotes[0]).toEqual({ noteId: 'note-2', sdId: 'sd-2' });
+    });
+  });
+
+  describe('updateVisibleNotes and getAllVisibleNotes', () => {
+    it('should return empty array when no visible notes tracked', () => {
+      const visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toEqual([]);
+    });
+
+    it('should track visible notes for a window', () => {
+      const win = createMockWindow({ id: 1 });
+      const windowId = manager.registerWindow(win, 'main');
+
+      manager.updateVisibleNotes(windowId, [
+        { noteId: 'note-1', sdId: 'sd-1' },
+        { noteId: 'note-2', sdId: 'sd-1' },
+      ]);
+
+      const visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toHaveLength(2);
+      expect(visibleNotes).toContainEqual({ noteId: 'note-1', sdId: 'sd-1' });
+      expect(visibleNotes).toContainEqual({ noteId: 'note-2', sdId: 'sd-1' });
+    });
+
+    it('should aggregate visible notes from multiple windows', () => {
+      const win1 = createMockWindow({ id: 1 });
+      const win2 = createMockWindow({ id: 2 });
+
+      const windowId1 = manager.registerWindow(win1, 'main');
+      const windowId2 = manager.registerWindow(win2, 'minimal');
+
+      manager.updateVisibleNotes(windowId1, [
+        { noteId: 'note-1', sdId: 'sd-1' },
+        { noteId: 'note-2', sdId: 'sd-1' },
+      ]);
+      manager.updateVisibleNotes(windowId2, [
+        { noteId: 'note-3', sdId: 'sd-2' },
+        { noteId: 'note-4', sdId: 'sd-2' },
+      ]);
+
+      const visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toHaveLength(4);
+    });
+
+    it('should deduplicate visible notes across windows', () => {
+      const win1 = createMockWindow({ id: 1 });
+      const win2 = createMockWindow({ id: 2 });
+
+      const windowId1 = manager.registerWindow(win1, 'main');
+      const windowId2 = manager.registerWindow(win2, 'minimal');
+
+      // Same notes visible in both windows
+      manager.updateVisibleNotes(windowId1, [
+        { noteId: 'note-1', sdId: 'sd-1' },
+        { noteId: 'note-2', sdId: 'sd-1' },
+      ]);
+      manager.updateVisibleNotes(windowId2, [
+        { noteId: 'note-1', sdId: 'sd-1' }, // Duplicate
+        { noteId: 'note-3', sdId: 'sd-1' },
+      ]);
+
+      const visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toHaveLength(3);
+      expect(visibleNotes).toContainEqual({ noteId: 'note-1', sdId: 'sd-1' });
+      expect(visibleNotes).toContainEqual({ noteId: 'note-2', sdId: 'sd-1' });
+      expect(visibleNotes).toContainEqual({ noteId: 'note-3', sdId: 'sd-1' });
+    });
+
+    it('should update visible notes when window is updated', () => {
+      const win = createMockWindow({ id: 1 });
+      const windowId = manager.registerWindow(win, 'main');
+
+      manager.updateVisibleNotes(windowId, [
+        { noteId: 'note-1', sdId: 'sd-1' },
+        { noteId: 'note-2', sdId: 'sd-1' },
+      ]);
+
+      let visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toHaveLength(2);
+
+      // User scrolls, new notes visible
+      manager.updateVisibleNotes(windowId, [
+        { noteId: 'note-3', sdId: 'sd-1' },
+        { noteId: 'note-4', sdId: 'sd-1' },
+      ]);
+
+      visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toHaveLength(2);
+      expect(visibleNotes).toContainEqual({ noteId: 'note-3', sdId: 'sd-1' });
+      expect(visibleNotes).toContainEqual({ noteId: 'note-4', sdId: 'sd-1' });
+    });
+
+    it('should remove visible notes when window is unregistered', () => {
+      const win1 = createMockWindow({ id: 1 });
+      const win2 = createMockWindow({ id: 2 });
+
+      const windowId1 = manager.registerWindow(win1, 'main');
+      const windowId2 = manager.registerWindow(win2, 'minimal');
+
+      manager.updateVisibleNotes(windowId1, [{ noteId: 'note-1', sdId: 'sd-1' }]);
+      manager.updateVisibleNotes(windowId2, [{ noteId: 'note-2', sdId: 'sd-1' }]);
+
+      let visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toHaveLength(2);
+
+      manager.unregisterWindow(windowId1);
+
+      visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toHaveLength(1);
+      expect(visibleNotes[0]).toEqual({ noteId: 'note-2', sdId: 'sd-1' });
+    });
+
+    it('should handle updateVisibleNotes for unknown window gracefully', () => {
+      // Should not throw
+      manager.updateVisibleNotes('unknown-window', [{ noteId: 'note-1', sdId: 'sd-1' }]);
+
+      const visibleNotes = manager.getAllVisibleNotes();
+      expect(visibleNotes).toEqual([]);
+    });
+  });
+
+  describe('getHighPriorityNotes', () => {
+    it('should return union of open notes and visible notes', () => {
+      const win1 = createMockWindow({ id: 1 });
+      const win2 = createMockWindow({ id: 2 });
+
+      manager.registerWindow(win1, 'main', 'note-open', 'sd-1');
+      const windowId2 = manager.registerWindow(win2, 'minimal');
+
+      manager.updateVisibleNotes(windowId2, [
+        { noteId: 'note-visible-1', sdId: 'sd-1' },
+        { noteId: 'note-visible-2', sdId: 'sd-1' },
+      ]);
+
+      const highPriority = manager.getHighPriorityNotes();
+      expect(highPriority).toHaveLength(3);
+      expect(highPriority).toContainEqual({ noteId: 'note-open', sdId: 'sd-1' });
+      expect(highPriority).toContainEqual({ noteId: 'note-visible-1', sdId: 'sd-1' });
+      expect(highPriority).toContainEqual({ noteId: 'note-visible-2', sdId: 'sd-1' });
+    });
+
+    it('should deduplicate open and visible notes', () => {
+      const win = createMockWindow({ id: 1 });
+      const windowId = manager.registerWindow(win, 'main', 'note-1', 'sd-1');
+
+      // The open note is also in the visible list
+      manager.updateVisibleNotes(windowId, [
+        { noteId: 'note-1', sdId: 'sd-1' }, // Same as open note
+        { noteId: 'note-2', sdId: 'sd-1' },
+      ]);
+
+      const highPriority = manager.getHighPriorityNotes();
+      expect(highPriority).toHaveLength(2);
+    });
+  });
 });

@@ -487,6 +487,12 @@ void app.whenReady().then(async () => {
     // Initialize SD Watcher Manager
     sdWatcherManager = new SDWatcherManager(profilePresenceReader);
 
+    // Set database reference for full repoll functionality
+    sdWatcherManager.setDatabase(database);
+
+    // Initialize polling group for tier 2 persistent polling
+    sdWatcherManager.initPollingGroup();
+
     // Handler for when new SD is created (for IPC)
     const handleNewStorageDir = async (sdId: string, sdPath: string): Promise<void> => {
       if (!database) {
@@ -804,6 +810,14 @@ void app.whenReady().then(async () => {
           await webServerManager.stop();
           console.log('[FeatureFlags] Web server stopped');
         }
+      },
+      // getPollingGroupStatus callback - returns polling group status for UI
+      (): import('@notecove/shared').PollingGroupStatus | null => {
+        return sdWatcherManager?.getPollingGroupStatus() ?? null;
+      },
+      // recordRecentEdit callback - add note to polling group as recently edited
+      (noteId: string, sdId: string): void => {
+        sdWatcherManager?.recordRecentEdit(noteId, sdId);
       }
     );
 
@@ -969,12 +983,23 @@ void app.whenReady().then(async () => {
       createWindow({ syncStatus: true });
     });
 
+    // Helper to sync high-priority notes to polling group
+    const syncHighPriorityNotesToPollingGroup = (): void => {
+      if (windowStateManager && sdWatcherManager) {
+        const openNotes = windowStateManager.getAllOpenNotes();
+        const visibleNotes = windowStateManager.getAllVisibleNotes();
+        sdWatcherManager.updateHighPriorityNotes(openNotes, visibleNotes);
+      }
+    };
+
     // Register window state IPC handlers (for session restoration)
     ipcMain.handle(
       'windowState:reportCurrentNote',
       (_event, windowId: string, noteId: string, sdId?: string) => {
         if (windowStateManager) {
           windowStateManager.updateNoteId(windowId, noteId, sdId);
+          // Update polling group with new high-priority note set
+          syncHighPriorityNotesToPollingGroup();
         }
       }
     );
@@ -1024,6 +1049,17 @@ void app.whenReady().then(async () => {
         panelLayout: state.panelLayout,
       };
     });
+
+    ipcMain.handle(
+      'windowState:reportVisibleNotes',
+      (_event, windowId: string, notes: { noteId: string; sdId: string }[]) => {
+        if (windowStateManager) {
+          windowStateManager.updateVisibleNotes(windowId, notes);
+          // Update polling group with new high-priority note set
+          syncHighPriorityNotesToPollingGroup();
+        }
+      }
+    );
 
     // Debug: Trigger note discovery manually (for testing the wake-from-sleep bug fix)
     ipcMain.handle('debug:triggerNoteDiscovery', async () => {
@@ -1122,6 +1158,16 @@ void app.whenReady().then(async () => {
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send('sync:all-initial-syncs-complete');
       }
+
+      // Start polling group for tier 2 persistent polling
+      sdWatcherManager?.startPollingGroup();
+
+      // Run initial full repoll to catch any changes missed while app was closed
+      // This happens after initial syncs complete to avoid overwhelming the system
+      void sdWatcherManager?.runFullRepoll();
+
+      // Start the periodic full repoll timer
+      sdWatcherManager?.startFullRepollTimer();
     });
 
     if (process.env['NODE_ENV'] === 'test') {
@@ -1377,6 +1423,8 @@ app.on('will-quit', (event) => {
 
       // 5. Clean up all SD watchers and syncs
       if (sdWatcherManager) {
+        // Stop polling group first
+        sdWatcherManager.stopPollingGroup();
         // Wait for pending syncs with timeout (shorter in test mode)
         const syncTimeout = isTestMode ? 1000 : 5000;
         await sdWatcherManager.waitForPendingSyncs(syncTimeout);

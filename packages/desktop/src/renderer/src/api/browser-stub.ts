@@ -124,6 +124,14 @@ export const browserApiStub: typeof window.electronAPI = {
     onStatusChanged: stubEventSubscription,
   },
 
+  polling: {
+    getSettings: notImplemented('polling.getSettings'),
+    setSettings: notImplemented('polling.setSettings'),
+    getSettingsForSd: notImplemented('polling.getSettingsForSd'),
+    setSettingsForSd: notImplemented('polling.setSettingsForSd'),
+    getGroupStatus: notImplemented('polling.getGroupStatus'),
+  },
+
   appState: {
     get: notImplemented('appState.get'),
     set: notImplemented('appState.set'),
@@ -223,6 +231,15 @@ export const browserApiStub: typeof window.electronAPI = {
   testing: {
     createWindow: notImplemented('testing.createWindow'),
     setNoteTimestamp: notImplemented('testing.setNoteTimestamp'),
+    getAllTags: notImplemented('testing.getAllTags'),
+    getTagsForNote: notImplemented('testing.getTagsForNote'),
+    getNoteById: notImplemented('testing.getNoteById'),
+    onFileWatcherEvent: stubEventSubscription,
+    onGracePeriodEnded: stubEventSubscription,
+    onActivitySyncComplete: stubEventSubscription,
+    onActivityWatcherDebug: stubEventSubscription,
+    onInitialSyncComplete: stubEventSubscription,
+    onAllInitialSyncsComplete: stubEventSubscription,
   },
 
   app: {
@@ -257,6 +274,7 @@ export const browserApiStub: typeof window.electronAPI = {
     reportEditorState: notImplemented('windowState.reportEditorState'),
     reportPanelLayout: notImplemented('windowState.reportPanelLayout'),
     getSavedState: notImplemented('windowState.getSavedState'),
+    reportVisibleNotes: notImplemented('windowState.reportVisibleNotes'),
   },
 
   window: {

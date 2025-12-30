@@ -29,6 +29,7 @@ import { TelemetrySettings } from './TelemetrySettings';
 import { RecoverySettings } from './RecoverySettings';
 import { WebServerSettings } from './WebServerSettings';
 import { OEmbedSettings } from './OEmbedSettings';
+import { AdvancedSettings } from './AdvancedSettings';
 import { isElectron } from '../../utils/platform';
 import { useFeatureFlags } from '../../contexts/FeatureFlagsContext';
 import { useProfileMode } from '../../contexts/ProfileModeContext';
@@ -134,6 +135,11 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         label: 'Recovery',
         electronOnly: true,
         component: <RecoverySettings />,
+      },
+      {
+        label: 'Advanced',
+        electronOnly: true,
+        component: <AdvancedSettings />,
       },
     ],
     [themeMode, onThemeChange]

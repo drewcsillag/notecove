@@ -63,6 +63,7 @@ export {
   storedToRuntimeSettings,
   mergePollingSettings,
   type PollingGroupEntry,
+  type PollingGroupEntrySerialized,
   type PollingGroupSettings,
   type PollingGroupSettingsOverride,
   type PollingGroupStoredSettings,

@@ -2,36 +2,34 @@
  * SyncStatusIndicator Component
  *
  * A subtle indicator that shows when background sync is in progress.
- * Displays a small spinner and pending count when syncs are active.
- *
- * @see plans/stale-sync-ux/PLAN.md - Step 2
+ * Displays a small spinner and count when:
+ * - Fast-path syncs are active (Tier 1)
+ * - Polling group has pending entries (Tier 2)
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Box, Typography, Tooltip, useTheme } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 
-interface SyncStatus {
-  pendingCount: number;
-  perSd: {
-    sdId: string;
-    sdName: string;
-    pendingCount: number;
-    pendingNoteIds: string[];
-  }[];
+interface CombinedSyncStatus {
+  /** Fast path pending count */
+  fastPathPending: number;
+  /** Polling group entry count */
+  pollingGroupCount: number;
+  /** Whether any sync is actively in progress */
   isSyncing: boolean;
 }
 
 export interface SyncStatusIndicatorProps {
-  /** Polling interval in milliseconds (default: 1000) */
+  /** Polling interval in milliseconds (default: 2000) */
   pollInterval?: number;
 }
 
 export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
-  pollInterval = 1000,
+  pollInterval = 2000,
 }) => {
   const theme = useTheme();
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncStatus, setSyncStatus] = useState<CombinedSyncStatus | null>(null);
   const mountedRef = useRef(true);
 
   // Poll for sync status
@@ -39,8 +37,19 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
     if (!mountedRef.current) return;
 
     try {
-      const status = await window.electronAPI.sync.getStatus();
-      setSyncStatus(status);
+      // Get both fast-path status and polling group status
+      const [fastPathStatus, pollingStatus] = await Promise.all([
+        window.electronAPI.sync.getStatus(),
+        window.electronAPI.polling.getGroupStatus(),
+      ]);
+
+      const combined: CombinedSyncStatus = {
+        fastPathPending: fastPathStatus.pendingCount,
+        pollingGroupCount: pollingStatus?.totalEntries ?? 0,
+        isSyncing: fastPathStatus.isSyncing || (pollingStatus?.totalEntries ?? 0) > 0,
+      };
+
+      setSyncStatus(combined);
     } catch (error) {
       console.error('[SyncStatusIndicator] Failed to get sync status:', error);
     }
@@ -58,10 +67,8 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
     }, pollInterval);
 
     // Also listen for sync status change events
-    const unsubscribe = window.electronAPI.sync.onStatusChanged((status) => {
-      if (mountedRef.current) {
-        setSyncStatus(status);
-      }
+    const unsubscribe = window.electronAPI.sync.onStatusChanged(() => {
+      void fetchStatus();
     });
 
     return () => {
@@ -76,13 +83,26 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
     return null;
   }
 
-  const tooltipContent = syncStatus.perSd
-    .filter((sd) => sd.pendingCount > 0)
-    .map((sd) => `${sd.sdName}: ${sd.pendingCount} note${sd.pendingCount > 1 ? 's' : ''} syncing`)
-    .join('\n');
+  // Calculate total and tooltip
+  const totalCount = syncStatus.fastPathPending + syncStatus.pollingGroupCount;
+  const tooltipLines: string[] = [];
+
+  if (syncStatus.fastPathPending > 0) {
+    tooltipLines.push(
+      `${syncStatus.fastPathPending} note${syncStatus.fastPathPending > 1 ? 's' : ''} syncing (fast)`
+    );
+  }
+
+  if (syncStatus.pollingGroupCount > 0) {
+    tooltipLines.push(
+      `${syncStatus.pollingGroupCount} note${syncStatus.pollingGroupCount > 1 ? 's' : ''} being polled`
+    );
+  }
+
+  const tooltipContent = tooltipLines.join('\n') || 'Syncing...';
 
   return (
-    <Tooltip title={tooltipContent || 'Syncing...'} placement="right">
+    <Tooltip title={tooltipContent} placement="right">
       <Box
         data-testid="sync-status-indicator"
         sx={{
@@ -127,7 +147,7 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
             userSelect: 'none',
           }}
         >
-          Syncing {syncStatus.pendingCount} note{syncStatus.pendingCount > 1 ? 's' : ''}
+          Syncing {totalCount} note{totalCount > 1 ? 's' : ''}
         </Typography>
       </Box>
     </Tooltip>

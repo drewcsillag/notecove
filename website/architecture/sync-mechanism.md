@@ -104,33 +104,60 @@ sequenceDiagram
     CRDT->>CRDT: Broadcast note:updated to renderer
 ```
 
-### Polling and Retry Logic
+### Two-Tier Polling System
 
-Cloud storage services don't sync instantly. `pollAndReload()` handles this:
+Cloud storage services don't sync instantly. NoteCove uses a two-tier approach:
+
+**Tier 1: Fast Path (Aggressive Polling)**
+
+When an activity log entry is detected, the fast path attempts to sync with exponential backoff:
 
 ```typescript
+// Fast path delays: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 7s, 10s, 15s, 30s
 async pollAndReload(noteId: string, targetSequence: string): Promise<void> {
-  const maxAttempts = 10;
-  const baseDelay = 500;  // ms
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    // Check if CRDT log has reached expected sequence
-    const ready = await this.checkCRDTLogExists(noteId, instanceId, expectedSeq);
-
-    if (ready) {
+  for (const delay of FAST_PATH_DELAYS) {
+    if (await this.checkCRDTLogExists(noteId, instanceId, expectedSeq)) {
       await this.crdtManager.reloadNote(noteId);
       return;  // Success!
     }
-
-    // Exponential backoff: 500ms, 1s, 2s, 4s, 8s, 16s, 32s, 60s, 60s, 60s
-    const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 60000);
     await sleep(delay);
-  }
 
-  // All retries failed - mark as stale to skip in future
-  this.skipStaleEntry(noteId, targetSequence);
+    // If cumulative delay exceeds 60 seconds, hand off to Tier 2
+    if (cumulativeDelay > 60000) {
+      this.handoffToPollingGroup(noteId, sdId, expectedSequences);
+      return;
+    }
+  }
 }
 ```
+
+**Tier 2: Polling Group (Persistent Polling)**
+
+Notes that don't sync via fast path are added to the polling group for persistent, rate-limited polling:
+
+```typescript
+interface PollingGroupEntry {
+  noteId: string;
+  sdId: string;
+  expectedSequences: Map<string, number>; // instanceId -> sequence
+  reason: 'fast-path-handoff' | 'open-note' | 'notes-list' | 'recent-edit' | 'full-repoll';
+  priority: 'high' | 'normal';
+}
+```
+
+Polling group features:
+
+- **Rate limiting**: 120 notes/min average (configurable)
+- **Priority**: Open notes and visible notes poll first
+- **Hit acceleration**: When finding data, polling speeds up automatically
+- **Full repoll**: Periodic scan of all notes (every 30 min, configurable)
+
+Exit criteria by reason:
+
+- `fast-path-handoff`: Exit when all expected sequences caught up
+- `full-repoll`: Exit after one poll
+- `open-note` / `notes-list`: Exit when note closes
+- `recent-edit`: Exit after 5 min window expires
 
 ## Deletion Sync
 
@@ -381,33 +408,50 @@ sequenceDiagram
 
 ## Key Files Reference
 
-| File                 | Location                          | Purpose                          |
-| -------------------- | --------------------------------- | -------------------------------- |
-| `activity-logger.ts` | `packages/shared/src/storage/`    | Write activity log entries       |
-| `activity-sync.ts`   | `packages/desktop/src/main/sync/` | Watch and process activity logs  |
-| `deletion-logger.ts` | `packages/desktop/src/main/sync/` | Write deletion log entries       |
-| `deletion-sync.ts`   | `packages/desktop/src/main/sync/` | Watch and process deletion logs  |
-| `snapshot-writer.ts` | `packages/shared/src/storage/`    | Write snapshots with flag byte   |
-| `snapshot-reader.ts` | `packages/shared/src/storage/`    | Read snapshots (skip incomplete) |
-| `index.ts`           | `packages/desktop/src/main/`      | Wake-from-sleep handler          |
+| File                    | Location                       | Purpose                          |
+| ----------------------- | ------------------------------ | -------------------------------- |
+| `activity-logger.ts`    | `packages/shared/src/storage/` | Write activity log entries       |
+| `activity-sync.ts`      | `packages/shared/src/storage/` | Watch and process activity logs  |
+| `polling-group.ts`      | `packages/shared/src/storage/` | Tier 2 polling group logic       |
+| `deletion-logger.ts`    | `packages/shared/src/storage/` | Write deletion log entries       |
+| `deletion-sync.ts`      | `packages/shared/src/storage/` | Watch and process deletion logs  |
+| `snapshot-writer.ts`    | `packages/shared/src/storage/` | Write snapshots with flag byte   |
+| `snapshot-reader.ts`    | `packages/shared/src/storage/` | Read snapshots (skip incomplete) |
+| `sd-watcher-manager.ts` | `packages/desktop/src/main/`   | SD management and polling timer  |
+| `index.ts`              | `packages/desktop/src/main/`   | Wake-from-sleep handler          |
 
 ## Configuration
 
 ### Timeouts and Delays
 
-| Setting                        | Value        | Purpose                        |
-| ------------------------------ | ------------ | ------------------------------ |
-| Poll base delay                | 500ms        | Initial delay before retry     |
-| Poll max delay                 | 60s          | Maximum retry delay            |
-| Poll max attempts              | 10           | Retries before giving up       |
-| Wake-from-sleep delay          | 5s           | Wait for cloud sync after wake |
-| Activity log compact threshold | 1000 entries | Max entries before compaction  |
+| Setting                        | Default | Purpose                            |
+| ------------------------------ | ------- | ---------------------------------- |
+| Fast path max delay            | 60s     | Maximum total delay before handoff |
+| Wake-from-sleep delay          | 5s      | Wait for cloud sync after wake     |
+| Activity log compact threshold | 1000    | Max entries before compaction      |
 
-### Stale Entry Handling
+### Polling Group Settings
 
-When `pollAndReload()` fails all retries, the entry is marked as "stale" and skipped in future sync runs. This prevents infinite retry loops for entries that will never succeed (e.g., if the source instance was uninstalled).
+| Setting                 | Default | Purpose                                |
+| ----------------------- | ------- | -------------------------------------- |
+| Poll rate per minute    | 120     | Base polling rate for misses           |
+| Hit rate multiplier     | 0.25    | Hits count as 0.25 polls (faster)      |
+| Max burst per second    | 10      | Cap to prevent CPU/disk spikes         |
+| Normal priority reserve | 20%     | Capacity reserved for background polls |
+| Recent edit window      | 5 min   | How long recently edited notes poll    |
+| Full repoll interval    | 30 min  | Periodic full scan (0 = disabled)      |
 
-Stale entries are stored in memory and cleared on app restart, allowing a fresh sync attempt.
+These settings are configurable via Tools > Settings > Advanced.
+
+### Sync Failure Handling
+
+The two-tier system eliminates the concept of "stale" entries:
+
+1. **Fast path timeout**: If sync doesn't complete within ~60 seconds, the note is handed off to the polling group
+2. **Polling group persistence**: Notes remain in the polling group until their exit criteria are met
+3. **Full repoll safety net**: Periodic full repoll catches any missed syncs
+
+This ensures that slow cloud sync services (like overnight syncs when laptops are closed) don't cause missed updates.
 
 ## Next Steps
 

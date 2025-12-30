@@ -295,6 +295,26 @@ export const testingApi = {
       ipcRenderer.removeListener('test:activity-watcher-debug', listener);
     };
   },
+
+  // Initial sync completion events (fired from main process during startup)
+  onInitialSyncComplete: (callback: (data: { sdId: string }) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { sdId: string }): void => {
+      callback(data);
+    };
+    ipcRenderer.on('sync:initial-sync-complete', listener);
+    return () => {
+      ipcRenderer.removeListener('sync:initial-sync-complete', listener);
+    };
+  },
+  onAllInitialSyncsComplete: (callback: () => void): (() => void) => {
+    const listener = (): void => {
+      callback();
+    };
+    ipcRenderer.on('sync:all-initial-syncs-complete', listener);
+    return () => {
+      ipcRenderer.removeListener('sync:all-initial-syncs-complete', listener);
+    };
+  },
 };
 
 export const webServerApi = {

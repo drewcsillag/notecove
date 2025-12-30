@@ -11,7 +11,7 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import * as fs from 'fs/promises';
 import * as Y from 'yjs';
-import type { Database } from '@notecove/shared';
+import type { Database, PollingGroupStatus, PollingGroupSettings } from '@notecove/shared';
 import {
   ActivityLogger,
   ActivitySync,
@@ -19,6 +19,7 @@ import {
   DeletionSync,
   ImageStorage,
   isValidImageId,
+  PollingGroup,
 } from '@notecove/shared';
 import type { CRDTManager } from './crdt';
 import type { AppendLogManager } from '@notecove/shared';
@@ -64,8 +65,341 @@ export class SDWatcherManager {
 
   private profilePresenceReader: ProfilePresenceReader | null = null;
 
+  // Polling group for tier 2 persistent polling
+  private pollingGroup: PollingGroup | null = null;
+  private pollingInterval: NodeJS.Timeout | null = null;
+  private fullRepollInterval: NodeJS.Timeout | null = null;
+  private lastFullRepollAt = 0;
+  private database: Database | null = null;
+
   constructor(profilePresenceReader: ProfilePresenceReader | null = null) {
     this.profilePresenceReader = profilePresenceReader;
+  }
+
+  /**
+   * Set the database reference (called during first SD setup)
+   */
+  setDatabase(database: Database): void {
+    this.database = database;
+  }
+
+  /**
+   * Initialize the polling group for tier 2 persistent polling
+   */
+  initPollingGroup(settings?: Partial<PollingGroupSettings>): void {
+    if (this.pollingGroup) {
+      console.warn('[SDWatcherManager] Polling group already initialized');
+      return;
+    }
+
+    // Default settings
+    const defaultSettings: PollingGroupSettings = {
+      pollRatePerMinute: 120,
+      hitRateMultiplier: 0.25,
+      maxBurstPerSecond: 10,
+      normalPriorityReserve: 0.2,
+      recentEditWindowMs: 5 * 60 * 1000, // 5 minutes
+      fullRepollIntervalMs: 30 * 60 * 1000, // 30 minutes
+      fastPathMaxDelayMs: 60 * 1000, // 60 seconds
+    };
+
+    this.pollingGroup = new PollingGroup({ ...defaultSettings, ...settings });
+    console.log('[SDWatcherManager] Polling group initialized');
+  }
+
+  /**
+   * Get the polling group instance
+   */
+  getPollingGroup(): PollingGroup | null {
+    return this.pollingGroup;
+  }
+
+  /**
+   * Get polling group status for UI
+   */
+  getPollingGroupStatus(): PollingGroupStatus | null {
+    if (!this.pollingGroup) return null;
+
+    // Calculate time until next full repoll
+    let nextFullRepollIn: number | null = null;
+    const settings = this.pollingGroup.getSettings();
+    const intervalMs = settings.fullRepollIntervalMs;
+
+    if (intervalMs > 0 && this.lastFullRepollAt > 0) {
+      const elapsed = Date.now() - this.lastFullRepollAt;
+      const remaining = intervalMs - elapsed;
+      nextFullRepollIn = Math.max(0, remaining);
+    } else if (intervalMs <= 0) {
+      nextFullRepollIn = null; // Disabled
+    }
+
+    return this.pollingGroup.getStatus(nextFullRepollIn);
+  }
+
+  /**
+   * Start the polling group timer
+   */
+  startPollingGroup(): void {
+    if (!this.pollingGroup) {
+      console.warn('[SDWatcherManager] Cannot start polling group - not initialized');
+      return;
+    }
+
+    if (this.pollingInterval) {
+      console.warn('[SDWatcherManager] Polling group already running');
+      return;
+    }
+
+    // Poll every 500ms to check if we should poll any notes
+    this.pollingInterval = setInterval(() => {
+      if (this.pollingGroup) {
+        void this.runPollingGroupTick();
+      }
+    }, 500);
+
+    console.log('[SDWatcherManager] Polling group timer started');
+  }
+
+  /**
+   * Stop the polling group timer
+   */
+  stopPollingGroup(): void {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      console.log('[SDWatcherManager] Polling group timer stopped');
+    }
+    // Also stop the full repoll timer
+    this.stopFullRepollTimer();
+  }
+
+  /**
+   * Run a full repoll of all notes in all SDs.
+   * This adds all notes to the polling group with 'full-repoll' reason.
+   * Each note will be polled once to check for any external changes.
+   */
+  async runFullRepoll(): Promise<void> {
+    if (!this.pollingGroup) {
+      console.warn('[SDWatcherManager] Cannot run full repoll - polling group not initialized');
+      return;
+    }
+
+    if (!this.database) {
+      console.warn('[SDWatcherManager] Cannot run full repoll - database not available');
+      return;
+    }
+
+    console.log('[SDWatcherManager] Starting full repoll...');
+
+    // Get all storage directories
+    const allSDs = await this.database.getAllStorageDirs();
+    let totalNotesAdded = 0;
+
+    for (const sd of allSDs) {
+      try {
+        // Get all notes for this SD (non-deleted only)
+        const notes = await this.database.getNotesBySd(sd.id);
+        const activeNotes = notes.filter((note) => !note.deleted);
+
+        for (const note of activeNotes) {
+          this.pollingGroup.add({
+            noteId: note.id,
+            sdId: sd.id,
+            expectedSequences: new Map(), // No specific sequences to wait for
+            reason: 'full-repoll',
+          });
+        }
+
+        totalNotesAdded += activeNotes.length;
+        console.log(
+          `[SDWatcherManager] Added ${activeNotes.length} notes from SD ${sd.id} to full repoll`
+        );
+      } catch (error) {
+        console.error(
+          `[SDWatcherManager] Error adding notes from SD ${sd.id} to full repoll:`,
+          error
+        );
+      }
+    }
+
+    console.log(`[SDWatcherManager] Full repoll started with ${totalNotesAdded} total notes`);
+  }
+
+  /**
+   * Start the full repoll timer for periodic repolling.
+   * This schedules a full repoll at the configured interval.
+   */
+  startFullRepollTimer(): void {
+    if (!this.pollingGroup) {
+      console.warn(
+        '[SDWatcherManager] Cannot start full repoll timer - polling group not initialized'
+      );
+      return;
+    }
+
+    if (this.fullRepollInterval) {
+      console.warn('[SDWatcherManager] Full repoll timer already running');
+      return;
+    }
+
+    const settings = this.pollingGroup.getSettings();
+    const intervalMs = settings.fullRepollIntervalMs;
+
+    // If interval is 0 or negative, full repoll is disabled
+    if (intervalMs <= 0) {
+      console.log('[SDWatcherManager] Full repoll disabled (interval = 0)');
+      return;
+    }
+
+    // Record when we started (for calculating time until next repoll)
+    this.lastFullRepollAt = Date.now();
+
+    this.fullRepollInterval = setInterval(() => {
+      this.lastFullRepollAt = Date.now();
+      void this.runFullRepoll();
+    }, intervalMs);
+
+    console.log(
+      `[SDWatcherManager] Full repoll timer started (interval: ${intervalMs / 1000 / 60} min)`
+    );
+  }
+
+  /**
+   * Stop the full repoll timer.
+   */
+  stopFullRepollTimer(): void {
+    if (this.fullRepollInterval) {
+      clearInterval(this.fullRepollInterval);
+      this.fullRepollInterval = null;
+      console.log('[SDWatcherManager] Full repoll timer stopped');
+    }
+  }
+
+  /**
+   * Run one tick of the polling group
+   *
+   * This triggers sync for each SD that has pending entries in the polling group.
+   * The actual sync logic in ActivitySync will reload notes as needed.
+   */
+  private async runPollingGroupTick(): Promise<void> {
+    if (!this.pollingGroup) return;
+
+    // Get the next batch of entries to poll
+    const batch = this.pollingGroup.getNextBatch(5);
+    if (batch.length === 0) return;
+
+    // Group by SD
+    const entriesBySd = new Map<string, typeof batch>();
+    for (const entry of batch) {
+      let sdEntries = entriesBySd.get(entry.sdId);
+      if (!sdEntries) {
+        sdEntries = [];
+        entriesBySd.set(entry.sdId, sdEntries);
+      }
+      sdEntries.push(entry);
+    }
+
+    // Trigger sync for each SD
+    for (const [sdId, entries] of entriesBySd) {
+      const activitySync = this.sdActivitySyncs.get(sdId);
+      if (!activitySync) continue;
+
+      try {
+        // Trigger a full sync - this will reload any notes that have changes
+        const reloadedNotes = await activitySync.syncFromOtherInstances();
+
+        // Mark entries as polled, with hit if the note was reloaded
+        for (const entry of entries) {
+          const wasHit = reloadedNotes.has(entry.noteId);
+          this.pollingGroup.markPolled(entry.noteId, entry.sdId, wasHit);
+          this.pollingGroup.checkExitCriteria(entry.noteId, entry.sdId);
+        }
+      } catch (err) {
+        console.error(`[SDWatcherManager] Failed to poll SD ${sdId}:`, err);
+      }
+    }
+  }
+
+  /**
+   * Update high-priority notes (open notes and notes in lists)
+   */
+  updateHighPriorityNotes(
+    openNotes: { noteId: string; sdId: string }[],
+    visibleNotes: { noteId: string; sdId: string }[]
+  ): void {
+    if (!this.pollingGroup) return;
+
+    // Group by SD
+    const openBySd = new Map<string, Set<string>>();
+    const visibleBySd = new Map<string, Set<string>>();
+
+    for (const note of openNotes) {
+      let noteIds = openBySd.get(note.sdId);
+      if (!noteIds) {
+        noteIds = new Set();
+        openBySd.set(note.sdId, noteIds);
+      }
+      noteIds.add(note.noteId);
+    }
+
+    for (const note of visibleNotes) {
+      let noteIds = visibleBySd.get(note.sdId);
+      if (!noteIds) {
+        noteIds = new Set();
+        visibleBySd.set(note.sdId, noteIds);
+      }
+      noteIds.add(note.noteId);
+    }
+
+    // Update polling group for each SD
+    for (const [sdId, noteIds] of openBySd) {
+      this.pollingGroup.setOpenNotes(sdId, noteIds);
+    }
+
+    for (const [sdId, noteIds] of visibleBySd) {
+      this.pollingGroup.setNotesInLists(sdId, noteIds);
+    }
+  }
+
+  /**
+   * Add a note to the polling group (handoff from fast path)
+   */
+  addToPollingGroup(noteId: string, sdId: string, expectedSequences: Map<string, number>): void {
+    if (!this.pollingGroup) {
+      console.warn('[SDWatcherManager] Cannot add to polling group - not initialized');
+      return;
+    }
+
+    this.pollingGroup.add({
+      noteId,
+      sdId,
+      expectedSequences,
+      reason: 'fast-path-handoff',
+    });
+
+    console.log(
+      `[SDWatcherManager] Added note ${noteId} to polling group (handoff from fast path)`
+    );
+  }
+
+  /**
+   * Record that a note was recently edited locally.
+   * This adds the note to the polling group with 'recent-edit' reason,
+   * which gives it high priority for polling and keeps it in the group
+   * for the configured recent edit window (default 5 minutes).
+   */
+  recordRecentEdit(noteId: string, sdId: string): void {
+    if (!this.pollingGroup) {
+      // Polling group may not be initialized yet during early startup
+      return;
+    }
+
+    this.pollingGroup.add({
+      noteId,
+      sdId,
+      expectedSequences: new Map(), // No specific sequences to wait for
+      reason: 'recent-edit',
+    });
   }
 
   /**

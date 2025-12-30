@@ -122,7 +122,7 @@ function handleGetState(ctx: HandlerContext) {
 
 function handleApplyUpdate(ctx: HandlerContext) {
   return async (_event: IpcMainInvokeEvent, noteId: string, update: Uint8Array): Promise<void> => {
-    const { crdtManager, database, broadcastToAll } = ctx;
+    const { crdtManager, database, broadcastToAll, recordRecentEdit } = ctx;
 
     await crdtManager.applyUpdate(noteId, update);
 
@@ -132,6 +132,11 @@ function handleApplyUpdate(ctx: HandlerContext) {
       if (noteDoc) {
         const crdtMetadata = noteDoc.getMetadata();
         const cachedNote = await database.getNote(noteId);
+
+        // Record this as a recent edit for polling group prioritization
+        if (cachedNote && recordRecentEdit) {
+          recordRecentEdit(noteId, cachedNote.sdId);
+        }
 
         if (cachedNote) {
           const deleted = crdtMetadata.deleted;

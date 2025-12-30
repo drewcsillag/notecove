@@ -38,6 +38,7 @@ import {
 } from '../../services/export-service';
 import type { ExportProgress } from '../../utils/markdown-export';
 import { isElectron } from '../../utils/platform';
+import { useWindowState } from '../../hooks/useWindowState';
 
 const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
 
@@ -76,6 +77,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   exportTrigger,
   onExportComplete,
 }) => {
+  // Get window state hook for reporting visible notes
+  const { reportVisibleNotes } = useWindowState();
+
   const [notes, setNotes] = useState<Note[]>([]);
   // Note: selectedFolderId is now passed as prop for window isolation
   const [loading, setLoading] = useState(true);
@@ -720,6 +724,16 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       }
     };
   }, [selectedFolderId, fetchNotes, handleNoteSelect]);
+
+  // Report visible notes to main process for polling group prioritization
+  // This helps the sync system prioritize notes that are visible in any window's notes list
+  useEffect(() => {
+    const visibleNotes = notes.map((note) => ({
+      noteId: note.id,
+      sdId: note.sdId,
+    }));
+    reportVisibleNotes(visibleNotes);
+  }, [notes, reportVisibleNotes]);
 
   // Handle SD deletion - clear notes list and search if viewing deleted SD
   useEffect(() => {

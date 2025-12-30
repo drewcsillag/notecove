@@ -51,6 +51,12 @@ export type WebBroadcastCallback = (channel: string, ...args: unknown[]) => void
 export type GetPollingGroupStatusFn = () => PollingGroupStatus | null;
 
 /**
+ * Callback type for recording a recent edit to a note
+ * This is used to add notes to the polling group for sync prioritization
+ */
+export type RecordRecentEditFn = (noteId: string, sdId: string) => void;
+
+/**
  * User info for @-mentions autocomplete
  */
 export interface MentionUser {
@@ -111,6 +117,7 @@ export interface HandlerDependencies {
   onUserSettingsChanged?: OnUserSettingsChangedFn;
   stopWebServer?: StopWebServerFn;
   getPollingGroupStatus?: GetPollingGroupStatusFn;
+  recordRecentEdit?: RecordRecentEditFn;
 }
 
 /**

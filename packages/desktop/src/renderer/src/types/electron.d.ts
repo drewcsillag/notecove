@@ -3,6 +3,7 @@
  */
 
 import type { NoteMetadata, SyncProgress, SyncStatus } from '../../../main/ipc/types';
+import type { PollingGroupStoredSettings, PollingGroupStatus } from '@notecove/shared';
 
 declare global {
   interface Window {
@@ -305,6 +306,17 @@ declare global {
         exportDiagnostics: () => Promise<{ success: boolean; filePath?: string; error?: string }>;
         onProgress: (callback: (sdId: string, progress: SyncProgress) => void) => () => void;
         onStatusChanged: (callback: (status: SyncStatus) => void) => () => void;
+      };
+
+      polling: {
+        getSettings: () => Promise<PollingGroupStoredSettings>;
+        setSettings: (settings: Partial<PollingGroupStoredSettings>) => Promise<void>;
+        getSettingsForSd: (sdId: string) => Promise<PollingGroupStoredSettings>;
+        setSettingsForSd: (
+          sdId: string,
+          settings: Partial<PollingGroupStoredSettings>
+        ) => Promise<void>;
+        getGroupStatus: () => Promise<PollingGroupStatus | null>;
       };
 
       appState: {
@@ -676,6 +688,41 @@ declare global {
           field: 'created' | 'modified' | 'deleted_at',
           timestamp: number
         ) => Promise<void>;
+        getAllTags: () => Promise<{ id: string; name: string }[]>;
+        getTagsForNote: (noteId: string) => Promise<{ id: string; name: string }[]>;
+        getNoteById: (noteId: string) => Promise<{
+          id: string;
+          title: string;
+          sdId: string;
+          folderId: string | null;
+          created: number;
+          modified: number;
+          deleted: boolean;
+          pinned: boolean;
+        } | null>;
+        // Test instrumentation event handlers
+        onFileWatcherEvent: (
+          callback: (data: {
+            sdId: string;
+            filename: string;
+            type: string;
+            gracePeriodActive: boolean;
+          }) => void
+        ) => () => void;
+        onGracePeriodEnded: (callback: (data: { sdId: string }) => void) => () => void;
+        onActivitySyncComplete: (
+          callback: (data: { sdId: string; noteIds: string[] }) => void
+        ) => () => void;
+        onActivityWatcherDebug: (
+          callback: (data: {
+            sdId: string;
+            filename: string;
+            reason: string;
+            instanceId?: string;
+          }) => void
+        ) => () => void;
+        onInitialSyncComplete: (callback: (data: { sdId: string }) => void) => () => void;
+        onAllInitialSyncsComplete: (callback: () => void) => () => void;
       };
 
       app: {
@@ -744,6 +791,15 @@ declare global {
             showTagPanel?: boolean;
           };
         } | null>;
+
+        /**
+         * Report the notes currently visible in the notes list.
+         * Called when the notes list changes (filtering, scrolling, new notes loaded).
+         */
+        reportVisibleNotes: (
+          windowId: string,
+          notes: { noteId: string; sdId: string }[]
+        ) => Promise<void>;
       };
 
       // Window operations

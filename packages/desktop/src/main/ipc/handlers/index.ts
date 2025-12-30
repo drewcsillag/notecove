@@ -20,6 +20,8 @@ import type {
   GetSyncStatusFn,
   OnUserSettingsChangedFn,
   StopWebServerFn,
+  GetPollingGroupStatusFn,
+  RecordRecentEditFn,
 } from './types';
 import {
   isValidImageId,
@@ -116,7 +118,9 @@ export class IPCHandlers {
     getDeletionLogger?: GetDeletionLoggerFn,
     getSyncStatus?: GetSyncStatusFn,
     onUserSettingsChanged?: OnUserSettingsChangedFn,
-    stopWebServer?: StopWebServerFn
+    stopWebServer?: StopWebServerFn,
+    getPollingGroupStatus?: GetPollingGroupStatusFn,
+    recordRecentEdit?: RecordRecentEditFn
   ) {
     // Initialize services that need setup
     initializeImageServices(database);
@@ -144,6 +148,8 @@ export class IPCHandlers {
       getSyncStatus,
       onUserSettingsChanged,
       stopWebServer,
+      getPollingGroupStatus,
+      recordRecentEdit,
       broadcastToAll: this.broadcastToAll.bind(this),
       discoverImageAcrossSDs: this.discoverImageAcrossSDs.bind(this),
       oembedService,
