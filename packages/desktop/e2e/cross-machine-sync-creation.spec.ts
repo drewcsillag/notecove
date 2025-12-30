@@ -148,20 +148,10 @@ test.describe('cross-machine sync - new note creation', () => {
     // Wait for focus to be set and editor to stabilize
     await window1.waitForTimeout(2000);
 
-    // Use JavaScript to set the heading content directly to avoid CRDT sequence violations
-    // The TipTap editor exposes the heading as an H1 element inside .ProseMirror
+    // Type the title using keyboard (now safe thanks to the applyUpdate queue fix)
     const editor = window1.locator('.ProseMirror');
-    await editor.evaluate((el, title) => {
-      // Find the H1 heading and set its text content
-      const h1 = el.querySelector('h1');
-      if (h1) {
-        // Clear and set new content
-        h1.innerHTML = title;
-        // Trigger input event to notify the editor of the change
-        const event = new InputEvent('input', { bubbles: true });
-        el.dispatchEvent(event);
-      }
-    }, testTitle);
+    await editor.click(); // Ensure focus
+    await window1.keyboard.type(testTitle);
 
     // Wait for content to be processed by the CRDT system
     await window1.waitForTimeout(3000);
@@ -343,16 +333,10 @@ test.describe('cross-machine sync - new note creation', () => {
     // Wait for focus to be set and editor to stabilize
     await window1.waitForTimeout(2000);
 
-    // Use JavaScript to set the heading content directly to avoid CRDT sequence violations
+    // Type the title using keyboard (now safe thanks to the applyUpdate queue fix)
     const editor = window1.locator('.ProseMirror');
-    await editor.evaluate((el, title) => {
-      const h1 = el.querySelector('h1');
-      if (h1) {
-        h1.innerHTML = title;
-        const event = new InputEvent('input', { bubbles: true });
-        el.dispatchEvent(event);
-      }
-    }, testTitle);
+    await editor.click(); // Ensure focus
+    await window1.keyboard.type(testTitle);
 
     // Wait for content to be processed by the CRDT system
     await window1.waitForTimeout(3000);
