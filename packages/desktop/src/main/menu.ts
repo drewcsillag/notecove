@@ -245,8 +245,8 @@ export function createMenu(deps: MenuDependencies): void {
         { role: 'selectAll' },
         { type: 'separator' },
         {
-          label: 'Find...',
-          accelerator: 'CmdOrCtrl+F',
+          label: 'Find Note',
+          accelerator: 'CmdOrCtrl+Alt+F',
           click: () => {
             const focusedWindow = BrowserWindow.getFocusedWindow();
             if (focusedWindow) {
@@ -258,7 +258,7 @@ export function createMenu(deps: MenuDependencies): void {
         },
         {
           label: 'Find in Note',
-          accelerator: 'CmdOrCtrl+Shift+F',
+          accelerator: 'CmdOrCtrl+F',
           click: () => {
             const focusedWindow = BrowserWindow.getFocusedWindow();
             if (focusedWindow) {
@@ -301,8 +301,10 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'Toggle Folder Panel',
           accelerator: 'CmdOrCtrl+Shift+1',
           click: () => {
-            // TODO: Toggle folder panel
-            if (mainWindow) {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:toggle-folder-panel');
+            } else if (mainWindow) {
               mainWindow.webContents.send('menu:toggle-folder-panel');
             }
           },
@@ -311,8 +313,10 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'Toggle Tags Panel',
           accelerator: 'CmdOrCtrl+Shift+2',
           click: () => {
-            // TODO: Toggle tags panel (when implemented)
-            if (mainWindow) {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:toggle-tags-panel');
+            } else if (mainWindow) {
               mainWindow.webContents.send('menu:toggle-tags-panel');
             }
           },
@@ -321,7 +325,10 @@ export function createMenu(deps: MenuDependencies): void {
           label: 'Toggle Notes List',
           accelerator: 'CmdOrCtrl+Shift+0',
           click: () => {
-            if (mainWindow) {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.send('menu:toggle-notes-list-panel');
+            } else if (mainWindow) {
               mainWindow.webContents.send('menu:toggle-notes-list-panel');
             }
           },

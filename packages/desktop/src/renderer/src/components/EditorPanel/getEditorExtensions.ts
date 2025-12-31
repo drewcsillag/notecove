@@ -29,6 +29,7 @@ import {
 import { TabIndent } from './extensions/TabIndent';
 import { NotecoveListItem } from './extensions/NotecoveListItem';
 import { MoveBlock } from './extensions/MoveBlock';
+import { CutLine } from './extensions/CutLine';
 import { NotecoveCodeBlock } from './extensions/CodeBlockLowlight';
 
 /**
@@ -120,6 +121,8 @@ export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallb
     NotecoveTableCell,
     // Add MoveBlock extension for Alt-Up/Alt-Down to move blocks
     MoveBlock,
+    // Add CutLine extension for Cmd+X to cut current line when no selection
+    CutLine,
     // Collaboration extension binds TipTap to Yjs
     // Use 'content' fragment to match NoteDoc structure
     Collaboration.configure({
