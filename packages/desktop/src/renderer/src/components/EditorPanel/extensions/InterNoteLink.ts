@@ -12,7 +12,6 @@
 
 import { Extension } from '@tiptap/react';
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
-import type { Transaction } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
@@ -24,7 +23,6 @@ import { ReactRenderer } from '@tiptap/react';
 import { LinkSuggestionList, type LinkSuggestionListRef } from './LinkSuggestionList';
 import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion';
 import { createFloatingPopup, type FloatingPopup } from './utils/floating-popup';
-import { getChangedRanges, expandRanges, isFullDocumentReload } from './utils/transaction-ranges';
 
 export interface InterNoteLinkOptions {
   HTMLAttributes: Record<string, unknown>;
@@ -449,7 +447,6 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
           },
           apply(transaction, oldState) {
             // forceDecoration is used when title cache updates
-            // We still need full regeneration for this case
             if (transaction.getMeta('forceDecoration')) {
               return findAndDecorateLinks(transaction.doc, editorView);
             }
@@ -459,13 +456,13 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
               return oldState;
             }
 
-            // Full document reload (CRDT sync, etc) - do full re-scan
-            if (isFullDocumentReload(transaction)) {
-              return findAndDecorateLinks(transaction.doc, editorView);
-            }
-
-            // Incremental update: only re-scan changed regions
-            return updateLinksIncrementally(transaction, oldState, editorView);
+            // Always do full recalculation on document changes.
+            // Previously used incremental updates via updateLinksIncrementally(),
+            // but this had edge cases where widget decorations with side: -1
+            // weren't properly removed, causing visual duplication when typing
+            // near task items with links.
+            // Full recalculation is reliable and fast enough for typical note sizes.
+            return findAndDecorateLinks(transaction.doc, editorView);
           },
         },
         view(view) {
@@ -650,66 +647,6 @@ function findLinksInRange(
       }
     }
   });
-
-  return decorations;
-}
-
-/**
- * Incrementally update link decorations based on transaction changes.
- * Only re-scans the changed regions instead of the entire document.
- *
- * @param transaction - The transaction that caused the change
- * @param oldState - The previous decoration set
- * @param editorView - Optional editor view for triggering title fetches
- * @returns Updated decoration set
- */
-function updateLinksIncrementally(
-  transaction: Transaction,
-  oldState: DecorationSet,
-  editorView?: EditorView | null
-): DecorationSet {
-  const doc = transaction.doc;
-
-  // Get the ranges that were changed
-  let changedRanges = getChangedRanges(transaction);
-
-  // If no specific changes detected, fall back to full scan
-  if (changedRanges.length === 0) {
-    return findAndDecorateLinks(doc, editorView);
-  }
-
-  // Expand ranges to catch links that might span the edit boundary
-  // A link like [[uuid]] could be up to 50 chars
-  changedRanges = expandRanges(changedRanges, 50, doc.content.size);
-
-  // Map old decorations through the transaction (updates positions)
-  let decorations = oldState.map(transaction.mapping, doc);
-
-  // Process each changed range
-  for (const range of changedRanges) {
-    let searchFrom = range.from;
-    let searchTo = range.to;
-
-    // Find existing decorations in this range
-    const existingInRange = decorations.find(searchFrom, searchTo, () => true);
-
-    // CRITICAL: If we have existing decorations, we MUST include their full range
-    // in our search. Otherwise, we might remove a decoration but not re-add it
-    // because part of it falls outside our search range.
-    for (const deco of existingInRange) {
-      searchFrom = Math.min(searchFrom, deco.from);
-      searchTo = Math.max(searchTo, deco.to);
-    }
-
-    // Remove decorations that overlap with this range
-    decorations = decorations.remove(existingInRange);
-
-    // Find new links in the expanded range and add them
-    const newDecorations = findLinksInRange(doc, searchFrom, searchTo, editorView);
-    if (newDecorations.length > 0) {
-      decorations = decorations.add(doc, newDecorations);
-    }
-  }
 
   return decorations;
 }
