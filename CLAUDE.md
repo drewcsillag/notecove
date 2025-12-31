@@ -46,9 +46,11 @@ This is a FEATURE - it prevents context degradation from causing mistakes.
 
 ## CI - MANDATORY BEFORE EVERY COMMIT
 
-- **BEFORE EVERY COMMIT**: Use Task tool with subagent_type="ci-runner" to run `pnpm ci-local`
-- **DO NOT** tail ci-runner output - it provides a summary
-- If CI fails: Fix the failures and run ci-runner again
+- **ALWAYS** Run the following before every commit and fix the problems you find
+  - `pnpm format:check`
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - `pnpm test`
 - **NEVER EVER** claim failures are "pre-existing" without verifying against previous commit
 - **NEVER EVER** skip tests without asking first
 - If tests are broken: FIX THEM, even if unrelated to current work
