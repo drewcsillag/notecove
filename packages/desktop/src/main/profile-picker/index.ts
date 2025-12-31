@@ -13,6 +13,7 @@ import * as os from 'os';
 import { is } from '@electron-toolkit/utils';
 import { ProfileStorage, type Profile, type ProfileMode, getProfileMode } from '@notecove/shared';
 import { NodeFileSystemAdapter } from '../storage/node-fs-adapter';
+import { initializeProfileDatabase } from '../profile-database-init';
 
 /**
  * Check if app.getAppPath() returns dist-electron/main (vs package root or asar).
@@ -210,6 +211,13 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
     // Ensure profile data directory exists
     await storage.ensureProfileDataDir(newProfile.id);
 
+    // Create database and initial storage directory
+    // Simple create defaults to local mode with profile-specific storage
+    const dbPath = storage.getProfileDatabasePath(newProfile.id);
+    const storagePath = join(storage.getProfileDataDir(newProfile.id), 'storage');
+    await initializeProfileDatabase(dbPath, storagePath);
+    console.log(`[ProfilePicker] Created profile "${name}" with SD at ${storagePath}`);
+
     return newProfile;
   });
 
@@ -251,11 +259,8 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
         lastUsed: Date.now(),
       };
 
-      // Store initialization data for first-launch setup
-      // These will be consumed by the main app when the profile is first used
-      if (config.storagePath) {
-        newProfile.initialStoragePath = config.storagePath;
-      }
+      // Store initialization data for first-launch setup (username/handle only)
+      // Note: storagePath is now handled via database, not profile config
       if (config.username) {
         newProfile.initialUsername = config.username;
       }
@@ -268,6 +273,26 @@ function registerIPCHandlers(options: ProfilePickerOptions): void {
 
       // Ensure profile data directory exists
       await storage.ensureProfileDataDir(newProfile.id);
+
+      // Create database and initial storage directory
+      const dbPath = storage.getProfileDatabasePath(newProfile.id);
+
+      // Determine storage path based on mode:
+      // - local/paranoid: use profile directory (~/Library/Application Support/NoteCove/profiles/{id}/storage)
+      // - cloud/custom: use provided storagePath (required for these modes)
+      let storagePath: string;
+      if (config.storagePath) {
+        storagePath = config.storagePath;
+      } else if (config.mode === 'local' || config.mode === 'paranoid') {
+        // Local and paranoid modes default to profile-specific storage
+        storagePath = join(storage.getProfileDataDir(newProfile.id), 'storage');
+      } else {
+        // Cloud and custom modes require an explicit storage path
+        throw new Error(`Storage path is required for ${config.mode} mode`);
+      }
+
+      await initializeProfileDatabase(dbPath, storagePath);
+      console.log(`[ProfilePicker] Created profile "${config.name}" with SD at ${storagePath}`);
 
       return newProfile;
     }
@@ -384,7 +409,13 @@ export async function showProfilePicker(
     config.profiles.push(devProfile);
     await storage.saveProfiles(config);
     await storage.ensureProfileDataDir(devProfile.id);
-    console.log('[ProfilePicker] Auto-created Development profile');
+
+    // Create database and initial storage directory for dev profile
+    // Local mode uses profile-specific storage
+    const dbPath = storage.getProfileDatabasePath(devProfile.id);
+    const storagePath = join(storage.getProfileDataDir(devProfile.id), 'storage');
+    await initializeProfileDatabase(dbPath, storagePath);
+    console.log(`[ProfilePicker] Auto-created Development profile with SD at ${storagePath}`);
   }
 
   // Register IPC handlers

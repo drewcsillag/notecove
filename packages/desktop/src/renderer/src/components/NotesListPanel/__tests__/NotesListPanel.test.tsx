@@ -135,15 +135,18 @@ describe('NotesListPanel', () => {
   });
 
   it('should show loading state initially', () => {
-    render(<NotesListPanel {...defaultProps} />);
+    const { unmount } = render(<NotesListPanel {...defaultProps} />);
     expect(screen.getByText('Loading notes...')).toBeInTheDocument();
+    unmount();
   });
 
   it('should show "No notes" when folder is empty', async () => {
     // Use real timers for this test (same pattern as other async tests in this file)
     jest.useRealTimers();
 
+    // Reset mocks to default resolved values
     mockElectronAPI.note.list.mockResolvedValue([]);
+    mockElectronAPI.folder.list.mockResolvedValue([]);
     mockElectronAPI.appState.get.mockImplementation((key: string) => {
       if (key === 'selectedFolderId') return Promise.resolve('all-notes');
       if (key === 'searchQuery') return Promise.resolve(null);
@@ -153,9 +156,13 @@ describe('NotesListPanel', () => {
     const { unmount } = render(<NotesListPanel {...defaultProps} selectedFolderId="all-notes" />);
 
     // Wait for the empty state message to appear (same pattern as "Notes (2)" in next test)
-    await waitFor(() => {
-      expect(screen.getByText('No notes in this folder')).toBeInTheDocument();
-    });
+    // Use longer timeout since multiple async effects run on mount
+    await waitFor(
+      () => {
+        expect(screen.getByText('No notes in this folder')).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
 
     unmount();
   });

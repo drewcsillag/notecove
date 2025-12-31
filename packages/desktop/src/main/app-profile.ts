@@ -17,8 +17,7 @@ export interface ProfileSelectionResult {
   /** Profile mode for determining privacy/feature settings */
   profileMode: ProfileMode;
   profileLock: ProfileLock;
-  /** Initial storage path from wizard (undefined if not set or already applied) */
-  initialStoragePath?: string;
+  // Note: initialStoragePath removed - SD is created during profile creation
   /** Initial username from wizard (undefined if not set or already applied) */
   initialUsername?: string;
   /** Initial handle from wizard (undefined if not set or already applied) */
@@ -64,9 +63,7 @@ export async function selectProfile(
         };
 
         // Only include initialization data if present
-        if (profile.initialStoragePath) {
-          result.initialStoragePath = profile.initialStoragePath;
-        }
+        // Note: initialStoragePath removed - SD is created during profile creation
         if (profile.initialUsername) {
           result.initialUsername = profile.initialUsername;
         }
@@ -302,9 +299,7 @@ export async function selectProfile(
   };
 
   // Include initialization data if present
-  if (profile?.initialStoragePath) {
-    result.initialStoragePath = profile.initialStoragePath;
-  }
+  // Note: initialStoragePath removed - SD is created during profile creation
   if (profile?.initialUsername) {
     result.initialUsername = profile.initialUsername;
   }

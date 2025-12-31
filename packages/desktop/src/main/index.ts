@@ -37,7 +37,7 @@ import { getProfileStorage } from './profile-picker';
 import { parseCliArgs } from './cli/cli-parser';
 import { WebServerManager } from './web-server/manager';
 import { selectProfile } from './app-profile';
-import { initializeDefaultSD, loadAndRegisterSDs } from './app-storage-dirs';
+// Note: initializeDefaultSD and loadAndRegisterSDs removed - SD initialization now inline
 import { registerBasicIPCHandlers } from './app-ipc-setup';
 import { ProfilePresenceManager } from './profile-presence-manager';
 import { ProfilePresenceReader } from './profile-presence-reader';
@@ -182,10 +182,10 @@ async function initializeDatabase(profileId?: string): Promise<Database> {
   }
 
   // Determine database path:
-  // 1. Use TEST_DB_PATH if in test mode
+  // 1. Use TEST_DB_PATH if explicitly set
   // 2. If profileId provided, use profile-specific database path
-  // 3. Otherwise use custom path from config if set
-  // 4. Fall back to default userData/notecove.db
+  // 3. For E2E tests (NODE_ENV=test), use userData/notecove.db
+  // 4. Otherwise fail - no fallback paths
   let dbPath: string;
   if (process.env['TEST_DB_PATH']) {
     dbPath = process.env['TEST_DB_PATH'];
@@ -197,8 +197,14 @@ async function initializeDatabase(profileId?: string): Promise<Database> {
     // Ensure profile directory exists
     await profileStorage.ensureProfileDataDir(profileId);
     console.log(`[Profile] Using profile database: ${dbPath}`);
+  } else if (process.env['NODE_ENV'] === 'test') {
+    // E2E tests use a temporary userData directory - create database there
+    dbPath = join(app.getPath('userData'), 'notecove.db');
+    console.log(`[TEST MODE] Using test database at: ${dbPath}`);
   } else {
-    dbPath = await configManager.getDatabasePath();
+    throw new Error(
+      'No database path available. Either TEST_DB_PATH must be set or a profile must be selected.'
+    );
   }
 
   if (process.env['NODE_ENV'] === 'test') {
@@ -300,8 +306,8 @@ void app.whenReady().then(async () => {
       !!process.env['TEST_DB_PATH'] ||
       process.env['NODE_ENV'] === 'test';
 
-    // Track initialization data from wizard
-    let initialStoragePath: string | undefined;
+    // Track initialization data from wizard (username/handle only)
+    // Note: initialStoragePath removed - SD is created during profile creation
     let initialUsername: string | undefined;
     let initialHandle: string | undefined;
 
@@ -312,7 +318,6 @@ void app.whenReady().then(async () => {
       setSelectedProfileMode(profileResult.profileMode);
       profileLock = profileResult.profileLock;
       // Capture initialization data from wizard
-      initialStoragePath = profileResult.initialStoragePath;
       initialUsername = profileResult.initialUsername;
       initialHandle = profileResult.initialHandle;
     }
@@ -380,34 +385,47 @@ void app.whenReady().then(async () => {
     const isDevBuild = !app.isPackaged;
     const currentSDType: SDType = isDevBuild ? 'dev' : 'prod';
 
-    // Determine storage directory:
-    // 1. TEST_STORAGE_DIR env var (for testing)
-    // 2. initialStoragePath from wizard (for new profiles created with wizard)
-    // 3. Profile-specific default at profiles/<profileId>/storage
-    // 4. Shared 'storage' for backwards compatibility (no profile selected)
-    let storageDir: string;
-    if (process.env['TEST_STORAGE_DIR']) {
-      storageDir = process.env['TEST_STORAGE_DIR'];
-    } else if (initialStoragePath) {
-      // Wizard-specified path - use as-is
-      storageDir = initialStoragePath;
-      console.log(`[Storage] Using wizard-specified storage path: ${storageDir}`);
-    } else if (selectedProfileId) {
-      // Default profile-specific path
-      storageDir = join(app.getPath('userData'), 'profiles', selectedProfileId, 'storage');
-    } else {
-      // Fallback for backwards compatibility
-      storageDir = join(app.getPath('userData'), 'storage');
+    // Storage directories are loaded from database (created during profile creation).
+    // TEST_STORAGE_DIR is only for testing.
+    //
+    // All SDs use UUIDs - there is no special "default" SD ID anymore.
+    // The first SD created for a profile is just a regular SD with name "Default".
+
+    // For testing: create a temporary SD if needed
+    // TEST_STORAGE_DIR takes precedence, otherwise use userData/storage for E2E tests
+    const existingSDs = await database.getAllStorageDirs();
+    if (existingSDs.length === 0) {
+      if (process.env['TEST_STORAGE_DIR']) {
+        // Unit tests with explicit storage dir
+        const testStorageDir = process.env['TEST_STORAGE_DIR'];
+        const testSdId = 'test-sd-' + String(Date.now());
+        await database.createStorageDir(testSdId, 'Test Storage', testStorageDir);
+        console.log(`[Storage] Created test SD: ${testSdId} at ${testStorageDir}`);
+      } else if (process.env['NODE_ENV'] === 'test') {
+        // E2E tests without explicit storage dir - use userData/storage
+        const testStorageDir = join(app.getPath('userData'), 'storage');
+        const testSdId = 'test-sd-' + String(Date.now());
+        await database.createStorageDir(testSdId, 'Test Storage', testStorageDir);
+        console.log(`[Storage] Created E2E test SD: ${testSdId} at ${testStorageDir}`);
+      }
     }
 
-    // Initialize default SD structure
-    await initializeDefaultSD(
-      storageDir,
-      fsAdapter,
-      sdMarker,
-      currentSDType,
-      !!process.env['TEST_STORAGE_DIR']
-    );
+    // Load all SDs from database - they should have been created during profile creation
+    const allStorageDirs = await database.getAllStorageDirs();
+    if (allStorageDirs.length === 0) {
+      throw new Error(
+        'No storage directories found in database. ' +
+          'SDs should be created during profile creation.'
+      );
+    }
+
+    // Get the first/active SD for initialization
+    const activeSD = await database.getActiveStorageDir();
+    const primarySD = activeSD ?? allStorageDirs[0];
+    if (!primarySD) {
+      throw new Error('No primary SD found after loading storage directories');
+    }
+    console.log(`[Storage] Primary SD: "${primarySD.name}" (${primarySD.id}) at ${primarySD.path}`);
 
     // Initialize AppendLogManager with database (multi-SD aware)
     // InstanceId is unique per app installation (NOT per profile)
@@ -435,20 +453,36 @@ void app.whenReady().then(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     storageManager = new AppendLogManager(fsAdapter as any, database, profileId, instanceId);
 
-    // Register the default SD
-    storageManager.registerSD('default', storageDir);
+    // Register ALL storage directories from database
+    // All SDs are treated uniformly - no special "default" handling
+    for (const sd of allStorageDirs) {
+      // Check SD marker for safety (skip in test mode)
+      if (!process.env['TEST_STORAGE_DIR']) {
+        const existingMarker = await sdMarker.readSDMarker(sd.path);
 
-    // Load all Storage Directories from database and register them
-    // Also perform safety checks for dev/prod mismatches
-    const allSDs = await database.getAllStorageDirs();
-    await loadAndRegisterSDs(
-      database,
-      storageManager,
-      sdMarker,
-      currentSDType,
-      isDevBuild,
-      !!process.env['TEST_STORAGE_DIR']
-    );
+        // Production build: refuse to load dev SDs
+        if (!isDevBuild && existingMarker === 'dev') {
+          console.warn(`[Init] Skipping dev SD in production: ${sd.name} at ${sd.path}`);
+          continue;
+        }
+
+        // Ensure marker exists (will write current build type if missing)
+        await sdMarker.ensureMarker(sd.path, currentSDType);
+      }
+
+      // Initialize SD directory structure
+      const sdConfig = { id: sd.id, path: sd.path, label: sd.name };
+      const sdStructure = new SyncDirectoryStructure(fsAdapter, sdConfig);
+      await sdStructure.initialize();
+
+      // Ensure folders/logs directory exists
+      const folderLogsPath = join(sd.path, 'folders', 'logs');
+      await fsAdapter.mkdir(folderLogsPath);
+
+      // Register with storage manager
+      storageManager.registerSD(sd.id, sd.path);
+      console.log(`[Init] Registered SD: ${sd.name} (${sd.id}) at ${sd.path}`);
+    }
 
     // Initialize CRDT manager with database reference
     // Type assertion needed due to TypeScript module resolution quirk between dist and src
@@ -457,7 +491,7 @@ void app.whenReady().then(async () => {
 
     // Eagerly load folder tree to trigger demo folder creation
     // This ensures demo folders are created while we know the updates directory exists
-    await crdtManager.loadFolderTree('default');
+    await crdtManager.loadFolderTree(primarySD.id);
 
     // Initialize ProfilePresenceManager for writing presence files to SDs
     // This enables the Stale Sync UI to show meaningful device/user names
@@ -795,12 +829,7 @@ void app.whenReady().then(async () => {
           console.log(`[User Settings] ${key} changed, updating profile presence`);
           // Get all connected SD paths
           const allSDs = await database.getAllStorageDirs();
-          const allSDPaths = [
-            storageDir,
-            ...allSDs
-              .filter((sd: { id: string; path: string }) => sd.id !== 'default')
-              .map((sd: { id: string; path: string }) => sd.path),
-          ];
+          const allSDPaths = allSDs.map((sd: { id: string; path: string }) => sd.path);
           await profilePresenceManager.writePresenceToAllSDs(allSDPaths);
         }
       },
@@ -867,36 +896,19 @@ void app.whenReady().then(async () => {
 
     // Create default note if none exists
     // IMPORTANT: Do this BEFORE setupSDWatchers to prevent race condition where
+    // Ensure default note exists in primary SD
     // activity sync imports empty note files before welcome note is created
-    await ensureDefaultNote(
-      database,
-      crdtManager,
-      storageDir,
-      instanceId,
-      (name: 'documents' | 'userData') => app.getPath(name),
-      getSelectedProfileMode()
-    );
+    await ensureDefaultNote(database, crdtManager, instanceId, getSelectedProfileMode());
 
     // Collect initial sync functions to run in background after window creation
     const initialSyncFunctions: (() => Promise<void>)[] = [];
 
-    // Set up watchers for default SD AFTER ensureDefaultNote
+    // Set up watchers for all SDs AFTER ensureDefaultNote
     // This ensures the welcome note is created before activity sync runs
     /* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */
     if (!sdWatcherManager) {
       throw new Error('SD Watcher Manager not initialized');
     }
-    const defaultSDResult = await sdWatcherManager.setupSDWatchers(
-      'default',
-      storageDir,
-      fsAdapter,
-      profileId,
-      instanceId,
-      storageManager,
-      crdtManager,
-      database
-    );
-    initialSyncFunctions.push(defaultSDResult.runInitialSync);
 
     if (process.env['NODE_ENV'] === 'test') {
       await fs.appendFile(
@@ -905,48 +917,43 @@ void app.whenReady().then(async () => {
       );
     }
 
-    // Set up watchers for all other registered SDs (only if fully initialized)
+    // Set up watchers for all registered SDs (only if fully initialized)
     // Don't run initial sync yet - will run in background after window creation
-    for (const sd of allSDs) {
-      if (sd.id !== 'default') {
-        // Check if SD has basic structure (notes directory)
-        const notesPath = join(sd.path, 'notes');
-        const isInitialized = await fsAdapter.exists(notesPath);
+    for (const sd of allStorageDirs) {
+      // Check if SD has basic structure (notes directory)
+      const notesPath = join(sd.path, 'notes');
+      const isInitialized = await fsAdapter.exists(notesPath);
 
-        if (isInitialized) {
-          // Ensure folders/logs exists (create if missing)
-          const folderLogsPath = join(sd.path, 'folders', 'logs');
-          if (!(await fsAdapter.exists(folderLogsPath))) {
-            console.log(`[Init] Creating folders/logs for SD: ${sd.id}`);
-            await fsAdapter.mkdir(folderLogsPath);
-          }
-
-          console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
-          const sdResult = await sdWatcherManager.setupSDWatchers(
-            sd.id,
-            sd.path,
-            fsAdapter,
-            profileId,
-            instanceId,
-            storageManager,
-            crdtManager,
-            database
-          );
-          initialSyncFunctions.push(sdResult.runInitialSync);
-        } else {
-          console.log(
-            `[Init] Skipping watchers for SD: ${sd.id} (not fully initialized: ${sd.path})`
-          );
+      if (isInitialized) {
+        // Ensure folders/logs exists (create if missing)
+        const folderLogsPath = join(sd.path, 'folders', 'logs');
+        if (!(await fsAdapter.exists(folderLogsPath))) {
+          console.log(`[Init] Creating folders/logs for SD: ${sd.id}`);
+          await fsAdapter.mkdir(folderLogsPath);
         }
+
+        console.log(`[Init] Setting up watchers for SD: ${sd.id}`);
+        const sdResult = await sdWatcherManager.setupSDWatchers(
+          sd.id,
+          sd.path,
+          fsAdapter,
+          profileId,
+          instanceId,
+          storageManager,
+          crdtManager,
+          database
+        );
+        initialSyncFunctions.push(sdResult.runInitialSync);
+      } else {
+        console.log(
+          `[Init] Skipping watchers for SD: ${sd.id} (not fully initialized: ${sd.path})`
+        );
       }
     }
 
     // Write profile presence to all SDs on startup
     // This enables other devices to see who is using each SD
-    const allSDPaths = [
-      storageDir,
-      ...allSDs.filter((sd) => sd.id !== 'default').map((sd) => sd.path),
-    ];
+    const allSDPaths = allStorageDirs.map((sd) => sd.path);
     await profilePresenceManager.writePresenceToAllSDs(allSDPaths);
 
     // Periodic compaction of activity logs for all SDs (every 5 minutes)

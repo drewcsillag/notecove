@@ -40,8 +40,6 @@ import type { ExportProgress } from '../../utils/markdown-export';
 import { isElectron } from '../../utils/platform';
 import { useWindowState } from '../../hooks/useWindowState';
 
-const DEFAULT_SD_ID = 'default'; // Phase 2.5.1: Single SD only
-
 interface Note {
   id: string;
   title: string;
@@ -165,9 +163,9 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
   // Load folders for the active SD (for displaying folder paths in notes list)
   const loadFolders = useCallback(async () => {
+    if (!activeSdId) return; // Wait until SD is loaded
     try {
-      const sdId = activeSdId ?? DEFAULT_SD_ID;
-      const foldersData = await window.electronAPI.folder.list(sdId);
+      const foldersData = await window.electronAPI.folder.list(activeSdId);
       setFolders(
         foldersData
           .filter((f) => !f.deleted)
@@ -201,7 +199,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
         const notesList: Note[] = searchResults.map((result) => ({
           id: result.noteId,
           title: result.title,
-          sdId: activeSdId ?? DEFAULT_SD_ID,
+          sdId: activeSdId ?? '', // Search results are display-only; actual sdId from note metadata
           folderId: null, // Search results don't have folder info
           created: 0,
           modified: 0,
@@ -228,20 +226,23 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   // Fetch notes for the selected folder
   const fetchNotes = useCallback(
     async (folderId: string | null) => {
+      if (!activeSdId) {
+        setLoading(true); // Show loading until SD is available
+        return;
+      }
       setLoading(true);
       setError(null);
       setIsSearching(false);
 
       try {
         let notesList: Note[];
-        const sdId = activeSdId ?? DEFAULT_SD_ID;
 
         if (folderId === 'all-notes' || folderId?.startsWith('all-notes:') || folderId === null) {
           // Fetch all notes for the SD
-          notesList = await window.electronAPI.note.list(sdId);
+          notesList = await window.electronAPI.note.list(activeSdId);
         } else {
           // Fetch notes for specific folder
-          notesList = await window.electronAPI.note.list(sdId, folderId);
+          notesList = await window.electronAPI.note.list(activeSdId, folderId);
         }
 
         // Filter by tag filters if any (AND logic for includes, AND logic for excludes)
@@ -396,6 +397,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
   // Handle note creation
   const handleCreateNote = useCallback(async () => {
     if (creating) return; // Prevent double-clicks
+    if (!activeSdId) return; // Wait until SD is loaded
 
     // Don't allow note creation in Recently Deleted
     if (
@@ -412,11 +414,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
       // Create note via IPC - use the currently active SD
       console.log('[NotesListPanel] Creating note with activeSdId:', activeSdId);
-      const noteId = await window.electronAPI.note.create(
-        activeSdId ?? DEFAULT_SD_ID,
-        folderId ?? '',
-        ''
-      );
+      const noteId = await window.electronAPI.note.create(activeSdId, folderId ?? '', '');
 
       // Notify parent that a new note was created (for initial formatting)
       onNoteCreated?.(noteId);
@@ -833,10 +831,13 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           });
         } else {
           // Export all notes in the current SD (exportTrigger === 'all')
-          const sdId = activeSdId ?? DEFAULT_SD_ID;
+          if (!activeSdId) {
+            console.log('[Export] No active SD, cannot export all');
+            return;
+          }
 
           // Get all folders for this SD
-          const foldersData = await window.electronAPI.folder.list(sdId);
+          const foldersData = await window.electronAPI.folder.list(activeSdId);
           const folders: FolderInfo[] = foldersData.map((f) => ({
             id: f.id,
             name: f.name,
@@ -844,10 +845,10 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
           }));
 
           // Get all notes for this SD (pass undefined to get ALL notes, not just root folder)
-          const allNotesInSD = await window.electronAPI.note.list(sdId, undefined);
+          const allNotesInSD = await window.electronAPI.note.list(activeSdId, undefined);
 
           setExportProgress({ current: 0, total: allNotesInSD.length, currentNoteName: '' });
-          await exportAllNotes(sdId, folders, allNotesInSD, noteTitleLookup, (progress) => {
+          await exportAllNotes(activeSdId, folders, allNotesInSD, noteTitleLookup, (progress) => {
             setExportProgress(progress);
           });
         }
@@ -1133,7 +1134,7 @@ export const NotesListPanel: React.FC<NotesListPanelProps> = ({
       // Get current note's folder and SD to pre-select
       const note = notes.find((n) => n.id === noteId);
       setSelectedDestinationFolder(note?.folderId ?? null);
-      setSelectedDestinationSdId(note?.sdId ?? activeSdId ?? DEFAULT_SD_ID);
+      setSelectedDestinationSdId(note?.sdId ?? activeSdId ?? '');
 
       setMoveDialogOpen(true);
     } catch (err) {

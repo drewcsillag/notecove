@@ -410,6 +410,7 @@ function handleGetNoteInfo(ctx: HandlerContext) {
       }
     }
 
+    // Use database path (authoritative) - after prevention fix, storageManager uses this too
     const noteDir = path.join(sd.path, 'notes', noteId);
     const noteDirPath = noteDir;
     const logsDir = path.join(noteDir, 'logs');

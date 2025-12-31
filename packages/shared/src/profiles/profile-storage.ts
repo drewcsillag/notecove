@@ -271,9 +271,11 @@ export class ProfileStorage {
   /**
    * Clear initialization data from a profile.
    *
-   * This removes the initialStoragePath, initialUsername, and initialHandle
-   * fields that were set by the wizard. Called after these settings have
-   * been applied on first launch to prevent re-application.
+   * This removes the initialUsername and initialHandle fields that were set
+   * by the wizard. Called after these settings have been applied on first
+   * launch to prevent re-application.
+   *
+   * Note: initialStoragePath was removed - SD is now created during profile creation.
    *
    * @param profileId - The ID of the profile to update
    */
@@ -287,7 +289,6 @@ export class ProfileStorage {
     }
 
     // Remove initialization fields
-    delete profile.initialStoragePath;
     delete profile.initialUsername;
     delete profile.initialHandle;
 

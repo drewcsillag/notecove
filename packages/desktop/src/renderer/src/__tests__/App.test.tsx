@@ -56,10 +56,14 @@ const mockElectronAPI = {
     }),
   },
   sd: {
-    list: jest.fn().mockResolvedValue([]),
+    list: jest
+      .fn()
+      .mockResolvedValue([{ id: 'test-sd', name: 'Test Storage', path: '/test/path' }]),
     create: jest.fn(),
     setActive: jest.fn(),
-    getActive: jest.fn().mockResolvedValue(null),
+    getActive: jest
+      .fn()
+      .mockResolvedValue({ id: 'test-sd', name: 'Test Storage', path: '/test/path' }),
     onUpdated: jest.fn(),
     onOpenSettings: jest.fn(() => () => {
       /* unsubscribe */
@@ -518,21 +522,33 @@ describe('App', () => {
         deleted: false,
       });
 
-      // Set up note.list to return a note - this triggers auto-selection of default note
-      mockElectronAPI.note.list.mockResolvedValue([
-        {
-          id: 'default-note',
-          title: 'Default Note',
-          sdId: 'sd-to-delete',
-          folderId: null,
-          created: Date.now(),
-          modified: Date.now(),
-          deleted: false,
-          pinned: false,
-          contentPreview: '',
-          contentText: '',
-        },
-      ]);
+      // Set up note.getInfo to return a note - this triggers auto-selection of default note
+      mockElectronAPI.note.getInfo.mockResolvedValue({
+        id: 'default-note',
+        title: 'Default Note',
+        sdId: 'sd-to-delete',
+        sdName: 'Test Storage',
+        sdPath: '/test/path',
+        folderId: null,
+        folderName: null,
+        folderPath: null,
+        fullFolderPath: '',
+        created: Date.now(),
+        modified: Date.now(),
+        tags: [],
+        characterCount: 0,
+        wordCount: 0,
+        paragraphCount: 0,
+        vectorClock: {},
+        documentHash: '',
+        crdtUpdateCount: 0,
+        noteDirPath: '/test/notes/default-note',
+        totalFileSize: 0,
+        snapshotCount: 0,
+        deleted: false,
+        pinned: false,
+        contentPreview: '',
+      });
 
       render(<App />);
 
@@ -804,6 +820,16 @@ describe('App', () => {
         };
       });
 
+      // Set up SD for the test - needed for selectNextNote to work
+      mockElectronAPI.sd.list.mockResolvedValue([
+        {
+          id: 'test-sd',
+          name: 'Test Storage',
+          path: '/test/path',
+        },
+      ]);
+      mockElectronAPI.sd.getActive.mockResolvedValue('test-sd');
+
       // Set up notes list - will return remaining note after deletion
       mockElectronAPI.note.list.mockResolvedValue([
         {
@@ -819,6 +845,10 @@ describe('App', () => {
           contentText: '',
         },
       ]);
+
+      // Return null from note.getInfo - this test verifies behavior when selection is empty
+      // (simulating the scenario where NotesListPanel already cleared selection)
+      mockElectronAPI.note.getInfo.mockResolvedValue(null);
 
       const { container } = render(<App />);
 
@@ -868,6 +898,44 @@ describe('App', () => {
         return () => {
           /* unsubscribe */
         };
+      });
+
+      // Set up SD for the test - needed for selectNextNote to work
+      mockElectronAPI.sd.list.mockResolvedValue([
+        {
+          id: 'test-sd',
+          name: 'Test Storage',
+          path: '/test/path',
+        },
+      ]);
+      mockElectronAPI.sd.getActive.mockResolvedValue('test-sd');
+
+      // Set up note.getInfo to return default note on mount
+      mockElectronAPI.note.getInfo.mockResolvedValue({
+        id: 'default-note',
+        title: 'Default Note',
+        sdId: 'test-sd',
+        sdName: 'Test Storage',
+        sdPath: '/test/path',
+        folderId: null,
+        folderName: null,
+        folderPath: null,
+        fullFolderPath: '',
+        created: Date.now(),
+        modified: Date.now(),
+        tags: [],
+        characterCount: 0,
+        wordCount: 0,
+        paragraphCount: 0,
+        vectorClock: {},
+        documentHash: '',
+        crdtUpdateCount: 0,
+        noteDirPath: '/test/notes/default-note',
+        totalFileSize: 0,
+        snapshotCount: 0,
+        deleted: false,
+        pinned: false,
+        contentPreview: '',
       });
 
       // Set up initial notes list with a default note
@@ -943,6 +1011,44 @@ describe('App', () => {
           };
         }
       );
+
+      // Set up SD for the test - needed for selectNextNote to work
+      mockElectronAPI.sd.list.mockResolvedValue([
+        {
+          id: 'test-sd',
+          name: 'Test Storage',
+          path: '/test/path',
+        },
+      ]);
+      mockElectronAPI.sd.getActive.mockResolvedValue('test-sd');
+
+      // Set up note.getInfo to return default note on mount
+      mockElectronAPI.note.getInfo.mockResolvedValue({
+        id: 'default-note',
+        title: 'Default Note',
+        sdId: 'test-sd',
+        sdName: 'Test Storage',
+        sdPath: '/test/path',
+        folderId: null,
+        folderName: null,
+        folderPath: null,
+        fullFolderPath: '',
+        created: Date.now(),
+        modified: Date.now(),
+        tags: [],
+        characterCount: 0,
+        wordCount: 0,
+        paragraphCount: 0,
+        vectorClock: {},
+        documentHash: '',
+        crdtUpdateCount: 0,
+        noteDirPath: '/test/notes/default-note',
+        totalFileSize: 0,
+        snapshotCount: 0,
+        deleted: false,
+        pinned: false,
+        contentPreview: '',
+      });
 
       // Set up initial notes list
       mockElectronAPI.note.list.mockResolvedValue([
@@ -1049,6 +1155,9 @@ describe('App', () => {
           contentText: '',
         },
       ]);
+
+      // Return null from note.getInfo so auto-selection doesn't overwrite minimal mode's note selection
+      mockElectronAPI.note.getInfo.mockResolvedValue(null);
 
       render(<App />);
 
