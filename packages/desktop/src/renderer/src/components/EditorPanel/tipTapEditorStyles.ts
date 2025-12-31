@@ -92,6 +92,7 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
       },
       // Date chip styling (YYYY-MM-DD dates)
       // Uses normal text color but with chip background
+      // Inherits font-weight, font-style, text-decoration from parent to support marks (bold, italic, etc.)
       '& .date-chip': {
         backgroundColor:
           theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
@@ -99,7 +100,10 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
         padding: '2px 6px',
         borderRadius: '4px',
         cursor: 'pointer',
-        fontWeight: 500,
+        // Inherit font styles to allow marks (bold, italic, underline, strike) to show through
+        fontWeight: 'inherit',
+        fontStyle: 'inherit',
+        textDecoration: 'inherit',
         transition: 'background-color 0.15s ease',
         '&:hover': {
           backgroundColor:
@@ -107,6 +111,7 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
         },
       },
       // Mention chip styling (user @mentions)
+      // Inherits font-weight, font-style, text-decoration from parent to support marks (bold, italic, etc.)
       '& .mention-chip': {
         backgroundColor:
           theme.palette.mode === 'dark' ? 'rgba(144, 202, 249, 0.16)' : 'rgba(25, 118, 210, 0.08)',
@@ -114,7 +119,10 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
         padding: '2px 6px',
         borderRadius: '4px',
         cursor: 'pointer',
-        fontWeight: 500,
+        // Inherit font styles to allow marks (bold, italic, underline, strike) to show through
+        fontWeight: 'inherit',
+        fontStyle: 'inherit',
+        textDecoration: 'inherit',
         whiteSpace: 'nowrap',
         transition: 'background-color 0.15s ease',
         '&:hover': {

@@ -105,7 +105,7 @@ export const CutLine = Extension.create({
 
               // Check if this is the only item in its parent list
               const parentNode = $from.node(deleteDepth - 1);
-              if (parentNode && parentNode.childCount === 1) {
+              if (parentNode.childCount === 1) {
                 // Delete the entire list
                 const listStart = $from.before(deleteDepth - 1);
                 const listEnd = $from.after(deleteDepth - 1);

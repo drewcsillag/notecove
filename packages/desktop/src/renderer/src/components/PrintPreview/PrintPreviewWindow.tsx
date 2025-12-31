@@ -268,7 +268,7 @@ const printStyles = `
     font-weight: 500;
   }
 
-  /* Date chips */
+  /* Date chips - inherit font styles to support marks (bold, italic, etc.) */
   .print-content .date-chip {
     display: inline;
     background-color: #f3e5f5;
@@ -277,7 +277,9 @@ const printStyles = `
     padding: 2px 6px;
     font-size: 0.9em;
     color: #7b1fa2;
-    font-weight: 500;
+    font-weight: inherit;
+    font-style: inherit;
+    text-decoration: inherit;
   }
 
   /* oEmbed unfurl cards */
