@@ -346,7 +346,7 @@ export function createMenu(deps: MenuDependencies): void {
           submenu: [
             {
               label: 'Note Info',
-              accelerator: 'CmdOrCtrl+Shift+I',
+              // No accelerator - conflicts with Import Markdown (Cmd+Shift+I)
               click: () => {
                 // Send to focused window, not mainWindow, so the correct note context is used
                 const focusedWindow = BrowserWindow.getFocusedWindow();
