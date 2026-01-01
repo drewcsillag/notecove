@@ -23,12 +23,14 @@ import {
   type SnapshotFileMetadata,
   type PackFileMetadata,
 } from './crdt';
+import { parseLogFile, parseSnapshotFile, LOG_HEADER_SIZE } from './storage/binary-format';
 
 // Types for the bridge interface
 interface NoteCoveBridge {
   // Note operations
   createNote(noteId: string): void;
   applyUpdate(noteId: string, updateBase64: string): void;
+  applyLogFile(noteId: string, logFileBase64: string): number; // Returns number of updates applied
   getDocumentState(noteId: string): string;
   extractTitle(stateBase64: string): string;
   extractContent(stateBase64: string): string;
@@ -37,6 +39,8 @@ interface NoteCoveBridge {
   // Folder tree operations
   createFolderTree(sdId: string): void;
   loadFolderTree(sdId: string, stateBase64: string): void;
+  applyFolderTreeUpdate(sdId: string, updateBase64: string): void;
+  applyFolderTreeLogFile(sdId: string, logFileBase64: string): number; // Returns number of updates applied
   getFolderTreeState(sdId: string): string;
   closeFolderTree(sdId: string): void;
 
@@ -188,6 +192,24 @@ const bridge: NoteCoveBridge = {
     Y.applyUpdate(doc, updateBytes);
   },
 
+  applyLogFile(noteId: string, logFileBase64: string): number {
+    const doc = openNotes.get(noteId);
+    if (!doc) {
+      throw new Error(`Note ${noteId} is not open`);
+    }
+
+    const fileBytes = base64ToUint8Array(logFileBase64);
+    const parsed = parseLogFile(fileBytes);
+
+    let applied = 0;
+    for (const record of parsed.records) {
+      Y.applyUpdate(doc, record.data);
+      applied++;
+    }
+
+    return applied;
+  },
+
   getDocumentState(noteId: string): string {
     const doc = openNotes.get(noteId);
     if (!doc) {
@@ -291,6 +313,34 @@ const bridge: NoteCoveBridge = {
     Y.applyUpdate(folderTree.doc, stateBytes);
 
     openFolderTrees.set(sdId, folderTree.doc);
+  },
+
+  applyFolderTreeUpdate(sdId: string, updateBase64: string): void {
+    const doc = openFolderTrees.get(sdId);
+    if (!doc) {
+      throw new Error(`Folder tree for SD ${sdId} is not open`);
+    }
+
+    const updateBytes = base64ToUint8Array(updateBase64);
+    Y.applyUpdate(doc, updateBytes);
+  },
+
+  applyFolderTreeLogFile(sdId: string, logFileBase64: string): number {
+    const doc = openFolderTrees.get(sdId);
+    if (!doc) {
+      throw new Error(`Folder tree for SD ${sdId} is not open`);
+    }
+
+    const fileBytes = base64ToUint8Array(logFileBase64);
+    const parsed = parseLogFile(fileBytes);
+
+    let applied = 0;
+    for (const record of parsed.records) {
+      Y.applyUpdate(doc, record.data);
+      applied++;
+    }
+
+    return applied;
   },
 
   getFolderTreeState(sdId: string): string {

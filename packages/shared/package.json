@@ -42,6 +42,7 @@
     "build": "pnpm build:esm && pnpm build:cjs",
     "build:esm": "tsc -p tsconfig.json",
     "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:ios": "node scripts/build-ios-bridge.mjs",
     "dev": "tsc --watch",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",

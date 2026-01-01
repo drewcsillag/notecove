@@ -19,6 +19,9 @@ targets:
       - path: NoteCove
         excludes:
           - "**/*.entitlements"
+      - path: NoteCove/CRDT/Resources/ios-bridge-bundle.js
+        type: file
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.notecove.NoteCove
@@ -52,6 +55,9 @@ targets:
     platform: iOS
     sources:
       - path: NoteCoveTests
+      - path: NoteCove/CRDT/Resources/ios-bridge-bundle.js
+        type: file
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.notecove.NoteCoveTests

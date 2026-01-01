@@ -7,12 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0960094113448A9952005D0B /* ios-bridge-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 40BBFE974D497A5E16D0C7B6 /* ios-bridge-bundle.js */; };
+		09B63004246FAF52F47FAAFB /* CRDTManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3226CF2D6FA123164C6422D /* CRDTManagerTests.swift */; };
 		1EA12ABE431E3E753446796B /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDF59B5876B5F580178B168 /* OnboardingView.swift */; };
 		3151CEFB67EE6299D9CB351C /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66FA11B67F6593B58F1D1544 /* Note.swift */; };
 		35308C91F9FB5404E8B3DF76 /* NoteCoveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 255C548184391C53FB2DFA6F /* NoteCoveApp.swift */; };
 		3BE3FAD8F20C285D45A9B3C7 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 753B754BA2E1B24FA88ACF63 /* DatabaseManager.swift */; };
 		3FEE1BF66093E75748FFF30B /* NoteCoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565C5B989A781C0043491970 /* NoteCoveTests.swift */; };
 		631C5EF5059EB0D16DDE20AA /* NoteListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */; };
+		7A265E4560BAB59B1C406DEC /* ios-bridge-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 40BBFE974D497A5E16D0C7B6 /* ios-bridge-bundle.js */; };
 		8796B79499F416DB214CE3C7 /* NoteCoveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B862C088E86BD2F092B1594 /* NoteCoveUITests.swift */; };
 		88D906F3ED8A50AAC02561CC /* StorageDirectoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24FA2DBD1A6944132D8DB425 /* StorageDirectoryTests.swift */; };
 		8A1A8F759C1EA8C6DE17C3D3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3CA629A30408DFA3D3A48B /* ContentView.swift */; };
@@ -21,6 +24,7 @@
 		D4F2B7EE9857F6A489F8E6CA /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC635389550CEBBF70056C5 /* SampleData.swift */; };
 		DA9BFBF400ECEDECEAA10D84 /* Schema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3CD2E8DAA5A6716F8A9CB9 /* Schema.swift */; };
 		E4F6125ED7A38337B32D6AD1 /* FolderTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9321BEDA245CC75B1AE6EF74 /* FolderTreeView.swift */; };
+		E51DCD99682A497CA66AC87F /* CRDTManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68FE2FB0A9EB4603248BAD46 /* CRDTManager.swift */; };
 		E876014E0A8B668DCE00DCB2 /* StorageDirectoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04DF904012BDCD4565160700 /* StorageDirectoryManager.swift */; };
 		ECB9748285EA4B412A61ABE2 /* NoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04B4A5349B0AEDB73668F75 /* NoteEditorView.swift */; };
 		F17EA9CEAA94A01A8668C786 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CB0D032179A2E5AB04CDAE8A /* Assets.xcassets */; };
@@ -51,9 +55,11 @@
 		24FA2DBD1A6944132D8DB425 /* StorageDirectoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDirectoryTests.swift; sourceTree = "<group>"; };
 		255C548184391C53FB2DFA6F /* NoteCoveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCoveApp.swift; sourceTree = "<group>"; };
 		26ADFF95122C4217035DF32A /* StorageDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDirectory.swift; sourceTree = "<group>"; };
+		40BBFE974D497A5E16D0C7B6 /* ios-bridge-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "ios-bridge-bundle.js"; sourceTree = "<group>"; };
 		4AA39C45765887770F1A7354 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		565C5B989A781C0043491970 /* NoteCoveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCoveTests.swift; sourceTree = "<group>"; };
 		66FA11B67F6593B58F1D1544 /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
+		68FE2FB0A9EB4603248BAD46 /* CRDTManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTManager.swift; sourceTree = "<group>"; };
 		753B754BA2E1B24FA88ACF63 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 		7B862C088E86BD2F092B1594 /* NoteCoveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCoveUITests.swift; sourceTree = "<group>"; };
 		8A3CD2E8DAA5A6716F8A9CB9 /* Schema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Schema.swift; sourceTree = "<group>"; };
@@ -63,6 +69,7 @@
 		9764E24E7D5F2C7D7F556884 /* Folder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Folder.swift; sourceTree = "<group>"; };
 		A04B4A5349B0AEDB73668F75 /* NoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorView.swift; sourceTree = "<group>"; };
 		AEB5841B19AF45DCB5986817 /* NoteCoveTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = NoteCoveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3226CF2D6FA123164C6422D /* CRDTManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTManagerTests.swift; sourceTree = "<group>"; };
 		C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteListView.swift; sourceTree = "<group>"; };
 		CB0D032179A2E5AB04CDAE8A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E266CFAEA3B0F184F8C317FF /* DatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseTests.swift; sourceTree = "<group>"; };
@@ -99,9 +106,19 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		2775B8CBB2DF72981F2AAF65 /* CRDT */ = {
+			isa = PBXGroup;
+			children = (
+				68FE2FB0A9EB4603248BAD46 /* CRDTManager.swift */,
+				9554B43AA72D110A25CE0880 /* Resources */,
+			);
+			path = CRDT;
+			sourceTree = "<group>";
+		};
 		4CC38BF4020BB087B2574FD9 /* NoteCoveTests */ = {
 			isa = PBXGroup;
 			children = (
+				B3226CF2D6FA123164C6422D /* CRDTManagerTests.swift */,
 				E266CFAEA3B0F184F8C317FF /* DatabaseTests.swift */,
 				1BEE95A0E4DE0FB2F08A2543 /* Info.plist */,
 				565C5B989A781C0043491970 /* NoteCoveTests.swift */,
@@ -147,12 +164,21 @@
 			path = NoteCoveUITests;
 			sourceTree = "<group>";
 		};
+		9554B43AA72D110A25CE0880 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				40BBFE974D497A5E16D0C7B6 /* ios-bridge-bundle.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		967EA917C9D0712C76A7142E /* NoteCove */ = {
 			isa = PBXGroup;
 			children = (
 				CB0D032179A2E5AB04CDAE8A /* Assets.xcassets */,
 				FAE371D9267609B12C06B891 /* Info.plist */,
 				0179812EE027B6739326B8E4 /* App */,
+				2775B8CBB2DF72981F2AAF65 /* CRDT */,
 				E5B9E85B49D4E4521FBE4FE2 /* Database */,
 				BD61071203479B100A635B7A /* Editor */,
 				73A0A7A7B9FCF82A8965B0B2 /* Models */,
@@ -218,6 +244,7 @@
 			buildConfigurationList = 7441D51B08CA4A66CDFD81FC /* Build configuration list for PBXNativeTarget "NoteCoveTests" */;
 			buildPhases = (
 				4694EE26CC8FD2B8BBF9C00D /* Sources */,
+				14AFAD92773E2A4E7956CC86 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -312,11 +339,20 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		14AFAD92773E2A4E7956CC86 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0960094113448A9952005D0B /* ios-bridge-bundle.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		22307F784C454FE03ED88E05 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				F17EA9CEAA94A01A8668C786 /* Assets.xcassets in Resources */,
+				7A265E4560BAB59B1C406DEC /* ios-bridge-bundle.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -327,6 +363,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E51DCD99682A497CA66AC87F /* CRDTManager.swift in Sources */,
 				8A1A8F759C1EA8C6DE17C3D3 /* ContentView.swift in Sources */,
 				3BE3FAD8F20C285D45A9B3C7 /* DatabaseManager.swift in Sources */,
 				F8F97509EBE4F8CB80BF0D90 /* Folder.swift in Sources */,
@@ -347,6 +384,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				09B63004246FAF52F47FAAFB /* CRDTManagerTests.swift in Sources */,
 				FC6670171C030B0457B51B40 /* DatabaseTests.swift in Sources */,
 				3FEE1BF66093E75748FFF30B /* NoteCoveTests.swift in Sources */,
 				88D906F3ED8A50AAC02561CC /* StorageDirectoryTests.swift in Sources */,
