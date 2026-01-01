@@ -9,6 +9,7 @@
 ## Summary
 
 Fix 5 reliably failing e2e tests:
+
 1. `e2e/cross-machine-sync-deletion-sloppy.spec.ts:249` - ❌ Still failing (complex edge case)
 2. `e2e/cross-machine-sync-instances.spec.ts:86` - ✅ Fixed
 3. `e2e/cross-machine-sync-instances.spec.ts:251` - ✅ Fixed
@@ -18,6 +19,7 @@ Fix 5 reliably failing e2e tests:
 ## Tasks
 
 ### Step 1: Improve Sequence Validator Robustness
+
 🟩 **Done**
 
 **Rationale**: Fix diagnostics FIRST so we get useful error messages when debugging the simulator.
@@ -32,6 +34,7 @@ Fix 5 reliably failing e2e tests:
 - [x] 🟩 Update PLAN.md
 
 ### Step 2: Fix FileSyncSimulator Partial Sync Completion
+
 🟩 **Done**
 
 **Problem**: `stop()` clears pending partial sync completions, leaving truncated CRDT log files.
@@ -48,6 +51,7 @@ Fix 5 reliably failing e2e tests:
 - [x] 🟩 Update PLAN.md
 
 ### Step 3: Investigate Tags Test Isolation
+
 🟩 **Done**
 
 **Problem**: Tags test was failing due to autocomplete interference when typing tags. The test typed `#deleteremoveme #deletekeepme` but autocomplete was capturing keystrokes when typing `#de...`, resulting in partial/incorrect tags being indexed.
@@ -55,6 +59,7 @@ Fix 5 reliably failing e2e tests:
 **Root Cause**: Fast typing was triggering autocomplete, which interfered with tag parsing. Tags from previous tests (like those starting with `de`) were being suggested and selected.
 
 **Fix Applied**:
+
 - Changed tag names to use unique prefix `x` (to avoid autocomplete conflicts)
 - Added 50ms delay between keystrokes
 - Added trailing spaces after tags to ensure proper termination
@@ -66,13 +71,16 @@ Fix 5 reliably failing e2e tests:
 - [x] 🟩 Update PLAN.md
 
 ### Step 4: Fix Multi-SD Live Sync Test (Bug 11)
+
 🟩 **Done**
 
 **Problem**: Test "Editor should show edits from other instance without reloading note" was failing due to TWO issues:
+
 1. `parseActivityFilename` in ActivitySync only accepted IDs with 22 or 36 characters, but tests use short IDs like "instance-1" (10 chars)
 2. The file watcher filter didn't use `parseActivityFilename`, causing instances to process their own activity logs
 
 **Root Cause Analysis**:
+
 - For filename `instance-1_instance-1.log`, `parseActivityFilename` failed the length check and fell through to old format parsing
 - This returned `instanceId: "instance-1_instance-1"` instead of `instanceId: "instance-1"`
 - The `isOwnFile` check failed: `"instance-1_instance-1" !== "instance-1"` → false
@@ -81,6 +89,7 @@ Fix 5 reliably failing e2e tests:
 **Additional Discovery**: When loading notes from another instance, the editor stays non-editable (`contenteditable: false`). This is a separate bug that was worked around by restructuring the test.
 
 **Fixes Applied**:
+
 1. Updated `parseActivityFilename` to accept any non-empty ID length (not just 22/36 chars)
 2. Updated file watcher filter in `sd-watcher-manager.ts` to use `parseActivityFilename`
 3. Restructured test to have Instance 2 create the note (newly created notes are editable)
@@ -92,6 +101,7 @@ Fix 5 reliably failing e2e tests:
 - [x] 🟩 Update PLAN.md
 
 ### Step 5: Verification
+
 🟨 **Partial**
 
 - [x] 🟩 Run all 5 tests individually:
@@ -113,12 +123,14 @@ Fix 5 reliably failing e2e tests:
 **Problem**: When FileSyncSimulator does partial syncs of CRDT log files, Instance 2 may read the file before it's fully synced. The CRDT log file grows from 4870 bytes to 8178 bytes, but Instance 2 only sees 4870 bytes at load time.
 
 **Root Cause**:
+
 - Instance 2's ActivitySync detects new activity log entries
 - It tries to load the CRDT file to get the content
 - But the CRDT file is only partially synced (partial sync in progress)
 - Instance 2 loads a truncated state, missing the final content
 
 **Potential Fixes** (for future work):
+
 1. Add file locking/completion detection in ActivitySync
 2. Have ActivitySync verify file size matches expected before loading
 3. Add retry logic when CRDT content doesn't match expected sequence

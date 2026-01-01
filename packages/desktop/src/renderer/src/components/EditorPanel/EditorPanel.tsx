@@ -129,6 +129,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     []
   );
 
+  // Memoized wrapper to prevent TipTapEditor from remounting when EditorPanel re-renders
+  // TipTapEditor's cleanup effect includes onTitleChange in its dependencies,
+  // so an unstable reference would cause the editor to be destroyed and recreated
+  const stableTitleChangeHandler = useCallback(
+    (noteId: string, title: string, contentText: string) => {
+      void handleTitleChange(noteId, title, contentText);
+    },
+    [handleTitleChange]
+  );
+
   // Save panel size when it changes
   const handlePanelResize = (sizes: number[]) => {
     const commentSize = sizes[1];
@@ -152,9 +162,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               isNewlyCreated={isNewlyCreated}
               {...(onNavigateToNote && { onNavigateToNote })}
               {...(onNoteLoaded && { onNoteLoaded })}
-              onTitleChange={(noteId: string, title: string, contentText: string) => {
-                void handleTitleChange(noteId, title, contentText);
-              }}
+              onTitleChange={stableTitleChangeHandler}
               showSearchPanel={showSearchPanel}
               {...(onSearchPanelClose && { onSearchPanelClose })}
               searchTerm={searchTerm}
