@@ -34,25 +34,29 @@ From code analysis:
 ### Q1: What information is available in the activity log entry?
 
 Looking at the code, activity log entries contain:
+
 - `noteId|instanceId_sequence`
 
 **Question**: Can we add the expected file size or a hash to the activity log entry so the receiving instance can verify the CRDT file is complete?
 
 Pros:
+
 - Clean solution - receiver knows exactly what to expect
 - Works for real cloud sync scenarios (not just simulator)
 
 Cons:
+
 - Requires format change to activity log
 - Backward compatibility concerns
 
-No. The file under normal circumstances will grow as the user edits the doc as it is a log. So it's rarely ever *complete* per se. The only time it's complete is when it's hit its max size and rolls to a new file. But for this test, that's not going to happen. You do have the length fields in the log to know whether you have a complete record though.
+No. The file under normal circumstances will grow as the user edits the doc as it is a log. So it's rarely ever _complete_ per se. The only time it's complete is when it's hit its max size and rolls to a new file. But for this test, that's not going to happen. You do have the length fields in the log to know whether you have a complete record though.
 
 ### Q2: Should we prioritize simulator-only fixes or production fixes?
 
 The test uses extreme conditions (50% partial sync, 30-70% content). Real cloud services like iCloud/Dropbox rarely have this level of partial file states.
 
 **Options:**
+
 1. **Simulator fix only**: Make FileSyncSimulator complete CRDT files before activity logs - quick fix, test passes, but doesn't improve production robustness
 2. **Production fix**: Add retry/verification logic that handles partial files in real deployments - more work, but benefits real users
 3. **Both**: Quick simulator fix to unblock, then production hardening as follow-up
@@ -66,6 +70,7 @@ Currently `checkCRDTLogExists()` is called in a retry loop by `pollAndReload()` 
 **Problem**: The current check only verifies sequence number, not file completeness.
 
 **Options:**
+
 1. Add file size verification (requires knowing expected size - see Q1)
 2. Add content hash verification (requires computing hash on write)
 3. Add "last record complete" verification (check if file ends at record boundary)
@@ -76,6 +81,7 @@ Currently `checkCRDTLogExists()` is called in a retry loop by `pollAndReload()` 
 ### Q4: Is modifying the activity log format acceptable?
 
 Adding expected file size to activity entries would require:
+
 - Changing ActivityLogger to include file size
 - Changing parseActivityFilename to extract file size
 - Backward compatibility for old format entries

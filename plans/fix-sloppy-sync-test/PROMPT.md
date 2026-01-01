@@ -15,6 +15,7 @@ The test "should sync deleted notes with sloppy sync" fails intermittently becau
 5. Instance 2 loads a truncated CRDT state and misses final content
 
 Evidence from debugging:
+
 - CRDT file grows from 4870 bytes to 8178 bytes
 - Instance 2 only sees 4870 bytes at load time
 - The truncated file is valid (doesn't trigger corruption detection) but incomplete
@@ -47,7 +48,9 @@ Evidence from debugging:
 The test should pass reliably. The solution should handle partial file states gracefully, which benefits real-world usage too.
 
 ---
+
 Summary of work completed:
+
 - Fixed 4 of 5 flaky tests (80% complete)
 - Discovered parseActivityFilename ID length bug causing self-processing
 - Fixed file watcher filter to use proper activity log parsing

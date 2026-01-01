@@ -325,12 +325,17 @@ test.describe('cross-machine sync - deletion and sloppy sync', () => {
     await window1.waitForTimeout(500);
 
     // Change 2: Add more content on next line
+    // Re-focus editor to ensure keystrokes are received
+    await editor1.focus();
     await window1.keyboard.press('Enter');
+    await window1.waitForTimeout(100);
     await window1.keyboard.type('Second line of content');
     await window1.waitForTimeout(500);
 
     // Change 3: Add even more
+    await editor1.focus();
     await window1.keyboard.press('Enter');
+    await window1.waitForTimeout(100);
     await window1.keyboard.type('Third line should also sync');
     await window1.waitForTimeout(2000);
 
