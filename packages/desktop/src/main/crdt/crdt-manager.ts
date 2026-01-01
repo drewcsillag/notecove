@@ -604,9 +604,11 @@ export class CRDTManagerImpl implements CRDTManager {
           (hasIncompleteFile ? ' (some files incomplete)' : '')
       );
 
-      // If we haven't found the expected sequence and there are incomplete files,
-      // return false to trigger retry (the sequence might be in the incomplete file)
-      if (!hasExpectedSeq && hasIncompleteFile) {
+      // If any file is incomplete (truncated), return false to trigger retry.
+      // Even if we found the expected sequence in complete records, the truncated
+      // portion may contain additional content that would be missed by reloadNote().
+      // This handles partial cloud sync (iCloud/Dropbox) where files are cut off mid-record.
+      if (hasIncompleteFile) {
         return false;
       }
 

@@ -508,6 +508,170 @@ describe('CRDTManagerImpl - Integration', () => {
   });
 });
 
+describe('CRDTManagerImpl - checkCRDTLogExists with truncated files', () => {
+  // This test suite verifies that checkCRDTLogExists returns false when files are truncated,
+  // even if the expected sequence number exists in complete records.
+  //
+  // Bug: When a CRDT log file is partially synced (common with iCloud/Dropbox), the file
+  // contains a valid expected sequence in complete records BUT has a truncated record at
+  // the end. The old logic returned true because hasExpectedSeq was true, but this caused
+  // reloadNote() to read truncated content.
+  //
+  // Fix: Always return false if any file is incomplete, even if expected sequence is found.
+
+  let manager: CRDTManagerImpl;
+  let mockStorageManager: jest.Mocked<AppendLogManager>;
+  let tempDir: string;
+
+  beforeEach(async () => {
+    jest.useRealTimers(); // Need real timers for filesystem operations
+
+    // Create temp directory for test files
+    const os = await import('os');
+    const path = await import('path');
+    const fs = await import('fs/promises');
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'crdt-test-'));
+
+    mockStorageManager = {
+      getInstanceId: jest.fn().mockReturnValue('test-instance'),
+      getSDPath: jest.fn().mockReturnValue(tempDir),
+      loadNote: jest.fn().mockResolvedValue({
+        doc: new Y.Doc(),
+        vectorClock: {},
+      }),
+      writeNoteUpdate: jest.fn().mockResolvedValue({
+        sequence: 1,
+        offset: 0,
+        file: 'test.crdtlog',
+      }),
+      loadFolderTree: jest.fn().mockResolvedValue({
+        doc: new Y.Doc(),
+      }),
+      writeFolderUpdate: jest.fn().mockResolvedValue(undefined),
+      saveNoteSnapshot: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AppendLogManager>;
+
+    manager = new CRDTManagerImpl(mockStorageManager);
+  });
+
+  afterEach(async () => {
+    manager.destroy();
+    // Clean up temp directory
+    const fs = await import('fs/promises');
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('should return false when file has expected sequence but ends with truncated record', async () => {
+    // This is the key bug we're fixing:
+    // - File has sequence 5 in a complete record (hasExpectedSeq = true)
+    // - File also has a truncated record at the end (hasIncompleteFile = true)
+    // - Old logic: returns true (BUG!)
+    // - New logic: returns false (correct, because truncated content would be missed)
+
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const { createLogFile, writeLogRecord } = await import('@shared/storage');
+
+    // Create directory structure: {tempDir}/notes/{noteId}/logs/
+    const noteId = 'test-note-123';
+    const instanceId = 'remote-instance';
+    const logsDir = path.join(tempDir, 'notes', noteId, 'logs');
+    await fs.mkdir(logsDir, { recursive: true });
+
+    // Create a log file with:
+    // - Complete record with sequence 5 (the expected sequence)
+    // - Truncated record at the end (simulating partial cloud sync)
+    const completeLogFile = createLogFile([
+      { timestamp: Date.now(), sequence: 5, data: new Uint8Array([1, 2, 3]) },
+    ]);
+
+    // Add a partial record: write length prefix claiming 100 bytes, but only provide 10
+    // This simulates a partial sync where the file was cut off mid-record
+    const partialRecordStart = writeLogRecord(Date.now(), 6, new Uint8Array(50));
+    // Truncate it to just the length prefix + a few bytes (not the full record)
+    const truncatedPart = partialRecordStart.slice(0, 15);
+
+    // Combine: complete file + truncated record
+    const truncatedFile = new Uint8Array(completeLogFile.length + truncatedPart.length);
+    truncatedFile.set(completeLogFile, 0);
+    truncatedFile.set(truncatedPart, completeLogFile.length);
+
+    // Write to disk with proper filename format: {instanceId}_{timestamp}.crdtlog
+    const logFilename = `${instanceId}_${Date.now()}.crdtlog`;
+    await fs.writeFile(path.join(logsDir, logFilename), truncatedFile);
+
+    // Call checkCRDTLogExists with expected sequence 5
+    // This SHOULD return false because the file is truncated
+    // (even though sequence 5 exists in a complete record)
+    const result = await manager.checkCRDTLogExists(noteId, 'test-sd', instanceId, 5);
+
+    // With the fix, this should be false because hasIncompleteFile = true
+    // Without the fix, this would be true (the bug)
+    expect(result).toBe(false);
+  });
+
+  it('should return true when file has expected sequence and is complete', async () => {
+    // Control test: verify that complete files still return true
+
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const { createLogFile } = await import('@shared/storage');
+
+    const noteId = 'test-note-456';
+    const instanceId = 'remote-instance';
+    const logsDir = path.join(tempDir, 'notes', noteId, 'logs');
+    await fs.mkdir(logsDir, { recursive: true });
+
+    // Create a complete log file with sequence 5
+    const completeLogFile = createLogFile([
+      { timestamp: Date.now(), sequence: 5, data: new Uint8Array([1, 2, 3]) },
+    ]);
+
+    const logFilename = `${instanceId}_${Date.now()}.crdtlog`;
+    await fs.writeFile(path.join(logsDir, logFilename), completeLogFile);
+
+    const result = await manager.checkCRDTLogExists(noteId, 'test-sd', instanceId, 5);
+
+    // Complete file with expected sequence should return true
+    expect(result).toBe(true);
+  });
+
+  it('should return false when file is truncated and expected sequence not found', async () => {
+    // This was already working, but verify it still works
+
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const { createLogFile, writeLogRecord } = await import('@shared/storage');
+
+    const noteId = 'test-note-789';
+    const instanceId = 'remote-instance';
+    const logsDir = path.join(tempDir, 'notes', noteId, 'logs');
+    await fs.mkdir(logsDir, { recursive: true });
+
+    // Create a file with sequence 3, but we'll ask for sequence 5
+    // Also truncate it
+    const completeLogFile = createLogFile([
+      { timestamp: Date.now(), sequence: 3, data: new Uint8Array([1, 2, 3]) },
+    ]);
+
+    const partialRecordStart = writeLogRecord(Date.now(), 4, new Uint8Array(50));
+    const truncatedPart = partialRecordStart.slice(0, 15);
+
+    const truncatedFile = new Uint8Array(completeLogFile.length + truncatedPart.length);
+    truncatedFile.set(completeLogFile, 0);
+    truncatedFile.set(truncatedPart, completeLogFile.length);
+
+    const logFilename = `${instanceId}_${Date.now()}.crdtlog`;
+    await fs.writeFile(path.join(logsDir, logFilename), truncatedFile);
+
+    // Ask for sequence 5 which doesn't exist
+    const result = await manager.checkCRDTLogExists(noteId, 'test-sd', instanceId, 5);
+
+    // Should return false (sequence not found + file incomplete)
+    expect(result).toBe(false);
+  });
+});
+
 describe('CRDTManagerImpl - Concurrent applyUpdate Race Condition', () => {
   // This test suite verifies the fix for the CRDT sequence violation bug.
   //
