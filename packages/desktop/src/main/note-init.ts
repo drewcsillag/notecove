@@ -135,38 +135,31 @@ async function getOtherInstanceCRDTLogs(logsPath: string, instanceId: string): P
  * Ensure a default note exists for the user
  * @param db Database instance
  * @param crdtMgr CRDT manager instance
- * @param defaultStoragePath Path to use for the default storage directory (e.g., from TEST_STORAGE_DIR in tests)
  * @param instanceId Our instance ID (to avoid checking our own activity logs)
- * @param getPath Function to get app path (for Documents folder)
  * @param profileMode Profile mode for determining privacy settings (paranoid mode uses secure import)
  */
 export async function ensureDefaultNote(
   db: Database,
   crdtMgr: CRDTManager,
-  defaultStoragePath: string | undefined,
   instanceId: string | undefined,
-  getPath: (name: 'documents' | 'userData') => string,
   profileMode: ProfileMode = 'local'
 ): Promise<void> {
   // Use secure mode for paranoid profiles to prevent unfurl/chip nodes
   const secureMode = profileMode === 'paranoid';
   const DEFAULT_NOTE_ID = 'default-note';
 
-  // Ensure default SD exists
-  let DEFAULT_SD_ID: string;
+  // Get the active/primary SD - it must already exist from profile creation
   const existingSDs = await db.getAllStorageDirs();
   if (existingSDs.length === 0) {
-    // Create default SD - use provided path or fallback to Documents folder
-    const defaultPath = defaultStoragePath ?? join(getPath('documents'), 'NoteCove');
-    DEFAULT_SD_ID = 'default';
-    await db.createStorageDir(DEFAULT_SD_ID, 'Default', defaultPath);
-    console.log('[Main] Created default SD at:', defaultPath);
-  } else {
-    // Use the active SD or the first one
-    const activeSD = await db.getActiveStorageDir();
-    DEFAULT_SD_ID = activeSD ? activeSD.id : (existingSDs[0]?.id ?? 'default');
-    console.log('[Main] Using existing SD:', DEFAULT_SD_ID);
+    throw new Error('No storage directories found. SDs should be created during profile creation.');
   }
+  const activeSD = await db.getActiveStorageDir();
+  const primarySD = activeSD ?? existingSDs[0];
+  if (!primarySD) {
+    throw new Error('No primary SD found after loading storage directories');
+  }
+  const DEFAULT_SD_ID = primarySD.id;
+  console.log('[Main] Using existing SD:', DEFAULT_SD_ID);
 
   // Check if the default note exists in ANY SD (not just the default SD)
   // This is important because the note might have been moved to another SD
@@ -296,7 +289,10 @@ export async function ensureDefaultNote(
 
   // Get the SD path to check for activity logs from other instances
   const sdRecord = await db.getStorageDir(DEFAULT_SD_ID);
-  const sdPath = sdRecord?.path ?? defaultStoragePath;
+  if (!sdRecord) {
+    throw new Error(`SD with id ${DEFAULT_SD_ID} not found in database`);
+  }
+  const sdPath = sdRecord.path;
 
   // No notes exist in database, but CRDT files might exist
   // Load the note to check if it already has content from sync directory
@@ -311,11 +307,13 @@ export async function ensureDefaultNote(
     if (content.length === 0) {
       // Check if there are activity logs OR CRDT logs from other instances
       // If so, wait for content to sync before creating welcome content
-      const noteLogsPath = join(sdPath ?? '', 'notes', DEFAULT_NOTE_ID, 'logs');
-      const otherActivityInstances =
-        sdPath && instanceId ? await getOtherInstanceActivityLogs(sdPath, instanceId) : [];
-      const otherCRDTInstances =
-        sdPath && instanceId ? await getOtherInstanceCRDTLogs(noteLogsPath, instanceId) : [];
+      const noteLogsPath = join(sdPath, 'notes', DEFAULT_NOTE_ID, 'logs');
+      const otherActivityInstances = instanceId
+        ? await getOtherInstanceActivityLogs(sdPath, instanceId)
+        : [];
+      const otherCRDTInstances = instanceId
+        ? await getOtherInstanceCRDTLogs(noteLogsPath, instanceId)
+        : [];
 
       // Combine both sources of other instance detection
       const allOtherInstances = [...new Set([...otherActivityInstances, ...otherCRDTInstances])];

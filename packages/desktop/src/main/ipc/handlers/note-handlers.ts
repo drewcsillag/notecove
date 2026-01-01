@@ -60,7 +60,10 @@ function handleLoadNote(ctx: HandlerContext) {
 
     // Get note from database to find its sdId
     const note = await database.getNote(noteId);
-    const sdId = note?.sdId ?? 'default';
+    if (!note) {
+      throw new Error(`Cannot load note: note ${noteId} not found in database`);
+    }
+    const sdId = note.sdId;
 
     await crdtManager.loadNote(noteId, sdId);
 
@@ -69,8 +72,8 @@ function handleLoadNote(ctx: HandlerContext) {
     if (noteDoc) {
       const crdtMetadata = noteDoc.getMetadata();
 
-      // Only update if note exists in cache and CRDT has initialized metadata
-      if (note && crdtMetadata.id) {
+      // Only update if CRDT has initialized metadata
+      if (crdtMetadata.id) {
         await database.upsertNote({
           ...note,
           folderId: crdtMetadata.folderId,

@@ -54,13 +54,8 @@ export interface Profile {
   // =========================================================================
   // Initialization fields - set by wizard, consumed on first launch
   // These are cleared after the settings are applied.
+  // Note: initialStoragePath was removed - SD is now created in database during profile creation
   // =========================================================================
-
-  /**
-   * Initial storage directory path to set up on first launch.
-   * The main app will create an SD at this path when the profile is first used.
-   */
-  initialStoragePath?: string;
 
   /**
    * Initial username setting to apply on first launch.

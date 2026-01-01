@@ -34,9 +34,6 @@ import StorageIcon from '@mui/icons-material/Storage';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { IconButton, Tooltip, Chip } from '@mui/material';
 
-// Phase 2.5.1: Single SD only
-const DEFAULT_SD_ID = 'default';
-
 // App state key for SD order (per-device, not synced)
 const SD_ORDER_KEY = 'sdOrder';
 
@@ -1372,14 +1369,6 @@ export const FolderTree: FC<FolderTreeProps> = ({
     targetFolderId: string,
     sourceSdId?: string
   ): Promise<void> => {
-    // Use default SD ID if sourceSdId is undefined (single-SD scenarios)
-    const effectiveSourceSdId = sourceSdId ?? DEFAULT_SD_ID;
-    console.log('[FolderTree] Note drop:', {
-      noteIds,
-      targetFolderId,
-      sourceSdId: effectiveSourceSdId,
-    });
-
     try {
       // Check if the first note is deleted to detect drag from Recently Deleted
       if (noteIds.length === 0) {
@@ -1391,6 +1380,14 @@ export const FolderTree: FC<FolderTreeProps> = ({
       }
       const firstNoteMetadata = await window.electronAPI.note.getMetadata(firstNoteId);
       const isDraggingDeletedNotes = firstNoteMetadata.deleted;
+
+      // Use provided sourceSdId or get from note metadata
+      const effectiveSourceSdId = sourceSdId ?? firstNoteMetadata.sdId;
+      console.log('[FolderTree] Note drop:', {
+        noteIds,
+        targetFolderId,
+        sourceSdId: effectiveSourceSdId,
+      });
 
       // Determine the target SD ID and actual folder ID
       let targetSdId: string;

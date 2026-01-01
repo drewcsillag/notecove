@@ -65,7 +65,7 @@ test.describe('Storage Directory Rename', () => {
     await expect(settingsDialog).toBeVisible();
     await window.waitForTimeout(500);
 
-    // Find the SD list item (the Default SD)
+    // Find the SD list item (the Test Storage SD)
     const sdList = settingsDialog.locator('[role="tabpanel"] ul');
     const sdItem = sdList.locator('li[class*="MuiListItem"]').first();
     await expect(sdItem).toBeVisible();
@@ -113,7 +113,7 @@ test.describe('Storage Directory Rename', () => {
     // Should have a text field with the current name
     const nameInput = renameDialog.locator('input[type="text"]');
     await expect(nameInput).toBeVisible();
-    await expect(nameInput).toHaveValue('Default');
+    await expect(nameInput).toHaveValue('Test Storage');
 
     // Close dialog
     await window.keyboard.press('Escape');
@@ -156,7 +156,7 @@ test.describe('Storage Directory Rename', () => {
 
     // Verify the SD name has changed in the list
     await expect(settingsDialog.locator('h6', { hasText: 'My Notes' })).toBeVisible();
-    await expect(settingsDialog.locator('h6', { hasText: 'Default' })).not.toBeVisible();
+    await expect(settingsDialog.locator('h6', { hasText: 'Test Storage' })).not.toBeVisible();
   });
 
   test('should show error for duplicate name', async () => {
@@ -177,7 +177,7 @@ test.describe('Storage Directory Rename', () => {
     await expect(settingsDialog).toBeVisible();
     await window.waitForTimeout(1000);
 
-    // Find and right-click the first SD item (Default)
+    // Find and right-click the first SD item (Test Storage)
     const sdList = settingsDialog.locator('[role="tabpanel"] ul');
     const sdItem = sdList.locator('li[class*="MuiListItem"]').first();
     await sdItem.click({ button: 'right' });
@@ -283,7 +283,7 @@ test.describe('Storage Directory Rename', () => {
     await expect(renameDialog).not.toBeVisible();
 
     // Original name should still be visible
-    await expect(settingsDialog.locator('h6', { hasText: 'Default' })).toBeVisible();
+    await expect(settingsDialog.locator('h6', { hasText: 'Test Storage' })).toBeVisible();
   });
 
   test('should disable OK button when name is empty', async () => {
@@ -370,7 +370,7 @@ test.describe('Storage Directory Rename - Folder Panel', () => {
   });
 
   test('should show context menu with Rename option when right-clicking SD in folder panel', async () => {
-    // Find the SD node in the folder tree (it has a storage icon and shows "Default")
+    // Find the SD node in the folder tree (it has a storage icon and shows "Test Storage")
     // The SD node has data-testid="folder-tree-node-sd:default" pattern
     const sdNode = window.locator('[data-testid^="folder-tree-node-sd:"]').first();
     await expect(sdNode).toBeVisible();
@@ -408,7 +408,7 @@ test.describe('Storage Directory Rename - Folder Panel', () => {
     // Should have a text field with the current name
     const nameInput = renameDialog.locator('input[type="text"]');
     await expect(nameInput).toBeVisible();
-    await expect(nameInput).toHaveValue('Default');
+    await expect(nameInput).toHaveValue('Test Storage');
 
     // Close dialog
     await window.keyboard.press('Escape');

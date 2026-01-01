@@ -806,17 +806,15 @@ export class CRDTManagerImpl implements CRDTManager {
       Y.applyUpdate(folderTree.doc, Y.encodeStateAsUpdate(loadResult.doc), 'load');
       loadResult.doc.destroy();
 
-      // Check if folder tree is empty (new installation)
+      // Check if folder tree is empty (new installation) - create demo folders for any SD
       const folders = folderTree.getAllFolders();
-      if (folders.length === 0 && sdId === 'default') {
-        this.createDemoFolders(folderTree);
+      if (folders.length === 0) {
+        this.createDemoFolders(folderTree, sdId);
       }
     } catch (error) {
       console.error(`Failed to load folder tree updates for ${sdId}:`, error);
-      // On error, create demo folders for default SD
-      if (sdId === 'default') {
-        this.createDemoFolders(folderTree);
-      }
+      // On error, create demo folders for this SD
+      this.createDemoFolders(folderTree, sdId);
     }
   }
 
@@ -848,13 +846,13 @@ export class CRDTManagerImpl implements CRDTManager {
    * Create demo folders for testing (Phase 2.4.1 only)
    * TODO: Remove in Phase 2.4.2 when we have real folder creation
    */
-  private createDemoFolders(folderTree: FolderTreeDoc): void {
+  private createDemoFolders(folderTree: FolderTreeDoc, sdId: string): void {
     const folders: FolderData[] = [
       {
         id: 'folder-1' as UUID,
         name: 'Work',
         parentId: null,
-        sdId: 'default',
+        sdId,
         order: 0,
         deleted: false,
       },
@@ -862,7 +860,7 @@ export class CRDTManagerImpl implements CRDTManager {
         id: 'folder-2' as UUID,
         name: 'Projects',
         parentId: 'folder-1' as UUID,
-        sdId: 'default',
+        sdId,
         order: 0,
         deleted: false,
       },
@@ -870,7 +868,7 @@ export class CRDTManagerImpl implements CRDTManager {
         id: 'folder-3' as UUID,
         name: 'Personal',
         parentId: null,
-        sdId: 'default',
+        sdId,
         order: 1,
         deleted: false,
       },
@@ -878,7 +876,7 @@ export class CRDTManagerImpl implements CRDTManager {
         id: 'folder-4' as UUID,
         name: 'Ideas',
         parentId: 'folder-3' as UUID,
-        sdId: 'default',
+        sdId,
         order: 0,
         deleted: false,
       },
@@ -886,7 +884,7 @@ export class CRDTManagerImpl implements CRDTManager {
         id: 'folder-5' as UUID,
         name: 'Recipes',
         parentId: 'folder-3' as UUID,
-        sdId: 'default',
+        sdId,
         order: 1,
         deleted: false,
       },
@@ -900,7 +898,8 @@ export class CRDTManagerImpl implements CRDTManager {
   /**
    * Get the SD ID for a note by querying the database
    * @param noteId Note ID
-   * @returns SD ID or 'default' as fallback
+   * @returns SD ID or active/primary SD as fallback
+   * @throws Error if no SD is available
    */
   private async getNoteSdId(noteId: string): Promise<string> {
     // Try to get from loaded document first (optimization)
@@ -919,11 +918,29 @@ export class CRDTManagerImpl implements CRDTManager {
       } catch (error) {
         console.error(`[CRDT Manager] Failed to query database for note ${noteId}:`, error);
       }
+
+      // Fallback to active/primary SD
+      try {
+        const activeSD = await this.database.getActiveStorageDir();
+        if (activeSD) {
+          console.log(
+            `[CRDT Manager] No sdId found for note ${noteId}, using active SD: ${activeSD.id}`
+          );
+          return activeSD.id;
+        }
+        const allSDs = await this.database.getAllStorageDirs();
+        if (allSDs.length > 0 && allSDs[0]) {
+          console.log(
+            `[CRDT Manager] No sdId found for note ${noteId}, using first SD: ${allSDs[0].id}`
+          );
+          return allSDs[0].id;
+        }
+      } catch (error) {
+        console.error(`[CRDT Manager] Failed to query SDs for fallback:`, error);
+      }
     }
 
-    // Fallback to default SD
-    console.log(`[CRDT Manager] No sdId found for note ${noteId}, using 'default'`);
-    return 'default';
+    throw new Error(`Cannot determine SD for note ${noteId}: no database or no SDs available`);
   }
 
   /**

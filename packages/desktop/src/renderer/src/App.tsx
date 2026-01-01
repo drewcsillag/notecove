@@ -666,10 +666,9 @@ function App(): React.ReactElement {
   useEffect(() => {
     const loadDefaultNote = async (): Promise<void> => {
       try {
-        // Check if default note exists
-        const notes = await window.electronAPI.note.list('default');
-        const defaultNote = notes.find((note) => note.id === 'default-note');
-        if (defaultNote) {
+        // Check if default note exists using getInfo (works across all SDs)
+        const noteInfo = await window.electronAPI.note.getInfo('default-note');
+        if (noteInfo) {
           setSelectedNoteId('default-note');
         }
       } catch (error: unknown) {

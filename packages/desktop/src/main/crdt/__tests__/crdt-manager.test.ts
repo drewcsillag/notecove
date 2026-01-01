@@ -490,9 +490,9 @@ describe('CRDTManagerImpl - Integration', () => {
       expect(mockStorageManager.loadFolderTree).toHaveBeenCalledTimes(1);
     });
 
-    it('should create demo folders for default SD when empty', async () => {
-      // The loadFolderTree creates demo folders for 'default' SD when empty
-      const folderTree = await manager.loadFolderTree('default');
+    it('should create demo folders for any SD when empty', async () => {
+      // The loadFolderTree creates demo folders for any SD when empty
+      const folderTree = await manager.loadFolderTree('test-sd-id');
       const folders = folderTree.getAllFolders();
 
       // Demo folders should be created
