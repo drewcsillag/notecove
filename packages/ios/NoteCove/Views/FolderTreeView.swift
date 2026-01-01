@@ -5,6 +5,10 @@ struct FolderTreeView: View {
     @Binding var selectedFolder: Folder?
     @State private var folders: [Folder] = []
     @State private var expandedFolders: Set<String> = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    @ObservedObject private var storageManager = StorageDirectoryManager.shared
 
     var body: some View {
         List(selection: $selectedFolder) {
@@ -14,17 +18,28 @@ struct FolderTreeView: View {
             }
             .tag(nil as Folder?)
 
-            // Folder tree
-            ForEach(rootFolders) { folder in
-                FolderRow(
-                    folder: folder,
-                    allFolders: folders,
-                    expandedFolders: $expandedFolders
-                )
+            if isLoading {
+                ProgressView("Loading folders...")
+            } else if let error = errorMessage {
+                Text(error)
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            } else {
+                // Folder tree
+                ForEach(rootFolders) { folder in
+                    FolderRow(
+                        folder: folder,
+                        allFolders: folders,
+                        expandedFolders: $expandedFolders
+                    )
+                }
             }
         }
         .listStyle(.sidebar)
         .onAppear {
+            loadFolders()
+        }
+        .onChange(of: storageManager.activeDirectory?.id) { _, _ in
             loadFolders()
         }
     }
@@ -35,9 +50,46 @@ struct FolderTreeView: View {
     }
 
     private func loadFolders() {
-        // TODO: Load from database/CRDT in Phase 2
-        // For now, use sample data for UI development
-        folders = SampleData.folders
+        // Check if we have an active storage directory
+        guard let activeDir = storageManager.activeDirectory else {
+            // Fall back to sample data when no storage directory
+            folders = SampleData.folders
+            return
+        }
+
+        let sdId = activeDir.id
+
+        isLoading = true
+        errorMessage = nil
+
+        Task { @MainActor in
+            do {
+                let crdtManager = CRDTManager.shared
+
+                // Initialize if needed
+                if !crdtManager.isInitialized {
+                    try crdtManager.initialize()
+                }
+
+                // Load folder tree from CRDT
+                _ = try crdtManager.loadFolderTreeState(sdId: sdId)
+
+                // Get visible folders and convert to Folder model
+                let folderInfos = try crdtManager.getVisibleFolders(sdId: sdId)
+                folders = folderInfos.map { Folder(from: $0) }
+
+                // Close the folder tree to free memory (we have the data now)
+                crdtManager.closeFolderTree(sdId: sdId)
+
+                isLoading = false
+            } catch {
+                print("[FolderTreeView] Error loading folders: \(error)")
+                errorMessage = "Could not load folders"
+                // Fall back to sample data
+                folders = SampleData.folders
+                isLoading = false
+            }
+        }
     }
 }
 

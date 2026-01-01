@@ -9833,6 +9833,31 @@ ${err.toString()}`);
       doc2.destroy();
       openFolderTrees.delete(sdId);
     },
+    extractFolders(sdId) {
+      const doc2 = openFolderTrees.get(sdId);
+      if (!doc2) {
+        throw new Error(`Folder tree for SD ${sdId} is not open`);
+      }
+      const foldersMap = doc2.getMap("folders");
+      const result = [];
+      foldersMap.forEach((folderMap) => {
+        result.push({
+          id: folderMap.get("id"),
+          name: folderMap.get("name"),
+          parentId: folderMap.get("parentId") ?? null,
+          sdId: folderMap.get("sdId"),
+          order: folderMap.get("order"),
+          deleted: folderMap.get("deleted")
+        });
+      });
+      result.sort((a, b) => {
+        if (a.order !== b.order) {
+          return a.order - b.order;
+        }
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
+      return result;
+    },
     // ==================== File Name Utilities ====================
     parseUpdateFilename(filename) {
       return parseUpdateFilename(filename);

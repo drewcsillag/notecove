@@ -29,3 +29,15 @@ extension Folder {
         self.order = row["order"] as? Int ?? 0
     }
 }
+
+// MARK: - CRDT Conversion
+
+extension Folder {
+    /// Initialize from CRDT FolderInfo
+    init(from folderInfo: FolderInfo) {
+        self.id = folderInfo.id
+        self.name = folderInfo.name
+        self.parentId = folderInfo.parentId
+        self.order = folderInfo.order
+    }
+}

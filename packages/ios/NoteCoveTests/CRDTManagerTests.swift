@@ -72,6 +72,55 @@ final class CRDTManagerTests: XCTestCase {
         }
     }
 
+    // MARK: - Folder Tree Tests
+
+    func testCreateAndExtractFolderTree() throws {
+        try crdtManager.initialize()
+
+        // Create a folder tree via the JavaScript bridge
+        let testSdId = "test-sd-id"
+
+        // Access the bridge directly to create a folder tree
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in
+            XCTFail("JS Exception: \(exception!)")
+        }
+
+        // Load the bridge
+        let bundle = Bundle.allBundles.first { $0.url(forResource: "ios-bridge-bundle", withExtension: "js") != nil }!
+        let url = bundle.url(forResource: "ios-bridge-bundle", withExtension: "js")!
+        let script = try String(contentsOf: url, encoding: .utf8)
+        context.evaluateScript(script)
+
+        guard let bridge = context.objectForKeyedSubscript("NoteCoveBridge"), !bridge.isUndefined else {
+            XCTFail("Bridge not found")
+            return
+        }
+
+        // Create folder tree
+        bridge.invokeMethod("createFolderTree", withArguments: [testSdId])
+
+        // Initially should have no folders
+        guard let folders = bridge.invokeMethod("extractFolders", withArguments: [testSdId])?.toArray() as? [[String: Any]] else {
+            XCTFail("extractFolders did not return array")
+            return
+        }
+
+        XCTAssertEqual(folders.count, 0, "New folder tree should be empty")
+
+        // Clean up
+        bridge.invokeMethod("closeFolderTree", withArguments: [testSdId])
+    }
+
+    func testExtractFoldersWithoutOpenTree() throws {
+        try crdtManager.initialize()
+
+        // Trying to extract folders from non-existent tree should throw
+        XCTAssertThrowsError(try crdtManager.extractFolders(sdId: "nonexistent-sd")) { error in
+            XCTAssertTrue(error is CRDTError)
+        }
+    }
+
     // MARK: - Integration Test Placeholder
 
     func testBridgeLoadsCorrectly() throws {

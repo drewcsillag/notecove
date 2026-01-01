@@ -34,6 +34,16 @@ struct NoteMetadata {
     let preview: String
 }
 
+/// Folder data from CRDT
+struct FolderInfo: Identifiable {
+    let id: String
+    let name: String
+    let parentId: String?
+    let sdId: String
+    let order: Int
+    let deleted: Bool
+}
+
 /// Manager for CRDT operations using JavaScriptCore
 @MainActor
 final class CRDTManager: ObservableObject {
@@ -404,6 +414,78 @@ final class CRDTManager: ObservableObject {
     func closeFolderTree(sdId: String) {
         guard isInitialized, let bridge = bridge else { return }
         bridge.invokeMethod("closeFolderTree", withArguments: [sdId])
+    }
+
+    /// Extract folders from a loaded folder tree
+    /// - Parameter sdId: The storage directory ID
+    /// - Returns: Array of FolderInfo objects (includes deleted folders)
+    func extractFolders(sdId: String) throws -> [FolderInfo] {
+        guard isInitialized, let bridge = bridge else {
+            throw CRDTError.bridgeNotInitialized
+        }
+
+        guard let result = bridge.invokeMethod("extractFolders", withArguments: [sdId]) else {
+            throw CRDTError.folderTreeNotOpen(sdId)
+        }
+
+        if let exception = jsContext?.exception {
+            let message = exception.toString() ?? "Unknown error"
+            jsContext?.exception = nil
+            throw CRDTError.javaScriptError(message)
+        }
+
+        guard result.isArray, let array = result.toArray() else {
+            throw CRDTError.javaScriptError("extractFolders did not return an array")
+        }
+
+        var folders: [FolderInfo] = []
+        for item in array {
+            guard let dict = item as? [String: Any],
+                  let id = dict["id"] as? String,
+                  let name = dict["name"] as? String,
+                  let sdId = dict["sdId"] as? String,
+                  let order = dict["order"] as? Int,
+                  let deleted = dict["deleted"] as? Bool else {
+                continue
+            }
+
+            let parentId = dict["parentId"] as? String
+
+            folders.append(FolderInfo(
+                id: id,
+                name: name,
+                parentId: parentId,
+                sdId: sdId,
+                order: order,
+                deleted: deleted
+            ))
+        }
+
+        return folders
+    }
+
+    /// Get visible folders (non-deleted, sorted by order)
+    /// - Parameter sdId: The storage directory ID
+    /// - Returns: Array of visible FolderInfo objects
+    func getVisibleFolders(sdId: String) throws -> [FolderInfo] {
+        let allFolders = try extractFolders(sdId: sdId)
+        return allFolders.filter { !$0.deleted }
+    }
+
+    /// Get root folders (parentId is nil)
+    /// - Parameter sdId: The storage directory ID
+    /// - Returns: Array of root FolderInfo objects
+    func getRootFolders(sdId: String) throws -> [FolderInfo] {
+        return try getVisibleFolders(sdId: sdId).filter { $0.parentId == nil }
+    }
+
+    /// Get child folders of a parent
+    /// - Parameters:
+    ///   - sdId: The storage directory ID
+    ///   - parentId: The parent folder ID
+    /// - Returns: Array of child FolderInfo objects
+    func getChildFolders(sdId: String, parentId: String) throws -> [FolderInfo] {
+        return try getVisibleFolders(sdId: sdId).filter { $0.parentId == parentId }
     }
 
     // MARK: - Memory Management

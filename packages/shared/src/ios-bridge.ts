@@ -23,7 +23,17 @@ import {
   type SnapshotFileMetadata,
   type PackFileMetadata,
 } from './crdt';
-import { parseLogFile, parseSnapshotFile, LOG_HEADER_SIZE } from './storage/binary-format';
+import { parseLogFile } from './storage/binary-format';
+
+// Types for folder data exposed to Swift
+interface FolderInfo {
+  id: string;
+  name: string;
+  parentId: string | null;
+  sdId: string;
+  order: number;
+  deleted: boolean;
+}
 
 // Types for the bridge interface
 interface NoteCoveBridge {
@@ -42,6 +52,7 @@ interface NoteCoveBridge {
   applyFolderTreeUpdate(sdId: string, updateBase64: string): void;
   applyFolderTreeLogFile(sdId: string, logFileBase64: string): number; // Returns number of updates applied
   getFolderTreeState(sdId: string): string;
+  extractFolders(sdId: string): FolderInfo[];
   closeFolderTree(sdId: string): void;
 
   // File name parsing utilities
@@ -361,6 +372,37 @@ const bridge: NoteCoveBridge = {
 
     doc.destroy();
     openFolderTrees.delete(sdId);
+  },
+
+  extractFolders(sdId: string): FolderInfo[] {
+    const doc = openFolderTrees.get(sdId);
+    if (!doc) {
+      throw new Error(`Folder tree for SD ${sdId} is not open`);
+    }
+
+    const foldersMap = doc.getMap<Y.Map<unknown>>('folders');
+    const result: FolderInfo[] = [];
+
+    foldersMap.forEach((folderMap) => {
+      result.push({
+        id: folderMap.get('id') as string,
+        name: folderMap.get('name') as string,
+        parentId: (folderMap.get('parentId') as string | null) ?? null,
+        sdId: folderMap.get('sdId') as string,
+        order: folderMap.get('order') as number,
+        deleted: folderMap.get('deleted') as boolean,
+      });
+    });
+
+    // Sort by order, then by name for stability
+    result.sort((a, b) => {
+      if (a.order !== b.order) {
+        return a.order - b.order;
+      }
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    });
+
+    return result;
   },
 
   // ==================== File Name Utilities ====================

@@ -1,6 +1,6 @@
 # iOS App Implementation Plan
 
-**Overall Progress:** `20%`
+**Overall Progress:** `30%`
 
 **Original Prompt:** [PROMPT.md](./PROMPT.md)
 
@@ -12,39 +12,39 @@ Build a native iOS app for NoteCove, initially targeting iPad with adaptive layo
 
 ### Key Decisions
 
-| Decision | Choice | Source |
-|----------|--------|--------|
-| Editor approach | Hybrid: Native SwiftUI shell + WKWebView for TipTap editor | [QUESTIONS-2.md](./QUESTIONS-2.md) |
-| UI framework | SwiftUI-first, UIKit for WebView and file picker | [QUESTIONS-2.md](./QUESTIONS-2.md) |
-| Database | GRDB.swift (FTS5 support required) | [QUESTIONS-2.md](./QUESTIONS-2.md) |
-| Cloud storage | User picks folder (iCloud Drive for MVP, then Google Drive) | [QUESTIONS-1.md](./QUESTIONS-1.md) |
-| iOS version | iOS 17+ (with iOS 26 enhancements) | [QUESTIONS-1.md](./QUESTIONS-1.md) |
-| Bundle ID | `com.notecove.NoteCove` | [QUESTIONS-2.md](./QUESTIONS-2.md) |
-| Profile | Single hardcoded profile per device | [QUESTIONS-2.md](./QUESTIONS-2.md) |
-| CRDT strategy | JavaScriptCore + ios-bridge.ts | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
-| Background sync | Foreground-only (acceptable limitation) | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
+| Decision        | Choice                                                      | Source                                       |
+| --------------- | ----------------------------------------------------------- | -------------------------------------------- |
+| Editor approach | Hybrid: Native SwiftUI shell + WKWebView for TipTap editor  | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| UI framework    | SwiftUI-first, UIKit for WebView and file picker            | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| Database        | GRDB.swift (FTS5 support required)                          | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| Cloud storage   | User picks folder (iCloud Drive for MVP, then Google Drive) | [QUESTIONS-1.md](./QUESTIONS-1.md)           |
+| iOS version     | iOS 17+ (with iOS 26 enhancements)                          | [QUESTIONS-1.md](./QUESTIONS-1.md)           |
+| Bundle ID       | `com.notecove.NoteCove`                                     | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| Profile         | Single hardcoded profile per device                         | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| CRDT strategy   | JavaScriptCore + ios-bridge.ts                              | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
+| Background sync | Foreground-only (acceptable limitation)                     | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
 
 ### iOS 26 Features to Leverage
 
 Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/articles/278/whats-new-in-swiftui-for-ios-26):
 
-| Feature | Use Case | Priority |
-|---------|----------|----------|
-| **Liquid Glass** design | Modern UI with `.buttonStyle(.glass)` | Phase 5 |
-| **Native WebView** | SwiftUI WebView wrapper (simpler than UIViewRepresentable) | Phase 2 |
-| **Rich-text TextView** | Future alternative to WKWebView (investigate) | Future |
-| **ToolbarSpacer** | Better toolbar layout | Phase 3 |
-| **40% performance gains** | Benefit automatically | - |
+| Feature                   | Use Case                                                   | Priority |
+| ------------------------- | ---------------------------------------------------------- | -------- |
+| **Liquid Glass** design   | Modern UI with `.buttonStyle(.glass)`                      | Phase 5  |
+| **Native WebView**        | SwiftUI WebView wrapper (simpler than UIViewRepresentable) | Phase 2  |
+| **Rich-text TextView**    | Future alternative to WKWebView (investigate)              | Future   |
+| **ToolbarSpacer**         | Better toolbar layout                                      | Phase 3  |
+| **40% performance gains** | Benefit automatically                                      | -        |
 
 ### Phase Overview
 
-| Phase | Focus | Status |
-|-------|-------|--------|
-| 1 | Project Foundation | 🟩 Complete |
-| 2 | Read-Only MVP | 🟥 To Do |
-| 3 | Editing Support | 🟥 To Do |
-| 4 | Search & Navigation | 🟥 To Do |
-| 5 | Polish & Advanced | 🟥 To Do |
+| Phase | Focus               | Status         |
+| ----- | ------------------- | -------------- |
+| 1     | Project Foundation  | 🟩 Complete    |
+| 2     | Read-Only MVP       | 🟨 In Progress |
+| 3     | Editing Support     | 🟥 To Do       |
+| 4     | Search & Navigation | 🟥 To Do       |
+| 5     | Polish & Advanced   | 🟥 To Do       |
 
 ---
 
@@ -97,13 +97,14 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
 
 ### Tasks
 
-- [ ] 🟥 **2.1 CRDT Integration (JavaScriptCore)**
-  - [ ] 🟥 Bundle `ios-bridge.ts` compiled for JavaScriptCore
-  - [ ] 🟥 Create Swift wrapper for NoteCoveBridge
-  - [ ] 🟥 Implement CRDT document loading from `.yjson` files
-  - [ ] 🟥 Extract note content, title from CRDT state
-  - [ ] 🟥 Write tests using fixtures from `packages/ios/fixtures/`
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.1 CRDT Integration (JavaScriptCore)** ✅
+  - [x] 🟩 Bundle `ios-bridge.ts` compiled for JavaScriptCore
+  - [x] 🟩 Create Swift wrapper for NoteCoveBridge (CRDTManager.swift)
+  - [x] 🟩 Implement CRDT document loading from `.crdtlog` files (binary format, not .yjson)
+  - [x] 🟩 Extract note content, title from CRDT state
+  - [x] 🟩 Add polyfills for JavaScriptCore (crypto, TextEncoder/TextDecoder, atob/btoa)
+  - [x] 🟩 Write tests (9 CRDT tests passing)
+  - [x] 🟩 Update PLAN.md
 
 - [ ] 🟥 **2.2 Debug Tools (Early)**
   - [ ] 🟥 Add hidden "Debug" tab in settings
@@ -113,12 +114,13 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
   - [ ] 🟥 This becomes foundation for Storage Inspector in Phase 5
   - [ ] 🟥 Update PLAN.md
 
-- [ ] 🟥 **2.3 Folder Tree Sync**
-  - [ ] 🟥 Load folder tree CRDT from storage directory
-  - [ ] 🟥 Populate folders table in database
-  - [ ] 🟥 Create FolderTreeView SwiftUI component
-  - [ ] 🟥 Implement folder selection
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.3 Folder Tree Sync** ✅
+  - [x] 🟩 Load folder tree CRDT from storage directory (via CRDTManager)
+  - [x] 🟩 Add extractFolders method to ios-bridge.ts and CRDTManager
+  - [x] 🟩 Update FolderTreeView to load from CRDT when SD available
+  - [x] 🟩 Implement folder selection (NavigationLink)
+  - [x] 🟩 Fall back to SampleData when no SD configured
+  - [x] 🟩 Update PLAN.md
 
 - [ ] 🟥 **2.4 Note List**
   - [ ] 🟥 Scan storage directory for note files
@@ -350,6 +352,7 @@ These are explicitly out of scope for initial release:
 ### Test Fixtures
 
 Test fixtures copied from Dev profile to `packages/ios/fixtures/`:
+
 - `notes/` - Sample note CRDT files
 - `folders/` - Folder tree CRDT
 - `media/` - Sample images
@@ -402,11 +405,11 @@ packages/ios/
 
 ### Known Limitations
 
-| Limitation | Reason | Workaround |
-|------------|--------|------------|
-| No background sync | iOS doesn't allow background file polling | Sync on app foreground |
-| WebView memory limits | WKWebView has ~300-500MB limit | Only load active note |
-| Security-scoped bookmarks expire | iOS security model | Re-prompt user when expired |
+| Limitation                       | Reason                                    | Workaround                  |
+| -------------------------------- | ----------------------------------------- | --------------------------- |
+| No background sync               | iOS doesn't allow background file polling | Sync on app foreground      |
+| WebView memory limits            | WKWebView has ~300-500MB limit            | Only load active note       |
+| Security-scoped bookmarks expire | iOS security model                        | Re-prompt user when expired |
 
 ### Build Script
 
@@ -442,12 +445,14 @@ xcodebuild \
 
 ## Change Log
 
-| Date | Change |
-|------|--------|
-| 2025-12-31 | Initial plan created |
+| Date       | Change                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2025-12-31 | Initial plan created                                                                                                                             |
 | 2025-12-31 | Updated after critique: JavaScriptCore confirmed, debug tools moved to Phase 2, iOS 26 features added, test fixtures added, error handling added |
-| 2025-12-31 | Completed Phase 1.1: Xcode project setup with GRDB, iCloud entitlements |
-| 2025-12-31 | Completed Phase 1.2: Database layer with GRDB migrations, FTS5 search, 12 unit tests |
-| 2025-12-31 | Completed Phase 1.3: StorageDirectoryManager with bookmarks, lifecycle handling, 7 tests |
-| 2025-12-31 | Completed Phase 1.4: Basic app shell with SampleData for folders/notes, onboarding flow |
-| 2025-12-31 | **Phase 1 Complete**: Project foundation ready (22 tests passing) |
+| 2025-12-31 | Completed Phase 1.1: Xcode project setup with GRDB, iCloud entitlements                                                                          |
+| 2025-12-31 | Completed Phase 1.2: Database layer with GRDB migrations, FTS5 search, 12 unit tests                                                             |
+| 2025-12-31 | Completed Phase 1.3: StorageDirectoryManager with bookmarks, lifecycle handling, 7 tests                                                         |
+| 2025-12-31 | Completed Phase 1.4: Basic app shell with SampleData for folders/notes, onboarding flow                                                          |
+| 2025-12-31 | **Phase 1 Complete**: Project foundation ready (22 tests passing)                                                                                |
+| 2025-12-31 | Completed Phase 2.1: CRDT Integration with JavaScriptCore, polyfills, binary .crdtlog format, 9 CRDT tests                                       |
+| 2025-12-31 | Completed Phase 2.3: Folder Tree Sync with extractFolders in bridge, FolderTreeView loads from CRDT                                              |
