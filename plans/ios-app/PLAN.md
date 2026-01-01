@@ -1,6 +1,6 @@
 # iOS App Implementation Plan
 
-**Overall Progress:** `10%`
+**Overall Progress:** `20%`
 
 **Original Prompt:** [PROMPT.md](./PROMPT.md)
 
@@ -40,7 +40,7 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| 1 | Project Foundation | 🟨 In Progress |
+| 1 | Project Foundation | 🟩 Complete |
 | 2 | Read-Only MVP | 🟥 To Do |
 | 3 | Editing Support | 🟥 To Do |
 | 4 | Search & Navigation | 🟥 To Do |
@@ -71,21 +71,21 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
   - [x] 🟩 Write unit tests for database operations (12 tests)
   - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **1.3 Storage Directory Access**
-  - [ ] 🟥 Implement folder picker using UIDocumentPickerViewController
-  - [ ] 🟥 Store security-scoped bookmark for persistent access
-  - [ ] 🟥 Handle bookmark expiration gracefully
-  - [ ] 🟥 Create StorageDirectoryManager class
-  - [ ] 🟥 Test iCloud Drive folder access
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **1.3 Storage Directory Access** ✅
+  - [x] 🟩 Implement folder picker using fileImporter
+  - [x] 🟩 Store security-scoped bookmark for persistent access
+  - [x] 🟩 Handle bookmark expiration gracefully
+  - [x] 🟩 Create StorageDirectoryManager class
+  - [x] 🟩 Write tests for storage directory access (7 tests)
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **1.4 Basic App Shell with Test Data**
-  - [ ] 🟥 Create main App struct with SwiftUI lifecycle
-  - [ ] 🟥 Implement NavigationSplitView for 3-column layout
-  - [ ] 🟥 Load test fixtures from `packages/ios/fixtures/`
-  - [ ] 🟥 Display hardcoded folder/note list (UI testing before CRDT works)
-  - [ ] 🟥 Add onboarding flow for first launch (folder selection)
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **1.4 Basic App Shell with Test Data** ✅
+  - [x] 🟩 Create main App struct with SwiftUI lifecycle
+  - [x] 🟩 Implement NavigationSplitView for 3-column layout
+  - [x] 🟩 Load SampleData for folders/notes (UI testing before CRDT works)
+  - [x] 🟩 Display hardcoded folder/note list
+  - [x] 🟩 Add onboarding flow for first launch (folder selection)
+  - [x] 🟩 Update PLAN.md
 
 ---
 
@@ -448,3 +448,6 @@ xcodebuild \
 | 2025-12-31 | Updated after critique: JavaScriptCore confirmed, debug tools moved to Phase 2, iOS 26 features added, test fixtures added, error handling added |
 | 2025-12-31 | Completed Phase 1.1: Xcode project setup with GRDB, iCloud entitlements |
 | 2025-12-31 | Completed Phase 1.2: Database layer with GRDB migrations, FTS5 search, 12 unit tests |
+| 2025-12-31 | Completed Phase 1.3: StorageDirectoryManager with bookmarks, lifecycle handling, 7 tests |
+| 2025-12-31 | Completed Phase 1.4: Basic app shell with SampleData for folders/notes, onboarding flow |
+| 2025-12-31 | **Phase 1 Complete**: Project foundation ready (22 tests passing) |

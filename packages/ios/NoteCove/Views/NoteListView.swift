@@ -58,37 +58,9 @@ struct NoteListView: View {
     }
 
     private func loadNotes() {
-        // TODO: Load from database
-        // For now, use placeholder data
-        notes = [
-            Note(
-                id: "note-1",
-                title: "Welcome to NoteCove",
-                preview: "This is your first note. Start typing to edit...",
-                folderId: nil,
-                createdAt: Date().addingTimeInterval(-86400),
-                modifiedAt: Date(),
-                isPinned: true
-            ),
-            Note(
-                id: "note-2",
-                title: "Meeting Notes",
-                preview: "Discussed project timeline and deliverables...",
-                folderId: "folder-1",
-                createdAt: Date().addingTimeInterval(-172800),
-                modifiedAt: Date().addingTimeInterval(-3600),
-                isPinned: false
-            ),
-            Note(
-                id: "note-3",
-                title: "Ideas",
-                preview: "Random thoughts and ideas for the weekend...",
-                folderId: "folder-2",
-                createdAt: Date().addingTimeInterval(-259200),
-                modifiedAt: Date().addingTimeInterval(-7200),
-                isPinned: false
-            ),
-        ]
+        // TODO: Load from database/CRDT in Phase 2
+        // For now, use sample data for UI development
+        notes = SampleData.notes
     }
 
     private func createNewNote() {

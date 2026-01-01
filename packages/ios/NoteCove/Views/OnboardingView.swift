@@ -4,8 +4,10 @@ import UniformTypeIdentifiers
 /// Onboarding wizard for first-time setup
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var storageManager: StorageDirectoryManager
     @State private var showingFolderPicker = false
     @State private var errorMessage: String?
+    @State private var isProcessing = false
 
     var body: some View {
         VStack(spacing: 32) {
@@ -43,17 +45,39 @@ struct OnboardingView: View {
                 Text(error)
                     .foregroundStyle(.red)
                     .font(.callout)
-                    .padding()
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            // Stale bookmark message
+            if case .bookmarkStale = storageManager.accessError {
+                VStack(spacing: 8) {
+                    Text("Your previous folder access has expired.")
+                        .foregroundStyle(.orange)
+                        .font(.callout)
+                    Text("Please select your NoteCove folder again.")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+                .padding(.horizontal)
             }
 
             // Select folder button
             Button(action: { showingFolderPicker = true }) {
-                Label("Select Folder", systemImage: "folder.badge.plus")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
+                if isProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else {
+                    Label("Select Folder", systemImage: "folder.badge.plus")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                }
             }
             .buttonStyle(.borderedProminent)
+            .disabled(isProcessing)
             .padding(.horizontal, 40)
 
             Spacer()
@@ -83,34 +107,30 @@ struct OnboardingView: View {
     }
 
     private func handleFolderSelection(_ result: Result<[URL], Error>) {
+        isProcessing = true
+        errorMessage = nil
+
         switch result {
         case .success(let urls):
             guard let url = urls.first else {
                 errorMessage = "No folder selected"
+                isProcessing = false
                 return
             }
 
-            // Start accessing the security-scoped resource
-            guard url.startAccessingSecurityScopedResource() else {
-                errorMessage = "Cannot access this folder. Please try again."
-                return
+            do {
+                try storageManager.setActiveDirectory(from: url)
+                appState.completeOnboarding()
+            } catch let error as StorageDirectoryError {
+                errorMessage = error.errorDescription
+            } catch {
+                errorMessage = "Failed to access folder: \(error.localizedDescription)"
             }
-
-            // Validate it looks like a NoteCove storage directory
-            let sdIdURL = url.appendingPathComponent("SD_ID")
-            if !FileManager.default.fileExists(atPath: sdIdURL.path) {
-                url.stopAccessingSecurityScopedResource()
-                errorMessage = "This doesn't appear to be a NoteCove storage directory. Please select a folder with SD_ID file."
-                return
-            }
-
-            // Save the folder
-            appState.setStorageDirectory(url)
-            appState.completeOnboarding()
-            url.stopAccessingSecurityScopedResource()
+            isProcessing = false
 
         case .failure(let error):
             errorMessage = "Failed to select folder: \(error.localizedDescription)"
+            isProcessing = false
         }
     }
 }
@@ -118,4 +138,5 @@ struct OnboardingView: View {
 #Preview {
     OnboardingView()
         .environmentObject(AppState())
+        .environmentObject(StorageDirectoryManager.shared)
 }

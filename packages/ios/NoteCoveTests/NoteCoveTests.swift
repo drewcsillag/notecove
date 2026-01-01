@@ -1,6 +1,7 @@
 import XCTest
 @testable import NoteCove
 
+@MainActor
 final class NoteCoveTests: XCTestCase {
 
     override func setUpWithError() throws {

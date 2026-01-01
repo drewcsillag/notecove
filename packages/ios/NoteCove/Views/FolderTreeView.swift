@@ -35,13 +35,9 @@ struct FolderTreeView: View {
     }
 
     private func loadFolders() {
-        // TODO: Load from database
-        // For now, use placeholder data
-        folders = [
-            Folder(id: "folder-1", name: "Work", parentId: nil, order: 0),
-            Folder(id: "folder-2", name: "Personal", parentId: nil, order: 1),
-            Folder(id: "folder-3", name: "Projects", parentId: "folder-1", order: 0),
-        ]
+        // TODO: Load from database/CRDT in Phase 2
+        // For now, use sample data for UI development
+        folders = SampleData.folders
     }
 }
 

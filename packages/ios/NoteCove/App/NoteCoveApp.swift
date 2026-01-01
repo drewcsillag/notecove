@@ -3,29 +3,66 @@ import SwiftUI
 @main
 struct NoteCoveApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var storageManager = StorageDirectoryManager.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(storageManager)
+                .onChange(of: scenePhase) { _, newPhase in
+                    handleScenePhaseChange(newPhase)
+                }
+                .onAppear {
+                    // Restore storage directory access on launch
+                    storageManager.restoreAccess()
+                }
+        }
+    }
+
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            // Resume access when app becomes active
+            storageManager.resumeAccess()
+        case .inactive:
+            // Keep access during brief inactive periods
+            break
+        case .background:
+            // Release security-scoped resource access in background
+            storageManager.releaseAccess()
+        @unknown default:
+            break
         }
     }
 }
 
 /// Global application state
+@MainActor
 class AppState: ObservableObject {
     /// Whether onboarding has been completed
     @Published var hasCompletedOnboarding: Bool = false
 
-    /// The current storage directory path (from security-scoped bookmark)
-    @Published var storageDirectoryURL: URL?
-
     /// Instance ID for this device (for CRDT vector clocks)
-    @Published var instanceId: String
+    let instanceId: String
+
+    /// Reset argument for testing
+    private let shouldResetState: Bool
 
     init() {
+        // Check for reset argument (for UI testing)
+        shouldResetState = CommandLine.arguments.contains("--reset-state")
+
+        if shouldResetState {
+            // Clear all state for testing
+            UserDefaults.standard.removeObject(forKey: "instanceId")
+            UserDefaults.standard.removeObject(forKey: "hasCompletedOnboarding")
+            UserDefaults.standard.removeObject(forKey: "activeStorageDirectoryId")
+        }
+
         // Load or generate instance ID
-        if let savedId = UserDefaults.standard.string(forKey: "instanceId") {
+        if let savedId = UserDefaults.standard.string(forKey: "instanceId"), !shouldResetState {
             self.instanceId = savedId
         } else {
             let newId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased()
@@ -34,35 +71,8 @@ class AppState: ObservableObject {
         }
 
         // Check if onboarding completed
-        self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
-
-        // Try to restore storage directory from bookmark
-        if let bookmarkData = UserDefaults.standard.data(forKey: "storageDirectoryBookmark") {
-            do {
-                var isStale = false
-                let url = try URL(resolvingBookmarkData: bookmarkData,
-                                  options: .withoutUI,
-                                  relativeTo: nil,
-                                  bookmarkDataIsStale: &isStale)
-                if !isStale {
-                    self.storageDirectoryURL = url
-                }
-            } catch {
-                print("Failed to restore storage directory bookmark: \(error)")
-            }
-        }
-    }
-
-    /// Save the storage directory URL as a security-scoped bookmark
-    func setStorageDirectory(_ url: URL) {
-        do {
-            let bookmarkData = try url.bookmarkData(options: .minimalBookmark,
-                                                     includingResourceValuesForKeys: nil,
-                                                     relativeTo: nil)
-            UserDefaults.standard.set(bookmarkData, forKey: "storageDirectoryBookmark")
-            self.storageDirectoryURL = url
-        } catch {
-            print("Failed to create bookmark for storage directory: \(error)")
+        if !shouldResetState {
+            self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
         }
     }
 
@@ -70,5 +80,12 @@ class AppState: ObservableObject {
     func completeOnboarding() {
         hasCompletedOnboarding = true
         UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+    }
+
+    /// Reset onboarding state (for re-selecting folder)
+    func resetOnboarding() {
+        hasCompletedOnboarding = false
+        UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        StorageDirectoryManager.shared.clearActiveDirectory()
     }
 }
