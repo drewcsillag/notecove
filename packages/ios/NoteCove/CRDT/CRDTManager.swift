@@ -44,6 +44,18 @@ struct FolderInfo: Identifiable {
     let deleted: Bool
 }
 
+/// Note metadata from CRDT
+struct NoteInfo: Identifiable {
+    let id: String
+    let title: String
+    let preview: String
+    let folderId: String?
+    let createdAt: Date
+    let modifiedAt: Date
+    let deleted: Bool
+    let pinned: Bool
+}
+
 /// Manager for CRDT operations using JavaScriptCore
 @MainActor
 final class CRDTManager: ObservableObject {
@@ -351,6 +363,143 @@ final class CRDTManager: ObservableObject {
     func closeNote(noteId: String) {
         guard isInitialized, let bridge = bridge else { return }
         bridge.invokeMethod("closeNote", withArguments: [noteId])
+    }
+
+    /// List all note IDs in the storage directory
+    /// - Returns: Array of note ID strings
+    func listNoteIds() throws -> [String] {
+        guard let activeDir = storageManager.activeDirectory,
+              let sdURL = activeDir.url else {
+            throw CRDTError.fileNotFound("No active storage directory")
+        }
+
+        let notesDir = sdURL.appendingPathComponent("notes")
+        guard FileManager.default.fileExists(atPath: notesDir.path) else {
+            return []
+        }
+
+        let contents = try FileManager.default.contentsOfDirectory(at: notesDir, includingPropertiesForKeys: [.isDirectoryKey])
+        return contents.compactMap { url in
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                return url.lastPathComponent
+            }
+            return nil
+        }
+    }
+
+    /// Load a note and extract its metadata
+    /// - Parameter noteId: The note ID
+    /// - Returns: NoteInfo with title, preview, folder, dates, etc.
+    func loadNoteInfo(noteId: String) throws -> NoteInfo {
+        guard isInitialized, let bridge = bridge else {
+            throw CRDTError.bridgeNotInitialized
+        }
+
+        guard let activeDir = storageManager.activeDirectory,
+              let sdURL = activeDir.url else {
+            throw CRDTError.fileNotFound("No active storage directory")
+        }
+
+        let notesDir = sdURL.appendingPathComponent("notes").appendingPathComponent(noteId)
+
+        guard FileManager.default.fileExists(atPath: notesDir.path) else {
+            throw CRDTError.fileNotFound(notesDir.path)
+        }
+
+        // Create the note in JS
+        bridge.invokeMethod("createNote", withArguments: [noteId])
+
+        // Look for log files in the logs subdirectory
+        let logsDir = notesDir.appendingPathComponent("logs")
+        if FileManager.default.fileExists(atPath: logsDir.path) {
+            let files = try FileManager.default.contentsOfDirectory(
+                at: logsDir,
+                includingPropertiesForKeys: nil
+            )
+
+            // Sort by filename to apply in order
+            let sortedFiles = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+            for file in sortedFiles {
+                let filename = file.lastPathComponent
+                guard filename.hasSuffix(".crdtlog") else {
+                    continue
+                }
+
+                let data = try Data(contentsOf: file)
+                let base64 = data.base64EncodedString()
+
+                bridge.invokeMethod("applyLogFile", withArguments: [noteId, base64])
+
+                if let exception = jsContext?.exception {
+                    print("[CRDTManager] Error applying log file \(filename): \(exception)")
+                    jsContext?.exception = nil
+                }
+            }
+        }
+
+        // Extract metadata using the bridge
+        guard let result = bridge.invokeMethod("extractNoteMetadata", withArguments: [noteId]) else {
+            throw CRDTError.noteNotOpen(noteId)
+        }
+
+        if let exception = jsContext?.exception {
+            let message = exception.toString() ?? "Unknown error"
+            jsContext?.exception = nil
+            bridge.invokeMethod("closeNote", withArguments: [noteId])
+            throw CRDTError.javaScriptError(message)
+        }
+
+        guard let dict = result.toDictionary() as? [String: Any],
+              let id = dict["id"] as? String,
+              let title = dict["title"] as? String,
+              let preview = dict["preview"] as? String,
+              let created = dict["created"] as? Double,
+              let modified = dict["modified"] as? Double,
+              let deleted = dict["deleted"] as? Bool,
+              let pinned = dict["pinned"] as? Bool else {
+            bridge.invokeMethod("closeNote", withArguments: [noteId])
+            throw CRDTError.javaScriptError("Failed to extract note metadata")
+        }
+
+        let folderId = dict["folderId"] as? String
+
+        // Close the note to free memory
+        bridge.invokeMethod("closeNote", withArguments: [noteId])
+
+        return NoteInfo(
+            id: id,
+            title: title,
+            preview: preview,
+            folderId: folderId,
+            createdAt: Date(timeIntervalSince1970: created / 1000),
+            modifiedAt: Date(timeIntervalSince1970: modified / 1000),
+            deleted: deleted,
+            pinned: pinned
+        )
+    }
+
+    /// Load all notes and return their metadata
+    /// - Returns: Array of NoteInfo, excluding deleted notes
+    func loadAllNotes() throws -> [NoteInfo] {
+        let noteIds = try listNoteIds()
+        var notes: [NoteInfo] = []
+
+        for noteId in noteIds {
+            do {
+                let noteInfo = try loadNoteInfo(noteId: noteId)
+                if !noteInfo.deleted {
+                    notes.append(noteInfo)
+                }
+            } catch {
+                print("[CRDTManager] Error loading note \(noteId): \(error)")
+                // Continue with other notes
+            }
+        }
+
+        // Sort by modified date descending (newest first)
+        return notes.sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
     // MARK: - Folder Tree Operations

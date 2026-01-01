@@ -35,3 +35,18 @@ extension Note {
         self.isPinned = (row["pinned"] as? Int ?? 0) == 1
     }
 }
+
+// MARK: - CRDT Conversion
+
+extension Note {
+    /// Initialize from CRDT NoteInfo
+    init(from noteInfo: NoteInfo) {
+        self.id = noteInfo.id
+        self.title = noteInfo.title
+        self.preview = noteInfo.preview
+        self.folderId = noteInfo.folderId
+        self.createdAt = noteInfo.createdAt
+        self.modifiedAt = noteInfo.modifiedAt
+        self.isPinned = noteInfo.pinned
+    }
+}

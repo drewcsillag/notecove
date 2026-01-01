@@ -6,20 +6,43 @@ struct NoteListView: View {
     @Binding var selectedNote: Note?
     @State private var notes: [Note] = []
     @State private var searchText = ""
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    @ObservedObject private var storageManager = StorageDirectoryManager.shared
 
     var body: some View {
-        List(selection: $selectedNote) {
-            ForEach(filteredNotes) { note in
-                NoteRowView(note: note)
-                    .tag(note)
+        Group {
+            if isLoading {
+                ProgressView("Loading notes...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text(error)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(selection: $selectedNote) {
+                    ForEach(filteredNotes) { note in
+                        NoteRowView(note: note)
+                            .tag(note)
+                    }
+                }
+                .listStyle(.plain)
+                .searchable(text: $searchText, prompt: "Search notes")
             }
         }
-        .listStyle(.plain)
-        .searchable(text: $searchText, prompt: "Search notes")
         .onAppear {
             loadNotes()
         }
         .onChange(of: folder) { _, _ in
+            // Re-filter, no reload needed
+        }
+        .onChange(of: storageManager.activeDirectory?.id) { _, _ in
             loadNotes()
         }
         .toolbar {
@@ -58,13 +81,42 @@ struct NoteListView: View {
     }
 
     private func loadNotes() {
-        // TODO: Load from database/CRDT in Phase 2
-        // For now, use sample data for UI development
-        notes = SampleData.notes
+        // Check if we have an active storage directory
+        guard storageManager.activeDirectory != nil else {
+            // Fall back to sample data when no storage directory
+            notes = SampleData.notes
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        Task { @MainActor in
+            do {
+                let crdtManager = CRDTManager.shared
+
+                // Initialize if needed
+                if !crdtManager.isInitialized {
+                    try crdtManager.initialize()
+                }
+
+                // Load all notes from CRDT
+                let noteInfos = try crdtManager.loadAllNotes()
+                notes = noteInfos.map { Note(from: $0) }
+
+                isLoading = false
+            } catch {
+                print("[NoteListView] Error loading notes: \(error)")
+                errorMessage = "Could not load notes"
+                // Fall back to sample data
+                notes = SampleData.notes
+                isLoading = false
+            }
+        }
     }
 
     private func createNewNote() {
-        // TODO: Implement note creation
+        // TODO: Implement note creation in Phase 3
         print("Create new note")
     }
 }

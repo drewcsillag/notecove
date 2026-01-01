@@ -1,6 +1,6 @@
 # iOS App Implementation Plan
 
-**Overall Progress:** `30%`
+**Overall Progress:** `35%`
 
 **Original Prompt:** [PROMPT.md](./PROMPT.md)
 
@@ -122,14 +122,14 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
   - [x] 🟩 Fall back to SampleData when no SD configured
   - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.4 Note List**
-  - [ ] 🟥 Scan storage directory for note files
-  - [ ] 🟥 Extract metadata (title, preview, modified date)
-  - [ ] 🟥 Populate notes table in database
-  - [ ] 🟥 Create NoteListView SwiftUI component
-  - [ ] 🟥 Filter notes by selected folder
-  - [ ] 🟥 Sort by modified date (pinned first)
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.4 Note List** ✅
+  - [x] 🟩 Scan storage directory for note folders
+  - [x] 🟩 Add extractNoteMetadata to ios-bridge.ts
+  - [x] 🟩 Add NoteInfo struct and loadAllNotes to CRDTManager
+  - [x] 🟩 Update NoteListView to load from CRDT
+  - [x] 🟩 Filter notes by selected folder
+  - [x] 🟩 Sort by modified date (pinned first)
+  - [x] 🟩 Update PLAN.md
 
 - [ ] 🟥 **2.5 Read-Only Note Viewer**
   - [ ] 🟥 Create WKWebView wrapper for rendering (or iOS 26 native WebView)
@@ -456,3 +456,4 @@ xcodebuild \
 | 2025-12-31 | **Phase 1 Complete**: Project foundation ready (22 tests passing)                                                                                |
 | 2025-12-31 | Completed Phase 2.1: CRDT Integration with JavaScriptCore, polyfills, binary .crdtlog format, 9 CRDT tests                                       |
 | 2025-12-31 | Completed Phase 2.3: Folder Tree Sync with extractFolders in bridge, FolderTreeView loads from CRDT                                              |
+| 2025-12-31 | Completed Phase 2.4: Note List with extractNoteMetadata, loadAllNotes, NoteListView loads from CRDT, 32 tests                                    |

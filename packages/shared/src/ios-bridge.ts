@@ -35,6 +35,18 @@ interface FolderInfo {
   deleted: boolean;
 }
 
+// Types for note metadata exposed to Swift
+interface NoteInfo {
+  id: string;
+  title: string;
+  preview: string;
+  folderId: string | null;
+  created: number; // Unix timestamp in ms
+  modified: number; // Unix timestamp in ms
+  deleted: boolean;
+  pinned: boolean;
+}
+
 // Types for the bridge interface
 interface NoteCoveBridge {
   // Note operations
@@ -44,6 +56,7 @@ interface NoteCoveBridge {
   getDocumentState(noteId: string): string;
   extractTitle(stateBase64: string): string;
   extractContent(stateBase64: string): string;
+  extractNoteMetadata(noteId: string): NoteInfo; // Extract metadata from loaded note
   closeNote(noteId: string): void;
 
   // Folder tree operations
@@ -291,6 +304,60 @@ const bridge: NoteCoveBridge = {
 
     tempDoc.destroy();
     return contentText;
+  },
+
+  extractNoteMetadata(noteId: string): NoteInfo {
+    const doc = openNotes.get(noteId);
+    if (!doc) {
+      throw new Error(`Note ${noteId} is not open`);
+    }
+
+    const metadata = doc.getMap('metadata');
+    const content = doc.getXmlFragment('content');
+
+    // Extract title using the helper
+    const title = extractTitleFromFragment(content);
+
+    // Extract preview text (first ~200 chars of content)
+    let previewText = '';
+    const extractText = (elem: Y.XmlElement): string => {
+      let text = '';
+      elem.forEach((child) => {
+        if (child instanceof Y.XmlText) {
+          text += String(child.toString());
+        } else if (child instanceof Y.XmlElement) {
+          text += extractText(child);
+        }
+      });
+      return text;
+    };
+
+    // Skip first paragraph (title) and get content preview
+    let isFirst = true;
+    content.forEach((item) => {
+      if (isFirst) {
+        isFirst = false;
+        return; // Skip title
+      }
+      if (item instanceof Y.XmlText) {
+        previewText += String(item.toString()) + ' ';
+      } else if (item instanceof Y.XmlElement) {
+        previewText += extractText(item) + ' ';
+      }
+    });
+    const preview = previewText.trim().slice(0, 200);
+
+    const now = Date.now();
+    return {
+      id: (metadata.get('id') as string) ?? noteId,
+      title,
+      preview,
+      folderId: (metadata.get('folderId') as string | null) ?? null,
+      created: (metadata.get('created') as number) ?? now,
+      modified: (metadata.get('modified') as number) ?? now,
+      deleted: (metadata.get('deleted') as boolean) ?? false,
+      pinned: (metadata.get('pinned') as boolean) ?? false,
+    };
   },
 
   closeNote(noteId: string): void {

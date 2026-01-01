@@ -9770,6 +9770,51 @@ ${err.toString()}`);
       tempDoc.destroy();
       return contentText;
     },
+    extractNoteMetadata(noteId) {
+      const doc2 = openNotes.get(noteId);
+      if (!doc2) {
+        throw new Error(`Note ${noteId} is not open`);
+      }
+      const metadata = doc2.getMap("metadata");
+      const content = doc2.getXmlFragment("content");
+      const title = extractTitleFromFragment(content);
+      let previewText = "";
+      const extractText = (elem) => {
+        let text2 = "";
+        elem.forEach((child) => {
+          if (child instanceof YXmlText) {
+            text2 += String(child.toString());
+          } else if (child instanceof YXmlElement) {
+            text2 += extractText(child);
+          }
+        });
+        return text2;
+      };
+      let isFirst = true;
+      content.forEach((item) => {
+        if (isFirst) {
+          isFirst = false;
+          return;
+        }
+        if (item instanceof YXmlText) {
+          previewText += String(item.toString()) + " ";
+        } else if (item instanceof YXmlElement) {
+          previewText += extractText(item) + " ";
+        }
+      });
+      const preview = previewText.trim().slice(0, 200);
+      const now = Date.now();
+      return {
+        id: metadata.get("id") ?? noteId,
+        title,
+        preview,
+        folderId: metadata.get("folderId") ?? null,
+        created: metadata.get("created") ?? now,
+        modified: metadata.get("modified") ?? now,
+        deleted: metadata.get("deleted") ?? false,
+        pinned: metadata.get("pinned") ?? false
+      };
+    },
     closeNote(noteId) {
       const doc2 = openNotes.get(noteId);
       if (!doc2) {

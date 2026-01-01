@@ -121,6 +121,51 @@ final class CRDTManagerTests: XCTestCase {
         }
     }
 
+    // MARK: - Note List Tests
+
+    func testExtractNoteMetadata() throws {
+        try crdtManager.initialize()
+
+        // Access the bridge directly to create a note
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in
+            XCTFail("JS Exception: \(exception!)")
+        }
+
+        // Load the bridge
+        let bundle = Bundle.allBundles.first { $0.url(forResource: "ios-bridge-bundle", withExtension: "js") != nil }!
+        let url = bundle.url(forResource: "ios-bridge-bundle", withExtension: "js")!
+        let script = try String(contentsOf: url, encoding: .utf8)
+        context.evaluateScript(script)
+
+        guard let bridge = context.objectForKeyedSubscript("NoteCoveBridge"), !bridge.isUndefined else {
+            XCTFail("Bridge not found")
+            return
+        }
+
+        let testNoteId = "test-note-id"
+
+        // Create a note
+        bridge.invokeMethod("createNote", withArguments: [testNoteId])
+
+        // Extract metadata - should return defaults for empty note
+        guard let metadata = bridge.invokeMethod("extractNoteMetadata", withArguments: [testNoteId])?.toDictionary() as? [String: Any] else {
+            XCTFail("extractNoteMetadata did not return dictionary")
+            return
+        }
+
+        // Empty note should have "Untitled" or empty title
+        let title = metadata["title"] as? String ?? ""
+        XCTAssertTrue(title == "Untitled" || title.isEmpty, "Empty note should have Untitled or empty title")
+
+        // Should have default timestamps
+        XCTAssertNotNil(metadata["created"])
+        XCTAssertNotNil(metadata["modified"])
+
+        // Clean up
+        bridge.invokeMethod("closeNote", withArguments: [testNoteId])
+    }
+
     // MARK: - Integration Test Placeholder
 
     func testBridgeLoadsCorrectly() throws {
