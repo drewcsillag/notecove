@@ -1,6 +1,6 @@
 # iOS App Implementation Plan
 
-**Overall Progress:** `35%`
+**Overall Progress:** `60%`
 
 **Original Prompt:** [PROMPT.md](./PROMPT.md)
 
@@ -106,13 +106,13 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
   - [x] 🟩 Write tests (9 CRDT tests passing)
   - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.2 Debug Tools (Early)**
-  - [ ] 🟥 Add hidden "Debug" tab in settings
-  - [ ] 🟥 Show SD file list with file sizes and dates
-  - [ ] 🟥 Show database table contents
-  - [ ] 🟥 Show activity log entries
-  - [ ] 🟥 This becomes foundation for Storage Inspector in Phase 5
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.2 Debug Tools (Early)** ✅
+  - [x] 🟩 Add hidden debug access (5 taps on gear icon)
+  - [x] 🟩 Show SD file list with file sizes and dates
+  - [x] 🟩 Show database table contents and row counts
+  - [x] 🟩 Show activity log entries
+  - [x] 🟩 This becomes foundation for Storage Inspector in Phase 5
+  - [x] 🟩 Update PLAN.md
 
 - [x] 🟩 **2.3 Folder Tree Sync** ✅
   - [x] 🟩 Load folder tree CRDT from storage directory (via CRDTManager)
@@ -131,29 +131,31 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
   - [x] 🟩 Sort by modified date (pinned first)
   - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.5 Read-Only Note Viewer**
-  - [ ] 🟥 Create WKWebView wrapper for rendering (or iOS 26 native WebView)
-  - [ ] 🟥 Bundle minimal TipTap read-only renderer
-  - [ ] 🟥 Pass CRDT state to WebView for rendering
-  - [ ] 🟥 Handle images: load from storage directory media folder
-  - [ ] 🟥 Render tables, code blocks, lists correctly
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.5 Read-Only Note Viewer** ✅
+  - [x] 🟩 Create WKWebView wrapper for rendering (ReadOnlyNoteWebView)
+  - [x] 🟩 Convert CRDT Y.XmlFragment to HTML via extractContentAsHTML
+  - [x] 🟩 CSS styling with dark/light mode support
+  - [x] 🟩 Render tables, code blocks, lists, task items correctly
+  - [x] 🟩 External links open in Safari
+  - [x] 🟩 11 CRDT tests, 35 total tests
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.6 Sync Monitoring**
-  - [ ] 🟥 Implement foreground-only file scanning (no background polling)
-  - [ ] 🟥 Trigger rescan on app foreground (UIApplication lifecycle)
-  - [ ] 🟥 Detect new/modified notes and reload
-  - [ ] 🟥 Add instance ID generation for this device
-  - [ ] 🟥 Write activity log entries
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.6 Sync Monitoring** ✅
+  - [x] 🟩 Implement foreground-only file scanning (SyncMonitor)
+  - [x] 🟩 Trigger rescan on app foreground (UIApplication lifecycle)
+  - [x] 🟩 Detect new/modified notes and reload via notification
+  - [x] 🟩 Add InstanceID class for device identification
+  - [x] 🟩 Write activity log entries on sync
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **2.7 Error Handling**
-  - [ ] 🟥 Handle: iCloud Drive not configured
-  - [ ] 🟥 Handle: Folder access denied
-  - [ ] 🟥 Handle: Corrupt CRDT files
-  - [ ] 🟥 Handle: Security-scoped bookmark expired
-  - [ ] 🟥 Show user-friendly error messages
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **2.7 Error Handling** ✅
+  - [x] 🟩 Handle: iCloud Drive not configured (StorageDirectoryError.iCloudNotConfigured)
+  - [x] 🟩 Handle: Folder access denied (StorageDirectoryError.accessDenied)
+  - [x] 🟩 Handle: Corrupt CRDT files (CRDTError.corruptCRDTFile)
+  - [x] 🟩 Handle: Security-scoped bookmark expired (StorageDirectoryError.bookmarkStale)
+  - [x] 🟩 User-friendly error messages with recovery suggestions
+  - [x] 🟩 Context-aware error icons and colors in UI
+  - [x] 🟩 Update PLAN.md
 
 - [ ] 🟥 **2.8 Desktop-iOS Sync Testing**
   - [ ] 🟥 Test: Create note on desktop, verify appears on iOS
@@ -457,3 +459,7 @@ xcodebuild \
 | 2025-12-31 | Completed Phase 2.1: CRDT Integration with JavaScriptCore, polyfills, binary .crdtlog format, 9 CRDT tests                                       |
 | 2025-12-31 | Completed Phase 2.3: Folder Tree Sync with extractFolders in bridge, FolderTreeView loads from CRDT                                              |
 | 2025-12-31 | Completed Phase 2.4: Note List with extractNoteMetadata, loadAllNotes, NoteListView loads from CRDT, 32 tests                                    |
+| 2025-12-31 | Completed Phase 2.5: Read-Only Note Viewer with HTML rendering via WKWebView, dark/light mode CSS, 35 tests                                      |
+| 2025-12-31 | Completed Phase 2.2: Debug Tools with hidden access, file browser, database stats, activity logs                                                   |
+| 2025-12-31 | Completed Phase 2.6: Sync Monitoring with SyncMonitor, InstanceID, foreground lifecycle, activity logging                                          |
+| 2025-12-31 | Completed Phase 2.7: Error Handling with user-friendly messages, recovery suggestions, context-aware icons                                         |

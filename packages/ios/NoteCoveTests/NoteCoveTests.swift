@@ -44,6 +44,8 @@ final class NoteCoveTests: XCTestCase {
     func testInstanceIdGeneration() throws {
         let appState = AppState()
         XCTAssertFalse(appState.instanceId.isEmpty)
-        XCTAssertEqual(appState.instanceId.count, 12) // 12 character hex ID
+        // Format: ios-XXXXXXXX-timestamp (e.g., ios-1a2b3c4d-1735612345)
+        XCTAssertTrue(appState.instanceId.hasPrefix("ios-"), "Instance ID should start with 'ios-'")
+        XCTAssertTrue(appState.instanceId.count > 15, "Instance ID should be at least 16 characters")
     }
 }

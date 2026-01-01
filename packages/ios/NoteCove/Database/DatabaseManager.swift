@@ -45,6 +45,16 @@ final class DatabaseManager {
         return dbPool
     }
 
+    /// Check if database is initialized
+    var isInitialized: Bool {
+        dbPool != nil
+    }
+
+    /// Get the database file path
+    var databasePath: String {
+        databaseURL?.path ?? ""
+    }
+
     // MARK: - Migrations
 
     private func runMigrations() throws {
@@ -386,6 +396,21 @@ final class DatabaseManager {
             let folderCount = try FolderRecord.filter(FolderRecord.Columns.deleted == false).fetchCount(db)
             let sdCount = try StorageDirRecord.fetchCount(db)
             return DatabaseStats(noteCount: noteCount, folderCount: folderCount, sdCount: sdCount)
+        }
+    }
+
+    /// Get row count for a table (for debug purposes)
+    func getRowCount(tableName: String) throws -> Int {
+        try pool.read { db in
+            // Sanitize table name to prevent SQL injection
+            let validTables = ["notes", "notes_fts", "folders", "storage_dirs", "tags", "note_tags",
+                               "app_state", "schema_version", "note_sync_state", "folder_sync_state",
+                               "activity_log_state", "images"]
+            guard validTables.contains(tableName) else {
+                return 0
+            }
+            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(tableName)")
+            return count ?? 0
         }
     }
 }

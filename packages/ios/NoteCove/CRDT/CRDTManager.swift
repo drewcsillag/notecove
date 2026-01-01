@@ -9,6 +9,8 @@ enum CRDTError: Error, LocalizedError {
     case invalidBase64
     case noteNotOpen(String)
     case folderTreeNotOpen(String)
+    case corruptCRDTFile(String)
+    case parseError(String)
 
     var errorDescription: String? {
         switch self {
@@ -24,6 +26,28 @@ enum CRDTError: Error, LocalizedError {
             return "Note \(noteId) is not open"
         case .folderTreeNotOpen(let sdId):
             return "Folder tree for SD \(sdId) is not open"
+        case .corruptCRDTFile(let path):
+            return "The note file is corrupt and cannot be read: \(path)"
+        case .parseError(let message):
+            return "Failed to parse note data: \(message)"
+        }
+    }
+
+    /// User-friendly description without technical details
+    var userFriendlyDescription: String {
+        switch self {
+        case .bridgeNotInitialized:
+            return "NoteCove is still starting up. Please wait a moment."
+        case .javaScriptError:
+            return "There was a problem reading the note. Try again later."
+        case .fileNotFound:
+            return "This note could not be found."
+        case .invalidBase64, .corruptCRDTFile, .parseError:
+            return "This note appears to be damaged and cannot be opened."
+        case .noteNotOpen:
+            return "This note is not currently available."
+        case .folderTreeNotOpen:
+            return "The folder list is not available."
         }
     }
 }

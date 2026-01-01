@@ -6,6 +6,11 @@ struct NoteCoveApp: App {
     @StateObject private var storageManager = StorageDirectoryManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        // Initialize sync monitor to set up lifecycle observers
+        _ = SyncMonitor.shared
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -45,7 +50,9 @@ class AppState: ObservableObject {
     @Published var hasCompletedOnboarding: Bool = false
 
     /// Instance ID for this device (for CRDT vector clocks)
-    let instanceId: String
+    var instanceId: String {
+        InstanceID.shared.id
+    }
 
     /// Reset argument for testing
     private let shouldResetState: Bool
@@ -56,18 +63,9 @@ class AppState: ObservableObject {
 
         if shouldResetState {
             // Clear all state for testing
-            UserDefaults.standard.removeObject(forKey: "instanceId")
+            InstanceID.shared.reset()
             UserDefaults.standard.removeObject(forKey: "hasCompletedOnboarding")
             UserDefaults.standard.removeObject(forKey: "activeStorageDirectoryId")
-        }
-
-        // Load or generate instance ID
-        if let savedId = UserDefaults.standard.string(forKey: "instanceId"), !shouldResetState {
-            self.instanceId = savedId
-        } else {
-            let newId = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased()
-            self.instanceId = String(newId)
-            UserDefaults.standard.set(self.instanceId, forKey: "instanceId")
         }
 
         // Check if onboarding completed

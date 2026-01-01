@@ -7,9 +7,11 @@ struct NoteListView: View {
     @State private var notes: [Note] = []
     @State private var searchText = ""
     @State private var isLoading = false
+    @State private var isRefreshing = false
     @State private var errorMessage: String?
 
     @ObservedObject private var storageManager = StorageDirectoryManager.shared
+    @ObservedObject private var syncMonitor = SyncMonitor.shared
 
     var body: some View {
         Group {
@@ -34,6 +36,9 @@ struct NoteListView: View {
                 }
                 .listStyle(.plain)
                 .searchable(text: $searchText, prompt: "Search notes")
+                .refreshable {
+                    await refreshNotes()
+                }
             }
         }
         .onAppear {
@@ -45,10 +50,27 @@ struct NoteListView: View {
         .onChange(of: storageManager.activeDirectory?.id) { _, _ in
             loadNotes()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .notesDidChange)) { _ in
+            loadNotes()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: createNewNote) {
-                    Label("New Note", systemImage: "square.and.pencil")
+                HStack(spacing: 12) {
+                    // Sync status indicator
+                    if syncMonitor.isSyncing {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else if let lastSync = syncMonitor.lastSyncTime {
+                        Button(action: { Task { await refreshNotes() } }) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundStyle(.secondary)
+                        }
+                        .help("Last synced: \(lastSync.formatted(.relative(presentation: .numeric)))")
+                    }
+
+                    Button(action: createNewNote) {
+                        Label("New Note", systemImage: "square.and.pencil")
+                    }
                 }
             }
         }
@@ -118,6 +140,13 @@ struct NoteListView: View {
     private func createNewNote() {
         // TODO: Implement note creation in Phase 3
         print("Create new note")
+    }
+
+    private func refreshNotes() async {
+        // Trigger sync monitor to check for changes
+        await syncMonitor.triggerSync()
+        // Reload notes
+        loadNotes()
     }
 }
 

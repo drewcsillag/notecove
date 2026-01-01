@@ -7,6 +7,8 @@ struct ContentView: View {
     @State private var selectedFolder: Folder?
     @State private var selectedNote: Note?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var showingDebug = false
+    @State private var debugTapCount = 0
 
     var body: some View {
         Group {
@@ -28,6 +30,14 @@ struct ContentView: View {
             // Sidebar: Folder tree
             FolderTreeView(selectedFolder: $selectedFolder)
                 .navigationTitle("Folders")
+                .toolbar {
+                    ToolbarItem(placement: .bottomBar) {
+                        // Hidden debug access: tap 5 times to reveal
+                        Button(action: handleDebugTap) {
+                            Image(systemName: "gearshape")
+                        }
+                    }
+                }
         } content: {
             // Middle column: Note list
             NoteListView(folder: selectedFolder, selectedNote: $selectedNote)
@@ -41,25 +51,52 @@ struct ContentView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .sheet(isPresented: $showingDebug) {
+            DebugView()
+        }
+    }
+
+    private func handleDebugTap() {
+        debugTapCount += 1
+        if debugTapCount >= 5 {
+            debugTapCount = 0
+            showingDebug = true
+        }
+
+        // Reset tap count after 2 seconds of inactivity
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if debugTapCount > 0 && debugTapCount < 5 {
+                debugTapCount = 0
+            }
+        }
     }
 
     // MARK: - Error Views
 
     private var accessErrorView: some View {
         VStack(spacing: 24) {
-            Image(systemName: "folder.badge.questionmark")
+            Image(systemName: errorIcon)
                 .font(.system(size: 60))
-                .foregroundStyle(.orange)
+                .foregroundStyle(errorColor)
 
-            Text("Storage Access Required")
+            Text(errorTitle)
                 .font(.title2)
                 .fontWeight(.semibold)
 
             if let error = storageManager.accessError {
-                Text(error.errorDescription ?? "Unknown error")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                VStack(spacing: 8) {
+                    Text(error.errorDescription ?? "Unknown error")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    if let suggestion = error.recoverySuggestion {
+                        Text(suggestion)
+                            .font(.callout)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(.horizontal)
             }
 
             Button("Select Folder Again") {
@@ -68,6 +105,59 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
         }
         .padding()
+    }
+
+    private var errorIcon: String {
+        guard let error = storageManager.accessError else {
+            return "folder.badge.questionmark"
+        }
+
+        switch error {
+        case .bookmarkStale:
+            return "clock.badge.exclamationmark"
+        case .accessDenied, .notAccessible:
+            return "lock.shield"
+        case .iCloudNotConfigured:
+            return "icloud.slash"
+        case .folderNotFound:
+            return "folder.badge.minus"
+        default:
+            return "folder.badge.questionmark"
+        }
+    }
+
+    private var errorColor: Color {
+        guard let error = storageManager.accessError else {
+            return .orange
+        }
+
+        switch error {
+        case .bookmarkStale, .accessDenied, .notAccessible:
+            return .orange
+        case .iCloudNotConfigured:
+            return .blue
+        default:
+            return .red
+        }
+    }
+
+    private var errorTitle: String {
+        guard let error = storageManager.accessError else {
+            return "Storage Access Required"
+        }
+
+        switch error {
+        case .bookmarkStale:
+            return "Access Expired"
+        case .accessDenied, .notAccessible:
+            return "Access Denied"
+        case .iCloudNotConfigured:
+            return "iCloud Not Set Up"
+        case .folderNotFound:
+            return "Folder Not Found"
+        default:
+            return "Storage Access Required"
+        }
     }
 
     private var noNoteSelectedView: some View {

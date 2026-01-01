@@ -261,6 +261,8 @@ enum StorageDirectoryError: LocalizedError {
     case notAccessible
     case bookmarkStale
     case bookmarkCreationFailed(Error)
+    case iCloudNotConfigured
+    case folderNotFound
     case unknown(Error)
 
     var errorDescription: String? {
@@ -277,8 +279,30 @@ enum StorageDirectoryError: LocalizedError {
             return "Access to the storage directory has expired. Please select it again."
         case .bookmarkCreationFailed(let error):
             return "Failed to save folder access: \(error.localizedDescription)"
+        case .iCloudNotConfigured:
+            return "iCloud Drive is not configured. Please enable iCloud Drive in Settings."
+        case .folderNotFound:
+            return "The selected folder no longer exists."
         case .unknown(let error):
             return "An unexpected error occurred: \(error.localizedDescription)"
+        }
+    }
+
+    /// Recovery suggestion for user
+    var recoverySuggestion: String? {
+        switch self {
+        case .notStorageDirectory:
+            return "Select your NoteCove storage folder (contains SD_ID file)"
+        case .accessDenied, .notAccessible:
+            return "Tap 'Select Folder Again' to grant access"
+        case .bookmarkStale:
+            return "Tap 'Select Folder Again' to refresh access"
+        case .iCloudNotConfigured:
+            return "Go to Settings > Apple Account > iCloud > iCloud Drive"
+        case .folderNotFound:
+            return "The folder may have been moved or deleted"
+        default:
+            return nil
         }
     }
 }

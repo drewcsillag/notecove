@@ -42,6 +42,9 @@ struct FolderTreeView: View {
         .onChange(of: storageManager.activeDirectory?.id) { _, _ in
             loadFolders()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .notesDidChange)) { _ in
+            loadFolders()
+        }
     }
 
     private var rootFolders: [Folder] {
