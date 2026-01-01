@@ -9815,6 +9815,171 @@ ${err.toString()}`);
         pinned: metadata.get("pinned") ?? false
       };
     },
+    extractContentAsHTML(noteId) {
+      const doc2 = openNotes.get(noteId);
+      if (!doc2) {
+        throw new Error(`Note ${noteId} is not open`);
+      }
+      const content = doc2.getXmlFragment("content");
+      const convertToHTML = (elem) => {
+        if (elem instanceof YXmlText) {
+          let text2 = elem.toString();
+          const attrs2 = elem.getAttributes();
+          if (attrs2.bold) text2 = `<strong>${text2}</strong>`;
+          if (attrs2.italic) text2 = `<em>${text2}</em>`;
+          if (attrs2.underline) text2 = `<u>${text2}</u>`;
+          if (attrs2.strike) text2 = `<s>${text2}</s>`;
+          if (attrs2.code) text2 = `<code>${text2}</code>`;
+          return text2;
+        }
+        const tagName = elem.nodeName;
+        let html2 = "";
+        const attrs = elem.getAttributes();
+        let attrStr = "";
+        switch (tagName) {
+          case "paragraph":
+            html2 = "<p>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</p>";
+            break;
+          case "heading":
+            const level = attrs.level || 1;
+            html2 = `<h${level}>`;
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += `</h${level}>`;
+            break;
+          case "bulletList":
+            html2 = "<ul>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</ul>";
+            break;
+          case "orderedList":
+            html2 = "<ol>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</ol>";
+            break;
+          case "listItem":
+            html2 = "<li>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</li>";
+            break;
+          case "taskItem":
+            const checked = attrs.checked;
+            const checkState = checked === true ? "\u2611" : checked === "indeterminate" ? "\u25D0" : "\u2610";
+            html2 = `<li class="task-item" data-checked="${checked}">${checkState} `;
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</li>";
+            break;
+          case "blockquote":
+            html2 = "<blockquote>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</blockquote>";
+            break;
+          case "codeBlock":
+            const lang = attrs.language || "";
+            html2 = `<pre><code class="language-${lang}">`;
+            elem.forEach((child) => {
+              if (child instanceof YXmlText) {
+                html2 += child.toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
+              }
+            });
+            html2 += "</code></pre>";
+            break;
+          case "horizontalRule":
+            html2 = "<hr>";
+            break;
+          case "image":
+            const src = attrs.src || "";
+            const alt = attrs.alt || "";
+            const title = attrs.title || "";
+            html2 = `<img src="${src}" alt="${alt}" title="${title}" class="note-image">`;
+            break;
+          case "table":
+            html2 = "<table>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</table>";
+            break;
+          case "tableRow":
+            html2 = "<tr>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</tr>";
+            break;
+          case "tableHeader":
+            html2 = "<th>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</th>";
+            break;
+          case "tableCell":
+            html2 = "<td>";
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</td>";
+            break;
+          case "hardBreak":
+            html2 = "<br>";
+            break;
+          default:
+            html2 = `<div class="${tagName}">`;
+            elem.forEach((child) => {
+              if (child instanceof YXmlText || child instanceof YXmlElement) {
+                html2 += convertToHTML(child);
+              }
+            });
+            html2 += "</div>";
+        }
+        return html2;
+      };
+      let html = "";
+      content.forEach((item) => {
+        if (item instanceof YXmlText || item instanceof YXmlElement) {
+          html += convertToHTML(item);
+        }
+      });
+      return html;
+    },
     closeNote(noteId) {
       const doc2 = openNotes.get(noteId);
       if (!doc2) {

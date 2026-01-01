@@ -57,6 +57,7 @@ interface NoteCoveBridge {
   extractTitle(stateBase64: string): string;
   extractContent(stateBase64: string): string;
   extractNoteMetadata(noteId: string): NoteInfo; // Extract metadata from loaded note
+  extractContentAsHTML(noteId: string): string; // Get note content as HTML for rendering
   closeNote(noteId: string): void;
 
   // Folder tree operations
@@ -358,6 +359,201 @@ const bridge: NoteCoveBridge = {
       deleted: (metadata.get('deleted') as boolean) ?? false,
       pinned: (metadata.get('pinned') as boolean) ?? false,
     };
+  },
+
+  extractContentAsHTML(noteId: string): string {
+    const doc = openNotes.get(noteId);
+    if (!doc) {
+      throw new Error(`Note ${noteId} is not open`);
+    }
+
+    const content = doc.getXmlFragment('content');
+
+    // Convert Y.XmlFragment to HTML
+    const convertToHTML = (elem: Y.XmlElement | Y.XmlText): string => {
+      if (elem instanceof Y.XmlText) {
+        let text = elem.toString();
+        // Apply marks (bold, italic, etc.)
+        const attrs = elem.getAttributes();
+        if (attrs.bold) text = `<strong>${text}</strong>`;
+        if (attrs.italic) text = `<em>${text}</em>`;
+        if (attrs.underline) text = `<u>${text}</u>`;
+        if (attrs.strike) text = `<s>${text}</s>`;
+        if (attrs.code) text = `<code>${text}</code>`;
+        return text;
+      }
+
+      const tagName = elem.nodeName;
+      let html = '';
+
+      // Get attributes
+      const attrs = elem.getAttributes();
+      let attrStr = '';
+
+      // Handle specific node types
+      switch (tagName) {
+        case 'paragraph':
+          html = '<p>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</p>';
+          break;
+
+        case 'heading':
+          const level = attrs.level || 1;
+          html = `<h${level}>`;
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += `</h${level}>`;
+          break;
+
+        case 'bulletList':
+          html = '<ul>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</ul>';
+          break;
+
+        case 'orderedList':
+          html = '<ol>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</ol>';
+          break;
+
+        case 'listItem':
+          html = '<li>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</li>';
+          break;
+
+        case 'taskItem':
+          const checked = attrs.checked;
+          const checkState = checked === true ? '☑' : checked === 'indeterminate' ? '◐' : '☐';
+          html = `<li class="task-item" data-checked="${checked}">${checkState} `;
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</li>';
+          break;
+
+        case 'blockquote':
+          html = '<blockquote>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</blockquote>';
+          break;
+
+        case 'codeBlock':
+          const lang = attrs.language || '';
+          html = `<pre><code class="language-${lang}">`;
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText) {
+              html += child.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+          });
+          html += '</code></pre>';
+          break;
+
+        case 'horizontalRule':
+          html = '<hr>';
+          break;
+
+        case 'image':
+          const src = attrs.src || '';
+          const alt = attrs.alt || '';
+          const title = attrs.title || '';
+          // Image src will be replaced on iOS side with local file path
+          html = `<img src="${src}" alt="${alt}" title="${title}" class="note-image">`;
+          break;
+
+        case 'table':
+          html = '<table>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</table>';
+          break;
+
+        case 'tableRow':
+          html = '<tr>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</tr>';
+          break;
+
+        case 'tableHeader':
+          html = '<th>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</th>';
+          break;
+
+        case 'tableCell':
+          html = '<td>';
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</td>';
+          break;
+
+        case 'hardBreak':
+          html = '<br>';
+          break;
+
+        default:
+          // Generic element handling
+          html = `<div class="${tagName}">`;
+          elem.forEach((child) => {
+            if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
+              html += convertToHTML(child);
+            }
+          });
+          html += '</div>';
+      }
+
+      return html;
+    };
+
+    let html = '';
+    content.forEach((item) => {
+      if (item instanceof Y.XmlText || item instanceof Y.XmlElement) {
+        html += convertToHTML(item);
+      }
+    });
+
+    return html;
   },
 
   closeNote(noteId: string): void {

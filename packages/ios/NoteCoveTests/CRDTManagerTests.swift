@@ -166,6 +166,49 @@ final class CRDTManagerTests: XCTestCase {
         bridge.invokeMethod("closeNote", withArguments: [testNoteId])
     }
 
+    // MARK: - HTML Content Tests
+
+    func testExtractContentAsHTML() throws {
+        try crdtManager.initialize()
+
+        // Access the bridge directly to create a note with content
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in
+            XCTFail("JS Exception: \(exception!)")
+        }
+
+        // Load the bridge
+        let bundle = Bundle.allBundles.first { $0.url(forResource: "ios-bridge-bundle", withExtension: "js") != nil }!
+        let url = bundle.url(forResource: "ios-bridge-bundle", withExtension: "js")!
+        let script = try String(contentsOf: url, encoding: .utf8)
+        context.evaluateScript(script)
+
+        guard let bridge = context.objectForKeyedSubscript("NoteCoveBridge"), !bridge.isUndefined else {
+            XCTFail("Bridge not found")
+            return
+        }
+
+        let testNoteId = "html-test-note"
+
+        // Create a note
+        bridge.invokeMethod("createNote", withArguments: [testNoteId])
+
+        // Extract HTML from empty note - should return empty or minimal HTML
+        guard let result = bridge.invokeMethod("extractContentAsHTML", withArguments: [testNoteId]),
+              let html = result.toString() else {
+            XCTFail("extractContentAsHTML did not return string")
+            return
+        }
+
+        // Empty note should return empty string or minimal content
+        XCTAssertNotNil(html, "HTML should not be nil")
+        // An empty note should return empty string
+        XCTAssertTrue(html.isEmpty, "Empty note should produce empty HTML, got: \(html)")
+
+        // Clean up
+        bridge.invokeMethod("closeNote", withArguments: [testNoteId])
+    }
+
     // MARK: - Integration Test Placeholder
 
     func testBridgeLoadsCorrectly() throws {

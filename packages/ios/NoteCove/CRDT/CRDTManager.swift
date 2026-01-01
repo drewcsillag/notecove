@@ -365,6 +365,76 @@ final class CRDTManager: ObservableObject {
         bridge.invokeMethod("closeNote", withArguments: [noteId])
     }
 
+    /// Load a note and get its content as HTML for rendering
+    /// - Parameter noteId: The note ID
+    /// - Returns: HTML string of the note content
+    func loadNoteContentAsHTML(noteId: String) throws -> String {
+        guard isInitialized, let bridge = bridge else {
+            throw CRDTError.bridgeNotInitialized
+        }
+
+        guard let activeDir = storageManager.activeDirectory,
+              let sdURL = activeDir.url else {
+            throw CRDTError.fileNotFound("No active storage directory")
+        }
+
+        let notesDir = sdURL.appendingPathComponent("notes").appendingPathComponent(noteId)
+
+        guard FileManager.default.fileExists(atPath: notesDir.path) else {
+            throw CRDTError.fileNotFound(notesDir.path)
+        }
+
+        // Create the note in JS
+        bridge.invokeMethod("createNote", withArguments: [noteId])
+
+        // Look for log files in the logs subdirectory
+        let logsDir = notesDir.appendingPathComponent("logs")
+        if FileManager.default.fileExists(atPath: logsDir.path) {
+            let files = try FileManager.default.contentsOfDirectory(
+                at: logsDir,
+                includingPropertiesForKeys: nil
+            )
+
+            let sortedFiles = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+            for file in sortedFiles {
+                let filename = file.lastPathComponent
+                guard filename.hasSuffix(".crdtlog") else {
+                    continue
+                }
+
+                let data = try Data(contentsOf: file)
+                let base64 = data.base64EncodedString()
+
+                bridge.invokeMethod("applyLogFile", withArguments: [noteId, base64])
+
+                if let exception = jsContext?.exception {
+                    print("[CRDTManager] Error applying log file \(filename): \(exception)")
+                    jsContext?.exception = nil
+                }
+            }
+        }
+
+        // Extract content as HTML
+        guard let result = bridge.invokeMethod("extractContentAsHTML", withArguments: [noteId]),
+              let html = result.toString() else {
+            bridge.invokeMethod("closeNote", withArguments: [noteId])
+            throw CRDTError.javaScriptError("Failed to extract HTML content")
+        }
+
+        if let exception = jsContext?.exception {
+            let message = exception.toString() ?? "Unknown error"
+            jsContext?.exception = nil
+            bridge.invokeMethod("closeNote", withArguments: [noteId])
+            throw CRDTError.javaScriptError(message)
+        }
+
+        // Close the note to free memory
+        bridge.invokeMethod("closeNote", withArguments: [noteId])
+
+        return html
+    }
+
     /// List all note IDs in the storage directory
     /// - Returns: Array of note ID strings
     func listNoteIds() throws -> [String] {
