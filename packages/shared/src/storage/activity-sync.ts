@@ -117,7 +117,7 @@ export interface ActivitySyncCallbacks {
 }
 
 /** Parsed activity log filename information */
-interface ParsedActivityFilename {
+export interface ParsedActivityFilename {
   /** Full filename including .log extension */
   filename: string;
   /** Profile ID (null for old format files without profile) */
@@ -134,28 +134,25 @@ interface ParsedActivityFilename {
  * - New: `{profileId}_{instanceId}.log`
  *
  * Detection logic: If the filename (without .log) contains exactly one underscore
- * and both parts are valid ID lengths (22 chars for compact or 36 chars for full UUID),
- * it's the new format. Otherwise it's the old format.
+ * and both parts are non-empty, it's treated as new format. This handles both
+ * production IDs (22/36 chars) and test IDs (any length like "instance-1").
  */
-function parseActivityFilename(filename: string): ParsedActivityFilename | null {
+export function parseActivityFilename(filename: string): ParsedActivityFilename | null {
   if (!filename.endsWith('.log')) return null;
 
   const baseName = filename.slice(0, -4); // Remove .log
 
-  // Try to split by underscore
+  // Try to split by underscore - look for first underscore
   const underscoreIndex = baseName.indexOf('_');
 
   if (underscoreIndex !== -1) {
     const firstPart = baseName.slice(0, underscoreIndex);
     const secondPart = baseName.slice(underscoreIndex + 1);
 
-    // Check if both parts look like valid IDs (22 or 36 chars)
-    // and that there's no underscore in the second part (which would indicate
-    // the first underscore was inside an old-format instance ID)
-    const isValidIdLength = (s: string) => s.length === 22 || s.length === 36;
-
-    if (isValidIdLength(firstPart) && isValidIdLength(secondPart) && !secondPart.includes('_')) {
-      // New format: {profileId}_{instanceId}.log
+    // If second part has no underscore and both parts are non-empty,
+    // treat as new format: {profileId}_{instanceId}.log
+    // This handles both production IDs (22/36 chars) and test IDs (any length)
+    if (firstPart.length > 0 && secondPart.length > 0 && !secondPart.includes('_')) {
       return {
         filename,
         profileId: firstPart,

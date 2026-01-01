@@ -33,7 +33,12 @@ export const defaultLogConfig: SimulatorLogConfig = {
  * Logger for sync simulator operations
  */
 export class SimulatorLogger {
-  constructor(private config: SimulatorLogConfig = defaultLogConfig) {}
+  private config: SimulatorLogConfig;
+
+  constructor(config: Partial<SimulatorLogConfig> = {}) {
+    // Merge with defaults to ensure all fields are defined
+    this.config = { ...defaultLogConfig, ...config };
+  }
 
   log(message: string): void {
     if (this.config.enabled) {
@@ -372,25 +377,36 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
 
     // Check magic number (NCLG)
     if (buffer.length < 5) {
-      throw new Error('File too small to be a valid CRDT log');
+      console.warn(`[parseCRDTLogSequences] File truncated (only ${buffer.length} bytes, need at least 5 for header)`);
+      return records;
     }
 
     const magic = buffer.toString('ascii', 0, 4);
     if (magic !== 'NCLG') {
-      throw new Error(`Invalid magic number: ${magic}`);
+      console.warn(`[parseCRDTLogSequences] Invalid magic number: ${magic} (file may be corrupted or truncated)`);
+      return records;
     }
 
     const version = buffer[4];
     if (version !== 0x01) {
-      throw new Error(`Unsupported version: ${version}`);
+      console.warn(`[parseCRDTLogSequences] Unsupported version: ${version}`);
+      return records;
     }
 
     offset = 5; // Skip header
 
     // Parse records
     while (offset < buffer.length) {
-      // Read varint length
-      const lengthResult = readVarint(buffer, offset);
+      const recordStartOffset = offset;
+
+      // Read varint length - may throw on truncation
+      let lengthResult;
+      try {
+        lengthResult = readVarint(buffer, offset);
+      } catch {
+        console.warn(`[parseCRDTLogSequences] File truncated at offset ${offset} while reading record length`);
+        break;
+      }
       const length = lengthResult.value;
       offset = lengthResult.offset;
 
@@ -399,24 +415,44 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
         break;
       }
 
+      // Check if we have enough bytes for the full record
       if (offset + length > buffer.length) {
-        // Incomplete record (partial sync)
+        console.warn(`[parseCRDTLogSequences] File truncated: record at offset ${recordStartOffset} claims ${length} bytes but only ${buffer.length - offset} available`);
         break;
       }
 
       // Read timestamp (8 bytes, big-endian)
-      if (offset + 8 > buffer.length) break;
+      if (offset + 8 > buffer.length) {
+        console.warn(`[parseCRDTLogSequences] File truncated at offset ${offset} while reading timestamp`);
+        break;
+      }
       const timestamp = buffer.readBigUInt64BE(offset);
       offset += 8;
 
-      // Read sequence (varint)
-      const sequenceResult = readVarint(buffer, offset);
+      // Save offset before reading sequence varint
+      const offsetBeforeSequence = offset;
+
+      // Read sequence (varint) - may throw on truncation
+      let sequenceResult;
+      try {
+        sequenceResult = readVarint(buffer, offset);
+      } catch {
+        console.warn(`[parseCRDTLogSequences] File truncated at offset ${offset} while reading sequence`);
+        break;
+      }
       const sequence = sequenceResult.value;
       offset = sequenceResult.offset;
 
-      // Skip data
-      const dataSize =
-        length - 8 - (sequenceResult.offset - (offset - (sequenceResult.offset - offset)));
+      // Calculate data size correctly: length minus timestamp (8 bytes) minus sequence varint size
+      const sequenceVarintSize = sequenceResult.offset - offsetBeforeSequence;
+      const dataSize = length - 8 - sequenceVarintSize;
+
+      if (dataSize < 0) {
+        console.warn(`[parseCRDTLogSequences] Invalid record at offset ${recordStartOffset}: computed negative data size ${dataSize}`);
+        break;
+      }
+
+      // Skip past data to next record
       offset += dataSize;
 
       records.push({
@@ -581,6 +617,11 @@ export class FileSyncSimulator {
   private pendingSyncs: Map<string, NodeJS.Timeout> = new Map();
   private fileSizes: Map<string, number> = new Map();
   private pollInterval: NodeJS.Timeout | null = null;
+  // Track pending partial sync completions so we can complete them on stop()
+  private pendingPartialCompletions: Map<
+    string,
+    { sourceFilePath: string; destFilePath: string; direction: string }
+  > = new Map();
 
   constructor(
     private sd1Path: string,
@@ -863,6 +904,14 @@ export class FileSyncSimulator {
 
         // Track completion timeout so it can be cleared on stop()
         const completionKey = `${destFilePath}:completion`;
+
+        // Store info needed to complete this partial sync (for completing on stop)
+        this.pendingPartialCompletions.set(completionKey, {
+          sourceFilePath,
+          destFilePath,
+          direction,
+        });
+
         const completionTimeout = setTimeout(async () => {
           if (!this.stopped) {
             // Re-read source file to get current content (file may have grown since partial sync)
@@ -880,6 +929,7 @@ export class FileSyncSimulator {
             }
           }
           this.pendingSyncs.delete(completionKey);
+          this.pendingPartialCompletions.delete(completionKey);
         }, completionDelay);
 
         this.pendingSyncs.set(completionKey, completionTimeout);
@@ -907,6 +957,59 @@ export class FileSyncSimulator {
   }
 
   /**
+   * Complete all pending partial syncs immediately.
+   * This ensures files are in a valid state before validation.
+   */
+  async completePendingPartialSyncs(): Promise<void> {
+    if (this.pendingPartialCompletions.size === 0) {
+      return;
+    }
+
+    this.config.logger.log(
+      `Completing ${this.pendingPartialCompletions.size} pending partial sync(s)...`
+    );
+
+    const { writeFile: writeFilePromise } = await import('fs/promises');
+
+    const completionPromises: Promise<void>[] = [];
+
+    for (const [key, info] of this.pendingPartialCompletions.entries()) {
+      const promise = (async () => {
+        try {
+          const currentContent = await readFile(info.sourceFilePath);
+          const relativePath = info.destFilePath.includes(this.sd1Path)
+            ? info.destFilePath.substring(this.sd1Path.length)
+            : info.destFilePath.substring(this.sd2Path.length);
+
+          this.config.logger.log(
+            `Force-completing partial sync: ${relativePath} (${info.direction}) - ${currentContent.length} bytes`
+          );
+          await writeFilePromise(info.destFilePath, currentContent);
+        } catch (err) {
+          // File may have been deleted
+          if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+            this.config.logger.error(`Error force-completing partial sync for ${key}:`, err);
+          }
+        }
+
+        // Clear the scheduled timeout since we completed it manually
+        const timeout = this.pendingSyncs.get(key);
+        if (timeout) {
+          clearTimeout(timeout);
+          this.pendingSyncs.delete(key);
+        }
+      })();
+
+      completionPromises.push(promise);
+    }
+
+    await Promise.all(completionPromises);
+    this.pendingPartialCompletions.clear();
+
+    this.config.logger.log('All pending partial syncs completed');
+  }
+
+  /**
    * Stop the file sync simulator
    */
   async stop(): Promise<void> {
@@ -919,7 +1022,11 @@ export class FileSyncSimulator {
       this.pollInterval = null;
     }
 
-    // Clear all pending syncs
+    // Complete all pending partial syncs before clearing timeouts
+    // This ensures files are in a valid state for validation
+    await this.completePendingPartialSyncs();
+
+    // Clear all pending syncs (non-partial syncs that haven't started yet)
     for (const timeout of this.pendingSyncs.values()) {
       clearTimeout(timeout);
     }

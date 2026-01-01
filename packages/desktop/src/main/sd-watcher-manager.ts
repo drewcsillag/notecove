@@ -19,6 +19,7 @@ import {
   DeletionSync,
   ImageStorage,
   isValidImageId,
+  parseActivityFilename,
   PollingGroup,
 } from '@notecove/shared';
 import type { CRDTManager } from './crdt';
@@ -659,24 +660,6 @@ export class SDWatcherManager {
         return;
       }
 
-      // Ignore directory creation events and our own log file
-      if (event.filename === '.activity' || event.filename === `${instanceId}.log`) {
-        console.log(
-          `[ActivityWatcher ${sdId}] Ignoring own log file or directory:`,
-          event.filename
-        );
-        // Broadcast for test debugging
-        for (const window of BrowserWindow.getAllWindows()) {
-          window.webContents.send('test:activity-watcher-debug', {
-            sdId,
-            filename: event.filename,
-            reason: 'own-log',
-            instanceId,
-          });
-        }
-        return;
-      }
-
       // Only process .log files
       if (!event.filename.endsWith('.log')) {
         console.log(`[ActivityWatcher ${sdId}] Ignoring non-.log file:`, event.filename);
@@ -689,6 +672,41 @@ export class SDWatcherManager {
           });
         }
         return;
+      }
+
+      // Ignore directory creation events
+      if (event.filename === '.activity') {
+        console.log(`[ActivityWatcher ${sdId}] Ignoring directory event:`, event.filename);
+        return;
+      }
+
+      // Parse the filename to check if it's our own log file
+      // Format: {profileId}_{instanceId}.log or {instanceId}.log (old format)
+      const parsed = parseActivityFilename(event.filename);
+      if (parsed) {
+        const isOwnFile =
+          parsed.instanceId === instanceId ||
+          (parsed.profileId !== null && parsed.profileId === profileId);
+        if (isOwnFile) {
+          console.log(
+            `[ActivityWatcher ${sdId}] Ignoring own log file:`,
+            event.filename,
+            `(parsed: instanceId=${parsed.instanceId}, profileId=${parsed.profileId})`
+          );
+          // Broadcast for test debugging
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.send('test:activity-watcher-debug', {
+              sdId,
+              filename: event.filename,
+              reason: 'own-log',
+              instanceId,
+              profileId,
+              parsedInstanceId: parsed.instanceId,
+              parsedProfileId: parsed.profileId,
+            });
+          }
+          return;
+        }
       }
 
       // Sync from other instances

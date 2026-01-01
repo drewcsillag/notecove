@@ -423,7 +423,11 @@ test.describe('Tags System - Database Indexing', () => {
 
     const editor = page.locator('.ProseMirror');
     await editor.click();
-    await page.keyboard.type('Remove test: #deleteremoveme #deletekeepme');
+    // Type tags with trailing spaces to ensure they're properly terminated
+    // Use unique tag names that won't conflict with autocomplete from previous tests
+    await page.keyboard.type('Remove test: #xremoveme ', { delay: 50 });
+    await page.waitForTimeout(100);
+    await page.keyboard.type('#xkeepme ', { delay: 50 });
     await page.waitForTimeout(2500); // Wait for auto-save
 
     // Verify initial tags are indexed
@@ -432,24 +436,24 @@ test.describe('Tags System - Database Indexing', () => {
       return tags.map((t: { name: string }) => t.name);
     });
 
-    expect(allTags).toContain('deletekeepme');
-    expect(allTags).toContain('deleteremoveme');
+    expect(allTags).toContain('xkeepme');
+    expect(allTags).toContain('xremoveme');
 
-    // Remove the #deleteremoveme tag by editing the note
+    // Remove the #xremoveme tag by editing the note
     await editor.click();
     await page.keyboard.press('Control+A'); // Select all
-    await page.keyboard.type('Remove test: #deletekeepme'); // Only keep one tag
+    await page.keyboard.type('Remove test: #xkeepme ', { delay: 50 }); // Only keep one tag
     await page.waitForTimeout(2500); // Wait for auto-save
 
-    // Verify #deleteremoveme tag was removed from global index
+    // Verify #xremoveme tag was removed from global index
     allTags = await page.evaluate(async () => {
       const tags = await window.electronAPI.tag.getAll();
       return tags.map((t: { name: string }) => t.name);
     });
 
-    // Note: deleteremoveme might still exist if it's in other notes,
-    // but deletekeepme should definitely still be there
-    expect(allTags).toContain('deletekeepme');
+    // Note: xremoveme might still exist if it's in other notes,
+    // but xkeepme should definitely still be there
+    expect(allTags).toContain('xkeepme');
   });
 });
 
