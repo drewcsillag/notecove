@@ -93,19 +93,19 @@ describe('StructuredLogger', () => {
     it('should include default context in all messages', () => {
       const logger = new StructuredLogger({
         defaultContext: {
-          app_version: '0.1.9',
+          app_version: '0.2.0',
         },
       });
 
       logger.info('Test message');
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('app_version="0.1.9"'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('app_version="0.2.0"'));
     });
 
     it('should merge default context with message context', () => {
       const logger = new StructuredLogger({
         defaultContext: {
-          app_version: '0.1.9',
+          app_version: '0.2.0',
         },
       });
 
@@ -114,7 +114,7 @@ describe('StructuredLogger', () => {
       });
 
       const loggedMessage = consoleLogSpy.mock.calls[0][0] as string;
-      expect(loggedMessage).toContain('app_version="0.1.9"');
+      expect(loggedMessage).toContain('app_version="0.2.0"');
       expect(loggedMessage).toContain('note_id="abc-123"');
     });
   });
@@ -141,7 +141,7 @@ describe('StructuredLogger', () => {
     it('should create child logger with additional context', () => {
       const parentLogger = new StructuredLogger({
         defaultContext: {
-          app_version: '0.1.9',
+          app_version: '0.2.0',
         },
       });
 
@@ -154,7 +154,7 @@ describe('StructuredLogger', () => {
       childLogger.info('Test message');
 
       const loggedMessage = consoleLogSpy.mock.calls[0][0] as string;
-      expect(loggedMessage).toContain('app_version="0.1.9"');
+      expect(loggedMessage).toContain('app_version="0.2.0"');
       expect(loggedMessage).toContain('sd_id="default"');
     });
 

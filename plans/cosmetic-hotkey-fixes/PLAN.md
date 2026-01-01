@@ -9,6 +9,7 @@
 ## Summary
 
 Four distinct fixes:
+
 1. Swap Find hotkeys and rename menu item
 2. Fix panel toggle shortcuts to use focused window
 3. Implement Cmd+X "cut line when no selection"
@@ -43,7 +44,9 @@ None
 ## Technical Notes
 
 ### Cmd+X Implementation
+
 TipTap allows custom keyboard shortcuts via extensions. When `Mod-x` is pressed:
+
 1. Check if selection is empty (from === to)
 2. If empty: select the current line, copy to clipboard, delete
 3. If not empty: let default cut behavior handle it (return false)
@@ -51,12 +54,14 @@ TipTap allows custom keyboard shortcuts via extensions. When `Mod-x` is pressed:
 Use `navigator.clipboard.writeText()` for plain text clipboard (standard for line-cut in editors).
 
 ### Edge Cases for Cut Line
+
 - Cursor at document start: cut first line
 - Cursor at document end: cut last line
 - Empty line: cut the empty line (just newline)
 - Single line document: cut and leave empty paragraph
 
 ### Plan Critique Notes
+
 - Steps 1-2 are low risk (menu.ts changes)
 - Step 3 medium risk - tests cover edge cases
 - Ordering is correct - no dependencies between steps
@@ -64,17 +69,20 @@ Use `navigator.clipboard.writeText()` for plain text clipboard (standard for lin
 ## Implementation Notes
 
 ### Files Changed
+
 1. `packages/desktop/src/main/menu.ts` - Updated Find hotkeys and panel toggle handlers
 2. `packages/desktop/src/renderer/src/components/EditorPanel/extensions/CutLine.ts` - New extension
 3. `packages/desktop/src/renderer/src/components/EditorPanel/extensions/__tests__/CutLine.test.ts` - New tests (9 tests)
 4. `packages/desktop/src/renderer/src/components/EditorPanel/getEditorExtensions.ts` - Added CutLine import
 
 ### Test Results
+
 - CutLine tests: 9/9 passed
 - EditorPanel tests: 641 passed (1 skipped)
 - All formatting checks pass
 
 ### Pre-existing Issues (Not Fixed)
+
 - TypeScript errors in profile/sync related code (PollingGroup, ProfileMode types missing from @notecove/shared)
 - ESLint errors related to the same missing types
 - These are unrelated to this feature and appear to be from incomplete work on another branch

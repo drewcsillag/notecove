@@ -5,28 +5,33 @@
 I've analyzed the codebase and found:
 
 ### 1. Find Hotkeys (in `menu.ts`)
+
 - Current "Find..." (Cmd+F) sends `menu:find` → opens quick find
 - Current "Find in Note" (Cmd+Shift+F) sends `menu:find-in-note` → opens in-note search
 
 **Your request:**
+
 - "Find Note" should be Cmd+Option+F (currently labeled "Find..." with Cmd+F)
 - "Find in Note" should be Cmd+F (currently Cmd+Shift+F)
 
 This is essentially swapping/reassigning the accelerators and renaming "Find..." to "Find Note".
 
 ### 2. Panel Toggle Hotkeys (Shift+Cmd+1, Shift+Cmd+2)
+
 Current code always sends to `mainWindow`:
+
 ```typescript
 click: () => {
   if (mainWindow) {
     mainWindow.webContents.send('menu:toggle-folder-panel');
   }
-}
+};
 ```
 
 Should use `BrowserWindow.getFocusedWindow()` like other menu items already do.
 
 ### 3. Cmd+X with No Selection
+
 The Edit menu uses `{ role: 'cut' }` which is Electron's built-in cut. To customize "cut current line when no selection", I would need to add a custom handler.
 
 ## Questions
@@ -44,6 +49,7 @@ actually, I want A
 ### Q2: Confirming the Find Hotkey Swap
 
 Just to confirm the final state:
+
 - **Edit → Find Note**: Cmd+Option+F (opens quick search for notes)
 - **Edit → Find in Note**: Cmd+F (opens in-note search/replace)
 

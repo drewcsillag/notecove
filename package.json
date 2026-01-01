@@ -1,6 +1,6 @@
 {
   "name": "notecove",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "private": true,
   "description": "Cross-platform notes application with offline-first CRDT synchronization",
   "author": "NoteCove Contributors",
