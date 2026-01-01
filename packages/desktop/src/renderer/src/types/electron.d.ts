@@ -1295,6 +1295,15 @@ declare global {
         onChanged: (callback: (theme: 'light' | 'dark') => void) => () => void;
       };
 
+      /** Checkbox settings operations for sync across windows */
+      checkboxSettings: {
+        /**
+         * Listen for checkbox settings changes broadcast from main process.
+         * Called when any window changes a checkbox behavior setting.
+         */
+        onChanged: (callback: () => void) => () => void;
+      };
+
       /** Feature flags operations for experimental features */
       featureFlags: {
         /** Get all feature flags with their current values and metadata */

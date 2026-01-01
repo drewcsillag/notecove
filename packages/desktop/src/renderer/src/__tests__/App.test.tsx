@@ -248,6 +248,11 @@ const mockElectronAPI = {
       /* unsubscribe */
     }),
   },
+  checkboxSettings: {
+    onChanged: jest.fn((_callback: () => void) => () => {
+      /* unsubscribe */
+    }),
+  },
   user: {
     getCurrentProfile: jest.fn().mockResolvedValue({
       profileId: 'test-profile-id',

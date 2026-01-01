@@ -62,6 +62,13 @@ function handleGetAppState(ctx: HandlerContext) {
   };
 }
 
+// Checkbox setting keys that should trigger broadcasts
+const CHECKBOX_SETTING_KEYS = [
+  'checkboxStrikethrough',
+  'checkboxAutoReorder',
+  'checkboxNopeEnabled',
+];
+
 function handleSetAppState(ctx: HandlerContext) {
   return async (_event: IpcMainInvokeEvent, key: string, value: string): Promise<void> => {
     const { database, onUserSettingsChanged, broadcastToAll, profileId } = ctx;
@@ -81,6 +88,11 @@ function handleSetAppState(ctx: HandlerContext) {
       const handle = (await database.getState('userHandle')) ?? '';
       console.log('[User Settings] Broadcasting profile change');
       broadcastToAll('user:profileChanged', { profileId, username, handle });
+    }
+
+    // Broadcast checkbox settings changes to all windows
+    if (CHECKBOX_SETTING_KEYS.includes(key)) {
+      broadcastToAll('checkboxSettings:changed');
     }
   };
 }

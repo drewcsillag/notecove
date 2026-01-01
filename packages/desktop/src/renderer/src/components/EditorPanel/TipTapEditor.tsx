@@ -53,6 +53,7 @@ import {
 } from './useChipHoverPreview';
 import { detectLinkContext, countLinksInParagraph } from './utils/linkContext';
 import { ImageLightbox } from './ImageLightbox';
+import { useCheckboxSettings } from '../../contexts/CheckboxSettingsContext';
 import { ImageContextMenu } from './ImageContextMenu';
 import { TableSizePickerDialog } from './TableSizePickerDialog';
 import { SearchPanel } from './SearchPanel';
@@ -111,6 +112,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   onViewComments,
 }) => {
   const theme = useTheme();
+  const { strikethrough } = useCheckboxSettings();
   const [yDoc] = useState(() => new Y.Doc());
   // Track whether text is selected (for enabling comment button)
   const [hasTextSelection, setHasTextSelection] = useState(false);
@@ -1136,7 +1138,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // Note: handleCmdK and handleCmdKRef effect are now managed by useEditorLinkPopovers
 
   return (
-    <Box sx={getTipTapEditorStyles(theme)}>
+    <Box sx={getTipTapEditorStyles(theme, { strikethroughEnabled: strikethrough })}>
       <EditorToolbar
         editor={editor}
         onLinkButtonClick={handleLinkButtonClick}

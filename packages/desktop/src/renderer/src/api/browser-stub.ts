@@ -355,6 +355,10 @@ export const browserApiStub: typeof window.electronAPI = {
     onChanged: stubEventSubscription,
   },
 
+  checkboxSettings: {
+    onChanged: stubEventSubscription,
+  },
+
   featureFlags: {
     getAll: notImplemented('featureFlags.getAll'),
     get: notImplemented('featureFlags.get'),

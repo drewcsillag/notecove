@@ -1133,6 +1133,11 @@ export const webClient: typeof window.electronAPI = {
     onChanged: noopSubscription,
   },
 
+  // Checkbox settings are synced via appState in browser mode
+  checkboxSettings: {
+    onChanged: noopSubscription,
+  },
+
   // Feature flags are not available in browser mode (desktop-only feature)
   featureFlags: {
     getAll: browserNotAvailable('featureFlags.getAll'),
