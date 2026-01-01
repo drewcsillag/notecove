@@ -1,0 +1,666 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1EA12ABE431E3E753446796B /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDF59B5876B5F580178B168 /* OnboardingView.swift */; };
+		3151CEFB67EE6299D9CB351C /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66FA11B67F6593B58F1D1544 /* Note.swift */; };
+		35308C91F9FB5404E8B3DF76 /* NoteCoveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 255C548184391C53FB2DFA6F /* NoteCoveApp.swift */; };
+		3BE3FAD8F20C285D45A9B3C7 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 753B754BA2E1B24FA88ACF63 /* DatabaseManager.swift */; };
+		3FEE1BF66093E75748FFF30B /* NoteCoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565C5B989A781C0043491970 /* NoteCoveTests.swift */; };
+		631C5EF5059EB0D16DDE20AA /* NoteListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */; };
+		8796B79499F416DB214CE3C7 /* NoteCoveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B862C088E86BD2F092B1594 /* NoteCoveUITests.swift */; };
+		8A1A8F759C1EA8C6DE17C3D3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3CA629A30408DFA3D3A48B /* ContentView.swift */; };
+		C3626DDCB1B05E5ACB08210A /* StorageDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ADFF95122C4217035DF32A /* StorageDirectory.swift */; };
+		D3D65EF6683FEA09DCF199D3 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0C47157B589FE19A8E813B8E /* GRDB */; };
+		DA9BFBF400ECEDECEAA10D84 /* Schema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3CD2E8DAA5A6716F8A9CB9 /* Schema.swift */; };
+		E4F6125ED7A38337B32D6AD1 /* FolderTreeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9321BEDA245CC75B1AE6EF74 /* FolderTreeView.swift */; };
+		ECB9748285EA4B412A61ABE2 /* NoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04B4A5349B0AEDB73668F75 /* NoteEditorView.swift */; };
+		F17EA9CEAA94A01A8668C786 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CB0D032179A2E5AB04CDAE8A /* Assets.xcassets */; };
+		F8F97509EBE4F8CB80BF0D90 /* Folder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9764E24E7D5F2C7D7F556884 /* Folder.swift */; };
+		FC6670171C030B0457B51B40 /* DatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E266CFAEA3B0F184F8C317FF /* DatabaseTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		08B2E8B256ED2CB08E97AAF8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1D909F8182ADAA9402ABC738 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A6F610A7C1215B680EA5F4E1;
+			remoteInfo = NoteCove;
+		};
+		B628D826892E34A1452C0EDE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1D909F8182ADAA9402ABC738 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A6F610A7C1215B680EA5F4E1;
+			remoteInfo = NoteCove;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1BEE95A0E4DE0FB2F08A2543 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		255C548184391C53FB2DFA6F /* NoteCoveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCoveApp.swift; sourceTree = "<group>"; };
+		26ADFF95122C4217035DF32A /* StorageDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDirectory.swift; sourceTree = "<group>"; };
+		4AA39C45765887770F1A7354 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		565C5B989A781C0043491970 /* NoteCoveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCoveTests.swift; sourceTree = "<group>"; };
+		66FA11B67F6593B58F1D1544 /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
+		753B754BA2E1B24FA88ACF63 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		7B862C088E86BD2F092B1594 /* NoteCoveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCoveUITests.swift; sourceTree = "<group>"; };
+		8A3CD2E8DAA5A6716F8A9CB9 /* Schema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Schema.swift; sourceTree = "<group>"; };
+		8A5B02D2F68923922EC149E1 /* NoteCoveUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = NoteCoveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EDC6C4CECFA6222E0F669EB /* NoteCove.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = NoteCove.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9321BEDA245CC75B1AE6EF74 /* FolderTreeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTreeView.swift; sourceTree = "<group>"; };
+		9764E24E7D5F2C7D7F556884 /* Folder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Folder.swift; sourceTree = "<group>"; };
+		A04B4A5349B0AEDB73668F75 /* NoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorView.swift; sourceTree = "<group>"; };
+		AEB5841B19AF45DCB5986817 /* NoteCoveTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = NoteCoveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteListView.swift; sourceTree = "<group>"; };
+		CB0D032179A2E5AB04CDAE8A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E266CFAEA3B0F184F8C317FF /* DatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseTests.swift; sourceTree = "<group>"; };
+		FA3CA629A30408DFA3D3A48B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		FAE371D9267609B12C06B891 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FEDF59B5876B5F580178B168 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C7ED617FC240221E9A1F9D66 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D3D65EF6683FEA09DCF199D3 /* GRDB in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0179812EE027B6739326B8E4 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				255C548184391C53FB2DFA6F /* NoteCoveApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		1F5266C1FAFC6345AC045803 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		4CC38BF4020BB087B2574FD9 /* NoteCoveTests */ = {
+			isa = PBXGroup;
+			children = (
+				E266CFAEA3B0F184F8C317FF /* DatabaseTests.swift */,
+				1BEE95A0E4DE0FB2F08A2543 /* Info.plist */,
+				565C5B989A781C0043491970 /* NoteCoveTests.swift */,
+			);
+			path = NoteCoveTests;
+			sourceTree = "<group>";
+		};
+		5ED8093F271DB84E91994310 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		6A60C750415A8678B4AA4101 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8EDC6C4CECFA6222E0F669EB /* NoteCove.app */,
+				AEB5841B19AF45DCB5986817 /* NoteCoveTests.xctest */,
+				8A5B02D2F68923922EC149E1 /* NoteCoveUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		73A0A7A7B9FCF82A8965B0B2 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				9764E24E7D5F2C7D7F556884 /* Folder.swift */,
+				66FA11B67F6593B58F1D1544 /* Note.swift */,
+				26ADFF95122C4217035DF32A /* StorageDirectory.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		8406080D1D19F016FB44421B /* NoteCoveUITests */ = {
+			isa = PBXGroup;
+			children = (
+				4AA39C45765887770F1A7354 /* Info.plist */,
+				7B862C088E86BD2F092B1594 /* NoteCoveUITests.swift */,
+			);
+			path = NoteCoveUITests;
+			sourceTree = "<group>";
+		};
+		967EA917C9D0712C76A7142E /* NoteCove */ = {
+			isa = PBXGroup;
+			children = (
+				CB0D032179A2E5AB04CDAE8A /* Assets.xcassets */,
+				FAE371D9267609B12C06B891 /* Info.plist */,
+				0179812EE027B6739326B8E4 /* App */,
+				E5B9E85B49D4E4521FBE4FE2 /* Database */,
+				BD61071203479B100A635B7A /* Editor */,
+				73A0A7A7B9FCF82A8965B0B2 /* Models */,
+				5ED8093F271DB84E91994310 /* Storage */,
+				DFC54AF6DF542081FDEB925B /* Utilities */,
+				C39565999605D5783CD86012 /* Views */,
+			);
+			path = NoteCove;
+			sourceTree = "<group>";
+		};
+		BBE40DBD94520B0CD736B8DA = {
+			isa = PBXGroup;
+			children = (
+				967EA917C9D0712C76A7142E /* NoteCove */,
+				4CC38BF4020BB087B2574FD9 /* NoteCoveTests */,
+				8406080D1D19F016FB44421B /* NoteCoveUITests */,
+				6A60C750415A8678B4AA4101 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BD61071203479B100A635B7A /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				1F5266C1FAFC6345AC045803 /* Resources */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		C39565999605D5783CD86012 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				FA3CA629A30408DFA3D3A48B /* ContentView.swift */,
+				9321BEDA245CC75B1AE6EF74 /* FolderTreeView.swift */,
+				A04B4A5349B0AEDB73668F75 /* NoteEditorView.swift */,
+				C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */,
+				FEDF59B5876B5F580178B168 /* OnboardingView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DFC54AF6DF542081FDEB925B /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		E5B9E85B49D4E4521FBE4FE2 /* Database */ = {
+			isa = PBXGroup;
+			children = (
+				753B754BA2E1B24FA88ACF63 /* DatabaseManager.swift */,
+				8A3CD2E8DAA5A6716F8A9CB9 /* Schema.swift */,
+			);
+			path = Database;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1EBB76B1631B40C1F2106407 /* NoteCoveTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7441D51B08CA4A66CDFD81FC /* Build configuration list for PBXNativeTarget "NoteCoveTests" */;
+			buildPhases = (
+				4694EE26CC8FD2B8BBF9C00D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C14C3704439B08DE0CC812A3 /* PBXTargetDependency */,
+			);
+			name = NoteCoveTests;
+			packageProductDependencies = (
+			);
+			productName = NoteCoveTests;
+			productReference = AEB5841B19AF45DCB5986817 /* NoteCoveTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		54F68CEFD6F20C3C74819C93 /* NoteCoveUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 563DAB6082B74A0F01FA1233 /* Build configuration list for PBXNativeTarget "NoteCoveUITests" */;
+			buildPhases = (
+				4FFCBE6D729A580C20FDA5B8 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				753AEE06C319B76AC702D2E5 /* PBXTargetDependency */,
+			);
+			name = NoteCoveUITests;
+			packageProductDependencies = (
+			);
+			productName = NoteCoveUITests;
+			productReference = 8A5B02D2F68923922EC149E1 /* NoteCoveUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A6F610A7C1215B680EA5F4E1 /* NoteCove */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CF489AE162445E693543A1B0 /* Build configuration list for PBXNativeTarget "NoteCove" */;
+			buildPhases = (
+				334BBB5C790C3F587D8407DC /* Sources */,
+				22307F784C454FE03ED88E05 /* Resources */,
+				C7ED617FC240221E9A1F9D66 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NoteCove;
+			packageProductDependencies = (
+				0C47157B589FE19A8E813B8E /* GRDB */,
+			);
+			productName = NoteCove;
+			productReference = 8EDC6C4CECFA6222E0F669EB /* NoteCove.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1D909F8182ADAA9402ABC738 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					54F68CEFD6F20C3C74819C93 = {
+						TestTargetID = A6F610A7C1215B680EA5F4E1;
+					};
+					A6F610A7C1215B680EA5F4E1 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 16F3CF79CB23F6C34FB3F224 /* Build configuration list for PBXProject "NoteCove" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = BBE40DBD94520B0CD736B8DA;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				78D7938D49BE7431EBAB18E3 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A6F610A7C1215B680EA5F4E1 /* NoteCove */,
+				1EBB76B1631B40C1F2106407 /* NoteCoveTests */,
+				54F68CEFD6F20C3C74819C93 /* NoteCoveUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		22307F784C454FE03ED88E05 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F17EA9CEAA94A01A8668C786 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		334BBB5C790C3F587D8407DC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A1A8F759C1EA8C6DE17C3D3 /* ContentView.swift in Sources */,
+				3BE3FAD8F20C285D45A9B3C7 /* DatabaseManager.swift in Sources */,
+				F8F97509EBE4F8CB80BF0D90 /* Folder.swift in Sources */,
+				E4F6125ED7A38337B32D6AD1 /* FolderTreeView.swift in Sources */,
+				3151CEFB67EE6299D9CB351C /* Note.swift in Sources */,
+				35308C91F9FB5404E8B3DF76 /* NoteCoveApp.swift in Sources */,
+				ECB9748285EA4B412A61ABE2 /* NoteEditorView.swift in Sources */,
+				631C5EF5059EB0D16DDE20AA /* NoteListView.swift in Sources */,
+				1EA12ABE431E3E753446796B /* OnboardingView.swift in Sources */,
+				DA9BFBF400ECEDECEAA10D84 /* Schema.swift in Sources */,
+				C3626DDCB1B05E5ACB08210A /* StorageDirectory.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4694EE26CC8FD2B8BBF9C00D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FC6670171C030B0457B51B40 /* DatabaseTests.swift in Sources */,
+				3FEE1BF66093E75748FFF30B /* NoteCoveTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FFCBE6D729A580C20FDA5B8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8796B79499F416DB214CE3C7 /* NoteCoveUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		753AEE06C319B76AC702D2E5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A6F610A7C1215B680EA5F4E1 /* NoteCove */;
+			targetProxy = B628D826892E34A1452C0EDE /* PBXContainerItemProxy */;
+		};
+		C14C3704439B08DE0CC812A3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A6F610A7C1215B680EA5F4E1 /* NoteCove */;
+			targetProxy = 08B2E8B256ED2CB08E97AAF8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0868E88C5DC78BC67E72182E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = NoteCoveUITests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.notecove.NoteCoveUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = NoteCove;
+			};
+			name = Debug;
+		};
+		2024B718533EBD658D73C0DE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		5D649F85323A0907D16B5031 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = NoteCoveTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.notecove.NoteCoveTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NoteCove.app/NoteCove";
+			};
+			name = Release;
+		};
+		61EBA10FA831169B8516E913 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = NoteCoveUITests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.notecove.NoteCoveUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = NoteCove;
+			};
+			name = Release;
+		};
+		6416C54FC7BBC449418C37FD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = NoteCove/NoteCove.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = NoteCove/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.notecove.NoteCove;
+				PRODUCT_NAME = NoteCove;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8655A40D4600475790A6254F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				INFOPLIST_FILE = NoteCoveTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.notecove.NoteCoveTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NoteCove.app/NoteCove";
+			};
+			name = Debug;
+		};
+		B2288FB40616422EA8B9A2DF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C5B71A1F8B0A8584B9E592D9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = NoteCove/NoteCove.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = NoteCove/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.notecove.NoteCove;
+				PRODUCT_NAME = NoteCove;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		16F3CF79CB23F6C34FB3F224 /* Build configuration list for PBXProject "NoteCove" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2288FB40616422EA8B9A2DF /* Debug */,
+				2024B718533EBD658D73C0DE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		563DAB6082B74A0F01FA1233 /* Build configuration list for PBXNativeTarget "NoteCoveUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0868E88C5DC78BC67E72182E /* Debug */,
+				61EBA10FA831169B8516E913 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7441D51B08CA4A66CDFD81FC /* Build configuration list for PBXNativeTarget "NoteCoveTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8655A40D4600475790A6254F /* Debug */,
+				5D649F85323A0907D16B5031 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CF489AE162445E693543A1B0 /* Build configuration list for PBXNativeTarget "NoteCove" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6416C54FC7BBC449418C37FD /* Debug */,
+				C5B71A1F8B0A8584B9E592D9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		78D7938D49BE7431EBAB18E3 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				kind = exactVersion;
+				version = 7.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0C47157B589FE19A8E813B8E /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 78D7938D49BE7431EBAB18E3 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1D909F8182ADAA9402ABC738 /* Project object */;
+}
