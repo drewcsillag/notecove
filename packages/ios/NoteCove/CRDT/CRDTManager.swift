@@ -459,6 +459,75 @@ final class CRDTManager: ObservableObject {
         return html
     }
 
+    /// Load a note and get its Yjs state as base64 for the TipTap editor
+    /// Note: This keeps the note open for editing. Call closeNote() when done.
+    /// - Parameter noteId: The note ID
+    /// - Returns: Base64-encoded Yjs state
+    func loadNoteStateForEditor(noteId: String) throws -> String {
+        guard isInitialized, let bridge = bridge else {
+            throw CRDTError.bridgeNotInitialized
+        }
+
+        guard let activeDir = storageManager.activeDirectory,
+              let sdURL = activeDir.url else {
+            throw CRDTError.fileNotFound("No active storage directory")
+        }
+
+        let notesDir = sdURL.appendingPathComponent("notes").appendingPathComponent(noteId)
+
+        guard FileManager.default.fileExists(atPath: notesDir.path) else {
+            throw CRDTError.fileNotFound(notesDir.path)
+        }
+
+        // Create the note in JS
+        bridge.invokeMethod("createNote", withArguments: [noteId])
+
+        // Look for log files in the logs subdirectory
+        let logsDir = notesDir.appendingPathComponent("logs")
+        if FileManager.default.fileExists(atPath: logsDir.path) {
+            let files = try FileManager.default.contentsOfDirectory(
+                at: logsDir,
+                includingPropertiesForKeys: nil
+            )
+
+            let sortedFiles = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+            for file in sortedFiles {
+                let filename = file.lastPathComponent
+                guard filename.hasSuffix(".crdtlog") else {
+                    continue
+                }
+
+                let data = try Data(contentsOf: file)
+                let base64 = data.base64EncodedString()
+
+                bridge.invokeMethod("applyLogFile", withArguments: [noteId, base64])
+
+                if let exception = jsContext?.exception {
+                    print("[CRDTManager] Error applying log file \(filename): \(exception)")
+                    jsContext?.exception = nil
+                }
+            }
+        }
+
+        // Get the document state as base64
+        guard let result = bridge.invokeMethod("getDocumentState", withArguments: [noteId]),
+              let stateBase64 = result.toString() else {
+            bridge.invokeMethod("closeNote", withArguments: [noteId])
+            throw CRDTError.javaScriptError("Failed to get document state")
+        }
+
+        if let exception = jsContext?.exception {
+            let message = exception.toString() ?? "Unknown error"
+            jsContext?.exception = nil
+            bridge.invokeMethod("closeNote", withArguments: [noteId])
+            throw CRDTError.javaScriptError(message)
+        }
+
+        // Note: We don't close the note here - it stays open for editing
+        return stateBase64
+    }
+
     /// List all note IDs in the storage directory
     /// - Returns: Array of note ID strings
     func listNoteIds() throws -> [String] {

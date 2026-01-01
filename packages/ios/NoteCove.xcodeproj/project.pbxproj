@@ -14,11 +14,13 @@
 		35308C91F9FB5404E8B3DF76 /* NoteCoveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 255C548184391C53FB2DFA6F /* NoteCoveApp.swift */; };
 		3BE3FAD8F20C285D45A9B3C7 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 753B754BA2E1B24FA88ACF63 /* DatabaseManager.swift */; };
 		3FEE1BF66093E75748FFF30B /* NoteCoveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565C5B989A781C0043491970 /* NoteCoveTests.swift */; };
+		506097A920F8B9AFDD3C2173 /* ios-editor-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = F68B5A42A22C91E69C3AFBA5 /* ios-editor-bundle.js */; };
 		631C5EF5059EB0D16DDE20AA /* NoteListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */; };
 		7A265E4560BAB59B1C406DEC /* ios-bridge-bundle.js in Resources */ = {isa = PBXBuildFile; fileRef = 40BBFE974D497A5E16D0C7B6 /* ios-bridge-bundle.js */; };
 		8796B79499F416DB214CE3C7 /* NoteCoveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B862C088E86BD2F092B1594 /* NoteCoveUITests.swift */; };
 		88D906F3ED8A50AAC02561CC /* StorageDirectoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24FA2DBD1A6944132D8DB425 /* StorageDirectoryTests.swift */; };
 		8A1A8F759C1EA8C6DE17C3D3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3CA629A30408DFA3D3A48B /* ContentView.swift */; };
+		99BD7EACC1F2164596950FFD /* ios-editor.html in Resources */ = {isa = PBXBuildFile; fileRef = 00EF45CFF09D48777C4EEF8E /* ios-editor.html */; };
 		C3626DDCB1B05E5ACB08210A /* StorageDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ADFF95122C4217035DF32A /* StorageDirectory.swift */; };
 		D3D65EF6683FEA09DCF199D3 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0C47157B589FE19A8E813B8E /* GRDB */; };
 		D4F2B7EE9857F6A489F8E6CA /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC635389550CEBBF70056C5 /* SampleData.swift */; };
@@ -53,6 +55,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00EF45CFF09D48777C4EEF8E /* ios-editor.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "ios-editor.html"; sourceTree = "<group>"; };
 		04DF904012BDCD4565160700 /* StorageDirectoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDirectoryManager.swift; sourceTree = "<group>"; };
 		16F5C35C1FB68795A41FFB1F /* InstanceID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstanceID.swift; sourceTree = "<group>"; };
 		1BEE95A0E4DE0FB2F08A2543 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -79,6 +82,7 @@
 		C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteListView.swift; sourceTree = "<group>"; };
 		CB0D032179A2E5AB04CDAE8A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E266CFAEA3B0F184F8C317FF /* DatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseTests.swift; sourceTree = "<group>"; };
+		F68B5A42A22C91E69C3AFBA5 /* ios-editor-bundle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "ios-editor-bundle.js"; sourceTree = "<group>"; };
 		FA3CA629A30408DFA3D3A48B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		FAE371D9267609B12C06B891 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FBC635389550CEBBF70056C5 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
@@ -108,6 +112,8 @@
 		1F5266C1FAFC6345AC045803 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				F68B5A42A22C91E69C3AFBA5 /* ios-editor-bundle.js */,
+				00EF45CFF09D48777C4EEF8E /* ios-editor.html */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -362,6 +368,8 @@
 			files = (
 				F17EA9CEAA94A01A8668C786 /* Assets.xcassets in Resources */,
 				7A265E4560BAB59B1C406DEC /* ios-bridge-bundle.js in Resources */,
+				506097A920F8B9AFDD3C2173 /* ios-editor-bundle.js in Resources */,
+				99BD7EACC1F2164596950FFD /* ios-editor.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

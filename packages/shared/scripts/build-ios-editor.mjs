@@ -1,0 +1,236 @@
+#!/usr/bin/env node
+
+/**
+ * Build the iOS editor bundle for WKWebView
+ */
+
+import * as esbuild from 'esbuild';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { writeFileSync, mkdirSync } from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const rootDir = join(__dirname, '..');
+
+async function build() {
+  const outDir = join(rootDir, 'dist', 'ios');
+  mkdirSync(outDir, { recursive: true });
+
+  // Bundle the editor JavaScript
+  const result = await esbuild.build({
+    entryPoints: [join(rootDir, 'src', 'ios-editor.ts')],
+    bundle: true,
+    minify: true,
+    format: 'iife',
+    globalName: 'NoteCoveEditorBundle',
+    target: ['safari17'],
+    outfile: join(outDir, 'ios-editor-bundle.js'),
+    metafile: true,
+  });
+
+  // Get bundle size
+  const bundleSize = Object.values(result.metafile.outputs)[0].bytes;
+  console.log(`✅ iOS editor bundle built: ${(bundleSize / 1024).toFixed(1)} KB`);
+
+  // Create the HTML wrapper
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NoteCove Editor</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --text-color: #1a1a1a;
+      --bg-color: #ffffff;
+      --placeholder-color: #999;
+      --border-color: #e0e0e0;
+      --code-bg: #f5f5f5;
+      --link-color: #007aff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-color: #f0f0f0;
+        --bg-color: #1c1c1e;
+        --placeholder-color: #666;
+        --border-color: #48484a;
+        --code-bg: #2c2c2e;
+        --link-color: #0a84ff;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    #editor {
+      padding: 16px;
+      min-height: 100%;
+      outline: none;
+    }
+
+    #editor:focus {
+      outline: none;
+    }
+
+    /* ProseMirror placeholder */
+    .ProseMirror p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      color: var(--placeholder-color);
+      pointer-events: none;
+      float: left;
+      height: 0;
+    }
+
+    /* Typography */
+    .ProseMirror h1 { font-size: 2em; margin: 0.67em 0; font-weight: 700; }
+    .ProseMirror h2 { font-size: 1.5em; margin: 0.75em 0; font-weight: 600; }
+    .ProseMirror h3 { font-size: 1.17em; margin: 0.83em 0; font-weight: 600; }
+    .ProseMirror p { margin: 1em 0; }
+
+    .ProseMirror a { color: var(--link-color); text-decoration: none; }
+    .ProseMirror strong { font-weight: 600; }
+    .ProseMirror em { font-style: italic; }
+    .ProseMirror u { text-decoration: underline; }
+    .ProseMirror s { text-decoration: line-through; }
+
+    .ProseMirror code {
+      font-family: 'SF Mono', Menlo, Monaco, monospace;
+      font-size: 0.9em;
+      background-color: var(--code-bg);
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+    }
+
+    .ProseMirror pre {
+      background-color: var(--code-bg);
+      padding: 12px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1em 0;
+    }
+
+    .ProseMirror pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.85em;
+    }
+
+    .ProseMirror blockquote {
+      margin: 1em 0;
+      padding: 0.5em 0 0.5em 1em;
+      border-left: 4px solid var(--border-color);
+      opacity: 0.9;
+    }
+
+    .ProseMirror ul, .ProseMirror ol {
+      margin: 1em 0;
+      padding-left: 1.5em;
+    }
+
+    .ProseMirror li { margin: 0.25em 0; }
+
+    /* Task list */
+    .ProseMirror ul[data-type="taskList"] {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .ProseMirror ul[data-type="taskList"] li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .ProseMirror ul[data-type="taskList"] li > label {
+      flex-shrink: 0;
+    }
+
+    .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+    }
+
+    .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+
+    /* Horizontal rule */
+    .ProseMirror hr {
+      border: none;
+      border-top: 1px solid var(--border-color);
+      margin: 2em 0;
+    }
+
+    /* Images */
+    .ProseMirror img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    /* Tables */
+    .ProseMirror table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+    }
+
+    .ProseMirror th, .ProseMirror td {
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      text-align: left;
+      min-width: 80px;
+    }
+
+    .ProseMirror th {
+      background-color: var(--code-bg);
+      font-weight: 600;
+    }
+
+    /* Selection */
+    .ProseMirror ::selection {
+      background: rgba(0, 122, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="editor"></div>
+  <script src="ios-editor-bundle.js"></script>
+  <script>
+    // Initialize editor when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.NoteCoveEditor) {
+        window.NoteCoveEditor.init('editor');
+      }
+    });
+  </script>
+</body>
+</html>`;
+
+  writeFileSync(join(outDir, 'ios-editor.html'), html);
+  console.log(`✅ iOS editor HTML created`);
+}
+
+build().catch((err) => {
+  console.error('Build failed:', err);
+  process.exit(1);
+});

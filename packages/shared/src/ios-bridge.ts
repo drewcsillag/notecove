@@ -372,7 +372,7 @@ const bridge: NoteCoveBridge = {
     // Convert Y.XmlFragment to HTML
     const convertToHTML = (elem: Y.XmlElement | Y.XmlText): string => {
       if (elem instanceof Y.XmlText) {
-        let text = elem.toString();
+        let text: string = String(elem.toString());
         // Apply marks (bold, italic, etc.)
         const attrs = elem.getAttributes();
         if (attrs.bold) text = `<strong>${text}</strong>`;
@@ -388,7 +388,6 @@ const bridge: NoteCoveBridge = {
 
       // Get attributes
       const attrs = elem.getAttributes();
-      let attrStr = '';
 
       // Handle specific node types
       switch (tagName) {
@@ -402,7 +401,7 @@ const bridge: NoteCoveBridge = {
           html += '</p>';
           break;
 
-        case 'heading':
+        case 'heading': {
           const level = attrs.level || 1;
           html = `<h${level}>`;
           elem.forEach((child) => {
@@ -412,6 +411,7 @@ const bridge: NoteCoveBridge = {
           });
           html += `</h${level}>`;
           break;
+        }
 
         case 'bulletList':
           html = '<ul>';
@@ -443,9 +443,10 @@ const bridge: NoteCoveBridge = {
           html += '</li>';
           break;
 
-        case 'taskItem':
+        case 'taskItem': {
           const checked = attrs.checked;
-          const checkState = checked === true ? '☑' : checked === 'indeterminate' ? '◐' : '☐';
+          const isChecked = checked === 'true';
+          const checkState = isChecked ? '☑' : checked === 'indeterminate' ? '◐' : '☐';
           html = `<li class="task-item" data-checked="${checked}">${checkState} `;
           elem.forEach((child) => {
             if (child instanceof Y.XmlText || child instanceof Y.XmlElement) {
@@ -454,6 +455,7 @@ const bridge: NoteCoveBridge = {
           });
           html += '</li>';
           break;
+        }
 
         case 'blockquote':
           html = '<blockquote>';
@@ -465,28 +467,30 @@ const bridge: NoteCoveBridge = {
           html += '</blockquote>';
           break;
 
-        case 'codeBlock':
+        case 'codeBlock': {
           const lang = attrs.language || '';
           html = `<pre><code class="language-${lang}">`;
           elem.forEach((child) => {
             if (child instanceof Y.XmlText) {
-              html += child.toString().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              html += String(child.toString()).replace(/</g, '&lt;').replace(/>/g, '&gt;');
             }
           });
           html += '</code></pre>';
           break;
+        }
 
         case 'horizontalRule':
           html = '<hr>';
           break;
 
-        case 'image':
+        case 'image': {
           const src = attrs.src || '';
           const alt = attrs.alt || '';
           const title = attrs.title || '';
           // Image src will be replaced on iOS side with local file path
           html = `<img src="${src}" alt="${alt}" title="${title}" class="note-image">`;
           break;
+        }
 
         case 'table':
           html = '<table>';

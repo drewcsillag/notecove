@@ -1,3 +1,14 @@
+# NoteCove iOS App
+#
+# To run on a physical device:
+# 1. Get your Team ID from Xcode (Preferences > Accounts > Your Team > Team ID)
+#    Or find it at https://developer.apple.com/account -> Membership -> Team ID
+# 2. Set it below in DEVELOPMENT_TEAM, or set the NC_TEAM_ID environment variable
+# 3. Run: xcodegen generate && open NoteCove.xcodeproj
+#
+# Note: iCloud entitlements require a paid Apple Developer account ($99/year)
+# For free accounts, use the simulator instead.
+
 name: NoteCove
 options:
   bundleIdPrefix: com.notecove
@@ -20,6 +31,12 @@ targets:
         excludes:
           - "**/*.entitlements"
       - path: NoteCove/CRDT/Resources/ios-bridge-bundle.js
+        type: file
+        buildPhase: resources
+      - path: NoteCove/Editor/Resources/ios-editor-bundle.js
+        type: file
+        buildPhase: resources
+      - path: NoteCove/Editor/Resources/ios-editor.html
         type: file
         buildPhase: resources
     settings:

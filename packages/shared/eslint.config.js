@@ -47,6 +47,7 @@ export default tseslint.config(
       '**/__tests__/**',
       '**/*.test.ts',
       '**/*.spec.ts',
+      '**/ios-editor.ts', // Built separately for iOS with browser globals
     ],
   }
 );
