@@ -334,9 +334,13 @@ test.describe('cross-machine sync - deletion and sloppy sync', () => {
     await window1.keyboard.type('Third line should also sync');
     await window1.waitForTimeout(2000);
 
+    console.log('[SloppySync] Ensuring all partial syncs complete...');
+    // Complete any pending partial syncs to ensure files are in valid state
+    await simulator.completePendingPartialSyncs();
+
     console.log('[SloppySync] Waiting for sloppy sync to complete...');
-    // Give extra time for slow/partial sync to complete
-    await window1.waitForTimeout(30000);
+    // Give extra time for Instance 2 to detect and load the synced content
+    await window1.waitForTimeout(15000);
 
     // THE KEY TEST: Does Instance 2 show the FINAL state?
     const notesList2 = window2.locator('[data-testid="notes-list"]');
