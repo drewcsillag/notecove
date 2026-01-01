@@ -44,7 +44,7 @@ describe('DeletionLogger', () => {
       await logger.recordDeletion(noteId);
 
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        `${deletionDir}/${profileId}_${instanceId}.log`,
+        `${deletionDir}/${profileId}.${instanceId}.log`,
         expect.any(Uint8Array)
       );
 
@@ -87,7 +87,7 @@ describe('DeletionLogger', () => {
 
   describe('getLogPath', () => {
     it('should return correct log path', () => {
-      expect(logger.getLogPath()).toBe(`${deletionDir}/${profileId}_${instanceId}.log`);
+      expect(logger.getLogPath()).toBe(`${deletionDir}/${profileId}.${instanceId}.log`);
     });
   });
 

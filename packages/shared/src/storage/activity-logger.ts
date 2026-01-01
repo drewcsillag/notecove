@@ -22,13 +22,16 @@ export class ActivityLogger {
   /**
    * Set profile and instance IDs and initialize log path
    *
-   * New filename format: {profileId}_{instanceId}.log
-   * Old format ({instanceId}.log) is still readable for backward compatibility.
+   * Filename format: {profileId}.{instanceId}.log
+   * Uses '.' as delimiter since profileId can contain '_' (base64url alphabet).
+   *
+   * Old formats ({instanceId}.log or {profileId}_{instanceId}.log) are still
+   * readable for backward compatibility in activity-sync.ts.
    */
   setIds(profileId: string, instanceId: string): void {
     this.profileId = profileId;
     // instanceId is only used for the filename, not stored separately
-    this.activityLogPath = this.fs.joinPath(this.activityDir, `${profileId}_${instanceId}.log`);
+    this.activityLogPath = this.fs.joinPath(this.activityDir, `${profileId}.${instanceId}.log`);
   }
 
   /**
@@ -52,18 +55,16 @@ export class ActivityLogger {
    * Always appends a new line for each update to ensure other instances
    * see all intermediate sequence numbers during incremental sync.
    *
-   * New format: noteId|profileId_sequenceNumber
-   * Old format: noteId|instanceId_sequenceNumber (still readable)
+   * Format: noteId|profileId|sequenceNumber
+   * Uses '|' as delimiter for all fields since profileId can contain '_'.
    *
-   * The profileId uniquely identifies the source of the update. The instanceId
-   * is now stored in the filename ({profileId}_{instanceId}.log) rather than
-   * in each line.
+   * Old formats (with '_' delimiter) are still readable in activity-sync.ts.
    *
    * Note: The compact() function prevents unbounded growth by keeping
    * only the last 1000 entries.
    */
   async recordNoteActivity(noteId: string, sequenceNumber: number): Promise<void> {
-    const line = `${noteId}|${this.profileId}_${sequenceNumber}`;
+    const line = `${noteId}|${this.profileId}|${sequenceNumber}`;
 
     // Always append - don't use replaceLastLine optimization
     // This ensures other instances see ALL intermediate sequences, which is

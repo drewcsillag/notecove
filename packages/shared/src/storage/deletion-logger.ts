@@ -25,11 +25,14 @@ export class DeletionLogger {
   /**
    * Set profile and instance IDs and initialize log path
    *
-   * New filename format: {profileId}_{instanceId}.log
-   * Old format ({instanceId}.log) is still readable for backward compatibility.
+   * Filename format: {profileId}.{instanceId}.log
+   * Uses '.' as delimiter since profileId can contain '_' (base64url alphabet).
+   *
+   * Old formats ({instanceId}.log or {profileId}_{instanceId}.log) are still
+   * readable for backward compatibility.
    */
   setIds(profileId: string, instanceId: string): void {
-    this.deletionLogPath = this.fs.joinPath(this.deletionDir, `${profileId}_${instanceId}.log`);
+    this.deletionLogPath = this.fs.joinPath(this.deletionDir, `${profileId}.${instanceId}.log`);
   }
 
   /**

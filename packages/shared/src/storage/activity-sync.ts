@@ -129,30 +129,32 @@ export interface ParsedActivityFilename {
 /**
  * Parse activity log filename to extract profile and instance IDs.
  *
- * Supports both formats:
- * - Old: `{instanceId}.log`
- * - New: `{profileId}_{instanceId}.log`
+ * Supports three formats:
+ * - Oldest: `{instanceId}.log`
+ * - Old: `{profileId}_{instanceId}.log` (problematic if profileId contains '_')
+ * - New: `{profileId}.{instanceId}.log` (uses '.' as delimiter)
  *
- * Detection logic: If the filename (without .log) contains exactly one underscore
- * and both parts are non-empty, it's treated as new format. This handles both
- * production IDs (22/36 chars) and test IDs (any length like "instance-1").
+ * Detection priority:
+ * 1. Check for '.' delimiter first (new format) - safest
+ * 2. Fall back to '_' delimiter (old format) - for backward compatibility
+ * 3. Assume entire basename is instanceId (oldest format)
  */
 export function parseActivityFilename(filename: string): ParsedActivityFilename | null {
   if (!filename.endsWith('.log')) return null;
 
   const baseName = filename.slice(0, -4); // Remove .log
 
-  // Try to split by underscore - look for first underscore
-  const underscoreIndex = baseName.indexOf('_');
+  // Check if both parts look like valid IDs (22 or 36 chars, or ios-* format)
+  const isValidIdLength = (s: string) => s.length === 22 || s.length === 36 || s.startsWith('ios-');
 
-  if (underscoreIndex !== -1) {
-    const firstPart = baseName.slice(0, underscoreIndex);
-    const secondPart = baseName.slice(underscoreIndex + 1);
+  // Try new format first: {profileId}.{instanceId}.log
+  // Find the last '.' which separates profileId from instanceId
+  const dotIndex = baseName.lastIndexOf('.');
+  if (dotIndex !== -1) {
+    const firstPart = baseName.slice(0, dotIndex);
+    const secondPart = baseName.slice(dotIndex + 1);
 
-    // If second part has no underscore and both parts are non-empty,
-    // treat as new format: {profileId}_{instanceId}.log
-    // This handles both production IDs (22/36 chars) and test IDs (any length)
-    if (firstPart.length > 0 && secondPart.length > 0 && !secondPart.includes('_')) {
+    if (isValidIdLength(firstPart) && isValidIdLength(secondPart)) {
       return {
         filename,
         profileId: firstPart,
@@ -161,7 +163,23 @@ export function parseActivityFilename(filename: string): ParsedActivityFilename 
     }
   }
 
-  // Old format: {instanceId}.log
+  // Try old format: {profileId}_{instanceId}.log
+  // Use lastIndexOf to handle profileIds that contain underscores
+  const underscoreIndex = baseName.lastIndexOf('_');
+  if (underscoreIndex !== -1) {
+    const firstPart = baseName.slice(0, underscoreIndex);
+    const secondPart = baseName.slice(underscoreIndex + 1);
+
+    if (isValidIdLength(firstPart) && isValidIdLength(secondPart)) {
+      return {
+        filename,
+        profileId: firstPart,
+        instanceId: secondPart,
+      };
+    }
+  }
+
+  // Oldest format: {instanceId}.log
   return {
     filename,
     profileId: null,
@@ -305,11 +323,23 @@ export class ActivitySync {
             if (parts.length < 2) continue; // Invalid line
 
             const noteId = parts[0];
-            const instanceSeq = parts[1];
-            if (!noteId || !instanceSeq) continue;
+            if (!noteId) continue;
 
-            const seqParts = instanceSeq.split('_');
-            const sequence = parseInt(seqParts[1] ?? '0');
+            // Parse sequence from line
+            // New format: noteId|profileId|sequence (3 parts)
+            // Old format: noteId|profileId_sequence (2 parts)
+            let sequence: number;
+            let instanceSeq: string;
+            if (parts.length >= 3) {
+              // New format
+              sequence = parseInt(parts[2] ?? '0');
+              instanceSeq = `${parts[1]}|${parts[2]}`; // Reconstruct for pollAndReload
+            } else {
+              // Old format
+              instanceSeq = parts[1] ?? '';
+              const seqParts = instanceSeq.split('_');
+              sequence = parseInt(seqParts[seqParts.length - 1] ?? '0');
+            }
 
             affectedNotes.add(noteId);
 
@@ -444,10 +474,22 @@ export class ActivitySync {
       cumulativeDelay += delay;
     }
 
-    // Parse instance ID and sequence from instanceSeq (format: "{instanceId}_{sequence}")
-    const seqParts = instanceSeq.split('_');
-    const expectedSequence = parseInt(seqParts[seqParts.length - 1] ?? '0');
-    const sourceInstanceId = seqParts.length > 1 ? seqParts.slice(0, -1).join('_') : instanceSeq;
+    // Parse instance ID and sequence from instanceSeq
+    // New format: "{profileId}|{sequence}" (uses '|' delimiter)
+    // Old format: "{profileId}_{sequence}" (uses '_' delimiter)
+    let expectedSequence: number;
+    let sourceInstanceId: string;
+    if (instanceSeq.includes('|')) {
+      // New format
+      const parts = instanceSeq.split('|');
+      expectedSequence = parseInt(parts[parts.length - 1] ?? '0');
+      sourceInstanceId = parts.slice(0, -1).join('|');
+    } else {
+      // Old format
+      const seqParts = instanceSeq.split('_');
+      expectedSequence = parseInt(seqParts[seqParts.length - 1] ?? '0');
+      sourceInstanceId = seqParts.length > 1 ? seqParts.slice(0, -1).join('_') : instanceSeq;
+    }
 
     // Track expected sequence for potential handoff to polling group
     this.trackPendingSequence(noteId, sourceInstanceId, expectedSequence);
@@ -687,18 +729,27 @@ export class ActivitySync {
     const cleaned: Array<{ noteId: string; sequence: number }> = [];
 
     try {
-      // Try new format first, then fall back to old format
-      let filePath: string;
+      // Try formats in order: newest to oldest
+      // Newest: {profileId}.{instanceId}.log
+      // Old: {profileId}_{instanceId}.log
+      // Oldest: {instanceId}.log
+      let filePath = this.fs.joinPath(this.activityDir, `${this.instanceId}.log`);
+      let exists = false;
+
       if (this.profileId) {
-        filePath = this.fs.joinPath(this.activityDir, `${this.profileId}_${this.instanceId}.log`);
-      } else {
-        filePath = this.fs.joinPath(this.activityDir, `${this.instanceId}.log`);
+        // Try newest format first
+        filePath = this.fs.joinPath(this.activityDir, `${this.profileId}.${this.instanceId}.log`);
+        exists = await this.fs.exists(filePath);
+
+        if (!exists) {
+          // Try old format
+          filePath = this.fs.joinPath(this.activityDir, `${this.profileId}_${this.instanceId}.log`);
+          exists = await this.fs.exists(filePath);
+        }
       }
 
-      // Check if our activity log exists
-      let exists = await this.fs.exists(filePath);
-      if (!exists && this.profileId) {
-        // Try old format as fallback
+      if (!exists) {
+        // Try oldest format
         filePath = this.fs.joinPath(this.activityDir, `${this.instanceId}.log`);
         exists = await this.fs.exists(filePath);
       }
@@ -721,6 +772,19 @@ export class ActivitySync {
         return cleaned;
       }
 
+      // Helper to parse sequence from line parts
+      // New format: noteId|profileId|sequence (3 parts)
+      // Old format: noteId|profileId_sequence (2 parts)
+      const parseSequence = (parts: string[]): number => {
+        if (parts.length >= 3) {
+          return parseInt(parts[2] ?? '0');
+        } else {
+          const instanceSeq = parts[1] ?? '';
+          const seqParts = instanceSeq.split('_');
+          return parseInt(seqParts[seqParts.length - 1] ?? '0');
+        }
+      };
+
       // Find highest sequence per-note in our log
       // Sequences are per-note-per-instance, so we need to track them separately
       const highestSeqPerNote = new Map<string, number>();
@@ -728,10 +792,8 @@ export class ActivitySync {
         const parts = line.split('|');
         if (parts.length < 2) continue;
         const noteId = parts[0];
-        const instanceSeq = parts[1];
-        if (!noteId || !instanceSeq) continue;
-        const seqParts = instanceSeq.split('_');
-        const seq = parseInt(seqParts[1] ?? '0');
+        if (!noteId) continue;
+        const seq = parseSequence(parts);
         const currentHighest = highestSeqPerNote.get(noteId) ?? 0;
         if (seq > currentHighest) {
           highestSeqPerNote.set(noteId, seq);
@@ -748,14 +810,12 @@ export class ActivitySync {
         }
 
         const noteId = parts[0];
-        const instanceSeq = parts[1];
-        if (!noteId || !instanceSeq) {
+        if (!noteId) {
           nonStaleLines.push(line);
           continue;
         }
 
-        const seqParts = instanceSeq.split('_');
-        const seq = parseInt(seqParts[1] ?? '0');
+        const seq = parseSequence(parts);
         const highestSeqForNote = highestSeqPerNote.get(noteId) ?? seq;
         const gap = highestSeqForNote - seq;
 
