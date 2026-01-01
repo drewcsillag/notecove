@@ -10,6 +10,10 @@
  */
 import { Node, mergeAttributes, InputRule } from '@tiptap/core';
 import { Node as ProseMirrorNode, Fragment } from '@tiptap/pm/model';
+import {
+  getCheckboxAutoReorder,
+  getCheckboxNopeEnabled,
+} from '../../../contexts/CheckboxSettingsContext';
 
 export type TaskItemState = 'unchecked' | 'checked' | 'nope';
 
@@ -38,8 +42,14 @@ declare module '@tiptap/core' {
 }
 
 function getNextState(currentState: TaskItemState): TaskItemState {
+  const nopeEnabled = getCheckboxNopeEnabled();
+
   if (currentState === 'unchecked') return 'checked';
-  if (currentState === 'checked') return 'nope';
+  if (currentState === 'checked') {
+    // Skip nope state when disabled, go directly to unchecked
+    return nopeEnabled ? 'nope' : 'unchecked';
+  }
+  // currentState === 'nope'
   return 'unchecked';
 }
 
@@ -290,7 +300,8 @@ export const TriStateTaskItem = Node.create<TriStateTaskItemOptions>({
         const nextState = getNextState(currentState);
         const wasCompleted = isCompletedState(currentState);
         const willBeCompleted = isCompletedState(nextState);
-        const needsReorder = wasCompleted !== willBeCompleted;
+        // Only reorder if the setting is enabled and completion state changed
+        const needsReorder = getCheckboxAutoReorder() && wasCompleted !== willBeCompleted;
 
         editor
           .chain()
@@ -447,10 +458,16 @@ export const TriStateTaskItem = Node.create<TriStateTaskItemOptions>({
         find: /(?:^|\s)\[[xX]\]\s$/,
         handler: createTaskInputHandler('checked'),
       }),
-      // Match "[n] " or "[N] " - nope task item
+      // Match "[n] " or "[N] " - nope task item (only when nope is enabled)
       new InputRule({
         find: /(?:^|\s)\[[nN]\]\s$/,
-        handler: createTaskInputHandler('nope'),
+        handler: (props) => {
+          // Skip this input rule when nope state is disabled
+          if (!getCheckboxNopeEnabled()) {
+            return;
+          }
+          createTaskInputHandler('nope')(props);
+        },
       }),
     ];
   },

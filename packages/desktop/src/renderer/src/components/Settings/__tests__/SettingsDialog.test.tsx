@@ -7,6 +7,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { SettingsDialog } from '../SettingsDialog';
 import { FeatureFlagsProvider } from '../../../contexts/FeatureFlagsContext';
+import { CheckboxSettingsProvider } from '../../../contexts/CheckboxSettingsContext';
 
 // Mock window.electronAPI
 const mockElectronAPI = {
@@ -19,8 +20,19 @@ const mockElectronAPI = {
     getCloudStoragePaths: jest.fn().mockResolvedValue({}),
   },
   appState: {
-    get: jest.fn(),
+    get: jest.fn().mockImplementation((key: string) => {
+      // Return enabled for checkbox settings
+      if (key === 'checkboxStrikethrough') return Promise.resolve('true');
+      if (key === 'checkboxAutoReorder') return Promise.resolve('true');
+      if (key === 'checkboxNopeEnabled') return Promise.resolve('true');
+      return Promise.resolve(null);
+    }),
     set: jest.fn(),
+  },
+  checkboxSettings: {
+    onChanged: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   theme: {
     set: jest.fn().mockResolvedValue(undefined),
@@ -64,10 +76,14 @@ const mockElectronAPI = {
 };
 
 /**
- * Wrapper that provides FeatureFlagsProvider context for tests
+ * Wrapper that provides contexts for tests
  */
 function TestWrapper({ children }: { children: React.ReactNode }) {
-  return <FeatureFlagsProvider>{children}</FeatureFlagsProvider>;
+  return (
+    <CheckboxSettingsProvider>
+      <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+    </CheckboxSettingsProvider>
+  );
 }
 
 // Set up global mocks before tests
@@ -277,8 +293,8 @@ describe('SettingsDialog', () => {
         expect(screen.getByText(/Customize the look and feel/i)).toBeInTheDocument();
       });
 
-      // Find and click the dark mode toggle
-      const darkModeSwitch = screen.getByRole('checkbox');
+      // Find and click the dark mode toggle (use label to avoid ambiguity with checkbox settings)
+      const darkModeSwitch = screen.getByLabelText('Dark Mode');
       fireEvent.click(darkModeSwitch);
 
       // Should call theme.set IPC to broadcast to all windows
@@ -309,8 +325,8 @@ describe('SettingsDialog', () => {
         expect(screen.getByText(/Customize the look and feel/i)).toBeInTheDocument();
       });
 
-      // Find and click the dark mode toggle (currently on, should turn off)
-      const darkModeSwitch = screen.getByRole('checkbox');
+      // Find and click the dark mode toggle (use label to avoid ambiguity with checkbox settings)
+      const darkModeSwitch = screen.getByLabelText('Dark Mode');
       fireEvent.click(darkModeSwitch);
 
       // Should call theme.set IPC with 'light'

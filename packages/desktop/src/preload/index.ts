@@ -36,6 +36,7 @@ import {
 } from './api/misc-api';
 import { themeApi } from './api/theme-api';
 import { oembedApi } from './api/oembed-api';
+import { checkboxSettingsApi } from './api/checkbox-settings-api';
 
 // Expose IPC API to renderer
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -142,6 +143,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Theme operations
   theme: themeApi,
+
+  // Checkbox settings operations
+  checkboxSettings: checkboxSettingsApi,
 
   // Feature flags operations
   featureFlags: featureFlagsApi,

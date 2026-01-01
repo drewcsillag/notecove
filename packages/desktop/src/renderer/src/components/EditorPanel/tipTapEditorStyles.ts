@@ -16,13 +16,38 @@ import { getCodeBlockStyles } from './codeBlockTheme';
 export const EDITOR_MAX_WIDTH = 750;
 
 /**
+ * Options for editor styles
+ */
+export interface TipTapEditorStyleOptions {
+  /** Whether to apply strikethrough to completed checkbox items (default: true) */
+  strikethroughEnabled?: boolean;
+}
+
+/**
  * Returns the complete sx styles for the TipTapEditor outer Box container.
  * Includes all ProseMirror styling for the editor content.
  *
  * @param theme - MUI theme object
+ * @param options - Optional style options
  * @returns SxProps style object for the editor container
  */
-export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
+export function getTipTapEditorStyles(
+  theme: Theme,
+  options?: TipTapEditorStyleOptions
+): SxProps<Theme> {
+  const { strikethroughEnabled = true } = options ?? {};
+
+  // Styles for completed checkbox content (checked and nope states)
+  const completedContentStyles = strikethroughEnabled
+    ? {
+        textDecoration: 'line-through',
+        opacity: 0.6,
+        color: theme.palette.text.secondary,
+      }
+    : {
+        textDecoration: 'none',
+        opacity: 1,
+      };
   return {
     height: '100%',
     display: 'flex',
@@ -668,32 +693,24 @@ export function getTipTapEditorStyles(theme: Theme): SxProps<Theme> {
           },
         },
 
-        // Checked state - green checkbox with checkmark, strikethrough text
+        // Checked state - green checkbox with checkmark, conditional strikethrough
         '&[data-checked="checked"]': {
           '& .task-checkbox': {
             backgroundColor: theme.palette.success.main,
             borderColor: theme.palette.success.main,
             color: '#ffffff',
           },
-          '& .task-content': {
-            textDecoration: 'line-through',
-            opacity: 0.6,
-            color: theme.palette.text.secondary,
-          },
+          '& .task-content': completedContentStyles,
         },
 
-        // Nope state - red checkbox with X, strikethrough text
+        // Nope state - red checkbox with X, conditional strikethrough
         '&[data-checked="nope"]': {
           '& .task-checkbox': {
             backgroundColor: theme.palette.error.main,
             borderColor: theme.palette.error.main,
             color: '#ffffff',
           },
-          '& .task-content': {
-            textDecoration: 'line-through',
-            opacity: 0.6,
-            color: theme.palette.text.secondary,
-          },
+          '& .task-content': completedContentStyles,
         },
       },
     },

@@ -172,6 +172,11 @@ export enum AppStateKey {
   SelectedFolderId = 'selectedFolderId', // Currently selected folder in main window
   LinkDisplayPreference = 'linkDisplayPreference', // 'none' | 'chip' | 'unfurl' | 'secure'
 
+  // Checkbox behavior settings
+  CheckboxStrikethrough = 'checkboxStrikethrough', // Apply strikethrough to completed items (default: true)
+  CheckboxAutoReorder = 'checkboxAutoReorder', // Move completed items to bottom of list (default: true)
+  CheckboxNopeEnabled = 'checkboxNopeEnabled', // Enable 3-state checkbox with nope state (default: true)
+
   // Polling group settings (Tier 2 sync polling)
   PollingRatePerMinute = 'pollingRatePerMinute', // Base polling rate (default 120)
   PollingHitMultiplier = 'pollingHitMultiplier', // Hit acceleration (default 0.25)

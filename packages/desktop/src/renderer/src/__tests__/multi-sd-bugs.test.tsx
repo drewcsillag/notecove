@@ -175,6 +175,9 @@ const mockElectronAPI = {
     set: jest.fn().mockResolvedValue(undefined),
     onChanged: jest.fn((_callback: (theme: 'light' | 'dark') => void) => () => {}),
   },
+  checkboxSettings: {
+    onChanged: jest.fn((_callback: () => void) => () => {}),
+  },
   user: {
     getCurrentProfile: jest.fn().mockResolvedValue({
       profileId: 'test-profile-id',
