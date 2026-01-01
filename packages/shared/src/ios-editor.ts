@@ -5,7 +5,7 @@
  * Communicates with Swift via webkit.messageHandlers.
  */
 
-import { Editor } from '@tiptap/core';
+import { Editor, Node, mergeAttributes } from '@tiptap/core';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Underline } from '@tiptap/extension-underline';
 import { TaskList } from '@tiptap/extension-task-list';
@@ -15,10 +15,133 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { Link } from '@tiptap/extension-link';
-import { Image } from '@tiptap/extension-image';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import * as Y from 'yjs';
-import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
+
+/**
+ * NotecoveImage - iOS TipTap Image Extension
+ *
+ * A simplified block node for displaying images stored in sync directories.
+ * Images are loaded via the notecove:// URL scheme which is handled by Swift's WKURLSchemeHandler.
+ */
+
+interface NotecoveImageAttrs {
+  imageId: string | null;
+  sdId: string | null;
+  alt: string;
+  caption: string;
+  width: string | null;
+  linkHref: string | null;
+}
+
+// Extend TipTap's Commands interface
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    notecoveImage: {
+      insertNotecoveImage: (attrs: Partial<NotecoveImageAttrs>) => ReturnType;
+    };
+  }
+}
+
+const NotecoveImage = Node.create({
+  name: 'notecoveImage',
+  group: 'block',
+  atom: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      imageId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-image-id'),
+        renderHTML: (attributes: NotecoveImageAttrs) => {
+          if (!attributes.imageId) return {};
+          return { 'data-image-id': attributes.imageId };
+        },
+      },
+      sdId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-sd-id'),
+        renderHTML: (attributes: NotecoveImageAttrs) => {
+          if (!attributes.sdId) return {};
+          return { 'data-sd-id': attributes.sdId };
+        },
+      },
+      alt: {
+        default: '',
+        parseHTML: (element) => {
+          const img = element.querySelector('img');
+          return img?.getAttribute('alt') ?? '';
+        },
+        renderHTML: () => ({}),
+      },
+      caption: {
+        default: '',
+        parseHTML: (element) => {
+          const figcaption = element.querySelector('figcaption');
+          return figcaption?.textContent ?? '';
+        },
+        renderHTML: () => ({}),
+      },
+      width: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-width'),
+        renderHTML: (attributes: NotecoveImageAttrs) => {
+          if (!attributes.width) return {};
+          return { 'data-width': attributes.width };
+        },
+      },
+      linkHref: {
+        default: null,
+        parseHTML: (element) => element.getAttribute('data-link-href'),
+        renderHTML: (attributes: NotecoveImageAttrs) => {
+          if (!attributes.linkHref) return {};
+          return { 'data-link-href': attributes.linkHref };
+        },
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'figure.notecove-image' }];
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    // Access attributes from node.attrs, not HTMLAttributes (which contains rendered HTML attrs)
+    const { imageId, sdId, alt, caption, width } = node.attrs as NotecoveImageAttrs;
+
+    // Build the image src using the notecove:// scheme
+    const src = imageId && sdId ? `notecove://image/${sdId}/${imageId}` : '';
+    console.log(`[NotecoveImage] renderHTML: imageId=${imageId}, sdId=${sdId}, src=${src}`);
+
+    // Build style for width
+    const imgStyle = width ? `width: ${width}` : '';
+
+    return [
+      'figure',
+      mergeAttributes(HTMLAttributes, { class: 'notecove-image' }),
+      ['img', { src, alt, style: imgStyle, class: 'notecove-image-element' }],
+      caption ? ['figcaption', {}, caption] : ['figcaption', { style: 'display: none' }],
+    ];
+  },
+
+  addCommands() {
+    return {
+      insertNotecoveImage:
+        (attrs) =>
+        ({ commands }) => {
+          return commands.insertContent({
+            type: this.name,
+            attrs,
+          });
+        },
+    };
+  },
+});
+import {
+  yXmlFragmentToProseMirrorRootNode,
+  prosemirrorJSONToYXmlFragment,
+} from 'y-prosemirror';
 
 // Declare webkit message handler type
 declare global {
@@ -81,10 +204,7 @@ const NoteCoveEditor = {
             rel: 'noopener noreferrer',
           },
         }),
-        Image.configure({
-          inline: false,
-          allowBase64: true,
-        }),
+        NotecoveImage,
         Placeholder.configure({
           placeholder: 'Start writing...',
         }),
@@ -92,6 +212,32 @@ const NoteCoveEditor = {
       editorProps: {
         attributes: {
           class: 'prose prose-sm sm:prose focus:outline-none',
+        },
+        handlePaste: (view, event) => {
+          // Check for pasted images
+          const items = event.clipboardData?.items;
+          if (!items) return false;
+
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+              // Get the image as a blob
+              const blob = item.getAsFile();
+              if (blob) {
+                event.preventDefault();
+                // Read as base64 and send to Swift for storage
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(',')[1];
+                  const mimeType = blob.type;
+                  postToSwift('imagePasted', { base64, mimeType });
+                };
+                reader.readAsDataURL(blob);
+                return true;
+              }
+            }
+          }
+          return false;
         },
       },
       onUpdate: ({ editor }) => {
@@ -219,6 +365,47 @@ const NoteCoveEditor = {
   },
 
   /**
+   * Sync editor content back to Yjs and return the update as base64.
+   * This creates a new Y.Doc from the current editor content.
+   * Returns null if editor is not initialized.
+   */
+  syncAndGetUpdate(): string | null {
+    if (!editor) return null;
+
+    try {
+      // Create a new Y.Doc to hold the synced content
+      const newDoc = new Y.Doc();
+      const content = newDoc.getXmlFragment('content');
+
+      // Convert ProseMirror JSON to Y.XmlFragment
+      const json = editor.getJSON();
+      prosemirrorJSONToYXmlFragment(editor.schema, json, content);
+
+      // Encode the state as an update
+      const state = Y.encodeStateAsUpdate(newDoc);
+      let binary = '';
+      for (let i = 0; i < state.length; i++) {
+        binary += String.fromCharCode(state[i]);
+      }
+
+      // Update our cached ydoc for next getYjsState call
+      if (ydoc) {
+        Y.applyUpdate(ydoc, state);
+      } else {
+        ydoc = newDoc;
+      }
+
+      postToSwift('synced', { noteId: currentNoteId });
+      return btoa(binary);
+    } catch (error) {
+      postToSwift('error', {
+        message: `Failed to sync: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+      return null;
+    }
+  },
+
+  /**
    * Get current content as HTML
    */
   getHTML(): string {
@@ -298,8 +485,27 @@ const NoteCoveEditor = {
 
   // MARK: - Image Commands
 
-  insertImage(src: string, alt?: string) {
-    editor?.chain().focus().setImage({ src, alt }).run();
+  /**
+   * Insert a NoteCove image at the current cursor position.
+   * Used when user selects an image from photo library or pastes from clipboard.
+   */
+  insertNotecoveImage(imageId: string, sdId: string, alt?: string) {
+    console.log(`[NoteCoveEditor] insertNotecoveImage called: imageId=${imageId}, sdId=${sdId}`);
+    if (!editor) {
+      console.error('[NoteCoveEditor] insertNotecoveImage: editor not initialized');
+      return;
+    }
+    editor?.chain().focus().insertNotecoveImage({ imageId, sdId, alt: alt || '' }).run();
+    // Log the DOM after insertion
+    setTimeout(() => {
+      const imgs = document.querySelectorAll('.notecove-image img');
+      console.log(`[NoteCoveEditor] After insertion: found ${imgs.length} images`);
+      imgs.forEach((img, i) => {
+        const imgEl = img as HTMLImageElement;
+        console.log(`[NoteCoveEditor] Image ${i}: src=${imgEl.src}, complete=${imgEl.complete}, naturalWidth=${imgEl.naturalWidth}`);
+      });
+    }, 100);
+    postToSwift('imageInserted', { imageId, sdId });
   },
 
   // MARK: - Table Commands
