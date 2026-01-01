@@ -377,13 +377,17 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
 
     // Check magic number (NCLG)
     if (buffer.length < 5) {
-      console.warn(`[parseCRDTLogSequences] File truncated (only ${buffer.length} bytes, need at least 5 for header)`);
+      console.warn(
+        `[parseCRDTLogSequences] File truncated (only ${buffer.length} bytes, need at least 5 for header)`
+      );
       return records;
     }
 
     const magic = buffer.toString('ascii', 0, 4);
     if (magic !== 'NCLG') {
-      console.warn(`[parseCRDTLogSequences] Invalid magic number: ${magic} (file may be corrupted or truncated)`);
+      console.warn(
+        `[parseCRDTLogSequences] Invalid magic number: ${magic} (file may be corrupted or truncated)`
+      );
       return records;
     }
 
@@ -404,7 +408,9 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
       try {
         lengthResult = readVarint(buffer, offset);
       } catch {
-        console.warn(`[parseCRDTLogSequences] File truncated at offset ${offset} while reading record length`);
+        console.warn(
+          `[parseCRDTLogSequences] File truncated at offset ${offset} while reading record length`
+        );
         break;
       }
       const length = lengthResult.value;
@@ -417,13 +423,17 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
 
       // Check if we have enough bytes for the full record
       if (offset + length > buffer.length) {
-        console.warn(`[parseCRDTLogSequences] File truncated: record at offset ${recordStartOffset} claims ${length} bytes but only ${buffer.length - offset} available`);
+        console.warn(
+          `[parseCRDTLogSequences] File truncated: record at offset ${recordStartOffset} claims ${length} bytes but only ${buffer.length - offset} available`
+        );
         break;
       }
 
       // Read timestamp (8 bytes, big-endian)
       if (offset + 8 > buffer.length) {
-        console.warn(`[parseCRDTLogSequences] File truncated at offset ${offset} while reading timestamp`);
+        console.warn(
+          `[parseCRDTLogSequences] File truncated at offset ${offset} while reading timestamp`
+        );
         break;
       }
       const timestamp = buffer.readBigUInt64BE(offset);
@@ -437,7 +447,9 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
       try {
         sequenceResult = readVarint(buffer, offset);
       } catch {
-        console.warn(`[parseCRDTLogSequences] File truncated at offset ${offset} while reading sequence`);
+        console.warn(
+          `[parseCRDTLogSequences] File truncated at offset ${offset} while reading sequence`
+        );
         break;
       }
       const sequence = sequenceResult.value;
@@ -448,7 +460,9 @@ export async function parseCRDTLogSequences(logPath: string): Promise<CRDTLogRec
       const dataSize = length - 8 - sequenceVarintSize;
 
       if (dataSize < 0) {
-        console.warn(`[parseCRDTLogSequences] Invalid record at offset ${recordStartOffset}: computed negative data size ${dataSize}`);
+        console.warn(
+          `[parseCRDTLogSequences] Invalid record at offset ${recordStartOffset}: computed negative data size ${dataSize}`
+        );
         break;
       }
 

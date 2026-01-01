@@ -937,7 +937,9 @@ test.describe('Multi-SD Cross-Instance Sync Bugs', () => {
 
     // In Instance 1, find and click on the note from Instance 2
     console.log('[Test] Selecting note in instance 1...');
-    const noteFromI2 = window1.locator('[data-testid="notes-list"]').getByText(/Content from instance 2/);
+    const noteFromI2 = window1
+      .locator('[data-testid="notes-list"]')
+      .getByText(/Content from instance 2/);
     await expect(noteFromI2).toBeVisible({ timeout: 10000 });
     await noteFromI2.click();
     await window1.waitForTimeout(2000);
