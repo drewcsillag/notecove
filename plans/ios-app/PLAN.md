@@ -575,3 +575,5 @@ xcodebuild \
 | 2026-01-01 | Completed Phase 3.2: CRDT Updates with syncAndGetUpdate, createLogFileFromUpdate, saveNoteUpdate                                                 |
 | 2026-01-01 | Completed Phase 3.3: Note Creation with generateNoteId, createNewNote in CRDTManager, startInEditMode for new notes                              |
 | 2026-01-01 | Completed Phase 3.4: Rich Text Features with EditorFormattingToolbar (bold, italic, lists, headings, blockquotes, tables, undo/redo)             |
+| 2026-01-01 | Completed Phase 3.5: Image Support with notecove:// URL scheme, PhotosPicker, clipboard paste, content-addressed storage                         |
+| 2026-01-01 | **Database-Backed Architecture**: Implemented 6-phase plan to prevent UI blocking on iCloud downloads. NoteListView now reads from SQLite (via GRDB ValueObservation), BackgroundSyncService syncs CRDT to database, SyncProgressView shows initial sync progress, write-through ensures instant UI updates on edit. See `plans/ios-database-architecture/PLAN.md` for details. |
