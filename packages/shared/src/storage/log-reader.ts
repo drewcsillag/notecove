@@ -67,18 +67,27 @@ export class LogReader {
       let instanceId: string;
       let timestamp: number;
 
-      // Try new format first: {profileId}_{instanceId}_{timestamp}.crdtlog
-      const newMatch = filename.match(/^(.+)_(.+)_(\d+)\.crdtlog$/);
-      if (newMatch) {
-        profileId = newMatch[1]!;
-        instanceId = newMatch[2]!;
-        timestamp = parseInt(newMatch[3]!, 10);
+      // Try new . format first: {profileId}.{instanceId}.{timestamp}.crdtlog
+      // This format uses . as delimiter since profileId/instanceId can contain underscores (base64url)
+      const dotMatch = filename.match(/^(.+)\.([^.]+)\.(\d+)\.crdtlog$/);
+      if (dotMatch) {
+        profileId = dotMatch[1]!;
+        instanceId = dotMatch[2]!;
+        timestamp = parseInt(dotMatch[3]!, 10);
       } else {
-        // Try old format: {instanceId}_{timestamp}.crdtlog
-        const oldMatch = filename.match(/^(.+)_(\d+)\.crdtlog$/);
-        if (!oldMatch) continue;
-        instanceId = oldMatch[1]!;
-        timestamp = parseInt(oldMatch[2]!, 10);
+        // Try old _ format: {profileId}_{instanceId}_{timestamp}.crdtlog
+        const underscoreMatch = filename.match(/^(.+)_(.+)_(\d+)\.crdtlog$/);
+        if (underscoreMatch) {
+          profileId = underscoreMatch[1]!;
+          instanceId = underscoreMatch[2]!;
+          timestamp = parseInt(underscoreMatch[3]!, 10);
+        } else {
+          // Try legacy format: {instanceId}_{timestamp}.crdtlog
+          const legacyMatch = filename.match(/^(.+)_(\d+)\.crdtlog$/);
+          if (!legacyMatch) continue;
+          instanceId = legacyMatch[1]!;
+          timestamp = parseInt(legacyMatch[2]!, 10);
+        }
       }
 
       const path = fs.joinPath(logDir, filename);

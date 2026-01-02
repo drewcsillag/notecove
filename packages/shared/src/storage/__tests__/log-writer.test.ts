@@ -147,7 +147,7 @@ describe('LogWriter', () => {
 
       const result = await writer.appendRecord(1000, 1, new Uint8Array([0x01]));
 
-      expect(result.file).toContain('inst-abc_');
+      expect(result.file).toContain('.inst-abc.');
       expect(result.file).toContain('.crdtlog');
       // First record starts right after the header
       expect(result.offset).toBe(LOG_HEADER_SIZE);
@@ -168,14 +168,15 @@ describe('LogWriter', () => {
   });
 
   describe('filename generation', () => {
-    it('should include profileId, instanceId and timestamp in filename', async () => {
+    it('should include profileId, instanceId and timestamp in filename with . delimiter', async () => {
       const fs = createMockFs();
       const writer = new LogWriter('/logs', 'profile-abc', 'inst-abc', fs);
 
       await writer.appendRecord(Date.now(), 1, new Uint8Array([0x01]));
 
       const file = writer.getCurrentFile()!;
-      expect(file).toMatch(/profile-abc_inst-abc_\d+\.crdtlog$/);
+      // Format: {profileId}.{instanceId}.{timestamp}.crdtlog
+      expect(file).toMatch(/profile-abc\.inst-abc\.\d+\.crdtlog$/);
     });
 
     it('should handle timestamp collision by incrementing', async () => {
@@ -183,7 +184,7 @@ describe('LogWriter', () => {
       // Pre-create a finalized file (with termination sentinel) with a specific timestamp
       // The LogWriter will try to append but find it's finalized, so it needs a new file
       const existingTimestamp = 1704067200000;
-      const existingFile = `/logs/profile-abc_inst-abc_${existingTimestamp}.crdtlog`;
+      const existingFile = `/logs/profile-abc.inst-abc.${existingTimestamp}.crdtlog`;
       // Header (5 bytes) + termination sentinel (1 byte with value 0x00)
       fs.files.set(existingFile, new Uint8Array([0x4e, 0x43, 0x4c, 0x47, 0x01, 0x00]));
 
@@ -197,7 +198,7 @@ describe('LogWriter', () => {
 
         const file = writer.getCurrentFile()!;
         // Should have timestamp + 1 since existing file is finalized
-        expect(file).toBe(`/logs/profile-abc_inst-abc_${existingTimestamp + 1}.crdtlog`);
+        expect(file).toBe(`/logs/profile-abc.inst-abc.${existingTimestamp + 1}.crdtlog`);
       } finally {
         Date.now = originalNow;
       }

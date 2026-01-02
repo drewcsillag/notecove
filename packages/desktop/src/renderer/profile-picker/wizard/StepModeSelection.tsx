@@ -29,7 +29,7 @@ export function StepModeSelection({
     {
       mode: 'local',
       title: 'Local',
-      description: 'Store notes in ~/Documents/NoteCove. Simple and private.',
+      description: 'Store notes in the profile. Simple and private.',
       available: true,
     },
     {

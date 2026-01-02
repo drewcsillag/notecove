@@ -51,12 +51,13 @@ describe('StepStorageConfig', () => {
   });
 
   describe('Local mode', () => {
-    it('should show default storage path for local mode', () => {
+    it('should show Local Storage title and NOT display a path', () => {
       const props = createProps({ state: createState('local') });
       render(<StepStorageConfig {...props} />);
 
       expect(screen.getByText('Local Storage')).toBeInTheDocument();
-      expect(screen.getByText(defaultStoragePath)).toBeInTheDocument();
+      // Should NOT show a storage path - users don't need to see it
+      expect(screen.queryByText(defaultStoragePath)).not.toBeInTheDocument();
     });
 
     it('should enable Next button for local mode (always valid)', () => {
@@ -67,11 +68,13 @@ describe('StepStorageConfig', () => {
       expect(nextButton).not.toBeDisabled();
     });
 
-    it('should show info box about storage location', () => {
+    it('should show info box about storage', () => {
       const props = createProps({ state: createState('local') });
       render(<StepStorageConfig {...props} />);
 
-      expect(screen.getByText(/Your notes will be stored in this folder/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Your notes will be stored securely in the profile/i)
+      ).toBeInTheDocument();
     });
   });
 

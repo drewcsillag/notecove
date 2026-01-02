@@ -66,19 +66,22 @@ describe('StepConfirmation', () => {
   });
 
   describe('Storage path display', () => {
-    it('should show default path for local mode', () => {
+    it('should NOT show storage path for local mode', () => {
       const props = createProps({ state: createState('local') });
       render(<StepConfirmation {...props} />);
 
-      expect(screen.getByText('Storage')).toBeInTheDocument();
-      expect(screen.getByText(defaultStoragePath)).toBeInTheDocument();
+      // For local mode, we don't show the storage path - it's in the profile
+      expect(screen.queryByText('Storage')).not.toBeInTheDocument();
+      expect(screen.queryByText(defaultStoragePath)).not.toBeInTheDocument();
     });
 
-    it('should show default path for paranoid mode', () => {
+    it('should NOT show storage path for paranoid mode', () => {
       const props = createProps({ state: createState('paranoid') });
       render(<StepConfirmation {...props} />);
 
-      expect(screen.getByText(defaultStoragePath)).toBeInTheDocument();
+      // For paranoid mode, we don't show the storage path - it's in the profile
+      expect(screen.queryByText('Storage')).not.toBeInTheDocument();
+      expect(screen.queryByText(defaultStoragePath)).not.toBeInTheDocument();
     });
 
     it('should show cloud path with NoteCove suffix for cloud mode', () => {

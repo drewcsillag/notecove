@@ -60,7 +60,10 @@ describe('StepModeSelection', () => {
     const props = createProps({ state: stateWithCloudProviders });
     render(<StepModeSelection {...props} />);
 
-    expect(screen.getByText(/Store notes in ~\/Documents\/NoteCove/)).toBeInTheDocument();
+    // Local mode: "Store notes in the profile. Simple and private."
+    expect(
+      screen.getByText(/Store notes in the profile\. Simple and private\./)
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/Store notes in your cloud storage for automatic sync/)
     ).toBeInTheDocument();

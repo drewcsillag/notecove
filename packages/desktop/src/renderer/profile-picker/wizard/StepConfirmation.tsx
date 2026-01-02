@@ -76,19 +76,22 @@ export function StepConfirmation({
             <span style={wizardStyles.summaryValue}>{getModeDisplayName()}</span>
           </div>
 
-          <div style={wizardStyles.summaryRow}>
-            <span style={wizardStyles.summaryLabel}>Storage</span>
-            <span
-              style={{
-                ...wizardStyles.summaryValue,
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                wordBreak: 'break-all',
-              }}
-            >
-              {getStoragePath()}
-            </span>
-          </div>
+          {/* Only show storage path for cloud and custom modes */}
+          {(state.mode === 'cloud' || state.mode === 'custom') && (
+            <div style={wizardStyles.summaryRow}>
+              <span style={wizardStyles.summaryLabel}>Storage</span>
+              <span
+                style={{
+                  ...wizardStyles.summaryValue,
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  wordBreak: 'break-all',
+                }}
+              >
+                {getStoragePath()}
+              </span>
+            </div>
+          )}
 
           {state.mode === 'cloud' && state.cloudProvider && (
             <div style={wizardStyles.summaryRow}>

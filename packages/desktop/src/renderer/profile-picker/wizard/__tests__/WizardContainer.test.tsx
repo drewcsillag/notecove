@@ -169,7 +169,8 @@ describe('WizardContainer', () => {
       await waitFor(() => {
         expect(screen.getByText('Local Storage')).toBeInTheDocument();
       });
-      expect(screen.getByText(defaultStoragePath)).toBeInTheDocument();
+      // Path is no longer shown for local mode - storage is in the profile
+      expect(screen.queryByText(defaultStoragePath)).not.toBeInTheDocument();
       fireEvent.click(screen.getByText('Next'));
 
       // Step 4: User settings

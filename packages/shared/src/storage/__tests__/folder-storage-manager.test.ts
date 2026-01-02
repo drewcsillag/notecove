@@ -311,7 +311,7 @@ describe('FolderStorageManager', () => {
       // Verify log file was created
       const logFiles = await fs.listFiles(paths.logs);
       expect(logFiles.length).toBe(1);
-      expect(logFiles[0]).toMatch(new RegExp(`^${profileId}_${instanceId}_\\d+\\.crdtlog$`));
+      expect(logFiles[0]).toMatch(new RegExp(`^${profileId}\\.${instanceId}\\.\\d+\\.crdtlog$`));
     });
 
     it('should increment sequence number', async () => {

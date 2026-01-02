@@ -149,6 +149,69 @@ describe('LogReader', () => {
       expect(files[0].instanceId).toBe('550e8400-e29b-41d4-a716-446655440000');
       expect(files[0].timestamp).toBe(1699028345000);
     });
+
+    it('should parse new . delimiter format: {profileId}.{instanceId}.{timestamp}.crdtlog', async () => {
+      const fs = createMockFs();
+      const logData = createLogFile([]);
+
+      fs.files.set('/logs/profile-abc.inst-xyz.1699028345000.crdtlog', logData);
+
+      const files = await LogReader.listLogFiles('/logs', fs);
+
+      expect(files.length).toBe(1);
+      expect(files[0].profileId).toBe('profile-abc');
+      expect(files[0].instanceId).toBe('inst-xyz');
+      expect(files[0].timestamp).toBe(1699028345000);
+    });
+
+    it('should parse new format with base64url profileId containing underscores', async () => {
+      const fs = createMockFs();
+      const logData = createLogFile([]);
+
+      // base64url can contain underscores, which is why we use . as delimiter
+      fs.files.set('/logs/abc_def_ghi.inst-xyz.1699028345000.crdtlog', logData);
+
+      const files = await LogReader.listLogFiles('/logs', fs);
+
+      expect(files.length).toBe(1);
+      expect(files[0].profileId).toBe('abc_def_ghi');
+      expect(files[0].instanceId).toBe('inst-xyz');
+      expect(files[0].timestamp).toBe(1699028345000);
+    });
+
+    it('should still parse old _ delimiter format for backward compatibility', async () => {
+      const fs = createMockFs();
+      const logData = createLogFile([]);
+
+      // Old format: {profileId}_{instanceId}_{timestamp}.crdtlog
+      fs.files.set('/logs/profile-abc_inst-xyz_1699028345000.crdtlog', logData);
+
+      const files = await LogReader.listLogFiles('/logs', fs);
+
+      expect(files.length).toBe(1);
+      expect(files[0].profileId).toBe('profile-abc');
+      expect(files[0].instanceId).toBe('inst-xyz');
+      expect(files[0].timestamp).toBe(1699028345000);
+    });
+
+    it('should parse both old and new formats in the same directory', async () => {
+      const fs = createMockFs();
+      const logData = createLogFile([]);
+
+      // Old format
+      fs.files.set('/logs/profile-abc_inst-old_1000.crdtlog', logData);
+      // New format
+      fs.files.set('/logs/profile-abc.inst-new.2000.crdtlog', logData);
+
+      const files = await LogReader.listLogFiles('/logs', fs);
+
+      expect(files.length).toBe(2);
+      // Sorted by timestamp
+      expect(files[0].instanceId).toBe('inst-old');
+      expect(files[0].timestamp).toBe(1000);
+      expect(files[1].instanceId).toBe('inst-new');
+      expect(files[1].timestamp).toBe(2000);
+    });
   });
 
   describe('readRecords', () => {

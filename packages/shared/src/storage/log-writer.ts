@@ -275,11 +275,12 @@ export class LogWriter {
 
   /**
    * Create a new log file with header.
-   * Uses new format: {profileId}_{instanceId}_{timestamp}.crdtlog
+   * Uses format: {profileId}.{instanceId}.{timestamp}.crdtlog
+   * (Uses . as delimiter since profileId/instanceId can contain underscores in base64url)
    */
   private async createNewFile(): Promise<void> {
     const timestamp = await this.getUniqueTimestamp();
-    const filename = `${this.profileId}_${this.instanceId}_${timestamp}.crdtlog`;
+    const filename = `${this.profileId}.${this.instanceId}.${timestamp}.crdtlog`;
     this.currentFile = this.fs.joinPath(this.logDir, filename);
 
     // Write header
@@ -298,11 +299,11 @@ export class LogWriter {
 
     // Check for existing files with this profile+instance ID
     const files = await this.fs.listFiles(this.logDir);
-    const prefix = `${this.profileId}_${this.instanceId}_`;
+    const prefix = `${this.profileId}.${this.instanceId}.`;
     const ourFiles = files
       .filter((f) => f.startsWith(prefix) && f.endsWith('.crdtlog'))
       .map((f) => {
-        const match = f.match(/_(\d+)\.crdtlog$/);
+        const match = f.match(/\.(\d+)\.crdtlog$/);
         return match ? parseInt(match[1]!, 10) : 0;
       })
       .filter((t) => t > 0);

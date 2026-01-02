@@ -50,13 +50,9 @@ export function StepStorageConfig({
 
   const renderLocalOrParanoidConfig = (): React.ReactElement => (
     <>
-      <div style={wizardStyles.fieldGroup}>
-        <label style={wizardStyles.label}>Storage Location</label>
-        <div style={wizardStyles.pathDisplay}>{state.defaultStoragePath}</div>
-      </div>
-
       <div style={wizardStyles.infoBox}>
-        Your notes will be stored in this folder. You can access and backup this folder directly.
+        Your notes will be stored securely in the profile. You can backup the profile directory if
+        needed.
       </div>
 
       {state.mode === 'paranoid' && (
