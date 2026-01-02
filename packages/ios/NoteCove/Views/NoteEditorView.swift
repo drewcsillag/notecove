@@ -225,10 +225,15 @@ struct NoteEditorView: View {
                     return
                 }
 
-                // Save the update to disk
+                // Save the update to disk and sync to database (write-through)
                 do {
+                    // 1. Save CRDT to disk
                     try CRDTManager.shared.saveNoteUpdate(noteId: note.id, updateBase64: updateBase64)
-                    print("[NoteEditorView] Changes saved successfully")
+                    print("[NoteEditorView] CRDT changes saved successfully")
+
+                    // 2. Sync to database for instant UI update
+                    await BackgroundSyncService.shared.syncChangedNotes([note.id])
+                    print("[NoteEditorView] Database sync completed")
                 } catch {
                     print("[NoteEditorView] Error saving changes: \(error)")
                 }
@@ -794,12 +799,16 @@ struct TipTapWebView: UIViewRepresentable {
         }
 
         private func handleAutoSave(noteId: String, updateBase64: String) {
-            // Save the CRDT update to disk
-            // This runs on a background thread to avoid blocking the UI
-            Task {
+            // Save the CRDT update to disk and sync to database for instant UI updates
+            Task { @MainActor in
                 do {
+                    // 1. Save CRDT to disk
                     try CRDTManager.shared.saveNoteUpdate(noteId: noteId, updateBase64: updateBase64)
-                    print("[TipTapWebView] Auto-save completed for note \(noteId)")
+                    print("[TipTapWebView] Auto-save CRDT completed for note \(noteId)")
+
+                    // 2. Sync to database for instant UI update (write-through)
+                    await BackgroundSyncService.shared.syncChangedNotes([noteId])
+                    print("[TipTapWebView] Auto-save DB sync completed for note \(noteId)")
                 } catch {
                     print("[TipTapWebView] Auto-save failed for note \(noteId): \(error)")
                 }
