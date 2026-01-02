@@ -291,6 +291,198 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(results.count, 0)
     }
 
+    // MARK: - Note Model Conversion Tests (Phase 1)
+
+    func testNoteFromNoteRecordConversion() throws {
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let record = NoteRecord(
+            id: "test-note-id",
+            title: "Test Title",
+            sdId: "sd-1",
+            folderId: "folder-123",
+            created: now - 10000,
+            modified: now,
+            deleted: false,
+            pinned: true,
+            contentPreview: "This is a preview",
+            contentText: "Full content"
+        )
+
+        let note = Note(from: record)
+
+        XCTAssertEqual(note.id, "test-note-id")
+        XCTAssertEqual(note.title, "Test Title")
+        XCTAssertEqual(note.preview, "This is a preview")
+        XCTAssertEqual(note.folderId, "folder-123")
+        XCTAssertTrue(note.isPinned)
+        // Verify date conversion (ms to Date)
+        XCTAssertEqual(note.modifiedAt.timeIntervalSince1970, Double(now) / 1000, accuracy: 0.001)
+        XCTAssertEqual(note.createdAt.timeIntervalSince1970, Double(now - 10000) / 1000, accuracy: 0.001)
+    }
+
+    func testNoteFromNoteRecordWithNilFolder() throws {
+        let record = NoteRecord(
+            id: "note-no-folder",
+            title: "Unfiled Note",
+            sdId: "sd-1",
+            folderId: nil,
+            created: 1000000,
+            modified: 2000000,
+            deleted: false,
+            pinned: false,
+            contentPreview: "",
+            contentText: ""
+        )
+
+        let note = Note(from: record)
+
+        XCTAssertNil(note.folderId)
+        XCTAssertFalse(note.isPinned)
+    }
+
+    // MARK: - Database Observation Tests (Phase 5)
+
+    func testObserveNotesReturnsValueObservation() throws {
+        // Insert a note
+        let note = NoteRecord(
+            id: "observe-test",
+            title: "Observable Note",
+            sdId: "sd-1",
+            folderId: nil,
+            created: Int64(Date().timeIntervalSince1970 * 1000),
+            modified: Int64(Date().timeIntervalSince1970 * 1000),
+            deleted: false,
+            pinned: false,
+            contentPreview: "Test",
+            contentText: "Test content"
+        )
+        try DatabaseManager.shared.upsertNote(note)
+
+        // Create observation
+        let observation = DatabaseManager.shared.observeNotes()
+
+        // Start observation and verify initial value
+        let expectation = XCTestExpectation(description: "Observation callback")
+        var receivedNotes: [NoteRecord] = []
+
+        let cancellable = observation.start(
+            in: DatabaseManager.shared.pool,
+            onError: { error in
+                XCTFail("Observation error: \(error)")
+            },
+            onChange: { notes in
+                receivedNotes = notes
+                expectation.fulfill()
+            }
+        )
+
+        wait(for: [expectation], timeout: 2.0)
+        cancellable.cancel()
+
+        XCTAssertEqual(receivedNotes.count, 1)
+        XCTAssertEqual(receivedNotes.first?.title, "Observable Note")
+    }
+
+    func testObserveNotesWithFolderFilter() throws {
+        // Insert notes in different folders
+        let note1 = NoteRecord(
+            id: "obs-folder-1",
+            title: "In Folder A",
+            sdId: "sd-1",
+            folderId: "folder-a",
+            created: Int64(Date().timeIntervalSince1970 * 1000),
+            modified: Int64(Date().timeIntervalSince1970 * 1000),
+            deleted: false,
+            pinned: false,
+            contentPreview: "",
+            contentText: ""
+        )
+        let note2 = NoteRecord(
+            id: "obs-folder-2",
+            title: "In Folder B",
+            sdId: "sd-1",
+            folderId: "folder-b",
+            created: Int64(Date().timeIntervalSince1970 * 1000),
+            modified: Int64(Date().timeIntervalSince1970 * 1000),
+            deleted: false,
+            pinned: false,
+            contentPreview: "",
+            contentText: ""
+        )
+        try DatabaseManager.shared.upsertNote(note1)
+        try DatabaseManager.shared.upsertNote(note2)
+
+        // Observe only folder-a
+        let observation = DatabaseManager.shared.observeNotes(folderId: "folder-a")
+
+        let expectation = XCTestExpectation(description: "Filtered observation")
+        var receivedNotes: [NoteRecord] = []
+
+        let cancellable = observation.start(
+            in: DatabaseManager.shared.pool,
+            onError: { _ in },
+            onChange: { notes in
+                receivedNotes = notes
+                expectation.fulfill()
+            }
+        )
+
+        wait(for: [expectation], timeout: 2.0)
+        cancellable.cancel()
+
+        XCTAssertEqual(receivedNotes.count, 1)
+        XCTAssertEqual(receivedNotes.first?.folderId, "folder-a")
+    }
+
+    func testObserveNotesExcludesDeleted() throws {
+        let activeNote = NoteRecord(
+            id: "obs-active",
+            title: "Active",
+            sdId: "sd-1",
+            folderId: nil,
+            created: Int64(Date().timeIntervalSince1970 * 1000),
+            modified: Int64(Date().timeIntervalSince1970 * 1000),
+            deleted: false,
+            pinned: false,
+            contentPreview: "",
+            contentText: ""
+        )
+        let deletedNote = NoteRecord(
+            id: "obs-deleted",
+            title: "Deleted",
+            sdId: "sd-1",
+            folderId: nil,
+            created: Int64(Date().timeIntervalSince1970 * 1000),
+            modified: Int64(Date().timeIntervalSince1970 * 1000),
+            deleted: true,
+            pinned: false,
+            contentPreview: "",
+            contentText: ""
+        )
+        try DatabaseManager.shared.upsertNote(activeNote)
+        try DatabaseManager.shared.upsertNote(deletedNote)
+
+        let observation = DatabaseManager.shared.observeNotes()
+
+        let expectation = XCTestExpectation(description: "Excludes deleted")
+        var receivedNotes: [NoteRecord] = []
+
+        let cancellable = observation.start(
+            in: DatabaseManager.shared.pool,
+            onError: { _ in },
+            onChange: { notes in
+                receivedNotes = notes
+                expectation.fulfill()
+            }
+        )
+
+        wait(for: [expectation], timeout: 2.0)
+        cancellable.cancel()
+
+        XCTAssertEqual(receivedNotes.count, 1)
+        XCTAssertEqual(receivedNotes.first?.title, "Active")
+    }
+
     // MARK: - Stats Tests
 
     func testDatabaseStats() throws {
