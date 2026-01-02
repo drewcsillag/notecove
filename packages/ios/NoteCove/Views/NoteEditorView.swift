@@ -727,6 +727,16 @@ struct TipTapWebView: UIViewRepresentable {
                 // Image was inserted into editor, nothing to do
                 print("[TipTapWebView] Image inserted: \(body["imageId"] ?? "unknown")")
 
+            case "autoSave":
+                // Handle auto-save from JS debounce
+                guard let noteId = body["noteId"] as? String,
+                      let updateBase64 = body["updateBase64"] as? String,
+                      !updateBase64.isEmpty else {
+                    print("[TipTapWebView] autoSave: missing noteId or updateBase64")
+                    return
+                }
+                handleAutoSave(noteId: noteId, updateBase64: updateBase64)
+
             default:
                 print("[TipTapWebView] Unknown action: \(action)")
             }
@@ -780,6 +790,19 @@ struct TipTapWebView: UIViewRepresentable {
                 callJS(js)
             } catch {
                 print("[TipTapWebView] Failed to save pasted image: \(error)")
+            }
+        }
+
+        private func handleAutoSave(noteId: String, updateBase64: String) {
+            // Save the CRDT update to disk
+            // This runs on a background thread to avoid blocking the UI
+            Task {
+                do {
+                    try CRDTManager.shared.saveNoteUpdate(noteId: noteId, updateBase64: updateBase64)
+                    print("[TipTapWebView] Auto-save completed for note \(noteId)")
+                } catch {
+                    print("[TipTapWebView] Auto-save failed for note \(noteId): \(error)")
+                }
             }
         }
 

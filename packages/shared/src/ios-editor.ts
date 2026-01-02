@@ -165,6 +165,82 @@ let ydoc: Y.Doc | null = null;
 let currentNoteId: string | null = null;
 let originalStateVector: Uint8Array | null = null; // Track original state for delta encoding
 
+// Auto-save debounce timer
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const AUTO_SAVE_DELAY_MS = 5000; // 5 seconds debounce
+let isLoadingNote = false; // Flag to prevent auto-save during note loading
+
+/**
+ * Cancel any pending auto-save timer
+ */
+function cancelAutoSave() {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+}
+
+/**
+ * Perform an auto-save: sync editor content to Y.Doc and send update to Swift
+ */
+function performAutoSave() {
+  if (!editor || !ydoc || !currentNoteId) return;
+
+  try {
+    // Get the content fragment from the existing ydoc
+    const content = ydoc.getXmlFragment('content');
+
+    // Clear existing content and replace with current editor state
+    ydoc.transact(() => {
+      content.delete(0, content.length);
+      const json = editor!.getJSON();
+      prosemirrorJSONToYXmlFragment(editor!.schema, json, content);
+    });
+
+    // Encode the delta since the original state
+    const update = originalStateVector
+      ? Y.encodeStateAsUpdate(ydoc, originalStateVector)
+      : Y.encodeStateAsUpdate(ydoc);
+
+    // Check if there's actually anything to save (update might be empty)
+    if (update.length <= 2) {
+      // Empty updates are typically just 2 bytes (state vector header)
+      return;
+    }
+
+    let binary = '';
+    for (let i = 0; i < update.length; i++) {
+      binary += String.fromCharCode(update[i]);
+    }
+    const updateBase64 = btoa(binary);
+
+    // Update the state vector for next save
+    originalStateVector = Y.encodeStateVector(ydoc);
+
+    // Send to Swift for persistence
+    postToSwift('autoSave', { noteId: currentNoteId, updateBase64 });
+  } catch (error) {
+    console.error('[ios-editor] Auto-save error:', error);
+  }
+}
+
+/**
+ * Schedule an auto-save with debouncing
+ */
+function scheduleAutoSave() {
+  // Don't schedule during note loading
+  if (isLoadingNote) return;
+
+  // Cancel any existing timer
+  cancelAutoSave();
+
+  // Schedule new auto-save
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    performAutoSave();
+  }, AUTO_SAVE_DELAY_MS);
+}
+
 /**
  * iOS Editor Bridge API
  */
@@ -245,6 +321,9 @@ const NoteCoveEditor = {
           html: editor.getHTML(),
           json: editor.getJSON(),
         });
+
+        // Schedule auto-save (debounced)
+        scheduleAutoSave();
       },
       onSelectionUpdate: ({ editor }) => {
         // Notify Swift of selection/formatting state
@@ -289,6 +368,10 @@ const NoteCoveEditor = {
       return false;
     }
 
+    // Cancel any pending auto-save from previous note
+    cancelAutoSave();
+    isLoadingNote = true;
+
     try {
       currentNoteId = noteId;
       ydoc = new Y.Doc();
@@ -311,9 +394,13 @@ const NoteCoveEditor = {
       // Set content in editor
       editor.commands.setContent(node.toJSON());
 
+      // Allow auto-saves now that loading is complete
+      isLoadingNote = false;
+
       postToSwift('loaded', { noteId });
       return true;
     } catch (error) {
+      isLoadingNote = false;
       postToSwift('error', {
         message: `Failed to load: ${error instanceof Error ? error.message : 'Unknown error'}`,
       });
@@ -345,11 +432,19 @@ const NoteCoveEditor = {
       return false;
     }
 
+    // Cancel any pending auto-save from previous note
+    cancelAutoSave();
+    isLoadingNote = true;
+
     currentNoteId = noteId;
     ydoc = new Y.Doc();
     // For new documents, the original state is empty
     originalStateVector = Y.encodeStateVector(ydoc);
     editor.commands.clearContent();
+
+    // Allow auto-saves now
+    isLoadingNote = false;
+
     postToSwift('loaded', { noteId });
     return true;
   },
@@ -381,6 +476,9 @@ const NoteCoveEditor = {
    * Returns null if editor is not initialized.
    */
   syncAndGetUpdate(): string | null {
+    // Cancel any pending auto-save since we're saving now
+    cancelAutoSave();
+
     if (!editor || !ydoc) return null;
 
     try {
@@ -588,10 +686,12 @@ const NoteCoveEditor = {
   // MARK: - Cleanup
 
   destroy() {
+    cancelAutoSave();
     editor?.destroy();
     editor = null;
     ydoc = null;
     currentNoteId = null;
+    isLoadingNote = false;
   },
 };
 
