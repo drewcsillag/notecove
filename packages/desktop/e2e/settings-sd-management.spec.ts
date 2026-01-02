@@ -82,7 +82,8 @@ test.describe('Settings - Storage Directory Management', () => {
     await expect(settingsDialog).toBeVisible();
 
     // Should show the default SD in the Storage Directories section
-    await expect(settingsDialog.locator('h6', { hasText: 'Default' })).toBeVisible();
+    // In test mode, the SD is named "Test Storage"
+    await expect(settingsDialog.locator('h6', { hasText: 'Test Storage' })).toBeVisible();
     await expect(settingsDialog.locator('text=Active')).toBeVisible();
   });
 

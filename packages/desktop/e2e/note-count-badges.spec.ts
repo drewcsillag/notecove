@@ -8,6 +8,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
+import { getFirstSdId, getAllNotesTestId, getRecentlyDeletedTestId } from './utils/sd-helpers';
 
 /**
  * Get the first window. Uses firstWindow() which handles windows
@@ -54,6 +55,7 @@ test.describe('Note count badges in folder tree', () => {
   let window: Page;
   let testDbPath: string;
   let testStorageDir: string;
+  let sdId: string;
 
   test.beforeEach(async () => {
     // Create temp directories
@@ -82,6 +84,9 @@ test.describe('Note count badges in folder tree', () => {
     // Wait for app to be ready
     await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
     await window.waitForTimeout(1000);
+
+    // Get the SD ID for use in tests
+    sdId = await getFirstSdId(window);
   }, 60000);
 
   test.afterEach(async () => {
@@ -107,7 +112,7 @@ test.describe('Note count badges in folder tree', () => {
 
   test('should show note count badge on "All Notes" folder', async () => {
     // Initially there's 1 welcome note, so "All Notes" should show badge with "1"
-    const allNotesNode = window.locator('[data-testid="folder-tree-node-all-notes:default"]');
+    const allNotesNode = window.locator(`[data-testid="${getAllNotesTestId(sdId)}"]`);
     await expect(allNotesNode).toBeVisible();
 
     // Check for badge with count "1"
@@ -176,9 +181,7 @@ test.describe('Note count badges in folder tree', () => {
     await window.waitForTimeout(1000);
 
     // Initially "Recently Deleted" should have no badge (0 notes)
-    const recentlyDeletedNode = window.locator(
-      '[data-testid="folder-tree-node-recently-deleted:default"]'
-    );
+    const recentlyDeletedNode = window.locator(`[data-testid="${getRecentlyDeletedTestId(sdId)}"]`);
     await expect(recentlyDeletedNode).toBeVisible();
 
     // No badge initially
@@ -201,7 +204,7 @@ test.describe('Note count badges in folder tree', () => {
     await expect(badge).toBeVisible();
 
     // Delete another note
-    const allNotesNode = window.locator('[data-testid="folder-tree-node-all-notes:default"]');
+    const allNotesNode = window.locator(`[data-testid="${getAllNotesTestId(sdId)}"]`);
     await allNotesNode.click();
     await window.waitForTimeout(500);
 
@@ -309,9 +312,7 @@ test.describe('Note count badges in folder tree', () => {
     await window.waitForTimeout(1000);
 
     // Go to Recently Deleted
-    const recentlyDeletedNode = window.locator(
-      '[data-testid="folder-tree-node-recently-deleted:default"]'
-    );
+    const recentlyDeletedNode = window.locator(`[data-testid="${getRecentlyDeletedTestId(sdId)}"]`);
     await recentlyDeletedNode.click();
     await window.waitForTimeout(500);
 
@@ -332,7 +333,7 @@ test.describe('Note count badges in folder tree', () => {
     await expect(badge).toHaveCount(0);
 
     // "All Notes" should show badge with "2" (welcome note + restored note)
-    const allNotesNode = window.locator('[data-testid="folder-tree-node-all-notes:default"]');
+    const allNotesNode = window.locator(`[data-testid="${getAllNotesTestId(sdId)}"]`);
     const allNotesBadge = allNotesNode.locator('.MuiChip-root').filter({ hasText: '2' });
     await expect(allNotesBadge).toBeVisible();
   });

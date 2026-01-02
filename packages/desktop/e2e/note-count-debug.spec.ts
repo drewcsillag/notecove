@@ -8,12 +8,14 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
+import { getFirstSdId, getAllNotesTestId } from './utils/sd-helpers';
 
 test.describe('Note count badge debugging', () => {
   let electronApp: ElectronApplication;
   let window: Page;
   let testDbPath: string;
   let testStorageDir: string;
+  let sdId: string;
 
   test.beforeEach(async () => {
     // Create temp directories
@@ -45,6 +47,9 @@ test.describe('Note count badge debugging', () => {
     // Wait for app to be ready
     await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
     await window.waitForTimeout(1000);
+
+    // Get the SD ID for use in tests
+    sdId = await getFirstSdId(window);
   });
 
   test.afterEach(async () => {
@@ -65,14 +70,14 @@ test.describe('Note count badge debugging', () => {
     console.log('=== INITIAL STATE ===');
 
     // Get all notes via API
-    const initialNotes = await window.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default', 'all-notes:default');
+    const initialNotes = await window.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id, `all-notes:${id}`);
       return notes.map((n) => ({ id: n.id, title: n.title, folderId: n.folderId }));
-    });
+    }, sdId);
     console.log('Initial notes:', initialNotes);
 
     // Get All Notes badge
-    const allNotesNode = window.locator('[data-testid="folder-tree-node-all-notes:default"]');
+    const allNotesNode = window.locator(`[data-testid="${getAllNotesTestId(sdId)}"]`);
     await expect(allNotesNode).toBeVisible();
 
     const initialAllNotesBadge = allNotesNode.locator('.MuiChip-root');
@@ -90,11 +95,11 @@ test.describe('Note count badge debugging', () => {
     await expect(personalFolderNode).toBeVisible();
 
     // Get folder ID via API
-    const folderId = await window.evaluate(async () => {
-      const folders = await window.electronAPI.folder.list('default');
+    const folderId = await window.evaluate(async (id) => {
+      const folders = await window.electronAPI.folder.list(id);
       const personal = folders.find((f) => f.name === 'Personal');
       return personal?.id;
-    });
+    }, sdId);
     console.log('Personal folder ID:', folderId);
 
     // Select Personal folder
@@ -121,16 +126,19 @@ test.describe('Note count badge debugging', () => {
       await window.waitForTimeout(1000);
 
       // Check notes via API
-      const notesAfterCreate = await window.evaluate(async (fId) => {
-        const allNotes = await window.electronAPI.note.list('default', 'all-notes:default');
-        const personalNotes = await window.electronAPI.note.list('default', fId);
-        return {
-          allCount: allNotes.length,
-          personalCount: personalNotes.length,
-          allNotes: allNotes.map((n) => ({ title: n.title, folderId: n.folderId })),
-          personalNotes: personalNotes.map((n) => ({ title: n.title, folderId: n.folderId })),
-        };
-      }, folderId);
+      const notesAfterCreate = await window.evaluate(
+        async ({ fId, id }) => {
+          const allNotes = await window.electronAPI.note.list(id, `all-notes:${id}`);
+          const personalNotes = await window.electronAPI.note.list(id, fId);
+          return {
+            allCount: allNotes.length,
+            personalCount: personalNotes.length,
+            allNotes: allNotes.map((n) => ({ title: n.title, folderId: n.folderId })),
+            personalNotes: personalNotes.map((n) => ({ title: n.title, folderId: n.folderId })),
+          };
+        },
+        { fId: folderId, id: sdId }
+      );
 
       console.log(`After creating note ${i}:`);
       console.log('  All notes count:', notesAfterCreate.allCount);
@@ -165,11 +173,14 @@ test.describe('Note count badge debugging', () => {
     }
 
     // Get final note counts via API
-    const finalCounts = await window.evaluate(async (fId) => {
-      const allNotesCount = await window.electronAPI.note.getAllNotesCount('default');
-      const personalCount = await window.electronAPI.note.getCountForFolder('default', fId);
-      return { allNotesCount, personalCount };
-    }, folderId);
+    const finalCounts = await window.evaluate(
+      async ({ fId, id }) => {
+        const allNotesCount = await window.electronAPI.note.getAllNotesCount(id);
+        const personalCount = await window.electronAPI.note.getCountForFolder(id, fId);
+        return { allNotesCount, personalCount };
+      },
+      { fId: folderId, id: sdId }
+    );
 
     console.log('\nFinal counts via API:');
     console.log('  getAllNotesCount:', finalCounts.allNotesCount);

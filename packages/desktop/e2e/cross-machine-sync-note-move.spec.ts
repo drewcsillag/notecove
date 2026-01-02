@@ -163,8 +163,8 @@ test.describe('cross-machine sync - note move', () => {
     // === Step 2: Move the default note to the folder ===
     console.log('[NoteMoveSync] Moving note to folder...');
 
-    // Click on "All Notes" to see the note
-    const allNotesNode = window1.locator('[data-testid="folder-tree-node-all-notes:default"]');
+    // Click on "All Notes" to see the note - use aria-label since SD ID is dynamic
+    const allNotesNode = window1.locator('[aria-label="All Notes"]').first();
     await allNotesNode.click();
     await window1.waitForTimeout(500);
 

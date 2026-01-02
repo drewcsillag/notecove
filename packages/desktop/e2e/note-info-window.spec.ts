@@ -286,8 +286,8 @@ test.describe('Note Info Window', () => {
       await noteInfoWindow.waitForTimeout(1000);
 
       // Should show the full folder path including SD name
-      // The default SD in test mode is named "Default"
-      await expect(noteInfoWindow.locator('text=Default / Test Folder')).toBeVisible({
+      // The default SD in test mode is named "Test Storage"
+      await expect(noteInfoWindow.locator('text=Test Storage / Test Folder')).toBeVisible({
         timeout: 10000,
       });
     }
