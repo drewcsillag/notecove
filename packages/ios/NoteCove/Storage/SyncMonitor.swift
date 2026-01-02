@@ -103,14 +103,13 @@ final class SyncMonitor: ObservableObject {
             let changes = try scanForChanges(in: url)
 
             if changes.hasChanges {
-                // Log the sync activity
-                try writeActivityLog(changes: changes, in: url)
-
                 // Clear CRDT cache to force reload
                 crdtManager.clearCache()
 
                 // Post notification for views to reload
                 NotificationCenter.default.post(name: .notesDidChange, object: nil)
+
+                print("[SyncMonitor] Detected changes - new: \(changes.newNotes.count), modified: \(changes.modifiedNotes.count), deleted: \(changes.deletedNotes.count)")
             }
 
             lastSyncTime = Date()
@@ -202,39 +201,6 @@ final class SyncMonitor: ObservableObject {
         }
 
         return changes
-    }
-
-    // MARK: - Activity Logging
-
-    private func writeActivityLog(changes: SyncChanges, in sdURL: URL) throws {
-        let activityDir = sdURL.appendingPathComponent("activity")
-        let fm = FileManager.default
-
-        // Create activity directory if needed
-        if !fm.fileExists(atPath: activityDir.path) {
-            try fm.createDirectory(at: activityDir, withIntermediateDirectories: true)
-        }
-
-        // Create activity log entry
-        let entry: [String: Any] = [
-            "timestamp": ISO8601DateFormatter().string(from: Date()),
-            "action": "sync",
-            "instanceId": InstanceID.shared.id,
-            "details": [
-                "newNotes": changes.newNotes.count,
-                "modifiedNotes": changes.modifiedNotes.count,
-                "deletedNotes": changes.deletedNotes.count
-            ] as [String: Any]
-        ]
-
-        // Generate filename
-        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
-        let filename = "ios-sync-\(timestamp).json"
-        let fileURL = activityDir.appendingPathComponent(filename)
-
-        // Write JSON
-        let data = try JSONSerialization.data(withJSONObject: entry, options: [.prettyPrinted])
-        try data.write(to: fileURL)
     }
 
     /// Clear the change tracking cache

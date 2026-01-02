@@ -33,10 +33,9 @@ final class StorageDirectoryManager: ObservableObject {
             throw StorageDirectoryError.accessDenied
         }
 
-        defer {
-            // We'll keep access open via bookmark, so stop this temporary access
-            url.stopAccessingSecurityScopedResource()
-        }
+        // Keep access open - we'll maintain it for the duration of the session
+        // (previously we stopped it in a defer block which broke file operations)
+        isAccessingSecurityScopedResource = true
 
         // Validate the directory
         let info = try validateStorageDirectory(at: url)
@@ -52,6 +51,9 @@ final class StorageDirectoryManager: ObservableObject {
 
         // Save as active SD
         UserDefaults.standard.set(info.id, forKey: "activeStorageDirectoryId")
+
+        // Configure activity logger with SD ID as profile ID
+        ActivityLogger.shared.configure(profileId: info.id, instanceId: InstanceID.shared.id)
     }
 
     /// Restore access to the previously active storage directory
@@ -90,6 +92,9 @@ final class StorageDirectoryManager: ObservableObject {
             activeDirectory = info
             hasAccess = true
             accessError = nil
+
+            // Configure activity logger with SD ID as profile ID
+            ActivityLogger.shared.configure(profileId: info.id, instanceId: InstanceID.shared.id)
 
         } catch let error as StorageDirectoryError {
             accessError = error

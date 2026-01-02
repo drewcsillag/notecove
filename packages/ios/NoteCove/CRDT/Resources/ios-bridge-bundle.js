@@ -7,7 +7,34 @@ if (typeof crypto === 'undefined') {
         array[i] = Math.floor(Math.random() * 256);
       }
       return array;
+    },
+    randomUUID: function() {
+      // Generate a v4 UUID using getRandomValues
+      var bytes = new Uint8Array(16);
+      this.getRandomValues(bytes);
+      // Set version (4) and variant (10xx) bits
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      // Convert to hex string with dashes
+      var hex = '';
+      for (var i = 0; i < 16; i++) {
+        hex += bytes[i].toString(16).padStart(2, '0');
+      }
+      return hex.slice(0,8) + '-' + hex.slice(8,12) + '-' + hex.slice(12,16) + '-' + hex.slice(16,20) + '-' + hex.slice(20);
     }
+  };
+} else if (typeof crypto.randomUUID === 'undefined') {
+  // crypto exists but randomUUID doesn't
+  crypto.randomUUID = function() {
+    var bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    var hex = '';
+    for (var i = 0; i < 16; i++) {
+      hex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return hex.slice(0,8) + '-' + hex.slice(8,12) + '-' + hex.slice(12,16) + '-' + hex.slice(16,20) + '-' + hex.slice(20);
   };
 }
 // TextEncoder/TextDecoder polyfill for JavaScriptCore
@@ -9527,6 +9554,22 @@ ${err.toString()}`);
   var LOG_MAGIC = 1313033287;
   var LOG_VERSION = 1;
   var LOG_HEADER_SIZE = 5;
+  function encodeVarint(value) {
+    if (value < 0) {
+      throw new Error("Cannot encode negative numbers as unsigned varint");
+    }
+    if (value < 128) {
+      return new Uint8Array([value]);
+    }
+    const bytes = [];
+    let remaining = value;
+    while (remaining >= 128) {
+      bytes.push(remaining & 127 | 128);
+      remaining = Math.floor(remaining / 128);
+    }
+    bytes.push(remaining);
+    return new Uint8Array(bytes);
+  }
   function decodeVarint(buffer, offset) {
     let value = 0;
     let shift = 0;
@@ -9547,6 +9590,15 @@ ${err.toString()}`);
       }
     }
     return { value, bytesRead };
+  }
+  function writeLogHeader() {
+    const header = new Uint8Array(LOG_HEADER_SIZE);
+    header[0] = 78;
+    header[1] = 67;
+    header[2] = 76;
+    header[3] = 71;
+    header[4] = LOG_VERSION;
+    return header;
   }
   function readLogHeader(buffer) {
     if (buffer.length < LOG_HEADER_SIZE) {
@@ -9574,6 +9626,20 @@ ${err.toString()}`);
     }
     return { valid: true, version };
   }
+  function encodeTimestamp(timestamp) {
+    const buffer = new Uint8Array(8);
+    const high = Math.floor(timestamp / 4294967296);
+    const low = timestamp >>> 0;
+    buffer[0] = high >>> 24 & 255;
+    buffer[1] = high >>> 16 & 255;
+    buffer[2] = high >>> 8 & 255;
+    buffer[3] = high & 255;
+    buffer[4] = low >>> 24 & 255;
+    buffer[5] = low >>> 16 & 255;
+    buffer[6] = low >>> 8 & 255;
+    buffer[7] = low & 255;
+    return buffer;
+  }
   function decodeTimestamp(buffer, offset) {
     if (buffer.length < offset + 8) {
       throw new Error("Buffer too short to read timestamp");
@@ -9581,6 +9647,25 @@ ${err.toString()}`);
     const high = buffer[offset] << 24 | buffer[offset + 1] << 16 | buffer[offset + 2] << 8 | buffer[offset + 3];
     const low = buffer[offset + 4] << 24 | buffer[offset + 5] << 16 | buffer[offset + 6] << 8 | buffer[offset + 7];
     return (high >>> 0) * 4294967296 + (low >>> 0);
+  }
+  function writeLogRecord(timestamp, sequence, data) {
+    const timestampBytes = encodeTimestamp(timestamp);
+    const sequenceBytes = encodeVarint(sequence);
+    const payloadLength = timestampBytes.length + sequenceBytes.length + data.length;
+    const lengthBytes = encodeVarint(payloadLength);
+    const record = new Uint8Array(lengthBytes.length + payloadLength);
+    let offset = 0;
+    record.set(lengthBytes, offset);
+    offset += lengthBytes.length;
+    record.set(timestampBytes, offset);
+    offset += timestampBytes.length;
+    record.set(sequenceBytes, offset);
+    offset += sequenceBytes.length;
+    record.set(data, offset);
+    return record;
+  }
+  function writeTerminationSentinel() {
+    return new Uint8Array([0]);
   }
   function readLogRecord(buffer, offset) {
     const lengthResult = decodeVarint(buffer, offset);
@@ -9617,6 +9702,24 @@ ${err.toString()}`);
   }
   var textEncoder = new TextEncoder();
   var textDecoder = new TextDecoder("utf-8");
+  function createLogFile(records, terminated = false) {
+    const parts = [];
+    parts.push(writeLogHeader());
+    for (const record of records) {
+      parts.push(writeLogRecord(record.timestamp, record.sequence, record.data));
+    }
+    if (terminated) {
+      parts.push(writeTerminationSentinel());
+    }
+    const totalSize = parts.reduce((sum, part) => sum + part.length, 0);
+    const result = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const part of parts) {
+      result.set(part, offset);
+      offset += part.length;
+    }
+    return result;
+  }
   function parseLogFile(buffer) {
     const header = readLogHeader(buffer);
     if (!header.valid) {
@@ -9823,7 +9926,7 @@ ${err.toString()}`);
       const content = doc2.getXmlFragment("content");
       const convertToHTML = (elem) => {
         if (elem instanceof YXmlText) {
-          let text2 = elem.toString();
+          let text2 = String(elem.toString());
           const attrs2 = elem.getAttributes();
           if (attrs2.bold) text2 = `<strong>${text2}</strong>`;
           if (attrs2.italic) text2 = `<em>${text2}</em>`;
@@ -9835,7 +9938,6 @@ ${err.toString()}`);
         const tagName = elem.nodeName;
         let html2 = "";
         const attrs = elem.getAttributes();
-        let attrStr = "";
         switch (tagName) {
           case "paragraph":
             html2 = "<p>";
@@ -9846,7 +9948,7 @@ ${err.toString()}`);
             });
             html2 += "</p>";
             break;
-          case "heading":
+          case "heading": {
             const level = attrs.level || 1;
             html2 = `<h${level}>`;
             elem.forEach((child) => {
@@ -9856,6 +9958,7 @@ ${err.toString()}`);
             });
             html2 += `</h${level}>`;
             break;
+          }
           case "bulletList":
             html2 = "<ul>";
             elem.forEach((child) => {
@@ -9883,9 +9986,10 @@ ${err.toString()}`);
             });
             html2 += "</li>";
             break;
-          case "taskItem":
+          case "taskItem": {
             const checked = attrs.checked;
-            const checkState = checked === true ? "\u2611" : checked === "indeterminate" ? "\u25D0" : "\u2610";
+            const isChecked = checked === "true";
+            const checkState = isChecked ? "\u2611" : checked === "indeterminate" ? "\u25D0" : "\u2610";
             html2 = `<li class="task-item" data-checked="${checked}">${checkState} `;
             elem.forEach((child) => {
               if (child instanceof YXmlText || child instanceof YXmlElement) {
@@ -9894,6 +9998,7 @@ ${err.toString()}`);
             });
             html2 += "</li>";
             break;
+          }
           case "blockquote":
             html2 = "<blockquote>";
             elem.forEach((child) => {
@@ -9903,25 +10008,46 @@ ${err.toString()}`);
             });
             html2 += "</blockquote>";
             break;
-          case "codeBlock":
+          case "codeBlock": {
             const lang = attrs.language || "";
             html2 = `<pre><code class="language-${lang}">`;
             elem.forEach((child) => {
               if (child instanceof YXmlText) {
-                html2 += child.toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                html2 += String(child.toString()).replace(/</g, "&lt;").replace(/>/g, "&gt;");
               }
             });
             html2 += "</code></pre>";
             break;
+          }
           case "horizontalRule":
             html2 = "<hr>";
             break;
-          case "image":
+          case "image": {
             const src = attrs.src || "";
             const alt = attrs.alt || "";
             const title = attrs.title || "";
             html2 = `<img src="${src}" alt="${alt}" title="${title}" class="note-image">`;
             break;
+          }
+          case "notecoveImage": {
+            const imageId = attrs.imageId || "";
+            const sdId = attrs.sdId || "";
+            const imgAlt = attrs.alt || "";
+            const caption = attrs.caption || "";
+            const width = attrs.width || "";
+            let imgHtml = `<figure class="notecove-image" data-image-id="${imageId}" data-sd-id="${sdId}">`;
+            imgHtml += `<img src="notecove://image/${sdId}/${imageId}" alt="${imgAlt}"`;
+            if (width) {
+              imgHtml += ` style="width: ${width}"`;
+            }
+            imgHtml += ` class="notecove-image-element">`;
+            if (caption) {
+              imgHtml += `<figcaption>${caption}</figcaption>`;
+            }
+            imgHtml += "</figure>";
+            html2 = imgHtml;
+            break;
+          }
           case "table":
             html2 = "<table>";
             elem.forEach((child) => {
@@ -9979,6 +10105,43 @@ ${err.toString()}`);
         }
       });
       return html;
+    },
+    extractImageReferences(noteId) {
+      const doc2 = openNotes.get(noteId);
+      if (!doc2) {
+        throw new Error(`Note ${noteId} is not open`);
+      }
+      const content = doc2.getXmlFragment("content");
+      const images = [];
+      const findImages = (elem) => {
+        if (elem instanceof YXmlText) {
+          return;
+        }
+        const tagName = elem.nodeName;
+        if (tagName === "notecoveImage") {
+          const attrs = elem.getAttributes();
+          const imageId = attrs.imageId;
+          const sdId = attrs.sdId;
+          if (imageId && sdId) {
+            images.push({
+              imageId: String(imageId),
+              sdId: String(sdId),
+              alt: String(attrs.alt || "")
+            });
+          }
+        }
+        elem.forEach((child) => {
+          if (child instanceof YXmlElement) {
+            findImages(child);
+          }
+        });
+      };
+      content.forEach((item) => {
+        if (item instanceof YXmlElement) {
+          findImages(item);
+        }
+      });
+      return images;
     },
     closeNote(noteId) {
       const doc2 = openNotes.get(noteId);
@@ -10080,6 +10243,40 @@ ${err.toString()}`);
     },
     parsePackFilename(filename) {
       return parsePackFilename(filename);
+    },
+    /**
+     * Create a log file from an update and return as base64.
+     * Used to save editor changes to disk.
+     *
+     * @param updateBase64 - The Yjs update as base64 string
+     * @param timestamp - Timestamp for the record
+     * @param sequence - Sequence number for the record (default 1)
+     * @returns Base64-encoded log file ready to write to disk
+     */
+    createLogFileFromUpdate(updateBase64, timestamp, sequence = 1) {
+      const updateBytes = base64ToUint8Array(updateBase64);
+      const logData = createLogFile([
+        { timestamp, sequence, data: updateBytes }
+      ]);
+      return uint8ArrayToBase64(logData);
+    },
+    /**
+     * Generate a log filename for a note update.
+     *
+     * Format: {profileId}_{instanceId}_{timestamp}.crdtlog
+     * This matches the desktop format for cross-platform sync compatibility.
+     *
+     * @param profileId - The profile ID (typically the SD ID on iOS)
+     * @param instanceId - The instance ID (device identifier)
+     * @param timestamp - Timestamp for the filename
+     * @returns Filename like "profileId_instanceId_timestamp.crdtlog"
+     */
+    generateLogFilename(profileId, instanceId, timestamp) {
+      return `${profileId}_${instanceId}_${timestamp}.crdtlog`;
+    },
+    // ==================== ID Generation ====================
+    generateNoteId() {
+      return generateCompactId();
     },
     // ==================== Memory Management ====================
     clearDocumentCache() {

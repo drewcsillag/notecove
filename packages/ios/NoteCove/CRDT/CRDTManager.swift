@@ -528,6 +528,132 @@ final class CRDTManager: ObservableObject {
         return stateBase64
     }
 
+    /// Save a CRDT update to disk as a new log file
+    /// - Parameters:
+    ///   - noteId: The note ID
+    ///   - updateBase64: The Yjs update as base64 string
+    /// - Throws: CRDTError if save fails
+    func saveNoteUpdate(noteId: String, updateBase64: String) throws {
+        guard isInitialized, let bridge = bridge else {
+            throw CRDTError.bridgeNotInitialized
+        }
+
+        guard let activeDir = storageManager.activeDirectory,
+              let sdURL = activeDir.url else {
+            throw CRDTError.fileNotFound("No active storage directory")
+        }
+
+        let logsDir = sdURL.appendingPathComponent("notes")
+            .appendingPathComponent(noteId)
+            .appendingPathComponent("logs")
+
+        // Create logs directory if needed
+        try FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+
+        // Get profile ID (SD ID), instance ID, and timestamp
+        let profileId = activeDir.id
+        let instanceId = InstanceID.shared.id
+        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+
+        // Generate log filename: {profileId}_{instanceId}_{timestamp}.crdtlog
+        guard let filenameResult = bridge.invokeMethod("generateLogFilename", withArguments: [profileId, instanceId, timestamp]),
+              let filename = filenameResult.toString() else {
+            throw CRDTError.javaScriptError("Failed to generate log filename")
+        }
+
+        // Create log file from update
+        guard let logDataResult = bridge.invokeMethod("createLogFileFromUpdate", withArguments: [updateBase64, timestamp, 1]),
+              let logDataBase64 = logDataResult.toString() else {
+            throw CRDTError.javaScriptError("Failed to create log file")
+        }
+
+        if let exception = jsContext?.exception {
+            let message = exception.toString() ?? "Unknown error"
+            jsContext?.exception = nil
+            throw CRDTError.javaScriptError(message)
+        }
+
+        // Decode and write the log file
+        guard let logData = Data(base64Encoded: logDataBase64) else {
+            throw CRDTError.invalidBase64
+        }
+
+        let fileURL = logsDir.appendingPathComponent(filename)
+        try logData.write(to: fileURL)
+
+        // Record activity for sync
+        let sequenceNumber = ActivityLogger.shared.getNextSequenceNumber(for: noteId)
+        ActivityLogger.shared.recordNoteActivity(noteId: noteId, sequenceNumber: sequenceNumber)
+
+        print("[CRDTManager] Saved note update to \(filename)")
+    }
+
+    /// Create a new empty note
+    /// - Parameter folderId: Optional folder ID to place the note in
+    /// - Returns: The new note ID
+    func createNewNote(folderId: String? = nil) throws -> String {
+        guard isInitialized, let bridge = bridge else {
+            throw CRDTError.bridgeNotInitialized
+        }
+
+        guard let activeDir = storageManager.activeDirectory,
+              let sdURL = activeDir.url else {
+            throw CRDTError.fileNotFound("No active storage directory")
+        }
+
+        // Generate a new note ID
+        guard let idResult = bridge.invokeMethod("generateNoteId", withArguments: []),
+              let noteId = idResult.toString(), !noteId.isEmpty else {
+            throw CRDTError.javaScriptError("Failed to generate note ID")
+        }
+
+        // Create the note folder structure
+        let notesDir = sdURL.appendingPathComponent("notes").appendingPathComponent(noteId)
+        let logsDir = notesDir.appendingPathComponent("logs")
+        try FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+
+        // Create an empty note document in JS
+        bridge.invokeMethod("createNote", withArguments: [noteId])
+
+        // Get the initial state
+        guard let stateResult = bridge.invokeMethod("getDocumentState", withArguments: [noteId]),
+              let stateBase64 = stateResult.toString() else {
+            throw CRDTError.javaScriptError("Failed to get initial note state")
+        }
+
+        // Save the initial state as a log file
+        let profileId = activeDir.id
+        let instanceId = InstanceID.shared.id
+        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+
+        // Generate log filename: {profileId}_{instanceId}_{timestamp}.crdtlog
+        guard let filenameResult = bridge.invokeMethod("generateLogFilename", withArguments: [profileId, instanceId, timestamp]),
+              let filename = filenameResult.toString() else {
+            throw CRDTError.javaScriptError("Failed to generate log filename")
+        }
+
+        guard let logDataResult = bridge.invokeMethod("createLogFileFromUpdate", withArguments: [stateBase64, timestamp, 1]),
+              let logDataBase64 = logDataResult.toString() else {
+            throw CRDTError.javaScriptError("Failed to create log file")
+        }
+
+        guard let logData = Data(base64Encoded: logDataBase64) else {
+            throw CRDTError.invalidBase64
+        }
+
+        let fileURL = logsDir.appendingPathComponent(filename)
+        try logData.write(to: fileURL)
+
+        // Record activity for sync (sequence 1 for new note)
+        ActivityLogger.shared.recordNoteActivity(noteId: noteId, sequenceNumber: 1)
+
+        // Close the note after creating
+        bridge.invokeMethod("closeNote", withArguments: [noteId])
+
+        print("[CRDTManager] Created new note: \(noteId)")
+        return noteId
+    }
+
     /// List all note IDs in the storage directory
     /// - Returns: Array of note ID strings
     func listNoteIds() throws -> [String] {

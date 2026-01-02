@@ -138,10 +138,7 @@ const NotecoveImage = Node.create({
     };
   },
 });
-import {
-  yXmlFragmentToProseMirrorRootNode,
-  prosemirrorJSONToYXmlFragment,
-} from 'y-prosemirror';
+import { yXmlFragmentToProseMirrorRootNode, prosemirrorJSONToYXmlFragment } from 'y-prosemirror';
 
 // Declare webkit message handler type
 declare global {
@@ -166,6 +163,7 @@ function postToSwift(action: string, data: unknown = {}) {
 let editor: Editor | null = null;
 let ydoc: Y.Doc | null = null;
 let currentNoteId: string | null = null;
+let originalStateVector: Uint8Array | null = null; // Track original state for delta encoding
 
 /**
  * iOS Editor Bridge API
@@ -303,6 +301,9 @@ const NoteCoveEditor = {
       }
       Y.applyUpdate(ydoc, bytes);
 
+      // Capture the state vector AFTER loading - this is our baseline for delta encoding
+      originalStateVector = Y.encodeStateVector(ydoc);
+
       // Get the content fragment and convert to ProseMirror
       const content = ydoc.getXmlFragment('content');
       const node = yXmlFragmentToProseMirrorRootNode(content, editor.schema);
@@ -346,6 +347,8 @@ const NoteCoveEditor = {
 
     currentNoteId = noteId;
     ydoc = new Y.Doc();
+    // For new documents, the original state is empty
+    originalStateVector = Y.encodeStateVector(ydoc);
     editor.commands.clearContent();
     postToSwift('loaded', { noteId });
     return true;
@@ -366,34 +369,48 @@ const NoteCoveEditor = {
 
   /**
    * Sync editor content back to Yjs and return the update as base64.
-   * This creates a new Y.Doc from the current editor content.
+   *
+   * This method properly handles CRDT updates by:
+   * 1. Clearing the existing ydoc content
+   * 2. Converting the current editor state to the ydoc
+   * 3. Encoding only the DELTA since the original state (not full state)
+   *
+   * This ensures that when merged with other devices' updates, content
+   * isn't duplicated.
+   *
    * Returns null if editor is not initialized.
    */
   syncAndGetUpdate(): string | null {
-    if (!editor) return null;
+    if (!editor || !ydoc) return null;
 
     try {
-      // Create a new Y.Doc to hold the synced content
-      const newDoc = new Y.Doc();
-      const content = newDoc.getXmlFragment('content');
+      // Get the content fragment from the existing ydoc
+      const content = ydoc.getXmlFragment('content');
 
-      // Convert ProseMirror JSON to Y.XmlFragment
-      const json = editor.getJSON();
-      prosemirrorJSONToYXmlFragment(editor.schema, json, content);
+      // Clear existing content and replace with current editor state
+      // We do this in a transaction so it's a single update
+      ydoc.transact(() => {
+        // Delete all existing content
+        content.delete(0, content.length);
 
-      // Encode the state as an update
-      const state = Y.encodeStateAsUpdate(newDoc);
+        // Convert current ProseMirror content to Y.XmlFragment
+        const json = editor!.getJSON();
+        prosemirrorJSONToYXmlFragment(editor!.schema, json, content);
+      });
+
+      // Encode the delta since the original state (not the full state!)
+      // This ensures we only send what changed, not duplicate existing content
+      const update = originalStateVector
+        ? Y.encodeStateAsUpdate(ydoc, originalStateVector)
+        : Y.encodeStateAsUpdate(ydoc);
+
       let binary = '';
-      for (let i = 0; i < state.length; i++) {
-        binary += String.fromCharCode(state[i]);
+      for (let i = 0; i < update.length; i++) {
+        binary += String.fromCharCode(update[i]);
       }
 
-      // Update our cached ydoc for next getYjsState call
-      if (ydoc) {
-        Y.applyUpdate(ydoc, state);
-      } else {
-        ydoc = newDoc;
-      }
+      // Update the state vector for next save
+      originalStateVector = Y.encodeStateVector(ydoc);
 
       postToSwift('synced', { noteId: currentNoteId });
       return btoa(binary);
@@ -495,14 +512,20 @@ const NoteCoveEditor = {
       console.error('[NoteCoveEditor] insertNotecoveImage: editor not initialized');
       return;
     }
-    editor?.chain().focus().insertNotecoveImage({ imageId, sdId, alt: alt || '' }).run();
+    editor
+      ?.chain()
+      .focus()
+      .insertNotecoveImage({ imageId, sdId, alt: alt || '' })
+      .run();
     // Log the DOM after insertion
     setTimeout(() => {
       const imgs = document.querySelectorAll('.notecove-image img');
       console.log(`[NoteCoveEditor] After insertion: found ${imgs.length} images`);
       imgs.forEach((img, i) => {
         const imgEl = img as HTMLImageElement;
-        console.log(`[NoteCoveEditor] Image ${i}: src=${imgEl.src}, complete=${imgEl.complete}, naturalWidth=${imgEl.naturalWidth}`);
+        console.log(
+          `[NoteCoveEditor] Image ${i}: src=${imgEl.src}, complete=${imgEl.complete}, naturalWidth=${imgEl.naturalWidth}`
+        );
       });
     }, 100);
     postToSwift('imageInserted', { imageId, sdId });

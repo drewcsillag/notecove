@@ -5,6 +5,7 @@ Based on my analysis of the codebase and website features, I have the following 
 ## 1. Scope & Platform
 
 ### 1.1 iPad vs iPhone Initial Target
+
 You mentioned "initially targeting iPad, as the UI should be basically the same as the desktop version." Questions:
 
 - **Should iPhone be completely out of scope initially?** Or should I plan for an adaptive layout that works on both but is iPad-optimized first?
@@ -16,6 +17,7 @@ plan for adaptive layout. ios17, but if there are things in ios26 (released in 2
 Split view, slide over, apple pencil definitely in view. Don't know enough about what stage manager is thought. Can you give me a TL;DR: of it?
 
 ### 1.2 Timeline Expectations
+
 I know you don't want time estimates, but I need to understand priority:
 
 - **MVP first vs full parity?** Should Phase 1 be a minimal usable app, or attempt full feature parity?
@@ -23,21 +25,23 @@ I know you don't want time estimates, but I need to understand priority:
 
 Phase 1 is minimally useable. Read only sync works for MVP
 
-
 ## 2. Editor Strategy (Critical Decision)
 
 The desktop app uses TipTap (ProseMirror-based) running in Electron's web view. For iOS, there are three main approaches:
 
 ### 2.1 Approach A: WKWebView + TipTap Bundle
+
 - **Pros:** Reuse existing TipTap extensions (24 custom extensions!), exact desktop parity, JS/TS code sharing
 - **Cons:** Not "truly native", may feel slightly non-native, WKWebView memory limits, keyboard handling quirks
 - **Note:** There's already a `tiptap-bundle.js` in `packages/ios/Sources/Resources/`
 
 ### 2.2 Approach B: Native TextKit/UIKit Rich Text
+
 - **Pros:** Truly native feel, better performance, no web view overhead
 - **Cons:** Massive reimplementation effort, must rebuild all 24 extensions natively, hard to keep in sync
 
 ### 2.3 Approach C: Hybrid (Native shell + WebView editor)
+
 - **Pros:** Native navigation/lists/sidebar, WebView only for the editor itself
 - **Cons:** Context switching between native and web, state synchronization complexity
 
@@ -47,10 +51,10 @@ The desktop app uses TipTap (ProseMirror-based) running in Electron's web view. 
 
 explore further and come back with a better analysis. But agree A or C and not B.
 
-
 ## 3. Sync & Storage
 
 ### 3.1 Storage Directory (SD) Location on iOS
+
 Desktop uses folders in Dropbox/iCloud Drive/Google Drive. For iOS:
 
 - **iCloud Drive:** Native iOS integration, cross-device sync, `~/Library/Mobile Documents/`
@@ -58,6 +62,7 @@ Desktop uses folders in Dropbox/iCloud Drive/Google Drive. For iOS:
 - **App sandbox only:** Notes stay in app sandbox, no cross-device sync without building our own backend
 
 **Question:** Should the iOS app:
+
 1. Only support iCloud Drive initially (simplest)?
 2. Support all cloud providers like desktop (complex)?
 3. Work offline in sandbox first, add cloud sync later?
@@ -65,6 +70,7 @@ Desktop uses folders in Dropbox/iCloud Drive/Google Drive. For iOS:
 Support ios for MVP, but quick follow to Google Drive, later Dropbox and One Drive
 
 ### 3.2 File System Access on iOS
+
 iOS is more restrictive than macOS:
 
 - **No direct file watching** like `chokidar` on desktop
@@ -76,6 +82,7 @@ iOS is more restrictive than macOS:
 Don't quite understand -- the question doesn't seem to follow the priors. Use more words in both as I'm not understanding something.
 
 ### 3.3 Cross-Device Sync with Desktop
+
 If a user has both desktop and iOS:
 
 - **Same SD:** Can they use the same iCloud Drive folder for both?
@@ -91,6 +98,7 @@ yes, hard requirement. Want to discover tricky bits early
 From the website features and source code analysis, here's what exists on desktop. For each category, please indicate priority:
 
 ### 4.1 Core Features (assumed required)
+
 - [1 ] **Rich text editing** - bold, italic, underline, strikethrough, code
 - [1] **Headings** (H1-H3)
 - [1] **Lists** - bullet, numbered, task/checkbox
@@ -105,6 +113,7 @@ From the website features and source code analysis, here's what exists on deskto
 - [3] **Dark/light theme**
 
 ### 4.2 Advanced Features (need priority)
+
 - [3] **Comments** - threaded, reactions, mentions (complex to implement)
 - [4] **Link unfurling/oEmbed** - 300+ providers (network-dependent)
 - [5] **Multi-window** (iPadOS Split View?)
@@ -118,6 +127,7 @@ From the website features and source code analysis, here's what exists on deskto
 x means I don't think we'll ever want/need them.
 
 ### 4.3 Features NOT in Website Docs (found in code)
+
 - [x] **Web server** - local network browsing (probably not applicable to iOS)
 - [5] **Paranoid mode** - privacy profile
 - [2] **Storage inspector** - debug tool
@@ -128,9 +138,11 @@ x means I don't think we'll ever want/need them.
 x means I don't think we'll ever want/need them.
 
 Paranoid and storage inspector
+
 ## 5. Technical Architecture
 
 ### 5.1 Swift vs SwiftUI
+
 - **SwiftUI:** Modern, declarative, less code, better for new apps, iOS 14+
 - **UIKit:** More mature, more control, better for complex interactions
 
@@ -139,6 +151,7 @@ Paranoid and storage inspector
 Dig a little deeper and give pros/cons and a recommedation. Of the features in mind, do these feel like things where UIKit is going to avoid a lot of work(arounds)?
 
 ### 5.2 iOS Bridge
+
 There's already `packages/shared/src/ios-bridge.ts` that exposes a `NoteCoveBridge` object for JavaScriptCore. Questions:
 
 - **Is this the intended architecture?** (JS core logic running in JavaScriptCore, Swift for UI/IO)
@@ -149,6 +162,7 @@ There's already `packages/shared/src/ios-bridge.ts` that exposes a `NoteCoveBrid
 It's a leftover from a previous attempt. Use it if it's useful, but don't if it's not.
 
 ### 5.3 Database
+
 Desktop uses `better-sqlite3`. iOS options:
 
 - **SQLite.swift** - Popular Swift wrapper
@@ -163,9 +177,11 @@ if Core Data supports FTS, it might work. But look at what we're using in sqlite
 ## 6. User Experience Questions
 
 ### 6.1 iPad Layout
+
 Desktop has: Left sidebar (folders/notes), Editor (center), Comment panel (right)
 
 For iPad:
+
 - **Same layout?** Three-column on landscape, collapsible on portrait?
 - **Navigation?** Tab bar, navigation controller, or sidebar?
 - **Keyboard shortcuts?** Should Mac-style shortcuts work with external keyboard?
@@ -176,6 +192,7 @@ Mac shortcuts should work with external keyboard
 As to navigation bar, I'm not sure what precisely you're referring to in the current app, or how it would map.
 
 ### 6.2 Onboarding
+
 Desktop has a profile picker and onboarding wizard. For iOS:
 
 - **Same flow?** Or simplified?
@@ -187,6 +204,7 @@ Go through the wizard, but there's just only one profile
 ## 7. Development & Testing
 
 ### 7.1 Xcode Project Setup
+
 - **Should the iOS app live in `packages/ios/`?** Or a new repo?
 - **Monorepo structure?** Keep it in the same pnpm workspace?
 - **Bundle ID / App ID:** Any existing Apple Developer setup?
@@ -196,8 +214,8 @@ Keep in same monorepo
 
 No existing developer setup
 
-
 ### 7.2 Testing Strategy
+
 - **Unit tests:** XCTest for Swift, Jest for JS bridge
 - **UI tests:** XCTest UI, or something else?
 - **Sync testing:** How to test desktop-iOS sync scenarios?
@@ -205,6 +223,7 @@ No existing developer setup
 make recommendations
 
 ### 7.3 CI/CD
+
 - **Build on CI?** GitHub Actions for iOS builds?
 - **TestFlight distribution?** For beta testing?
 
@@ -213,6 +232,7 @@ make a script I can run locally. I don't have external CI
 ## 8. What's Already Done?
 
 I found:
+
 - `packages/ios/Sources/Resources/tiptap-bundle.js` - a TipTap bundle already prepared
 - `packages/shared/src/ios-bridge.ts` - JavaScriptCore bridge with note/folder operations
 - Shared package designed to work in both Node.js and JavaScriptCore

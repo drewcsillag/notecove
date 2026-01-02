@@ -4,6 +4,7 @@ import SwiftUI
 struct NoteListView: View {
     let folder: Folder?
     @Binding var selectedNote: Note?
+    @Binding var newlyCreatedNoteId: String?
     @State private var notes: [Note] = []
     @State private var searchText = ""
     @State private var isLoading = false
@@ -12,6 +13,12 @@ struct NoteListView: View {
 
     @ObservedObject private var storageManager = StorageDirectoryManager.shared
     @ObservedObject private var syncMonitor = SyncMonitor.shared
+
+    init(folder: Folder?, selectedNote: Binding<Note?>, newlyCreatedNoteId: Binding<String?> = .constant(nil)) {
+        self.folder = folder
+        self._selectedNote = selectedNote
+        self._newlyCreatedNoteId = newlyCreatedNoteId
+    }
 
     var body: some View {
         Group {
@@ -138,8 +145,53 @@ struct NoteListView: View {
     }
 
     private func createNewNote() {
-        // TODO: Implement note creation in Phase 3
-        print("Create new note")
+        // Check if we have an active storage directory
+        guard storageManager.activeDirectory != nil else {
+            print("[NoteListView] Cannot create note: no active storage directory")
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                let crdtManager = CRDTManager.shared
+
+                // Initialize if needed
+                if !crdtManager.isInitialized {
+                    try crdtManager.initialize()
+                }
+
+                // Create the new note with the current folder
+                let noteId = try crdtManager.createNewNote(folderId: folder?.id)
+
+                // Create a Note object for the new note
+                let newNote = Note(
+                    id: noteId,
+                    title: "Untitled",
+                    preview: "",
+                    folderId: folder?.id,
+                    createdAt: Date(),
+                    modifiedAt: Date(),
+                    isPinned: false
+                )
+
+                // Add to the local notes array
+                notes.insert(newNote, at: 0)
+
+                // Track as newly created so it opens in edit mode
+                newlyCreatedNoteId = noteId
+
+                // Select the new note to open it in the editor
+                selectedNote = newNote
+
+                // Notify that notes have changed
+                NotificationCenter.default.post(name: .notesDidChange, object: nil)
+
+                print("[NoteListView] Created new note: \(noteId)")
+            } catch {
+                print("[NoteListView] Error creating note: \(error)")
+                errorMessage = "Could not create note"
+            }
+        }
     }
 
     private func refreshNotes() async {

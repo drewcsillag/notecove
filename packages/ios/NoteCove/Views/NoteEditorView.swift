@@ -269,6 +269,7 @@ struct NoteEditorView: View {
 
     private func loadNoteForEditing() {
         guard storageManager.activeDirectory != nil else {
+            isLoading = false
             return
         }
 
@@ -282,10 +283,12 @@ struct NoteEditorView: View {
 
                 let state = try crdtManager.loadNoteStateForEditor(noteId: note.id)
                 yjsStateBase64 = state
+                isLoading = false
                 isEditing = true
             } catch {
                 print("[NoteEditorView] Error loading note for editing: \(error)")
                 errorMessage = "Could not open note for editing"
+                isLoading = false
             }
         }
     }

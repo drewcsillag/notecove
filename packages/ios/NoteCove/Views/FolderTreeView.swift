@@ -1,22 +1,38 @@
 import SwiftUI
 
+/// Wrapper to make Folder? work with List selection
+/// We use the folder ID string, with empty string for "All Notes" (nil folder)
+struct FolderSelection: Hashable {
+    let id: String  // Empty string = All Notes, otherwise folder ID
+
+    static let allNotes = FolderSelection(id: "")
+
+    init(from folder: Folder?) {
+        self.id = folder?.id ?? ""
+    }
+
+    init(id: String) {
+        self.id = id
+    }
+}
+
 /// Sidebar view showing folder hierarchy
 struct FolderTreeView: View {
     @Binding var selectedFolder: Folder?
+    var onSelect: (() -> Void)?  // Called when user selects any item (for navigation)
     @State private var folders: [Folder] = []
     @State private var expandedFolders: Set<String> = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var selection: FolderSelection? = .allNotes
 
     @ObservedObject private var storageManager = StorageDirectoryManager.shared
 
     var body: some View {
-        List(selection: $selectedFolder) {
+        List(selection: $selection) {
             // All Notes option
-            NavigationLink(value: nil as Folder?) {
-                Label("All Notes", systemImage: "tray.full")
-            }
-            .tag(nil as Folder?)
+            Label("All Notes", systemImage: "tray.full")
+                .tag(FolderSelection.allNotes)
 
             if isLoading {
                 ProgressView("Loading folders...")
@@ -25,19 +41,56 @@ struct FolderTreeView: View {
                     .foregroundColor(.secondary)
                     .font(.caption)
             } else {
-                // Folder tree
-                ForEach(rootFolders) { folder in
-                    FolderRow(
-                        folder: folder,
-                        allFolders: folders,
-                        expandedFolders: $expandedFolders
-                    )
+                // Flatten the folder tree for display
+                ForEach(visibleFolders, id: \.folder.id) { item in
+                    HStack(spacing: 4) {
+                        // Indent
+                        if item.depth > 0 {
+                            Spacer()
+                                .frame(width: CGFloat(item.depth) * 20)
+                        }
+
+                        // Expand/collapse for folders with children
+                        if item.hasChildren {
+                            Button {
+                                toggleExpand(item.folder.id)
+                            } label: {
+                                Image(systemName: expandedFolders.contains(item.folder.id) ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 20, height: 20)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Spacer().frame(width: 20)
+                        }
+
+                        Label(item.folder.name, systemImage: "folder")
+                    }
+                    .tag(FolderSelection(id: item.folder.id))
                 }
             }
         }
         .listStyle(.sidebar)
+        .onChange(of: selection) { _, newValue in
+            // Sync selection back to selectedFolder binding
+            if let sel = newValue {
+                if sel.id.isEmpty {
+                    selectedFolder = nil
+                } else {
+                    selectedFolder = folders.first { $0.id == sel.id }
+                }
+                // Notify parent that selection was made (for iPhone navigation)
+                onSelect?()
+            }
+        }
+        .onChange(of: selectedFolder) { _, newFolder in
+            // Sync selectedFolder to selection
+            selection = FolderSelection(from: newFolder)
+        }
         .onAppear {
             loadFolders()
+            selection = FolderSelection(from: selectedFolder)
         }
         .onChange(of: storageManager.activeDirectory?.id) { _, _ in
             loadFolders()
@@ -47,9 +100,33 @@ struct FolderTreeView: View {
         }
     }
 
-    private var rootFolders: [Folder] {
-        folders.filter { $0.parentId == nil }
-            .sorted { $0.order < $1.order }
+    private func toggleExpand(_ folderId: String) {
+        if expandedFolders.contains(folderId) {
+            expandedFolders.remove(folderId)
+        } else {
+            expandedFolders.insert(folderId)
+        }
+    }
+
+    /// Flattened list of visible folders with depth info
+    private var visibleFolders: [FolderListItem] {
+        var result: [FolderListItem] = []
+        let roots = folders.filter { $0.parentId == nil }.sorted { $0.order < $1.order }
+        for folder in roots {
+            appendFolder(folder, depth: 0, to: &result)
+        }
+        return result
+    }
+
+    private func appendFolder(_ folder: Folder, depth: Int, to result: inout [FolderListItem]) {
+        let children = folders.filter { $0.parentId == folder.id }.sorted { $0.order < $1.order }
+        result.append(FolderListItem(folder: folder, depth: depth, hasChildren: !children.isEmpty))
+
+        if expandedFolders.contains(folder.id) {
+            for child in children {
+                appendFolder(child, depth: depth + 1, to: &result)
+            }
+        }
     }
 
     private func loadFolders() {
@@ -96,49 +173,11 @@ struct FolderTreeView: View {
     }
 }
 
-/// A single folder row in the tree
-struct FolderRow: View {
+/// Item for flattened folder list
+private struct FolderListItem {
     let folder: Folder
-    let allFolders: [Folder]
-    @Binding var expandedFolders: Set<String>
-
-    var body: some View {
-        let children = allFolders.filter { $0.parentId == folder.id }
-            .sorted { $0.order < $1.order }
-
-        if children.isEmpty {
-            NavigationLink(value: folder) {
-                Label(folder.name, systemImage: "folder")
-            }
-            .tag(folder)
-        } else {
-            DisclosureGroup(
-                isExpanded: Binding(
-                    get: { expandedFolders.contains(folder.id) },
-                    set: { isExpanded in
-                        if isExpanded {
-                            expandedFolders.insert(folder.id)
-                        } else {
-                            expandedFolders.remove(folder.id)
-                        }
-                    }
-                )
-            ) {
-                ForEach(children) { child in
-                    FolderRow(
-                        folder: child,
-                        allFolders: allFolders,
-                        expandedFolders: $expandedFolders
-                    )
-                }
-            } label: {
-                NavigationLink(value: folder) {
-                    Label(folder.name, systemImage: "folder")
-                }
-                .tag(folder)
-            }
-        }
-    }
+    let depth: Int
+    let hasChildren: Bool
 }
 
 #Preview {

@@ -63,7 +63,9 @@ struct OnboardingView: View {
             }
 
             // Select folder button
-            Button(action: { showingFolderPicker = true }) {
+            Button(action: {
+                showingFolderPicker = true
+            }) {
                 if isProcessing {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))

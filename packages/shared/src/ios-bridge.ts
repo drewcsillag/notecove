@@ -23,7 +23,8 @@ import {
   type SnapshotFileMetadata,
   type PackFileMetadata,
 } from './crdt';
-import { parseLogFile } from './storage/binary-format';
+import { parseLogFile, createLogFile } from './storage/binary-format';
+import { generateCompactId } from './utils/uuid-encoding';
 
 // Types for folder data exposed to Swift
 interface FolderInfo {
@@ -47,6 +48,13 @@ interface NoteInfo {
   pinned: boolean;
 }
 
+// Types for image references in notes
+interface ImageReference {
+  imageId: string;
+  sdId: string;
+  alt: string;
+}
+
 // Types for the bridge interface
 interface NoteCoveBridge {
   // Note operations
@@ -58,6 +66,7 @@ interface NoteCoveBridge {
   extractContent(stateBase64: string): string;
   extractNoteMetadata(noteId: string): NoteInfo; // Extract metadata from loaded note
   extractContentAsHTML(noteId: string): string; // Get note content as HTML for rendering
+  extractImageReferences(noteId: string): ImageReference[]; // Get all image references in note
   closeNote(noteId: string): void;
 
   // Folder tree operations
@@ -80,6 +89,13 @@ interface NoteCoveBridge {
   ): string;
   parseSnapshotFilename(filename: string): SnapshotFileMetadata | null;
   parsePackFilename(filename: string): PackFileMetadata | null;
+
+  // Log file creation utilities
+  createLogFileFromUpdate(updateBase64: string, timestamp: number, sequence?: number): string;
+  generateLogFilename(profileId: string, instanceId: string, timestamp: number): string;
+
+  // ID generation
+  generateNoteId(): string;
 
   // Memory management
   clearDocumentCache(): void;
@@ -492,6 +508,31 @@ const bridge: NoteCoveBridge = {
           break;
         }
 
+        case 'notecoveImage': {
+          // NoteCove image node - stored in SD media folder
+          // Output with data attributes for Swift to resolve
+          const imageId = attrs.imageId || '';
+          const sdId = attrs.sdId || '';
+          const imgAlt = attrs.alt || '';
+          const caption = attrs.caption || '';
+          const width = attrs.width || '';
+
+          // Use a custom URL scheme that WKWebView's scheme handler will intercept
+          // Format: notecove://image/{sdId}/{imageId}
+          let imgHtml = `<figure class="notecove-image" data-image-id="${imageId}" data-sd-id="${sdId}">`;
+          imgHtml += `<img src="notecove://image/${sdId}/${imageId}" alt="${imgAlt}"`;
+          if (width) {
+            imgHtml += ` style="width: ${width}"`;
+          }
+          imgHtml += ` class="notecove-image-element">`;
+          if (caption) {
+            imgHtml += `<figcaption>${caption}</figcaption>`;
+          }
+          imgHtml += '</figure>';
+          html = imgHtml;
+          break;
+        }
+
         case 'table':
           html = '<table>';
           elem.forEach((child) => {
@@ -558,6 +599,52 @@ const bridge: NoteCoveBridge = {
     });
 
     return html;
+  },
+
+  extractImageReferences(noteId: string): ImageReference[] {
+    const doc = openNotes.get(noteId);
+    if (!doc) {
+      throw new Error(`Note ${noteId} is not open`);
+    }
+
+    const content = doc.getXmlFragment('content');
+    const images: ImageReference[] = [];
+
+    // Recursively find all notecoveImage nodes
+    const findImages = (elem: Y.XmlElement | Y.XmlText): void => {
+      if (elem instanceof Y.XmlText) {
+        return;
+      }
+
+      const tagName = elem.nodeName;
+      if (tagName === 'notecoveImage') {
+        const attrs = elem.getAttributes();
+        const imageId = attrs.imageId;
+        const sdId = attrs.sdId;
+        if (imageId && sdId) {
+          images.push({
+            imageId: String(imageId),
+            sdId: String(sdId),
+            alt: String(attrs.alt || ''),
+          });
+        }
+      }
+
+      // Recurse into children
+      elem.forEach((child) => {
+        if (child instanceof Y.XmlElement) {
+          findImages(child);
+        }
+      });
+    };
+
+    content.forEach((item) => {
+      if (item instanceof Y.XmlElement) {
+        findImages(item);
+      }
+    });
+
+    return images;
   },
 
   closeNote(noteId: string): void {
@@ -694,6 +781,42 @@ const bridge: NoteCoveBridge = {
 
   parsePackFilename(filename: string): PackFileMetadata | null {
     return parsePackFilename(filename);
+  },
+
+  /**
+   * Create a log file from an update and return as base64.
+   * Used to save editor changes to disk.
+   *
+   * @param updateBase64 - The Yjs update as base64 string
+   * @param timestamp - Timestamp for the record
+   * @param sequence - Sequence number for the record (default 1)
+   * @returns Base64-encoded log file ready to write to disk
+   */
+  createLogFileFromUpdate(updateBase64: string, timestamp: number, sequence: number = 1): string {
+    const updateBytes = base64ToUint8Array(updateBase64);
+    const logData = createLogFile([{ timestamp, sequence, data: updateBytes }]);
+    return uint8ArrayToBase64(logData);
+  },
+
+  /**
+   * Generate a log filename for a note update.
+   *
+   * Format: {profileId}_{instanceId}_{timestamp}.crdtlog
+   * This matches the desktop format for cross-platform sync compatibility.
+   *
+   * @param profileId - The profile ID (typically the SD ID on iOS)
+   * @param instanceId - The instance ID (device identifier)
+   * @param timestamp - Timestamp for the filename
+   * @returns Filename like "profileId_instanceId_timestamp.crdtlog"
+   */
+  generateLogFilename(profileId: string, instanceId: string, timestamp: number): string {
+    return `${profileId}_${instanceId}_${timestamp}.crdtlog`;
+  },
+
+  // ==================== ID Generation ====================
+
+  generateNoteId(): string {
+    return generateCompactId();
   },
 
   // ==================== Memory Management ====================

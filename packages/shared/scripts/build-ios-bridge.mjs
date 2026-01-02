@@ -49,7 +49,34 @@ if (typeof crypto === 'undefined') {
         array[i] = Math.floor(Math.random() * 256);
       }
       return array;
+    },
+    randomUUID: function() {
+      // Generate a v4 UUID using getRandomValues
+      var bytes = new Uint8Array(16);
+      this.getRandomValues(bytes);
+      // Set version (4) and variant (10xx) bits
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      // Convert to hex string with dashes
+      var hex = '';
+      for (var i = 0; i < 16; i++) {
+        hex += bytes[i].toString(16).padStart(2, '0');
+      }
+      return hex.slice(0,8) + '-' + hex.slice(8,12) + '-' + hex.slice(12,16) + '-' + hex.slice(16,20) + '-' + hex.slice(20);
     }
+  };
+} else if (typeof crypto.randomUUID === 'undefined') {
+  // crypto exists but randomUUID doesn't
+  crypto.randomUUID = function() {
+    var bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    var hex = '';
+    for (var i = 0; i < 16; i++) {
+      hex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return hex.slice(0,8) + '-' + hex.slice(8,12) + '-' + hex.slice(12,16) + '-' + hex.slice(16,20) + '-' + hex.slice(20);
   };
 }
 // TextEncoder/TextDecoder polyfill for JavaScriptCore

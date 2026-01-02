@@ -12,17 +12,18 @@ Build a native iOS app for NoteCove, initially targeting iPad with adaptive layo
 
 ### Key Decisions
 
-| Decision        | Choice                                                      | Source                                       |
-| --------------- | ----------------------------------------------------------- | -------------------------------------------- |
-| Editor approach | Hybrid: Native SwiftUI shell + WKWebView for TipTap editor  | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
-| UI framework    | SwiftUI-first, UIKit for WebView and file picker            | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
-| Database        | GRDB.swift (FTS5 support required)                          | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
-| Cloud storage   | User picks folder (iCloud Drive for MVP, then Google Drive) | [QUESTIONS-1.md](./QUESTIONS-1.md)           |
-| iOS version     | iOS 17+ (with iOS 26 enhancements)                          | [QUESTIONS-1.md](./QUESTIONS-1.md)           |
-| Bundle ID       | `com.notecove.NoteCove`                                     | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
-| Profile         | Single hardcoded profile per device                         | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
-| CRDT strategy   | JavaScriptCore + ios-bridge.ts                              | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
-| Background sync | Foreground-only (acceptable limitation)                     | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
+| Decision        | Choice                                                       | Source                                       |
+| --------------- | ------------------------------------------------------------ | -------------------------------------------- |
+| Editor approach | Hybrid: Native SwiftUI shell + WKWebView for TipTap editor   | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| UI framework    | SwiftUI-first, UIKit for WebView and file picker             | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| Database        | GRDB.swift (FTS5 support required)                           | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| Cloud storage   | User picks folder (iCloud Drive for MVP, then Google Drive)  | [QUESTIONS-1.md](./QUESTIONS-1.md)           |
+| iOS version     | iOS 17+ (with iOS 26 enhancements)                           | [QUESTIONS-1.md](./QUESTIONS-1.md)           |
+| Bundle ID       | `com.notecove.NoteCove`                                      | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| Profile         | Single hardcoded profile per device                          | [QUESTIONS-2.md](./QUESTIONS-2.md)           |
+| Multi-SD        | Multiple SDs supported; folder tree shows all SDs as parents | Phase 6 planning (2026-01-01)                |
+| CRDT strategy   | JavaScriptCore + ios-bridge.ts                               | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
+| Background sync | Foreground-only (acceptable limitation)                      | [QUESTIONS-PLAN-1.md](./QUESTIONS-PLAN-1.md) |
 
 ### iOS 26 Features to Leverage
 
@@ -42,9 +43,10 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
 | ----- | ------------------- | -------------- |
 | 1     | Project Foundation  | 🟩 Complete    |
 | 2     | Read-Only MVP       | 🟨 In Progress |
-| 3     | Editing Support     | 🟥 To Do       |
+| 3     | Editing Support     | 🟨 In Progress |
 | 4     | Search & Navigation | 🟥 To Do       |
 | 5     | Polish & Advanced   | 🟥 To Do       |
+| 6     | Multi-SD Support    | 🟥 To Do       |
 
 ---
 
@@ -176,47 +178,54 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
 
 ### Tasks
 
-- [ ] 🟥 **3.1 TipTap Editor Integration**
-  - [ ] 🟥 Bundle full TipTap editor (not just renderer)
-  - [ ] 🟥 Configure for iOS-appropriate toolbar (use ToolbarSpacer for layout)
-  - [ ] 🟥 Set up JavaScript bridge for Swift ↔ TipTap communication
-  - [ ] 🟥 Handle iOS keyboard appearance/dismissal
-  - [ ] 🟥 Test with external keyboard
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **3.1 TipTap Editor Integration** ✅
+  - [x] 🟩 Bundle full TipTap editor (ios-editor.ts with esbuild)
+  - [x] 🟩 Create ios-editor.html template for WKWebView
+  - [x] 🟩 Set up JavaScript bridge for Swift ↔ TipTap communication (webkit.messageHandlers)
+  - [x] 🟩 Add syncAndGetUpdate() for capturing editor changes as Yjs
+  - [x] 🟩 Handle iOS keyboard appearance/dismissal
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **3.2 CRDT Updates**
-  - [ ] 🟥 Capture editor changes as Yjs updates
-  - [ ] 🟥 Write updates to storage directory (append-only log format)
-  - [ ] 🟥 Generate proper filenames with instance ID and sequence
-  - [ ] 🟥 Update local database cache
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **3.2 CRDT Updates** ✅
+  - [x] 🟩 Capture editor changes as Yjs updates (syncAndGetUpdate in ios-editor.ts)
+  - [x] 🟩 Write updates to storage directory (append-only log format)
+  - [x] 🟩 Generate proper filenames with instance ID and sequence (generateLogFilename)
+  - [x] 🟩 Add createLogFileFromUpdate to ios-bridge for binary log creation
+  - [x] 🟩 Add saveNoteUpdate to CRDTManager.swift
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **3.3 Note Creation**
-  - [ ] 🟥 Add "New Note" button to UI
-  - [ ] 🟥 Create new CRDT document
-  - [ ] 🟥 Write initial snapshot to storage directory
-  - [ ] 🟥 Add to database and navigate to editor
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **3.3 Note Creation** ✅
+  - [x] 🟩 "New Note" button already in UI (toolbar)
+  - [x] 🟩 Add generateNoteId to ios-bridge using generateCompactId
+  - [x] 🟩 Add createNewNote to CRDTManager.swift
+  - [x] 🟩 Write initial log file to storage directory
+  - [x] 🟩 Navigate to editor (with startInEditMode flag)
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **3.4 Rich Text Features**
-  - [ ] 🟥 Bold, italic, underline, strikethrough (Priority 1)
-  - [ ] 🟥 Headings H1-H3 (Priority 1)
-  - [ ] 🟥 Bullet, numbered, task lists (Priority 1)
-  - [ ] 🟥 Blockquotes (Priority 1)
-  - [ ] 🟥 Tables (Priority 1)
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **3.4 Rich Text Features** ✅
+  - [x] 🟩 Bold, italic, underline, strikethrough
+  - [x] 🟩 Headings H1-H3 (via menu dropdown)
+  - [x] 🟩 Bullet, numbered, task lists
+  - [x] 🟩 Blockquotes
+  - [x] 🟩 Code blocks
+  - [x] 🟩 Tables (insert, add/delete rows/columns)
+  - [x] 🟩 Undo/Redo
+  - [x] 🟩 EditorFormattingToolbar with scrollable button bar
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **3.5 Image Support**
-  - [ ] 🟥 View images from notes
-  - [ ] 🟥 Insert images from photo library
-  - [ ] 🟥 Paste images from clipboard
-  - [ ] 🟥 Store images in SD media folder
-  - [ ] 🟥 Update PLAN.md
+- [x] 🟩 **3.5 Image Support** ✅
+  - [x] 🟩 View images from notes (notecove:// URL scheme with WKURLSchemeHandler)
+  - [x] 🟩 Insert images from photo library (PhotosPicker integration)
+  - [x] 🟩 Paste images from clipboard (handlePaste in TipTap)
+  - [x] 🟩 Store images in SD media folder (ImageStorage with content-addressed naming)
+  - [x] 🟩 Update PLAN.md
 
-- [ ] 🟥 **3.6 Bidirectional Sync Testing**
-  - [ ] 🟥 Test: Edit on iOS, verify syncs to desktop
-  - [ ] 🟥 Test: Concurrent edits on both, verify CRDT merge
-  - [ ] 🟥 Test: Offline edit on iOS, sync when back online
+- [ ] 🟨 **3.6 Bidirectional Sync Testing**
+  - [ ] 🟨 Test: Edit on iOS, verify syncs to desktop
+  - [ ] 🟨 Test: Concurrent edits on both, verify CRDT merge
+  - [ ] 🟨 Test: Offline edit on iOS, sync when back online
+  - [ ] 🟨 Test: Images added on iOS sync to desktop
+  - [ ] 🟨 Test: Images from desktop display on iOS
   - [ ] 🟥 Update PLAN.md
 
 ---
@@ -317,6 +326,105 @@ Based on [iOS 26 developer documentation](https://www.hackingwithswift.com/artic
 - [ ] 🟥 **5.8 Paranoid Mode (Priority 5)**
   - [ ] 🟥 Disable network features when enabled
   - [ ] 🟥 Block link unfurling
+  - [ ] 🟥 Update PLAN.md
+
+---
+
+## Phase 6: Multi-SD Support
+
+**Goal:** Support multiple Storage Directories, SD creation, and unified folder tree.
+
+**Detailed plan:** [PLAN-PHASE-6.md](./PLAN-PHASE-6.md)
+
+### Design Decisions
+
+| Decision             | Choice                                | Rationale                                      |
+| -------------------- | ------------------------------------- | ---------------------------------------------- |
+| SD Creation Location | User chooses: Cloud (iCloud) or Local | Mirrors desktop flexibility                    |
+| Default folder name  | `NoteCove` in chosen location         | Simple, recognizable                           |
+| Folder tree          | All SDs shown as top-level parents    | No separate "switcher" - unified view          |
+| Bookmark storage     | Multiple bookmarks keyed by SD ID     | Each SD needs its own security-scoped bookmark |
+
+### Tasks
+
+- [ ] 🟥 **6.1 StorageDirectoryManager Multi-SD Refactor**
+  - [ ] 🟥 Change from single `activeDirectory` to `registeredDirectories: [StorageDirectoryInfo]`
+  - [ ] 🟥 Store multiple security-scoped bookmarks (keyed by SD ID)
+  - [ ] 🟥 Add `registerDirectory(url:)` → validates, creates bookmark, adds to list
+  - [ ] 🟥 Add `unregisterDirectory(id:)` → removes bookmark, removes from list
+  - [ ] 🟥 Keep `activeDirectory` concept for "currently focused" SD (for note creation context)
+  - [ ] 🟥 Persist registered SD list to database (`storage_dirs` table)
+  - [ ] 🟥 Restore all bookmarks on app launch
+  - [ ] 🟥 Write tests for multi-SD bookmark management
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.2 SD Creation**
+  - [ ] 🟥 Add `createStorageDirectory(at:name:)` to StorageDirectoryManager
+  - [ ] 🟥 Generate SD_ID using `generateCompactId()` from ios-bridge
+  - [ ] 🟥 Create directory structure: `notes/`, `folders/`, `activity/`, `media/`
+  - [ ] 🟥 Write `SD_ID` file
+  - [ ] 🟥 Write `SD-TYPE` file ("icloud" or "local")
+  - [ ] 🟥 Initialize empty folder tree CRDT
+  - [ ] 🟥 Register the new SD (bookmark + database)
+  - [ ] 🟥 Write tests for SD creation
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.3 Onboarding Flow Redesign**
+  - [ ] 🟥 First screen: "Where do you want to store your notes?"
+    - [ ] 🟥 Option: "In the cloud" (syncs across devices)
+    - [ ] 🟥 Option: "On this device only" (local storage)
+  - [ ] 🟥 Cloud path: Choose provider (iCloud only for now), default folder `NoteCove`
+  - [ ] 🟥 Local path: Default to `NoteCove` in On My iPad, allow customization
+  - [ ] 🟥 Both paths: Allow picking existing SD folder instead of creating new
+  - [ ] 🟥 After setup: Show folder tree with new SD
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.4 Unified Folder Tree**
+  - [ ] 🟥 Refactor FolderTreeView to show all registered SDs
+  - [ ] 🟥 Each SD appears as a top-level "folder" with its name
+  - [ ] 🟥 SD folders are expandable/collapsible, contain their folder trees
+  - [ ] 🟥 Visual distinction for SD vs regular folder (different icon, maybe bold)
+  - [ ] 🟥 "All Notes" option shows notes from ALL SDs
+  - [ ] 🟥 Tapping SD name selects it (shows its notes, sets as active for new note creation)
+  - [ ] 🟥 Context menu on SD: Rename, Remove (unregister, doesn't delete files)
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.5 Add SD Flow**
+  - [ ] 🟥 "Add Storage" button in folder sidebar (or settings)
+  - [ ] 🟥 Same flow as onboarding: Cloud vs Local → pick/create folder
+  - [ ] 🟥 Can also "Add Existing" to pick a folder that already has SD_ID
+  - [ ] 🟥 New SD appears in folder tree immediately
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.6 SyncMonitor Multi-SD**
+  - [ ] 🟥 Monitor all registered SDs for changes (not just one)
+  - [ ] 🟥 Track `lastKnownNoteModTimes` per SD
+  - [ ] 🟥 Post notifications with SD ID so views know which SD changed
+  - [ ] 🟥 Handle SD becoming inaccessible (bookmark expired, folder moved)
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.7 Note List Multi-SD**
+  - [ ] 🟥 "All Notes" shows notes from all SDs (with SD indicator badge?)
+  - [ ] 🟥 When SD selected, show only that SD's notes
+  - [ ] 🟥 When folder selected, show that folder's notes (already works)
+  - [ ] 🟥 New note created in currently selected SD (or first SD if "All Notes")
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.8 Database Integration**
+  - [ ] 🟥 Use existing `storage_dirs` table for persistence
+  - [ ] 🟥 Add DatabaseManager methods: `getAllStorageDirs()`, `createStorageDir()`, `deleteStorageDir()`
+  - [ ] 🟥 Ensure notes/folders properly filtered by `sd_id`
+  - [ ] 🟥 Clean up orphaned data when SD removed
+  - [ ] 🟥 Update PLAN.md
+
+- [ ] 🟥 **6.9 Testing & Edge Cases**
+  - [ ] 🟥 Test: Create new SD (cloud), verify files created correctly
+  - [ ] 🟥 Test: Create new SD (local), verify files created correctly
+  - [ ] 🟥 Test: Add existing SD, verify notes load
+  - [ ] 🟥 Test: Multiple SDs in folder tree, switch between them
+  - [ ] 🟥 Test: Remove SD (should unregister, not delete files)
+  - [ ] 🟥 Test: SD bookmark expires, handle gracefully with re-auth prompt
+  - [ ] 🟥 Test: App restart restores all registered SDs
   - [ ] 🟥 Update PLAN.md
 
 ---
@@ -460,6 +568,10 @@ xcodebuild \
 | 2025-12-31 | Completed Phase 2.3: Folder Tree Sync with extractFolders in bridge, FolderTreeView loads from CRDT                                              |
 | 2025-12-31 | Completed Phase 2.4: Note List with extractNoteMetadata, loadAllNotes, NoteListView loads from CRDT, 32 tests                                    |
 | 2025-12-31 | Completed Phase 2.5: Read-Only Note Viewer with HTML rendering via WKWebView, dark/light mode CSS, 35 tests                                      |
-| 2025-12-31 | Completed Phase 2.2: Debug Tools with hidden access, file browser, database stats, activity logs                                                   |
-| 2025-12-31 | Completed Phase 2.6: Sync Monitoring with SyncMonitor, InstanceID, foreground lifecycle, activity logging                                          |
-| 2025-12-31 | Completed Phase 2.7: Error Handling with user-friendly messages, recovery suggestions, context-aware icons                                         |
+| 2025-12-31 | Completed Phase 2.2: Debug Tools with hidden access, file browser, database stats, activity logs                                                 |
+| 2025-12-31 | Completed Phase 2.6: Sync Monitoring with SyncMonitor, InstanceID, foreground lifecycle, activity logging                                        |
+| 2025-12-31 | Completed Phase 2.7: Error Handling with user-friendly messages, recovery suggestions, context-aware icons                                       |
+| 2026-01-01 | Completed Phase 3.1: TipTap Editor Integration with ios-editor.ts, WKWebView wrapper, webkit.messageHandlers                                     |
+| 2026-01-01 | Completed Phase 3.2: CRDT Updates with syncAndGetUpdate, createLogFileFromUpdate, saveNoteUpdate                                                 |
+| 2026-01-01 | Completed Phase 3.3: Note Creation with generateNoteId, createNewNote in CRDTManager, startInEditMode for new notes                              |
+| 2026-01-01 | Completed Phase 3.4: Rich Text Features with EditorFormattingToolbar (bold, italic, lists, headings, blockquotes, tables, undo/redo)             |

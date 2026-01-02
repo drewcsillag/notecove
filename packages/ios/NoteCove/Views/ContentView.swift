@@ -6,6 +6,7 @@ struct ContentView: View {
     @EnvironmentObject var storageManager: StorageDirectoryManager
     @State private var selectedFolder: Folder?
     @State private var selectedNote: Note?
+    @State private var newlyCreatedNoteId: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showingDebug = false
     @State private var debugTapCount = 0
@@ -28,24 +29,48 @@ struct ContentView: View {
     private var mainNavigationView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             // Sidebar: Folder tree
-            FolderTreeView(selectedFolder: $selectedFolder)
-                .navigationTitle("Folders")
-                .toolbar {
-                    ToolbarItem(placement: .bottomBar) {
-                        // Hidden debug access: tap 5 times to reveal
-                        Button(action: handleDebugTap) {
-                            Image(systemName: "gearshape")
-                        }
+            FolderTreeView(selectedFolder: $selectedFolder) {
+                // On iPhone, programmatically navigate to content column when folder selected
+                columnVisibility = .doubleColumn
+            }
+            .navigationTitle("Folders")
+            .toolbar {
+                ToolbarItem(placement: .bottomBar) {
+                    // Hidden debug access: tap 5 times to reveal
+                    Button(action: handleDebugTap) {
+                        Image(systemName: "gearshape")
                     }
                 }
+            }
         } content: {
             // Middle column: Note list
-            NoteListView(folder: selectedFolder, selectedNote: $selectedNote)
-                .navigationTitle(selectedFolder?.name ?? "All Notes")
+            NoteListView(
+                folder: selectedFolder,
+                selectedNote: $selectedNote,
+                newlyCreatedNoteId: $newlyCreatedNoteId
+            )
+            .navigationTitle(selectedFolder?.name ?? "All Notes")
         } detail: {
             // Detail: Note editor
             if let note = selectedNote {
-                NoteEditorView(note: note)
+                NoteEditorView(
+                    note: note,
+                    startInEditMode: note.id == newlyCreatedNoteId
+                )
+                .onChange(of: note.id) { _, _ in
+                    // Clear newlyCreatedNoteId when note changes
+                    if newlyCreatedNoteId != nil {
+                        newlyCreatedNoteId = nil
+                    }
+                }
+                .onAppear {
+                    // Clear newlyCreatedNoteId after editor starts
+                    if newlyCreatedNoteId != nil {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            newlyCreatedNoteId = nil
+                        }
+                    }
+                }
             } else {
                 noNoteSelectedView
             }

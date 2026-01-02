@@ -9,5 +9,7 @@ node_modules
 *.min.js
 *.min.css
 pnpm-lock.yaml
-# Generated iOS bundle (built by esbuild)
+# Generated iOS bundles (built by esbuild)
+packages/ios/NoteCove/CRDT/Resources/ios-bridge-bundle.js
+packages/ios/NoteCove/Editor/Resources/ios-editor-bundle.js
 packages/ios/Sources/Resources/tiptap-bundle.js
