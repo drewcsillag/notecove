@@ -50,3 +50,18 @@ extension Note {
         self.isPinned = noteInfo.pinned
     }
 }
+
+// MARK: - Database Record Conversion
+
+extension Note {
+    /// Initialize from database NoteRecord
+    init(from record: NoteRecord) {
+        self.id = record.id
+        self.title = record.title
+        self.preview = record.contentPreview
+        self.folderId = record.folderId
+        self.createdAt = Date(timeIntervalSince1970: TimeInterval(record.created) / 1000)
+        self.modifiedAt = Date(timeIntervalSince1970: TimeInterval(record.modified) / 1000)
+        self.isPinned = record.pinned
+    }
+}

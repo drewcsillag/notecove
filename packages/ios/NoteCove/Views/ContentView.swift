@@ -4,12 +4,15 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var storageManager: StorageDirectoryManager
+    @StateObject private var syncService = BackgroundSyncService.shared
     @State private var selectedFolder: Folder?
     @State private var selectedNote: Note?
     @State private var newlyCreatedNoteId: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showingDebug = false
     @State private var debugTapCount = 0
+    @State private var needsInitialSync = true
+    @State private var showingSyncProgress = false
 
     var body: some View {
         Group {
@@ -18,8 +21,66 @@ struct ContentView: View {
             } else if !storageManager.hasAccess {
                 // Storage directory not accessible - show appropriate UI
                 accessErrorView
+            } else if showingSyncProgress {
+                // Show sync progress during initial sync
+                SyncProgressView(syncService: syncService) {
+                    // User clicked "Continue in background"
+                    showingSyncProgress = false
+                }
             } else {
                 mainNavigationView
+            }
+        }
+        .onChange(of: storageManager.hasAccess) { _, hasAccess in
+            if hasAccess && needsInitialSync {
+                startInitialSync()
+            }
+        }
+        .onAppear {
+            // Start initial sync if we have access but haven't synced yet
+            if storageManager.hasAccess && needsInitialSync {
+                startInitialSync()
+            }
+        }
+    }
+
+    private func startInitialSync() {
+        needsInitialSync = false
+
+        // Check if database has notes already (from previous session)
+        let dbManager = DatabaseManager.shared
+        if !dbManager.isInitialized {
+            // Initialize database if needed
+            if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let dbURL = documentsURL.appendingPathComponent("notecove.db")
+                try? dbManager.setupDatabase(at: dbURL)
+            }
+        }
+
+        // Check if we need to sync
+        let existingNotes = (try? dbManager.fetchNotes()) ?? []
+        if existingNotes.isEmpty {
+            // Database is empty - show sync progress
+            showingSyncProgress = true
+            Task {
+                do {
+                    _ = try await syncService.fullSync()
+                    // Auto-dismiss if sync completed quickly
+                    if case .complete = syncService.syncState {
+                        showingSyncProgress = false
+                    }
+                } catch {
+                    print("[ContentView] Initial sync failed: \(error)")
+                }
+            }
+        } else {
+            // Database has notes - do background sync without showing progress
+            Task {
+                do {
+                    _ = try await syncService.fullSync()
+                } catch {
+                    print("[ContentView] Background sync failed: \(error)")
+                }
             }
         }
     }

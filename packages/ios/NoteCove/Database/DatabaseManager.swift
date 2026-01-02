@@ -413,6 +413,35 @@ final class DatabaseManager {
             return count ?? 0
         }
     }
+
+    // MARK: - Database Observation
+
+    /// Observe notes for reactive updates
+    /// Returns an observation that publishes note arrays when the database changes
+    func observeNotes(folderId: String? = nil) -> ValueObservation<ValueReducers.Fetch<[NoteRecord]>> {
+        ValueObservation.tracking { db in
+            var request = NoteRecord.filter(NoteRecord.Columns.deleted == false)
+            if let folderId {
+                request = request.filter(NoteRecord.Columns.folderId == folderId)
+            }
+            return try request
+                .order(NoteRecord.Columns.pinned.desc, NoteRecord.Columns.modified.desc)
+                .fetchAll(db)
+        }
+    }
+
+    /// Observe folders for reactive updates
+    func observeFolders(sdId: String? = nil) -> ValueObservation<ValueReducers.Fetch<[FolderRecord]>> {
+        ValueObservation.tracking { db in
+            var request = FolderRecord.filter(FolderRecord.Columns.deleted == false)
+            if let sdId {
+                request = request.filter(FolderRecord.Columns.sdId == sdId)
+            }
+            return try request
+                .order(FolderRecord.Columns.order.asc)
+                .fetchAll(db)
+        }
+    }
 }
 
 // MARK: - Database Stats

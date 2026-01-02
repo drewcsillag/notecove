@@ -39,6 +39,8 @@
 		ICLOUD001A917F6B91B40B6E0 /* iCloudFileHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = ICLOUD002314C23D9B3EB65A2 /* iCloudFileHelper.swift */; };
 		IMGSCH001A917F6B91B40B6E0 /* ImageSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGSCH002314C23D9B3EB65A2 /* ImageSchemeHandler.swift */; };
 		IMGSTO001A917F6B91B40B6E0 /* ImageStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGSTO002314C23D9B3EB65A2 /* ImageStorage.swift */; };
+		BGSYNC001A917F6B91B40B6E0 /* BackgroundSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BGSYNC002314C23D9B3EB65A2 /* BackgroundSyncService.swift */; };
+		SYNCPV001A917F6B91B40B6E0 /* SyncProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCPV002314C23D9B3EB65A2 /* SyncProgressView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +70,8 @@
 		ICLOUD002314C23D9B3EB65A2 /* iCloudFileHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudFileHelper.swift; sourceTree = "<group>"; };
 		IMGSCH002314C23D9B3EB65A2 /* ImageSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSchemeHandler.swift; sourceTree = "<group>"; };
 		IMGSTO002314C23D9B3EB65A2 /* ImageStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStorage.swift; sourceTree = "<group>"; };
+		BGSYNC002314C23D9B3EB65A2 /* BackgroundSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSyncService.swift; sourceTree = "<group>"; };
+		SYNCPV002314C23D9B3EB65A2 /* SyncProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncProgressView.swift; sourceTree = "<group>"; };
 		24FA2DBD1A6944132D8DB425 /* StorageDirectoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDirectoryTests.swift; sourceTree = "<group>"; };
 		255C548184391C53FB2DFA6F /* NoteCoveApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteCoveApp.swift; sourceTree = "<group>"; };
 		26ADFF95122C4217035DF32A /* StorageDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDirectory.swift; sourceTree = "<group>"; };
@@ -151,6 +155,7 @@
 			isa = PBXGroup;
 			children = (
 				ACTLOG002314C23D9B3EB65A2 /* ActivityLogger.swift */,
+				BGSYNC002314C23D9B3EB65A2 /* BackgroundSyncService.swift */,
 				ICLOUD002314C23D9B3EB65A2 /* iCloudFileHelper.swift */,
 				IMGSCH002314C23D9B3EB65A2 /* ImageSchemeHandler.swift */,
 				IMGSTO002314C23D9B3EB65A2 /* ImageStorage.swift */,
@@ -241,6 +246,7 @@
 				A04B4A5349B0AEDB73668F75 /* NoteEditorView.swift */,
 				C45AF0F1375E05AF1DC6C463 /* NoteListView.swift */,
 				FEDF59B5876B5F580178B168 /* OnboardingView.swift */,
+				SYNCPV002314C23D9B3EB65A2 /* SyncProgressView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -404,6 +410,7 @@
 				ECB9748285EA4B412A61ABE2 /* NoteEditorView.swift in Sources */,
 				631C5EF5059EB0D16DDE20AA /* NoteListView.swift in Sources */,
 				1EA12ABE431E3E753446796B /* OnboardingView.swift in Sources */,
+				SYNCPV001A917F6B91B40B6E0 /* SyncProgressView.swift in Sources */,
 				D4F2B7EE9857F6A489F8E6CA /* SampleData.swift in Sources */,
 				DA9BFBF400ECEDECEAA10D84 /* Schema.swift in Sources */,
 				C3626DDCB1B05E5ACB08210A /* StorageDirectory.swift in Sources */,
@@ -413,6 +420,7 @@
 				ICLOUD001A917F6B91B40B6E0 /* iCloudFileHelper.swift in Sources */,
 				IMGSCH001A917F6B91B40B6E0 /* ImageSchemeHandler.swift in Sources */,
 				IMGSTO001A917F6B91B40B6E0 /* ImageStorage.swift in Sources */,
+				BGSYNC001A917F6B91B40B6E0 /* BackgroundSyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

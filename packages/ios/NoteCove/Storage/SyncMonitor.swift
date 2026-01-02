@@ -22,7 +22,6 @@ final class SyncMonitor: ObservableObject {
     private var isInForeground = true
 
     private let storageManager = StorageDirectoryManager.shared
-    private let crdtManager = CRDTManager.shared
 
     private init() {
         setupLifecycleObservers()
@@ -103,13 +102,17 @@ final class SyncMonitor: ObservableObject {
             let changes = try scanForChanges(in: url)
 
             if changes.hasChanges {
-                // Clear CRDT cache to force reload
-                crdtManager.clearCache()
+                // Get all changed note IDs
+                let changedNoteIds = changes.newNotes + changes.modifiedNotes
 
-                // Post notification for views to reload
-                NotificationCenter.default.post(name: .notesDidChange, object: nil)
+                // Update database via BackgroundSyncService
+                // This replaces the old approach of clearing CRDT cache and posting notification
+                await BackgroundSyncService.shared.syncChangedNotes(changedNoteIds)
 
-                print("[SyncMonitor] Detected changes - new: \(changes.newNotes.count), modified: \(changes.modifiedNotes.count), deleted: \(changes.deletedNotes.count)")
+                // Also retry any pending downloads
+                await BackgroundSyncService.shared.retryPendingNotes()
+
+                print("[SyncMonitor] Synced changes to database - new: \(changes.newNotes.count), modified: \(changes.modifiedNotes.count), deleted: \(changes.deletedNotes.count)")
             }
 
             lastSyncTime = Date()
