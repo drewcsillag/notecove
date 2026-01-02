@@ -49,4 +49,4 @@ count=$(echo "$failed_tests" | wc -l | tr -d ' ')
 tests_line=$(echo "$failed_tests" | tr '\n' ' ')
 
 echo "# Re-run $count failed test(s):"
-echo "pnpm --filter @notecove/desktop test:e2e $tests_line"
+echo "pnpm --filter @notecove/desktop test:e2e --workers=1 $tests_line"
