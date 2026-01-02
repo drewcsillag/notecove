@@ -36,6 +36,7 @@
 		FC6670171C030B0457B51B40 /* DatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E266CFAEA3B0F184F8C317FF /* DatabaseTests.swift */; };
 		FD00FAC3A917F6B91B40B6E0 /* SyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA06251314C23D9B3EB65A2 /* SyncMonitor.swift */; };
 		ACTLOG001A917F6B91B40B6E0 /* ActivityLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACTLOG002314C23D9B3EB65A2 /* ActivityLogger.swift */; };
+		ICLOUD001A917F6B91B40B6E0 /* iCloudFileHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = ICLOUD002314C23D9B3EB65A2 /* iCloudFileHelper.swift */; };
 		IMGSCH001A917F6B91B40B6E0 /* ImageSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGSCH002314C23D9B3EB65A2 /* ImageSchemeHandler.swift */; };
 		IMGSTO001A917F6B91B40B6E0 /* ImageStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMGSTO002314C23D9B3EB65A2 /* ImageStorage.swift */; };
 /* End PBXBuildFile section */
@@ -64,6 +65,7 @@
 		1BEE95A0E4DE0FB2F08A2543 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1EA06251314C23D9B3EB65A2 /* SyncMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMonitor.swift; sourceTree = "<group>"; };
 		ACTLOG002314C23D9B3EB65A2 /* ActivityLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLogger.swift; sourceTree = "<group>"; };
+		ICLOUD002314C23D9B3EB65A2 /* iCloudFileHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudFileHelper.swift; sourceTree = "<group>"; };
 		IMGSCH002314C23D9B3EB65A2 /* ImageSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageSchemeHandler.swift; sourceTree = "<group>"; };
 		IMGSTO002314C23D9B3EB65A2 /* ImageStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStorage.swift; sourceTree = "<group>"; };
 		24FA2DBD1A6944132D8DB425 /* StorageDirectoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDirectoryTests.swift; sourceTree = "<group>"; };
@@ -149,6 +151,7 @@
 			isa = PBXGroup;
 			children = (
 				ACTLOG002314C23D9B3EB65A2 /* ActivityLogger.swift */,
+				ICLOUD002314C23D9B3EB65A2 /* iCloudFileHelper.swift */,
 				IMGSCH002314C23D9B3EB65A2 /* ImageSchemeHandler.swift */,
 				IMGSTO002314C23D9B3EB65A2 /* ImageStorage.swift */,
 				04DF904012BDCD4565160700 /* StorageDirectoryManager.swift */,
@@ -407,6 +410,7 @@
 				E876014E0A8B668DCE00DCB2 /* StorageDirectoryManager.swift in Sources */,
 				FD00FAC3A917F6B91B40B6E0 /* SyncMonitor.swift in Sources */,
 				ACTLOG001A917F6B91B40B6E0 /* ActivityLogger.swift in Sources */,
+				ICLOUD001A917F6B91B40B6E0 /* iCloudFileHelper.swift in Sources */,
 				IMGSCH001A917F6B91B40B6E0 /* ImageSchemeHandler.swift in Sources */,
 				IMGSTO001A917F6B91B40B6E0 /* ImageStorage.swift in Sources */,
 			);

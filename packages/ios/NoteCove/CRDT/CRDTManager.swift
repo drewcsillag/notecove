@@ -11,6 +11,7 @@ enum CRDTError: Error, LocalizedError {
     case folderTreeNotOpen(String)
     case corruptCRDTFile(String)
     case parseError(String)
+    case filesDownloading(count: Int)
 
     var errorDescription: String? {
         switch self {
@@ -30,6 +31,8 @@ enum CRDTError: Error, LocalizedError {
             return "The note file is corrupt and cannot be read: \(path)"
         case .parseError(let message):
             return "Failed to parse note data: \(message)"
+        case .filesDownloading(let count):
+            return "Downloading \(count) file(s) from iCloud"
         }
     }
 
@@ -48,6 +51,8 @@ enum CRDTError: Error, LocalizedError {
             return "This note is not currently available."
         case .folderTreeNotOpen:
             return "The folder list is not available."
+        case .filesDownloading(let count):
+            return "Downloading \(count) file(s) from iCloud..."
         }
     }
 }
@@ -300,6 +305,7 @@ final class CRDTManager: ObservableObject {
     /// Load a note's CRDT state from storage directory
     /// - Parameter noteId: The note ID
     /// - Returns: Base64-encoded CRDT state
+    /// - Throws: CRDTError.filesDownloading if iCloud files need to be downloaded first
     func loadNoteState(noteId: String) throws -> String {
         guard isInitialized, let bridge = bridge else {
             throw CRDTError.bridgeNotInitialized
@@ -317,15 +323,27 @@ final class CRDTManager: ObservableObject {
             throw CRDTError.fileNotFound(notesDir.path)
         }
 
+        // Look for log files in the logs subdirectory
+        let logsDir = notesDir.appendingPathComponent("logs")
+
+        // Check if files need downloading from iCloud before accessing them
+        if FileManager.default.fileExists(atPath: logsDir.path) {
+            let pendingCount = iCloudFileHelper.pendingDownloadCount(in: logsDir)
+            if pendingCount > 0 {
+                // Start downloads and throw error to retry later
+                iCloudFileHelper.startDownloadingDirectory(logsDir)
+                throw CRDTError.filesDownloading(count: pendingCount)
+            }
+        }
+
         // Create the note in JS
         bridge.invokeMethod("createNote", withArguments: [noteId])
 
         // Look for log files in the logs subdirectory
-        let logsDir = notesDir.appendingPathComponent("logs")
         if FileManager.default.fileExists(atPath: logsDir.path) {
             let files = try FileManager.default.contentsOfDirectory(
                 at: logsDir,
-                includingPropertiesForKeys: [.contentModificationDateKey]
+                includingPropertiesForKeys: [.contentModificationDateKey, .ubiquitousItemDownloadingStatusKey]
             )
 
             // Sort by filename to apply in order (timestamp in filename)
@@ -335,6 +353,12 @@ final class CRDTManager: ObservableObject {
                 let filename = file.lastPathComponent
                 // Only process .crdtlog files
                 guard filename.hasSuffix(".crdtlog") else {
+                    continue
+                }
+
+                // Double-check file is downloaded (shouldn't block now)
+                guard iCloudFileHelper.isAvailableLocally(file) else {
+                    print("[CRDTManager] Skipping not-downloaded file: \(filename)")
                     continue
                 }
 
