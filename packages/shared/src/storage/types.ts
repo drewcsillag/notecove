@@ -93,6 +93,12 @@ export interface FileSystemAdapter {
    * If not implemented, falls back to read-modify-write.
    */
   seekWrite?(path: string, offset: number, data: Uint8Array): Promise<void>;
+
+  /**
+   * Rename a file or directory (optional)
+   * Used for profile ID migration.
+   */
+  rename?(oldPath: string, newPath: string): Promise<void>;
 }
 
 /**

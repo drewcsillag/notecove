@@ -13,9 +13,14 @@ import type { FileSystemAdapter } from '../../storage/types';
  * Create a mock filesystem adapter for testing
  */
 function createMockFs(files: Map<string, Uint8Array> = new Map()): FileSystemAdapter {
+  // Track directories that "exist" (for rename testing)
+  const directories = new Set<string>();
+
   return {
-    exists: jest.fn(async (path: string) => files.has(path)),
-    mkdir: jest.fn(async () => {}),
+    exists: jest.fn(async (path: string) => files.has(path) || directories.has(path)),
+    mkdir: jest.fn(async (path: string) => {
+      directories.add(path);
+    }),
     readFile: jest.fn(async (path: string) => {
       const data = files.get(path);
       if (!data) throw new Error(`ENOENT: ${path}`);
@@ -32,6 +37,21 @@ function createMockFs(files: Map<string, Uint8Array> = new Map()): FileSystemAda
     joinPath: jest.fn((...segments: string[]) => segments.join('/')),
     basename: jest.fn((path: string) => path.split('/').pop() || ''),
     stat: jest.fn(async () => ({ size: 0, mtimeMs: 0, ctimeMs: 0 })),
+    rename: jest.fn(async (oldPath: string, newPath: string) => {
+      // Simulate directory rename by updating directories set
+      if (directories.has(oldPath)) {
+        directories.delete(oldPath);
+        directories.add(newPath);
+      }
+      // Also rename any files that were under the old path
+      for (const [filePath, data] of files.entries()) {
+        if (filePath.startsWith(oldPath + '/')) {
+          const newFilePath = filePath.replace(oldPath, newPath);
+          files.delete(filePath);
+          files.set(newFilePath, data);
+        }
+      }
+    }),
   };
 }
 
@@ -490,6 +510,176 @@ describe('ProfileStorage', () => {
       const writtenData = writeCall[1];
       const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
       expect(parsed.profiles[0]?.lastUsed).toBeGreaterThanOrEqual(beforeUpdate);
+    });
+  });
+
+  describe('profile ID migration', () => {
+    // Full-form UUID (36 chars with dashes)
+    const FULL_UUID = '550e8400-e29b-41d4-a716-446655440000';
+    // Compact form (22 chars base64url)
+    const COMPACT_UUID = 'VQ6EAOKbQdSnFkRmVUQAAA';
+
+    it('should migrate full-form profile ID to compact form', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: FULL_UUID,
+            name: 'Legacy Profile',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: null,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      // Pre-create the old directory
+      await mockFs.mkdir(`${APP_DATA_DIR}/profiles/${FULL_UUID}`);
+
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+      const config = await storage.loadProfiles();
+
+      // Profile ID should be converted to compact form
+      expect(config.profiles[0]?.id).toBe(COMPACT_UUID);
+
+      // Directory should have been renamed
+      expect(mockFs.rename).toHaveBeenCalledWith(
+        `${APP_DATA_DIR}/profiles/${FULL_UUID}`,
+        `${APP_DATA_DIR}/profiles/${COMPACT_UUID}`
+      );
+
+      // Config should be saved with new ID
+      expect(mockFs.writeFile).toHaveBeenCalled();
+      const writeCall = (mockFs.writeFile as jest.Mock).mock.calls[0] as [string, Uint8Array];
+      const writtenData = writeCall[1];
+      const parsed = JSON.parse(new TextDecoder().decode(writtenData)) as ProfilesConfig;
+      expect(parsed.profiles[0]?.id).toBe(COMPACT_UUID);
+    });
+
+    it('should update defaultProfileId when migrating', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: FULL_UUID,
+            name: 'Legacy Profile',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: FULL_UUID,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      await mockFs.mkdir(`${APP_DATA_DIR}/profiles/${FULL_UUID}`);
+
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+      const config = await storage.loadProfiles();
+
+      // defaultProfileId should also be updated
+      expect(config.defaultProfileId).toBe(COMPACT_UUID);
+    });
+
+    it('should skip migration if directory rename fails', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: FULL_UUID,
+            name: 'Legacy Profile',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: null,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      // Make rename fail
+      (mockFs.rename as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+      const config = await storage.loadProfiles();
+
+      // Profile should keep original ID if rename failed
+      expect(config.profiles[0]?.id).toBe(FULL_UUID);
+      // Config should NOT be saved
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should not migrate already compact profile IDs', async () => {
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: COMPACT_UUID,
+            name: 'Modern Profile',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: null,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+      const config = await storage.loadProfiles();
+
+      // Profile ID should remain unchanged
+      expect(config.profiles[0]?.id).toBe(COMPACT_UUID);
+      // No rename should be attempted
+      expect(mockFs.rename).not.toHaveBeenCalled();
+      // No save should be triggered
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should migrate multiple profiles with full-form IDs', async () => {
+      const FULL_UUID_2 = '12345678-1234-1234-1234-123456789012';
+      const COMPACT_UUID_2 = 'EjRWeBI0EjQSNBI0VniQEg';
+
+      const existingConfig: ProfilesConfig = {
+        profiles: [
+          {
+            id: FULL_UUID,
+            name: 'Legacy Profile 1',
+            isDev: false,
+            created: 1000,
+            lastUsed: 2000,
+          },
+          {
+            id: FULL_UUID_2,
+            name: 'Legacy Profile 2',
+            isDev: true,
+            created: 1000,
+            lastUsed: 2000,
+          },
+        ],
+        defaultProfileId: FULL_UUID_2,
+        skipPicker: false,
+      };
+      const files = new Map<string, Uint8Array>();
+      files.set(PROFILES_JSON, new TextEncoder().encode(JSON.stringify(existingConfig)));
+      const mockFs = createMockFs(files);
+      await mockFs.mkdir(`${APP_DATA_DIR}/profiles/${FULL_UUID}`);
+      await mockFs.mkdir(`${APP_DATA_DIR}/profiles/${FULL_UUID_2}`);
+
+      const storage = new ProfileStorage(mockFs, APP_DATA_DIR);
+      const config = await storage.loadProfiles();
+
+      // Both profiles should be migrated
+      expect(config.profiles[0]?.id).toBe(COMPACT_UUID);
+      expect(config.profiles[1]?.id).toBe(COMPACT_UUID_2);
+      expect(config.defaultProfileId).toBe(COMPACT_UUID_2);
     });
   });
 });

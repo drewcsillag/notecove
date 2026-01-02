@@ -152,4 +152,8 @@ export class NodeFileSystemAdapter implements FileSystemAdapter {
       await fd.close();
     }
   }
+
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    await fs.rename(oldPath, newPath);
+  }
 }

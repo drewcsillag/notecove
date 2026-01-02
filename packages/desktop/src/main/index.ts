@@ -449,7 +449,12 @@ void app.whenReady().then(async () => {
         console.log(`[InstanceId] Generated new instanceId: ${instanceId}`);
       }
     }
-    const profileId = selectedProfileId ?? instanceId;
+    // Normalize profileId to compact form (safety net if ProfileStorage migration hasn't run)
+    let profileId = selectedProfileId ?? instanceId;
+    if (selectedProfileId && isFullUuid(selectedProfileId)) {
+      profileId = uuidToCompact(selectedProfileId);
+      console.log(`[ProfileId] Normalized to compact: ${selectedProfileId} → ${profileId}`);
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
     storageManager = new AppendLogManager(fsAdapter as any, database, profileId, instanceId);
 

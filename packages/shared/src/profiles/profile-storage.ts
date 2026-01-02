@@ -11,6 +11,7 @@
 import type { FileSystemAdapter } from '../storage/types';
 import type { Profile, ProfileMode, ProfilesConfig } from './types';
 import { createEmptyProfilesConfig, createProfile } from './types';
+import { isFullUuid, uuidToCompact } from '../utils/uuid-encoding';
 
 /** Filename for the profiles configuration */
 const PROFILES_CONFIG_FILENAME = 'profiles.json';
@@ -49,8 +50,8 @@ export class ProfileStorage {
    * - The file doesn't exist (first run)
    * - The file is corrupted (recovery)
    *
-   * Note: Existing profile IDs are NOT migrated because the profile ID
-   * is used as a directory name. New profiles get compact 22-char IDs.
+   * Migrates full-form UUIDs (36 chars) to compact form (22 chars) automatically.
+   * This involves renaming the profile directory and updating the config.
    *
    * @returns The loaded ProfilesConfig or empty config
    */
@@ -69,7 +70,11 @@ export class ProfileStorage {
       const config = JSON.parse(content) as ProfilesConfig;
 
       console.log(`[ProfileStorage] Loaded ${config.profiles.length} profiles`);
-      return config;
+
+      // Migrate full-form UUIDs to compact form
+      const migratedConfig = await this.migrateProfileIds(config);
+
+      return migratedConfig;
     } catch (error) {
       // File corrupted or other error - return empty config for recovery
       console.error(
@@ -78,6 +83,74 @@ export class ProfileStorage {
       );
       return createEmptyProfilesConfig();
     }
+  }
+
+  /**
+   * Migrate profile IDs from full-form UUID (36 chars) to compact form (22 chars).
+   *
+   * For each profile with a full-form UUID:
+   * 1. Convert the ID to compact form
+   * 2. Rename the profile directory
+   * 3. Update the profile.id
+   * 4. Update defaultProfileId if it references the old ID
+   *
+   * If directory rename fails, the profile is skipped (keeps old ID).
+   */
+  private async migrateProfileIds(config: ProfilesConfig): Promise<ProfilesConfig> {
+    // Check if rename is supported by the filesystem adapter
+    if (!this.fs.rename) {
+      // Can't migrate without rename support - return config as-is
+      return config;
+    }
+
+    // Track which old IDs were migrated to new IDs
+    const idMigrations = new Map<string, string>();
+
+    // Check each profile for full-form UUIDs
+    for (const profile of config.profiles) {
+      if (isFullUuid(profile.id)) {
+        const oldId = profile.id;
+        const newId = uuidToCompact(oldId);
+        const oldPath = this.getProfileDataDir(oldId);
+        const newPath = this.fs.joinPath(this.profilesDir, newId);
+
+        try {
+          // Rename the directory first
+          await this.fs.rename(oldPath, newPath);
+          console.log(`[ProfileStorage] Migrated profile directory: ${oldId} → ${newId}`);
+
+          // Update the profile ID
+          profile.id = newId;
+          idMigrations.set(oldId, newId);
+        } catch (error) {
+          // Rename failed - log warning and skip this profile
+          console.warn(
+            `[ProfileStorage] Failed to migrate profile ${oldId}, keeping old ID:`,
+            error
+          );
+        }
+      }
+    }
+
+    // If any profiles were migrated, update defaultProfileId and save
+    if (idMigrations.size > 0) {
+      // Update defaultProfileId if it was migrated
+      if (config.defaultProfileId && idMigrations.has(config.defaultProfileId)) {
+        const newDefaultId = idMigrations.get(config.defaultProfileId);
+        if (newDefaultId) {
+          config.defaultProfileId = newDefaultId;
+          console.log(`[ProfileStorage] Updated defaultProfileId: ${newDefaultId}`);
+        }
+      }
+
+      // Save the updated config
+      await this.saveProfiles(config);
+      console.log(
+        `[ProfileStorage] Saved migrated config (${idMigrations.size} profiles migrated)`
+      );
+    }
+
+    return config;
   }
 
   /**

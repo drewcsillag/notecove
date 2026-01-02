@@ -1,0 +1,1 @@
+The desktop app is writing files with its uuid in normal form (36 bytes), rather than its compacted form (22 bytes) that uses url-safe characters, when writing activity file names (as well as inside the activity log itself) and crdtlog file names.
