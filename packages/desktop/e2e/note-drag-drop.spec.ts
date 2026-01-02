@@ -28,6 +28,7 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { getFirstSdId, getAllNotesTestId, getRecentlyDeletedTestId } from './utils/sd-helpers';
 
 // Skip these tests - Playwright doesn't reliably simulate react-dnd drag events
 test.skip(true, 'Playwright drag simulation does not work reliably with react-dnd');
@@ -35,6 +36,7 @@ test.skip(true, 'Playwright drag simulation does not work reliably with react-dn
 let electronApp: ElectronApplication;
 let window: Page;
 let testUserDataDir: string;
+let sdId: string;
 
 test.beforeEach(async () => {
   // Create a unique temporary directory for this test
@@ -57,6 +59,9 @@ test.beforeEach(async () => {
   // Wait for app to be ready
   await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
   await window.waitForTimeout(500);
+
+  // Get the SD ID for use in tests
+  sdId = await getFirstSdId(window);
 });
 
 test.afterEach(async () => {
@@ -143,7 +148,7 @@ test.describe('Note Drag & Drop - Single Note', () => {
     await expect(noteItem).toBeVisible();
 
     // Get the "All Notes" button
-    const allNotesButton = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesButton = window.getByTestId(getAllNotesTestId(sdId));
     await expect(allNotesButton).toBeVisible();
 
     // Drag note to "All Notes" (root level)
@@ -165,7 +170,7 @@ test.describe('Note Drag & Drop - Single Note', () => {
     await window.waitForTimeout(2000);
 
     // Click on "All Notes"
-    const allNotesButton = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesButton = window.getByTestId(getAllNotesTestId(sdId));
     await allNotesButton.click();
     await window.waitForTimeout(1000);
 
@@ -183,7 +188,7 @@ test.describe('Note Drag & Drop - Single Note', () => {
     const notesBeforeDelete = await notesList.locator('li').count();
 
     // Get the "Recently Deleted" button
-    const recentlyDeletedButton = window.getByTestId('folder-tree-node-recently-deleted:default');
+    const recentlyDeletedButton = window.getByTestId(getRecentlyDeletedTestId(sdId));
     await expect(recentlyDeletedButton).toBeVisible();
 
     // Drag note to "Recently Deleted"
@@ -221,7 +226,7 @@ test.describe('Note Drag & Drop - Multi-Select', () => {
     await window.waitForTimeout(1500);
 
     // Click on "All Notes"
-    const allNotesButton = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesButton = window.getByTestId(getAllNotesTestId(sdId));
     await allNotesButton.click();
     await window.waitForTimeout(1000);
 
@@ -280,7 +285,7 @@ test.describe('Note Drag & Drop - Multi-Select', () => {
     await window.waitForTimeout(2000);
 
     // Click on "All Notes"
-    const allNotesButton = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesButton = window.getByTestId(getAllNotesTestId(sdId));
     await allNotesButton.click();
     await window.waitForTimeout(1000);
 
@@ -315,7 +320,7 @@ test.describe('Note Drag & Drop - Multi-Select', () => {
     await expect(window.locator('text=2 notes selected')).toBeVisible();
 
     // Get the "Recently Deleted" button
-    const recentlyDeletedButton = window.getByTestId('folder-tree-node-recently-deleted:default');
+    const recentlyDeletedButton = window.getByTestId(getRecentlyDeletedTestId(sdId));
     await expect(recentlyDeletedButton).toBeVisible();
 
     // Drag one of the selected notes to "Recently Deleted" (both should be deleted)
@@ -355,7 +360,7 @@ test.describe('Note Drag & Drop - Multi-Select', () => {
     await window.waitForTimeout(1500);
 
     // Click on "All Notes"
-    const allNotesButton = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesButton = window.getByTestId(getAllNotesTestId(sdId));
     await allNotesButton.click();
     await window.waitForTimeout(1000);
 
@@ -428,7 +433,7 @@ test.describe('Note Drag & Drop - Visual Feedback', () => {
     await window.waitForTimeout(2000);
 
     // Click on "All Notes"
-    const allNotesButton = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesButton = window.getByTestId(getAllNotesTestId(sdId));
     await allNotesButton.click();
     await window.waitForTimeout(1000);
 

@@ -68,32 +68,39 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
 
     console.log(`${E2E_LOG_PREFIX} Step 2: Create notes with rich text content`);
 
+    // Get the SD ID from the first SD
+    const sdId = await page.evaluate(async () => {
+      const sds = await window.electronAPI.sd.list();
+      return sds[0].id;
+    });
+    console.log(`${E2E_LOG_PREFIX} Using SD ID: ${sdId}`);
+
     // Create first note with bold text
-    await page.evaluate(async () => {
+    await page.evaluate(async (id) => {
       const noteId = await window.electronAPI.note.create(
-        'default',
+        id,
         null,
         '<p><strong>Bold Title</strong></p><p>Some content</p>'
       );
       await window.electronAPI.note.updateTitle(noteId, 'Bold Title', 'Bold Title\nSome content');
-    });
+    }, sdId);
     await page.waitForTimeout(500);
 
     // Create second note with italic and link
-    await page.evaluate(async () => {
+    await page.evaluate(async (id) => {
       const noteId = await window.electronAPI.note.create(
-        'default',
+        id,
         null,
         '<p><em>Italic</em> and <a href="#">Link</a></p>'
       );
       await window.electronAPI.note.updateTitle(noteId, 'Italic and Link', 'Italic and Link');
-    });
+    }, sdId);
     await page.waitForTimeout(500);
 
     // Create third note with heading
-    await page.evaluate(async () => {
+    await page.evaluate(async (id) => {
       const noteId = await window.electronAPI.note.create(
-        'default',
+        id,
         null,
         '<h1>Heading Title</h1><p>Content here</p>'
       );
@@ -102,7 +109,7 @@ test.describe('HTML Tags in Titles When Loading Existing SD', () => {
         'Heading Title',
         'Heading Title\nContent here'
       );
-    });
+    }, sdId);
     await page.waitForTimeout(500);
 
     // Wait longer to ensure all notes are synced to disk

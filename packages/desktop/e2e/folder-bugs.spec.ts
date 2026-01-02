@@ -18,11 +18,13 @@ import { resolve } from 'path';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { getFirstSdId, getAllNotesTestId } from './utils/sd-helpers';
 
 let electronApp: ElectronApplication;
 let page: Page;
 let testStorageDir: string;
 let testUserDataDir: string;
+let sdId: string;
 
 test.beforeEach(async () => {
   // Create a unique temp directory for THIS test's storage
@@ -56,6 +58,10 @@ test.beforeEach(async () => {
   page.on('console', (msg) => {
     console.log('[Renderer Console]:', msg.text());
   });
+
+  // Wait for app to be ready and get SD ID
+  await page.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
+  sdId = await getFirstSdId(page);
 }, 60000);
 
 test.afterEach(async () => {
@@ -178,7 +184,7 @@ test.describe('Bug: Drag-and-drop moves wrong folder', () => {
     await page.waitForTimeout(3000);
 
     // Force reload the tree by clicking "All Notes" to trigger fresh data load
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.getByTestId(getAllNotesTestId(sdId)).click();
     await page.waitForTimeout(500);
 
     // Expand Work folder to see Recipes (which should have moved there)
@@ -232,7 +238,7 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
 
     // Wait for folder:updated event and force tree refresh
     await page.waitForTimeout(2000);
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.getByTestId(getAllNotesTestId(sdId)).click();
     await page.waitForTimeout(500);
 
     // Expand Work to verify Ideas moved
@@ -250,7 +256,7 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
 
     // Wait for folder:updated event and force tree refresh
     await page.waitForTimeout(2000);
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.getByTestId(getAllNotesTestId(sdId)).click();
     await page.waitForTimeout(500);
 
     // Re-expand Work to see both Ideas and Recipes
@@ -269,7 +275,7 @@ test.describe('Bug: Drag-and-drop stops working after first drag', () => {
 
     // Wait for folder:updated event and force tree refresh
     await page.waitForTimeout(2000);
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.getByTestId(getAllNotesTestId(sdId)).click();
     await page.waitForTimeout(500);
 
     // Expand Personal to verify Ideas moved back
@@ -289,7 +295,7 @@ test.describe("Bug: Folders don't persist across app restarts", () => {
     await page.waitForTimeout(2000); // Wait for folder tree to fully load
 
     // Select "All Notes"
-    await page.getByTestId('folder-tree-node-all-notes:default').click();
+    await page.getByTestId(getAllNotesTestId(sdId)).click();
     await page.waitForTimeout(500);
 
     // Create a new folder
@@ -410,7 +416,7 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
       await page2.waitForSelector('text=Folders', { timeout: 10000 });
 
       // Create a folder in window 1
-      await page1.getByTestId('folder-tree-node-all-notes:default').click();
+      await page1.getByTestId(getAllNotesTestId(sdId)).click();
       await page1.waitForTimeout(500);
 
       const plusButton = page1.locator('button[title="Create folder"]');
@@ -636,7 +642,7 @@ test.describe("Bug: Folder changes don't sync across windows", () => {
     try {
       // TEST 1: Create a folder in instance 1
       console.log('[SYNC TEST] Creating folder in instance 1...');
-      await page1.getByTestId('folder-tree-node-all-notes:default').click();
+      await page1.getByTestId(getAllNotesTestId(sdId)).click();
       await page1.waitForTimeout(500);
 
       const plusButton1 = page1.locator('button[title="Create folder"]');

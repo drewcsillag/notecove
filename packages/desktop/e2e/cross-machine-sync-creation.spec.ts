@@ -483,9 +483,9 @@ test.describe('cross-machine sync - new note creation', () => {
     console.log(`[LiveFolderMove] Folder exists in Instance 2: ${folderExists > 0}`);
     expect(folderExists).toBeGreaterThan(0);
 
-    // Move the note to the folder in Instance 1
+    // Move the note to the folder in Instance 1 - use aria-label since SD ID is dynamic
     console.log('[LiveFolderMove] Moving note to folder in Instance 1...');
-    const allNotesNode = window1.locator('[data-testid="folder-tree-node-all-notes:default"]');
+    const allNotesNode = window1.locator('[aria-label="All Notes"]').first();
     await allNotesNode.click();
     await window1.waitForTimeout(500);
 

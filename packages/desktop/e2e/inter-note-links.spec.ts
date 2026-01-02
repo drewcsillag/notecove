@@ -9,6 +9,7 @@ import { _electron as electron } from 'playwright';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
+import { getFirstSdId } from './utils/sd-helpers';
 
 // Tests share an Electron instance via beforeAll, so they must run serially
 test.describe.configure({ mode: 'serial' });
@@ -16,6 +17,7 @@ test.describe.configure({ mode: 'serial' });
 let electronApp: ElectronApplication;
 let page: Page;
 let testUserDataDir: string;
+let sdId: string;
 
 test.beforeAll(async () => {
   // Create unique temp directory for this test
@@ -39,6 +41,9 @@ test.beforeAll(async () => {
   page = await electronApp.firstWindow();
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1000); // Wait for app initialization
+
+  // Get the SD ID for use in all tests
+  sdId = await getFirstSdId(page);
 });
 
 test.afterAll(async () => {
@@ -81,11 +86,11 @@ test.describe('Inter-Note Links - Basic Rendering', () => {
     await page.waitForTimeout(2500); // Wait for auto-save
 
     // Get the note ID
-    const targetNoteId = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const targetNoteId = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Target Note for Rendering Test');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     // Create a note with a link to the target note
     await page.click('button[title="Create note"]');
@@ -116,11 +121,11 @@ test.describe('Inter-Note Links - Basic Rendering', () => {
     await page.keyboard.type('Target Note 1');
     await page.waitForTimeout(2500);
 
-    const note1Id = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const note1Id = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Target Note 1');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
@@ -130,11 +135,11 @@ test.describe('Inter-Note Links - Basic Rendering', () => {
     await page.keyboard.type('Target Note 2');
     await page.waitForTimeout(2500);
 
-    const note2Id = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const note2Id = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Target Note 2');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     // Create note with multiple links
     await page.click('button[title="Create note"]');
@@ -255,11 +260,11 @@ test.describe('Inter-Note Links - Autocomplete', () => {
     await page.waitForTimeout(2500); // Wait for auto-save
 
     // Get the note ID via the API
-    const targetNoteId = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const targetNoteId = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Insert Me Note');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     // Create new note and use autocomplete
     await page.click('button[title="Create note"]');
@@ -355,11 +360,11 @@ test.describe('Inter-Note Links - Navigation', () => {
     await page.waitForTimeout(2500); // Wait for auto-save
 
     // Get the note ID via the API
-    const targetNoteId = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const targetNoteId = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Navigation Target Note');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     // Create source note with link
     await page.click('button[title="Create note"]');
@@ -395,11 +400,11 @@ test.describe('Inter-Note Links - Database Indexing', () => {
     await page.waitForTimeout(2500);
 
     // Get the note ID via the API
-    const target1Id = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const target1Id = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Index Target 1');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     await page.click('button[title="Create note"]');
     await page.waitForTimeout(500);
@@ -410,11 +415,11 @@ test.describe('Inter-Note Links - Database Indexing', () => {
     await page.waitForTimeout(2500);
 
     // Get the note ID via the API
-    const target2Id = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const target2Id = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Index Target 2');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     // Create note with links
     await page.click('button[title="Create note"]');
@@ -426,11 +431,11 @@ test.describe('Inter-Note Links - Database Indexing', () => {
     await page.waitForTimeout(2500); // Wait for auto-save and indexing
 
     // Get the note ID via the API
-    const sourceNoteId = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const sourceNoteId = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const sourceNote = notes.find((n) => n.title.startsWith('Links:'));
       return sourceNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     // Query the database via IPC to verify links are indexed
     const links = await page.evaluate(async (noteId) => {
@@ -486,11 +491,11 @@ test.describe('Inter-Note Links - Persistence', () => {
     await page.waitForTimeout(2500);
 
     // Get the note ID via the API
-    const targetNoteId = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const targetNoteId = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Persistent Target');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
 
     // Create note with link
     await page.click('button[title="Create note"]');

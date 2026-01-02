@@ -8,6 +8,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
+import { getFirstSdId } from './utils/sd-helpers';
 
 // Helper function to create a test note
 async function createTestNote(window: Page, content: string) {
@@ -46,6 +47,7 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
   let window: Page;
   let testDbPath: string;
   let testStorageDir: string;
+  let sdId: string;
 
   test.beforeEach(async () => {
     // Create temp directories
@@ -70,6 +72,9 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
 
     // Wait for app to be ready
     await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
+
+    // Get the SD ID for use in tests
+    sdId = await getFirstSdId(window);
   });
 
   test.afterEach(async () => {
@@ -111,10 +116,10 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     await expect(noteItems).toHaveCount(1);
 
     // Get the note ID
-    const noteId = await window.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default', 'recently-deleted:default');
+    const noteId = await window.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id, `recently-deleted:${id}`);
       return notes[0]?.id;
-    });
+    }, sdId);
 
     expect(noteId).toBeTruthy();
 
@@ -147,15 +152,17 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     await window.waitForTimeout(2000); // Give app time to fully initialize
 
     // Check what notes are in Recently Deleted (via API, not UI)
-    const remainingNotes = await window.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default', 'recently-deleted:default');
+    // Note: sdId is refreshed after app restart in the test
+    const currentSdId = await getFirstSdId(window);
+    const remainingNotes = await window.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id, `recently-deleted:${id}`);
       return notes.map((n) => ({
         id: n.id,
         title: n.title,
         modified: n.modified,
         deleted: n.deleted,
       }));
-    });
+    }, currentSdId);
     console.log('[Test] Notes remaining in Recently Deleted after restart:', remainingNotes);
 
     // Verify the old note has been permanently deleted
@@ -179,13 +186,10 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     await expect(getNotesList(window)).toHaveCount(1, { timeout: 5000 });
 
     // Debug: Check what notes are in the database before restart
-    const notesBeforeRestart = await window.evaluate(async () => {
-      // Get all notes (including deleted) from the default SD
-      const allNotes = await window.electronAPI.note.list('default', null);
-      const deletedNotes = await window.electronAPI.note.list(
-        'default',
-        'recently-deleted:default'
-      );
+    const notesBeforeRestart = await window.evaluate(async (id) => {
+      // Get all notes (including deleted) from the SD
+      const allNotes = await window.electronAPI.note.list(id, null);
+      const deletedNotes = await window.electronAPI.note.list(id, `recently-deleted:${id}`);
       return {
         all: allNotes.map((n) => ({
           id: n.id,
@@ -200,7 +204,7 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
           modified: n.modified,
         })),
       };
-    });
+    }, sdId);
     console.log('[Test] Notes before restart - all:', notesBeforeRestart.all);
     console.log('[Test] Notes before restart - deleted:', notesBeforeRestart.deleted);
 
@@ -250,12 +254,11 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
 
     // Debug: Check what notes are in the database after restart (before navigating to Recently Deleted)
-    const notesAfterRestart = await window.evaluate(async () => {
-      const allNotes = await window.electronAPI.note.list('default', null);
-      const deletedNotes = await window.electronAPI.note.list(
-        'default',
-        'recently-deleted:default'
-      );
+    // Note: Need to get fresh SD ID after restart
+    const sdIdAfterRestart = await getFirstSdId(window);
+    const notesAfterRestart = await window.evaluate(async (id) => {
+      const allNotes = await window.electronAPI.note.list(id, null);
+      const deletedNotes = await window.electronAPI.note.list(id, `recently-deleted:${id}`);
       return {
         all: allNotes.map((n) => ({
           id: n.id,
@@ -270,7 +273,7 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
           modified: n.modified,
         })),
       };
-    });
+    }, sdIdAfterRestart);
     console.log('[Test] Notes after restart - all:', notesAfterRestart.all);
     console.log('[Test] Notes after restart - deleted:', notesAfterRestart.deleted);
 
@@ -319,10 +322,10 @@ test.describe('Auto-cleanup of Recently Deleted notes', () => {
     await window.waitForTimeout(1000);
 
     // Set note's timestamp to 31 days ago
-    const noteId = await window.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default', 'recently-deleted:default');
+    const noteId = await window.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id, `recently-deleted:${id}`);
       return notes[0]?.id;
-    });
+    }, sdId);
 
     const thirtyOneDaysAgo = Date.now() - 31 * 24 * 60 * 60 * 1000;
     await window.evaluate(

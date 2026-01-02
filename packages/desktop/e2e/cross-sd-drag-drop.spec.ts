@@ -9,10 +9,12 @@ import { test, expect, _electron as electron, ElectronApplication, Page } from '
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { getFirstSdId, getAllNotesTestId } from './utils/sd-helpers';
 
 let electronApp: ElectronApplication;
 let window: Page;
 let testUserDataDir: string;
+let defaultSdId: string;
 
 /**
  * Helper function to get SD ID by name
@@ -46,6 +48,9 @@ test.beforeEach(async () => {
   // Wait for app to be ready
   await window.waitForSelector('[data-testid="notes-list"]', { timeout: 10000 });
   await window.waitForTimeout(500);
+
+  // Get the default SD ID for use in tests
+  defaultSdId = await getFirstSdId(window);
 });
 
 test.afterEach(async () => {
@@ -133,7 +138,7 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
     await window.waitForTimeout(500);
 
     // Create a note in default SD
-    const allNotesDefault = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesDefault = window.getByTestId(getAllNotesTestId(defaultSdId));
     await allNotesDefault.click();
     await window.waitForTimeout(500);
 
@@ -202,7 +207,7 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
     await window.waitForTimeout(500);
 
     // Create a note in default SD
-    const allNotesDefault = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesDefault = window.getByTestId(getAllNotesTestId(defaultSdId));
     await allNotesDefault.click();
     await window.waitForTimeout(500);
 
@@ -293,7 +298,7 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
     await window.waitForTimeout(500);
 
     // Create a note in default SD
-    const allNotesDefault = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesDefault = window.getByTestId(getAllNotesTestId(defaultSdId));
     await allNotesDefault.click();
     await window.waitForTimeout(500);
 
@@ -318,14 +323,14 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
     await window.waitForTimeout(2000);
 
     // Get the note ID before moving
-    const noteId = await window.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const noteId = await window.evaluate(async (sdId) => {
+      const notes = await window.electronAPI.note.list(sdId);
       console.log('[Test] All notes before move:', notes);
       const activeNotes = notes.filter((n: any) => !n.deleted);
       const sorted = activeNotes.sort((a: any, b: any) => b.created - a.created);
       console.log('[Test] Most recent note:', sorted[0]);
       return sorted[0]?.id;
-    });
+    }, defaultSdId);
 
     console.log('[Test] Captured noteId:', noteId);
     expect(noteId).toBeDefined();
@@ -348,14 +353,17 @@ test.describe('Cross-SD Drag & Drop - Single Note', () => {
     await window.waitForTimeout(2000);
 
     // Verify note is NOT in source SD anymore (not even in Recently Deleted)
-    const noteExistsInSource = await window.evaluate(async (id) => {
-      const notes = await window.electronAPI.note.list('default');
-      console.log(
-        '[Test] All notes in default SD after move:',
-        notes.map((n: any) => ({ id: n.id, sdId: n.sdId, deleted: n.deleted }))
-      );
-      return notes.some((n: any) => n.id === id);
-    }, noteId);
+    const noteExistsInSource = await window.evaluate(
+      async ({ noteId: id, sdId }) => {
+        const notes = await window.electronAPI.note.list(sdId);
+        console.log(
+          '[Test] All notes in default SD after move:',
+          notes.map((n: any) => ({ id: n.id, sdId: n.sdId, deleted: n.deleted }))
+        );
+        return notes.some((n: any) => n.id === id);
+      },
+      { noteId, sdId: defaultSdId }
+    );
     console.log('[Test] noteId:', noteId);
     console.log('[Test] Note exists in source:', noteExistsInSource);
     expect(noteExistsInSource).toBe(false);
@@ -404,7 +412,7 @@ test.describe('Cross-SD Drag & Drop - Multi-Select', () => {
     await window.waitForTimeout(500);
 
     // Create 3 notes in default SD
-    const allNotesDefault = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesDefault = window.getByTestId(getAllNotesTestId(defaultSdId));
     await allNotesDefault.click();
     await window.waitForTimeout(500);
 
@@ -483,7 +491,7 @@ test.describe('Cross-SD Drag & Drop - Conflict Resolution', () => {
     await window.waitForTimeout(500);
 
     // Create a note in default SD
-    const allNotesDefault = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesDefault = window.getByTestId(getAllNotesTestId(defaultSdId));
     await allNotesDefault.click();
     await window.waitForTimeout(500);
 
@@ -526,7 +534,7 @@ test.describe('Cross-SD Drag & Drop - Metadata Preservation', () => {
     await window.waitForTimeout(500);
 
     // Create a note in default SD
-    const allNotesDefault = window.getByTestId('folder-tree-node-all-notes:default');
+    const allNotesDefault = window.getByTestId(getAllNotesTestId(defaultSdId));
     await allNotesDefault.click();
     await window.waitForTimeout(500);
 

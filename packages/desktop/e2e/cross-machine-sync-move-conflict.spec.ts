@@ -161,8 +161,8 @@ test.describe('cross-machine sync - move conflict', () => {
     await expect(folderNodeA).toBeVisible({ timeout: 5000 });
     console.log('[MoveConflict] Folder A created:', folderAName);
 
-    // Move note to Folder A
-    const allNotesNode1 = window1.locator('[data-testid="folder-tree-node-all-notes:default"]');
+    // Move note to Folder A - use aria-label since SD ID is dynamic
+    const allNotesNode1 = window1.locator('[aria-label="All Notes"]').first();
     await allNotesNode1.click();
     await window1.waitForTimeout(500);
 

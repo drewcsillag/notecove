@@ -11,6 +11,7 @@ import { _electron as electron } from 'playwright';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
+import { getFirstSdId } from './utils/sd-helpers';
 
 let electronApp: ElectronApplication;
 let page: Page;
@@ -68,11 +69,12 @@ test.describe('Note List Display - Link Resolution', () => {
     await page.waitForTimeout(2500); // Wait for auto-save
 
     // Get the target note ID
-    const targetNoteId = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const sdId = await getFirstSdId(page);
+    const targetNoteId = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'My Target Note');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
     expect(targetNoteId).not.toBe('unknown-id');
 
     // Step 2: Create a note with the target note's UUID in the title
@@ -118,11 +120,12 @@ test.describe('Note List Display - Link Resolution', () => {
     await page.waitForTimeout(2500); // Wait for auto-save
 
     // Get the target note ID
-    const targetNoteId = await page.evaluate(async () => {
-      const notes = await window.electronAPI.note.list('default');
+    const sdId = await getFirstSdId(page);
+    const targetNoteId = await page.evaluate(async (id) => {
+      const notes = await window.electronAPI.note.list(id);
       const targetNote = notes.find((n) => n.title === 'Snippet Target Note');
       return targetNote?.id || 'unknown-id';
-    });
+    }, sdId);
     expect(targetNoteId).not.toBe('unknown-id');
 
     // Step 2: Create a note with a title and a second paragraph containing the link
