@@ -568,4 +568,9 @@ describe('TriStateTaskItem Commands', () => {
       });
     });
   });
+
+  // Note: Input rule position sensitivity is tested in E2E tests (tri-state-checkboxes.spec.ts)
+  // because input rules only trigger on actual typing, not programmatic insertion.
+  // See tests: "should NOT convert to task when [] is typed in middle of list item"
+  //            "should NOT convert when [] appears after space mid-line"
 });

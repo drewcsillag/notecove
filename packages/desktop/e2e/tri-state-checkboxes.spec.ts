@@ -211,6 +211,47 @@ test.describe('Task List - Alternative Input Syntax', () => {
     const taskItems = page.locator('li[data-type="taskItem"]');
     await expect(taskItems).toHaveCount(1);
   });
+
+  test('should NOT convert to task when [] is typed in middle of list item', async () => {
+    await createNoteAndClear(page);
+
+    // Create a bullet list with some text
+    await page.keyboard.type('- some text');
+    await page.waitForTimeout(200);
+
+    // Now type " [] " after the existing text - should NOT convert
+    await page.keyboard.type(' [] more text');
+    await page.waitForTimeout(500);
+
+    // Should still be a regular list item, NOT a task item
+    const taskItems = page.locator('li[data-type="taskItem"]');
+    await expect(taskItems).toHaveCount(0);
+
+    // Should be a regular list item with the text including literal []
+    const listItem = page.locator('.ProseMirror ul li');
+    await expect(listItem).toHaveCount(1);
+    await expect(listItem).toContainText('some text [] more text');
+  });
+
+  test('should NOT convert when [] appears after space mid-line', async () => {
+    await createNoteAndClear(page);
+
+    // Create a bullet list
+    await page.keyboard.type('- hello world');
+    await page.waitForTimeout(200);
+
+    // Type [] after a space (matches the regex \s\[\s?\]\s but should not convert)
+    await page.keyboard.type(' [] ');
+    await page.waitForTimeout(500);
+
+    // Should NOT be a task item
+    const taskItems = page.locator('li[data-type="taskItem"]');
+    await expect(taskItems).toHaveCount(0);
+
+    // Text should contain literal []
+    const listItem = page.locator('.ProseMirror ul li');
+    await expect(listItem).toContainText('hello world []');
+  });
 });
 
 test.describe('Task List - Standalone Input Syntax (Creates List)', () => {

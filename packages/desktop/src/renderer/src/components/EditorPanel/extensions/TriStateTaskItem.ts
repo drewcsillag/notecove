@@ -402,6 +402,17 @@ export const TriStateTaskItem = Node.create<TriStateTaskItemOptions>({
           const listItemPos = findParentListItemPos($from);
           if (listItemPos === null) return;
 
+          // Check if [] is at the start of the list item content
+          // Only convert if there's no text before the match
+          const parentNode = $from.parent;
+          if (parentNode.type.name !== 'paragraph') return;
+
+          const textBefore = parentNode.textBetween(
+            0,
+            $from.parentOffset - (range.to - range.from)
+          );
+          if (textBefore.trim() !== '') return; // Not at start, don't convert
+
           chain()
             .deleteRange(range)
             .command(({ tr }: { tr: import('@tiptap/pm/state').Transaction }) => {
