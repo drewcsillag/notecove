@@ -80,7 +80,7 @@ export interface TipTapEditorProps {
   onTitleChange?: (noteId: string, title: string, contentText: string) => void;
   showSearchPanel?: boolean;
   onSearchPanelClose?: () => void;
-  onNavigateToNote?: (noteId: string) => void;
+  onNavigateToNote?: (noteId: string, headingId?: string) => void;
   /** Lifted search term state for retention across panel open/close */
   searchTerm?: string;
   /** Callback to update the lifted search term state */
@@ -93,6 +93,8 @@ export interface TipTapEditorProps {
   onAddComment?: (selection: { from: number; to: number; text: string; threadId: string }) => void;
   /** Callback when "view comments" button is clicked (opens panel without thread selection) */
   onViewComments?: () => void;
+  /** Heading ID to scroll to after note loads */
+  pendingHeadingId?: string;
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -110,6 +112,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   onCommentClick,
   onAddComment,
   onViewComments,
+  pendingHeadingId,
 }) => {
   const theme = useTheme();
   const { strikethrough } = useCheckboxSettings();
@@ -287,19 +290,20 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           });
         }
       },
-      onLinkClick: (linkNoteId: string) => {
+      onLinkClick: (linkNoteId: string, headingId?: string) => {
         // Single click: Navigate to note in same window
-        console.log('[InterNoteLink] Single click on note:', linkNoteId);
+        console.log('[InterNoteLink] Single click on note:', linkNoteId, 'heading:', headingId);
         if (onNavigateToNote) {
-          onNavigateToNote(linkNoteId);
+          onNavigateToNote(linkNoteId, headingId);
         }
       },
-      onLinkDoubleClick: (linkNoteId: string) => {
+      onLinkDoubleClick: (linkNoteId: string, headingId?: string) => {
         // Double click: Open note in new window (minimal layout)
-        console.log('[InterNoteLink] Double click on note:', linkNoteId);
+        console.log('[InterNoteLink] Double click on note:', linkNoteId, 'heading:', headingId);
         void window.electronAPI.testing
           .createWindow({
             noteId: linkNoteId,
+            ...(headingId && { headingId }),
             minimal: true,
           })
           .then(() => {
@@ -312,6 +316,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       onCommentClick: (threadId: string) => {
         onCommentClick?.(threadId);
       },
+      getCurrentNoteId: () => noteIdRef.current,
     }),
     [onNavigateToNote, onCommentClick]
   );
@@ -695,6 +700,44 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   // Handle scroll/cursor state restoration and persistence
   useEditorStateRestoration(noteId, editor, isLoading, editorContainerRef);
 
+  // Scroll to heading when pendingHeadingId is set and note has finished loading
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- pendingHeadingId can be undefined
+    if (!pendingHeadingId || isLoading || !editor || !editorContainerRef.current) {
+      return;
+    }
+
+    // Small delay to ensure the editor content is fully rendered
+    const scrollTimer = setTimeout(() => {
+      const container = editorContainerRef.current;
+      if (!container) return;
+
+      // Find the heading element with matching data-heading-id
+      const headingElement = container.querySelector(
+        `[data-heading-id="${pendingHeadingId}"]`
+      );
+
+      if (headingElement) {
+        // Scroll the heading into view
+        headingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        // Add a temporary highlight class for visual feedback
+        headingElement.classList.add('heading-target-highlight');
+        setTimeout(() => {
+          headingElement.classList.remove('heading-target-highlight');
+        }, 2000);
+
+        console.log('[TipTapEditor] Scrolled to heading:', pendingHeadingId);
+      } else {
+        console.warn('[TipTapEditor] Heading not found:', pendingHeadingId);
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(scrollTimer);
+    };
+  }, [pendingHeadingId, isLoading, editor]);
+
   // Handle image drag-and-drop and keyboard shortcuts
   useEditorImages(editor, editorContainerRef);
 
@@ -1010,6 +1053,26 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       editorDom.removeEventListener('keydown', handleMoveBlockKeyDown);
     };
   }, [editor]);
+
+  // Listen for View Note JSON menu event
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- editor can be null in practice
+    if (!editor || !noteId) return;
+
+    const cleanup = window.electronAPI.menu.onViewNoteJSON(() => {
+      const json = editor.getJSON();
+      // Get the note title from first heading or use noteId as fallback
+      const firstHeading = json.content.find(
+        (node: { type?: string }) => node.type === 'heading'
+      );
+      const noteTitle =
+        (firstHeading?.content?.[0] as { text?: string } | undefined)?.text ?? noteId;
+
+      void window.electronAPI.window.openJSONViewer(json, noteTitle);
+    });
+
+    return cleanup;
+  }, [editor, noteId]);
 
   // Note: Link popover effects are now managed by useEditorLinkPopovers
   // Note: handleLinkButtonClick is now provided by useEditorLinkPopovers

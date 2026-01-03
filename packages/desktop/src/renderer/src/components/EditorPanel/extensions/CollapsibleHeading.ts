@@ -1,13 +1,15 @@
 /**
  * CollapsibleHeading Extension
  *
- * Extends TipTap's Heading node with collapsible functionality.
+ * Extends TipTap's Heading node with collapsible functionality and persistent IDs.
  * Users can click a toggle to collapse/expand content under a heading.
  *
  * Features:
  * - `collapsed` attribute (boolean, default: false)
+ * - `id` attribute for persistent heading ID (h_XXXXXXXX format) for anchor navigation
  * - Toggle button (▶/▼) next to heading
  * - Keyboard shortcuts: Mod-. to toggle, Mod-Shift-. to collapse/expand all (Step 4)
+ * - data-heading-id attribute for scrolling to specific headings from [[note-id#h_abc12xyz]] links
  *
  * The hiding of collapsed content is handled by CollapseDecorations plugin (Step 3).
  *
@@ -17,6 +19,8 @@
 import { Heading } from '@tiptap/extension-heading';
 import type { Level } from '@tiptap/extension-heading';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { generateHeadingId, isValidHeadingId } from '@notecove/shared';
 
 export interface CollapsibleHeadingOptions {
   /**
@@ -83,6 +87,17 @@ export const CollapsibleHeading = Heading.extend<CollapsibleHeadingOptions>({
             return {};
           }
           return { 'data-collapsed': 'true' };
+        },
+      },
+      // Persistent heading ID for anchor navigation
+      id: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-heading-id'),
+        renderHTML: (attributes: Record<string, unknown>) => {
+          if (!attributes['id']) {
+            return {};
+          }
+          return { 'data-heading-id': attributes['id'] as string };
         },
       },
     };
@@ -286,6 +301,48 @@ export const CollapsibleHeading = Heading.extend<CollapsibleHeadingOptions>({
         },
       };
     };
+  },
+
+  addProseMirrorPlugins() {
+    const parentPlugins = this.parent?.() ?? [];
+
+    return [
+      ...parentPlugins,
+      // Plugin to assign IDs to headings that don't have them
+      new Plugin({
+        key: new PluginKey('headingIdPlugin'),
+        appendTransaction: (transactions, _oldState, newState) => {
+          // Only process if there were actual document changes
+          const hasDocChanges = transactions.some((tr) => tr.docChanged);
+          if (!hasDocChanges) {
+            return null;
+          }
+
+          let tr = newState.tr;
+          let modified = false;
+
+          // Find all headings without valid IDs
+          newState.doc.descendants((node, pos) => {
+            if (node.type.name === 'heading') {
+              const currentId = node.attrs['id'] as string | null;
+              if (!currentId || !isValidHeadingId(currentId)) {
+                // Generate and assign a new ID
+                const newId = generateHeadingId();
+                tr = tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  id: newId,
+                });
+                modified = true;
+              }
+            }
+            return true; // Continue traversal
+          });
+
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- modified is set in callback
+          return modified ? tr : null;
+        },
+      }),
+    ];
   },
 });
 

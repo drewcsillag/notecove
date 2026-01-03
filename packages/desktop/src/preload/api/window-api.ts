@@ -103,6 +103,18 @@ export const windowApi = {
       success: boolean;
       error?: string;
     }>,
+  /**
+   * Open a JSON Viewer window to display editor JSON content.
+   * Creates a new window that displays the JSON in a scrollable, copyable format.
+   */
+  openJSONViewer: (
+    json: unknown,
+    noteTitle: string
+  ): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('window:openJSONViewer', json, noteTitle) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
 };
 
 export const menuApi = {
@@ -275,6 +287,15 @@ export const menuApi = {
     ipcRenderer.on('menu:print', listener);
     return () => {
       ipcRenderer.removeListener('menu:print', listener);
+    };
+  },
+  onViewNoteJSON: (callback: () => void): (() => void) => {
+    const listener = (): void => {
+      callback();
+    };
+    ipcRenderer.on('menu:viewNoteJSON', listener);
+    return () => {
+      ipcRenderer.removeListener('menu:viewNoteJSON', listener);
     };
   },
 };

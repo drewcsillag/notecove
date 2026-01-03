@@ -365,6 +365,17 @@ export function createMenu(deps: MenuDependencies): void {
                 }
               },
             },
+            {
+              label: 'View Note JSON',
+              click: () => {
+                const focusedWindow = BrowserWindow.getFocusedWindow();
+                if (focusedWindow) {
+                  focusedWindow.webContents.send('menu:viewNoteJSON');
+                } else if (mainWindow) {
+                  mainWindow.webContents.send('menu:viewNoteJSON');
+                }
+              },
+            },
             { type: 'separator' as const },
             {
               label: 'Create Snapshot',

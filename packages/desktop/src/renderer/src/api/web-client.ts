@@ -483,6 +483,11 @@ export const webClient: typeof window.electronAPI = {
         return [];
       }
     },
+    getHeadingsForNote: async (_noteId: string) => {
+      // Headings not exposed via web API - would need to parse note content
+      await Promise.resolve();
+      return [];
+    },
   },
 
   folder: {
@@ -771,6 +776,7 @@ export const webClient: typeof window.electronAPI = {
     onStorageInspector: noopSubscription,
     onFeatureFlags: noopSubscription,
     onPrint: noopSubscription,
+    onViewNoteJSON: noopSubscription,
   },
 
   tools: {
@@ -909,6 +915,11 @@ export const webClient: typeof window.electronAPI = {
     },
     // eslint-disable-next-line @typescript-eslint/require-await
     openPrintPreview: async () => {
+      // Not supported in web client - no separate windows
+      return { success: false, error: 'Not supported in web client' };
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    openJSONViewer: async () => {
       // Not supported in web client - no separate windows
       return { success: false, error: 'Not supported in web client' };
     },

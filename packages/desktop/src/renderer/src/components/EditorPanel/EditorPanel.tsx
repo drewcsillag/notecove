@@ -28,7 +28,9 @@ interface EditorPanelProps {
   onHistoryPanelClose?: () => void;
   showSearchPanel?: boolean;
   onSearchPanelClose?: () => void;
-  onNavigateToNote?: (noteId: string) => void;
+  onNavigateToNote?: (noteId: string, headingId?: string) => void;
+  /** Heading ID to scroll to after note loads */
+  pendingHeadingId?: string;
   showCommentPanel?: boolean;
   onCommentPanelClose?: () => void;
   /** Called when user adds a comment - parent can use to open panel */
@@ -44,6 +46,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   showSearchPanel = false,
   onSearchPanelClose,
   onNavigateToNote,
+  pendingHeadingId,
   showCommentPanel = false,
   onCommentPanelClose,
   onCommentAdded,
@@ -162,6 +165,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
               isNewlyCreated={isNewlyCreated}
               {...(onNavigateToNote && { onNavigateToNote })}
               {...(onNoteLoaded && { onNoteLoaded })}
+              {...(pendingHeadingId && { pendingHeadingId })}
               onTitleChange={stableTitleChangeHandler}
               showSearchPanel={showSearchPanel}
               {...(onSearchPanelClose && { onSearchPanelClose })}

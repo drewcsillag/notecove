@@ -83,6 +83,7 @@ export interface MentionUser {
  */
 export interface CreateWindowOptions {
   noteId?: string;
+  headingId?: string;
   minimal?: boolean;
   noteInfo?: boolean;
   storageInspector?: boolean;

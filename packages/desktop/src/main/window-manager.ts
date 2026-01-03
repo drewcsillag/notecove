@@ -50,6 +50,7 @@ import * as fs from 'fs/promises';
 
 export interface CreateWindowOptions {
   noteId?: string;
+  headingId?: string;
   minimal?: boolean;
   syncStatus?: boolean;
   noteInfo?: boolean;
@@ -255,6 +256,9 @@ export function createWindow(
   }
   if (options?.noteId) {
     params.set('noteId', options.noteId);
+  }
+  if (options?.headingId) {
+    params.set('headingId', options.headingId);
   }
   if (options?.minimal) {
     params.set('minimal', 'true');

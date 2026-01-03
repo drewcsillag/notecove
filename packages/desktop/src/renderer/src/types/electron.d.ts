@@ -217,6 +217,16 @@ declare global {
             modified: number;
           }[]
         >;
+        /**
+         * Get all headings from a note for autocomplete and display.
+         */
+        getHeadingsForNote: (noteId: string) => Promise<
+          {
+            text: string;
+            level: number;
+            id: string;
+          }[]
+        >;
       };
 
       folder: {
@@ -585,6 +595,7 @@ declare global {
         onStorageInspector: (callback: () => void) => () => void;
         onFeatureFlags: (callback: () => void) => () => void;
         onPrint: (callback: () => void) => () => void;
+        onViewNoteJSON: (callback: () => void) => () => void;
       };
 
       tools: {
@@ -686,7 +697,7 @@ declare global {
       };
 
       testing: {
-        createWindow: (options?: { noteId?: string; minimal?: boolean }) => Promise<void>;
+        createWindow: (options?: { noteId?: string; headingId?: string; minimal?: boolean }) => Promise<void>;
         setNoteTimestamp: (
           noteId: string,
           field: 'created' | 'modified' | 'deleted_at',
@@ -827,6 +838,14 @@ declare global {
          * Creates a new window that displays a print-ready view of the note.
          */
         openPrintPreview: (noteId: string) => Promise<{ success: boolean; error?: string }>;
+        /**
+         * Open a JSON Viewer window to display editor JSON content.
+         * Creates a new window that displays the JSON in a scrollable, copyable format.
+         */
+        openJSONViewer: (
+          json: unknown,
+          noteTitle: string
+        ) => Promise<{ success: boolean; error?: string }>;
       };
 
       // Storage inspector operations

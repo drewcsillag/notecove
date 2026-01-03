@@ -49,6 +49,8 @@ export interface EditorExtensionCallbacks {
   onLinkDoubleClick: (noteId: string) => void;
   /** Called when a comment highlight is clicked */
   onCommentClick: (threadId: string) => void;
+  /** Returns the current note ID for same-note heading autocomplete */
+  getCurrentNoteId: () => string | null;
 }
 
 /**
@@ -69,9 +71,9 @@ export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallb
       listItem: false, // Use NotecoveListItem with cursor-position-aware Tab
       codeBlock: false, // Use NotecoveCodeBlock with syntax highlighting
       link: false, // Use custom WebLink extension
-      heading: false, // Use CollapsibleHeading with collapse/expand toggle
+      heading: false, // Use CollapsibleHeading with collapse/expand toggle and heading IDs
     }),
-    // Add collapsible heading extension with toggle button
+    // Add collapsible heading extension with toggle button and persistent heading IDs
     CollapsibleHeading,
     // Add decoration plugin for hiding collapsed content
     CollapseDecorations,
@@ -108,6 +110,7 @@ export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallb
     InterNoteLink.configure({
       onLinkClick: callbacks.onLinkClick,
       onLinkDoubleClick: callbacks.onLinkDoubleClick,
+      getCurrentNoteId: callbacks.getCurrentNoteId,
     }),
     // Add SearchAndReplace extension for in-note search
     SearchAndReplace,

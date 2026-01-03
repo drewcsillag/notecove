@@ -216,7 +216,7 @@ export const importApi = {
 };
 
 export const testingApi = {
-  createWindow: (options?: { noteId?: string; minimal?: boolean }): Promise<void> =>
+  createWindow: (options?: { noteId?: string; headingId?: string; minimal?: boolean }): Promise<void> =>
     ipcRenderer.invoke('testing:createWindow', options) as Promise<void>,
   // Test-only: Set note timestamp (only available in NODE_ENV=test)
   setNoteTimestamp: (

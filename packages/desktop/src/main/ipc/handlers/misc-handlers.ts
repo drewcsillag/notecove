@@ -16,7 +16,7 @@
 
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { HandlerContext } from './types';
-import { AppStateKey, type NoteCache, type ProfileMode } from '@notecove/shared';
+import { AppStateKey, type NoteCache, type ProfileMode, type HeadingInfo } from '@notecove/shared';
 import { getTelemetryManager } from '../../telemetry/config';
 import { NodeFileSystemAdapter } from '../../storage/node-fs-adapter';
 import {
@@ -72,6 +72,7 @@ export function registerMiscHandlers(ctx: HandlerContext): void {
   // Link operations
   ipcMain.handle('link:getBacklinks', handleGetBacklinks(ctx));
   ipcMain.handle('link:searchNotesForAutocomplete', handleSearchNotesForAutocomplete(ctx));
+  ipcMain.handle('link:getHeadingsForNote', handleGetHeadingsForNote(ctx));
 
   // Mention operations
   ipcMain.handle('mention:getUsers', handleGetMentionUsers(ctx));
@@ -112,6 +113,7 @@ export function unregisterMiscHandlers(): void {
 
   ipcMain.removeHandler('link:getBacklinks');
   ipcMain.removeHandler('link:searchNotesForAutocomplete');
+  ipcMain.removeHandler('link:getHeadingsForNote');
 
   ipcMain.removeHandler('mention:getUsers');
 
@@ -228,6 +230,27 @@ function handleSearchNotesForAutocomplete(ctx: HandlerContext) {
 
     // Sort by modified date (most recent first)
     return resultsWithPaths.sort((a, b) => b.modified - a.modified).slice(0, 50);
+  };
+}
+
+function handleGetHeadingsForNote(ctx: HandlerContext) {
+  return async (_event: IpcMainInvokeEvent, noteId: string): Promise<HeadingInfo[]> => {
+    const { crdtManager } = ctx;
+
+    // Get the note's CRDT document
+    const noteDoc = crdtManager.getNoteDoc(noteId);
+    if (!noteDoc) {
+      // Note not loaded - try to load it first
+      await crdtManager.loadNote(noteId);
+      const loadedDoc = crdtManager.getNoteDoc(noteId);
+      if (!loadedDoc) {
+        console.warn(`[IPC] Note ${noteId} not found for heading extraction`);
+        return [];
+      }
+      return loadedDoc.getHeadings();
+    }
+
+    return noteDoc.getHeadings();
   };
 }
 

@@ -168,6 +168,28 @@ Line 3 with #tag3`;
         expect(tags).toEqual([]);
       });
     });
+
+    describe('heading IDs', () => {
+      it('should not extract heading IDs that look like h_XXXXXXXX', () => {
+        // Same-note heading links use [[#h_abc12xyz]] format
+        // The #h_abc12xyz part should not be treated as a tag
+        const tags = extractTags('See [[#h_Abc12xYz]] for details');
+        expect(tags).toEqual([]);
+      });
+
+      it('should still extract regular tags starting with h_', () => {
+        // Tags that start with h_ but don't match the exact heading ID format
+        // should still be extracted
+        const tags = extractTags('#h_short and #h_toolongtobeaheadingidformat');
+        expect(tags).toContain('h_short'); // Too short to be heading ID
+        expect(tags).toContain('h_toolongtobeaheadingidformat'); // Too long
+      });
+
+      it('should extract tags alongside heading links', () => {
+        const tags = extractTags('#project See [[#h_Abc12xYz]] for #todo');
+        expect(tags).toEqual(['project', 'todo']);
+      });
+    });
   });
 
   describe('HASHTAG_PATTERN', () => {

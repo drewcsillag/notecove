@@ -83,6 +83,7 @@ export const browserApiStub: typeof window.electronAPI = {
   link: {
     getBacklinks: notImplemented('link.getBacklinks'),
     searchNotesForAutocomplete: notImplemented('link.searchNotesForAutocomplete'),
+    getHeadingsForNote: notImplemented('link.getHeadingsForNote'),
   },
 
   folder: {
@@ -205,6 +206,7 @@ export const browserApiStub: typeof window.electronAPI = {
     onStorageInspector: stubEventSubscription,
     onFeatureFlags: stubEventSubscription,
     onPrint: stubEventSubscription,
+    onViewNoteJSON: stubEventSubscription,
   },
 
   tools: {
@@ -284,6 +286,7 @@ export const browserApiStub: typeof window.electronAPI = {
     openNoteInfo: notImplemented('window.openNoteInfo'),
     openStorageInspector: notImplemented('window.openStorageInspector'),
     openPrintPreview: notImplemented('window.openPrintPreview'),
+    openJSONViewer: notImplemented('window.openJSONViewer'),
   },
 
   image: {

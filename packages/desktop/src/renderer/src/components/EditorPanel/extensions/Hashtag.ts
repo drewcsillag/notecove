@@ -15,7 +15,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import type { Transaction } from '@tiptap/pm/state';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { HASHTAG_PATTERN, MAX_TAG_LENGTH } from '@notecove/shared';
+import { HASHTAG_PATTERN, MAX_TAG_LENGTH, isValidHeadingId } from '@notecove/shared';
 import Suggestion from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
 import { TagSuggestionList, type TagSuggestionListRef } from './TagSuggestionList';
@@ -218,7 +218,16 @@ function findHashtagsInRange(doc: PMNode, rangeFrom: number, rangeTo: number): D
       // Include decorations that OVERLAP with the specified range
       // This matches the behavior of DecorationSet.find() used when removing stale decorations
       if (from < rangeTo && to > rangeFrom) {
-        let tag = match[0].slice(1).toLowerCase();
+        // Get the tag without the # prefix
+        const tagWithoutHash = match[0].slice(1);
+
+        // Skip if this looks like a heading ID (h_XXXXXXXX format)
+        // These appear in same-note heading links like [[#h_abc12xyz]]
+        if (isValidHeadingId(tagWithoutHash)) {
+          continue;
+        }
+
+        let tag = tagWithoutHash.toLowerCase();
 
         if (tag.length > MAX_TAG_LENGTH) {
           tag = tag.slice(0, MAX_TAG_LENGTH);

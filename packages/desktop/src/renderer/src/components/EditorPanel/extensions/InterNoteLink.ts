@@ -16,7 +16,7 @@ import type { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { EditorView } from '@tiptap/pm/view';
 import type { ResolvedPos } from '@tiptap/pm/model';
-import { LINK_PATTERN, isFullUuid } from '@notecove/shared';
+import { LINK_WITH_HEADING_PATTERN, parseLink, isCompactUuid, isFullUuid } from '@notecove/shared';
 import Suggestion from '@tiptap/suggestion';
 import type { SuggestionMatch } from '@tiptap/suggestion';
 import { ReactRenderer } from '@tiptap/react';
@@ -27,8 +27,10 @@ import { createFloatingPopup, type FloatingPopup } from './utils/floating-popup'
 export interface InterNoteLinkOptions {
   HTMLAttributes: Record<string, unknown>;
   suggestion: Omit<SuggestionOptions, 'editor'>;
-  onLinkClick?: (noteId: string) => void;
-  onLinkDoubleClick?: (noteId: string) => void;
+  onLinkClick?: (noteId: string, headingId?: string) => void;
+  onLinkDoubleClick?: (noteId: string, headingId?: string) => void;
+  /** Callback to get the current note ID for same-note heading autocomplete */
+  getCurrentNoteId?: () => string | null;
 }
 
 // Cache for note titles to avoid excessive IPC calls
@@ -36,6 +38,23 @@ const noteTitleCache = new Map<string, string>();
 
 // Cache for broken link status (note doesn't exist or is deleted)
 const brokenLinkCache = new Set<string>();
+
+// Cache for heading text: key is "noteId:headingId", value is heading text
+const headingTextCache = new Map<string, string | null>();
+
+// Track pending heading fetches to avoid duplicate requests
+const pendingHeadingFetches = new Set<string>();
+
+// Pending note selection for heading mode
+// When user selects a note, we store its info here instead of showing the UUID
+let pendingNoteSelection: { noteId: string; noteTitle: string } | null = null;
+
+/**
+ * Clear the pending note selection (called when autocomplete completes or cancels)
+ */
+export function clearPendingNoteSelection(): void {
+  pendingNoteSelection = null;
+}
 
 /**
  * Clear the title cache for a specific note ID
@@ -45,11 +64,121 @@ export function clearNoteTitleCache(noteId?: string): void {
   if (noteId) {
     noteTitleCache.delete(noteId);
     brokenLinkCache.delete(noteId);
+    // Clear heading cache entries for this note
+    for (const key of headingTextCache.keys()) {
+      if (key.startsWith(`${noteId}:`)) {
+        headingTextCache.delete(key);
+      }
+    }
   } else {
     // Clear all caches
     noteTitleCache.clear();
     brokenLinkCache.clear();
+    headingTextCache.clear();
+    pendingHeadingFetches.clear();
   }
+}
+
+/**
+ * Represents a note suggestion item for autocomplete
+ */
+export interface NoteSuggestionItem {
+  type: 'note';
+  id: string;
+  title: string;
+  sdId: string;
+  folderId: string | null;
+  folderPath: string;
+  created: number;
+  modified: number;
+}
+
+/**
+ * Represents a heading suggestion item for autocomplete
+ */
+export interface HeadingSuggestionItem {
+  type: 'heading';
+  id: string; // The heading ID (h_XXXXXXXX)
+  text: string; // The heading text
+  level: number; // Heading level 1-6
+  noteId: string; // The parent note ID
+  noteTitle: string; // The parent note title (for display)
+}
+
+/**
+ * Represents an "entire note" option shown in heading mode
+ */
+export interface EntireNoteSuggestionItem {
+  type: 'entireNote';
+  id: string; // The note ID
+  noteTitle: string; // The note title for display
+}
+
+/**
+ * Union type for all suggestion items
+ */
+export type SuggestionItem = NoteSuggestionItem | HeadingSuggestionItem | EntireNoteSuggestionItem;
+
+/**
+ * Parse the autocomplete query to determine the mode (note or heading).
+ *
+ * @param query The text after [[ in the autocomplete trigger
+ * @returns Object describing the autocomplete mode and relevant parameters
+ */
+// Marker used in heading mode to show note title instead of UUID
+const HEADING_MODE_MARKER = '→';
+
+export function parseAutocompleteQuery(query: string): {
+  mode: 'note' | 'heading' | 'sameNoteHeading' | 'pendingHeading';
+  noteId?: string;
+  noteTitle?: string;
+  headingQuery: string;
+} {
+  // Check if we're in pending heading mode (user selected a note, now picking heading)
+  // Format: "Note Title →query" where query is the heading search
+  const markerIndex = query.indexOf(HEADING_MODE_MARKER);
+  if (markerIndex !== -1 && pendingNoteSelection) {
+    const headingQuery = query.substring(markerIndex + 1);
+    return {
+      mode: 'pendingHeading',
+      noteId: pendingNoteSelection.noteId,
+      noteTitle: pendingNoteSelection.noteTitle,
+      headingQuery,
+    };
+  }
+
+  // Check if query contains # to indicate heading mode
+  const hashIndex = query.indexOf('#');
+
+  if (hashIndex === -1) {
+    // No # found, we're in note mode
+    return { mode: 'note', headingQuery: query };
+  }
+
+  // Split by # to get note identifier and heading query
+  const beforeHash = query.substring(0, hashIndex);
+  const afterHash = query.substring(hashIndex + 1);
+
+  // If query starts with # (no note specified), it's same-note heading mode
+  if (!beforeHash) {
+    return {
+      mode: 'sameNoteHeading',
+      headingQuery: afterHash,
+    };
+  }
+
+  // Check if the part before # is a valid note ID (UUID)
+  if (isFullUuid(beforeHash) || isCompactUuid(beforeHash)) {
+    return {
+      mode: 'heading',
+      noteId: beforeHash,
+      headingQuery: afterHash,
+    };
+  }
+
+  // If the part before # is not a valid UUID, it might be a partial note title
+  // In this case, we're still in note mode (searching for notes matching the title)
+  return { mode: 'note', headingQuery: query };
 }
 
 /**
@@ -114,7 +243,7 @@ export function findDoubleBracketMatch($position: ResolvedPos): SuggestionMatch 
 }
 
 /**
- * Find a complete [[uuid]] link ending exactly at the given position
+ * Find a complete [[uuid]] or [[uuid#heading]] link ending exactly at the given position
  * @param doc - The ProseMirror document
  * @param pos - The position to check (cursor position)
  * @returns The range { from, to } of the link, or null if no link ends at this position
@@ -127,9 +256,9 @@ export function findLinkEndingAt(doc: PMNode, pos: number): { from: number; to: 
   const parentStart = $pos.start();
   const textBefore = doc.textBetween(parentStart, pos, '\0', '\0');
 
-  // Check if there's a complete [[uuid]] pattern ending at the cursor
+  // Check if there's a complete [[uuid]] or [[uuid#heading]] pattern ending at the cursor
   // The pattern must end exactly at the cursor position
-  const regex = new RegExp(LINK_PATTERN.source + '$', 'i');
+  const regex = new RegExp(LINK_WITH_HEADING_PATTERN.source + '$', 'i');
   const match = regex.exec(textBefore);
 
   if (!match) {
@@ -143,7 +272,7 @@ export function findLinkEndingAt(doc: PMNode, pos: number): { from: number; to: 
 }
 
 /**
- * Find a complete [[uuid]] link starting exactly at the given position
+ * Find a complete [[uuid]] or [[uuid#heading]] link starting exactly at the given position
  * @param doc - The ProseMirror document
  * @param pos - The position to check (cursor position)
  * @returns The range { from, to } of the link, or null if no link starts at this position
@@ -155,9 +284,9 @@ export function findLinkStartingAt(doc: PMNode, pos: number): { from: number; to
   const parentEnd = $pos.end();
   const textAfter = doc.textBetween(pos, parentEnd, '\0', '\0');
 
-  // Check if there's a complete [[uuid]] pattern starting at the cursor
+  // Check if there's a complete [[uuid]] or [[uuid#heading]] pattern starting at the cursor
   // The pattern must start exactly at position 0 of the textAfter
-  const regex = new RegExp('^' + LINK_PATTERN.source, 'i');
+  const regex = new RegExp('^' + LINK_WITH_HEADING_PATTERN.source, 'i');
   const match = regex.exec(textAfter);
 
   if (!match) {
@@ -184,28 +313,228 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
         pluginKey: new PluginKey('interNoteLinkSuggestion'),
 
         command: ({ editor, range, props }) => {
-          // props contains the selected note
-          const note = props as { id: string; title: string };
+          // props contains the selected item (note, heading, or entireNote)
+          const item = props as SuggestionItem;
 
-          // Delete the [[ and any query text
-          // Then insert [[note-id]]
-          editor
-            .chain()
-            .focus()
-            .deleteRange({
-              from: range.from,
-              to: range.to,
-            })
-            .insertContent(`[[${note.id}]]`)
-            .run();
+          if (item.type === 'note') {
+            // Note selected: check if it has multiple headings
+            // If only 0-1 headings, insert link directly; otherwise enter heading mode
+            void (async () => {
+              try {
+                const headings = await window.electronAPI.link.getHeadingsForNote(item.id);
+
+                if (headings.length <= 1) {
+                  // No meaningful headings (just title or none) - insert link directly
+                  pendingNoteSelection = null;
+                  editor
+                    .chain()
+                    .focus()
+                    .deleteRange({ from: range.from, to: range.to })
+                    .insertContent(`[[${item.id}]]`)
+                    .run();
+                } else {
+                  // Multiple headings - enter heading mode with title displayed
+                  pendingNoteSelection = { noteId: item.id, noteTitle: item.title };
+                  // Cache the title for later use
+                  noteTitleCache.set(item.id, item.title);
+                  editor
+                    .chain()
+                    .focus()
+                    .deleteRange({ from: range.from, to: range.to })
+                    .insertContent(`[[${item.title} ${HEADING_MODE_MARKER}`)
+                    .run();
+                }
+              } catch (error) {
+                console.error('[InterNoteLink] Failed to fetch headings:', error);
+                // On error, just insert the link directly
+                pendingNoteSelection = null;
+                editor
+                  .chain()
+                  .focus()
+                  .deleteRange({ from: range.from, to: range.to })
+                  .insertContent(`[[${item.id}]]`)
+                  .run();
+              }
+            })();
+          } else if (item.type === 'heading') {
+            // Heading selected: complete the link with heading-id]]
+            // Check if this is a same-note heading by looking at the original text
+            const originalText = editor.state.doc.textBetween(range.from, range.to, '\0', '\0');
+            const isSameNoteHeading = originalText.startsWith('[[#');
+
+            // Get the note ID - either from pending selection or from the item
+            const noteId = pendingNoteSelection?.noteId ?? item.noteId;
+            pendingNoteSelection = null;
+
+            if (isSameNoteHeading) {
+              // Same-note heading: use [[#heading-id]] format
+              editor
+                .chain()
+                .focus()
+                .deleteRange({ from: range.from, to: range.to })
+                .insertContent(`[[#${item.id}]]`)
+                .run();
+            } else {
+              // Cross-note heading: use [[note-id#heading-id]] format
+              editor
+                .chain()
+                .focus()
+                .deleteRange({ from: range.from, to: range.to })
+                .insertContent(`[[${noteId}#${item.id}]]`)
+                .run();
+            }
+          } else {
+            // "Link to entire note" selected
+            // Get the note ID from pending selection or from the item
+            const noteId = pendingNoteSelection?.noteId ?? item.id;
+            pendingNoteSelection = null;
+
+            editor
+              .chain()
+              .focus()
+              .deleteRange({ from: range.from, to: range.to })
+              .insertContent(`[[${noteId}]]`)
+              .run();
+          }
         },
 
-        items: async ({ query }) => {
+        items: async ({ query, editor }) => {
           try {
-            const notes = await window.electronAPI.link.searchNotesForAutocomplete(query);
-            return notes.slice(0, 10);
+            // Parse the query to determine mode (note or heading)
+            const parsed = parseAutocompleteQuery(query);
+
+            if (parsed.mode === 'sameNoteHeading') {
+              // Same-note heading mode: fetch headings for the current note
+              // Access the getCurrentNoteId callback from extension options
+              const interNoteLinkExt = editor.extensionManager.extensions.find(
+                (ext) => ext.name === 'interNoteLink'
+              );
+              const options = interNoteLinkExt?.options as InterNoteLinkOptions | undefined;
+              const currentNoteId = options?.getCurrentNoteId?.();
+
+              if (!currentNoteId) {
+                console.warn('[InterNoteLink] No current note ID for same-note heading autocomplete');
+                return [];
+              }
+
+              const headings = await window.electronAPI.link.getHeadingsForNote(currentNoteId);
+              const noteTitle = noteTitleCache.get(currentNoteId) ?? 'This note';
+
+              // Filter headings by the heading query (case-insensitive)
+              const filteredHeadings = parsed.headingQuery
+                ? headings.filter((h) =>
+                    h.text.toLowerCase().includes(parsed.headingQuery.toLowerCase())
+                  )
+                : headings;
+
+              // Build result: show headings only (no "entire note" option for same-note)
+              const result: SuggestionItem[] = [];
+
+              for (const h of filteredHeadings.slice(0, 10)) {
+                result.push({
+                  type: 'heading',
+                  id: h.id,
+                  text: h.text,
+                  level: h.level,
+                  noteId: currentNoteId,
+                  noteTitle,
+                });
+              }
+
+              return result;
+            } else if (parsed.mode === 'pendingHeading' && parsed.noteId) {
+              // Pending heading mode: user selected a note, now picking heading
+              // We have the note ID from pendingNoteSelection
+              const headings = await window.electronAPI.link.getHeadingsForNote(parsed.noteId);
+              const noteTitle = parsed.noteTitle ?? noteTitleCache.get(parsed.noteId) ?? 'Note';
+              const targetNoteId = parsed.noteId;
+
+              // Filter headings by the heading query (case-insensitive)
+              const filteredHeadings = parsed.headingQuery
+                ? headings.filter((h) =>
+                    h.text.toLowerCase().includes(parsed.headingQuery.toLowerCase())
+                  )
+                : headings;
+
+              // Build result: "Link to entire note" option first, then headings
+              const result: SuggestionItem[] = [];
+
+              // Add "Link to entire note" option at the top
+              result.push({
+                type: 'entireNote',
+                id: targetNoteId,
+                noteTitle,
+              });
+
+              // Add filtered headings
+              for (const h of filteredHeadings.slice(0, 9)) {
+                result.push({
+                  type: 'heading',
+                  id: h.id,
+                  text: h.text,
+                  level: h.level,
+                  noteId: targetNoteId,
+                  noteTitle,
+                });
+              }
+
+              return result;
+            } else if (parsed.mode === 'heading' && parsed.noteId) {
+              // Heading mode (legacy - UUID in document): fetch headings for the note
+              const headings = await window.electronAPI.link.getHeadingsForNote(parsed.noteId);
+              const noteTitle = noteTitleCache.get(parsed.noteId) ?? 'Note';
+              const targetNoteId = parsed.noteId;
+
+              // Filter headings by the heading query (case-insensitive)
+              const filteredHeadings = parsed.headingQuery
+                ? headings.filter((h) =>
+                    h.text.toLowerCase().includes(parsed.headingQuery.toLowerCase())
+                  )
+                : headings;
+
+              // Build result: "Link to entire note" option first, then headings
+              const result: SuggestionItem[] = [];
+
+              // Add "Link to entire note" option at the top
+              result.push({
+                type: 'entireNote',
+                id: targetNoteId,
+                noteTitle,
+              });
+
+              // Add filtered headings
+              for (const h of filteredHeadings.slice(0, 9)) {
+                result.push({
+                  type: 'heading',
+                  id: h.id,
+                  text: h.text,
+                  level: h.level,
+                  noteId: targetNoteId,
+                  noteTitle,
+                });
+              }
+
+              return result;
+            } else {
+              // Note mode: search for notes
+              const notes = await window.electronAPI.link.searchNotesForAutocomplete(query);
+
+              // Convert to NoteSuggestionItem format
+              return notes.slice(0, 10).map(
+                (note): NoteSuggestionItem => ({
+                  type: 'note',
+                  id: note.id,
+                  title: note.title,
+                  sdId: note.sdId,
+                  folderId: note.folderId,
+                  folderPath: note.folderPath,
+                  created: note.created,
+                  modified: note.modified,
+                })
+              );
+            }
           } catch (error) {
-            console.error('[InterNoteLink] Failed to fetch notes for autocomplete:', error);
+            console.error('[InterNoteLink] Failed to fetch items for autocomplete:', error);
             return [];
           }
         },
@@ -255,6 +584,8 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
             onExit() {
               popup?.destroy();
               component?.destroy();
+              // Clear pending note selection when autocomplete closes
+              pendingNoteSelection = null;
             },
           };
         },
@@ -431,6 +762,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
   addProseMirrorPlugins() {
     const onLinkClick = this.options.onLinkClick;
     const onLinkDoubleClick = this.options.onLinkDoubleClick;
+    const getCurrentNoteId = this.options.getCurrentNoteId;
 
     // Store a reference to the editor view for triggering re-renders
     let editorView: EditorView | null = null;
@@ -443,12 +775,12 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
         key: new PluginKey('interNoteLink'),
         state: {
           init(_, { doc }) {
-            return findAndDecorateLinks(doc, editorView);
+            return findAndDecorateLinks(doc, editorView, getCurrentNoteId);
           },
           apply(transaction, oldState) {
             // forceDecoration is used when title cache updates
             if (transaction.getMeta('forceDecoration')) {
-              return findAndDecorateLinks(transaction.doc, editorView);
+              return findAndDecorateLinks(transaction.doc, editorView, getCurrentNoteId);
             }
 
             // No document change - just return old state
@@ -462,7 +794,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
             // weren't properly removed, causing visual duplication when typing
             // near task items with links.
             // Full recalculation is reliable and fast enough for typical note sizes.
-            return findAndDecorateLinks(transaction.doc, editorView);
+            return findAndDecorateLinks(transaction.doc, editorView, getCurrentNoteId);
           },
         },
         view(view) {
@@ -488,6 +820,9 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
               return false;
             }
 
+            // Get optional heading ID
+            const headingId = target.getAttribute('data-heading-id') ?? undefined;
+
             // Clear any pending click timeout
             if (clickTimeout) {
               clearTimeout(clickTimeout);
@@ -497,7 +832,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
             if (onLinkClick) {
               // Set timeout to handle single click after double-click window
               clickTimeout = setTimeout(() => {
-                onLinkClick(noteId);
+                onLinkClick(noteId, headingId);
                 clickTimeout = null;
               }, 300);
             }
@@ -515,6 +850,9 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
               return false;
             }
 
+            // Get optional heading ID
+            const headingId = target.getAttribute('data-heading-id') ?? undefined;
+
             // Cancel pending single-click action
             if (clickTimeout) {
               clearTimeout(clickTimeout);
@@ -522,7 +860,7 @@ export const InterNoteLink = Extension.create<InterNoteLinkOptions>({
             }
 
             if (onLinkDoubleClick) {
-              onLinkDoubleClick(noteId);
+              onLinkDoubleClick(noteId, headingId);
             }
 
             return true;
@@ -563,9 +901,13 @@ export function resetDecorationRegenerationCount(): void {
  * 2. Look up the note title for each ID
  * 3. Create decorations that display the title instead of the ID
  */
-function findAndDecorateLinks(doc: PMNode, editorView?: EditorView | null): DecorationSet {
+function findAndDecorateLinks(
+  doc: PMNode,
+  editorView?: EditorView | null,
+  getCurrentNoteId?: () => string | null
+): DecorationSet {
   decorationRegenerationCount++;
-  const decorations = findLinksInRange(doc, 0, doc.content.size, editorView);
+  const decorations = findLinksInRange(doc, 0, doc.content.size, editorView, getCurrentNoteId);
   return DecorationSet.create(doc, decorations);
 }
 
@@ -576,16 +918,19 @@ function findAndDecorateLinks(doc: PMNode, editorView?: EditorView | null): Deco
  * @param rangeFrom - Start of the range to search
  * @param rangeTo - End of the range to search
  * @param editorView - Optional editor view for triggering title fetches
+ * @param getCurrentNoteId - Optional callback to get current note ID for same-note links
  * @returns Array of decorations for links found in the range
  */
 function findLinksInRange(
   doc: PMNode,
   rangeFrom: number,
   rangeTo: number,
-  editorView?: EditorView | null
+  editorView?: EditorView | null,
+  getCurrentNoteId?: () => string | null
 ): Decoration[] {
   const decorations: Decoration[] = [];
-  const regex = new RegExp(LINK_PATTERN.source, LINK_PATTERN.flags);
+  // Use pattern that supports both note-only links and note+heading links
+  const regex = new RegExp(LINK_WITH_HEADING_PATTERN.source, LINK_WITH_HEADING_PATTERN.flags);
 
   doc.nodesBetween(rangeFrom, rangeTo, (node, pos) => {
     if (!node.isText || !node.text) {
@@ -602,9 +947,28 @@ function findLinksInRange(
       // Include decorations that OVERLAP with the specified range
       // This matches the behavior of DecorationSet.find() used when removing stale decorations
       if (from < rangeTo && to > rangeFrom) {
-        // Only lowercase full UUIDs (36-char format) - compact UUIDs are case-sensitive
-        const rawId = match[1] ?? '';
-        const noteId = isFullUuid(rawId) ? rawId.toLowerCase() : rawId;
+        // Parse the link to extract note ID and heading ID
+        const parsed = parseLink(match[0]);
+        if (!parsed || (!parsed.noteId && !parsed.headingId)) {
+          continue; // Skip invalid links
+        }
+
+        const headingId = parsed.headingId ?? undefined;
+        const isSameNoteLink = !parsed.noteId && !!headingId;
+
+        // Resolve note ID (either from link or current note for same-note links)
+        let resolvedNoteId: string | null = parsed.noteId;
+        if (isSameNoteLink) {
+          resolvedNoteId = getCurrentNoteId?.() ?? null;
+        }
+
+        // Skip if we can't resolve the note ID
+        if (!resolvedNoteId) {
+          continue;
+        }
+
+        // Now we know noteId is definitely a string
+        const noteId: string = resolvedNoteId;
 
         // If we don't have the title cached, fetch it asynchronously
         if (!noteTitleCache.has(noteId)) {
@@ -612,25 +976,100 @@ function findLinksInRange(
           void fetchNoteTitle(noteId, editorView);
         }
 
-        // Create a widget that replaces the [[note-id]] text
+        // If there's a heading ID, fetch the heading text
+        const headingCacheKey = headingId ? `${noteId}:${headingId}` : null;
+        if (headingId && headingCacheKey && !headingTextCache.has(headingCacheKey)) {
+          void fetchHeadingText(noteId, headingId, editorView);
+        }
+
+        // Capture values for use in widget factory (closures)
+        const capturedNoteId = noteId;
+        const capturedIsSameNoteLink = isSameNoteLink;
+
+        // Create a widget that replaces the [[note-id]] or [[note-id#heading-id]] text
         const widget = Decoration.widget(
           to,
           () => {
-            const title = noteTitleCache.get(noteId) ?? 'Loading...';
-            const isBroken = brokenLinkCache.has(noteId);
+            const title = noteTitleCache.get(capturedNoteId) ?? 'Loading...';
+            const isNoteBroken = brokenLinkCache.has(capturedNoteId);
+
+            // Check if the heading is broken (note exists but heading doesn't)
+            let isHeadingBroken = false;
+            if (headingId && headingCacheKey && !isNoteBroken) {
+              const headingText = headingTextCache.get(headingCacheKey);
+              // null means we fetched and heading wasn't found
+              isHeadingBroken = headingText === null;
+            }
 
             const span = document.createElement('span');
-            span.className = isBroken ? 'inter-note-link-broken' : 'inter-note-link';
-            span.setAttribute('data-note-id', noteId);
-            span.setAttribute('role', isBroken ? 'text' : 'link');
-            span.setAttribute(
-              'aria-label',
-              isBroken ? `Broken link to ${title}` : `Link to ${title}`
-            );
-            if (!isBroken) {
+            // Apply appropriate class based on what's broken
+            if (isNoteBroken) {
+              span.className = 'inter-note-link-broken';
+            } else if (isHeadingBroken) {
+              span.className = 'inter-note-link-heading-broken';
+            } else {
+              span.className = 'inter-note-link';
+            }
+            span.setAttribute('data-note-id', capturedNoteId);
+            if (headingId) {
+              span.setAttribute('data-heading-id', headingId);
+            }
+            // Mark same-note links for click handler
+            if (capturedIsSameNoteLink) {
+              span.setAttribute('data-same-note', 'true');
+            }
+            span.setAttribute('role', isNoteBroken ? 'text' : 'link');
+
+            // Build display text
+            let displayText: string;
+            if (capturedIsSameNoteLink) {
+              // Same-note link: show [[#Heading Text]] format
+              if (headingId && headingCacheKey) {
+                const headingText = headingTextCache.get(headingCacheKey);
+                if (headingText) {
+                  displayText = `[[#${headingText}]]`;
+                } else if (headingText === null) {
+                  displayText = '[[#[heading not found]]]';
+                } else {
+                  displayText = '[[#...]]'; // Loading
+                }
+              } else {
+                displayText = '[[#]]'; // Shouldn't happen
+              }
+            } else {
+              // Cross-note link: show [[Note Title]] or [[Note Title#Heading Text]] format
+              displayText = `[[${title}`;
+              if (headingId && headingCacheKey) {
+                const headingText = headingTextCache.get(headingCacheKey);
+                if (headingText) {
+                  displayText += `#${headingText}`;
+                } else if (headingText === null) {
+                  displayText += '#[heading not found]';
+                }
+                // If undefined, we're still loading - don't show anything yet
+              }
+              displayText += ']]';
+            }
+
+            // Set appropriate aria-label
+            let ariaLabel: string;
+            if (isNoteBroken) {
+              ariaLabel = `Broken link to ${title}`;
+            } else if (isHeadingBroken) {
+              const headingLabel = capturedIsSameNoteLink ? 'this note' : title;
+              ariaLabel = `Link to ${headingLabel} (heading not found)`;
+            } else if (capturedIsSameNoteLink) {
+              const headingText = headingCacheKey ? headingTextCache.get(headingCacheKey) : null;
+              ariaLabel = `Link to heading ${headingText ?? 'loading...'}`;
+            } else {
+              ariaLabel = `Link to ${title}`;
+            }
+            span.setAttribute('aria-label', ariaLabel);
+
+            if (!isNoteBroken) {
               span.setAttribute('tabindex', '0');
             }
-            span.textContent = `[[${title}]]`;
+            span.textContent = displayText;
             return span;
           },
           {
@@ -638,7 +1077,7 @@ function findLinksInRange(
           }
         );
 
-        // Hide the original [[note-id]] text
+        // Hide the original [[note-id]] or [[note-id#heading-id]] text
         const hideDecoration = Decoration.inline(from, to, {
           class: 'inter-note-link-hidden',
         });
@@ -693,5 +1132,50 @@ async function fetchNoteTitle(noteId: string, editorView?: EditorView | null): P
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       editorView.dispatch(tr);
     }
+  }
+}
+
+/**
+ * Fetch heading text from database and cache it
+ */
+async function fetchHeadingText(
+  noteId: string,
+  headingId: string,
+  editorView?: EditorView | null
+): Promise<void> {
+  const cacheKey = `${noteId}:${headingId}`;
+
+  // Avoid duplicate fetches
+  if (pendingHeadingFetches.has(cacheKey)) {
+    return;
+  }
+
+  pendingHeadingFetches.add(cacheKey);
+
+  try {
+    const headings = await window.electronAPI.link.getHeadingsForNote(noteId);
+    const heading = headings.find((h) => h.id === headingId);
+
+    if (heading) {
+      headingTextCache.set(cacheKey, heading.text);
+    } else {
+      // Heading not found - might be deleted
+      headingTextCache.set(cacheKey, null);
+    }
+
+    // Trigger editor update to re-render with heading text
+    if (editorView) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const tr = (editorView.state as any).tr;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      tr.setMeta('forceDecoration', true);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      editorView.dispatch(tr);
+    }
+  } catch (error) {
+    console.error('[InterNoteLink] Failed to fetch heading text:', error);
+    headingTextCache.set(cacheKey, null);
+  } finally {
+    pendingHeadingFetches.delete(cacheKey);
   }
 }

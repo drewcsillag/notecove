@@ -2,7 +2,15 @@
  * Tests for Link Extraction Utilities
  */
 
-import { extractLinks, hasLinks, LINK_PATTERN } from '../link-extractor';
+import {
+  extractLinks,
+  hasLinks,
+  LINK_PATTERN,
+  LINK_WITH_HEADING_PATTERN,
+  extractHeadingFromLink,
+  isSameNoteLink,
+  parseLink,
+} from '../link-extractor';
 
 describe('link-extractor', () => {
   describe('LINK_PATTERN', () => {
@@ -222,6 +230,201 @@ describe('link-extractor', () => {
         [[660e8400-e29b-41d4-a716-446655440111]]
       `;
       expect(hasLinks(text)).toBe(true);
+    });
+  });
+
+  describe('LINK_WITH_HEADING_PATTERN', () => {
+    it('should match links without heading (backward compatible)', () => {
+      const validLinks = [
+        '[[550e8400-e29b-41d4-a716-446655440000]]',
+        '[[VQ6EAOKbQdSnFkRmVUQAAA]]',
+      ];
+
+      validLinks.forEach((link) => {
+        const regex = new RegExp(LINK_WITH_HEADING_PATTERN.source, LINK_WITH_HEADING_PATTERN.flags);
+        expect(regex.test(link)).toBe(true);
+      });
+    });
+
+    it('should match links with heading ID', () => {
+      const validLinks = [
+        '[[550e8400-e29b-41d4-a716-446655440000#h_Abc12xYz]]',
+        '[[550e8400-e29b-41d4-a716-446655440000#h_AAAAAAAA]]',
+        '[[550e8400-e29b-41d4-a716-446655440000#h_12345678]]',
+        '[[VQ6EAOKbQdSnFkRmVUQAAA#h_a_b-c_d-]]',
+      ];
+
+      validLinks.forEach((link) => {
+        const regex = new RegExp(LINK_WITH_HEADING_PATTERN.source, LINK_WITH_HEADING_PATTERN.flags);
+        expect(regex.test(link)).toBe(true);
+      });
+    });
+
+    it('should match same-note heading links (no note ID)', () => {
+      const validLinks = [
+        '[[#h_Abc12xYz]]',
+        '[[#h_AAAAAAAA]]',
+        '[[#h_12345678]]',
+        '[[#h_a_b-c_d-]]',
+      ];
+
+      validLinks.forEach((link) => {
+        const regex = new RegExp(LINK_WITH_HEADING_PATTERN.source, LINK_WITH_HEADING_PATTERN.flags);
+        expect(regex.test(link)).toBe(true);
+      });
+    });
+
+    it('should not match invalid heading IDs', () => {
+      const invalidLinks = [
+        '[[550e8400-e29b-41d4-a716-446655440000#]]', // Empty heading
+        '[[550e8400-e29b-41d4-a716-446655440000#my-heading]]', // Not h_ format
+        '[[550e8400-e29b-41d4-a716-446655440000#h_short]]', // Too short
+        '[[550e8400-e29b-41d4-a716-446655440000#h_toolongid]]', // Too long
+        '[[#]]', // Empty same-note heading
+        '[[#introduction]]', // Not h_ format
+      ];
+
+      invalidLinks.forEach((link) => {
+        const regex = new RegExp(LINK_WITH_HEADING_PATTERN.source, LINK_WITH_HEADING_PATTERN.flags);
+        expect(regex.test(link)).toBe(false);
+      });
+    });
+
+    it('should capture note ID and heading ID separately', () => {
+      const regex = new RegExp(LINK_WITH_HEADING_PATTERN.source, LINK_WITH_HEADING_PATTERN.flags);
+
+      // Full UUID with heading
+      let match = regex.exec('[[550e8400-e29b-41d4-a716-446655440000#h_Abc12xYz]]');
+      expect(match).not.toBeNull();
+      expect(match![1]).toBe('550e8400-e29b-41d4-a716-446655440000');
+      expect(match![2]).toBe('h_Abc12xYz');
+
+      // Reset regex
+      regex.lastIndex = 0;
+
+      // Compact UUID with heading
+      match = regex.exec('[[VQ6EAOKbQdSnFkRmVUQAAA#h_intro123]]');
+      expect(match).not.toBeNull();
+      expect(match![1]).toBe('VQ6EAOKbQdSnFkRmVUQAAA');
+      expect(match![2]).toBe('h_intro123');
+
+      // Reset regex
+      regex.lastIndex = 0;
+
+      // Same-note link (no note ID)
+      match = regex.exec('[[#h_Abc12xYz]]');
+      expect(match).not.toBeNull();
+      expect(match![1]).toBeUndefined();
+      expect(match![2]).toBe('h_Abc12xYz');
+
+      // Reset regex
+      regex.lastIndex = 0;
+
+      // Note link without heading
+      match = regex.exec('[[550e8400-e29b-41d4-a716-446655440000]]');
+      expect(match).not.toBeNull();
+      expect(match![1]).toBe('550e8400-e29b-41d4-a716-446655440000');
+      expect(match![2]).toBeUndefined();
+    });
+  });
+
+  describe('extractHeadingFromLink', () => {
+    it('should extract heading ID from link with heading', () => {
+      // Heading IDs are case-sensitive (base64url encoding)
+      expect(
+        extractHeadingFromLink('[[550e8400-e29b-41d4-a716-446655440000#h_Abc12xYz]]')
+      ).toBe('h_Abc12xYz');
+      expect(extractHeadingFromLink('[[VQ6EAOKbQdSnFkRmVUQAAA#h_intro123]]')).toBe('h_intro123');
+      expect(extractHeadingFromLink('[[#h_section1]]')).toBe('h_section1');
+    });
+
+    it('should return null for links without heading', () => {
+      expect(extractHeadingFromLink('[[550e8400-e29b-41d4-a716-446655440000]]')).toBeNull();
+      expect(extractHeadingFromLink('[[VQ6EAOKbQdSnFkRmVUQAAA]]')).toBeNull();
+    });
+
+    it('should return null for invalid links', () => {
+      expect(extractHeadingFromLink('not a link')).toBeNull();
+      expect(extractHeadingFromLink('[[invalid]]')).toBeNull();
+      expect(extractHeadingFromLink('')).toBeNull();
+    });
+  });
+
+  describe('isSameNoteLink', () => {
+    it('should return true for same-note heading links', () => {
+      expect(isSameNoteLink('[[#h_Abc12xYz]]')).toBe(true);
+      expect(isSameNoteLink('[[#h_intro123]]')).toBe(true);
+      expect(isSameNoteLink('[[#h_section1]]')).toBe(true);
+    });
+
+    it('should return false for links with note ID', () => {
+      expect(isSameNoteLink('[[550e8400-e29b-41d4-a716-446655440000]]')).toBe(false);
+      expect(isSameNoteLink('[[550e8400-e29b-41d4-a716-446655440000#h_Abc12xYz]]')).toBe(false);
+      expect(isSameNoteLink('[[VQ6EAOKbQdSnFkRmVUQAAA]]')).toBe(false);
+      expect(isSameNoteLink('[[VQ6EAOKbQdSnFkRmVUQAAA#h_intro123]]')).toBe(false);
+    });
+
+    it('should return false for invalid links', () => {
+      expect(isSameNoteLink('not a link')).toBe(false);
+      expect(isSameNoteLink('[[invalid]]')).toBe(false);
+      expect(isSameNoteLink('')).toBe(false);
+    });
+  });
+
+  describe('parseLink', () => {
+    it('should parse link with note ID only', () => {
+      const result = parseLink('[[550e8400-e29b-41d4-a716-446655440000]]');
+      expect(result).toEqual({
+        noteId: '550e8400-e29b-41d4-a716-446655440000',
+        headingId: null,
+      });
+    });
+
+    it('should parse link with note ID and heading', () => {
+      // Heading IDs are case-sensitive (base64url encoding)
+      const result = parseLink('[[550e8400-e29b-41d4-a716-446655440000#h_Abc12xYz]]');
+      expect(result).toEqual({
+        noteId: '550e8400-e29b-41d4-a716-446655440000',
+        headingId: 'h_Abc12xYz',
+      });
+    });
+
+    it('should parse same-note heading link', () => {
+      // Heading IDs are case-sensitive (base64url encoding)
+      const result = parseLink('[[#h_Abc12xYz]]');
+      expect(result).toEqual({
+        noteId: null,
+        headingId: 'h_Abc12xYz',
+      });
+    });
+
+    it('should parse compact UUID links', () => {
+      expect(parseLink('[[VQ6EAOKbQdSnFkRmVUQAAA]]')).toEqual({
+        noteId: 'VQ6EAOKbQdSnFkRmVUQAAA',
+        headingId: null,
+      });
+      expect(parseLink('[[VQ6EAOKbQdSnFkRmVUQAAA#h_intro123]]')).toEqual({
+        noteId: 'VQ6EAOKbQdSnFkRmVUQAAA',
+        headingId: 'h_intro123',
+      });
+    });
+
+    it('should normalize full UUIDs to lowercase but keep heading ID case', () => {
+      // Note IDs (full UUIDs) are normalized to lowercase
+      // But heading IDs are case-sensitive (base64url encoding)
+      const result = parseLink('[[550E8400-E29B-41D4-A716-446655440000#h_Abc12xYz]]');
+      expect(result).toEqual({
+        noteId: '550e8400-e29b-41d4-a716-446655440000',
+        headingId: 'h_Abc12xYz', // Heading ID keeps original case
+      });
+    });
+
+    it('should return null for invalid links', () => {
+      expect(parseLink('not a link')).toBeNull();
+      expect(parseLink('[[invalid]]')).toBeNull();
+      expect(parseLink('')).toBeNull();
+      expect(parseLink('[[#]]')).toBeNull(); // Empty heading
+      expect(parseLink('[[#my-heading]]')).toBeNull(); // Invalid heading format
     });
   });
 });

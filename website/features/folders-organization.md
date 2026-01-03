@@ -155,11 +155,28 @@ Use `[[Note Title]]` syntax:
 - Select a note to insert the link
 - The link appears as a clickable chip in the editor
 
+### Linking to Headings
+
+Jump directly to a specific section within a note:
+
+1. Type `[[` and select a note from autocomplete
+2. After selecting, autocomplete shows all headings in that note
+3. Select a heading or type to filter the list
+4. The link displays as `[[Note Title#Heading Text]]`
+
+**Same-Note Heading Links**: Type `[[#` to link to a heading within the current note. This is perfect for:
+- Creating a table of contents at the top of a note
+- Cross-referencing sections within long documents
+- Building navigation for structured notes
+
+Same-note links display as `[[#Heading Text]]` for a cleaner look.
+
 ### Following Links
 
 - Click a link to navigate to the linked note
-- `Cmd+Click` / `Ctrl+Click` to open in new window
-- Links are validated - broken links are highlighted
+- Click a heading link to jump directly to that section
+- Double-click to open in a new window
+- Links are validated - broken links are highlighted in red, broken heading links in orange
 
 ### Backlinks
 

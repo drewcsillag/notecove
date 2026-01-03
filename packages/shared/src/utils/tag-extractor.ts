@@ -6,6 +6,7 @@
  */
 
 import { getUrlRanges, type UrlRange } from './web-link-utils';
+import { isValidHeadingId } from './heading-extractor';
 
 /**
  * Maximum allowed length for a tag name (excluding the # prefix)
@@ -62,8 +63,17 @@ export function extractTags(text: string): string[] {
       continue;
     }
 
-    // Remove # prefix and convert to lowercase
-    let tag = match[0].slice(1).toLowerCase();
+    // Get the tag without # prefix
+    const tagWithoutHash = match[0].slice(1);
+
+    // Skip if this looks like a heading ID (h_XXXXXXXX format)
+    // These appear in same-note heading links like [[#h_abc12xyz]]
+    if (isValidHeadingId(tagWithoutHash)) {
+      continue;
+    }
+
+    // Convert to lowercase
+    let tag = tagWithoutHash.toLowerCase();
 
     // Enforce max length
     if (tag.length > MAX_TAG_LENGTH) {

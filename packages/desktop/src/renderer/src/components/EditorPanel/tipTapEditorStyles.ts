@@ -208,6 +208,19 @@ export function getTipTapEditorStyles(
         textDecoration: 'line-through',
         borderBottom: `1px dotted ${theme.palette.error.main}`,
       },
+      // Broken heading link styling (note exists but heading doesn't)
+      // Uses warning color and dashed underline to distinguish from broken note links
+      '& .inter-note-link-heading-broken': {
+        color: theme.palette.warning.dark,
+        fontWeight: 500,
+        cursor: 'pointer',
+        textDecoration: 'none',
+        borderBottom: `1px dashed ${theme.palette.warning.main}`,
+        '&:hover': {
+          textDecoration: 'underline',
+          borderBottomStyle: 'solid',
+        },
+      },
       // Hide the original [[note-id]] text when displaying title
       // Using font-size: 0 instead of display: none to keep the element in document flow.
       // This prevents scroll jumping when cursor moves through the hidden text,
@@ -217,6 +230,28 @@ export function getTipTapEditorStyles(
         letterSpacing: 0,
         lineHeight: 0,
         color: 'transparent',
+      },
+      // Heading target highlight - shown when navigating to a heading via link
+      '& .heading-target-highlight': {
+        backgroundColor:
+          theme.palette.mode === 'dark'
+            ? 'rgba(255, 235, 59, 0.25)' // Yellow highlight for dark mode
+            : 'rgba(255, 235, 59, 0.4)', // Yellow highlight for light mode
+        borderRadius: '4px',
+        transition: 'background-color 0.5s ease-out',
+        // Animation to fade out the highlight
+        animation: 'heading-highlight-fade 2s ease-out forwards',
+        '@keyframes heading-highlight-fade': {
+          '0%': {
+            backgroundColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(255, 235, 59, 0.25)'
+                : 'rgba(255, 235, 59, 0.4)',
+          },
+          '100%': {
+            backgroundColor: 'transparent',
+          },
+        },
       },
       // Web link styling (external http/https links)
       // Blue and underlined to distinguish from internal links (which are dotted)

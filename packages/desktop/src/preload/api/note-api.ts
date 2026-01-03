@@ -4,7 +4,7 @@
 
 import { ipcRenderer } from 'electron';
 import type { NoteMetadata } from '../../main/ipc/types';
-import type { NoteCache } from '@notecove/shared';
+import type { NoteCache, HeadingInfo } from '@notecove/shared';
 
 export const noteApi = {
   load: (noteId: string): Promise<void> => ipcRenderer.invoke('note:load', noteId) as Promise<void>,
@@ -382,4 +382,11 @@ export const linkApi = {
         modified: number;
       }[]
     >,
+  /**
+   * Get all headings from a note for autocomplete and display.
+   * @param noteId The note ID to get headings from
+   * @returns Array of headings with text, level, and ID
+   */
+  getHeadingsForNote: (noteId: string): Promise<HeadingInfo[]> =>
+    ipcRenderer.invoke('link:getHeadingsForNote', noteId) as Promise<HeadingInfo[]>,
 };

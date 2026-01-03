@@ -49,6 +49,8 @@ function App(): React.ReactElement {
   const [leftSidebarSizes, setLeftSidebarSizes] = useState<number[] | undefined>(undefined);
   const [panelSizesLoaded, setPanelSizesLoaded] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  // Heading ID to scroll to after navigating to a note (cleared after use)
+  const [pendingHeadingId, setPendingHeadingId] = useState<string | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [featureFlagsOpen, setFeatureFlagsOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
@@ -145,12 +147,19 @@ function App(): React.ReactElement {
     });
   }, [selectedNoteId]);
 
+  // Navigate to a note, optionally scrolling to a specific heading
+  const handleNavigateToNote = useCallback((noteId: string, headingId?: string) => {
+    setSelectedNoteId(noteId);
+    setPendingHeadingId(headingId);
+  }, []);
+
   // Parse URL parameters on mount (for minimal window mode with specific noteId)
   useEffect(() => {
     try {
       // Try to parse from query string first, then from hash
       const searchParams = new URLSearchParams(window.location.search);
       let noteIdParam = searchParams.get('noteId');
+      let headingIdParam = searchParams.get('headingId');
       let minimalParam = searchParams.get('minimal');
       let syncStatusParam = searchParams.get('syncStatus');
       let noteInfoParam = searchParams.get('noteInfo');
@@ -178,6 +187,7 @@ function App(): React.ReactElement {
       ) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         noteIdParam = hashParams.get('noteId');
+        headingIdParam = hashParams.get('headingId');
         minimalParam = hashParams.get('minimal');
         syncStatusParam = hashParams.get('syncStatus');
         noteInfoParam = hashParams.get('noteInfo');
@@ -192,8 +202,11 @@ function App(): React.ReactElement {
       }
 
       if (noteIdParam) {
-        console.log('[App] Opening note from URL parameter:', noteIdParam);
+        console.log('[App] Opening note from URL parameter:', noteIdParam, 'heading:', headingIdParam);
         setSelectedNoteId(noteIdParam);
+        if (headingIdParam) {
+          setPendingHeadingId(headingIdParam);
+        }
       }
 
       if (minimalParam === 'true') {
@@ -1330,7 +1343,8 @@ function App(): React.ReactElement {
                 onCommentAdded={() => {
                   setCommentPanelOpen(true);
                 }}
-                onNavigateToNote={setSelectedNoteId}
+                onNavigateToNote={handleNavigateToNote}
+                {...(pendingHeadingId && { pendingHeadingId })}
               />
             </Box>
           </DndProvider>
@@ -1435,7 +1449,8 @@ function App(): React.ReactElement {
                           onCommentAdded={() => {
                             setCommentPanelOpen(true);
                           }}
-                          onNavigateToNote={setSelectedNoteId}
+                          onNavigateToNote={handleNavigateToNote}
+                          {...(pendingHeadingId && { pendingHeadingId })}
                         />
                       }
                       onLayoutChange={handleLayoutChange}

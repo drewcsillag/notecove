@@ -6,6 +6,10 @@ import {
   type CommentReaction,
   generateCommentId,
 } from '../comments/types';
+import {
+  extractHeadingsFromFragment,
+  type HeadingInfo,
+} from '../utils/heading-extractor';
 
 /**
  * Event types for comment changes detected by CRDT observers
@@ -191,6 +195,14 @@ export class NoteDoc {
    */
   getContentText(): string {
     return JSON.stringify(this.content.toJSON());
+  }
+
+  /**
+   * Get all headings from the note content.
+   * Returns headings with their text, level, and ID for autocomplete and link navigation.
+   */
+  getHeadings(): HeadingInfo[] {
+    return extractHeadingsFromFragment(this.content);
   }
 
   // ============================================================================

@@ -84,6 +84,10 @@ Connect related notes using wiki-style links:
 - Click a link to navigate to that note
 - Double-click to open in a new window
 
+**Link to Headings**: After selecting a note, continue typing to see its headings and jump directly to a specific section.
+
+**Same-Note Headings**: Type `[[#` to link to a heading within the current note - great for building a table of contents or cross-referencing sections.
+
 ## Search
 
 ### Global Search
