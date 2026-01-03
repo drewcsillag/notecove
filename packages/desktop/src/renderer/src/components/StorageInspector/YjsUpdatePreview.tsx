@@ -299,10 +299,18 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
                       sx={{ color: isComment ? 'warning.main' : 'grey.400' }}
                     >
                       {isComment ? commentOp : content.type}
+                      {struct.parentSub && (
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          sx={{ color: 'info.main', fontFamily: 'monospace', ml: 0.5 }}
+                        >
+                          {struct.parentSub}
+                        </Typography>
+                      )}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'grey.500', ml: 'auto' }}>
                       in {parent}
-                      {struct.parentSub ? `.${struct.parentSub}` : ''}
                     </Typography>
                   </Box>
                   <Typography
@@ -316,11 +324,23 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
                   >
                     {content.value}
                   </Typography>
-                  {struct.length > 1 && (
-                    <Typography variant="caption" sx={{ color: 'grey.500' }}>
-                      Length: {struct.length}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      gap: 2,
+                      mt: 0.5,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ color: 'grey.600', fontFamily: 'monospace' }}>
+                      id: {struct.id.client}:{struct.id.clock}
                     </Typography>
-                  )}
+                    {struct.length > 1 && (
+                      <Typography variant="caption" sx={{ color: 'grey.500' }}>
+                        len: {struct.length}
+                      </Typography>
+                    )}
+                  </Box>
                 </Box>
               );
             })}
@@ -335,34 +355,47 @@ export const YjsUpdatePreview: React.FC<YjsUpdatePreviewProps> = ({ data, maxHei
                     Deletions
                   </Typography>
                 </Box>
-                <Box
-                  sx={{
-                    p: 1,
-                    borderRadius: 1,
-                    bgcolor: 'grey.800',
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontFamily: 'monospace',
-                      fontSize: '0.75rem',
-                      color: 'error.light',
-                    }}
-                  >
-                    {/* Display delete set info */}
-                    {ds.clients instanceof Map
-                      ? Array.from(ds.clients.entries())
-                          .map(([client, ranges]) => `Client ${client}: ${ranges.length} range(s)`)
-                          .join(', ')
-                      : Object.entries(ds.clients)
-                          .map(
-                            ([client, ranges]) =>
-                              `Client ${client}: ${(ranges as unknown[]).length} range(s)`
-                          )
-                          .join(', ')}
-                  </Typography>
-                </Box>
+                {/* Display delete set info with details */}
+                {(ds.clients instanceof Map
+                  ? Array.from(ds.clients.entries())
+                  : Object.entries(ds.clients)
+                ).map(([client, ranges]) => {
+                  const rangeList = ranges as { clock: number; len: number }[];
+                  return (
+                    <Box
+                      key={String(client)}
+                      sx={{
+                        p: 1,
+                        mb: 1,
+                        borderRadius: 1,
+                        bgcolor: 'grey.800',
+                        '&:last-child': { mb: 0 },
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{ color: 'error.light', fontFamily: 'monospace', display: 'block', mb: 0.5 }}
+                      >
+                        Client {String(client)}: {rangeList.length} range(s)
+                      </Typography>
+                      {rangeList.map((range, idx) => (
+                        <Typography
+                          key={idx}
+                          variant="caption"
+                          sx={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.7rem',
+                            color: 'grey.400',
+                            display: 'block',
+                            pl: 1,
+                          }}
+                        >
+                          clock: {range.clock}, len: {range.len}
+                        </Typography>
+                      ))}
+                    </Box>
+                  );
+                })}
               </>
             )}
           </>

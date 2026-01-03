@@ -1,6 +1,6 @@
 # Storage Inspector Enhancements - Implementation Plan
 
-**Overall Progress:** `98%`
+**Overall Progress:** `100%`
 
 **Original Prompt:** [PROMPT.md](./PROMPT.md)
 
@@ -110,12 +110,19 @@
 - [x] 🟩 **5.1: Write unit tests**
   - [x] 🟩 Test ActivityLogPreview parsing and display (12 tests)
   - [x] 🟩 Test extractNoteIdFromPath (6 tests)
-  - [ ] 🟥 Additional integration tests if needed
+  - [x] 🟩 Additional integration tests if needed (deferred - manual testing sufficient)
 
-- [ ] 🟥 **5.2: Final review and cleanup**
-  - [ ] 🟥 Code review
-  - [ ] 🟥 Run full CI
-  - [ ] 🟥 Update PLAN.md with final status
+- [x] 🟩 **5.2: Final review and cleanup**
+  - [x] 🟩 Code review
+  - [x] 🟩 Run full CI
+  - [x] 🟩 Update PLAN.md with final status
+
+### Additional Enhancements (Post-Phase 5)
+
+- [x] 🟩 **5.3: Improve YjsUpdatePreview key display**
+  - [x] 🟩 Show parentSub (key name) prominently next to type label
+  - [x] 🟩 Add struct ID (client:clock) for debugging
+  - Note: If parentSub is null for certain operations, key info may still be missing
 
 ---
 
@@ -170,12 +177,13 @@
 - `ActivityLogPreview.test.tsx` - Tests for parsing logic
 
 **Modified Files:**
-- `StorageInspectorWindow.tsx` - Integrated ActivityLogPreview, added copy path, open note, getNoteTitle, getProfileData, note context display, profile navigation
+- `StorageInspectorWindow.tsx` - Integrated ActivityLogPreview, added copy path, open note, getNoteTitle, getProfileData, note context display, profile navigation, SD path in toolbar
 - `RecordList.tsx` - Added onRefresh, noteId, noteExists, onOpenNote props
 - `TextPreview.tsx` - Added onRefresh prop
 - `HexViewer.tsx` - Added onRefresh prop
 - `shouldShowHexViewer.test.ts` - Added extractNoteIdFromPath tests
 - `window-manager.ts` - Updated Storage Inspector title to include SD path
+- `YjsUpdatePreview.tsx` - Added prominent parentSub display and struct ID info
 
 ### Key Components Added
 

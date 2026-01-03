@@ -657,7 +657,7 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
               </Typography>
             </Box>
           ) : fileData ? (
-            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ p: 2 }}>
               {/* File metadata */}
               <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -843,7 +843,8 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
                 <Paper
                   variant="outlined"
                   sx={{
-                    flexGrow: 1,
+                    height: 400,
+                    minHeight: 400,
                     overflow: 'hidden',
                     p: 1,
                     bgcolor: 'grey.900',
