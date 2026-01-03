@@ -52,6 +52,7 @@
     "@opentelemetry/semantic-conventions": "^1.37.0",
     "@tiptap/core": "3.14.0",
     "@tiptap/extension-code-block": "3.14.0",
+    "@tiptap/extension-heading": "3.14.0",
     "@tiptap/extension-code-block-lowlight": "3.14.0",
     "@tiptap/extension-collaboration": "3.14.0",
     "@tiptap/extension-link": "3.14.0",

@@ -322,10 +322,10 @@ export function useNoteSync(
       focusAttemptedRef.current = true;
 
       // Delay focus to ensure React has finished rendering
-      // Query DOM directly since editor reference may be stale after remounts
+      // Use TipTap's focus command which properly handles NodeViews
+      // Focus at 'start' to put cursor in the title heading
       setTimeout(() => {
-        const proseMirrorEl = document.querySelector<HTMLElement>('.ProseMirror');
-        proseMirrorEl?.focus();
+        editor.commands.focus('start');
         shouldFocusAfterLoadRef.current = false;
       }, 100);
     }

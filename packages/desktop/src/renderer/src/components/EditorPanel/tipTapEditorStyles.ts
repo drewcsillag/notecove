@@ -713,6 +713,54 @@ export function getTipTapEditorStyles(
           '& .task-content': completedContentStyles,
         },
       },
+      // Collapsible heading wrapper styling
+      '& .heading-wrapper': {
+        position: 'relative',
+        // Preserve heading margins from the inner h1/h2/h3
+        '& h1, & h2, & h3': {
+          margin: 0, // Reset margin since wrapper handles spacing
+        },
+      },
+      // Collapse toggle button - positioned in left margin, vertically centered
+      '& .heading-collapse-toggle': {
+        position: 'absolute',
+        left: '-20px', // Position in the left margin
+        top: '50%',
+        transform: 'translateY(-50%)',
+        width: '20px',
+        height: '20px',
+        padding: 0,
+        border: 'none',
+        background: 'transparent',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '3px',
+        color: theme.palette.primary.main,
+        fontSize: '18px',
+        lineHeight: 1,
+        transition: 'background-color 0.15s ease, opacity 0.15s ease',
+        opacity: 0.7,
+        '&:hover': {
+          backgroundColor:
+            theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+          opacity: 1,
+        },
+      },
+      // Collapsed content - hidden via decoration plugin
+      '& .collapsed-content': {
+        display: 'none',
+      },
+      // Print styles: show all content regardless of collapse state
+      '@media print': {
+        '& .collapsed-content': {
+          display: 'block',
+        },
+        '& .heading-collapse-toggle': {
+          display: 'none',
+        },
+      },
     },
   };
 }

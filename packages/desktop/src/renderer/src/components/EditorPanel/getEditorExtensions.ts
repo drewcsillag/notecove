@@ -31,6 +31,8 @@ import { NotecoveListItem } from './extensions/NotecoveListItem';
 import { MoveBlock } from './extensions/MoveBlock';
 import { CutLine } from './extensions/CutLine';
 import { NotecoveCodeBlock } from './extensions/CodeBlockLowlight';
+import { CollapsibleHeading } from './extensions/CollapsibleHeading';
+import { CollapseDecorations } from './extensions/CollapseDecorations';
 
 /**
  * Callbacks interface for extension events.
@@ -67,7 +69,12 @@ export function getEditorExtensions(yDoc: Y.Doc, callbacks: EditorExtensionCallb
       listItem: false, // Use NotecoveListItem with cursor-position-aware Tab
       codeBlock: false, // Use NotecoveCodeBlock with syntax highlighting
       link: false, // Use custom WebLink extension
+      heading: false, // Use CollapsibleHeading with collapse/expand toggle
     }),
+    // Add collapsible heading extension with toggle button
+    CollapsibleHeading,
+    // Add decoration plugin for hiding collapsed content
+    CollapseDecorations,
     // Add syntax-highlighted code blocks
     NotecoveCodeBlock,
     // Custom BulletList that accepts both listItem and taskItem

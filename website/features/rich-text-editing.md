@@ -31,6 +31,16 @@ Use keyboard shortcuts for quick access:
 - `Cmd+Alt+2` / `Ctrl+Alt+2`: Heading 2
 - `Cmd+Alt+3` / `Ctrl+Alt+3`: Heading 3
 
+**Collapsible Headings:**
+
+Each heading has a toggle button that lets you collapse or expand the content under it. Collapsed sections hide all content from the heading until the next heading of the same or higher level.
+
+- Click the ▼/▶ toggle next to any heading to collapse or expand
+- `Cmd+.` / `Ctrl+.`: Toggle collapse on heading at cursor
+- `Cmd+Shift+.` / `Ctrl+Shift+.`: Collapse or expand all headings
+
+Collapsed state is saved with your note and syncs across devices. When exporting or printing, all content is included regardless of collapse state.
+
 ### Lists
 
 Create structured lists:

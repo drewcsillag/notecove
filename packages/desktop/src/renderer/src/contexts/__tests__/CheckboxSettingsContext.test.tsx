@@ -28,8 +28,7 @@ const mockElectronAPI = {
 
 // Set up global mocks before tests
 beforeAll(() => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (global as any).window.electronAPI = mockElectronAPI;
+  (window as any).electronAPI = mockElectronAPI;
 });
 
 beforeEach(() => {

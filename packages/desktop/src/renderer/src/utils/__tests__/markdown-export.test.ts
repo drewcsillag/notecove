@@ -124,6 +124,34 @@ describe('prosemirrorToMarkdown', () => {
       const result = prosemirrorToMarkdown(content, noopLookup);
       expect(result).toBe('# ');
     });
+
+    it('should export collapsed heading content (ignore collapsed attribute)', () => {
+      // Collapsed headings should still export all content
+      const content = {
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 1, collapsed: true },
+            content: [{ type: 'text', text: 'Collapsed Heading' }],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'This content is "hidden" in UI but should export' }],
+          },
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Another Heading' }],
+          },
+        ],
+      };
+      const result = prosemirrorToMarkdown(content, noopLookup);
+      // All content should be present regardless of collapsed state
+      expect(result).toContain('# Collapsed Heading');
+      expect(result).toContain('This content is "hidden" in UI but should export');
+      expect(result).toContain('## Another Heading');
+    });
   });
 
   describe('text formatting', () => {

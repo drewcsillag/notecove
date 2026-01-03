@@ -55,10 +55,7 @@ if (isInList($from)) {
   const parentNode = $from.parent;
   if (parentNode.type.name !== 'paragraph') return;
 
-  const textBefore = parentNode.textBetween(
-    0,
-    $from.parentOffset - (range.to - range.from)
-  );
+  const textBefore = parentNode.textBetween(0, $from.parentOffset - (range.to - range.from));
   if (textBefore.trim() !== '') return; // Not at start, don't convert
 
   // ... rest of conversion logic
