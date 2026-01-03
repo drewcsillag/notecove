@@ -660,6 +660,8 @@ export const webClient: typeof window.electronAPI = {
       Promise.resolve({ success: false, error: 'Not supported in web mode' }),
     onProgress: noopSubscription,
     onStatusChanged: noopSubscription,
+    getActiveSyncs: () => Promise.resolve([]),
+    onActiveSyncsChanged: noopSubscription,
   },
 
   polling: {

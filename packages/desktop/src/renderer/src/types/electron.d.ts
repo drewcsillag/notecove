@@ -4,6 +4,7 @@
 
 import type { NoteMetadata, SyncProgress, SyncStatus } from '../../../main/ipc/types';
 import type { PollingGroupStoredSettings, PollingGroupStatus } from '@notecove/shared';
+import type { ActiveSyncEntry } from '../../../main/ipc/handlers/types';
 
 declare global {
   interface Window {
@@ -306,6 +307,8 @@ declare global {
         exportDiagnostics: () => Promise<{ success: boolean; filePath?: string; error?: string }>;
         onProgress: (callback: (sdId: string, progress: SyncProgress) => void) => () => void;
         onStatusChanged: (callback: (status: SyncStatus) => void) => () => void;
+        getActiveSyncs: () => Promise<ActiveSyncEntry[]>;
+        onActiveSyncsChanged: (callback: (activeSyncs: ActiveSyncEntry[]) => void) => () => void;
       };
 
       polling: {

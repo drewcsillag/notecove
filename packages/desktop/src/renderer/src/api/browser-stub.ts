@@ -122,6 +122,8 @@ export const browserApiStub: typeof window.electronAPI = {
     exportDiagnostics: notImplemented('sync.exportDiagnostics'),
     onProgress: stubEventSubscription,
     onStatusChanged: stubEventSubscription,
+    getActiveSyncs: notImplemented('sync.getActiveSyncs'),
+    onActiveSyncsChanged: stubEventSubscription,
   },
 
   polling: {

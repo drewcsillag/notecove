@@ -5,6 +5,7 @@
 import { ipcRenderer } from 'electron';
 import type { SyncProgress, SyncStatus } from '../../main/ipc/types';
 import type { PollingGroupStoredSettings, PollingGroupStatus } from '@notecove/shared';
+import type { ActiveSyncEntry } from '../../main/ipc/handlers/types';
 
 export const pollingApi = {
   getSettings: (): Promise<PollingGroupStoredSettings> =>
@@ -48,6 +49,20 @@ export const syncApi = {
     ipcRenderer.on('sync:status-changed', listener);
     return () => {
       ipcRenderer.removeListener('sync:status-changed', listener);
+    };
+  },
+  getActiveSyncs: (): Promise<ActiveSyncEntry[]> =>
+    ipcRenderer.invoke('sync:getActiveSyncs') as Promise<ActiveSyncEntry[]>,
+  onActiveSyncsChanged: (callback: (activeSyncs: ActiveSyncEntry[]) => void): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      activeSyncs: ActiveSyncEntry[]
+    ): void => {
+      callback(activeSyncs);
+    };
+    ipcRenderer.on('sync:activeSyncsChanged', listener);
+    return () => {
+      ipcRenderer.removeListener('sync:activeSyncsChanged', listener);
     };
   },
 };

@@ -1,105 +1,116 @@
 /**
  * SyncStatusIndicator Component
  *
- * A subtle indicator that shows when background sync is in progress.
- * Displays a small spinner and count when:
- * - Fast-path syncs are active (Tier 1)
- * - Polling group has pending entries (Tier 2)
+ * A subtle indicator that shows when actual sync activity is happening.
+ * Only displays when remote changes have been detected and are being loaded.
+ * Does NOT show during routine polling or background checks.
+ *
+ * Features:
+ * - Event-driven updates (reacts to sync:activeSyncsChanged)
+ * - 1 second minimum display time to prevent flickering
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Box, Typography, Tooltip, useTheme } from '@mui/material';
 import SyncIcon from '@mui/icons-material/Sync';
 
-interface CombinedSyncStatus {
-  /** Fast path pending count */
-  fastPathPending: number;
-  /** Polling group entry count */
-  pollingGroupCount: number;
-  /** Whether any sync is actively in progress */
-  isSyncing: boolean;
-}
+/** Minimum time to show the indicator (prevents flickering for fast syncs) */
+const MIN_DISPLAY_TIME_MS = 1000;
 
 export interface SyncStatusIndicatorProps {
-  /** Polling interval in milliseconds (default: 2000) */
-  pollInterval?: number;
+  /** Optional: minimum display time in ms (default: 1000) */
+  minDisplayTime?: number;
 }
 
 export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
-  pollInterval = 2000,
+  minDisplayTime = MIN_DISPLAY_TIME_MS,
 }) => {
   const theme = useTheme();
-  const [syncStatus, setSyncStatus] = useState<CombinedSyncStatus | null>(null);
+  const [activeSyncCount, setActiveSyncCount] = useState(0);
+  const [visible, setVisible] = useState(false);
   const mountedRef = useRef(true);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const showStartTimeRef = useRef<number | null>(null);
 
-  // Poll for sync status
-  const fetchStatus = useCallback(async () => {
-    if (!mountedRef.current) return;
+  // Handle active syncs change
+  const handleActiveSyncsChanged = useCallback(
+    (activeSyncs: { sdId: string; noteId: string }[]) => {
+      if (!mountedRef.current) return;
 
-    try {
-      // Get both fast-path status and polling group status
-      const [fastPathStatus, pollingStatus] = await Promise.all([
-        window.electronAPI.sync.getStatus(),
-        window.electronAPI.polling.getGroupStatus(),
-      ]);
+      const count = activeSyncs.length;
+      setActiveSyncCount(count);
 
-      const combined: CombinedSyncStatus = {
-        fastPathPending: fastPathStatus.pendingCount,
-        pollingGroupCount: pollingStatus?.totalEntries ?? 0,
-        isSyncing: fastPathStatus.isSyncing || (pollingStatus?.totalEntries ?? 0) > 0,
-      };
+      if (count > 0) {
+        // Clear any pending hide timeout
+        if (hideTimeoutRef.current) {
+          clearTimeout(hideTimeoutRef.current);
+          hideTimeoutRef.current = null;
+        }
 
-      setSyncStatus(combined);
-    } catch (error) {
-      console.error('[SyncStatusIndicator] Failed to get sync status:', error);
-    }
-  }, []);
+        // Show immediately and record start time
+        if (!visible) {
+          showStartTimeRef.current = Date.now();
+        }
+        setVisible(true);
+      } else {
+        // When syncs finish, respect minimum display time
+        const showStartTime = showStartTimeRef.current;
+        if (showStartTime && visible) {
+          const elapsedTime = Date.now() - showStartTime;
+          const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
+
+          if (remainingTime > 0) {
+            // Schedule hide after remaining time
+            hideTimeoutRef.current = setTimeout(() => {
+              if (mountedRef.current) {
+                setVisible(false);
+                showStartTimeRef.current = null;
+              }
+            }, remainingTime);
+          } else {
+            // Minimum time already passed, hide immediately
+            setVisible(false);
+            showStartTimeRef.current = null;
+          }
+        }
+      }
+    },
+    [visible, minDisplayTime]
+  );
 
   useEffect(() => {
     mountedRef.current = true;
 
-    // Initial fetch
-    void fetchStatus();
+    // Get initial state
+    void (async () => {
+      try {
+        const activeSyncs = await window.electronAPI.sync.getActiveSyncs();
+        handleActiveSyncsChanged(activeSyncs);
+      } catch (error) {
+        console.error('[SyncStatusIndicator] Failed to get initial active syncs:', error);
+      }
+    })();
 
-    // Set up polling interval
-    const intervalId = setInterval(() => {
-      void fetchStatus();
-    }, pollInterval);
-
-    // Also listen for sync status change events
-    const unsubscribe = window.electronAPI.sync.onStatusChanged(() => {
-      void fetchStatus();
-    });
+    // Subscribe to active syncs changes
+    const unsubscribe = window.electronAPI.sync.onActiveSyncsChanged(handleActiveSyncsChanged);
 
     return () => {
       mountedRef.current = false;
-      clearInterval(intervalId);
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
       unsubscribe();
     };
-  }, [fetchStatus, pollInterval]);
+  }, [handleActiveSyncsChanged]);
 
-  // Don't render anything if no sync is in progress
-  if (!syncStatus?.isSyncing) {
+  // Don't render anything if not visible
+  if (!visible) {
     return null;
   }
 
-  // Calculate total and tooltip
-  const totalCount = syncStatus.fastPathPending + syncStatus.pollingGroupCount;
-  const tooltipLines: string[] = [];
-
-  if (syncStatus.fastPathPending > 0) {
-    tooltipLines.push(
-      `${syncStatus.fastPathPending} note${syncStatus.fastPathPending > 1 ? 's' : ''} syncing (fast)`
-    );
-  }
-
-  if (syncStatus.pollingGroupCount > 0) {
-    tooltipLines.push(
-      `${syncStatus.pollingGroupCount} note${syncStatus.pollingGroupCount > 1 ? 's' : ''} being polled`
-    );
-  }
-
-  const tooltipContent = tooltipLines.join('\n') || 'Syncing...';
+  // Use the count from when we started showing, or current count
+  const displayCount = activeSyncCount > 0 ? activeSyncCount : 1;
+  const tooltipContent = `Syncing ${displayCount} note${displayCount > 1 ? 's' : ''}`;
 
   return (
     <Tooltip title={tooltipContent} placement="right">
@@ -147,7 +158,7 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
             userSelect: 'none',
           }}
         >
-          Syncing {totalCount} note{totalCount > 1 ? 's' : ''}
+          Syncing {displayCount} note{displayCount > 1 ? 's' : ''}
         </Typography>
       </Box>
     </Tooltip>

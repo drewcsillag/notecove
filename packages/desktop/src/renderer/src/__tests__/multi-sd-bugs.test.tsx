@@ -88,6 +88,8 @@ const mockElectronAPI = {
     }),
     onStatusChanged: jest.fn(() => () => {}),
     exportDiagnostics: jest.fn().mockResolvedValue({ success: true }),
+    getActiveSyncs: jest.fn().mockResolvedValue([]),
+    onActiveSyncsChanged: jest.fn(() => () => {}),
   },
   appState: {
     get: jest.fn().mockResolvedValue(null),

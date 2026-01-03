@@ -57,6 +57,19 @@ export type GetPollingGroupStatusFn = () => PollingGroupStatus | null;
 export type RecordRecentEditFn = (noteId: string, sdId: string) => void;
 
 /**
+ * Active sync entry - a note currently being synced
+ */
+export interface ActiveSyncEntry {
+  sdId: string;
+  noteId: string;
+}
+
+/**
+ * Callback type for getting active syncs (notes with detected changes being loaded)
+ */
+export type GetActiveSyncsFn = () => ActiveSyncEntry[];
+
+/**
  * User info for @-mentions autocomplete
  */
 export interface MentionUser {
@@ -119,6 +132,7 @@ export interface HandlerDependencies {
   stopWebServer?: StopWebServerFn;
   getPollingGroupStatus?: GetPollingGroupStatusFn;
   recordRecentEdit?: RecordRecentEditFn;
+  getActiveSyncs?: GetActiveSyncsFn;
 }
 
 /**

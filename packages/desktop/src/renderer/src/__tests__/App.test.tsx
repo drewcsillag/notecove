@@ -89,6 +89,10 @@ const mockElectronAPI = {
       /* unsubscribe */
     }),
     exportDiagnostics: jest.fn().mockResolvedValue({ success: true }),
+    getActiveSyncs: jest.fn().mockResolvedValue([]),
+    onActiveSyncsChanged: jest.fn(() => () => {
+      /* unsubscribe */
+    }),
   },
   appState: {
     get: jest.fn().mockResolvedValue(null),

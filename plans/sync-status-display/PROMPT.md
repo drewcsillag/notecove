@@ -1,0 +1,1 @@
+the syncstatus in the status bar always says "Syncing {NuMBER} notes". I only want to see it doing something when it's seen that something has gotten updates, not that it's doing it's periodic poll of all things... What is it actually doing now?

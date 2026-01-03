@@ -9,7 +9,7 @@
 import { ipcMain, dialog, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import type { HandlerContext } from './types';
+import type { HandlerContext, ActiveSyncEntry } from './types';
 import type { SyncStatus } from '../types';
 import {
   AppStateKey,
@@ -35,6 +35,9 @@ export function registerSyncHandlers(ctx: HandlerContext): void {
   ipcMain.handle('polling:getSettingsForSd', handleGetPollingSettingsForSd(ctx));
   ipcMain.handle('polling:setSettingsForSd', handleSetPollingSettingsForSd(ctx));
   ipcMain.handle('polling:getGroupStatus', handleGetPollingGroupStatus(ctx));
+
+  // Active syncs (notes with detected changes being loaded)
+  ipcMain.handle('sync:getActiveSyncs', handleGetActiveSyncs(ctx));
 }
 
 /**
@@ -50,6 +53,7 @@ export function unregisterSyncHandlers(): void {
   ipcMain.removeHandler('polling:getSettingsForSd');
   ipcMain.removeHandler('polling:setSettingsForSd');
   ipcMain.removeHandler('polling:getGroupStatus');
+  ipcMain.removeHandler('sync:getActiveSyncs');
 }
 
 // =============================================================================
@@ -333,5 +337,17 @@ function handleGetPollingGroupStatus(ctx: HandlerContext) {
       return null;
     }
     return ctx.getPollingGroupStatus();
+  };
+}
+
+/**
+ * Get active syncs (notes with detected remote changes currently being loaded)
+ */
+function handleGetActiveSyncs(ctx: HandlerContext) {
+  return async (): Promise<ActiveSyncEntry[]> => {
+    if (!ctx.getActiveSyncs) {
+      return [];
+    }
+    return ctx.getActiveSyncs();
   };
 }

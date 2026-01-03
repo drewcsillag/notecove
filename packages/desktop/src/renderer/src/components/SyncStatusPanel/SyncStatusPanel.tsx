@@ -35,6 +35,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import type { PollingGroupStatus, PollingGroupEntrySerialized } from '@notecove/shared';
+import type { ActiveSyncEntry } from '../../../../main/ipc/handlers/types';
 
 export interface SyncStatusPanelProps {
   open: boolean;
@@ -100,15 +101,20 @@ export const SyncStatusPanel: React.FC<SyncStatusPanelProps> = ({ open, onClose 
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState<PollingGroupStatus | null>(null);
+  const [activeSyncs, setActiveSyncs] = useState<ActiveSyncEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch polling group status
+  // Fetch polling group status and active syncs
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const pollingStatus = await window.electronAPI.polling.getGroupStatus();
+      const [pollingStatus, activeStatus] = await Promise.all([
+        window.electronAPI.polling.getGroupStatus(),
+        window.electronAPI.sync.getActiveSyncs(),
+      ]);
       setStatus(pollingStatus);
+      setActiveSyncs(activeStatus);
       setError(null);
     } catch (err) {
       console.error('[SyncStatusPanel] Failed to get polling status:', err);
@@ -117,7 +123,7 @@ export const SyncStatusPanel: React.FC<SyncStatusPanelProps> = ({ open, onClose 
     setLoading(false);
   }, []);
 
-  // Set up polling when dialog is open
+  // Set up polling and event listener when dialog is open
   useEffect(() => {
     if (open) {
       void fetchStatus();
@@ -126,6 +132,19 @@ export const SyncStatusPanel: React.FC<SyncStatusPanelProps> = ({ open, onClose 
       pollIntervalRef.current = setInterval(() => {
         void fetchStatus();
       }, 2000);
+
+      // Also listen for active syncs changes
+      const unsubscribe = window.electronAPI.sync.onActiveSyncsChanged((syncs) => {
+        setActiveSyncs(syncs);
+      });
+
+      return () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        unsubscribe();
+      };
     }
 
     return () => {
@@ -192,6 +211,46 @@ export const SyncStatusPanel: React.FC<SyncStatusPanelProps> = ({ open, onClose 
           >
             {error}
           </Alert>
+        )}
+
+        {/* Active Syncs Section */}
+        {activeSyncs.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Active Syncs
+              <Typography component="span" variant="caption" sx={{ ml: 1 }}>
+                ({activeSyncs.length} {activeSyncs.length === 1 ? 'note' : 'notes'})
+              </Typography>
+            </Typography>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                backgroundColor: 'action.hover',
+                borderColor: 'primary.main',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2">
+                  Syncing changes from other devices...
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {activeSyncs.map((sync) => (
+                  <Tooltip key={`${sync.sdId}-${sync.noteId}`} title={sync.noteId}>
+                    <Chip
+                      label={truncateId(sync.noteId)}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ fontFamily: 'monospace' }}
+                    />
+                  </Tooltip>
+                ))}
+              </Box>
+            </Paper>
+          </Box>
         )}
 
         {/* Summary Section */}

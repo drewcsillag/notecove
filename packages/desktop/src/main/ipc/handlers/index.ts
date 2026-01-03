@@ -22,6 +22,7 @@ import type {
   StopWebServerFn,
   GetPollingGroupStatusFn,
   RecordRecentEditFn,
+  GetActiveSyncsFn,
 } from './types';
 import {
   isValidImageId,
@@ -120,7 +121,8 @@ export class IPCHandlers {
     onUserSettingsChanged?: OnUserSettingsChangedFn,
     stopWebServer?: StopWebServerFn,
     getPollingGroupStatus?: GetPollingGroupStatusFn,
-    recordRecentEdit?: RecordRecentEditFn
+    recordRecentEdit?: RecordRecentEditFn,
+    getActiveSyncs?: GetActiveSyncsFn
   ) {
     // Initialize services that need setup
     initializeImageServices(database);
@@ -150,6 +152,7 @@ export class IPCHandlers {
       stopWebServer,
       getPollingGroupStatus,
       recordRecentEdit,
+      getActiveSyncs,
       broadcastToAll: this.broadcastToAll.bind(this),
       discoverImageAcrossSDs: this.discoverImageAcrossSDs.bind(this),
       oembedService,

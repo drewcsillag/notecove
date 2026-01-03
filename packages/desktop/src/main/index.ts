@@ -529,6 +529,14 @@ void app.whenReady().then(async () => {
     // Set database reference for full repoll functionality
     sdWatcherManager.setDatabase(database);
 
+    // Set up callback to broadcast when active syncs change
+    sdWatcherManager.setOnActiveSyncsChanged(() => {
+      const activeSyncs = sdWatcherManager?.getActiveSyncs() ?? [];
+      BrowserWindow.getAllWindows().forEach((window) => {
+        window.webContents.send('sync:activeSyncsChanged', activeSyncs);
+      });
+    });
+
     // Initialize polling group for tier 2 persistent polling
     sdWatcherManager.initPollingGroup();
 
@@ -852,6 +860,10 @@ void app.whenReady().then(async () => {
       // recordRecentEdit callback - add note to polling group as recently edited
       (noteId: string, sdId: string): void => {
         sdWatcherManager?.recordRecentEdit(noteId, sdId);
+      },
+      // getActiveSyncs callback - returns notes with detected changes currently being synced
+      (): { sdId: string; noteId: string }[] => {
+        return sdWatcherManager?.getActiveSyncs() ?? [];
       }
     );
 

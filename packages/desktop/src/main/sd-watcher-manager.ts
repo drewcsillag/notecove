@@ -73,8 +73,82 @@ export class SDWatcherManager {
   private lastFullRepollAt = 0;
   private database: Database | null = null;
 
+  // Active sync tracking: notes currently being synced (remote changes detected)
+  private activeSyncs = new Map<string, Set<string>>(); // sdId -> Set<noteId>
+  private onActiveSyncsChangedCallback: (() => void) | null = null;
+
   constructor(profilePresenceReader: ProfilePresenceReader | null = null) {
     this.profilePresenceReader = profilePresenceReader;
+  }
+
+  /**
+   * Set callback to be called when active syncs change
+   */
+  setOnActiveSyncsChanged(callback: () => void): void {
+    this.onActiveSyncsChangedCallback = callback;
+  }
+
+  /**
+   * Add notes to active syncs (called when remote changes detected)
+   */
+  addActiveSyncs(sdId: string, noteIds: Set<string>): void {
+    if (noteIds.size === 0) return;
+
+    let sdSyncs = this.activeSyncs.get(sdId);
+    if (!sdSyncs) {
+      sdSyncs = new Set();
+      this.activeSyncs.set(sdId, sdSyncs);
+    }
+
+    for (const noteId of noteIds) {
+      sdSyncs.add(noteId);
+    }
+
+    this.onActiveSyncsChangedCallback?.();
+  }
+
+  /**
+   * Remove notes from active syncs (called when sync completes)
+   */
+  removeActiveSyncs(sdId: string, noteIds: Set<string>): void {
+    if (noteIds.size === 0) return;
+
+    const sdSyncs = this.activeSyncs.get(sdId);
+    if (!sdSyncs) return;
+
+    for (const noteId of noteIds) {
+      sdSyncs.delete(noteId);
+    }
+
+    if (sdSyncs.size === 0) {
+      this.activeSyncs.delete(sdId);
+    }
+
+    this.onActiveSyncsChangedCallback?.();
+  }
+
+  /**
+   * Get all active syncs as a flat array
+   */
+  getActiveSyncs(): { sdId: string; noteId: string }[] {
+    const result: { sdId: string; noteId: string }[] = [];
+    for (const [sdId, noteIds] of this.activeSyncs) {
+      for (const noteId of noteIds) {
+        result.push({ sdId, noteId });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Get count of active syncs
+   */
+  getActiveSyncCount(): number {
+    let count = 0;
+    for (const noteIds of this.activeSyncs.values()) {
+      count += noteIds.size;
+    }
+    return count;
   }
 
   /**
@@ -309,11 +383,21 @@ export class SDWatcherManager {
         // Trigger a full sync - this will reload any notes that have changes
         const reloadedNotes = await activitySync.syncFromOtherInstances();
 
+        // Track active syncs for UI (only when actual changes detected)
+        if (reloadedNotes.size > 0) {
+          this.addActiveSyncs(sdId, reloadedNotes);
+        }
+
         // Mark entries as polled, with hit if the note was reloaded
         for (const entry of entries) {
           const wasHit = reloadedNotes.has(entry.noteId);
           this.pollingGroup.markPolled(entry.noteId, entry.sdId, wasHit);
           this.pollingGroup.checkExitCriteria(entry.noteId, entry.sdId);
+        }
+
+        // Remove from active syncs after processing
+        if (reloadedNotes.size > 0) {
+          this.removeActiveSyncs(sdId, reloadedNotes);
         }
       } catch (err) {
         console.error(`[SDWatcherManager] Failed to poll SD ${sdId}:`, err);
@@ -729,6 +813,11 @@ export class SDWatcherManager {
             Array.from(affectedNotes)
           );
 
+          // Track active syncs for UI (only when actual changes detected)
+          if (affectedNotes.size > 0) {
+            this.addActiveSyncs(sdId, affectedNotes);
+          }
+
           // Wait for all pending syncs to complete before broadcasting
           // This ensures CRDT state is up-to-date when renderers reload
           await activitySync.waitForPendingSyncs();
@@ -758,6 +847,9 @@ export class SDWatcherManager {
                 noteIds,
               });
             }
+
+            // Remove from active syncs after processing
+            this.removeActiveSyncs(sdId, affectedNotes);
           } else {
             console.log(`[ActivitySync ${sdId}] No affected notes to broadcast`);
             // Broadcast that there were no affected notes
@@ -887,6 +979,11 @@ export class SDWatcherManager {
         try {
           const affectedNotes = await activitySync.syncFromOtherInstances();
 
+          // Track active syncs for UI (only when actual changes detected)
+          if (affectedNotes.size > 0) {
+            this.addActiveSyncs(sdId, affectedNotes);
+          }
+
           // Wait for all pending syncs to complete before broadcasting
           await activitySync.waitForPendingSyncs();
 
@@ -909,6 +1006,9 @@ export class SDWatcherManager {
                 noteIds,
               });
             }
+
+            // Remove from active syncs after processing
+            this.removeActiveSyncs(sdId, affectedNotes);
           }
         } catch (error) {
           console.error(`[Init] Failed to perform initial sync for SD: ${sdId}:`, error);
@@ -948,6 +1048,9 @@ export class SDWatcherManager {
               const affectedNotes = await activitySync.syncFromOtherInstances();
 
               if (affectedNotes.size > 0) {
+                // Track active syncs for UI
+                this.addActiveSyncs(sdId, affectedNotes);
+
                 console.log(
                   `[ActivitySync Poll ${sdId}] Found changes via poll:`,
                   Array.from(affectedNotes)
@@ -972,6 +1075,9 @@ export class SDWatcherManager {
                     noteIds,
                   });
                 }
+
+                // Remove from active syncs after processing
+                this.removeActiveSyncs(sdId, affectedNotes);
               }
             } catch (error) {
               // Don't log every poll failure, just errors
