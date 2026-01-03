@@ -137,10 +137,13 @@ export function createWindow(
             : 800;
 
   // Determine window title
+  const storageInspectorTitle = options?.storageInspector
+    ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}${options.sdPath ? ` (${options.sdPath})` : ''}`
+    : '';
   const windowTitle = options?.about
     ? 'About NoteCove'
     : options?.storageInspector
-      ? `Storage Inspector${options.sdName ? ` - ${options.sdName}` : ''}`
+      ? storageInspectorTitle
       : options?.sdPicker
         ? 'Select Storage Directory'
         : options?.printPreview

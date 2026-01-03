@@ -21,12 +21,15 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import BugReportIcon from '@mui/icons-material/BugReport';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { StorageTreeBrowser, type SDTreeNode } from './StorageTreeBrowser';
 import { HexViewer, type ParsedField } from './HexViewer';
 import { RecordList, type RecordInfo } from './RecordList';
 import { TextPreview } from './TextPreview';
 import { ImagePreview } from './ImagePreview';
 import { YjsUpdatePreview } from './YjsUpdatePreview';
+import { ActivityLogPreview } from './ActivityLogPreview';
 
 /**
  * Helper to ensure data is a proper Uint8Array after IPC serialization.
@@ -101,6 +104,17 @@ export function shouldShowHexViewer(fileType: string): boolean {
   return !noHexTypes.has(fileType);
 }
 
+/**
+ * Extract noteId from a file path if it's under notes/{noteId}/...
+ * Returns null if not a note path.
+ */
+export function extractNoteIdFromPath(relativePath: string): string | null {
+  // Match paths like: notes/{noteId}/... or notes/{noteId}
+  const regex = /^notes\/([^/]+)/;
+  const match = regex.exec(relativePath);
+  return match?.[1] ?? null;
+}
+
 export interface StorageInspectorWindowProps {
   sdId: string;
   sdPath: string;
@@ -128,6 +142,9 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
   const [parsedRecords, setParsedRecords] = useState<RecordInfo[]>([]);
   const [selectedRecordIndex, setSelectedRecordIndex] = useState<number | null>(null);
   const [highlightRange, setHighlightRange] = useState<{ start: number; end: number } | null>(null);
+  const [noteExists, setNoteExists] = useState<boolean>(true);
+  const [noteTitle, setNoteTitle] = useState<string | null>(null);
+  const [copiedPath, setCopiedPath] = useState<boolean>(false);
 
   // Load SD contents
   const loadContents = useCallback(async () => {
@@ -165,6 +182,21 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
       setParsedRecords([]);
       setSelectedRecordIndex(null);
       setHighlightRange(null);
+      setNoteExists(true); // Reset note existence
+      setNoteTitle(null); // Reset note title
+
+      // Check if this is a note path and verify note exists
+      const noteId = extractNoteIdFromPath(node.path);
+      if (noteId) {
+        try {
+          const noteInfo = await window.electronAPI.note.getInfo(noteId);
+          setNoteExists(noteInfo !== null);
+          setNoteTitle(noteInfo?.title ?? null);
+        } catch {
+          setNoteExists(false);
+          setNoteTitle(null);
+        }
+      }
 
       // Don't load file data for directories
       if (node.type === 'directory') {
@@ -266,6 +298,119 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
   const handleRefresh = () => {
     void loadContents();
   };
+
+  // Copy full path to clipboard
+  const handleCopyPath = useCallback(async () => {
+    if (!fileData || !selectedNode) return;
+
+    // Build full absolute path: sdPath + relativePath
+    const fullPath = `${sdPath}/${selectedNode.path}`;
+    await navigator.clipboard.writeText(fullPath);
+
+    // Show feedback
+    setCopiedPath(true);
+    setTimeout(() => {
+      setCopiedPath(false);
+    }, 2000);
+  }, [fileData, selectedNode, sdPath]);
+
+  // Open note in new window
+  const handleOpenNote = useCallback(
+    (noteId: string) => {
+      void window.electronAPI.testing.createWindow({ noteId });
+    },
+    []
+  );
+
+  // Get note title for hover tooltip (searches across all SDs)
+  const getNoteTitle = useCallback(async (noteId: string): Promise<string | null> => {
+    try {
+      const noteInfo = await window.electronAPI.note.getInfo(noteId);
+      return noteInfo?.title ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Get profile data for hover tooltip
+  const getProfileData = useCallback(
+    async (profileId: string): Promise<string | null> => {
+      try {
+        const profilePath = `profiles/${profileId}.json`;
+        const result = await window.electronAPI.inspector.readFileInfo(sdPath, profilePath);
+        if (result.error || result.data.length === 0) {
+          return 'Profile not found';
+        }
+        // Decode and parse profile JSON (ProfilePresence format)
+        const text = new TextDecoder().decode(result.data);
+        const profile = JSON.parse(text) as {
+          profileName?: string;
+          username?: string;
+          user?: string;
+          hostname?: string;
+          platform?: string;
+        };
+        // Return formatted profile info
+        const lines = [];
+        if (profile.profileName) lines.push(profile.profileName);
+        if (profile.username) {
+          lines.push(profile.user ? `${profile.username} (${profile.user})` : profile.username);
+        } else if (profile.user) {
+          lines.push(profile.user);
+        }
+        if (profile.hostname) {
+          const platformIcon =
+            profile.platform === 'darwin'
+              ? '🍎'
+              : profile.platform === 'win32'
+                ? '🪟'
+                : profile.platform === 'linux'
+                  ? '🐧'
+                  : profile.platform === 'ios'
+                    ? '📱'
+                    : '';
+          lines.push(`${platformIcon} ${profile.hostname}`.trim());
+        }
+        return lines.length > 0 ? lines.join('\n') : 'Profile data available';
+      } catch {
+        return 'Invalid profile';
+      }
+    },
+    [sdPath]
+  );
+
+  // Get noteId from current path
+  const currentNoteId = selectedNode ? extractNoteIdFromPath(selectedNode.path) : null;
+
+  // Find a node in the tree by path
+  const findNodeByPath = useCallback(
+    (path: string, nodes?: SDTreeNode[]): SDTreeNode | null => {
+      const searchNodes = nodes ?? treeData;
+      for (const node of searchNodes) {
+        if (node.path === path) {
+          return node;
+        }
+        if (node.children) {
+          const found = findNodeByPath(path, node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    },
+    [treeData]
+  );
+
+  // Navigate to a profile file in the tree
+  const handleNavigateToProfile = useCallback(
+    (profileId: string) => {
+      const profilePath = `profiles/${profileId}.json`;
+      const node = findNodeByPath(profilePath);
+      if (node) {
+        void handleFileSelect(node);
+      }
+    },
+    [findNodeByPath, handleFileSelect]
+  );
 
   // Copy hex selection to clipboard
   const handleCopyHex = useCallback(async () => {
@@ -384,9 +529,17 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
           gap: 1,
         }}
       >
-        <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-          {sdName}
-        </Typography>
+        <Box sx={{ flexGrow: 1 }}>
+          <Typography variant="subtitle2" component="span">
+            {sdName}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{ ml: 1, color: 'text.secondary', fontFamily: 'monospace' }}
+          >
+            {sdPath}
+          </Typography>
+        </Box>
 
         {/* File actions - only show when a file is selected */}
         {fileData && (
@@ -428,6 +581,17 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
             <Tooltip title="Dump to console">
               <IconButton size="small" onClick={handleDumpToConsole}>
                 <BugReportIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title={copiedPath ? 'Copied!' : 'Copy full path'}>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  void handleCopyPath();
+                }}
+              >
+                <FolderOpenIcon fontSize="small" />
               </IconButton>
             </Tooltip>
 
@@ -496,14 +660,114 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
             <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* File metadata */}
               <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2">{selectedNode.name}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Typography variant="subtitle2">{selectedNode.name}</Typography>
+                  {/* Open Note button */}
+                  {currentNoteId && (
+                    <Tooltip title={noteExists ? 'Open note in new window' : 'Note not found'}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            handleOpenNote(currentNoteId);
+                          }}
+                          disabled={!noteExists}
+                          sx={{ p: 0.25 }}
+                        >
+                          <OpenInNewIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
+                </Box>
                 <Typography variant="caption" color="text.secondary" component="div">
                   Type: {fileData.type} | Size: {formatBytes(fileData.size)} | Modified:{' '}
                   {new Date(fileData.modified).toLocaleString()}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" component="div">
-                  Path: {selectedNode.path}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Path: {selectedNode.path}
+                  </Typography>
+                  <Tooltip title={copiedPath ? 'Copied!' : 'Copy full path'}>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        void handleCopyPath();
+                      }}
+                      sx={{ p: 0.25 }}
+                    >
+                      <ContentCopyIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+
+                {/* Note context for CRDT log files */}
+                {currentNoteId && fileData.type === 'crdtlog' && (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      p: 1.5,
+                      bgcolor: 'grey.900',
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'grey.700',
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'grey.400', display: 'block', mb: 0.5 }}
+                    >
+                      Note Context
+                    </Typography>
+                    {noteTitle && (
+                      <Typography
+                        variant="body2"
+                        sx={{ color: 'primary.main', fontWeight: 500, mb: 1 }}
+                      >
+                        {noteTitle}
+                      </Typography>
+                    )}
+                    {!noteTitle && noteExists && (
+                      <Typography
+                        variant="body2"
+                        sx={{ color: 'grey.500', fontStyle: 'italic', mb: 1 }}
+                      >
+                        (untitled note)
+                      </Typography>
+                    )}
+                    {!noteExists && (
+                      <Typography
+                        variant="body2"
+                        sx={{ color: 'warning.main', fontStyle: 'italic', mb: 1 }}
+                      >
+                        (note not found in database)
+                      </Typography>
+                    )}
+                    <Box sx={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                      <Typography
+                        variant="caption"
+                        component="div"
+                        sx={{ color: 'grey.500', fontFamily: 'monospace' }}
+                      >
+                        notes/<span style={{ color: '#4A90D9' }}>{currentNoteId}</span>
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        component="div"
+                        sx={{ color: 'grey.500', fontFamily: 'monospace', pl: 2 }}
+                      >
+                        └─ logs/
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        component="div"
+                        sx={{ color: 'grey.400', fontFamily: 'monospace', pl: 4 }}
+                      >
+                        └─ <span style={{ color: '#50C878' }}>{selectedNode.name}</span>
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
               </Box>
 
               {/* Image preview for image files */}
@@ -513,10 +777,28 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
                 </Box>
               )}
 
-              {/* Text preview for text-based files */}
-              {(fileData.type === 'activity' ||
-                fileData.type === 'profile' ||
-                fileData.type === 'identity') && (
+              {/* Activity log preview with parsing */}
+              {fileData.type === 'activity' && (
+                <Box sx={{ mb: 2 }}>
+                  <ActivityLogPreview
+                    data={fileData.data}
+                    filename={selectedNode.name}
+                    maxHeight={300}
+                    onRefresh={() => {
+                      void handleFileSelect(selectedNode);
+                    }}
+                    onNoteClick={(noteId) => {
+                      void window.electronAPI.testing.createWindow({ noteId });
+                    }}
+                    onProfileClick={handleNavigateToProfile}
+                    getNoteTitle={getNoteTitle}
+                    getProfileData={getProfileData}
+                  />
+                </Box>
+              )}
+
+              {/* Text preview for profile and identity files */}
+              {(fileData.type === 'profile' || fileData.type === 'identity') && (
                 <Box sx={{ mb: 2 }}>
                   <TextPreview data={fileData.data} fileType={fileData.type} maxHeight={300} />
                 </Box>
@@ -530,6 +812,12 @@ export const StorageInspectorWindow: React.FC<StorageInspectorWindowProps> = ({
                     selectedIndex={selectedRecordIndex}
                     onRecordSelect={handleRecordSelect}
                     maxHeight={200}
+                    onRefresh={() => {
+                      void handleFileSelect(selectedNode);
+                    }}
+                    noteId={currentNoteId ?? undefined}
+                    noteExists={noteExists}
+                    onOpenNote={handleOpenNote}
                   />
                 </Box>
               )}

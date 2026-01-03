@@ -18,6 +18,7 @@ import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 // Constants
 const BYTES_PER_ROW = 16;
@@ -58,6 +59,8 @@ export interface HexViewerProps {
   highlightRange?: { start: number; end: number } | null | undefined;
   /** Called when user clicks on bytes to highlight */
   onHighlightChange?: ((range: { start: number; end: number } | null) => void) | undefined;
+  /** Called when refresh is requested */
+  onRefresh?: (() => void) | undefined;
 }
 
 /**
@@ -223,6 +226,7 @@ export const HexViewer: React.FC<HexViewerProps> = ({
   fields,
   highlightRange,
   onHighlightChange,
+  onRefresh,
 }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -428,6 +432,14 @@ export const HexViewer: React.FC<HexViewerProps> = ({
           <Typography variant="caption" sx={{ ml: 2, color: 'grey.500' }}>
             ({data.length.toLocaleString()} bytes)
           </Typography>
+
+          {onRefresh && (
+            <Tooltip title="Refresh">
+              <IconButton size="small" onClick={onRefresh} sx={{ ml: 1 }}>
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
         </Paper>
       )}
 
@@ -437,6 +449,8 @@ export const HexViewer: React.FC<HexViewerProps> = ({
           sx={{
             display: 'flex',
             justifyContent: 'center',
+            alignItems: 'center',
+            gap: 1,
             py: 0.5,
             borderTop: '1px solid',
             borderColor: 'grey.700',
@@ -445,6 +459,13 @@ export const HexViewer: React.FC<HexViewerProps> = ({
           <Typography variant="caption" sx={{ color: 'grey.500' }}>
             {data.length.toLocaleString()} bytes
           </Typography>
+          {onRefresh && (
+            <Tooltip title="Refresh">
+              <IconButton size="small" onClick={onRefresh} sx={{ p: 0.5 }}>
+                <RefreshIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       )}
     </Box>

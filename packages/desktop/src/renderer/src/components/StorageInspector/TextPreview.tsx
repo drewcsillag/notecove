@@ -6,7 +6,8 @@
  */
 
 import React, { useMemo } from 'react';
-import { Box, Typography, Paper } from '@mui/material';
+import { Box, Typography, Paper, IconButton, Tooltip } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 export interface TextPreviewProps {
   /** Raw binary data to display as text */
@@ -15,6 +16,8 @@ export interface TextPreviewProps {
   fileType: 'activity' | 'profile' | 'identity' | 'unknown';
   /** Maximum height of the preview (defaults to 300px) */
   maxHeight?: number | undefined;
+  /** Called when refresh is requested */
+  onRefresh?: (() => void) | undefined;
 }
 
 /**
@@ -47,7 +50,7 @@ function formatJson(text: string): { formatted: string; isValid: boolean } {
   }
 }
 
-export const TextPreview: React.FC<TextPreviewProps> = ({ data, fileType, maxHeight = 300 }) => {
+export const TextPreview: React.FC<TextPreviewProps> = ({ data, fileType, maxHeight = 300, onRefresh }) => {
   const content = useMemo(() => {
     const text = decodeText(data);
 
@@ -101,9 +104,18 @@ export const TextPreview: React.FC<TextPreviewProps> = ({ data, fileType, maxHei
         <Typography variant="caption" sx={{ color: 'grey.400' }}>
           {getTitle()}
         </Typography>
-        <Typography variant="caption" sx={{ color: 'grey.500' }}>
-          {data.length.toLocaleString()} bytes
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="caption" sx={{ color: 'grey.500' }}>
+            {data.length.toLocaleString()} bytes
+          </Typography>
+          {onRefresh && (
+            <Tooltip title="Refresh">
+              <IconButton size="small" onClick={onRefresh} sx={{ p: 0.5 }}>
+                <RefreshIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       </Box>
 
       {/* Content */}

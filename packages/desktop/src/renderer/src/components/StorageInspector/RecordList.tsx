@@ -6,7 +6,9 @@
  */
 
 import React from 'react';
-import { Box, Typography, List, ListItemButton, ListItemText, Chip, Paper } from '@mui/material';
+import { Box, Typography, List, ListItemButton, ListItemText, Chip, Paper, IconButton, Tooltip } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 /**
  * Record information for display
@@ -31,6 +33,14 @@ export interface RecordListProps {
   onRecordSelect?: ((record: RecordInfo) => void) | undefined;
   /** Maximum height of the list (defaults to 200px) */
   maxHeight?: number | undefined;
+  /** Called when refresh is requested */
+  onRefresh?: (() => void) | undefined;
+  /** Note ID (for "Open Note" button) */
+  noteId?: string | undefined;
+  /** Whether the note exists in the database */
+  noteExists?: boolean | undefined;
+  /** Called when "Open Note" is clicked */
+  onOpenNote?: ((noteId: string) => void) | undefined;
 }
 
 /**
@@ -61,6 +71,10 @@ export const RecordList: React.FC<RecordListProps> = ({
   selectedIndex,
   onRecordSelect,
   maxHeight = 200,
+  onRefresh,
+  noteId,
+  noteExists = true,
+  onOpenNote,
 }) => {
   if (records.length === 0) {
     return (
@@ -97,12 +111,41 @@ export const RecordList: React.FC<RecordListProps> = ({
           zIndex: 1,
         }}
       >
-        <Typography variant="caption" sx={{ color: 'grey.400' }}>
-          Records ({records.length})
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'grey.500' }}>
-          Click to highlight in hex view
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="caption" sx={{ color: 'grey.400' }}>
+            Records ({records.length})
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'grey.500' }}>
+            Click to highlight in hex view
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {/* Open Note button */}
+          {noteId && onOpenNote && (
+            <Tooltip title={noteExists ? 'Open note in new window' : 'Note not found'}>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    onOpenNote(noteId);
+                  }}
+                  disabled={!noteExists}
+                  sx={{ p: 0.5 }}
+                >
+                  <OpenInNewIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
+          {/* Refresh button */}
+          {onRefresh && (
+            <Tooltip title="Refresh">
+              <IconButton size="small" onClick={onRefresh} sx={{ p: 0.5 }}>
+                <RefreshIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       </Box>
 
       {/* Record list */}
